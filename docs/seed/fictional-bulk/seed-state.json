@@ -651,7 +651,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "a582f54d-e44f-465e-b9f1-473d549c6506",
       "memberUserIds": [
@@ -682,7 +683,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "6bfd7ec1-c773-41b8-972b-0f129f66b4ea",
       "memberUserIds": [
@@ -712,7 +714,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "dfa313e7-bee5-408c-8c20-9863e47328d7",
       "memberUserIds": [
@@ -742,7 +745,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "3f6611d6-6e22-4b1c-99a6-e64fa8aef101",
       "memberUserIds": [
@@ -772,7 +776,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "6240d7b3-2287-4369-aae1-b70e4254d704",
       "memberUserIds": [
@@ -802,7 +807,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "67940ccd-4aa2-487c-b9b8-729f9134d193",
       "memberUserIds": [
@@ -834,7 +840,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "12ff931e-c54b-425c-8efa-0f430cb6a1ff",
       "memberUserIds": [
@@ -864,7 +871,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "4510eec7-f95f-4533-aec5-c618a33d5b8f",
       "memberUserIds": [
@@ -895,7 +903,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "a88e09bb-e7ef-448b-9055-fcf5da692935",
       "memberUserIds": [
@@ -926,7 +935,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "73631788-f403-48fe-b180-149bbb2f812b",
       "memberUserIds": [
@@ -957,7 +967,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "c60b6924-3fb8-421c-96fc-2356029833a8",
       "memberUserIds": [
@@ -988,7 +999,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "fe1741ef-f445-4fcf-8146-4758d75fccc4",
       "memberUserIds": [
@@ -1018,7 +1030,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "d1d338d1-912c-4a2d-808d-0d0c87b3716c",
       "memberUserIds": [
@@ -1048,7 +1061,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "269d0677-83d4-4ab8-a8a0-21320090ccdc",
       "memberUserIds": [
@@ -1079,7 +1093,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "5ccb48d6-d234-4c0d-8bef-186bd37122d4",
       "memberUserIds": [
@@ -1109,7 +1124,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "ba542c74-1db0-40ae-b9d9-b76ca3b454ef",
       "memberUserIds": [
@@ -1139,7 +1155,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "3b96d1c5-2e9f-4412-a565-f9a7932d4a3d",
       "memberUserIds": [
@@ -1171,7 +1188,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "346346f5-e7cf-437e-9139-f830da45de2d",
       "memberUserIds": [
@@ -1203,7 +1221,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "9a31588e-ac32-40ac-870a-e524adb46829",
       "memberUserIds": [
@@ -1234,7 +1253,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "81dd3ccf-e123-4f84-a5fb-489614f1a9c2",
       "memberUserIds": [
@@ -1265,7 +1285,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "754dab64-f7b6-433f-a318-4192768e884e",
       "memberUserIds": [
@@ -1296,7 +1317,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "9f4ec921-809f-49b6-be3d-32419be4ac4e",
       "memberUserIds": [
@@ -1326,7 +1348,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "3b12c0e6-9a78-4a58-995d-3ec85dd2e947",
       "memberUserIds": [
@@ -1357,7 +1380,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "d4ce53d1-9add-4c8e-9686-032e5b48f91f",
       "memberUserIds": [
@@ -1388,7 +1412,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "8762f3c4-7db5-45da-a9d7-ca4ab42f4a34",
       "memberUserIds": [
@@ -1418,7 +1443,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "939bf327-901f-46b5-ad35-ebd42951596d",
       "memberUserIds": [
@@ -1448,7 +1474,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "b2484e0d-47d7-425b-88c6-773a5f65a786",
       "memberUserIds": [
@@ -1478,7 +1505,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "7c065cf8-1f30-4065-a58c-c542b6e3fcd3",
       "memberUserIds": [
@@ -1509,7 +1537,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "a93ea79f-3d9b-4619-9c0b-d425d2d1b9f1",
       "memberUserIds": [
@@ -1539,7 +1568,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "3ca4283a-4791-4415-9e48-52c2405bd902",
       "memberUserIds": [
@@ -1569,7 +1599,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "2004ada2-e601-47b5-965d-c69bf4b47d4c",
       "memberUserIds": [
@@ -1599,7 +1630,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "2a58ead6-f830-458b-a9ca-7692c9396fed",
       "memberUserIds": [
@@ -1631,7 +1663,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "fcca274a-bbba-491a-a2c0-b9e91bf885a7",
       "memberUserIds": [
@@ -1663,7 +1696,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "cc0e3134-e320-4b76-82a4-8d67cd250660",
       "memberUserIds": [
@@ -1693,7 +1727,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "87f42b28-eb96-42e3-aa67-df613dd1e53c",
       "memberUserIds": [
@@ -1726,7 +1761,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "24619e30-6744-45dc-aba9-7361dd16f1dc",
       "memberUserIds": [
@@ -1756,7 +1792,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "bd28a746-de2f-4f8c-8e0e-e8a07a05a157",
       "memberUserIds": [
@@ -1787,7 +1824,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "c18c8e87-24cc-4858-96b5-a965b4657448",
       "memberUserIds": [
@@ -1818,7 +1856,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "2e9115ea-c7d5-40d3-8e43-bf1b28e23994",
       "memberUserIds": [
@@ -1848,7 +1887,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "983fb2b0-8ff7-4ce6-bb10-0f26e7495319",
       "memberUserIds": [
@@ -1879,7 +1919,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "2135aff4-22b3-40a2-8e1d-80d127091edf",
       "memberUserIds": [
@@ -1909,7 +1950,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "74533942-40a5-4e26-8b7d-28ccb2fca144",
       "memberUserIds": [
@@ -1940,7 +1982,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "8e42ab7c-a653-4833-834c-63d52a003751",
       "memberUserIds": [
@@ -1971,7 +2014,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "4c5bcc8b-9c80-4779-b24e-ca71182b8e0a",
       "memberUserIds": [
@@ -2001,7 +2045,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "5882500f-8aa3-413f-972b-3e77b1ca93d7",
       "memberUserIds": [
@@ -2033,7 +2078,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "8dd84f09-a3af-416e-8146-85db92ad8069",
       "memberUserIds": [
@@ -2064,7 +2110,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "1d524f0f-2292-4e8a-b653-f64026ada670",
       "memberUserIds": [
@@ -2095,7 +2142,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "99a1fe97-39b0-4fbe-8a42-863b4caa19ed",
       "memberUserIds": [
@@ -2125,7 +2173,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "330de185-fa76-4c09-8119-c1a1995b3a48",
       "memberUserIds": [
@@ -2156,7 +2205,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "9d10d944-4dfb-4bc2-afa1-67857ebd567c",
       "memberUserIds": [
@@ -2186,7 +2236,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "a23278ed-924c-4afa-a2ac-4fb0cfad8de9",
       "memberUserIds": [
@@ -2216,7 +2267,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "c2322c81-ffb9-4719-bb8e-36c83bbca084",
       "memberUserIds": [
@@ -2246,7 +2298,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "cb44eeef-65bb-48c1-ab49-4b32840a0b33",
       "memberUserIds": [
@@ -2276,7 +2329,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "34b715e5-f494-4c49-97f5-620f9aeba1e3",
       "memberUserIds": [
@@ -2308,7 +2362,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "4306f11e-a036-4428-a5fd-a43fed684686",
       "memberUserIds": [
@@ -2338,7 +2393,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "8512f821-b5e1-4efa-a18a-10b09e9a369f",
       "memberUserIds": [
@@ -2369,7 +2425,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "d739ea3c-d063-47b6-853d-491f4cc88cfb",
       "memberUserIds": [
@@ -2399,7 +2456,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "37d8fc33-f297-4216-bb06-f87b5447a5f7",
       "memberUserIds": [
@@ -2429,7 +2487,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "126a4953-621b-4c3d-b2c6-f7f44f599565",
       "memberUserIds": [
@@ -2459,7 +2518,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "74ef9340-f413-4e06-9638-9f45b9cc32b5",
       "memberUserIds": [
@@ -2489,7 +2549,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "35db2c5b-ddb2-4485-a815-9cb9d877a851",
       "memberUserIds": [
@@ -2519,7 +2580,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "23b66fb1-3a22-4c1d-9781-7f62a75b5469",
       "memberUserIds": [
@@ -2550,7 +2612,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "40fd7b70-bee7-490d-a485-20942381b646",
       "memberUserIds": [
@@ -2580,7 +2643,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "a0ab7c8f-9930-4eb5-a2cb-cab2f6152cd5",
       "memberUserIds": [
@@ -2612,7 +2676,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "d1945f26-a0b8-4e78-be72-3c0dc2f7f3ff",
       "memberUserIds": [
@@ -2644,7 +2709,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "aeee623f-ff09-4939-8e83-47fa4540f92a",
       "memberUserIds": [
@@ -2677,7 +2743,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "32c469e6-c883-42b9-8b66-4b846d5a27cc",
       "memberUserIds": [
@@ -2707,7 +2774,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "632ff261-56c0-4aef-8bdf-bf714b8c0774",
       "memberUserIds": [
@@ -2737,7 +2805,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "4d971c6f-83b4-437a-9f16-eff3a79eea94",
       "memberUserIds": [
@@ -2769,7 +2838,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "27b10534-0cce-4d4e-9112-8711e89f3f37",
       "memberUserIds": [
@@ -2801,7 +2871,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "d0ec0a58-68e4-4933-a72c-f36a55d50630",
       "memberUserIds": [
@@ -2831,7 +2902,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "a39b8f78-7a7b-45a4-9511-f42a8360afd0",
       "memberUserIds": [
@@ -2861,7 +2933,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "ba31dfd9-7998-4fd4-ac27-029a31915bbe",
       "memberUserIds": [
@@ -2892,7 +2965,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "d659b6df-c422-4634-8ce5-5edaf0d48115",
       "memberUserIds": [
@@ -2924,7 +2998,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "eda1cd96-2582-4853-aa86-63ce41d7fd1d",
       "memberUserIds": [
@@ -2955,7 +3030,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "00cd42d8-5253-4a82-9bc7-62dd12bcf8c5",
       "memberUserIds": [
@@ -2985,7 +3061,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "bb9480ad-7385-4150-96bc-f84d76e5bd2a",
       "memberUserIds": [
@@ -3015,7 +3092,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "863e9192-449d-4b17-84b4-737b54a896e5",
       "memberUserIds": [
@@ -3046,7 +3124,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "7f4a4ecc-8576-43df-98b4-9b1d0ecf9896",
       "memberUserIds": [
@@ -3077,7 +3156,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "deb749c9-8a65-4654-bb00-c861c0ea7425",
       "memberUserIds": [
@@ -3108,7 +3188,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "ec451911-fa44-445b-991d-1c60f5970e7d",
       "memberUserIds": [
@@ -3138,7 +3219,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "8a8d9e1c-dd55-4ccb-9272-c3dfdf906057",
       "memberUserIds": [
@@ -3169,7 +3251,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "6d2810c6-4a92-45ba-88a5-4d5a0ed599df",
       "memberUserIds": [
@@ -3196,7 +3279,12 @@
         "profile": true,
         "capital": true,
         "documents": true,
-        "docsv2": true
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
       },
       "founderUserId": "f7faf6e5-4937-4bfb-a325-9d1554dde1c5",
       "memberUserIds": [
@@ -3209,7 +3297,10 @@
         "batchly-technologies-financial-summary.txt": "6109fb5f-f63e-44ea-b626-f36e59d3134c",
         "batchly-technologies-product-brief.txt": "c6c0d226-0a16-48fc-95a4-ab2655e9a1ca",
         "deck.pdf": "f99fdb30-022a-4e14-9fc0-ca41602628e5"
-      }
+      },
+      "organisationId": "5aab84c2-d164-42b0-abd0-d72dd69c8e55",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
     },
     "fb0105": {
       "name": "Sparkisk Africa",
@@ -3223,7 +3314,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "d8d988e7-240e-4080-95f5-a7f0819580a9",
       "memberUserIds": [
@@ -3253,7 +3345,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "eb6ab293-98c8-42eb-8bf4-b19435d1bedb",
       "memberUserIds": [
@@ -3283,7 +3376,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "fd68da04-d46c-47b9-98e5-6c423d496f36",
       "memberUserIds": [
@@ -3314,7 +3408,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "88cf700e-7d19-4b51-a058-9a3b8a1059dd",
       "memberUserIds": [
@@ -3345,7 +3440,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "49c2b753-9121-411f-a9b9-5aa5cf54556b",
       "memberUserIds": [
@@ -3375,7 +3471,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "670b2ced-c5a0-4e8f-9457-79b90df85df8",
       "memberUserIds": [
@@ -3406,7 +3503,8 @@
         "docsv2": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "279d69e6-e0cd-4bdb-a2df-0ed53d490ceb",
       "memberUserIds": [
@@ -3437,7 +3535,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "2f640ecc-4ff5-4ee6-93b3-979a80253a17",
       "memberUserIds": [
@@ -3467,7 +3566,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "4036151d-f3de-4ebb-913f-b07b7c7b9eaa",
       "memberUserIds": [
@@ -3498,7 +3598,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "1b21aafa-542a-4dcd-a74b-fa4c54b56db0",
       "memberUserIds": [
@@ -3530,7 +3631,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "6a2a660c-2e75-45c2-8083-efc3b75208f2",
       "memberUserIds": [
@@ -3560,7 +3662,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "08b646fe-d569-487f-842f-8710c845c07d",
       "memberUserIds": [
@@ -3590,7 +3693,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "783873c5-5fbc-462a-bffd-f3722bb356aa",
       "memberUserIds": [
@@ -3622,7 +3726,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "644b427a-fa1e-42d1-bfd4-730d0b0208a9",
       "memberUserIds": [
@@ -3652,7 +3757,8 @@
         "team": true,
         "visible": true,
         "round": true,
-        "docsv2": true
+        "docsv2": true,
+        "verify": true
       },
       "founderUserId": "7ca782a4-3a79-4fce-b40a-0f0a63950b5b",
       "memberUserIds": [
@@ -3684,7 +3790,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "round": true
+        "round": true,
+        "verify": true
       },
       "founderUserId": "4edd0d55-1ee3-4afc-97ec-c603aa27d649",
       "memberUserIds": [
@@ -3699,6 +3806,4099 @@
         "deck.pdf": "bafddc3e-eaeb-43ce-91da-e78b242726df"
       },
       "organisationId": "616f54f2-5580-446c-9df6-3da835655c7a",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0121": {
+      "name": "Remiteon",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "1aaa28ca-b2ad-4bc8-8780-f92f2e5c001b",
+      "memberUserIds": [
+        "a96d6c98-906a-42c5-be94-5ad2999c1fac"
+      ],
+      "companyId": "6d891958-3d17-472b-9958-941be83776a0",
+      "capitalObjectiveId": "866c9e2a-9bb7-4818-917e-4551c9d948d4",
+      "documentIds": {
+        "remiteon-overview.txt": "6e71e133-2272-4985-a923-1a14ad8b35ed",
+        "remiteon-management-accounts-h1-2026.csv": "4d735a76-a98b-4344-8fd3-82cd7a5022ab",
+        "remiteon-product-brief.txt": "e5a38ccc-aca7-477c-ba77-3b92ff8d8103",
+        "remiteon-pipeline.csv": "618827ac-8024-4db2-a1e8-cb987c9cf6ed",
+        "deck.pdf": "06047d2e-a6ce-4cf1-9c60-8ff305345172"
+      },
+      "organisationId": "3a35e16f-ee6a-4e21-920b-7adb34f0cf85",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0122": {
+      "name": "Echoova Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "5275c868-ca66-443c-8947-4ee20471fc1c",
+      "memberUserIds": [
+        "4c34ed2e-4efb-40cb-be43-984100c68689"
+      ],
+      "companyId": "2bb633aa-1b8a-4cc2-9740-59cbb182b138",
+      "capitalObjectiveId": "3f16ac04-bcae-4dfa-8231-ed3ccc5be4e0",
+      "documentIds": {
+        "echoova-systems-overview.txt": "528d014e-4a97-48ad-99c2-09654e0822aa",
+        "echoova-systems-management-accounts-h1-2026.csv": "757c828a-29f3-4a60-a4fb-cfbbf7e7dc2c",
+        "echoova-systems-product-brief.txt": "272b1a62-5f55-4b97-bfd0-5f8c64ea1e6b",
+        "echoova-systems-pipeline.csv": "6cc83a25-1d91-4d2c-b660-639c8151e765",
+        "deck.pdf": "d05db95b-677e-4493-9e4a-6b87d31dd6e3"
+      },
+      "organisationId": "d7a10238-686c-4b0f-8b99-c13440c379fa",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0123": {
+      "name": "Routeana Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "c09fe4af-4e85-45b3-8826-c64c42982e3a",
+      "memberUserIds": [
+        "9fdb034c-b797-43eb-b492-e2b187c408df",
+        "d0f8704e-2a5f-44cd-9487-1213a594b7e3"
+      ],
+      "companyId": "3649991b-a100-4a6e-ab7c-9d779c350bdb",
+      "capitalObjectiveId": "905a1e07-fcd2-4918-b459-e34e61f878e0",
+      "documentIds": {
+        "routeana-co-overview.txt": "25bce1d2-b8ee-459c-87cd-99052c3e398b",
+        "routeana-co-management-accounts-h1-2026.csv": "64d7bc1e-d6e2-468a-a622-3164f2bbd52c",
+        "routeana-co-product-brief.txt": "d1dc4ac0-292b-4b2e-9531-353d455cd4ca",
+        "routeana-co-pipeline.csv": "40cc89e0-a57f-41dd-9f6f-d95f13fd019d",
+        "deck.pdf": "3e643c01-5d73-4e72-b20b-028d3a6111b0"
+      },
+      "organisationId": "59b0a06f-6706-483d-b99d-d28aa2cd4a26",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0124": {
+      "name": "Vaultio",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "88e73b4a-3bdd-4d6f-968c-0a5424034d14",
+      "memberUserIds": [
+        "2e804a20-63ed-4516-839d-e49471aeaefb"
+      ],
+      "companyId": "2b9fc3a1-ca1a-4244-9d87-810aa832c3db",
+      "capitalObjectiveId": "22c6751d-21ee-4ab3-9292-80745c83d0b9",
+      "documentIds": {
+        "vaultio-overview.txt": "cf197c37-2929-4c4e-a010-dbe6b0c72004",
+        "vaultio-management-accounts-h1-2026.csv": "5cf2083f-51f4-4235-a77c-bc08e087fbb0",
+        "vaultio-product-brief.txt": "9948a9d9-0c1b-42f0-a21c-49c96d42f939",
+        "deck.pdf": "7cca4396-8341-4138-af00-e317e57354b7"
+      },
+      "organisationId": "31d9aa96-3a50-4249-87e6-40b5c18a97e4",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0125": {
+      "name": "Depotova Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true
+      },
+      "founderUserId": "59b13b12-2964-4f2b-8ff2-3803be43b657",
+      "memberUserIds": [
+        "a1d4dc7a-17eb-4f23-9682-748b07024ba3"
+      ],
+      "companyId": "7b7b91ba-0424-4e29-9fa5-7a1ca97cee83"
+    },
+    "fb0126": {
+      "name": "Sentinela",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "1d206b1c-7328-4ed1-896d-88d5a09d4bfd",
+      "memberUserIds": [
+        "b393b7e6-bb2c-4a8b-b47d-3d285237c639"
+      ],
+      "companyId": "2bd3e828-618c-42c1-ac88-8f3c2dcd498b",
+      "capitalObjectiveId": "256d48f1-9374-497e-bbb4-832d64b5084f",
+      "documentIds": {
+        "sentinela-overview.txt": "9c9295c3-fcf0-442e-bcfc-c4839cc968e1",
+        "sentinela-management-accounts-h1-2026.csv": "e18a1800-0423-4802-bde7-3cf91cdb23d7",
+        "sentinela-product-brief.txt": "1d06e6ab-eb14-4f92-8aab-612a56d2a3e4",
+        "deck.pdf": "21ac994f-8ca6-4c70-8a10-4ca72530e731"
+      },
+      "organisationId": "966457f3-8cec-4d0e-a889-a19b53f9f477",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0127": {
+      "name": "Classra Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "7a577ccc-e885-4b9d-9a34-668f54de8e86",
+      "memberUserIds": [
+        "df085f02-3b46-4da9-83ac-79635809cfb9",
+        "57c9b890-9063-4763-9ec3-78729db7ae6c"
+      ],
+      "companyId": "8dfe2e53-4964-4490-9e8f-2dee4ca2f5e3",
+      "capitalObjectiveId": "83d2c6cf-96cc-4fdd-8750-fb682bcbef7a",
+      "documentIds": {
+        "classra-africa-overview.txt": "cd955bac-bdf9-493d-a9c5-d38316a922f1",
+        "classra-africa-management-accounts-h1-2026.csv": "0bad8e1d-3598-4041-bc5c-c81aac55ef10",
+        "classra-africa-product-brief.txt": "c4bc5b08-a99a-4b70-b5f1-4ce7f88aa633",
+        "deck.pdf": "2b24fbb0-1260-4c8c-ae6c-2f5c36dab16a"
+      },
+      "organisationId": "6e90f969-2756-45cd-bd1f-d78d0d0da39a",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0128": {
+      "name": "Quilla",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "b8ac66ba-c24d-4994-b70d-7e609ff1cd17",
+      "memberUserIds": [
+        "97e73236-61bf-4535-b6b9-4fc6535e17ba"
+      ],
+      "companyId": "636d7564-f287-407f-866d-fbd2419d3fbd",
+      "capitalObjectiveId": "1c507a00-911a-4237-96b8-7efe2b60e7dc",
+      "documentIds": {
+        "quilla-overview.txt": "ca31f669-0d02-4fcd-852b-4b43d560d606",
+        "quilla-management-accounts-h1-2026.csv": "1c913fcc-44d2-4d11-84b0-f64536197b8e",
+        "quilla-product-brief.txt": "8346adb0-1f2f-494b-aaee-18cfd327993f",
+        "quilla-pipeline.csv": "f90e475c-868e-4648-b82f-b1e20ae068e6",
+        "deck.pdf": "25bb6b62-8007-46f3-878d-707f34a3c8f1"
+      },
+      "organisationId": "2615cea3-2f70-4d7b-a6ee-655b52dbe629",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0129": {
+      "name": "Gridova",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "5ad7c70a-1724-4965-9fa5-6c1629998a5e",
+      "memberUserIds": [
+        "1adfd660-df0d-4a4b-867d-35c727d45e59"
+      ],
+      "companyId": "c6e41406-2b93-4721-862a-3785cbd1cfee",
+      "capitalObjectiveId": "057a9fda-f534-41fb-a93e-0e9606df5db3",
+      "documentIds": {
+        "gridova-overview.txt": "f5f08c5e-f244-4961-a347-2c248aa57eb6",
+        "gridova-management-accounts-h1-2026.csv": "ca601b29-b092-467e-bf7c-44b5cb74806b",
+        "gridova-product-brief.txt": "074528d6-c01a-49a4-ac22-0af2829846f4",
+        "deck.pdf": "926ecb89-db6e-459f-b541-ee0f07ee6575"
+      },
+      "organisationId": "9485ae43-a6d9-4bb1-902c-e1c8ddd05cfa",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0130": {
+      "name": "Rideeon Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "1c72b8c4-5dcb-48c5-a8fe-ccee8cb7341a",
+      "memberUserIds": [
+        "f655724b-7148-49ea-b12a-a9358e464db8",
+        "e84681c6-1b90-4dac-920f-87f8e34fec11",
+        "5d0409af-df8f-4028-b5d2-3cd9b859f8af"
+      ],
+      "companyId": "b462a90e-fbc8-46ef-a490-fee50c0e3d54",
+      "capitalObjectiveId": "80d15e99-8725-41fc-b15e-7439a9dd2752",
+      "documentIds": {
+        "rideeon-labs-overview.txt": "03fb13a7-4a8b-40bb-8aa4-1f3f934bd306",
+        "rideeon-labs-management-accounts-h1-2026.csv": "2fd33245-034c-4f73-8773-586f7d1eca47",
+        "rideeon-labs-product-brief.txt": "b26fa670-7d0c-42d6-82fc-024f16aecf7a",
+        "rideeon-labs-pipeline.csv": "50405a50-6b52-42fb-ade9-472c2ee4e5a2",
+        "deck.pdf": "65e878d2-e8e5-40bd-977d-0f568a6c190e"
+      },
+      "organisationId": "404bf4a8-aff7-492e-9c6f-193c76f2d0ab",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0131": {
+      "name": "Mintora",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "17d53666-d710-4e3d-bb1e-72ce16be1b8d",
+      "memberUserIds": [
+        "37ab6377-772c-4e04-9950-5b21db962112"
+      ],
+      "companyId": "7f0a9119-f602-4726-883f-b569243eb4a3",
+      "capitalObjectiveId": "3121983c-df88-4e95-b31a-94a7c9c42f45",
+      "documentIds": {
+        "mintora-overview.txt": "eb561c02-63a3-4fbb-ac8c-68e468c84f28",
+        "mintora-management-accounts-h1-2026.csv": "5ee20a6a-0fa2-4689-849c-559997d983c9",
+        "mintora-product-brief.txt": "511168bd-bf8e-4b77-8138-7b757d64e25b",
+        "mintora-pipeline.csv": "b6ed3274-95d6-4acf-a630-3ddbabe03d2f",
+        "deck.pdf": "e96dd4ba-0486-4a2d-bfdb-44c69fea6b58"
+      },
+      "organisationId": "2368bb79-2618-49e3-9bab-1a580542d9de",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0132": {
+      "name": "Kioskix Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "430df202-f604-443b-bc29-f120c3a4557a",
+      "memberUserIds": [
+        "87b8b6b7-25a6-4873-bed9-7093020a89c1"
+      ],
+      "companyId": "53611136-426e-4aa8-a34b-6c1e3115c28c",
+      "capitalObjectiveId": "e510999c-9c8f-464d-9a89-3aa21d81a3c3",
+      "documentIds": {
+        "kioskix-technologies-overview.txt": "33c4fa5d-a22e-4613-a370-0d3f72d03187",
+        "kioskix-technologies-management-accounts-h1-2026.csv": "e269e14d-a118-479a-83aa-a3d83189c312",
+        "kioskix-technologies-product-brief.txt": "83cf74f4-1897-4b73-9bdf-590d86112a71",
+        "deck.pdf": "b1c91c77-1a13-4419-969e-cbcf0b578fc2"
+      },
+      "organisationId": "b811732c-6aa3-4096-a5bf-6257385640ed",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0133": {
+      "name": "Coverra",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "f24bf2e6-880b-4b23-860e-3d6b4ffa3950",
+      "memberUserIds": [
+        "e1270310-3633-4ebc-af16-dba25eecc565",
+        "176740f7-6c06-4378-b3cd-0096ffb0bba9"
+      ],
+      "companyId": "de362468-156e-4b5f-af90-9e2072574759",
+      "capitalObjectiveId": "14322e90-0234-485b-9e00-47625ba31d0c",
+      "documentIds": {
+        "coverra-overview.txt": "a0754a42-6270-4f98-99bb-d0915b7f4be6",
+        "coverra-management-accounts-h1-2026.csv": "9eece9d3-06ed-41c6-9dec-f7a15e3ffcdd",
+        "coverra-product-brief.txt": "f451a1f1-dfc0-4c90-b14e-19797166c079",
+        "deck.pdf": "aa51bfeb-50ff-4671-9a1f-8fd87fb41507"
+      },
+      "organisationId": "a5bd8d08-44d7-452a-9dfd-ee1387506fa9",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0134": {
+      "name": "Motoix",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "685311b8-28cc-4ede-8137-427b4afebb44",
+      "memberUserIds": [
+        "3abc3f64-1aaa-48ec-8c26-698fce89fe53",
+        "317cfbc8-3941-464b-ae75-7a7d945fb158"
+      ],
+      "companyId": "7cac79c5-a199-49d5-b56a-5f5bfbf8ae2c",
+      "capitalObjectiveId": "7bc10993-e3df-4698-a22a-d5a75ce72ccd",
+      "documentIds": {
+        "motoix-overview.txt": "8636b53b-2744-412a-a857-fbfca87c1395",
+        "motoix-management-accounts-h1-2026.csv": "fb8e6bef-2dff-4843-b068-b48415f1e8ce",
+        "motoix-product-brief.txt": "ce9706ce-eabe-48d1-876a-48500907152a",
+        "deck.pdf": "ed478975-aace-49f8-9984-e117661b5748"
+      },
+      "organisationId": "44fa24cf-c320-49cb-a685-a4a32c1beaf9",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0135": {
+      "name": "Classum",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "e82dfadb-e2fa-4896-bc3a-caf0977871ef",
+      "memberUserIds": [
+        "0f90c059-f4a0-44e3-92aa-b2c90cef6fdb"
+      ],
+      "companyId": "5ea900ca-2e8b-4a29-a392-5a9d5c71c18e",
+      "capitalObjectiveId": "ba8d177b-b411-48e4-8456-965beabc5693",
+      "documentIds": {
+        "classum-overview.txt": "28693a49-3995-4ee8-b764-53c698543b9f",
+        "classum-financial-summary.txt": "98f3cf8d-3868-4cf4-a4f9-4e2c44248ea2",
+        "classum-product-brief.txt": "85ab7ffc-2ab8-4704-84cc-fdc72bac492f",
+        "deck.pdf": "ea8e30d6-4613-464e-9a74-511c6eafcf69"
+      },
+      "organisationId": "fd335266-069f-458d-bdc4-718f3feddbf2",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0136": {
+      "name": "Tillum Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "abce7206-c616-437b-ad3a-389577a6e95d",
+      "memberUserIds": [
+        "050d2a34-e363-4d55-9563-3412b8e9627f"
+      ],
+      "companyId": "490f757a-9341-4425-a336-90aca24a4c74",
+      "capitalObjectiveId": "067a9b12-23b8-4f10-978e-c04949f0e5a7",
+      "documentIds": {
+        "tillum-technologies-overview.txt": "01f1a3a0-b09a-4cb9-8c4b-24d6be0c9457",
+        "tillum-technologies-management-accounts-h1-2026.csv": "5463b8d3-54c2-4576-b51c-4fb77392875d",
+        "tillum-technologies-product-brief.txt": "2d9c7846-259b-492f-a876-2a83c49821ec",
+        "deck.pdf": "0a693811-c895-4407-9ed4-c6c6e2816d68"
+      },
+      "organisationId": "ccfd4205-76ec-49be-855e-fe5d5bf1fa01",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0137": {
+      "name": "Kopaly",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "9bef33c1-ef00-4985-ae57-7636cf171d84",
+      "memberUserIds": [
+        "df19d365-81fd-42c3-b139-9dd7c82dc361",
+        "1d155e36-358c-4b2d-9982-e78bb4286300"
+      ],
+      "companyId": "472f6b0b-13bb-436d-865a-d0b53fed5845",
+      "capitalObjectiveId": "c192f3bb-d3f2-46c3-8842-0b30be25136a",
+      "documentIds": {
+        "kopaly-overview.txt": "80a68630-c0f4-46ab-85c7-825852db3d45",
+        "kopaly-management-accounts-h1-2026.csv": "3c6aae6c-d93e-45a1-8b11-a3c5aa5217a0",
+        "kopaly-product-brief.txt": "7f25ea40-fc99-4d9d-85ed-58db0a65c4c7",
+        "deck.pdf": "6d6ec875-e408-4520-a903-f51789c2100e"
+      },
+      "organisationId": "bdd51671-dc5b-4ccf-a7f4-eb2fc7945ce4",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0138": {
+      "name": "Studioum Hub",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "7ed76f57-d5a4-4d75-a9f8-91867c4cb725",
+      "memberUserIds": [
+        "bcc315b9-2f1c-43a3-b32f-d2759c549ed6",
+        "7c5d1682-248d-44ab-97a6-c3af4e04df06"
+      ],
+      "companyId": "eab3223a-3993-4815-a094-e451f107e397",
+      "capitalObjectiveId": "efb07753-3f4d-47dd-93bf-92cc8a629a2d",
+      "documentIds": {
+        "studioum-hub-overview.txt": "52105c08-dcb8-4dd8-91aa-a0b7eeea4a69",
+        "studioum-hub-management-accounts-h1-2026.csv": "46e4393b-e24d-445c-bbae-589723b24813",
+        "studioum-hub-product-brief.txt": "0ca37844-4a26-40cd-ab39-e2377cb1ef3e",
+        "deck.pdf": "8ca89e61-e0c6-4799-bd27-4716868ec3a1"
+      },
+      "organisationId": "accaad7d-5c33-4ec4-8dc1-479141d0654c",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0139": {
+      "name": "Teament Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "bc5a4ef3-6654-4cdb-9dd6-3d560bac251f",
+      "memberUserIds": [
+        "2524437d-a3e3-4c2c-b01f-eed10f211c74"
+      ],
+      "companyId": "17a5d289-445c-422f-b4a6-c80db76596a7",
+      "capitalObjectiveId": "3de1712b-1f88-461c-92d3-8c1adfc26bc3",
+      "documentIds": {
+        "teament-labs-overview.txt": "fd60986c-d20b-4579-882d-fec09c10f5a8",
+        "teament-labs-financial-summary.txt": "daf6a391-52d4-4850-b3d7-45c8c45c2946",
+        "teament-labs-product-brief.txt": "d596d14d-ed64-48de-8128-1d3f00332307",
+        "deck.pdf": "807aa9ba-a7ae-4da4-b35f-ff2cf164eae3"
+      },
+      "organisationId": "ad9e10a1-28fc-453d-a360-ec9ad7d2d0ec",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0140": {
+      "name": "Identova Works",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "2a053947-ece4-45c9-8988-d9bdccad8ce8",
+      "memberUserIds": [
+        "2c499e62-d1e4-4d8d-9bff-e83584741b48"
+      ],
+      "companyId": "2297c928-d507-45cf-bbb1-ebb1cefb1ba5",
+      "capitalObjectiveId": "189e6c0a-caef-470d-bd95-2b99e912969a",
+      "documentIds": {
+        "identova-works-overview.txt": "f44c4c61-a98b-45b9-8f1b-b83dc95fac70",
+        "identova-works-management-accounts-h1-2026.csv": "299cfa07-6511-4991-8ab5-d78c6e9d4157",
+        "identova-works-product-brief.txt": "93d7e9f3-b4ac-4a97-9de3-5c68ae91e7ce",
+        "deck.pdf": "ada2bc07-fff0-4f4f-b179-5f75c84e69d4"
+      },
+      "organisationId": "ca896f48-97d4-4942-b5a9-05ad31bc177e",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0141": {
+      "name": "Kyceon Works",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "db188f2a-b7d4-4a33-8628-6f9c1cc81fec",
+      "memberUserIds": [
+        "6ae7d057-a541-4a7d-bdd5-b25f29aabd27"
+      ],
+      "companyId": "df502b50-839a-43ae-ba95-35c2d68f971c",
+      "capitalObjectiveId": "b984bcd6-6a22-437f-9ec6-a25f53f25ffb",
+      "documentIds": {
+        "kyceon-works-overview.txt": "fa053432-89ef-406c-84a8-8dfbcc1a2e90",
+        "kyceon-works-management-accounts-h1-2026.csv": "fc0240da-f1e6-41bd-8789-1323a23f35ca",
+        "kyceon-works-product-brief.txt": "08284596-4436-455b-a4cd-0441b24557f4",
+        "kyceon-works-pipeline.csv": "0e074c75-1fb9-4cda-af79-9b2d5653d5ac",
+        "deck.pdf": "7d424ba0-e8fb-42a4-9723-20ff9c34bc7b"
+      },
+      "organisationId": "8bbd26a9-54d1-4241-bbd1-e04ce26f44ec",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0142": {
+      "name": "Vitaum Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "fe187a51-ea9f-4861-ad43-894f92a7d861",
+      "memberUserIds": [
+        "182a4056-0e60-489a-b661-33c0f22b5ce7"
+      ],
+      "companyId": "310c0672-9cf9-473e-a89e-30796ac34e9f",
+      "capitalObjectiveId": "b8bef33d-8461-4902-bae7-50a14d20d27d",
+      "documentIds": {
+        "vitaum-africa-overview.txt": "44a67678-142f-4836-91ce-7d43d0c3a615",
+        "vitaum-africa-financial-summary.txt": "d2407e3a-2f31-454c-a333-f5ab1750b761",
+        "vitaum-africa-product-brief.txt": "59b04e97-c69e-4896-b4b3-deeef29b7e0a",
+        "deck.pdf": "99110f79-0fbe-4e99-829b-d941c389917c"
+      },
+      "organisationId": "e57ed1f2-de0e-41a5-ad79-29eaad469b94",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0143": {
+      "name": "Kycana Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "e023435b-ff0b-4b33-97a0-4ec33af253fb",
+      "memberUserIds": [
+        "1dba0b0c-38de-4124-bebe-d14f60567359"
+      ],
+      "companyId": "f93a71f8-0cae-4067-b41d-641eb9a2b7d6",
+      "capitalObjectiveId": "982668a2-b6ba-48c0-8e50-1ac59664bd12",
+      "documentIds": {
+        "kycana-africa-overview.txt": "2c4ebafa-613a-4f6e-9bdf-9baf19fa8165",
+        "kycana-africa-financial-summary.txt": "eb0b542c-88f9-4b8f-81d9-ae42eafaf0ca",
+        "kycana-africa-product-brief.txt": "d37fa35f-fe9c-492f-9fbf-211bb4689bef",
+        "deck.pdf": "e59047cb-865b-449f-a61f-e50fdf850f1f"
+      },
+      "organisationId": "fba4b99b-7f40-4661-a31c-f18a03e4afc7",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0144": {
+      "name": "Quillari Hub",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "406574f1-b693-4acb-988a-f4ee962333b2",
+      "memberUserIds": [
+        "17062102-70aa-4fc5-9790-3ff2ec42dc64"
+      ],
+      "companyId": "70adfbb8-904d-4e44-b3e2-3cc07ae68542",
+      "capitalObjectiveId": "366fb297-b8ed-44d1-803b-d4b8fc0ce9ce",
+      "documentIds": {
+        "quillari-hub-overview.txt": "b1d534cc-cc63-4c4b-a824-b19910e309c4",
+        "quillari-hub-financial-summary.txt": "a7af1277-c27f-45c2-83d8-4a6b923a393d",
+        "quillari-hub-product-brief.txt": "12952440-7f9e-452c-8e1f-acc6c9ff05c2",
+        "deck.pdf": "2d67951a-9e8d-41c6-8e79-686d38aed201"
+      },
+      "organisationId": "f1dc30d5-8453-4e28-af5b-ba26a6b5f426",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0145": {
+      "name": "Waveix Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "b88dd60f-65a0-4f12-9bab-1994ad230bcb",
+      "memberUserIds": [
+        "09fe1c47-ca30-4d10-aa7e-81362b4e85b9",
+        "639665dc-e3c6-4c15-a322-969051bded3e"
+      ],
+      "companyId": "deccd168-11f5-4a28-abf2-1cd29d8c8bf6",
+      "capitalObjectiveId": "7e418972-d260-4867-984a-78425784c894",
+      "documentIds": {
+        "waveix-systems-overview.txt": "8c8550bc-6c09-4d54-b495-dda8ed08c7d3",
+        "waveix-systems-management-accounts-h1-2026.csv": "d9bfddc1-b6d3-4d49-8d3d-f1fb1c62b6b9",
+        "waveix-systems-product-brief.txt": "7e8eab73-d830-48a7-8ab6-124a757afb64",
+        "deck.pdf": "b794b347-2fff-43ad-bc2b-d60477190b84"
+      },
+      "organisationId": "617dbd64-e982-4441-ade0-e49cbdde5ed1",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0146": {
+      "name": "Dukaari",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "1fa0b358-afe9-4f8e-b0bd-dcfae88a25de",
+      "memberUserIds": [
+        "ee9a735c-cf61-4d1d-83ac-c87fb05bec31"
+      ],
+      "companyId": "9c514def-bb2c-428f-924e-0d819c4190a2",
+      "capitalObjectiveId": "2f5fd4f2-8cec-4043-a17c-7ab7f4d51acb",
+      "documentIds": {
+        "dukaari-overview.txt": "d1bf1dc7-45f9-404b-9ef2-00fac771fb92",
+        "dukaari-management-accounts-h1-2026.csv": "e2aff17b-d205-4c90-beca-7b5b1ff59717",
+        "dukaari-product-brief.txt": "03a24a3f-382c-4493-84d9-1c758d674d14",
+        "deck.pdf": "0832802d-0c71-4661-8238-b00476fd74fc"
+      },
+      "organisationId": "78689581-a566-4fd6-8173-da2051b985cd",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0147": {
+      "name": "Shieldora Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "1b1de9cd-5623-4888-a15c-73f9004bf179",
+      "memberUserIds": [
+        "5528dca8-7354-410d-8743-7fdb5b4af952"
+      ],
+      "companyId": "e33622a6-2ba7-4a8c-b96a-e521f1defb1e",
+      "capitalObjectiveId": "38e6c3be-852f-47d4-b95b-78665fe0c53f",
+      "documentIds": {
+        "shieldora-systems-overview.txt": "6637206d-4538-45ae-a8fa-665e38d5ce22",
+        "shieldora-systems-management-accounts-h1-2026.csv": "d5c97933-2912-4152-b4f1-72ddaf00f2e6",
+        "shieldora-systems-product-brief.txt": "8cef98e8-02a9-4bf3-97c5-14a250d716a3",
+        "deck.pdf": "ad218c1e-dc2b-4469-97f6-92bacf3eecfa"
+      },
+      "organisationId": "129ee18f-d222-4498-81ea-c812a0eb33ae",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0148": {
+      "name": "Ledgerra Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "784f879d-7fae-4489-9e6e-a80847b9ae05",
+      "memberUserIds": [
+        "1769ad83-e5b4-40f7-b87e-7f4251a0e2e1",
+        "c756014f-bf7a-4fa5-b004-1586534144d3"
+      ],
+      "companyId": "f50d7c19-9d5f-46e5-9e01-e9b599b8bd75",
+      "capitalObjectiveId": "63a4ef1a-3c36-40da-a338-b6c39593b346",
+      "documentIds": {
+        "ledgerra-co-overview.txt": "35023e6b-a7a4-40ae-9358-b39bacf81f30",
+        "ledgerra-co-financial-summary.txt": "b8dd6e04-f727-4e2b-9924-fca42680ac4b",
+        "ledgerra-co-product-brief.txt": "90ba441a-b8ad-4aba-9fcc-023ecfe6ac5f",
+        "deck.pdf": "6a5ca3a9-27f7-4322-a865-4445a3c49bc1"
+      },
+      "organisationId": "0adeeab1-a2e7-4e24-8149-937c859350af",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0149": {
+      "name": "Teamum Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "1e993041-300d-4f5a-9623-92a2aba8403c",
+      "memberUserIds": [
+        "d1318f25-bb37-4c1f-8cea-be030853fb95"
+      ],
+      "companyId": "0bc11e60-7a6d-4d61-9b88-f2ddd0237d7c",
+      "capitalObjectiveId": "275c7d31-7051-4cca-945e-0640913122f5",
+      "documentIds": {
+        "teamum-labs-overview.txt": "ba7b1cbc-a023-4c51-8e26-caeecb6382c1",
+        "teamum-labs-financial-summary.txt": "f9f98940-2549-497b-bc6f-ddb1a8842d4d",
+        "teamum-labs-product-brief.txt": "49d6748d-5d9d-44f8-be42-33f7e0a3ae03",
+        "deck.pdf": "7da86286-38c4-454d-9e2c-4fa1e93635b3"
+      },
+      "organisationId": "fa943d70-eb69-4441-8391-7b16da7d5a8b",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0150": {
+      "name": "Shieldra Works",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "4269d5c1-56c4-46e1-bb82-e39e39b57880",
+      "memberUserIds": [
+        "39202ade-d464-4a5a-ba20-eff1691812e2",
+        "5a759cd5-7689-4908-bd5a-9cf34acbefcc"
+      ],
+      "companyId": "bc05c59e-03f7-485e-8b95-707f44fd3a93",
+      "capitalObjectiveId": "1f0ceb78-3721-4685-806a-a901d74d1e63",
+      "documentIds": {
+        "shieldra-works-overview.txt": "b4778e47-b4dd-4b2c-844b-5f72bbf87b01",
+        "shieldra-works-management-accounts-h1-2026.csv": "09cd787c-bf6b-45e1-98e2-abc71990e2dc",
+        "shieldra-works-product-brief.txt": "642aa275-5866-4540-8523-d8cb3eb34124",
+        "deck.pdf": "3493ae24-357c-4ee1-9e32-edf4c3ed6386"
+      },
+      "organisationId": "a237ff6a-f255-41ab-981f-f2ef61353e96",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0151": {
+      "name": "Basketum Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "b5faab69-6f8d-4dc1-a927-e6ead3c8c42a",
+      "memberUserIds": [
+        "3f43fcff-59af-402e-ba8e-7ed548589883"
+      ],
+      "companyId": "fe054879-e959-439f-9591-99d0d59267cc",
+      "capitalObjectiveId": "eac22c19-3429-4394-933d-64fe9f004abd",
+      "documentIds": {
+        "basketum-systems-overview.txt": "38743e72-cca4-45db-8d36-34987004329a",
+        "basketum-systems-financial-summary.txt": "228b3b83-2c49-400f-95e1-427d364ec120",
+        "basketum-systems-product-brief.txt": "ec4646ef-9da8-4feb-b44f-d5490ae99235",
+        "deck.pdf": "a079b840-21b5-411b-b3a0-f3ef442f6764"
+      },
+      "organisationId": "c1d302a4-9237-419f-8164-0b72f8d50d97",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0152": {
+      "name": "Nestisk Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "089b5236-bafe-4bca-a6a0-8988e111f9bb",
+      "memberUserIds": [
+        "98074a35-f7fe-440a-9679-72a5a5eec4d5",
+        "1a4a7f7b-f9d9-4d59-b7dc-889a60499e36"
+      ],
+      "companyId": "d9e2db7e-6617-4ce4-83d8-d4f95d368107",
+      "capitalObjectiveId": "0ff662d7-14a8-4a1e-ba3c-2b481733bc89",
+      "documentIds": {
+        "nestisk-africa-overview.txt": "767fc3e2-0ed3-4ee4-a930-a4b0100db540",
+        "nestisk-africa-management-accounts-h1-2026.csv": "114e57c6-06f6-4f47-a952-573a984e92ba",
+        "nestisk-africa-product-brief.txt": "c041a56f-21e5-4d51-82e4-a0ba4f76c39f",
+        "deck.pdf": "3f12eee4-ce6f-4082-a175-f7905e9b575a"
+      },
+      "organisationId": "b8e1c5f7-9d19-4c09-8648-b3f756203b0c",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0153": {
+      "name": "Trusteon Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "3cf96205-3ffc-4e9d-bedf-b402d4074219",
+      "memberUserIds": [
+        "07cb926c-8c1d-48d8-875f-d86f9eb3eb23"
+      ],
+      "companyId": "40a432fb-ad67-4cce-a5e7-086f4398c3cc",
+      "capitalObjectiveId": "74fd55a7-bccc-469a-92ad-b7791d16a1f7",
+      "documentIds": {
+        "trusteon-labs-overview.txt": "58e5547e-cfe1-4dd7-a563-8956bbb90cbd",
+        "trusteon-labs-management-accounts-h1-2026.csv": "ed75a28b-22a3-414c-89c9-6e9338fabeca",
+        "trusteon-labs-product-brief.txt": "83b54f4a-012d-4fc9-aa92-3657e229e087",
+        "deck.pdf": "638d38ad-ef20-414b-8a69-ddb9c9efc1ee"
+      },
+      "organisationId": "a8df37d9-782f-4b3a-a437-c2ab2c31d681",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0154": {
+      "name": "Depotix Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "412cef2a-3cfa-4190-af8d-a498ed30011c",
+      "memberUserIds": [
+        "d8107177-ddc8-49c0-b0ef-42e345d60a6f",
+        "c183070a-37de-417f-a1bc-4e4ed287784b"
+      ],
+      "companyId": "e4e4f474-cf76-4119-9c94-3f5e1d7b77f2",
+      "capitalObjectiveId": "6fab0947-3481-454c-a461-467120cd914a",
+      "documentIds": {
+        "depotix-co-overview.txt": "569e4115-f315-40ff-af68-419355a25686",
+        "depotix-co-management-accounts-h1-2026.csv": "23119d94-904a-4017-a6d4-0fea883fb9c7",
+        "depotix-co-product-brief.txt": "2059da11-8858-43af-a8e1-8a43745895ab",
+        "deck.pdf": "e07f1272-7713-43cd-a161-2a47a1137ceb"
+      },
+      "organisationId": "33ce8073-b962-4bf0-b581-10fe505b85d4",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0155": {
+      "name": "Cargoum",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "35c78288-1f9c-4118-af19-c322a983bf19",
+      "memberUserIds": [
+        "e79aa39c-7357-4e9c-9581-fd832b6e4f57"
+      ],
+      "companyId": "01ed6cfe-0872-48d9-9d93-dee0ec0d95a3",
+      "capitalObjectiveId": "9b743331-6357-4727-8871-9ec7ee591140",
+      "documentIds": {
+        "cargoum-overview.txt": "08572d0d-2a5b-4c48-880c-11316b078e12",
+        "cargoum-management-accounts-h1-2026.csv": "003430ac-a225-4984-ac5b-60df1fe6da5d",
+        "cargoum-product-brief.txt": "0837f4a2-f24a-4d50-9aef-a5fd16dd3db1",
+        "deck.pdf": "c3245f44-d72e-42f0-879e-09293da2006a"
+      },
+      "organisationId": "2e0ee5fd-b4ee-476e-9bbf-a82c9619dc7c",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0156": {
+      "name": "Lumenio",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "7ee3ca56-8e4b-4e17-a017-13376d5e6552",
+      "memberUserIds": [
+        "8e119b81-5660-41d6-866b-54220e7c2979"
+      ],
+      "companyId": "2a5d4f60-4930-4252-b5d6-4e2323c712a5",
+      "capitalObjectiveId": "441d9858-2f7b-4790-8b9b-7c909113e85d",
+      "documentIds": {
+        "lumenio-overview.txt": "feb4109e-c4e1-490c-9dd4-8b19a0649571",
+        "lumenio-management-accounts-h1-2026.csv": "7a14bff5-f618-49dd-b39a-a10ceb6d4613",
+        "lumenio-product-brief.txt": "3bf945e4-aee9-4fc5-8093-f9b88f5c00f4",
+        "lumenio-pipeline.csv": "12df4583-bb8c-4348-8156-0479090816b5",
+        "deck.pdf": "6e203f84-4637-4291-8b7f-fface4d27161"
+      },
+      "organisationId": "83ef0955-03f8-412a-a6bf-f0d4cef7ea38",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0157": {
+      "name": "Supplyelle Hub",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "914474a7-5b91-4205-9675-5dca2a5af5d7",
+      "memberUserIds": [
+        "e15520af-024e-410c-ac25-06e8d37d4a55"
+      ],
+      "companyId": "b0cc7fad-a74e-48da-b109-0d38ba5c123d",
+      "capitalObjectiveId": "36307d6c-ba18-4458-b78f-1bea1c1cb907",
+      "documentIds": {
+        "supplyelle-hub-overview.txt": "044f9e86-db67-4a72-b8cd-f71dd7ccaa52",
+        "supplyelle-hub-management-accounts-h1-2026.csv": "974f0bfc-1c0a-433e-9e6f-21f65a8f3caa",
+        "supplyelle-hub-product-brief.txt": "1dc5fcc6-b5a9-498a-ba1f-77f525e58524",
+        "supplyelle-hub-pipeline.csv": "1bad70f9-7161-4c2d-b1a9-4f698182894d",
+        "deck.pdf": "572e6617-0209-442e-ad65-4964b30da5fd"
+      },
+      "organisationId": "5401c6e4-a167-4f82-a268-175ea865eac1",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0158": {
+      "name": "Swiftix Works",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "b905ca7d-895b-4381-8ee7-44a27676c5dd",
+      "memberUserIds": [
+        "303fc57b-fb97-4e43-a0f0-a2557a11983a"
+      ],
+      "companyId": "7c50caf0-7c5d-44e4-99dc-0af4cae92455",
+      "capitalObjectiveId": "4641bebb-bd0f-4c85-80d1-e46a9e75bd41",
+      "documentIds": {
+        "swiftix-works-overview.txt": "28f12433-3a57-43d6-a973-82d82d54cf20",
+        "swiftix-works-management-accounts-h1-2026.csv": "8f4f1d50-1fb6-4b8f-8b55-2f6880d3c8ab",
+        "swiftix-works-product-brief.txt": "9478c54b-d220-4806-9d91-6e1e086e9824",
+        "deck.pdf": "c8112cd3-8cc9-4470-9269-1ad1bb49716f"
+      },
+      "organisationId": "d5d41e91-68e6-446a-93ea-7fc89182f756",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0159": {
+      "name": "Adjustana Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "8c7358c5-fb94-4ec9-a441-4d9c098cfe0d",
+      "memberUserIds": [
+        "d49f83db-b79b-44cf-878e-d28586905ab9",
+        "14b6d848-28d1-4f75-82aa-ef61583dc0f8"
+      ],
+      "companyId": "21845ab6-d5cb-4606-9fca-861184084724",
+      "capitalObjectiveId": "69e6faf1-54e7-46c6-a096-37053a041e70",
+      "documentIds": {
+        "adjustana-co-overview.txt": "e83c3d25-02ed-4a5d-858c-3daba290d796",
+        "adjustana-co-management-accounts-h1-2026.csv": "aa54d6e0-76e3-46c7-9528-cef8b5f695b1",
+        "adjustana-co-product-brief.txt": "0f28ca5b-101f-45fe-8a5e-03032fdc836e",
+        "deck.pdf": "dca0e6fe-a50c-4f13-8b53-54870322743c"
+      },
+      "organisationId": "facb5db8-525b-4232-86f8-0db5783d95fc",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0160": {
+      "name": "Swiftova Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "c941f213-0f01-42c6-a528-3e3464fbe4f1",
+      "memberUserIds": [
+        "1bfbdf48-09cd-417c-9b89-e0e841fa6440"
+      ],
+      "companyId": "4637d505-9ebd-47c2-b39c-13157b3a859a",
+      "capitalObjectiveId": "fb43a687-a007-4b86-96ec-ebab224c3440",
+      "documentIds": {
+        "swiftova-labs-overview.txt": "a08bbdf5-4f21-44f4-a344-a041bb23b635",
+        "swiftova-labs-financial-summary.txt": "4be62675-60f1-4fbf-b740-77f55a799053",
+        "swiftova-labs-product-brief.txt": "60bb607c-ce29-468a-bd84-f24613bf9707",
+        "deck.pdf": "cf0751e5-77e3-4868-95d1-00434a0aad8c"
+      },
+      "organisationId": "62a94b3d-d5a5-4105-9314-6e903dbee3a5",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0161": {
+      "name": "Latheana",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "a70aeee4-1957-49d4-aa1c-bc0e3d232178",
+      "memberUserIds": [
+        "b4346ab4-982e-4d94-ae60-93cd49596641"
+      ],
+      "companyId": "c58265b3-ae18-4c32-96b3-3a405e3b037d",
+      "capitalObjectiveId": "9516c3c6-ea10-4dd8-804e-216233611375",
+      "documentIds": {
+        "latheana-overview.txt": "6e9229e5-2a95-4d7c-874a-335b36bc6105",
+        "latheana-management-accounts-h1-2026.csv": "9876472e-2876-461f-81fb-267e2cc7441c",
+        "latheana-product-brief.txt": "5e26e0ed-b1a2-4d5e-96e7-72c43b36f71c",
+        "deck.pdf": "e2748d8c-7428-4962-861e-ffab989e8b74"
+      },
+      "organisationId": "88555404-b3b8-43ba-aa26-6a05bf97c0ef",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0162": {
+      "name": "Rosterix Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "8af376fb-5a85-4d9f-bffa-846ae8a72845",
+      "memberUserIds": [
+        "52b3633c-0f42-41b2-a6c1-c2d2fbf08078",
+        "216b89d6-f2f6-4a14-9a34-999fae4f0c8f"
+      ],
+      "companyId": "60ce429f-a2ef-4931-929c-7973bd4e4a14",
+      "capitalObjectiveId": "d7268aac-ca86-4d5a-8234-377a9332e0e3",
+      "documentIds": {
+        "rosterix-technologies-overview.txt": "7d382977-d2cc-4547-8668-9e9edafc84c8",
+        "rosterix-technologies-financial-summary.txt": "00077ad9-4c37-46ac-ab85-9d9c6bf85f65",
+        "rosterix-technologies-product-brief.txt": "3be0fffc-461f-45d8-bf2b-b8a1285affd6",
+        "deck.pdf": "853adef2-8229-43ec-a20e-3feec3512c4a"
+      },
+      "organisationId": "eac92ea6-7350-4c87-83c5-f7f034aa4d26",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0163": {
+      "name": "Ledgerly Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "09064002-c1c0-4363-8cbd-b527858f9434",
+      "memberUserIds": [
+        "4b58ef1a-36e2-4fc7-bd5a-ec24b5a902c7",
+        "d2823b5e-3445-4a7d-a074-800f16217342"
+      ],
+      "companyId": "4757ff28-be5e-4b8f-b613-df74e5733d29",
+      "capitalObjectiveId": "d03d9004-75dd-4bdb-8124-fb32dbe57477",
+      "documentIds": {
+        "ledgerly-technologies-overview.txt": "cc257cce-b0a0-4ec8-8765-54889a6b0ba7",
+        "ledgerly-technologies-financial-summary.txt": "128e111f-f17e-418d-a4e1-a46ec1592b24",
+        "ledgerly-technologies-product-brief.txt": "1957473c-5729-4943-a0fc-037ec68e0310",
+        "deck.pdf": "dead626a-872e-4404-a012-8de0d1ad4871"
+      },
+      "organisationId": "51cec6fc-50f2-457a-bfdc-c268adc64342",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0164": {
+      "name": "Sentryova Hub",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "86baaa5d-787c-4521-9e34-ecbf20785595",
+      "memberUserIds": [
+        "6e6081d9-b7f5-47fa-872d-94dfbdcb7bd9",
+        "ee3eef62-b2f8-4963-850d-41dca877611d"
+      ],
+      "companyId": "61d4ae57-5533-4d2c-b8a4-5f2826570df1",
+      "capitalObjectiveId": "2327f6da-6f56-473a-8e32-f21f4d311eb1",
+      "documentIds": {
+        "sentryova-hub-overview.txt": "8dfc9e74-28ab-4f8d-949c-0ca0163eccee",
+        "sentryova-hub-financial-summary.txt": "ccd0c853-127b-4745-968f-b36c7d78d078",
+        "sentryova-hub-product-brief.txt": "ddfe2104-6f74-477a-bf11-56e65f99d54b",
+        "deck.pdf": "5e884eee-8407-4d3f-9350-8ee1a55de82f"
+      },
+      "organisationId": "62e8563c-f64e-4736-8fb4-1b93d5367077",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0165": {
+      "name": "Rideum",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "19e192f5-3a06-4db2-baed-fca73864d6ab",
+      "memberUserIds": [
+        "85c3be1a-c0e8-4a2d-97b5-bb2c74ed3792"
+      ],
+      "companyId": "6e27d9d8-517f-4636-a2aa-d3ee23e11182",
+      "capitalObjectiveId": "2993ba5c-c58e-4dc0-a6ea-3609feee320c",
+      "documentIds": {
+        "rideum-overview.txt": "b43ee0d6-b56c-45be-9231-af4931983876",
+        "rideum-management-accounts-h1-2026.csv": "5ce147fe-2160-48cf-956b-53b59d583689",
+        "rideum-product-brief.txt": "73318182-997b-4998-b8c5-6b5d1ad9325b",
+        "deck.pdf": "c1493fdd-1b4c-435d-bee3-0c93139df1d7"
+      },
+      "organisationId": "f4f080e2-9649-4ac3-9295-497026c07ad2",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0166": {
+      "name": "Covera Hub",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "8a7b1943-dcc5-466d-b1a8-6f6e2762d2af",
+      "memberUserIds": [
+        "a40c7bca-d48f-456d-bc4f-3c790e4099c9"
+      ],
+      "companyId": "101d1feb-eba2-4fdf-b6ff-e1f780a154cb",
+      "capitalObjectiveId": "34ff26b3-df43-4398-9af4-ffdf8f0de991",
+      "documentIds": {
+        "covera-hub-overview.txt": "79ac4d7c-2a22-4f88-a227-f1ffb846f71e",
+        "covera-hub-management-accounts-h1-2026.csv": "7d170ae8-8679-4362-a850-d5799c3bd9c2",
+        "covera-hub-product-brief.txt": "716a9127-3c82-43a3-b502-8a5ed8f8972a",
+        "deck.pdf": "d0103133-c304-4380-8a4f-567530c5f0e7"
+      },
+      "organisationId": "6c213f1b-f53e-4399-8703-b21bb5f16290",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0167": {
+      "name": "Depoto",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "1177c269-6aaa-4734-bc99-03fd85e56183",
+      "memberUserIds": [
+        "9b7aee2c-644c-46f0-9b3a-aafab36c1b5c",
+        "d1e40d34-dbd2-4098-9cb0-5f7c663cb8ef"
+      ],
+      "companyId": "4b1f768b-243f-4944-9800-4040e85f77df",
+      "capitalObjectiveId": "1b20f98f-859f-438f-ad4c-b7dd199cb1db",
+      "documentIds": {
+        "depoto-overview.txt": "2f062b8e-8c16-42b4-ac21-100f6d1adfba",
+        "depoto-management-accounts-h1-2026.csv": "304a28a2-a62c-4565-b964-574dd2de4e46",
+        "depoto-product-brief.txt": "4e3c46ce-2787-4d8d-8d3c-f7e8f53f4089",
+        "deck.pdf": "99eaaace-0502-4561-ae65-171034b51ca4"
+      },
+      "organisationId": "2506804a-9935-46bb-adf6-4a624e43a002",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0168": {
+      "name": "Sourceisk Works",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "462cd46d-543a-49f0-a460-36c386e16b57",
+      "memberUserIds": [
+        "5593aa0c-7e6b-4e80-9bda-6fbe03c88eee",
+        "7e304c1b-ea4c-46a5-8229-58bde8b89915"
+      ],
+      "companyId": "ba451dce-ddc4-49e0-8d35-de23f38fec92",
+      "capitalObjectiveId": "d2239fed-237a-462b-a5a5-309ec51f54f1",
+      "documentIds": {
+        "sourceisk-works-overview.txt": "f7cf4597-d29e-40be-be46-8c0ff23e95d1",
+        "sourceisk-works-management-accounts-h1-2026.csv": "671cdd8e-c0ae-419c-94b9-6a808a2e7630",
+        "sourceisk-works-product-brief.txt": "f5a37228-d39e-47ce-96e9-01657e58adca",
+        "sourceisk-works-pipeline.csv": "0a4ea576-0281-4a10-b428-be0a404eface",
+        "deck.pdf": "0d152b30-1b5d-47af-9553-e7f0aaaa4524"
+      },
+      "organisationId": "de582f1d-7bec-4439-a49c-1badddce887b",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0169": {
+      "name": "Fieldana Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "1bab3658-f1da-4739-8a3b-5c508236d35b",
+      "memberUserIds": [
+        "56c18792-e327-43e9-a3de-20a14f71a890"
+      ],
+      "companyId": "4f4bdaac-3784-4edc-9eab-220833138180",
+      "capitalObjectiveId": "deef331a-53f9-442a-90d1-876c5e72e652",
+      "documentIds": {
+        "fieldana-technologies-overview.txt": "cd7df1ec-5499-45ed-822a-8b5e94efe68b",
+        "fieldana-technologies-financial-summary.txt": "f94e5030-31b8-437e-89ab-8c2f6709944b",
+        "fieldana-technologies-product-brief.txt": "ca21526a-3adc-430f-a1bb-4740d2ccac99",
+        "deck.pdf": "43c8c950-ddd2-4a52-bb40-2a8356fd56b1"
+      },
+      "organisationId": "9583251e-c0e9-40a0-9754-07a3b7689bcd",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0170": {
+      "name": "Bridgeisk",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "5a5c1308-1939-4074-a82b-543ac4ae2f3c",
+      "memberUserIds": [
+        "8dd835df-fde7-4a8a-abc6-cdcba9612cfd",
+        "d6d65cb4-9699-47ae-a1c3-f1af23f3bb18"
+      ],
+      "companyId": "5bd1b9c4-d905-4031-93b5-e9e238b6a0fc",
+      "capitalObjectiveId": "95d8b220-5309-410d-b53d-0894d5fe5f6f",
+      "documentIds": {
+        "bridgeisk-overview.txt": "8003a8f2-6811-4d52-b457-5d8ff3aba2d8",
+        "bridgeisk-management-accounts-h1-2026.csv": "cc4b5b3a-3d47-403d-a9f4-a27de4405479",
+        "bridgeisk-product-brief.txt": "55f3e251-4d8f-4466-bb51-a58a8b9bc811",
+        "deck.pdf": "0adf5302-088d-4a24-b48f-15999f27ad0b"
+      },
+      "organisationId": "d4aa65b8-9dec-45ce-afcf-53469613aab9",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0171": {
+      "name": "Nestra",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "8be92b88-7c10-45fe-8deb-7ec378e32c69",
+      "memberUserIds": [
+        "c44b2a8b-e7d2-4ee0-927d-461f3a6eafa6"
+      ],
+      "companyId": "f64699fa-c197-45ad-9fc1-8107fb6c3d81",
+      "capitalObjectiveId": "869f4c9d-4573-4d8a-a7b2-903ac30409df",
+      "documentIds": {
+        "nestra-overview.txt": "1918b37c-eb3f-435f-a384-a9791f975a77",
+        "nestra-management-accounts-h1-2026.csv": "52c9aabb-01f6-4501-b37b-f38fabef053a",
+        "nestra-product-brief.txt": "a597cf40-7754-43a7-bdf0-0566445d67ae",
+        "deck.pdf": "3e96f70e-d2b8-42de-af4d-325b74c3a84c"
+      },
+      "organisationId": "ad60a9c9-6561-4e83-badf-a761b11cb5b6",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0172": {
+      "name": "Kioskelle",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "af22134d-874b-441a-9a7a-5f95a229f5d7",
+      "memberUserIds": [
+        "96a66f8e-32dd-4b9e-ba7b-b4145a0ef597"
+      ],
+      "companyId": "d1bd2f25-6af7-4aba-9f53-287b9739ac5c",
+      "capitalObjectiveId": "33ea12e6-b905-470b-86bc-cc0086b6f509",
+      "documentIds": {
+        "kioskelle-overview.txt": "c44423fe-6e8d-4f43-83cc-3ca8eeff9029",
+        "kioskelle-management-accounts-h1-2026.csv": "93990e94-11a7-4798-b275-5fa99ff6d234",
+        "kioskelle-product-brief.txt": "0281773f-d45d-4aa7-bdf6-4ea9fe9fcbba",
+        "kioskelle-pipeline.csv": "9ec992ba-c4d3-4fcf-a53e-6358193680bb",
+        "deck.pdf": "d62cc33f-93fb-497b-b948-fef90b210f6d"
+      },
+      "organisationId": "9a660fd4-2bab-431c-aca1-d610500dcfce",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0173": {
+      "name": "Orderra Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "063f7554-d5fa-458b-b1c6-ad8f93a9202f",
+      "memberUserIds": [
+        "f607dbbf-aa5c-4e6b-9227-a585ab22fa9b"
+      ],
+      "companyId": "5752dc11-874b-4792-9c3a-bc9a64ceef57",
+      "capitalObjectiveId": "da6284f1-da91-4287-8ead-5e02e6c43703",
+      "documentIds": {
+        "orderra-co-overview.txt": "19e231fe-93e2-4b3d-9475-29debe5c8edf",
+        "orderra-co-management-accounts-h1-2026.csv": "aa13c3f1-6aaf-43ee-8c9d-5e9179c31880",
+        "orderra-co-product-brief.txt": "f4931746-3399-41d3-a144-aa1a3a5883fa",
+        "orderra-co-pipeline.csv": "3a3aac62-2eed-467d-8ad0-649f8c301ee9",
+        "deck.pdf": "760658c1-ca55-4ec7-9a1c-1cac4028b477"
+      },
+      "organisationId": "5684f31b-058d-4874-8504-a12df3fff62f",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0174": {
+      "name": "Tapent Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "88f64a1f-2eec-406a-ab90-4767cf7fdaaf",
+      "memberUserIds": [
+        "36a6d9b7-3cef-4a8f-a389-aa3dde8769a0"
+      ],
+      "companyId": "37f75083-412e-4d33-9a40-7a2bd3415473",
+      "capitalObjectiveId": "e0476b40-1b71-4b2f-94ee-ef8154ed4f96",
+      "documentIds": {
+        "tapent-co-overview.txt": "d3b69257-6f54-4f51-8c95-ee4d4280ccf5",
+        "tapent-co-management-accounts-h1-2026.csv": "51258be7-72de-4cce-9275-bf1dd3501b70",
+        "tapent-co-product-brief.txt": "7680fa2e-43c1-4091-bb47-fc9f36114146",
+        "tapent-co-pipeline.csv": "1ff7b7f8-961b-4582-8012-d4cc72e63b75",
+        "deck.pdf": "061d4a6d-edb3-4684-a123-ad52a38c291a"
+      },
+      "organisationId": "c424f2c4-4e5a-4456-9577-4b2c1c2be914",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0175": {
+      "name": "Kopaisk",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true
+      },
+      "founderUserId": "63ded3f9-035c-4352-9a7f-586912d1b3b4",
+      "memberUserIds": [
+        "c30e0724-b9dd-459c-9d89-7c212e5ff2d7"
+      ],
+      "companyId": "4177d734-d457-404b-83f6-e0cf6ad426aa",
+      "capitalObjectiveId": "0c67bd49-e0c7-45f3-90c7-7138599bd9a3",
+      "documentIds": {
+        "kopaisk-overview.txt": "42b5f1f7-009c-4067-931e-51784fe9a43a",
+        "kopaisk-management-accounts-h1-2026.csv": "809f1d25-482f-4765-b7d8-c6d276f9db76",
+        "kopaisk-product-brief.txt": "1ef7d8b2-eea8-4230-8c27-07a2f3c3f639",
+        "kopaisk-pipeline.csv": "588ee6bc-24b9-472b-8cba-014c8b076890",
+        "deck.pdf": "0c1036ab-b3f4-4191-80a4-f0dc93cc3036"
+      }
+    },
+    "fb0176": {
+      "name": "Sourceum Works",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "f42b2811-f020-4c7c-9d2e-dd3da2f07b32",
+      "memberUserIds": [
+        "d2a4ea3d-59ca-4529-a7cd-cb8ff5c9594b"
+      ],
+      "companyId": "1b679c78-c538-4212-a990-ed77bb37a22d",
+      "capitalObjectiveId": "3350b559-cf56-4c29-bd10-366fbf00b541",
+      "documentIds": {
+        "sourceum-works-overview.txt": "fb4366f0-301b-448b-ac3a-18acd32b2508",
+        "sourceum-works-management-accounts-h1-2026.csv": "428cb72d-7faf-48aa-91e7-9988f3d233ec",
+        "sourceum-works-product-brief.txt": "b050a5c0-2207-47e4-9e56-4a3979cce698",
+        "deck.pdf": "df41a731-6184-4f17-a4f6-8edf18656e75"
+      },
+      "organisationId": "6eae1845-8cef-43dc-900e-9a809292d753",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0177": {
+      "name": "Embedova Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "e892f76d-73a7-43b0-9738-50a24a5ef669",
+      "memberUserIds": [
+        "b4532e03-8d5d-4b2a-8707-f8165dc1b1d3"
+      ],
+      "companyId": "05bcbe16-9a06-466c-a822-a3d7f3201245",
+      "capitalObjectiveId": "b5924c28-8d0c-4ef5-b628-90f9c9f5ff59",
+      "documentIds": {
+        "embedova-co-overview.txt": "4c5e7793-f4ce-4388-9516-4b1310caf251",
+        "embedova-co-financial-summary.txt": "370ac7a6-93bb-4474-ab7d-758b7f69f8b6",
+        "embedova-co-product-brief.txt": "6a5f4522-15c7-4332-8f4d-642c4409d99b",
+        "deck.pdf": "976c4cb2-4474-467b-839e-4761f4a36510"
+      },
+      "organisationId": "8d8392c8-7ebd-495a-a8bb-8de1ad4e4c08",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0178": {
+      "name": "Scholarly Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "33d8ae4d-68d5-4f01-9492-f8ae7c104528",
+      "memberUserIds": [
+        "facdf1a2-b670-4a27-94da-38c7b9bf332a",
+        "7f1e01cb-dd9a-45b1-9643-31daf6b93602"
+      ],
+      "companyId": "2dc37ee8-3127-46c2-8071-ee56cc2336be",
+      "capitalObjectiveId": "2aad6b70-52ef-4d2e-8ad0-1e53999c3308",
+      "documentIds": {
+        "scholarly-africa-overview.txt": "32bfbb9f-8c1c-4b15-a0ed-ff84e4bd9b49",
+        "scholarly-africa-financial-summary.txt": "26a85b14-1afb-4ed3-841a-179492b5cf41",
+        "scholarly-africa-product-brief.txt": "bb74ea09-3ed7-4062-818b-37dcf9da4ee2",
+        "deck.pdf": "fcc29d86-3240-49c9-aea7-b8a14163aa67"
+      },
+      "organisationId": "8a88ad21-d38f-4699-a30e-acf5027ea299",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0179": {
+      "name": "Weavera Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "060d85b6-310d-456d-a332-7373d6e6f798",
+      "memberUserIds": [
+        "827f9546-faad-4a59-9925-774d793347f3",
+        "8ac689c6-e353-4795-b521-254dc1d33991"
+      ],
+      "companyId": "b87f050b-19e0-4174-9662-edf1d454c1da",
+      "capitalObjectiveId": "748c55c6-8b45-4469-8297-e08107efce17",
+      "documentIds": {
+        "weavera-technologies-overview.txt": "eae189db-7525-4195-9afd-e0567f4a6537",
+        "weavera-technologies-management-accounts-h1-2026.csv": "eeb3124d-9bcd-4033-9c23-a21f4dec5cc9",
+        "weavera-technologies-product-brief.txt": "45ed3473-0d9c-4caa-9e19-e865af7854d5",
+        "deck.pdf": "3f947b97-05b3-42ab-af8e-c8c3bbd0d27a"
+      },
+      "organisationId": "04bf67f5-5e0e-49f9-b626-5245b54124c5",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0180": {
+      "name": "Vaulto",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "824af99e-650b-4c3e-855f-d5b5bb18f847",
+      "memberUserIds": [
+        "c0f9eda1-3403-4065-a384-cf93ee85ecdb"
+      ],
+      "companyId": "c6f1fe40-db84-493f-9883-acbcf23a3b64",
+      "capitalObjectiveId": "f83e5d3d-77d2-4056-8ed6-8735354ec0bd",
+      "documentIds": {
+        "vaulto-overview.txt": "b38b0bba-2b8b-41a3-be92-7b163bffc118",
+        "vaulto-financial-summary.txt": "db7769f7-5f29-454e-9c8f-0ec82c8670bf",
+        "vaulto-product-brief.txt": "889eaa20-c03a-4dc7-a687-1580f502b093",
+        "deck.pdf": "d60fa670-841a-4f29-b45f-50bc5655eb5e"
+      },
+      "organisationId": "22767ae5-c170-4065-a997-3ab442b36ea6",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0181": {
+      "name": "Storeo",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "3ba20d49-fc2b-4a3a-a303-5eef68fb4245",
+      "memberUserIds": [
+        "4d166e6a-3acd-4f9c-9ae0-9d9772bb5946"
+      ],
+      "companyId": "5b3743a7-1836-475e-a54f-95b6de76f2af",
+      "capitalObjectiveId": "15dbf1ec-9b53-40ab-8750-6677a1481c37",
+      "documentIds": {
+        "storeo-overview.txt": "2a353510-db5c-47f6-aebe-c4011f0fc03f",
+        "storeo-management-accounts-h1-2026.csv": "b44fe906-3aa1-4cb0-a2cb-4ebc901fec51",
+        "storeo-product-brief.txt": "5bf52ae5-4db6-435b-9d38-a6a6999e6a77",
+        "deck.pdf": "e6377bdc-fc8c-4dd4-a526-ce05c661b830"
+      },
+      "organisationId": "b3bbed15-4e86-4f5d-86ee-1c168ac1d7a9",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0182": {
+      "name": "Lanea Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "334c8acd-bb59-4ca3-89b1-b2e6188a3f94",
+      "memberUserIds": [
+        "ed05de5f-4673-4f62-a7f9-0bea4b9dd648"
+      ],
+      "companyId": "c974628d-4599-40cf-a4fa-e1aadbb07a02",
+      "capitalObjectiveId": "04324ff2-5fdb-45af-ad59-4ab18406351f",
+      "documentIds": {
+        "lanea-co-overview.txt": "f2658687-5a94-4f3b-93e8-c3318acbc5e4",
+        "lanea-co-management-accounts-h1-2026.csv": "b2bad1ed-7530-4955-96e3-1888f539c70e",
+        "lanea-co-product-brief.txt": "9af51ccb-1149-47ab-a260-08fa0bbe63d1",
+        "deck.pdf": "83ec9a3d-4767-4a3f-8eec-0e996600b854"
+      },
+      "organisationId": "223d0884-95ae-44c2-99bb-10275f8136e0",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0183": {
+      "name": "Kycana Hub",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "22e7587d-bbda-4c73-b447-f81101e160cf",
+      "memberUserIds": [
+        "adba1e8d-a231-4bca-9325-588cf2d19afd"
+      ],
+      "companyId": "e9904cea-1c03-434a-bc7b-efb93bde9a14",
+      "capitalObjectiveId": "b45d5f54-c32f-42eb-9a0a-d0c40255a458",
+      "documentIds": {
+        "kycana-hub-overview.txt": "e00d95ac-b19d-45b2-bbf8-c069da05d754",
+        "kycana-hub-management-accounts-h1-2026.csv": "30197412-26bf-4cc2-b63d-c2ad6fed2db5",
+        "kycana-hub-product-brief.txt": "0025e626-e446-45f1-b955-081dd4317aa5",
+        "kycana-hub-pipeline.csv": "a0146553-5e1d-4e62-8050-5da1f8696a01",
+        "deck.pdf": "6715aa1a-693c-46a1-8db8-efcd91f09999"
+      },
+      "organisationId": "804916ba-dfdf-48e5-9137-3eb4fd0c0fa9",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0184": {
+      "name": "Nestix Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "29f63018-edd3-4549-abb6-8f9040fd9144",
+      "memberUserIds": [
+        "507508cb-0c4b-4b82-8361-1ac2b2040129"
+      ],
+      "companyId": "428b36af-3533-4722-a481-d1f2fbcd1875",
+      "capitalObjectiveId": "00c9f159-b627-478d-90a0-ae7ff7d953a1",
+      "documentIds": {
+        "nestix-co-overview.txt": "ac2004f7-d4ed-4523-b5c6-632d189b1d73",
+        "nestix-co-financial-summary.txt": "e2294856-e5d2-4092-99e4-028280c29a0d",
+        "nestix-co-product-brief.txt": "73c8e8ae-8e8d-40f7-be67-8f4450a4f0be",
+        "deck.pdf": "873b88d5-e262-4951-94a6-ed0a1bedfaea"
+      },
+      "organisationId": "d25de9cb-4a7a-4cd3-8bd3-938eb692e982",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0185": {
+      "name": "Layerent Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "95d2ce1a-e259-4638-9c37-c1844835f2f0",
+      "memberUserIds": [
+        "2e1f98d6-d2e1-46dd-8a27-ff5b5334cb9a"
+      ],
+      "companyId": "28f5ca42-d4e0-410c-906b-3951aaa902ce",
+      "capitalObjectiveId": "c5545f26-c16a-4db5-9f43-7cbfce6e1d63",
+      "documentIds": {
+        "layerent-systems-overview.txt": "4b0148bb-072f-4eea-a4c0-656d316c2c12",
+        "layerent-systems-management-accounts-h1-2026.csv": "4b7d2132-147b-43f6-b591-640288de5d89",
+        "layerent-systems-product-brief.txt": "89f214d2-f6d3-43db-8210-71e3cd3fef97",
+        "deck.pdf": "b7b0cd4a-0bc5-4784-9110-d293b98b2948"
+      },
+      "organisationId": "51bccc75-32f4-4806-98f7-6ce4003304dc",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0186": {
+      "name": "Wardeon Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "3cc6e6e9-8307-4896-9a6d-51a01af1f1c3",
+      "memberUserIds": [
+        "75ea208b-5b45-4903-9bee-6bda38124bf9"
+      ],
+      "companyId": "05e2684a-b84b-48ea-993b-ebcfb907c4b7",
+      "capitalObjectiveId": "93e40e4d-ba9b-4331-a702-31207de02450",
+      "documentIds": {
+        "wardeon-africa-overview.txt": "55372451-5ade-4dff-9c36-e0c9fe5ad356",
+        "wardeon-africa-management-accounts-h1-2026.csv": "2de1b344-6257-4bf1-96e5-4549ac3c2287",
+        "wardeon-africa-product-brief.txt": "b14c4db6-f643-4f9b-ae08-66d086e8966e",
+        "deck.pdf": "eac7f66f-da68-480e-be09-3cfb87b2d64e"
+      },
+      "organisationId": "371df8dc-22eb-403d-bded-c6ad26322a08",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0187": {
+      "name": "Fieldo Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "eedf1ce5-375a-4a48-aded-d0bde07fc394",
+      "memberUserIds": [
+        "29db0007-97e7-463e-9a5f-fe3e692d1919"
+      ],
+      "companyId": "168cd5ea-9c67-4255-b1a5-37d3459167af",
+      "capitalObjectiveId": "4ab3e990-5ecd-44f6-b7d2-d273bc0c5c71",
+      "documentIds": {
+        "fieldo-labs-overview.txt": "ea4fb13d-6e90-45b8-9dc6-2187272560d8",
+        "fieldo-labs-management-accounts-h1-2026.csv": "eda48ce5-ff4a-413d-a119-a524a132a405",
+        "fieldo-labs-product-brief.txt": "70f88be5-bf0a-4693-8982-fea0e82d579d",
+        "fieldo-labs-pipeline.csv": "d52017fb-babf-4c58-a3b8-3abc58c1c49d",
+        "deck.pdf": "780feb0b-fb8c-402d-88ea-e692b07bd417"
+      },
+      "organisationId": "dd3fd011-2117-4f5e-b967-f9d3cd968c36",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0188": {
+      "name": "Sentinelora Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "7ab5052c-3ea3-4e1e-8562-45e022496d0b",
+      "memberUserIds": [
+        "8d61682a-b06c-4f95-8990-b7bff19e6e11",
+        "0e6f8a4b-d062-447d-9e79-640b695eb401"
+      ],
+      "companyId": "c92ef316-c7ea-4996-9b83-0c60428dda61",
+      "capitalObjectiveId": "022535b6-813b-4562-81ce-388ab7ea3438",
+      "documentIds": {
+        "sentinelora-technologies-overview.txt": "c6b5c678-f3e7-4cd0-a55a-02319082a1ff",
+        "sentinelora-technologies-management-accounts-h1-2026.csv": "76238ea1-4a87-4768-befe-c1af7756b641",
+        "sentinelora-technologies-product-brief.txt": "cd6b737a-08cf-40ca-8c21-21a1214a3aad",
+        "sentinelora-technologies-pipeline.csv": "b8d1e800-e6ba-4a0f-bb4c-5677cb48879b",
+        "deck.pdf": "d2193880-8215-4b26-b216-a8bd20648361"
+      },
+      "organisationId": "e0b1c0ff-b730-4c87-b90d-79b2607f35db",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0189": {
+      "name": "Studioisk",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "b96da161-2b3d-4e4c-b206-1a49dde10cc8",
+      "memberUserIds": [
+        "3eb54bcd-a4bf-422c-af3e-f8bcfd791484"
+      ],
+      "companyId": "4eb43e16-1a66-422f-b4ed-6b5db405b1f3",
+      "capitalObjectiveId": "9db7fe29-a6bf-4ed9-9dba-5e062761b658",
+      "documentIds": {
+        "studioisk-overview.txt": "c592ddb5-0d3c-49e3-8aa3-18aebd1f76e6",
+        "studioisk-management-accounts-h1-2026.csv": "b6681c28-33d4-4e93-8070-c0361382528e",
+        "studioisk-product-brief.txt": "1d715575-52aa-43f6-9683-2b2449387de9",
+        "deck.pdf": "3adda097-e079-45f6-b966-c2ac39fb2ce5"
+      },
+      "organisationId": "84f4dd70-0bab-452a-be4c-27cb2d24d2a5",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0190": {
+      "name": "Ledgerova Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "91a9aa9c-826b-4628-914a-719eb4412d4d",
+      "memberUserIds": [
+        "c2910db9-ef9c-47c3-806c-fa0a9256b1bf"
+      ],
+      "companyId": "5fbcaa1e-2cbd-4323-91ab-002c4aedb19d",
+      "capitalObjectiveId": "70a59b4c-0aa4-4eca-87be-ea07372f09bb",
+      "documentIds": {
+        "ledgerova-africa-overview.txt": "c5d79ad2-2083-4b5c-912e-a05512b6c120",
+        "ledgerova-africa-management-accounts-h1-2026.csv": "585a3f4d-7f29-4b03-9c35-bd5f675ac6c4",
+        "ledgerova-africa-product-brief.txt": "0b57473e-7200-466b-a379-a264a86d0bf9",
+        "deck.pdf": "73f2eca4-fd64-4c43-9e25-a7a7de040faf"
+      },
+      "organisationId": "1573ac69-2037-4039-aaab-06f7c08a337f",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0191": {
+      "name": "Cargoum Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "e2d6ccbe-252c-4e6d-a2c8-2ea04ce5e443",
+      "memberUserIds": [
+        "cf4c2666-310f-4d51-83b0-dcb2d1e2fb0f"
+      ],
+      "companyId": "45c02862-43cd-463a-b80d-74d40ca24f26",
+      "capitalObjectiveId": "76c750e8-16ae-4cce-85b2-5e9e451308dd",
+      "documentIds": {
+        "cargoum-labs-overview.txt": "7d576adc-b4e7-4761-b2d1-80cf222e073c",
+        "cargoum-labs-financial-summary.txt": "060dfe50-2df2-4ff1-b21f-6ef4ca32f9f8",
+        "cargoum-labs-product-brief.txt": "db07f79d-18b4-4a3a-b1b8-bf2cd7dbc765",
+        "deck.pdf": "43adce8e-910e-4fa4-9177-ee10e738d737"
+      },
+      "organisationId": "4cab3db7-ef64-4e4e-98b1-8417fdee2c54",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0192": {
+      "name": "Latheum",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "f409a244-776a-4d4d-a17b-d3bf7036d003",
+      "memberUserIds": [
+        "919b033f-f6db-4697-bc07-5af1bf86d09b",
+        "c12d1698-c4ae-4bda-8071-6e556f9d533a"
+      ],
+      "companyId": "c0c856b7-eb82-48fa-bcb3-f6888e19e3e1",
+      "capitalObjectiveId": "73728489-e24e-46f8-8db0-8bb5dfcd4bd3",
+      "documentIds": {
+        "latheum-overview.txt": "5b73778c-2c37-458a-ae3e-a9cf7ad59ea9",
+        "latheum-management-accounts-h1-2026.csv": "21b5aed5-a586-400b-8384-cc9235e9588c",
+        "latheum-product-brief.txt": "4d6eec74-130c-4763-8054-829db661586d",
+        "deck.pdf": "cf74d4b7-0ce0-4e0a-ac18-fb7b21a2e202"
+      },
+      "organisationId": "dcc20f65-0b64-411c-b032-75b6163cda6d",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0193": {
+      "name": "Storeum Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "55d55fa2-fd59-4d80-b4d1-9bbfc212741c",
+      "memberUserIds": [
+        "99171a82-0bf4-4c08-a0a6-a32f3ff70133",
+        "9b1ed7b3-efdf-405e-b99c-f6ca194443b5"
+      ],
+      "companyId": "5392c657-bf73-44dc-9880-a59442a0aa67",
+      "capitalObjectiveId": "e928a095-bc66-4527-9a99-549c8e1c97da",
+      "documentIds": {
+        "storeum-africa-overview.txt": "76e6f0d4-e6a4-40c9-81f6-7230aebf3921",
+        "storeum-africa-management-accounts-h1-2026.csv": "61fbcdb6-2986-43f1-a9e4-47f2e65e8834",
+        "storeum-africa-product-brief.txt": "6f10698f-e846-44d6-9641-1c7a9338b2b8",
+        "storeum-africa-pipeline.csv": "01a2691d-bfce-479a-9833-924bf3f642b7",
+        "deck.pdf": "b38e376e-0747-4d4b-877c-b0ff2903325f"
+      },
+      "organisationId": "0405d12e-78f4-45d2-b6a2-ac0a2f88d12c",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0194": {
+      "name": "Kioskari Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "7318771a-810a-4c23-b12c-42b4157969f1",
+      "memberUserIds": [
+        "80f70104-9a0f-4cfc-ab9e-c70f5377d8ea"
+      ],
+      "companyId": "c4874458-3211-43cf-b0cb-e0d740b9b477",
+      "capitalObjectiveId": "8aa04b88-6c3c-40a8-8347-d1232a8c6a1c",
+      "documentIds": {
+        "kioskari-africa-overview.txt": "e8338bc2-d6ba-4aee-9e3b-1090351c955b",
+        "kioskari-africa-management-accounts-h1-2026.csv": "c5afa862-3190-4ca4-895d-bebc7f1f74ba",
+        "kioskari-africa-product-brief.txt": "97518381-e97a-4669-a766-c7c163d80d7d",
+        "deck.pdf": "944d0777-ca52-46cd-a9d8-b1a60cfef6d5"
+      },
+      "organisationId": "3cb0a45c-7230-4f86-a9fa-511a724acce4",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0195": {
+      "name": "Dwellisk Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "603f8ce8-4f8c-4bc6-9433-0fd99618edc5",
+      "memberUserIds": [
+        "1ddd7256-be65-4ee6-a278-9ceb97b2f41c"
+      ],
+      "companyId": "9522d9c7-700b-48b9-8f6f-2a765993a800",
+      "capitalObjectiveId": "f505f28c-5b6d-483a-8862-3bffcd6fa3d7",
+      "documentIds": {
+        "dwellisk-africa-overview.txt": "8a78fd01-d633-4957-abf2-5d852f020096",
+        "dwellisk-africa-financial-summary.txt": "9d6ca586-b0b9-4a63-8d2a-6404db37a74f",
+        "dwellisk-africa-product-brief.txt": "4f8eb95c-50ae-4007-8d8f-729406bc7a5a",
+        "deck.pdf": "a6246299-b528-43f7-8a3b-db998c849141"
+      },
+      "organisationId": "514b59f7-6376-458d-bf8d-912140b7c228",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0196": {
+      "name": "Coinra",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "51819c1f-28ca-4caf-a1af-610c520e5f66",
+      "memberUserIds": [
+        "5d8f8a38-70a8-41e4-9bb3-4b4d3c3c80da",
+        "fd89f613-060e-47f6-9097-5fd17d01a9f0"
+      ],
+      "companyId": "c96e3bd3-ded7-4d20-bbb6-635f7baac472",
+      "capitalObjectiveId": "0b76f887-089e-4419-944a-0350f134d14f",
+      "documentIds": {
+        "coinra-overview.txt": "6feb99d3-4cbd-4c53-b917-9260cb54cd88",
+        "coinra-financial-summary.txt": "3fb977c6-d3a6-417f-aa0a-aabd40d40975",
+        "coinra-product-brief.txt": "2758497c-b347-4e7f-8869-9b4ab261d12e",
+        "deck.pdf": "42bf96bc-f70f-47b7-9161-ee1f9f4c053f"
+      },
+      "organisationId": "cd04598c-cc08-4619-a624-93790ecc6424",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0197": {
+      "name": "Staffora Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "7ff23dce-90fe-4bc4-90ff-edcd045c46dd",
+      "memberUserIds": [
+        "165d7559-3c7f-4387-aa94-63dfe52ce12f"
+      ],
+      "companyId": "5b8d356b-fd5f-41a8-a091-98d9f25c62f5",
+      "capitalObjectiveId": "2b39df08-8b2d-43d5-84e6-d2e3c8ee1ecb",
+      "documentIds": {
+        "staffora-africa-overview.txt": "bbd99e12-2086-42bd-9c0b-0b22b0f445d1",
+        "staffora-africa-financial-summary.txt": "313cd86b-a0fe-4a21-9dfc-8ad04bd5a3ec",
+        "staffora-africa-product-brief.txt": "a8bfad82-ab89-489a-a373-312fda6d9584",
+        "deck.pdf": "3a593957-19ef-41ea-a2cd-cb23367f16b3"
+      },
+      "organisationId": "8d7aceef-2da4-403d-b240-72df4b8f89b5",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0198": {
+      "name": "Depotum Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "63e24b7e-7d4f-4e08-8a5b-1823ce0ed130",
+      "memberUserIds": [
+        "6e29c71c-9446-4196-a327-1af6308a539d"
+      ],
+      "companyId": "9de8915c-c3d4-4aa2-adc5-8af58a8f8d19",
+      "capitalObjectiveId": "bd30dbaf-ebc8-469d-93fb-3064245d9e4a",
+      "documentIds": {
+        "depotum-technologies-overview.txt": "7835d159-7eb7-46e5-bd49-19632dce227a",
+        "depotum-technologies-management-accounts-h1-2026.csv": "c9ecbe11-ad16-4f43-92a5-e21516dd3a8d",
+        "depotum-technologies-product-brief.txt": "61341628-e3e5-49b6-953a-dbddba149717",
+        "depotum-technologies-pipeline.csv": "74c1748b-bef2-4ba7-9dae-fc25fde61e5e",
+        "deck.pdf": "3555b092-f6fd-400f-bf9a-699f2868e78a"
+      },
+      "organisationId": "6a9c2e4f-4b9f-4e4d-b7c2-dc375464b4ef",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0199": {
+      "name": "Coverio",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "4e93340b-bc04-4ab6-b4df-efef4b3ff208",
+      "memberUserIds": [
+        "20dca0e2-e4b4-4793-8256-479aa6a54a14",
+        "92719044-462e-42d0-99e9-753e01f489ca"
+      ],
+      "companyId": "4724eb48-267d-45db-854f-9ca09c924852",
+      "capitalObjectiveId": "1442d0cc-9785-44d7-ae04-40800bd25842",
+      "documentIds": {
+        "coverio-overview.txt": "9d1a8a1d-eefe-4dc0-8f78-c30b4657f83e",
+        "coverio-management-accounts-h1-2026.csv": "75216b17-0e4b-4956-8e11-f811b0cde414",
+        "coverio-product-brief.txt": "76b4ea13-bd5d-43e4-a09d-d026f2b854cf",
+        "deck.pdf": "1e2f3d30-bc2f-4d21-9df2-dfd1c9a306f0"
+      },
+      "organisationId": "186a0e9f-84a1-4eb6-8d3b-e0845a458027",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0200": {
+      "name": "Forgeo Hub",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "09be57ea-e562-4085-af7e-3632aa015372",
+      "memberUserIds": [
+        "dda02722-ff40-419b-99a1-4c7ddd87117a"
+      ],
+      "companyId": "d510db5b-bfa7-49b0-b965-add4b3b88bfc",
+      "capitalObjectiveId": "c364bf7f-b3bd-4fc6-83d0-f32c4d183865",
+      "documentIds": {
+        "forgeo-hub-overview.txt": "510dcd56-884a-4d43-a836-4fa1627fa804",
+        "forgeo-hub-management-accounts-h1-2026.csv": "24596179-c03e-46ef-9aeb-7ff283b3aa94",
+        "forgeo-hub-product-brief.txt": "a4fec82a-b63d-417e-830b-09e1300adbbf",
+        "forgeo-hub-pipeline.csv": "8654e7e8-4b71-44c0-88cc-805209b0b303",
+        "deck.pdf": "c909b535-88ae-414d-b49d-39dc08c8f977"
+      },
+      "organisationId": "9d93393b-084a-4778-9141-33ebca161d88",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0201": {
+      "name": "Coverelle Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "a998aacf-b1af-4e76-84c6-7a9ac50b9f6d",
+      "memberUserIds": [
+        "8ee76f5a-1e92-47fb-bd1a-a2d19434ce06"
+      ],
+      "companyId": "7a12285e-ec08-45be-a6a9-ff1d03cbc833",
+      "capitalObjectiveId": "35219cbe-8f03-4488-a7de-ae2c2a1060d6",
+      "documentIds": {
+        "coverelle-technologies-overview.txt": "ee832065-19ef-4246-b87f-873a0b9ef257",
+        "coverelle-technologies-management-accounts-h1-2026.csv": "89539a6b-f61b-4a31-8e06-7ba60481b2fd",
+        "coverelle-technologies-product-brief.txt": "4f13a78a-c901-4840-95e5-735da894a118",
+        "deck.pdf": "f256bb54-a151-4de6-a1cc-a073a03eabb9"
+      },
+      "organisationId": "4a8dc462-9ac6-42c3-b814-ad29f717f194",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0202": {
+      "name": "Staffora",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "c5889885-2e42-48ef-a357-f2293b9544cc",
+      "memberUserIds": [
+        "7a544167-81a8-4bfc-86a7-2e7e906895c7"
+      ],
+      "companyId": "aa8f0d4c-eb8d-4c01-a218-0d05c7f3dc58",
+      "capitalObjectiveId": "88f0b328-8da3-45be-b926-c23dd30f668d",
+      "documentIds": {
+        "staffora-overview.txt": "15ac4f58-de4a-40cc-9a13-7d7ef9f8530b",
+        "staffora-management-accounts-h1-2026.csv": "641faf13-7441-4f51-8e2b-24f564cc22dc",
+        "staffora-product-brief.txt": "b926023f-5b3b-4fcc-97bb-1dd544b60816",
+        "deck.pdf": "b5ac5f79-22ac-4de4-bfaa-07d87b3dc7fa"
+      },
+      "organisationId": "5bc08aa7-156f-45a0-ac89-5fbbb543fe39",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0203": {
+      "name": "Layerora",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "2950baa9-217e-4dd7-9280-257d7c8669b3",
+      "memberUserIds": [
+        "6bdd8341-c45f-4957-8644-972dceeb9b33",
+        "6167644b-dca5-4991-b07e-ff706dc3df76"
+      ],
+      "companyId": "0a958018-b858-416d-9fa8-fabc1d66095e",
+      "capitalObjectiveId": "947c88ea-1e84-48a9-a1b6-8be2e21e1f20",
+      "documentIds": {
+        "layerora-overview.txt": "08bbc00f-25b2-4344-a1ae-d278fd7e0c5e",
+        "layerora-management-accounts-h1-2026.csv": "879f202a-664e-482e-90d8-092ce7a9b077",
+        "layerora-product-brief.txt": "c40f9299-2e14-484d-aa15-16b3e5abc840",
+        "deck.pdf": "948a3180-ecf9-4d21-8c43-2063b1efecdf"
+      },
+      "organisationId": "7fb3b34c-c738-4770-b02a-59a26bee8d5b",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0204": {
+      "name": "Harvestly Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "ab2ee136-5281-4817-bd6d-868bfe4e04b2",
+      "memberUserIds": [
+        "41075d9b-3de1-4757-9aa5-7ad6c2a3fef8",
+        "88fd1745-0f58-4661-8fda-7006115bf6f2"
+      ],
+      "companyId": "e3c29a23-0bd4-4107-b319-c03fa7313f56",
+      "capitalObjectiveId": "4f565fee-4b23-4f46-9e5b-c8c53a747368",
+      "documentIds": {
+        "harvestly-systems-overview.txt": "c558dbee-9d57-4eee-b259-ef868f8bba1c",
+        "harvestly-systems-management-accounts-h1-2026.csv": "2d5871c9-8b9a-4773-8d0a-ef41e5fe31de",
+        "harvestly-systems-product-brief.txt": "f7b5e1d0-433e-478f-a8e6-7e0dd395e09c",
+        "deck.pdf": "54c291aa-35f2-4d46-bff6-4eb02f51ac60"
+      },
+      "organisationId": "807c626d-2d94-4bfa-a477-61ca7633ec01",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0205": {
+      "name": "Sparkra Works",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "7fc28aa2-09a5-4010-a2f7-93893e2eb017",
+      "memberUserIds": [
+        "6d1c2196-4953-4fbe-8285-60f8ff8fd673",
+        "0a15c450-2717-4fc5-94f8-9e69db408bcc",
+        "93f88515-adfa-4721-8c71-8b7a01a1de97"
+      ],
+      "companyId": "ee75dd62-5013-43ed-846d-1069fd47d743",
+      "capitalObjectiveId": "c9bbf969-39a9-4187-9a05-948c30920cfd",
+      "documentIds": {
+        "sparkra-works-overview.txt": "b5010fe2-100a-4e64-a3f4-5e1180601897",
+        "sparkra-works-management-accounts-h1-2026.csv": "1e4c97ae-0476-492e-aa29-19edfbe62f44",
+        "sparkra-works-product-brief.txt": "39fcd301-1ceb-476a-82f9-5ba5d51aceb2",
+        "sparkra-works-pipeline.csv": "69812d77-7556-496a-add7-aec423e4017c",
+        "deck.pdf": "e2f58879-5d52-4d59-bf74-07174331b8a9"
+      },
+      "organisationId": "6e72a3e9-7253-42e9-a209-c29c5f41c150",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0206": {
+      "name": "Tillix Works",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "347ed373-c51d-42b1-b525-6d0b9d51d4ab",
+      "memberUserIds": [
+        "75ba8106-b04b-4add-b16c-9a790b4ddd40"
+      ],
+      "companyId": "ff41d42d-5ed1-4217-a808-3b40c1c68611",
+      "capitalObjectiveId": "632ad9a0-b02c-4718-9e7c-db839b088efc",
+      "documentIds": {
+        "tillix-works-overview.txt": "2e2cb1bc-79c6-437b-a72f-3b636223bc45",
+        "tillix-works-management-accounts-h1-2026.csv": "dbe12feb-c98e-4114-af11-20fd62c8bff2",
+        "tillix-works-product-brief.txt": "92e254d5-8f0f-498b-8cac-be890eb93bb9",
+        "deck.pdf": "6f181b15-af35-48c9-896e-259ced72f470"
+      },
+      "organisationId": "b20adf02-2ad7-48ba-909d-772b15ffacce",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0207": {
+      "name": "Triageo Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "450d14d9-2b8d-45c0-a576-ab29dfbafe10",
+      "memberUserIds": [
+        "2b68bb2a-4597-4ea4-84be-ab052c144080",
+        "4ca1e180-44b5-4176-97a4-24aa67c07e11",
+        "80fcc408-0c33-4c00-81d4-89ae548eed1b"
+      ],
+      "companyId": "735bbc42-b681-4290-ba81-7a4412e1736d",
+      "capitalObjectiveId": "7f3749b7-8348-452d-b81c-9808701d6f5a",
+      "documentIds": {
+        "triageo-labs-overview.txt": "bd4f4e33-17fb-4118-8366-361c0a40199c",
+        "triageo-labs-management-accounts-h1-2026.csv": "8a59c0df-146f-45a5-a29b-163ad86d5403",
+        "triageo-labs-product-brief.txt": "f19088b1-1620-433b-8436-cda279c934a4",
+        "deck.pdf": "435a7fc3-730b-498b-b363-763dea4d129b"
+      },
+      "organisationId": "1ea7a193-fde5-4183-bad0-0463e107253e",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0208": {
+      "name": "Milla Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "25ae041f-5bc9-454a-bc4e-ff4a629e3833",
+      "memberUserIds": [
+        "d6477cd3-c7f5-4e5f-ab04-f3c6e59700fd"
+      ],
+      "companyId": "010c8a02-efa1-4b90-967d-9dd5227b3d6a",
+      "capitalObjectiveId": "348e53c7-0910-466a-9a9d-8df79e257688",
+      "documentIds": {
+        "milla-africa-overview.txt": "e9daa861-4bc9-45e4-b763-137945350457",
+        "milla-africa-financial-summary.txt": "6af06b76-bf4b-4695-b521-273ce7476e9d",
+        "milla-africa-product-brief.txt": "7a4b8d0b-3de0-47ae-86a3-5fab4fc9ee55",
+        "deck.pdf": "a06f415e-f8c6-45fe-9e6f-e71de13c75bf"
+      },
+      "organisationId": "d903d2aa-07b6-47e5-af55-5653842e0e4a",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0209": {
+      "name": "Signalent Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "bd96eb61-5574-4421-9cf3-86a111f81aeb",
+      "memberUserIds": [
+        "fbc3ed93-29ad-4cd1-b622-827d2181dfe8"
+      ],
+      "companyId": "b8e77d13-1932-4c59-a22d-e7af82ca534f",
+      "capitalObjectiveId": "7e2b1308-c05b-4392-83b8-b3295abb3e11",
+      "documentIds": {
+        "signalent-africa-overview.txt": "2bb43add-0932-453b-adc8-037c3117017b",
+        "signalent-africa-management-accounts-h1-2026.csv": "cd34420e-628d-4f9d-bb27-9f06246fd2ac",
+        "signalent-africa-product-brief.txt": "d53233b3-820b-47b1-b807-4cde3aa596da",
+        "signalent-africa-pipeline.csv": "a879e367-f94c-423c-a297-695aff11407c",
+        "deck.pdf": "4fb79ff6-26f3-484d-9916-9f95430b9e28"
+      },
+      "organisationId": "8578dee3-7737-40d5-bcfd-ba9d65b27fd7",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0210": {
+      "name": "Sunum Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "3b7c6502-9f36-44b0-b014-4b0a74f016e8",
+      "memberUserIds": [
+        "ba67e0c0-68ee-4351-bd7b-c7ae0022a60e",
+        "eb02641e-d687-4b2d-9215-df7b02c1fc61"
+      ],
+      "companyId": "46649509-2f62-4a4b-98f1-dd15003f1c17",
+      "capitalObjectiveId": "b152be9f-0fde-4043-8e49-77b93dce6a1f",
+      "documentIds": {
+        "sunum-co-overview.txt": "108a7229-06a3-4933-a061-e63779ba2b1f",
+        "sunum-co-management-accounts-h1-2026.csv": "5c8107e9-0c2c-47eb-b57f-0792eb9ea762",
+        "sunum-co-product-brief.txt": "779902ce-d9b6-49f5-bfc7-e39d614731db",
+        "sunum-co-pipeline.csv": "a256618e-843e-4ad2-bf5a-a2766e88ec89",
+        "deck.pdf": "1becfa5a-1b14-45c7-afaa-37d3b23a5c93"
+      },
+      "organisationId": "0ba506eb-82d8-4308-82ff-e14a65d9a59d",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0211": {
+      "name": "Sparkari",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "894b504f-49d5-42c5-8b7f-aebdf4569284",
+      "memberUserIds": [
+        "fca7fc5f-bcb3-4f2b-bc77-9d0203504c22",
+        "43df5e7d-37c7-4218-8bca-374bac976862",
+        "597cf681-6ce6-4f76-89c2-9a51f229e850"
+      ],
+      "companyId": "09b401e5-845b-409e-aa82-30a92e7312e0",
+      "capitalObjectiveId": "04e0fcc6-788b-48b3-adb0-23b9f0fe17fa",
+      "documentIds": {
+        "sparkari-overview.txt": "b500c7e9-d3ec-4fce-9dbc-8140e594c333",
+        "sparkari-financial-summary.txt": "8509b077-56d6-449a-9ca4-ff68c278977e",
+        "sparkari-product-brief.txt": "2f0ea67d-a54c-4ea5-a8bb-ef94b4a27f42",
+        "deck.pdf": "a6bba92e-1342-41fb-9677-f5ee0ed21fb2"
+      },
+      "organisationId": "7439c1d0-c7bd-4a71-9ec9-5a5d629d579f",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0212": {
+      "name": "Ledgerari Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "850d6a36-1025-4be5-a169-790efadbce12",
+      "memberUserIds": [
+        "a6394af3-afaa-48de-acbe-4b8ea8e8834f"
+      ],
+      "companyId": "13d19230-9f2c-4122-b41a-d39f15292ca5",
+      "capitalObjectiveId": "386e7d1d-2deb-4324-bee2-028f8dd8b14a",
+      "documentIds": {
+        "ledgerari-systems-overview.txt": "0151d291-e6ee-4dd3-adab-a56e654c5407",
+        "ledgerari-systems-financial-summary.txt": "a9540ec0-3aea-480f-9923-832b455b6f64",
+        "ledgerari-systems-product-brief.txt": "0c3d3467-d0a8-4082-873b-d0d40b0f843c",
+        "deck.pdf": "8afb881c-aecf-48c1-a465-aa7cbd68f441"
+      },
+      "organisationId": "2d33b898-5948-4575-91b0-3595e40282c4",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0213": {
+      "name": "Latheent",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "6be153b5-4f27-44e9-9d74-52eedbf34660",
+      "memberUserIds": [
+        "ac6eca9b-9c3b-4974-bddb-b58d0e5429aa",
+        "91a9b059-f652-4086-a22b-719d4ee0b456"
+      ],
+      "companyId": "aa0df452-4301-4400-a781-3601b7bf8370",
+      "capitalObjectiveId": "0cbd38e5-d174-41d1-91aa-ed5c3eb36194",
+      "documentIds": {
+        "latheent-overview.txt": "b4c4d4b9-e431-44cd-b8d4-1ee8cf047e43",
+        "latheent-management-accounts-h1-2026.csv": "4ab1c308-a335-4fa4-aba2-0244bd772cb0",
+        "latheent-product-brief.txt": "44e68615-e382-4323-b693-22254581d8ef",
+        "deck.pdf": "bdd19005-cd84-4987-9efd-aeea7eb48134"
+      },
+      "organisationId": "3c362b9b-d0a0-44b4-8772-97a365c2255c",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0214": {
+      "name": "Scopeelle Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "03c70961-5770-4fff-b3ee-321ebb5c7ce2",
+      "memberUserIds": [
+        "5a74aeaf-de28-4a01-8838-a53ce50077ba",
+        "34ac3ba3-2617-4381-b3ab-0cceeac56f72"
+      ],
+      "companyId": "83099dbd-0b48-4108-bec4-0c985866662e",
+      "capitalObjectiveId": "b0d58074-541f-4aa5-8401-08c897f52ce3",
+      "documentIds": {
+        "scopeelle-systems-overview.txt": "946129e1-7b79-4e28-a9f1-42604e0bc385",
+        "scopeelle-systems-management-accounts-h1-2026.csv": "f2924e6a-7383-4245-9fdd-605a266751a5",
+        "scopeelle-systems-product-brief.txt": "e126fe85-f9cd-47e0-8a73-80ec032e49f5",
+        "deck.pdf": "03c6ad62-576d-4b03-9fac-230bbb0815f8"
+      },
+      "organisationId": "cfdea4fd-c57d-4027-84c6-c0bc0ddd8fc8",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0215": {
+      "name": "Waveisk",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "2e8ddf20-74b7-4f48-8992-74768d7848c2",
+      "memberUserIds": [
+        "a23f144b-070e-414f-a1e9-3612447fe65b",
+        "af511dbf-8ba9-4d66-8100-2d32b4fcf57f"
+      ],
+      "companyId": "f785d6b3-7594-4a0c-9b0b-1f0d290aa7aa",
+      "capitalObjectiveId": "38e57f8b-21d5-4e08-9d45-a703b38b6b72",
+      "documentIds": {
+        "waveisk-overview.txt": "9791326c-5230-45d0-bcd2-e32c257b88ae",
+        "waveisk-management-accounts-h1-2026.csv": "d5fa0126-dd0a-4f01-934c-f2c54907312a",
+        "waveisk-product-brief.txt": "8e1092c7-5fb7-44bf-a19f-1f75d6e89f67",
+        "waveisk-pipeline.csv": "0d08355c-b0b6-44e4-8a82-7f4b304b4db4",
+        "deck.pdf": "012fcdb3-b0fb-4daa-be76-877dc734a040"
+      },
+      "organisationId": "df97ba07-c3c5-4435-9417-59c7258ea904",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0216": {
+      "name": "Storely Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "8e09eba9-5546-4ee0-97d1-5401bea71a61",
+      "memberUserIds": [
+        "85baa042-13e6-45b4-88bd-996131764033",
+        "fe645c69-b2fc-4c48-896a-ee1f2f3a1d83"
+      ],
+      "companyId": "490f0dd5-9e26-43c5-bedf-a3971a44c4b2",
+      "capitalObjectiveId": "d9d4386f-3e13-4a5b-8da5-13964e456c9c",
+      "documentIds": {
+        "storely-systems-overview.txt": "f8a766c2-7933-420b-8ade-83180354e735",
+        "storely-systems-financial-summary.txt": "c76c66b0-4ad2-489d-a758-ae0276ff6bd1",
+        "storely-systems-product-brief.txt": "f2324060-7a07-44c4-8216-b5450c70ff94",
+        "deck.pdf": "044d28fc-4cc6-4292-852c-756e8e8fcd06"
+      },
+      "organisationId": "27f1681b-f36d-408f-ac32-6c56efdb71a5",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0217": {
+      "name": "Clinicly",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "d18430f0-f35a-473f-bd1e-ffda61b45347",
+      "memberUserIds": [
+        "c865146b-4951-4682-96ba-aa3899c204fd",
+        "0c8d0d44-0a00-4ed5-9ce0-9abca2f433a1"
+      ],
+      "companyId": "0a160452-d9a2-4583-8396-207de755aa5a",
+      "capitalObjectiveId": "80364f45-1fcd-4ec7-8371-423a19892b21",
+      "documentIds": {
+        "clinicly-overview.txt": "f60c6a8e-79bd-4569-8c8b-a8cc28fc5ccf",
+        "clinicly-management-accounts-h1-2026.csv": "ba2f6b8e-e897-46b5-baf2-30a4a31ff991",
+        "clinicly-product-brief.txt": "6c595653-b338-4a96-9246-484d3e45af8e",
+        "clinicly-pipeline.csv": "2432bc29-958d-4420-ab71-d59a7f518e97",
+        "deck.pdf": "d91ca095-a8c2-4ae8-8347-3c3b42c78560"
+      },
+      "organisationId": "845b66de-b0f4-4d0b-8363-34a35eba5ce3",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0218": {
+      "name": "Rosterisk Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "d72a23b5-1699-4805-9643-9aa6b89b1323",
+      "memberUserIds": [
+        "0978110f-c322-48ed-8bb6-61d7ec4beac0"
+      ],
+      "companyId": "cac845f5-5744-49cd-a655-beb5b3df0b4b",
+      "capitalObjectiveId": "45af9b33-cfe2-4363-910e-dab13fcda751",
+      "documentIds": {
+        "rosterisk-labs-overview.txt": "94845447-a9bd-4d73-8368-ccffec182cd9",
+        "rosterisk-labs-management-accounts-h1-2026.csv": "07edf76a-006c-4079-a53d-b7fbb3ed7edf",
+        "rosterisk-labs-product-brief.txt": "e06f097d-9c8c-4864-b489-a4d5bf70c1d6",
+        "rosterisk-labs-pipeline.csv": "98287269-4e4f-47d9-ab3f-ae3ccecf60f8",
+        "deck.pdf": "bcf49115-944c-4943-b9e7-7f25488688b3"
+      },
+      "organisationId": "596ebd32-3766-40af-a95c-153cfb42c4b8",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0219": {
+      "name": "Careova Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "3bdcce4a-0a6b-4f7c-97a2-b9ae23ed3ead",
+      "memberUserIds": [
+        "ec02a5ec-3c3f-4319-a5dd-00e1ec62ecf7"
+      ],
+      "companyId": "3eef772e-7f7b-4fbc-8eeb-cbcae1ffff05",
+      "capitalObjectiveId": "20321d8b-933d-4127-9fb7-58afbef87d94",
+      "documentIds": {
+        "careova-co-overview.txt": "7fe8fee0-382e-400e-b396-e71bd08d8030",
+        "careova-co-management-accounts-h1-2026.csv": "1961365a-d56b-4122-ae38-3beee26f0ff6",
+        "careova-co-product-brief.txt": "4735be94-8d30-4025-956d-ddce205bcdbf",
+        "deck.pdf": "0398eb81-6e89-458a-8105-f1e0b5c5a4e9"
+      },
+      "organisationId": "3322ad1f-95ea-43b5-9252-d7e1384d82da",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0220": {
+      "name": "Proofra Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "359ee69d-a795-4621-a617-52d0276d4088",
+      "memberUserIds": [
+        "8860e673-5431-49cf-a452-6ee84282ca8e",
+        "bf12a6d7-9a73-425c-8930-726565610dee"
+      ],
+      "companyId": "5acf391e-18d2-4569-8c22-261b08ff6d6b",
+      "capitalObjectiveId": "3b163345-246a-4b62-a0c5-5667b6974342",
+      "documentIds": {
+        "proofra-technologies-overview.txt": "ff82fd95-025c-48d6-91ac-662b016194b4",
+        "proofra-technologies-management-accounts-h1-2026.csv": "58a126f0-e10c-456d-9ea5-aa863511c1a5",
+        "proofra-technologies-product-brief.txt": "698ea9d5-4e05-432e-8363-126385a2a8b7",
+        "deck.pdf": "c700fa4e-e752-4c38-903d-733e4a1b166f"
+      },
+      "organisationId": "c0844e0c-0e9b-4b95-8cd6-f46f921ffa0f",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0221": {
+      "name": "Counterora",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "2461b647-2a5f-485d-a17c-1309dfd5a665",
+      "memberUserIds": [
+        "66300e4b-a619-4453-9786-e14d11e8fe14"
+      ],
+      "companyId": "bf1c6f23-26e6-47d9-a486-d712e271b358",
+      "capitalObjectiveId": "cd24af9d-6f5e-4fa8-8efd-a6e71aafb191",
+      "documentIds": {
+        "counterora-overview.txt": "40f527c2-a476-492a-93ad-93240afcf198",
+        "counterora-financial-summary.txt": "965a5d19-861b-4c3d-b695-5ebbbdf7fb06",
+        "counterora-product-brief.txt": "44714d34-be51-4846-81dc-0f855f453f80",
+        "deck.pdf": "c99ab13d-565c-4b9c-9172-1bfba125d2c6"
+      },
+      "organisationId": "3cf01b52-9998-4d82-bc66-021725b5f41c",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0222": {
+      "name": "Signalra",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "6b57b2da-809d-4071-acdb-1854d2a157c7",
+      "memberUserIds": [
+        "976bb6f8-e304-420d-b623-afe63ef6755e"
+      ],
+      "companyId": "3c2ccc70-c278-47d6-9a90-8df4e13eed5a",
+      "capitalObjectiveId": "669c666b-1f85-44fa-a4df-f686fcc94801",
+      "documentIds": {
+        "signalra-overview.txt": "e1dce103-7c07-4892-b9b8-147a1ac942bd",
+        "signalra-management-accounts-h1-2026.csv": "a3e44602-fa64-4be1-957c-1a346130c7f7",
+        "signalra-product-brief.txt": "b477c69a-ff29-4a00-964e-2b2a78ddc5c4",
+        "deck.pdf": "84a773e5-920d-4f43-a1e6-6f10b9ee8020"
+      },
+      "organisationId": "d457c87e-3713-4ae0-b657-c8041c05b3db",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0223": {
+      "name": "Classeon Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true
+      },
+      "founderUserId": "b03f5872-554e-487d-907c-9ecb689b09ed",
+      "memberUserIds": [
+        "4de0e467-b5a0-4f60-968e-3bc86e459ef0",
+        "93b18c87-eb71-46f4-9f14-84f2c6f1814c",
+        "d5338618-b85f-4f26-a3df-8024cd8d874d"
+      ],
+      "companyId": "1c32c5b0-8185-441e-8f46-b21c0610c469",
+      "capitalObjectiveId": "a79308f6-7bf0-4de8-8e92-ef182c19b1bb",
+      "documentIds": {
+        "classeon-co-overview.txt": "daea64d4-ecd8-4faf-a6ae-31c18aadaf95",
+        "classeon-co-financial-summary.txt": "a8bc569e-967d-46fb-bbd0-61caba94c5ed",
+        "classeon-co-product-brief.txt": "8166658c-bb6d-4b82-8a0e-a7d23666a74f",
+        "deck.pdf": "0220ee92-1747-4879-b539-0910167f78b4"
+      },
+      "organisationId": "ba903a74-f2e0-4fb4-8c62-57efd5f64596"
+    },
+    "fb0224": {
+      "name": "Weaveisk Works",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "d56f34af-d767-464f-98d7-9491f77f908a",
+      "memberUserIds": [
+        "01461cc6-43c3-44e4-a8c7-b9b09cc950b1"
+      ],
+      "companyId": "b8b0c199-7c06-4e9a-a800-73088053466c",
+      "capitalObjectiveId": "b601f700-9682-4722-a7f2-1a87a96beb07",
+      "documentIds": {
+        "weaveisk-works-overview.txt": "bc0b61db-0d7e-440d-90e7-d03b20d2028c",
+        "weaveisk-works-management-accounts-h1-2026.csv": "90f3fcbd-ce47-49aa-aea9-aa886570b300",
+        "weaveisk-works-product-brief.txt": "63165b55-d2c7-493e-9308-10662d1ced39",
+        "weaveisk-works-pipeline.csv": "c40c73a4-da22-4956-ad6c-ece1b956c1f0",
+        "deck.pdf": "e0be1d19-d5b2-4483-b4b5-b5a2a5b647b3"
+      },
+      "organisationId": "891b10cb-241a-49f2-a555-c645b0f21a6b",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0225": {
+      "name": "Pulseisk Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "6927a78b-2f5c-416d-8929-1d0f2a02d341",
+      "memberUserIds": [
+        "bc795366-8433-47d6-b18e-938aae63ad18",
+        "4d2e14a7-ba91-496b-94b6-6c68b0596d95",
+        "ca1e5390-91a0-4adb-8b6c-ebf96e47832f"
+      ],
+      "companyId": "e74de29e-b2b7-44df-a92a-c915449302a6",
+      "capitalObjectiveId": "1f565523-0566-4a4c-986a-d566b64755d1",
+      "documentIds": {
+        "pulseisk-technologies-overview.txt": "d054f07e-3dd1-48f2-8adc-7a0850849ac5",
+        "pulseisk-technologies-management-accounts-h1-2026.csv": "cab7462a-387a-46e3-857d-f812c81cf205",
+        "pulseisk-technologies-product-brief.txt": "357385c6-1efb-4767-a77b-522cfbdd87b4",
+        "deck.pdf": "667d9f73-a414-4323-a352-f92f0cf44f6d"
+      },
+      "organisationId": "fbf6a404-6aec-4010-9ddd-38b50e0ad29a",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0226": {
+      "name": "Scopera Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "b6981f88-3b39-4cbb-8af0-123a70df2716",
+      "memberUserIds": [
+        "81235713-6b2e-4069-aa76-c117a19ab31d",
+        "89c4ffd5-4431-47e5-90d8-9f8568909d25",
+        "4a86f795-731b-4ace-8966-86e79fe563ed"
+      ],
+      "companyId": "1fc55f54-b294-40bd-8728-c3f3a2cd394d",
+      "capitalObjectiveId": "ef40fe80-8560-42c0-8ea0-8ba2fe2d5c43",
+      "documentIds": {
+        "scopera-africa-overview.txt": "8541449d-d5a9-4eb9-b539-51c65132b3b4",
+        "scopera-africa-management-accounts-h1-2026.csv": "b9ac1fcc-f42f-4479-be87-2e54663ff8f1",
+        "scopera-africa-product-brief.txt": "498cb376-de6c-4e47-b8aa-3dfaa6a4ed34",
+        "scopera-africa-pipeline.csv": "58403d9e-4a17-472d-918b-ab26e7ed2bc3",
+        "deck.pdf": "67734cb2-5161-4f3d-9cde-0ec7deaa2963"
+      },
+      "organisationId": "72a5b661-1f26-4b1e-9bb8-a6d711761ea4",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0227": {
+      "name": "Shieldix",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "383efb5e-b97f-424a-bd2c-7e1770af038b",
+      "memberUserIds": [
+        "5d5d004a-054b-42c7-a1d5-32382d961ca7"
+      ],
+      "companyId": "e783d69f-54d8-4721-b036-0136a4c0507d",
+      "capitalObjectiveId": "fe8a7edf-f187-49eb-b290-d497600c73a4",
+      "documentIds": {
+        "shieldix-overview.txt": "4d619e32-bb37-47b7-9676-ca69c9f7e146",
+        "shieldix-management-accounts-h1-2026.csv": "f6569e47-522b-47c7-8cc5-70ae0dce3d1a",
+        "shieldix-product-brief.txt": "d3c3f156-d37b-449f-85f8-d36085c7c1f4",
+        "shieldix-pipeline.csv": "c85d4694-bf73-4d94-8d96-e5cc7f532694",
+        "deck.pdf": "d90cf0d8-74f4-435e-8b95-d52c3dfc72eb"
+      },
+      "organisationId": "04fe3cbf-832a-466a-9d6e-0c446fc17736",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0228": {
+      "name": "Shambaent Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "ba1db0c4-74fb-46f5-a8d2-275b1de69064",
+      "memberUserIds": [
+        "d4408f6e-e06f-46b7-a790-cdd6755878eb"
+      ],
+      "companyId": "aaa5269a-90fa-40e2-a420-dff10e00d840",
+      "capitalObjectiveId": "86ec38c9-d1f8-4fbd-93b4-722a9f1b932b",
+      "documentIds": {
+        "shambaent-systems-overview.txt": "14fd1eff-3b13-4a24-977e-d23381157c88",
+        "shambaent-systems-management-accounts-h1-2026.csv": "d65e4d5d-7c62-4732-bb71-3b0bd6f3c7b3",
+        "shambaent-systems-product-brief.txt": "dfe9293c-09bf-45cb-bbe6-833498bd4982",
+        "deck.pdf": "a3d55db7-9139-41ec-af86-5c2fb873b911"
+      },
+      "organisationId": "3295f23e-deb9-4918-b83e-3e09736d7c2d",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0229": {
+      "name": "Lakely Co",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "b9bdbebf-6807-4b91-b62d-e1863970695e",
+      "memberUserIds": [
+        "3f2d1c1f-f3a6-4228-bc0a-91d56b9a1353",
+        "26fb9256-c461-4519-ac11-3f6d8b791404"
+      ],
+      "companyId": "ab2d36d2-9d8e-4e95-a9f1-36f56e151170",
+      "capitalObjectiveId": "c42da85b-eed9-4aa6-86e1-6b80e8129a4f",
+      "documentIds": {
+        "lakely-co-overview.txt": "110893af-66de-4fc6-828d-910750d01e1b",
+        "lakely-co-management-accounts-h1-2026.csv": "96d17541-d02e-4680-8b43-56c7bbab9b54",
+        "lakely-co-product-brief.txt": "67a3a668-6de1-4b72-bdbc-4ebb492ed949",
+        "lakely-co-pipeline.csv": "b092d433-365c-4236-8bec-2fa16e2530ac",
+        "deck.pdf": "6145ee8a-f91e-459c-ae64-40a691f6f0e4"
+      },
+      "organisationId": "38f51bd3-10c3-4990-a1df-942af8b2c0fa",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0230": {
+      "name": "Havenisk Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "04d974cc-9f0e-4ce3-bac4-a812fb6677f9",
+      "memberUserIds": [
+        "5b2f5eb0-6dba-4883-b4d0-ca670cffa256",
+        "5c229bb6-d3a5-491e-a044-4566d1539574"
+      ],
+      "companyId": "32bbfc63-82af-4ad9-858d-68caba6d6d21",
+      "capitalObjectiveId": "18ba4622-d885-4509-bc1f-a133b08b64ae",
+      "documentIds": {
+        "havenisk-systems-overview.txt": "68279686-2773-4ac8-a53d-24065a0cbaf6",
+        "havenisk-systems-management-accounts-h1-2026.csv": "a06242ff-09e3-4274-8b8d-280fa2ad7bab",
+        "havenisk-systems-product-brief.txt": "5a9f8075-7155-4885-9841-fdd6620b4abb",
+        "deck.pdf": "2c9ebced-b362-45b1-8624-badc2faeb15b"
+      },
+      "organisationId": "bdc0f2d5-bfff-4bb1-afd3-e5dda8418ec3",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0231": {
+      "name": "Haveneon Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "9212bd81-a7b8-48ab-ab34-431eb814cb56",
+      "memberUserIds": [
+        "831b7f8c-fdd6-407a-bcb8-8647cc011dc6"
+      ],
+      "companyId": "dd777600-02d1-4479-82ff-f4f00515053a",
+      "capitalObjectiveId": "5f74ed49-85aa-44bf-993d-a69f48e80ce0",
+      "documentIds": {
+        "haveneon-africa-overview.txt": "27e2f6ff-c6bb-4fb5-acdc-05ccc5dc69ba",
+        "haveneon-africa-management-accounts-h1-2026.csv": "b400f2b6-9702-4876-ad4e-e302302a7b41",
+        "haveneon-africa-product-brief.txt": "273f7044-5d53-4dda-b431-6629deede94f",
+        "deck.pdf": "c3e9615a-9ab4-4778-8170-76bfcf4b7373"
+      },
+      "organisationId": "72a743b9-eb8f-4e5b-acaa-236b4e4dee60",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0232": {
+      "name": "Latheari",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "9d6c560a-b87a-4777-b772-18b6dd9000ca",
+      "memberUserIds": [
+        "e89d0434-3429-4923-96ce-c9a7a49061f6",
+        "ead0ef8e-91ce-4abd-8fe9-57ca45d88c7b"
+      ],
+      "companyId": "9806c785-9a7e-411a-88cd-f082351f8d74",
+      "capitalObjectiveId": "032e00d4-4c3d-4034-9b41-05e39a939a53",
+      "documentIds": {
+        "latheari-overview.txt": "a40c3482-267d-4331-addd-8fdce8e7606c",
+        "latheari-management-accounts-h1-2026.csv": "110a3f8f-11ca-4270-b685-bd7c764e9859",
+        "latheari-product-brief.txt": "05576e72-2ecf-48f2-8e4e-7b9f383080e4",
+        "deck.pdf": "52634f73-f30d-4633-85a5-fc32b40f885e"
+      },
+      "organisationId": "2f7eff9c-0520-4dbb-ab9b-c41754992f9d",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0233": {
+      "name": "Schemaora Works",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "e325a147-1807-4a39-aef6-211a85ecc7c6",
+      "memberUserIds": [
+        "891b59aa-293f-4d14-8bec-b21b94e25cc4"
+      ],
+      "companyId": "78bc265c-9fc5-4d60-b277-183ac8e2c950",
+      "capitalObjectiveId": "ce8f2760-1116-491b-847a-46d1ab33ab02",
+      "documentIds": {
+        "schemaora-works-overview.txt": "380bc989-2832-4448-aa74-0a10fd58269d",
+        "schemaora-works-management-accounts-h1-2026.csv": "c8518dda-6a27-4868-a5e4-0d3dee307154",
+        "schemaora-works-product-brief.txt": "59de375b-113e-4fe6-a58a-ec2f2b5232d1",
+        "schemaora-works-pipeline.csv": "c96bcad9-8acd-475c-ae4d-bf76967a6091",
+        "deck.pdf": "7a31f4a3-5fd5-4569-840c-ce3d418b2c7f"
+      },
+      "organisationId": "b6e652c0-86d5-4bd2-a3af-55f0d173a5e7",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0234": {
+      "name": "Batchent Technologies",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "c02451ca-5f4b-4878-8c2f-fe749e600b13",
+      "memberUserIds": [
+        "ecc06aa4-9eb4-4788-824b-0771440c1137"
+      ],
+      "companyId": "fc80b7c2-9fdb-46bf-8767-d5addfbccd99",
+      "capitalObjectiveId": "563411cd-2dec-402e-939f-34a1aac8c037",
+      "documentIds": {
+        "batchent-technologies-overview.txt": "83738cd8-80e9-4251-bdc6-63aba3b226ab",
+        "batchent-technologies-financial-summary.txt": "db873a4e-b810-463a-9cb9-b2105999d2b0",
+        "batchent-technologies-product-brief.txt": "f081b9e0-5f4f-48b3-8aca-6e35daeba5f2",
+        "deck.pdf": "881d7f86-5116-4b7d-a2e7-8a180ccd25aa"
+      },
+      "organisationId": "cbaf8366-5c09-4c8b-b6d2-90fb43a56fe7",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0235": {
+      "name": "Layero",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "f78d9e0c-754e-4396-9462-e071532acbee",
+      "memberUserIds": [
+        "d769ba49-d657-4564-932b-ea95261a20eb"
+      ],
+      "companyId": "38cf5bfa-08db-4be4-a927-b0f51ba689a7",
+      "capitalObjectiveId": "d557a74e-f787-496b-b2d6-2c1c90d75b21",
+      "documentIds": {
+        "layero-overview.txt": "71718b98-dbff-42ae-9560-9bad8610e3b7",
+        "layero-management-accounts-h1-2026.csv": "b23e8ceb-f86b-4163-b50a-64b6afa949a6",
+        "layero-product-brief.txt": "4024b228-2d6e-4273-ac4b-88181cec5fa9",
+        "layero-pipeline.csv": "692df437-b734-4745-8e91-164cb87984fc",
+        "deck.pdf": "60ca9096-06d4-470b-ba4c-351f47fffa66"
+      },
+      "organisationId": "355b415f-ab5c-4419-9a24-b4de8b3f00a1",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0236": {
+      "name": "Scholarelle",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "a491b2ac-9ae4-491f-9ae6-69ffe3687e89",
+      "memberUserIds": [
+        "7aa45a33-5c73-4e71-a01e-4dc539dd8ef7",
+        "0f867795-4261-44f1-8884-5ff26d31f96d"
+      ],
+      "companyId": "07d4cba9-f49d-4e27-9215-8714c3fe5829",
+      "capitalObjectiveId": "a9032c75-961b-4770-ad76-e9e8c874af75",
+      "documentIds": {
+        "scholarelle-overview.txt": "6f5607d1-9ea5-497b-a0ce-f59a86e06871",
+        "scholarelle-management-accounts-h1-2026.csv": "73e36d20-e24a-4ae1-b0dc-ec94da3c1faa",
+        "scholarelle-product-brief.txt": "0534a7d6-2c7f-411a-9343-22b47e815a53",
+        "deck.pdf": "55a52c79-0cda-4427-b6d4-13f04641913f"
+      },
+      "organisationId": "8268996b-6284-45f9-91dd-06755c0f3f71",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0237": {
+      "name": "Purseana",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "dfe26ee4-4e96-4a17-8fa0-e3526ba42771",
+      "memberUserIds": [
+        "e6e46867-c205-42a9-a3a8-c2bd5a7aae32"
+      ],
+      "companyId": "2833f40e-0478-49fc-b037-8ad039e18814",
+      "capitalObjectiveId": "08326b4a-0c33-4b43-a82f-6e8e51f61ddc",
+      "documentIds": {
+        "purseana-overview.txt": "d5aeb62b-915b-475c-ae7f-db1632112d65",
+        "purseana-management-accounts-h1-2026.csv": "c8d42704-1a18-4f29-9999-96e2a4aced21",
+        "purseana-product-brief.txt": "6dd552c1-8667-4685-96a0-147f3cf30d5c",
+        "purseana-pipeline.csv": "7aa8e3d4-22fb-4058-ac22-aa934fc45d1e",
+        "deck.pdf": "2c982adb-b01e-4ed0-bd94-60bbd5209ff3"
+      },
+      "organisationId": "90e23ffd-ce9b-448d-b82d-564dbd103daf",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0238": {
+      "name": "Routeio",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "92d4fb34-044d-42de-8f18-0c66e6ed4a92",
+      "memberUserIds": [
+        "d9b8cfbc-9694-412f-8079-937d6dae58e8"
+      ],
+      "companyId": "1eaff7db-e19a-4cbd-b45d-35c6198f97a1",
+      "capitalObjectiveId": "5fe3eba9-2162-4007-992f-699e77f518ab",
+      "documentIds": {
+        "routeio-overview.txt": "959a73a7-8726-49bd-a5c8-f65e76c8dae0",
+        "routeio-financial-summary.txt": "b8a45338-9c1b-40ba-924c-df3e625bcabb",
+        "routeio-product-brief.txt": "317d2e63-0aba-4d33-83f5-53d7b00efd75",
+        "deck.pdf": "1b5a942b-13a0-4f71-a533-84dd11c11dd3"
+      },
+      "organisationId": "8b1c1aa3-042d-44c1-9e12-4e4359efc8b5",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0239": {
+      "name": "Milla Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "c02e87aa-8950-4a7e-bb70-ae31b198b4a6",
+      "memberUserIds": [
+        "7051b21e-28d7-4239-88bb-d923fb705e61"
+      ],
+      "companyId": "efa2edc7-ec75-448a-951d-dc98dab3800e",
+      "capitalObjectiveId": "47451dda-18a7-455e-96b7-948b12335d32",
+      "documentIds": {
+        "milla-systems-overview.txt": "c18de360-ed97-4997-82b5-c3c113e269f3",
+        "milla-systems-management-accounts-h1-2026.csv": "79eafbeb-255e-4c62-af9b-b5f7fafa6c81",
+        "milla-systems-product-brief.txt": "d135d3a4-7971-4865-a2d6-16f99928f702",
+        "milla-systems-pipeline.csv": "77363fc1-e1df-46ef-9fb2-0e1b48ea3746",
+        "deck.pdf": "52036d3a-2aff-4fab-8497-3f7c9d5db8f4"
+      },
+      "organisationId": "1318b961-a755-4cc2-85e7-b7feba2e007a",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0240": {
+      "name": "Crewa Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "de211671-6aad-4a0c-901c-fb31e19b791c",
+      "memberUserIds": [
+        "69fafe91-32c4-4935-b60d-62d7e6adb9ca",
+        "d89f0d2d-44c9-4904-ab73-9aca1735ef61"
+      ],
+      "companyId": "42e1bc2c-0c93-4278-b98b-d5641bb912c1",
+      "capitalObjectiveId": "6cec91c8-b2c3-41e4-984c-cce3a1f06ab6",
+      "documentIds": {
+        "crewa-labs-overview.txt": "547cbc86-e6ce-481c-82b1-d266fb83c0b2",
+        "crewa-labs-management-accounts-h1-2026.csv": "5015bbf4-30b5-4b0a-aa68-16fbff5e9283",
+        "crewa-labs-product-brief.txt": "7351fd48-30aa-4048-8ccc-1d4af9660351",
+        "deck.pdf": "dcff849d-748c-45a7-b4db-fafd60684a62"
+      },
+      "organisationId": "09fe0bfb-a5a7-4953-a406-bb623b41b911",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0241": {
+      "name": "Motoly Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "a0c9ce95-e2ed-45ac-9e47-d9a15f0bbefe",
+      "memberUserIds": [
+        "1e8596aa-ccf5-4fe7-8951-8f5a371764de"
+      ],
+      "companyId": "6a128b01-4f8a-47a6-9db4-7c30dfbfd4ce",
+      "capitalObjectiveId": "2b8f476f-3e3f-4273-a37f-55bf46b7dbce",
+      "documentIds": {
+        "motoly-systems-overview.txt": "0c05b589-6d13-45af-817b-0a3217d0b2a8",
+        "motoly-systems-management-accounts-h1-2026.csv": "e7db1014-8ea7-4599-926b-c26b8669bf20",
+        "motoly-systems-product-brief.txt": "c39b125d-0d15-47cf-bf30-f28fafe52ecd",
+        "motoly-systems-pipeline.csv": "35815d10-cfc9-48ad-9735-6d838e7a85ab",
+        "deck.pdf": "b3ae597d-a0e7-4a9c-8d93-8ccef9b5c7d4"
+      },
+      "organisationId": "aeddc312-d2f9-49a4-a4a3-4ac4efb73eee",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0242": {
+      "name": "Depotisk Systems",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "76198426-809b-4f02-b67b-71cce74e2bb3",
+      "memberUserIds": [
+        "414e1205-80de-470a-9af3-0f1f3374e932"
+      ],
+      "companyId": "fb4737ad-3ebe-49bf-8721-55c36f8cb52e",
+      "capitalObjectiveId": "ded92a77-1bcb-4cb9-a001-af031a709699",
+      "documentIds": {
+        "depotisk-systems-overview.txt": "3ad3cae2-ce65-4b4f-91a8-23d830821a66",
+        "depotisk-systems-management-accounts-h1-2026.csv": "1990bb39-e4d4-4f15-8ef8-fb1f1f7b3141",
+        "depotisk-systems-product-brief.txt": "f604216c-af02-4efe-984d-6fbdffac9141",
+        "deck.pdf": "d3731ab2-727b-4c44-9bce-6b114c994594"
+      },
+      "organisationId": "f09b8500-91a2-467d-81ec-d950d056e5d5",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0243": {
+      "name": "Verifyo",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "c0f5e428-5661-4621-9428-1db9a0505a39",
+      "memberUserIds": [
+        "c232b969-6ef5-4f60-b2fc-7bb17daf93af"
+      ],
+      "companyId": "5658dd51-a6df-4aee-8a43-96784a699c0c",
+      "capitalObjectiveId": "34dbfef1-5760-4086-8eba-f5d7bf49989b",
+      "documentIds": {
+        "verifyo-overview.txt": "12c69fdd-5681-4d16-95c8-a1125cd2b33a",
+        "verifyo-financial-summary.txt": "6cefb251-c7bf-4cc8-920e-0a193d851d69",
+        "verifyo-product-brief.txt": "f420f1f1-b693-4890-8e32-4016c2d984f4",
+        "deck.pdf": "780dde50-c134-4abf-9402-e1dac5df1438"
+      },
+      "organisationId": "972776ef-f0e3-40e2-a15a-44f883043a90",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0244": {
+      "name": "Wardora Hub",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "fae805f0-ac70-4f2a-97e0-dd3c0f8004dc",
+      "memberUserIds": [
+        "2ce7800c-d331-404c-85b2-890f8b0cd4a0"
+      ],
+      "companyId": "005804fc-6603-4a20-aad5-1bb4a453f864",
+      "capitalObjectiveId": "d15ea58d-6803-494a-beef-f511bd747f74",
+      "documentIds": {
+        "wardora-hub-overview.txt": "bf8ed7fe-9682-4f4b-91d6-2925ab82d6dc",
+        "wardora-hub-management-accounts-h1-2026.csv": "5bd70da9-2a23-4450-85ca-f2ec238efae0",
+        "wardora-hub-product-brief.txt": "23c62d44-a537-43fa-80a5-432ad1a19839",
+        "deck.pdf": "d855e165-a716-4f10-aa9a-24034193a846"
+      },
+      "organisationId": "21fea88e-26d7-4952-983f-0313da37dbdf",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0245": {
+      "name": "Yielda",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "d085aaf6-835b-4eac-8dfe-47609c511c4c",
+      "memberUserIds": [
+        "7779b64f-a2f8-4e39-b1d8-c553361a7f55"
+      ],
+      "companyId": "c6fdf104-17f2-4616-b5e1-4c06ecb41177",
+      "capitalObjectiveId": "69e7a987-e4c7-458e-9732-15a5a297c850",
+      "documentIds": {
+        "yielda-overview.txt": "92c35605-ff37-4a42-ac65-99df6b3fde14",
+        "yielda-management-accounts-h1-2026.csv": "1860c895-35b6-4da7-aa08-bbe6cb8c0138",
+        "yielda-product-brief.txt": "675dd2d5-b66b-42e4-9163-008dc76c6b0f",
+        "deck.pdf": "6c933f39-99de-402c-90f0-1f6205b01d9a"
+      },
+      "organisationId": "290a7fac-95c1-4ea3-9a71-dd62f990e065",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0246": {
+      "name": "Trustisk",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "07526abe-1a0a-4c4b-8e74-2d7d2cd0285f",
+      "memberUserIds": [
+        "44b0e118-a1f6-496f-93b1-ed56e45acaea",
+        "4ba8f2e9-6891-44a9-b6eb-b196e93a6e8c"
+      ],
+      "companyId": "b11727d5-e746-484b-85c4-44477ee78400",
+      "capitalObjectiveId": "1f4c746e-4364-4975-9491-0909d11748f4",
+      "documentIds": {
+        "trustisk-overview.txt": "743d44e7-2bbb-4ce1-9ed2-6ae4e235b5bb",
+        "trustisk-management-accounts-h1-2026.csv": "747cc190-2f0b-4d04-bcb2-d3f6298c67f5",
+        "trustisk-product-brief.txt": "a6f51127-c9b3-4812-9e7d-a1e5926e7050",
+        "trustisk-pipeline.csv": "4fbf2c23-f2c8-4b57-a6f2-1693ec8d9744",
+        "deck.pdf": "021adadd-a5f5-4732-b6d6-6e87a7a1d435"
+      },
+      "organisationId": "f9b6e25e-619c-47c7-926e-cab1dec3c08e",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0247": {
+      "name": "Vitaana Labs",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "1cd4e0d1-c2d3-4dc6-bd06-f6fb1e803bd0",
+      "memberUserIds": [
+        "481f1300-1e31-4bed-be71-3c7a833506c1",
+        "c0c2bd1b-7248-4a15-9404-b229ac742f8d"
+      ],
+      "companyId": "e2e55d60-f1c0-4ac3-9193-cad937be856b",
+      "capitalObjectiveId": "32484b1f-dedd-4ea1-a8d8-3094f6239985",
+      "documentIds": {
+        "vitaana-labs-overview.txt": "1a1cb73b-bf17-4841-9bbe-390fc8ae84b0",
+        "vitaana-labs-financial-summary.txt": "35c726ed-1d94-4b21-91af-a55f01430f8c",
+        "vitaana-labs-product-brief.txt": "901a5215-edbb-45d8-8a4b-b9ce04e986c8",
+        "deck.pdf": "7bb957b4-9c5e-4893-8019-85fc74eecb12"
+      },
+      "organisationId": "36d5045a-5cc4-4ea3-a48d-223144a13e6e",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0248": {
+      "name": "Scopeora Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "0853915e-905d-406f-a667-00f53da6e9c3",
+      "memberUserIds": [
+        "1a89f993-752d-41d4-a1b7-cf1b0959aaa1",
+        "8371a0a4-35cc-4b26-ba6b-5486092e3653"
+      ],
+      "companyId": "12199820-ffc1-4d80-bfa5-3d6269ba952c",
+      "capitalObjectiveId": "d6d102e1-0031-4eff-8554-3bca868a9fee",
+      "documentIds": {
+        "scopeora-africa-overview.txt": "e2921241-066d-461c-8746-fc509022c650",
+        "scopeora-africa-management-accounts-h1-2026.csv": "6dc6a851-8ef9-44ac-aec7-fea875a099cd",
+        "scopeora-africa-product-brief.txt": "b7198114-c85a-49e6-9f80-f1e7ea66a4b2",
+        "deck.pdf": "4f956685-1324-4698-8cfd-78515b8dfb2b"
+      },
+      "organisationId": "1c65e583-00c8-4ea6-a8f4-4c6882755302",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0249": {
+      "name": "Dukaari Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "ae4817f6-760d-4646-8d55-7375862b79d5",
+      "memberUserIds": [
+        "91922377-4a60-4161-b61c-4c08100784ae"
+      ],
+      "companyId": "d9bb8f77-a721-438d-91e3-9213114dae00",
+      "capitalObjectiveId": "ad19f2c0-0641-4eee-b8af-13b5efd4e331",
+      "documentIds": {
+        "dukaari-africa-overview.txt": "3bc8dab8-cd41-4682-bfea-8210b199bae1",
+        "dukaari-africa-management-accounts-h1-2026.csv": "3b99d9e7-8fb8-43ab-9525-a004979b9fe4",
+        "dukaari-africa-product-brief.txt": "ce3fc00f-2ee3-4d1e-96e5-4e9a914a720d",
+        "deck.pdf": "d3521475-3b3f-4c51-966e-2c6c3e33b148"
+      },
+      "organisationId": "fa85bd42-e77c-4c54-aca0-a16f2c719f77",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "fb0250": {
+      "name": "Coreeon Africa",
+      "steps": {
+        "accounts": true,
+        "journey": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "docsv2": true,
+        "q": true,
+        "team": true,
+        "visible": true,
+        "round": true,
+        "verify": true
+      },
+      "founderUserId": "2ffcc380-2581-4e54-bdfb-fdc28870e29b",
+      "memberUserIds": [
+        "8e3f1249-cf5a-4322-9068-3b33098d0426",
+        "b5df190f-9d7c-4547-88f1-2581ff0bcc44"
+      ],
+      "companyId": "1f4df201-0e17-4dbe-b6ab-b9b55938760a",
+      "capitalObjectiveId": "3d145ed9-1212-4308-9007-427f1ca9f091",
+      "documentIds": {
+        "coreeon-africa-overview.txt": "1bddc9ab-beac-4816-ad84-f9b357453caf",
+        "coreeon-africa-management-accounts-h1-2026.csv": "003b5646-f38e-4b9c-b80b-f724b3661534",
+        "coreeon-africa-product-brief.txt": "85240093-d1f9-4beb-8658-8508547ff2c6",
+        "coreeon-africa-pipeline.csv": "35d5c6c6-da82-4e6c-bb4a-d9500e5622c9",
+        "deck.pdf": "27fcd7ea-cf29-46f2-96b8-364a8d05ba52"
+      },
+      "organisationId": "9a6f113a-e31e-4b7e-95bc-b773f2b0e68b",
       "visibility": "network_visible",
       "readiness": "requirements_outstanding"
     }
