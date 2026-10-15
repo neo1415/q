@@ -68,12 +68,31 @@
   body {
     min-height: 100dvh;
     background-color: var(--cq-canvas);
-    /*
-     * Texture, not decoration (founder direction 2026-09-29): two faint
-     * blooms of the brand blue and a very low-contrast grain, fixed so
-     * content scrolls over them. Tokens only, so light mode gets its own
-     * quieter values.
-     */
+    /* Brand-coloured scrollbars, thin, everywhere. */
+    scrollbar-color: var(--cq-qcard-edge) transparent;
+    color: var(--cq-text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Texture, not decoration (founder direction 2026-09-29; owner directive
+   * 2026-10-15 §D): two faint blooms of the brand blue, a very low-contrast
+   * grain and a fine dot grid that fades out where people read. Painted
+   * once on fixed layers behind everything, so scrolling moves none of it
+   * (a fixed body background repaints the viewport on every scroll in some
+   * browsers). Tokens only: light and dark have their own values.
+   */
+  body::before,
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+  body::before {
     background-image:
       radial-gradient(
         60rem 40rem at 100% -10%,
@@ -86,13 +105,27 @@
         transparent 70%
       ),
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .55 0 0 0 0 .7 0 0 0 .045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-attachment: fixed;
-    /* Brand-coloured scrollbars, thin, everywhere. */
-    scrollbar-color: var(--cq-qcard-edge) transparent;
-    color: var(--cq-text-primary);
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
+  }
+  body::after {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      var(--cq-texture-dot) 1px,
+      transparent 1.5px
+    );
+    background-size: 24px 24px;
+    /* Strongest toward the edges, gone where people read. */
+    mask-image: radial-gradient(
+      ellipse 70% 60% at 50% 45%,
+      transparent 35%,
+      black 100%
+    );
+  }
+  /* More contrast or forced colours: a flat canvas, nothing behind text. */
+  @media (prefers-contrast: more), (forced-colors: active) {
+    body::before,
+    body::after {
+      display: none;
+    }
   }
 
   @media (min-width: 1024px) {

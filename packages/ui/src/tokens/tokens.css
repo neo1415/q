@@ -158,6 +158,8 @@
   --cq-qcard-edge: oklch(0.6 0.16 255);
   --cq-qcard-glow: oklch(0.6 0.16 255 / 0.16);
   --cq-qcard-arc: oklch(0.62 0.16 255 / 0.1);
+  /* The shell's dot grid (2026-10-15): ink at a whisper, below text contrast. */
+  --cq-texture-dot: oklch(0.42 0.03 258 / 0.07);
   --cq-stage-surface: oklch(1 0 0 / 0.06);
   --cq-stage-surface-strong: oklch(1 0 0 / 0.12);
   --cq-stage-border: oklch(1 0 0 / 0.14);
@@ -223,6 +225,7 @@
     --cq-qcard-edge: oklch(0.68 0.16 255);
     --cq-qcard-glow: oklch(0.68 0.16 255 / 0.22);
     --cq-qcard-arc: oklch(0.7 0.16 255 / 0.2);
+    --cq-texture-dot: oklch(0.86 0.02 258 / 0.055);
     --cq-accent-hover: oklch(0.76 0.14 258);
     --cq-accent-soft: oklch(0.27 0.06 258);
     --cq-positive: oklch(0.72 0.12 151);
@@ -276,6 +279,7 @@
   --cq-qcard-edge: oklch(0.68 0.16 255);
   --cq-qcard-glow: oklch(0.68 0.16 255 / 0.22);
   --cq-qcard-arc: oklch(0.7 0.16 255 / 0.2);
+  --cq-texture-dot: oklch(0.86 0.02 258 / 0.055);
   --cq-accent-hover: oklch(0.76 0.14 258);
   --cq-accent-soft: oklch(0.27 0.06 258);
   --cq-positive: oklch(0.72 0.12 151);
