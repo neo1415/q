@@ -55,3 +55,4 @@ export {
   type KnowledgePack,
   type PackEntry,
 } from "./knowledge-pack.js";
+export { PREMIERE_CERTIFICATION_LEDGER, PREMIERE_SCRIPT } from "./premiere.js";

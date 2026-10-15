@@ -514,3 +514,54 @@ describe("director SKIP / REPEAT edges", () => {
     expect(s.phase).toBe("COMPLETE");
   });
 });
+
+describe("TourRunner.hearAudience — mic transcript into the gate", () => {
+  it("pauses on an audience 'pause', ignores the narrator saying it", async () => {
+    const h = harness();
+    h.runner.start();
+    await flush();
+    const quiet = {
+      narratorPlaying: false,
+      counterpartPlaying: false,
+      echoCancellation: false,
+    };
+    expect(
+      h.runner.hearAudience(
+        {
+          segmentId: "q-1",
+          source: "NARRATOR_Q",
+          channelId: "narrator",
+          text: "Pause",
+          final: true,
+        },
+        quiet,
+      ),
+    ).toBeNull();
+    expect(h.runner.state.phase).toBe("SPEAK_AND_ACT");
+    const decision = h.runner.hearAudience(
+      {
+        segmentId: "mic-1",
+        source: "AUDIENCE_MIC",
+        channelId: "mic",
+        text: "Pause",
+        final: true,
+      },
+      quiet,
+    );
+    expect(decision?.admitted).toBe(true);
+    expect(h.runner.state.phase).toBe("PAUSED");
+    // A question while paused is not another interruption.
+    expect(
+      h.runner.hearAudience(
+        {
+          segmentId: "mic-2",
+          source: "AUDIENCE_MIC",
+          channelId: "mic",
+          text: "Is that verified?",
+          final: true,
+        },
+        quiet,
+      ),
+    ).toBeNull();
+  });
+});
