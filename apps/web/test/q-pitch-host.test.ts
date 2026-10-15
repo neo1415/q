@@ -350,4 +350,30 @@ describe("the tour's subject company (server setting, viewer-checked)", () => {
       ),
     ).toBeNull();
   });
+
+  it("reuses one viewer's answer briefly, never another viewer's, and never a refusal", async () => {
+    const { ViewerSubjectCache, VIEWER_SUBJECT_TTL_MS } =
+      await import("@/features/q-pitch/subject-model");
+    let now = 1_000;
+    const cache = new ViewerSubjectCache(() => now);
+    let reads = 0;
+    const load = () => {
+      reads += 1;
+      return Promise.resolve(SUBJECT);
+    };
+    expect(await cache.read("viewer-a", LEDGERFOLD, load)).toEqual(SUBJECT);
+    expect(await cache.read("viewer-a", LEDGERFOLD, load)).toEqual(SUBJECT);
+    expect(reads).toBe(1);
+    // Another viewer asks for themselves.
+    expect(
+      await cache.read("viewer-b", LEDGERFOLD, () => Promise.resolve(null)),
+    ).toBeNull();
+    // A refusal is not remembered.
+    expect(await cache.read("viewer-b", LEDGERFOLD, load)).toEqual(SUBJECT);
+    expect(reads).toBe(2);
+    // The answer lapses: a revoked read is noticed this soon.
+    now += VIEWER_SUBJECT_TTL_MS;
+    await cache.read("viewer-a", LEDGERFOLD, load);
+    expect(reads).toBe(3);
+  });
 });

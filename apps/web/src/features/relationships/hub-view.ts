@@ -183,3 +183,11 @@ export function hubOverviewRefs(
     )
     .slice(0, 12);
 }
+
+/**
+ * Perf lane 2026-10-16: while a tapped CRM tab's view is read, what is
+ * about to change dims (the tab itself carries the mark, LinkPending), so
+ * the tap is answered at once. The header, with its tabs, stays as it is.
+ */
+export const HUB_PAGE_PENDING =
+  "[&>*]:transition-opacity [&>*]:duration-(--cq-motion-fast) [&:has([data-link-pending])>:not(header)]:opacity-60";

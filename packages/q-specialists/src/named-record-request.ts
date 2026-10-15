@@ -1,6 +1,7 @@
 import type { QRecordPage } from "@capital-q/contracts";
 import { scoreOrgNames, scorePersonNames } from "@capital-q/q-core/names";
 import { spokenNameScore } from "@capital-q/q-tools";
+import { asksForDrawing, isDrawingObject } from "@capital-q/q-core/speech";
 
 import {
   PAGE_VERB,
@@ -166,6 +167,9 @@ export function namedRecordRequestOf(text: string): NamedRecordRequest | null {
     if (pageRequestOf(sentence)?.kind === "PAGE") return null;
     const object = PAGE_VERB.exec(sentence)?.[1]?.trim();
     if (object === undefined || object.length === 0) continue;
+    // Owner 2026-10-15: "show me a map of where Tensorgate is" was opened
+    // as Tensorgate's profile. A drawing asked for names no record to open.
+    if (isDrawingObject(object) || asksForDrawing(sentence)) continue;
     const found = fromObject(object);
     if (found !== null) return found;
   }

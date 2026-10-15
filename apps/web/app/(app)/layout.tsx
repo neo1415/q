@@ -22,8 +22,7 @@ import { InstallPrompt } from "@/pwa/install-prompt";
 import { loadMyOrganisations } from "@/features/team/load-organisations";
 import { PitchWarmup } from "@/features/discover/player/pitch-warmup-trigger";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
-import { resolveTourSubject } from "@/features/q-pitch/subject";
-import { QPitchEntry } from "@/features/q-pitch/tour-entry";
+import { QPitchEntrySlot } from "@/features/q-pitch/tour-entry-slot";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -62,9 +61,6 @@ export default async function ApplicationLayout({
   const brandRead = loadBrandStyle().catch(() => null);
   const context = await resolveOwnContext();
   const qPitch = qPitchEnabled();
-  // Read as this viewer, in parallel with the shell's other reads.
-  const subjectRead = qPitch ? resolveTourSubject() : Promise.resolve(null);
-  subjectRead.catch(() => undefined);
   const shell: ShellContext =
     context.kind === "FOUNDER"
       ? { scope: "founder_private", label: context.label ?? undefined }
@@ -104,17 +100,15 @@ export default async function ApplicationLayout({
   // WORK-58: the Admin group shows only to a platform admin, decided by
   // the API (the console's own route refuses anyone else regardless).
   // P5: the brand colour, read alongside so it paints with the first frame.
-  const [verifyNudgeState, admin, brandCss, organisations, tourSubject] =
-    await Promise.all([
-      unfinished === null && context.kind !== "NONE"
-        ? verifyRead
-        : Promise.resolve(null),
-      adminRead,
-      brandRead,
-      // G2: the switcher's list (shown only for two or more).
-      loadMyOrganisations(),
-      subjectRead.catch(() => null),
-    ]);
+  const [verifyNudgeState, admin, brandCss, organisations] = await Promise.all([
+    unfinished === null && context.kind !== "NONE"
+      ? verifyRead
+      : Promise.resolve(null),
+    adminRead,
+    brandRead,
+    // G2: the switcher's list (shown only for two or more).
+    loadMyOrganisations(),
+  ]);
   return (
     <AppShell
       context={{ ...shell, admin, organisations, qPitch }}
@@ -132,16 +126,15 @@ export default async function ApplicationLayout({
       ) : null}
       <QSwarmPointer />
       {/* Q Pitch rehearsal host (QP-F08): off unless the server enables it;
-          the host itself admits only fictional demo accounts. */}
+          the host itself admits only fictional demo accounts. Its subject
+          read streams after the page and never holds the first byte. */}
       {qPitch &&
       unfinished === null &&
       user.email !== null &&
       (context.kind === "INVESTOR" || context.kind === "FOUNDER") ? (
-        <QPitchEntry
-          account={user.email}
-          role={context.kind}
-          subject={tourSubject}
-        />
+        <Suspense fallback={null}>
+          <QPitchEntrySlot account={user.email} role={context.kind} />
+        </Suspense>
       ) : null}
       {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
           receipts to the Q API, and the notice when an act did not happen. */}
