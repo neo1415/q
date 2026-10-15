@@ -287,6 +287,10 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   WORK_DONE: "Opens Work on its Done tab: what Q finished for them.",
   WORK_TEAM: "Opens Work on its Team tab: Q's team and the jobs it holds.",
   WORK_COST: "Opens Work on its Cost tab: what Q's work has cost so far.",
+  OWN_DATA_ROOM:
+    "For a founder, opens their own company's Data room tab, where they add, organise and share documents.",
+  OWN_DECK:
+    "For a founder, opens their own company's Pitch deck tab, where they replace or edit the deck.",
   GATEQ_INBOX:
     "Opens GateQ's Inbox (an investor's): the applications that came in through their gate.",
   GATEQ_FIND:

@@ -57,6 +57,15 @@ describe("GateQ video provider bridge URL", () => {
     const baseUrl = (pal?.body as { layers: { llm: { base_url: string } } })
       .layers.llm.base_url;
     expect(baseUrl).toBe("https://api.example/v1/gateq/video/bridge");
+    // The applicant's room shows the interviewer as "Q", never an id; the
+    // conversation keeps the session id for tracing on the provider's side.
+    expect((pal?.body as { pal_name: string }).pal_name).toBe("Q");
+    const conversation = bodies.find((b) =>
+      b.url.endsWith("/v2/conversations"),
+    );
+    expect(
+      (conversation?.body as { conversation_name: string }).conversation_name,
+    ).toBe("cq-gateq-s1");
     // What Tavus will call is exactly the route the api serves.
     expect(`${baseUrl}/chat/completions`).toBe(
       `https://api.example${GATEQ_VIDEO_BRIDGE_PATH}`,

@@ -714,3 +714,29 @@ PR99 exactefd2 protectedCI38617987342 allPASS; normalproductionmerge48c6. Web/AP
   - OpenAI about $0.46: lane S $0.41, lane G about $0.05;
   - Tavus $0.
 - Next: batch D (#113), the paid Tavus test after 09:00 WAT, the dossier-Q re-acceptance, the Q Pitch pilot re-run, CRM screenshots and walkthroughs, and the S3 after-deploy measures.
+
+## 15 October 2026, 11:20 WAT — releases E–H; batch I merged
+
+Releases:
+
+- E (#116)
+- F (#118): Home loads in 0.6–1.4 s.
+- G (#121): CRM redesign, the Discover rule that shows only companies with a pitch video, and the fictional-account presence guard.
+- H (#124): founder onboarding v4+ fix and the video room fixes.
+
+Batch I (#123: video allowance, Daily guard, Qatar research, Gulf taxonomy) is merged to `build/int-rc` and has 4 migrations pending. They will be applied, and the release made, after lane G's paid acceptance.
+
+Paid usage:
+
+- Tavus key#1 (disposable) ran out after 463.5 s: 13 pitch videos, plus two GateQ tests that ran on it by mistake before the Builder key was set.
+- Q Pitch has spent about $0.15 of OpenAI and lane S about $0.46.
+
+Lanes:
+
+- G: video acceptance, all-accounts eligibility, Tavus in Google Meet.
+- V: pitch videos.
+- D: bulk seed (20 + 100 so far) and enrichment.
+- C: CRM deep research and rebuild, founder documents access.
+- S: speed, precision and memory.
+- A: artifacts reliability.
+- P: Q Pitch, all scenes certified except the mic test for Q-to-Q.

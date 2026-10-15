@@ -300,6 +300,8 @@ const DESTINATION_LABELS: Readonly<
   WORK_DONE: "Open Done",
   WORK_TEAM: "Open Q's team",
   WORK_COST: "Open Cost",
+  OWN_DATA_ROOM: "Open your data room",
+  OWN_DECK: "Open your pitch deck",
   GATEQ_INBOX: "Open your GateQ inbox",
   GATEQ_FIND: "Open GateQ Find",
   GATEQ_CLAIM: "Open GateQ Claim",

@@ -183,6 +183,8 @@ const SCREEN_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   WORK_DONE: "Work (Done)",
   WORK_TEAM: "Work (Team)",
   WORK_COST: "Work (Cost)",
+  OWN_DATA_ROOM: "their data room",
+  OWN_DECK: "their pitch deck",
   GATEQ_INBOX: "their GateQ inbox",
   GATEQ_FIND: "GateQ Find",
   GATEQ_CLAIM: "GateQ Claim",

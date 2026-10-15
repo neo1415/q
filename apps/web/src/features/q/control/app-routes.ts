@@ -42,6 +42,7 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/company/[companyId]",
   "/company/[companyId]/founder/[position]",
   "/crm",
+  "/company/data-room",
   "/company/interest",
   "/company/visibility",
   "/daily",

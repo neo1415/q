@@ -139,11 +139,15 @@ export function createPostgresGateqVideoSessions(deps: {
         : null;
     },
     markLive: async (input) => {
-      await sql`
+      // The clock starts when the room is ready (migration 20261226160000).
+      const rows = await sql`
         update gateq.application_video_sessions
            set status = 'LIVE', provider_conversation_id = ${input.providerConversationId},
-               join_url_sealed = ${input.joinUrlSealed}
-         where id = ${input.id} and status = 'STARTING'`;
+               join_url_sealed = ${input.joinUrlSealed},
+               live_at = now(), ends_at = now() + make_interval(secs => max_seconds)
+         where id = ${input.id} and status = 'STARTING'
+         returning *`;
+      return rows[0] === undefined ? null : toRow(rows[0]);
     },
     end: async (input) => {
       const rows = await sql`

@@ -137,11 +137,16 @@ export type GateqVideoSessionStore = {
     readonly applicationId: string;
     readonly tenantId: string;
   }) => Promise<GateqVideoAllowance | null>;
+  /**
+   * The room is ready: the session goes live and its clock starts now, so
+   * the applicant's full time begins when they can use it. Returns the live
+   * row (with its new end), or null when it was no longer starting.
+   */
   readonly markLive: (input: {
     readonly id: string;
     readonly providerConversationId: string;
     readonly joinUrlSealed: string | null;
-  }) => Promise<void>;
+  }) => Promise<GateqVideoSessionRow | null>;
   readonly end: (input: {
     readonly id: string;
     readonly reason: NonNullable<GateqVideoSessionRow["endedReason"]>;
@@ -327,17 +332,13 @@ export function createGateqVideoInterview(deps: {
         createdConversationId = room.conversationId;
         const joinUrlSealed =
           room.joinUrl === null ? null : deps.sealer.seal(room.joinUrl);
-        await deps.store.markLive({
+        const live = await deps.store.markLive({
           id: row.id,
           providerConversationId: room.conversationId,
           joinUrlSealed,
         });
-        return view({
-          ...row,
-          status: "LIVE",
-          providerConversationId: room.conversationId,
-          joinUrlSealed,
-        });
+        if (live === null) throw new Error("video session no longer starting");
+        return view(live);
       } catch {
         // The allowance is spent by the attempt (no retry-to-mint), the
         // row is closed, and the applicant carries on by typing. A room the

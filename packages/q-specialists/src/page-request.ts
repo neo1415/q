@@ -213,6 +213,15 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   docs: d("DOCUMENTS"),
   files: d("DOCUMENTS"),
   "brand kit": d("DOCUMENTS"),
+  // Owner 2026-10-15: a founder's own data room and deck. Only with
+  // "my"/"our": a bare "the data room" is the tab of the record on screen.
+  "my data room": d("OWN_DATA_ROOM"),
+  "our data room": d("OWN_DATA_ROOM"),
+  "my dataroom": d("OWN_DATA_ROOM"),
+  "my deck": d("OWN_DECK"),
+  "our deck": d("OWN_DECK"),
+  "my pitch deck": d("OWN_DECK"),
+  "our pitch deck": d("OWN_DECK"),
   rehearsals: d("REHEARSALS"),
   rehearsal: d("REHEARSALS"),
   rehearse: d("REHEARSALS"),
@@ -363,6 +372,9 @@ export function withoutLeadIn(text: string): string {
   return text.trim().replace(LEAD_IN, "").trim();
 }
 
+const COMPANY_DOCUMENTS =
+  /^(?:the\s+)?(?:documents?|docs|files)\s+(?:for|of|from|at)\s+(?:the\s+)?\p{Lu}/u;
+
 /**
  * A request to open a page, or null when the words are not one (a record
  * by name, a question, anything else). UNKNOWN only when they named a
@@ -378,6 +390,9 @@ export function pageRequestOf(text: string): PageRequest | null {
   if (object === undefined || object.length === 0) return null;
   const key = normalise(object);
   if (key.length === 0) return null;
+  // "the files of Tensorgate" is that company's data room, a record
+  // (named-record-request.ts), not the person's own Documents page.
+  if (COMPANY_DOCUMENTS.test(object)) return null;
   for (const candidate of [
     ...candidates(normalise(object, true)),
     ...candidates(key),

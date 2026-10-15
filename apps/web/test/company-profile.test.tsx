@@ -271,6 +271,44 @@ describe("the profile, for an investor", () => {
     ).toBeTruthy();
   });
 
+  it("a synthetic-demo attestation shows a quiet 'Demo verified (synthetic)' with its basis, never the gold badge", () => {
+    const base = investorProfile();
+    renderProfile(
+      investorProfile({
+        overview:
+          base.overview === null
+            ? null
+            : { ...base.overview, organisationDemoAttested: true },
+      }),
+    );
+    expect(
+      screen.queryAllByText("Organisation verified by Capital Q"),
+    ).toHaveLength(0);
+    expect(document.querySelector("[data-verified-badge]")).toBeNull();
+    const demo = document.querySelector("[data-demo-attestation]");
+    expect(demo?.textContent).toBe("Demo verified (synthetic)");
+    expect(demo?.getAttribute("title")).toMatch(/synthetic-demo attestation/u);
+    expect(demo?.getAttribute("title")).toMatch(
+      /not verified a real organisation/u,
+    );
+  });
+
+  it("an operator or provider verification keeps the gold badge", () => {
+    const base = investorProfile();
+    renderProfile(
+      investorProfile({
+        overview:
+          base.overview === null
+            ? null
+            : { ...base.overview, organisationDemoAttested: false },
+      }),
+    );
+    expect(
+      document.querySelector("[data-verified-badge]")?.textContent,
+    ).toContain("Organisation verified by Capital Q");
+    expect(document.querySelector("[data-demo-attestation]")).toBeNull();
+  });
+
   it("keeps Interest and Pass alone in the decision row and folds the details on a phone (design-48)", () => {
     renderProfile(investorProfile());
     const row = document.querySelector("[data-profile-actions]");
