@@ -60,7 +60,8 @@ export type GateQFrozenApplicationDocumentObject =
     readonly fileName: string;
     readonly contentType: string;
     readonly byteSize: number;
-    readonly malwareStatus: "CLEAN" | "NOT_SCANNED";
+    /** Investor downloads exist only for a CLEAN scan (lead decision 2026-10-15). */
+    readonly malwareStatus: "CLEAN";
   };
 export class GateQApplicationDocumentSelectionError extends Error {
   constructor() {
@@ -198,6 +199,9 @@ export function createGateQApplicationDocumentPort(deps: {
     executor: DatabaseExecutor,
     ref: GateQApplicationDocumentRef,
     documentIds: readonly string[] | null = null,
+    // Investor disclosure accepts only a CLEAN scan; the founder's own
+    // interview may still read a NOT_SCANNED version (never shared).
+    disclosable = false,
   ) =>
     executor`
       select d.id as document_id,v.id as version_id,d.title,v.original_filename,v.mime_type,v.sha256,v.size_bytes,
@@ -208,7 +212,8 @@ export function createGateQApplicationDocumentPort(deps: {
       where d.tenant_id=${ref.tenantId} and d.owner_kind='GATEQ_APPLICATION' and d.gateq_application_id=${ref.applicationId}
       and d.status='ACTIVE' and d.custody_cleanup_started_at is null
       and (${documentIds === null} or d.id=any(${executor.array([...(documentIds ?? [])])}::uuid[]))
-      and v.processing_status='COMPLETED' and v.text_extraction_status='COMPLETED' and v.malware_scan_status in ('CLEAN','NOT_SCANNED')
+      and v.processing_status='COMPLETED' and v.text_extraction_status='COMPLETED'
+      and (v.malware_scan_status='CLEAN' or (${!disclosable} and v.malware_scan_status='NOT_SCANNED'))
       order by d.created_at,d.id limit ${maxDocuments}`;
 
   const frozenFor = (
@@ -250,7 +255,7 @@ export function createGateQApplicationDocumentPort(deps: {
       where g.tenant_id=${ref.tenantId} and g.application_id=${ref.applicationId} and a.status='SUBMITTED'
         and g.document_id=${selected.documentId} and g.document_version_id=${selected.versionId} and g.sha256=${selected.sha256} and v.sha256=g.sha256
         and d.owner_kind='GATEQ_APPLICATION' and d.status='ACTIVE' and d.custody_cleanup_started_at is null
-        and v.processing_status='COMPLETED' and v.text_extraction_status='COMPLETED' and v.malware_scan_status in ('CLEAN','NOT_SCANNED')`;
+        and v.processing_status='COMPLETED' and v.text_extraction_status='COMPLETED' and v.malware_scan_status='CLEAN'`;
   };
   const withExcerpts = async (
     ref: GateQApplicationDocumentRef,
@@ -369,6 +374,7 @@ export function createGateQApplicationDocumentPort(deps: {
                 tx.sql,
                 ref,
                 selected.map((d) => d.documentId),
+                true,
               )
             ).map((row) => ReadyRow.parse(row));
       if (
@@ -420,6 +426,8 @@ export function createGateQApplicationDocumentPort(deps: {
         storage_bucket: z.string().min(1),
         storage_key: z.string().min(1),
       }).parse(rows[0]);
+      // Defence in depth beside the query: no unscanned bytes to investors.
+      if (r.malware_scan_status !== "CLEAN") return null;
       return {
         documentId: r.document_id,
         versionId: r.version_id,
@@ -428,7 +436,7 @@ export function createGateQApplicationDocumentPort(deps: {
         fileName: r.original_filename,
         contentType: r.mime_type,
         byteSize: r.size_bytes,
-        malwareStatus: r.malware_scan_status,
+        malwareStatus: "CLEAN",
       };
     },
     frozenDocuments: async (input) => {

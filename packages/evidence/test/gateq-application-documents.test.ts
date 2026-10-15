@@ -154,6 +154,7 @@ describe("listing the application's documents", () => {
       q.startsWith("select d.id as document_id")
         ? [
             row({ disclosed: true }),
+            row({ malware_scan_status: "NOT_SCANNED" }),
             row({ malware_scan_status: "BLOCKED" }),
             row({ text_extraction_status: "FAILED" }),
             row({
@@ -171,9 +172,20 @@ describe("listing the application's documents", () => {
       items.map((i) => [i.status, i.includedInSubmission, i.removable]),
     ).toEqual([
       ["READY", true, false],
+      ["READY", false, true],
       ["BLOCKED", false, true],
       ["FAILED", false, true],
       ["UPLOADING", false, true],
+    ]);
+    // Only a CLEAN scan can ever reach an investor; NOT_SCANNED says why.
+    expect(
+      items.map((i) => [i.shareableWithInvestor, i.privateReason]),
+    ).toEqual([
+      [true, null],
+      [false, "NOT_SCANNED"],
+      [false, null],
+      [false, null],
+      [false, null],
     ]);
     // Scoped to this credential's own application and session.
     const query = f.calls.find((c) => c.query.startsWith("select d.id"));
@@ -379,10 +391,12 @@ describe("the GateQ intake document port", () => {
     ]);
     const select = calls.find((c) => c.query.startsWith("select d.id"));
     expect(select?.query).toContain("d.owner_kind='GATEQ_APPLICATION'");
+    // The founder's own interview may read NOT_SCANNED; disclosure may not.
     expect(select?.query).toContain(
-      "v.malware_scan_status in ('CLEAN','NOT_SCANNED')",
+      "(v.malware_scan_status='CLEAN' or (? and v.malware_scan_status='NOT_SCANNED'))",
     );
     expect(select?.values.slice(0, 2)).toEqual([tenantId, applicationId]);
+    expect(select?.values.at(-2)).toBe(true);
   });
 
   it("withholds every excerpt of a document flagged for instruction-like text", async () => {
@@ -469,6 +483,12 @@ describe("the GateQ intake document port", () => {
       },
     ]);
     expect(first.notReady).toEqual([]);
+    // Freezing for an investor admits only CLEAN: the NOT_SCANNED branch is off.
+    expect(
+      calls
+        .find((c) => c.query.startsWith("select d.id as document_id"))
+        ?.values.at(-2),
+    ).toBe(false);
     const inserts = () =>
       calls.filter((c) => c.query.startsWith("insert into")).length;
     expect(inserts()).toBe(1);
@@ -604,6 +624,29 @@ describe("the GateQ intake document port", () => {
     ).rejects.toThrow();
     expect(calls.some((c) => c.query.startsWith("insert"))).toBe(false);
   });
+  it("never hands an investor the bytes of a version that was not scanned clean", async () => {
+    const { sql } = recordingSql((q) =>
+      q.includes("v.storage_bucket,v.storage_key")
+        ? [
+            ready({
+              storage_bucket: "cq-documents-private",
+              storage_key: "uploads/unscanned.pdf",
+              malware_scan_status: "NOT_SCANNED",
+            }),
+          ]
+        : [],
+    );
+    const port = createGateQApplicationDocumentPort({ sql });
+    expect(
+      await port.frozenDocumentObject({
+        tenantId,
+        applicationId,
+        documentId,
+        versionId,
+        sha256: "b".repeat(64),
+      }),
+    ).toBeNull();
+  });
   it("resolves only the exact submitted tuple, and keeps storage coordinates out of page excerpts", async () => {
     const { sql, calls } = recordingSql((q) =>
       q.includes("v.storage_bucket,v.storage_key")
@@ -612,6 +655,7 @@ describe("the GateQ intake document port", () => {
               title: "deck.pdf",
               storage_bucket: "cq-documents-private",
               storage_key: "uploads/frozen.pdf",
+              malware_scan_status: "CLEAN",
             }),
           ]
         : q.startsWith("select page_number")
@@ -631,7 +675,7 @@ describe("the GateQ intake document port", () => {
       documentId,
       versionId,
       object: { bucket: "cq-documents-private", key: "uploads/frozen.pdf" },
-      malwareStatus: "NOT_SCANNED",
+      malwareStatus: "CLEAN",
     });
     const doc = await port.readFrozenDocument(input);
     expect(doc?.excerpts).toEqual([{ page: 2, text: "Authorized evidence" }]);
@@ -641,6 +685,8 @@ describe("the GateQ intake document port", () => {
       c.query.includes("v.storage_bucket,v.storage_key"),
     );
     expect(guard?.query).toContain("a.status='SUBMITTED'");
+    expect(guard?.query).toContain("v.malware_scan_status='CLEAN'");
+    expect(guard?.query).not.toContain("NOT_SCANNED");
     expect(guard?.query).toContain("g.document_version_id=? and g.sha256=?");
     expect(guard?.query).not.toContain("d.current_version_id");
     expect(guard?.values).toEqual([

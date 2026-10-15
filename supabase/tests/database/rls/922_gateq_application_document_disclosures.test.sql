@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
-select plan(12);
+select plan(13);
 
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
   ('00000000-0000-4000-8000-00000000ee01', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b'), 'VC', 'Disclosure Capital');
@@ -41,9 +41,13 @@ update evidence.documents set current_version_id='00000000-0000-4000-8000-000000
 update evidence.documents set current_version_id='00000000-0000-4000-8000-00000000ee62' where id='00000000-0000-4000-8000-00000000ee52';
 update evidence.documents set current_version_id='00000000-0000-4000-8000-00000000ee63' where id='00000000-0000-4000-8000-00000000ee53';
 
+select throws_ok($$insert into evidence.gateq_application_document_disclosures(tenant_id,application_id,document_id,document_version_id,sha256) values
+  (pg_temp.rls_id('tenant_b'),'00000000-0000-4000-8000-00000000ee31','00000000-0000-4000-8000-00000000ee51','00000000-0000-4000-8000-00000000ee61',repeat('b',64))$$,
+  '23514',null,'a NOT_SCANNED version stays founder-only and is never disclosed to an investor');
+update evidence.document_versions set malware_scan_status='CLEAN' where id='00000000-0000-4000-8000-00000000ee61';
 select lives_ok($$insert into evidence.gateq_application_document_disclosures(tenant_id,application_id,document_id,document_version_id,sha256) values
   (pg_temp.rls_id('tenant_b'),'00000000-0000-4000-8000-00000000ee31','00000000-0000-4000-8000-00000000ee51','00000000-0000-4000-8000-00000000ee61',repeat('b',64))$$,
-  'an application discloses its own current, processed version');
+  'an application discloses its own current, processed, scanned-clean version');
 select throws_ok($$insert into evidence.gateq_application_document_disclosures(tenant_id,application_id,document_id,document_version_id,sha256) values
   (pg_temp.rls_id('tenant_b'),'00000000-0000-4000-8000-00000000ee31','00000000-0000-4000-8000-00000000ee53','00000000-0000-4000-8000-00000000ee63',repeat('d',64))$$,
   '23514',null,'an application cannot disclose another application''s document');

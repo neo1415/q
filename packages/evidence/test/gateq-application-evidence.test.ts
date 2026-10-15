@@ -18,6 +18,7 @@ import {
   createGateQApplicationEvidenceService,
   GateQApplicationEvidenceScopeError,
   type GateQApplicationEvidenceScope,
+  DEFAULT_GATEWAY_EVIDENCE_BYTES,
 } from "../src/application/gateq-application-evidence.js";
 import {
   DocumentUploadCreationConflictError,
@@ -717,6 +718,25 @@ describe("application-owned canonical Evidence", () => {
       f.service.create({ credential: "opaque-session", input }),
     ).rejects.toBeInstanceOf(EvidenceRuleError);
     expect(f.createUploadAuthorization).not.toHaveBeenCalled();
+  });
+  it("refuses a new ticket when the gateway's total application storage is full, under a per-gateway lock", async () => {
+    const f = fixture((q) =>
+      q.startsWith("select a.id")
+        ? [{ id: applicationId }]
+        : q.startsWith("select count(*)")
+          ? [{ count: 0, bytes: 0, open: 0 }]
+          : q.startsWith("with g as")
+            ? [{ bytes: DEFAULT_GATEWAY_EVIDENCE_BYTES - 1 }]
+            : [],
+    );
+    await expect(
+      f.service.create({ credential: "opaque-session", input }),
+    ).rejects.toThrow("application storage is full");
+    const gateway = f.calls.find((c) => c.query.startsWith("with g as"));
+    expect(gateway?.query).toContain("pg_advisory_xact_lock");
+    expect(gateway?.query).toContain("a.gateway_id=g.gateway_id");
+    expect(f.createUploadAuthorization).not.toHaveBeenCalled();
+    expect(f.calls.some((c) => c.query.startsWith("insert"))).toBe(false);
   });
   it("commits actual provider expiry before returning the target and retains the longest expiry on re-sign", async () => {
     const f = fixture((q) =>

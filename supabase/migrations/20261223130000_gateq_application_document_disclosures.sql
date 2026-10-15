@@ -32,7 +32,9 @@ begin
   select * into v from evidence.document_versions where id=new.document_version_id and tenant_id=new.tenant_id;
   if not found or v.document_id <> new.document_id or d.current_version_id is distinct from new.document_version_id
     or v.sha256 <> new.sha256 or v.processing_status <> 'COMPLETED' or v.text_extraction_status <> 'COMPLETED'
-    or v.malware_scan_status not in ('CLEAN','NOT_SCANNED') then
+    -- Lead decision 2026-10-15: only a CLEAN scan is ever disclosed to an
+    -- investor; NOT_SCANNED stays the founder's private material.
+    or v.malware_scan_status <> 'CLEAN' then
     raise exception 'disclosure must name the current, processed version' using errcode='check_violation';
   end if;
   return new;

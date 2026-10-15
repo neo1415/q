@@ -59,6 +59,11 @@ export type GateQApplicationEvidenceDependencies = {
   readonly uploads: DocumentUploadLimits;
   readonly maxDocuments: number;
   readonly maxTotalBytes: number;
+  /**
+   * Total bytes all applications to one gateway may hold or reserve. Per-
+   * application limits alone let many confirmed guests fill storage.
+   */
+  readonly maxGatewayBytes?: number | undefined;
   /** Verify session, contact proof and open application; ownership is never request input. */
   readonly authorise: (
     credential: string,
@@ -111,7 +116,17 @@ export type GateQApplicationEvidenceItem = {
   readonly extractionStatus: string | null;
   readonly sha256: string | null;
   readonly instructionRiskSignals: number;
+  /**
+   * Only a version scanned CLEAN may ever be disclosed to (or downloaded by)
+   * an investor. READY but not scanned stays usable in the founder's own
+   * interview and is labelled private; it is never "clean" or "verified".
+   */
+  readonly shareableWithInvestor: boolean;
+  readonly privateReason: "NOT_SCANNED" | null;
 };
+
+/** Lead decision 2026-10-15: a sane default; deployments may lower or raise it. */
+export const DEFAULT_GATEWAY_EVIDENCE_BYTES = 5 * 1024 * 1024 * 1024;
 function hash(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -160,9 +175,11 @@ export function createGateQApplicationEvidenceService(
   deps: GateQApplicationEvidenceDependencies,
 ) {
   if (
-    ![deps.maxDocuments, deps.maxTotalBytes].every(
-      (n) => Number.isSafeInteger(n) && n > 0,
-    )
+    ![
+      deps.maxDocuments,
+      deps.maxTotalBytes,
+      deps.maxGatewayBytes ?? DEFAULT_GATEWAY_EVIDENCE_BYTES,
+    ].every((n) => Number.isSafeInteger(n) && n > 0)
   )
     throw new EvidenceRuleError(
       "application upload limits must be positive integers",
@@ -311,6 +328,33 @@ export function createGateQApplicationEvidenceService(
         counts.open >= deps.uploads.maxOpenSessions
       )
         throw new EvidenceRuleError("application upload limit reached");
+      // The same accounting across every application to this gateway,
+      // serialized per gateway (an advisory lock, so gateway edits never
+      // wait on uploads) so two guests cannot both take the last bytes.
+      const gatewayBytes = z.coerce.number().parse(
+        (
+          await tx.sql`
+        with g as (
+          select a.gateway_id from gateq.applications a
+          where a.id=${s.applicationId} and a.tenant_id=${s.tenantId}
+        ), locked as (
+          select pg_advisory_xact_lock(hashtextextended('gateq-evidence:' || g.gateway_id::text, 0)) from g
+        )
+        select coalesce(sum(case when u.cleanup_pending then ${deps.maxTotalBytes}
+          when u.document_version_id is not null then u.declared_size_bytes
+          when u.status in ('REJECTED','CANCELLED','EXPIRED') and evidence.gateq_upload_authorization_retired(u) then 0
+          else greatest(u.declared_size_bytes, ${deps.uploads.maxBytes}) end),0) as bytes
+        from locked, g join gateq.applications a on a.gateway_id=g.gateway_id and a.tenant_id=${s.tenantId}
+        join evidence.document_upload_sessions u on u.gateq_application_id=a.id and u.tenant_id=a.tenant_id`
+        )[0]?.["bytes"] ?? 0,
+      );
+      if (
+        gatewayBytes + deps.uploads.maxBytes >
+        (deps.maxGatewayBytes ?? DEFAULT_GATEWAY_EVIDENCE_BYTES)
+      )
+        throw new EvidenceRuleError(
+          "this investor's application storage is full; try again later",
+        );
       const document = z.object({ id: DocumentIdSchema }).parse(
         (
           await tx.sql`
@@ -616,6 +660,12 @@ export function createGateQApplicationEvidenceService(
         extractionStatus: r.text_extraction_status,
         sha256: r.sha256,
         instructionRiskSignals: r.instruction_risk_signals ?? 0,
+        shareableWithInvestor:
+          status === "READY" && r.malware_scan_status === "CLEAN",
+        privateReason:
+          status === "READY" && r.malware_scan_status === "NOT_SCANNED"
+            ? ("NOT_SCANNED" as const)
+            : null,
       };
     });
   }
