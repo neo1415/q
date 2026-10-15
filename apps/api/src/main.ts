@@ -197,6 +197,8 @@ import {
   gateqInboxActionsPort,
   ownGatewayIdFrom,
   createGateqVideoInterview,
+  createDossierSynthesis,
+  createPostgresSynthesisStore,
   createPostgresGateqVideoSessions,
   gateqVideoConfigFrom,
 } from "@capital-q/gateq-intake";
@@ -730,6 +732,66 @@ function gateqContactRequiredFrom(): string | undefined {
   if (Number.isNaN(Date.parse(raw)))
     throw new Error("Invalid GateQ contact confirmation boundary");
   return raw;
+}
+
+/**
+ * Q's reading of each submitted GateQ application (lead decision
+ * 2026-10-15): cited, nonbinding, recorded once after submission. Off
+ * unless CQ_GATEQ_SYNTHESIS=on with CQ_GATEQ_SYNTHESIS_FROM (an ISO
+ * instant: only submissions from then on are read, so switching it on
+ * never spends on the backlog). One application at a time, at most
+ * CQ_GATEQ_SYNTHESIS_MAX_ATTEMPTS (default 2, at most 3) model calls each.
+ */
+const gateqSynthesisFrom = Date.parse(
+  process.env["CQ_GATEQ_SYNTHESIS_FROM"]?.trim() ?? "",
+);
+if (
+  process.env["CQ_GATEQ_SYNTHESIS"] === "on" &&
+  gateqModelProviders.length > 0 &&
+  Number.isFinite(gateqSynthesisFrom)
+) {
+  const attempts = Number(process.env["CQ_GATEQ_SYNTHESIS_MAX_ATTEMPTS"]);
+  const synthesis = createDossierSynthesis({
+    gateway: createModelGateway({
+      catalog: createPostgresModelCatalog({ sql: database.sql }),
+      registry: createModelProviderRegistry(gateqModelProviders),
+      usage: createPostgresModelUsageRepository({ sql: database.sql }),
+      health: createProcessLocalProviderHealth(),
+      spendCap: gateqSpendCap,
+      syntheticDemo: createSyntheticDemoRoutingAllowance({
+        operatorEnabled: gateqProviderSecrets.syntheticDemoRouting,
+        environment: config.runtime.deploymentEnvironment,
+        databaseUrl: databaseConfig.secrets.url,
+      }),
+      logger: teamLogger,
+    }),
+    store: createPostgresSynthesisStore({
+      sql: database.sql,
+      from: new Date(gateqSynthesisFrom),
+      maxAttempts:
+        Number.isSafeInteger(attempts) && attempts >= 1 && attempts <= 3
+          ? attempts
+          : 2,
+    }),
+    logger: teamLogger,
+  });
+  let synthesising = false;
+  setInterval(() => {
+    if (synthesising) return;
+    synthesising = true;
+    void synthesis
+      .sweep(1)
+      .then((result) => {
+        if (result.ready + result.failed > 0)
+          teamLogger.info(result, "gateq synthesis sweep");
+      })
+      .catch((error: unknown) => {
+        teamLogger.warn({ err: error }, "gateq synthesis sweep failed");
+      })
+      .finally(() => {
+        synthesising = false;
+      });
+  }, 30_000).unref();
 }
 
 /**

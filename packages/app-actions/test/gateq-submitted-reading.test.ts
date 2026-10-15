@@ -28,6 +28,30 @@ const dossier = {
 };
 
 describe("Q's authorized submitted dossier reading", () => {
+  it("hands Q a computed figure as Q's inference with its derivation, never as the founder's words", () => {
+    const result = submittedReading({
+      ...dossier,
+      dimensions: [
+        {
+          group: "TRACTION",
+          label: "Traction",
+          facts: [
+            {
+              ...claim,
+              summary: "360000 USD",
+              truthClass: "Q_INFERENCE" as const,
+              derivation:
+                "Not said in these words: Q derived it from interview turn 7, where the founder said “two pay $180,000 each”",
+            },
+          ],
+        },
+      ],
+    });
+    expect(result).toContain("360000 USD [truth=Q_INFERENCE");
+    expect(result).toContain("two pay $180,000 each");
+    expect(result).toContain("never attribute it to them");
+  });
+
   it("preserves exact findings, source lineage, epistemic labels and unresolved gaps", () => {
     const result = submittedReading(dossier);
     expect(result).toContain(claim.summary);

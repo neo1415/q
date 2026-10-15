@@ -133,17 +133,19 @@ export function registerGateqVideoRoutes(
   app.get(GATEQ_APPLY_VIDEO_PATH, async (request, reply) => {
     const token = credential(request);
     try {
-      const [available, session, allowance] = await Promise.all([
-        video.available(token),
+      const [availability, session, allowance] = await Promise.all([
+        video.availability(token),
         video.current(token),
         // Wording only: a failed read never hides typing or the session.
         video.allowance(token).catch(() => null),
       ]);
       void reply.header("Cache-Control", "no-store");
       return GateqVideoStateDtoSchema.parse({
-        available,
+        available: availability.available,
         session: dto(session),
         allowance,
+        unavailableReason: availability.reason,
+        perApplication: video.perApplication,
       });
     } catch (error: unknown) {
       return notFound(error, request, reply);

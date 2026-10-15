@@ -977,6 +977,53 @@ describe("the interview step, video first", () => {
     ).toBeNull();
   });
 
+  it("says plainly when this application's video sessions are used", async () => {
+    video.state.mockResolvedValue({
+      ok: true,
+      state: {
+        available: false,
+        session: null,
+        allowance: {
+          weeklySessions: 5,
+          remaining: 3,
+          resetsAt: "2026-10-19T00:00:00.000Z",
+        },
+        unavailableReason: "APPLICATION_SESSIONS_USED",
+        perApplication: 2,
+      },
+    });
+    step();
+    await flush();
+    expect(screen.getByLabelText("Your answer")).toBeTruthy();
+    expect(
+      screen.getByText(/used the 2 video sessions this application allows/),
+    ).toBeTruthy();
+  });
+
+  it("re-offers video after the person chose to continue by typing", async () => {
+    video.state.mockResolvedValue(offered);
+    video.start.mockResolvedValue({
+      ok: true,
+      state: { available: false, session: live, allowance: null },
+    });
+    video.end.mockResolvedValue({
+      ok: true,
+      state: { available: false, session: null, allowance: null },
+    });
+    step();
+    await flush();
+    fireEvent.click(screen.getByRole("checkbox"));
+    await press("Start the video interview");
+    await flush();
+    await press("Continue by typing instead");
+    await flush();
+    expect(video.end).toHaveBeenCalledWith(TOKEN, true);
+    expect(screen.getByLabelText("Your answer")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Talk with Q on video instead" }),
+    ).toBeTruthy();
+  });
+
   it("falls back to typing when the start is refused", async () => {
     video.state.mockResolvedValue(offered);
     video.start.mockResolvedValue({

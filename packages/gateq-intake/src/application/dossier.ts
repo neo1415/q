@@ -18,6 +18,7 @@ import {
   factSummary,
   INVESTMENT_DIMENSIONS,
 } from "./coverage.js";
+import { amountOfSummary, amountStatedIn } from "./stated-amount.js";
 
 /**
  * The investor-ready GateQ dossier, built in the submission transaction
@@ -216,4 +217,53 @@ export function buildDossier(input: {
     transcript: { turnCount: input.turnCount },
     synthesis: null,
   });
+}
+
+/**
+ * A heard amount the person never said is Q's inference, not their claim
+ * (lead decision 2026-10-15). Applied when the dossier is built and again
+ * when a frozen one is read, so a submission made before the write-side
+ * check is shown truthfully without rewriting what was received. Only an
+ * amount from an interview turn whose words are on hand is judged; a fact
+ * from the form, or a turn that was not kept, is left as recorded.
+ */
+export function withDerivedAmountsMarked<
+  D extends Pick<GateqDossierV1, "dimensions">,
+>(
+  dossier: D,
+  turns: readonly {
+    readonly seq: number;
+    readonly role: string;
+    readonly text: string;
+  }[],
+): D {
+  const said = new Map(
+    turns
+      .filter((turn) => turn.role === "PERSON")
+      .map((turn) => [turn.seq, turn.text] as const),
+  );
+  return {
+    ...dossier,
+    dimensions: dossier.dimensions.map((group) => ({
+      ...group,
+      facts: group.facts.map((fact) => {
+        if (fact.sourceTurnSeq === null || fact.truthClass === "Q_INFERENCE")
+          return fact;
+        const value = amountOfSummary(fact.summary);
+        const words = said.get(fact.sourceTurnSeq);
+        if (value === null || words === undefined) return fact;
+        if (amountStatedIn(value.amount, words)) return fact;
+        const quote = words.length > 400 ? `${words.slice(0, 399)}…` : words;
+        return {
+          ...fact,
+          truthClass: "Q_INFERENCE" as const,
+          derivation:
+            `Not said in these words: Q derived it from interview turn ${String(fact.sourceTurnSeq)}, where the founder said “${quote}”`.slice(
+              0,
+              600,
+            ),
+        };
+      }),
+    })),
+  };
 }

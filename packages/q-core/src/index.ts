@@ -815,6 +815,15 @@ export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-
 export { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./prompts/tasks/investor-mandate-synthesis.v2.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V3 } from "./prompts/tasks/investor-mandate-synthesis.v3.js";
 export { FIT_EXPLANATION_V1 } from "./prompts/tasks/fit-explanation.v1.js";
+export { GATEQ_DOSSIER_SYNTHESIS_V1 } from "./prompts/tasks/gateq-dossier-synthesis.v1.js";
+export {
+  GATEQ_DOSSIER_SYNTHESIS_SCHEMA_NAME,
+  GATEQ_DOSSIER_SYNTHESIS_SCHEMA_VERSION,
+  GateqDossierSynthesisResultSchema,
+  GateqDossierSynthesisVariablesSchema,
+  type GateqDossierSynthesisResult,
+  type GateqDossierSynthesisVariables,
+} from "./prompts/schemas/gateq-dossier-synthesis.js";
 export { FIT_Q_VIEW_V1 } from "./prompts/tasks/fit-q-view.v1.js";
 export { FIT_Q_VIEW_V2 } from "./prompts/tasks/fit-q-view.v2.js";
 export { FIT_Q_VIEW_V3 } from "./prompts/tasks/fit-q-view.v3.js";
