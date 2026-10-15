@@ -13,6 +13,12 @@ import type { HybridCandidateService } from "../hybrid/service.js";
 import { RANKER_VERSION, RankingInputError } from "../ranking/contracts.js";
 import type { RankingService } from "../ranking/service.js";
 import type { FitOrdering } from "../fit/order.js";
+import {
+  applyFeedEligibility,
+  DISCOVER_FEED_ELIGIBILITY_CURRENT,
+  type DiscoverFeedEligibility,
+  type PlayablePitchPort,
+} from "../ranking/feed-eligibility.js";
 import { RerankInputError } from "../rerank/contracts.js";
 import type { RerankService } from "../rerank/service.js";
 import { SEMANTIC_GENERATOR_VERSION } from "../semantic/contracts.js";
@@ -114,6 +120,14 @@ export type SlateBuilderDependencies = {
    * the slate records this order's version. Absent: REC-005's order.
    */
   readonly fitOrdering?: FitOrdering | undefined;
+  /**
+   * Discover feed eligibility (discover-feed-eligibility.v1): which
+   * eligible companies have a playable pitch video. Under a policy that
+   * requires one, a build without this port admits nobody (fail closed).
+   */
+  readonly playablePitches?: PlayablePitchPort | undefined;
+  /** The feed policy applied; defaults to DISCOVER_FEED_ELIGIBILITY_CURRENT. */
+  readonly feedEligibility?: DiscoverFeedEligibility | undefined;
   readonly snapshots: FeatureSnapshotStore;
   readonly slates: SlateRepository;
   readonly transactions: TransactionManager;
@@ -210,9 +224,12 @@ export function createSlateBuilder(
     slates,
     transactions,
     pool: discoverablePool,
+    playablePitches,
     logger,
   } = dependencies;
   const policy = dependencies.policy ?? SLATE_POLICY_V1;
+  const feedPolicy =
+    dependencies.feedEligibility ?? DISCOVER_FEED_ELIGIBILITY_CURRENT;
   const clock = dependencies.clock ?? (() => new Date());
   const meter = getMeter("@capital-q/discovery");
   const metrics = {
@@ -265,9 +282,22 @@ export function createSlateBuilder(
           metrics.builds.add(1, { outcome: "NO_ACTIVE_MANDATE" });
           return { kind: "NO_ACTIVE_MANDATE" };
         }
-        const eligible = pool.candidates.filter(
-          (c) => c.eligibility.decision === "ELIGIBLE",
-        );
+        // REC-001 first, then the feed's own hard gate: a video feed
+        // admits only companies with a playable pitch. Never a weight.
+        const feed = await applyFeedEligibility({
+          policy: feedPolicy,
+          port: playablePitches,
+          candidates: pool.candidates.filter(
+            (c) => c.eligibility.decision === "ELIGIBLE",
+          ),
+        });
+        if (!feed.confirmed) {
+          logger?.warn(
+            { feedEligibilityVersion: feedPolicy.version },
+            "playable pitches could not be confirmed: feed admits none",
+          );
+        }
+        const eligible = feed.admitted;
         const rankedResult = await ranking.rankCandidates({
           actor: query.actor,
           mode: query.mode,

@@ -56,6 +56,7 @@ import {
 } from "@capital-q/eventing/publisher";
 import {
   createRecommendationPipeline,
+  playablePitchPortFrom,
   createRefreshRequester,
   requestRebuildsForVersionDrift,
   createSlateInvalidationService,
@@ -131,6 +132,7 @@ import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
 import {
   createPostgresAutomatedModeration,
   createPostgresDiscoverablePitchQueryPort,
+  DISCOVERABLE_PITCH_BATCH_MAX,
   MediaAssetIdSchema,
 } from "@capital-q/media";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
@@ -585,6 +587,14 @@ const recommendations = createRecommendationPipeline({
   sql: database.sql,
   transactions: database.transactions,
   disclosure,
+  // discover-feed-eligibility.v1: the Discover video feed admits only
+  // companies with a playable pitch, by the Media context's own rule.
+  playablePitches: playablePitchPortFrom({
+    findDiscoverablePitches: createPostgresDiscoverablePitchQueryPort({
+      sql: database.sql,
+    }).findDiscoverablePitches,
+    batchMax: DISCOVERABLE_PITCH_BATCH_MAX,
+  }),
   // After a post-meeting pass, the company comes back only on a material
   // change (doc 19 §67): a new pitch, a new raise, or a changed mandate.
   materialChanges: createMaterialChanges({

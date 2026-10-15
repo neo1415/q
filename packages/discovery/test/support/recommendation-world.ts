@@ -420,6 +420,11 @@ export async function seedRecommendationWorld(
     transactions: nestedTransactions(tx),
     disclosure,
     embedder: input.embedder,
+    // The synthetic world has no media; every company counts as having a
+    // playable pitch so these cases keep testing what they always did.
+    playablePitches: {
+      companiesWithPlayablePitch: (ids) => Promise.resolve(new Set(ids)),
+    },
     clock: () => new Date("2026-09-18T12:00:00.000Z"),
   });
   const { features, hybrid, semantic } = pipeline;

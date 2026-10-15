@@ -87,6 +87,7 @@ import {
   createMediaService,
   createPostgresDiscoverablePitchQueryPort,
   cuesAround,
+  DISCOVERABLE_PITCH_BATCH_MAX,
   extractPitchClaims,
   MediaAssetIdSchema,
   firstPitchRaise,
@@ -567,6 +568,7 @@ import {
   createMaterialChanges,
   createSlateReadPipeline,
   composeCompanyRaiseReader,
+  playablePitchPortFrom,
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
 
@@ -1265,6 +1267,13 @@ const recommendationVolume = createEntitlementService({ sql: database.sql });
 const slateRead = createSlateReadPipeline({
   sql: database.sql,
   disclosure,
+  // discover-feed-eligibility.v1, re-checked at read (same rule as api).
+  playablePitches: playablePitchPortFrom({
+    findDiscoverablePitches: createPostgresDiscoverablePitchQueryPort({
+      sql: database.sql,
+    }).findDiscoverablePitches,
+    batchMax: DISCOVERABLE_PITCH_BATCH_MAX,
+  }),
   // After a post-meeting pass, the company comes back only on a material
   // change (doc 19 §67): a new pitch, a new raise, or a changed mandate.
   materialChanges: createMaterialChanges({
