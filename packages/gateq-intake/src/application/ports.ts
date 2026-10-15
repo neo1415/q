@@ -1,3 +1,4 @@
+import type { DisclosureLineage } from "../contracts/disclosure-lineage.js";
 import type { TransactionContext } from "@capital-q/database";
 import type { GatewayPolicy, QualificationResult } from "@capital-q/gateq";
 
@@ -114,6 +115,7 @@ export type ApplicationFactRepository = {
       readonly at: string;
       /** Lineage: the PERSON turn these were read from, when one was. */
       readonly sourceTurnSeq?: number | null | undefined;
+      readonly disclosureLineage?: DisclosureLineage | undefined;
     },
   ) => Promise<readonly ApplicationFact[]>;
 };
@@ -146,6 +148,8 @@ export type ApplicationSubmissionRepository = {
 /** One line of the interview, as stored. */
 export type StoredTurn = {
   readonly seq: number;
+  /** Server-owned complete dependencies; absent historical rows fail closed. */
+  readonly disclosureLineage?: DisclosureLineage | undefined;
   readonly role: "PERSON" | "Q";
   readonly text: string;
   readonly clientTurnId: string;
@@ -207,6 +211,7 @@ export type ApplicationTurnRepository = {
       readonly askingDimension?: ApplicationDimension | null | undefined;
       readonly intent?: string | null | undefined;
       readonly latencyMs?: number | null | undefined;
+      readonly disclosureLineage?: DisclosureLineage | undefined;
     },
   ) => Promise<void>;
   /** Oldest first. `limit` keeps the newest that many. */
@@ -236,6 +241,7 @@ export type ApplicationTurnRepository = {
     readonly askingDimension?: ApplicationDimension | null | undefined;
     readonly intent?: string | null | undefined;
     readonly latencyMs?: number | null | undefined;
+    readonly disclosureLineage?: DisclosureLineage | undefined;
   }) => Promise<{ readonly seq: number }>;
   readonly countFor: (applicationId: ApplicationId) => Promise<number>;
 };

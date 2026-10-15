@@ -193,6 +193,8 @@ export function coverageFor(input: {
   readonly policy: GatewayPolicy;
   readonly qualification: QualificationResult;
   readonly facts: readonly ApplicationFact[];
+  /** Emit each answer's fact id and turn seq (two-phase rollout flag). */
+  readonly includeSources?: boolean | undefined;
 }): GateqCoverageV1 {
   const current = new Map(
     input.facts
@@ -242,6 +244,9 @@ export function coverageFor(input: {
         ...base,
         summary: factSummary(dimension, fact.value).slice(0, 2000),
         provenance: fact.provenance,
+        ...(input.includeSources === true
+          ? { sourceFactId: fact.id, sourceTurnSeq: fact.sourceTurnSeq ?? null }
+          : {}),
       });
     }
   }
