@@ -23,7 +23,7 @@ import {
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { effectShown } from "@/features/q/control/perform";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
-import { RelationshipFitChips } from "@/features/fit/relationship-fit-chips";
+import { RelationshipFitLine } from "@/features/fit/relationship-fit-chips";
 import {
   dismissReminderAction,
   markNoticesReadAction,
@@ -355,9 +355,11 @@ export function RelationshipsBoard({
             <span className="text-right">Last activity</span>
             <span className="text-right">Next step</span>
           </div>
+          {/* One surface with hairline rows, not a card per relationship
+              (redesign 2026-10-15). */}
           <ul
             aria-label="Relationships"
-            className="flex flex-col gap-2"
+            className="flex flex-col divide-y divide-(--cq-border-subtle) overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
             data-relationships-list
           >
             {visible.map((row) => (
@@ -453,7 +455,7 @@ function RelationshipRow({
   return (
     <article
       aria-labelledby={`relationship-${item.relationshipId}`}
-      className="relative grid grid-cols-[40px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-xs) lg:grid-cols-[40px_minmax(0,1fr)_150px_96px_190px] lg:px-4 lg:py-3"
+      className="relative grid grid-cols-[40px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 p-3.5 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:grid-cols-[40px_minmax(0,1fr)_150px_96px_190px] lg:px-4 lg:py-3"
       data-relationship-card={item.state}
     >
       {item.counterpart.kind === "COMPANY" ? (
@@ -490,7 +492,7 @@ function RelationshipRow({
           {/* The whole row opens the relationship; the button stays its own. */}
           <Link
             href={href}
-            className="truncate after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-(--cq-focus-ring)"
+            className="truncate after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-(--cq-focus-ring)"
           >
             {name}
           </Link>
@@ -500,7 +502,7 @@ function RelationshipRow({
             {about}
           </p>
         )}
-        {fit === undefined ? null : <RelationshipFitChips profile={fit} />}
+        {fit === undefined ? null : <RelationshipFitLine profile={fit} />}
         <div className="flex items-center gap-2 lg:hidden">
           {pill}
           {when}

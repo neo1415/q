@@ -504,7 +504,10 @@ export function RelationshipDeal({
           {side === "INVESTOR" ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
               {counterpart} is in your portfolio: it counts in{" "}
-              <a className="underline underline-offset-2" href="/results">
+              <a
+                className="underline underline-offset-2"
+                href="/relationships?view=overview"
+              >
                 Results
               </a>{" "}
               from the money received.
