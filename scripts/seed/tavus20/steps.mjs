@@ -192,11 +192,13 @@ async function onboardingForm(page, c) {
       await page.getByRole("button", { name: "Looks right" }).click();
       await page.waitForTimeout(9000);
     } else if (/founding team/.test(head)) {
-      const role = /CTO/.test(c.founderPerson.role)
-        ? "CTO"
-        : /COO/.test(c.founderPerson.role)
-          ? "COO"
-          : "CEO";
+      const role =
+        c.onboardingRole ??
+        (/CTO/.test(c.founderPerson.role)
+          ? "CTO"
+          : /COO/.test(c.founderPerson.role)
+            ? "COO"
+            : "CEO");
       await page.getByRole("radio", { name: role, exact: true }).check();
       const founders = c.onboardingFounders ?? plan.founderCount(c);
       await page
@@ -208,7 +210,7 @@ async function onboardingForm(page, c) {
       await page
         .getByRole("textbox", { name: /How many people/ })
         .fill(String(c.headcount ?? c.onboardingHeadcount ?? 1));
-      for (const n of plan.strengthsOf(c)) {
+      for (const n of c.strengths ?? plan.strengthsOf(c)) {
         await page
           .getByRole("checkbox", { name: n, exact: true })
           .check()
@@ -412,7 +414,9 @@ export async function stepProfile(page, c) {
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForTimeout(7000);
   out.push(await ui.setField(page, "Company", "City", c.headquarters.city));
-  out.push(await ui.setField(page, "Company", "Legal name", c.legalName));
+  // Unknown legal name or founding date stays empty (never a placeholder).
+  if (c.legalName)
+    out.push(await ui.setField(page, "Company", "Legal name", c.legalName));
   if (!plan.COUNTRY_LABEL[c.headquarters.country]) {
     // F19: neither setup nor profile lists this country (fixed on the
     // branch); production takes it only through the company API.
@@ -441,7 +445,7 @@ export async function stepProfile(page, c) {
   {
     const r = await ui.openRegion(page, "Company");
     const opener = r.getByRole("button", { name: /^(Add|Edit) founded$/ });
-    if (await opener.isVisible().catch(() => false)) {
+    if (c.foundedDate && (await opener.isVisible().catch(() => false))) {
       await opener.click();
       await page.waitForTimeout(600);
       await r.getByRole("textbox", { name: "Founded" }).fill(c.foundedDate);
@@ -629,7 +633,7 @@ export async function stepDocuments(page, c) {
   const deckDoc = (dr0.documents ?? []).find(
     (d) => d.kind && /deck/i.test(d.title),
   );
-  if (!deckDoc && !have.has(deckTitle)) {
+  if (!c.deckViaQ && !deckDoc && !have.has(deckTitle)) {
     const staged = stageFile(
       c,
       join(lib.assetDir(c), "deck.pdf"),
@@ -688,40 +692,7 @@ export async function stepDocuments(page, c) {
     log(c, `renamed to ${title}`);
   }
   // Deck: rename (onboarding uploads keep the file name) and make it downloadable.
-  await page.goto(`${lib.WEB}/documents`, { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(7000);
-  const deckItem = page
-    .getByRole("listitem")
-    .filter({ hasText: "Pitch deck" })
-    .first();
-  const deckName = (
-    await deckItem
-      .locator("p")
-      .first()
-      .innerText()
-      .catch(() => "")
-  ).trim();
-  if (deckName && deckName !== deckTitle) {
-    await page.getByRole("button", { name: `Actions for ${deckName}` }).click();
-    await page.getByRole("menuitem", { name: "Rename…" }).click();
-    const d = page.getByRole("dialog").first();
-    await d.getByRole("textbox").first().fill(deckTitle);
-    await d.getByRole("button", { name: "Save name" }).click();
-    await page.waitForTimeout(3000);
-  }
-  await page.getByRole("button", { name: `Actions for ${deckTitle}` }).click();
-  await page.getByRole("menuitem", { name: "Share…" }).click();
-  await page.waitForTimeout(1200);
-  {
-    const d = page.getByRole("dialog").first();
-    await d
-      .getByRole("combobox")
-      .selectOption({ label: "Investors who can find us" });
-    const save = d.getByRole("button", { name: "Save" });
-    if (await save.isEnabled().catch(() => false)) await save.click();
-    else await d.getByRole("button", { name: "Cancel" }).click();
-    await page.waitForTimeout(3000);
-  }
+  if (!c.deckViaQ) await deckShare(page, deckTitle);
   // F9/F10: level radios fail on first filing in production; folders have no UI.
   const dr = (
     await lib.call(
@@ -773,6 +744,44 @@ export async function stepDocuments(page, c) {
   if (results.some((r) => r.startsWith("MISSING")))
     throw new Error("data room incomplete");
   done(c, "documents");
+}
+
+/** Deck: rename (onboarding uploads keep the file name) and make it downloadable. */
+async function deckShare(page, deckTitle) {
+  await page.goto(`${lib.WEB}/documents`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(7000);
+  const deckItem = page
+    .getByRole("listitem")
+    .filter({ hasText: "Pitch deck" })
+    .first();
+  const deckName = (
+    await deckItem
+      .locator("p")
+      .first()
+      .innerText()
+      .catch(() => "")
+  ).trim();
+  if (deckName && deckName !== deckTitle) {
+    await page.getByRole("button", { name: `Actions for ${deckName}` }).click();
+    await page.getByRole("menuitem", { name: "Rename…" }).click();
+    const d = page.getByRole("dialog").first();
+    await d.getByRole("textbox").first().fill(deckTitle);
+    await d.getByRole("button", { name: "Save name" }).click();
+    await page.waitForTimeout(3000);
+  }
+  await page.getByRole("button", { name: `Actions for ${deckTitle}` }).click();
+  await page.getByRole("menuitem", { name: "Share…" }).click();
+  await page.waitForTimeout(1200);
+  {
+    const d = page.getByRole("dialog").first();
+    await d
+      .getByRole("combobox")
+      .selectOption({ label: "Investors who can find us" });
+    const save = d.getByRole("button", { name: "Save" });
+    if (await save.isEnabled().catch(() => false)) await save.click();
+    else await d.getByRole("button", { name: "Cancel" }).click();
+    await page.waitForTimeout(3000);
+  }
 }
 
 // ------------------------------------------------------------------ pitch
@@ -997,6 +1006,8 @@ async function inviteAndAccept(page, c, members) {
 
 export async function stepTeam(page, c) {
   if (isDone(c, "team")) return;
+  // No named team in the sources: nobody is invented.
+  if (!c.team?.length) return done(c, "team");
   const { s } = stateOf(c);
   const members = [];
   for (const [i, p] of c.team.entries()) {

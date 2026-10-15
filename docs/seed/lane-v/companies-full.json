@@ -1,0 +1,89 @@
+[
+  {
+    "n": 0,
+    "company": "Capital Q",
+    "sources": [
+      "docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt (Decision #001, #009, #010, #012)",
+      "docs/product-sources/text/Real_CAPITAL_Q_PRODUCT_SPECIFICATION.txt (3.1 What Capital Q Is)",
+      "docs/product-sources/text/CapitalQ_GateQ_Product_Feature_Specification.txt (Standardised Application Profile)",
+      "docs/ai-handoff/LANDING-PROMISES.md (URL, LP-04, LP-15, LP-46)",
+      "Owner brief 15 Oct 2026: raise USD 2,000,000 as a founder claim"
+    ],
+    "legalName": null,
+    "foundedDate": null,
+    "websiteUrl": "https://www.fdncapitalpartners.com/capitalq.html",
+    "headquarters": { "city": "Lagos", "country": "NG" },
+    "currentStageCode": "unsure",
+    "headcount": null,
+    "onboardingFounders": 1,
+    "onboardingHeadcount": 1,
+    "teamFacts": {
+      "founderCount": null,
+      "fullTimeFounderCount": null,
+      "teamSize": null
+    },
+    "onboardingRole": "Something else",
+    "strengths": [],
+    "signal": "A waitlist",
+    "shortDescription": "Capital Q is an AI-native Investment Intelligence Operating System for private capital. Q, its investment intelligence analyst, learns each investor's thesis and onboards businesses through a conversation.",
+    "primaryDescription": "Capital Q is an AI-native Investment Intelligence Operating System for private capital. It is not a fundraising marketplace, investor directory, CRM, pitch deck repository or document management platform. Its primary purpose is to generate trusted investment intelligence that enables better investment decisions while reducing information asymmetry between founders and investors. Q is Capital Q's investment intelligence analyst: it learns each investor's thesis and conversationally onboards businesses to understand their traction, financials, team, raise and investment story. Regardless of how a founder first presents a company, GateQ converts the information into the same core structure, so investment teams can compare companies like for like. Evidence comes before opinion. Capital Q is built by FDN Capital Partners, with offices in Lagos, Nigeria and Dubai, UAE.",
+    "tags": {
+      "industry": ["artificial_intelligence", "fintech", "capital_markets"],
+      "geography": ["nigeria"]
+    },
+    "founderPerson": {
+      "name": "Capital Q demo founder",
+      "email": "founder.capitalq@fictional.capitalq.local",
+      "role": "Founder",
+      "appRole": "OWNER",
+      "headline": "Founder account for Capital Q (demonstration account)",
+      "professionalSummary": null,
+      "backgroundSummary": null
+    },
+    "team": [],
+    "metrics": { "kpis": [], "points": [] },
+    "capital": {
+      "targetRaise": { "amount": 2000000, "currency": "USD" },
+      "instrument": null,
+      "targetCloseDate": null,
+      "useOfFunds": []
+    },
+    "roundName": "Capital Q raise",
+    "deckViaQ": true,
+    "dataRoom": [
+      {
+        "title": "Capital Q Product Specification",
+        "folder": "other",
+        "visibility": "ON_REQUEST",
+        "source": "docs/product-sources/Real CAPITAL Q PRODUCT SPECIFICATION.docx"
+      },
+      {
+        "title": "GateQ Product Feature Specification",
+        "folder": "other",
+        "visibility": "ON_REQUEST",
+        "source": "docs/product-sources/CapitalQ_GateQ_Product_Feature_Specification.docx"
+      },
+      {
+        "title": "Capital Q Final System Review",
+        "folder": "other",
+        "visibility": "SHARED_ONLY",
+        "source": "docs/product-sources/Capital Q Final System Review.docx"
+      },
+      {
+        "title": "Capital Q product overview (landing page, Oct 2026)",
+        "folder": "other",
+        "visibility": "PUBLIC",
+        "source": "docs/ai-handoff/LANDING-PROMISES.md"
+      },
+      {
+        "title": "Capital Q fundraising summary (Oct 2026)",
+        "folder": "fundraising",
+        "visibility": "PUBLIC",
+        "source": "docs/seed/lane-v/capital-q/fundraising-summary.md"
+      }
+    ],
+    "qPersonality": "FORMAL",
+    "pitchTitle": "Capital Q: pitch (AI presenter, AI-generated)",
+    "pitchVideo": "00-capital-q-9x16.mp4"
+  }
+]

@@ -10,6 +10,8 @@ export const FOLDER = {
   contracts: "commercial",
   team: "team",
   kyc_kyb: "kyc_kyb",
+  fundraising: "fundraising",
+  other: "other",
 };
 
 /** Dataset visibility → data room level (ADR-001 scope is derived by the product). */
@@ -124,6 +126,8 @@ export function strengthsOf(c) {
 
 /** Onboarding "Main use of funds" checkboxes from the use-of-funds lines. */
 export function useOfFundsBoxes(c) {
+  // Unknown use of funds stays unanswered (the question is optional).
+  if (!c.capital.useOfFunds?.length) return [];
   const lines = c.capital.useOfFunds
     .map((u) => u.line.toLowerCase())
     .join(" | ");
