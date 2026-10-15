@@ -110,8 +110,8 @@ try {
           );
         });
       const nav = page.getByRole("navigation", {
-        name: "Relationship Hub",
-        exact: true,
+        // The Hub's strip is named CRM since 2026-10-15; older revisions say Relationship Hub.
+        name: /^(?:CRM|Relationship Hub)$/u,
       });
       await nav.getByRole("link", { name: gateq, exact: true }).waitFor();
       async function closeBriefing() {

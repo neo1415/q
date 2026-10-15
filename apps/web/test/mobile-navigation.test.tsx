@@ -28,7 +28,7 @@ describe("MobileNavigation", () => {
       "Discover",
       "Explore",
       "Q",
-      "Relationships",
+      "CRM",
     ]);
     expect(within(nav).getByRole("button", { name: "More" })).toBeTruthy();
   });
@@ -63,7 +63,8 @@ describe("MobileNavigation", () => {
       moreSectionsFor("founder_private").map((item) => item.href),
     );
     expect(labels).toContain("/rehearsals");
-    expect(labels).toContain("/results");
+    // Results is the CRM's Reports tab (a phone tab), not a More entry.
+    expect(labels).not.toContain("/results");
     expect(
       within(sheet)
         .getByRole("link", { name: /The Q Daily/ })
@@ -83,7 +84,7 @@ describe("MobileNavigation", () => {
     expect(
       screen.getByRole("button", { name: "More" }).hasAttribute("aria-current"),
     ).toBe(false);
-    for (const name of ["Q", "Explore", "Relationships"]) {
+    for (const name of ["Q", "Explore", "CRM"]) {
       expect(
         screen.getByRole("link", { name }).hasAttribute("aria-current"),
       ).toBe(false);

@@ -155,7 +155,13 @@ function Header({
   return (
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div className="flex min-w-0 flex-col gap-1">
-        <Heading className="cq-title-xl text-(--cq-text-primary)">
+        {/* Inside the CRM the page's h1 is the Hub; this is a tab's heading. */}
+        <Heading
+          className={cx(
+            props.headingLevel === 2 ? "cq-title-md" : "cq-title-xl",
+            "text-(--cq-text-primary)",
+          )}
+        >
           {props.heading ?? "Results"}
         </Heading>
         <p className="cq-body-sm text-(--cq-text-secondary)">

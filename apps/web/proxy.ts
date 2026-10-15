@@ -29,6 +29,7 @@ export const config = {
     "/profile/:path*",
     "/onboarding/:path*",
     "/relationships/:path*",
+    "/crm/:path*",
     "/settings/:path*",
     // G1/G2: an invitation's link.
     "/join/:path*",
