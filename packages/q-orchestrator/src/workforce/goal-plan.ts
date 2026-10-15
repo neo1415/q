@@ -318,10 +318,13 @@ export function planProgress(input: {
       step.fallbackFor === undefined
         ? undefined
         : steps.find((one) => one.key === step.fallbackFor);
+    // A fallback that did not run because its step finished, or is
+    // waiting on the person, was never needed (it runs only on failure).
+    const targetStatus =
+      target === undefined ? undefined : outcomes.get(target.key)?.status;
     const notNeeded =
-      outcome === undefined &&
-      target !== undefined &&
-      outcomes.get(target.key)?.status === "DONE";
+      (outcome === undefined || outcome.status === "SKIPPED") &&
+      (targetStatus === "DONE" || targetStatus === "HELD");
     return {
       key: step.key.slice(0, 40),
       who: step.who.slice(0, 60),

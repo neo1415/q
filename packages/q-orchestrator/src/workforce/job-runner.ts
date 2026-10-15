@@ -177,6 +177,8 @@ export async function runJob(input: {
       for (const next of found?.dependsOn ?? []) visit(next);
     };
     for (const key of step.dependsOn) visit(key);
+    // A fallback stands in for its step: what that step rested on, it does.
+    if (step.fallbackFor !== undefined) visit(step.fallbackFor);
     return seen;
   };
 
@@ -247,12 +249,17 @@ export async function runJob(input: {
         : results.get(step.fallbackFor);
     let status: StepStatus;
     let summary: string;
+    const coveredName =
+      input.steps.find((one) => one.key === step.fallbackFor)?.agentName ??
+      "the step it covers";
     if (covered?.status === "DONE") {
       status = "SKIPPED";
-      const name =
-        input.steps.find((one) => one.key === step.fallbackFor)?.agentName ??
-        "the step it covers";
-      summary = `Not needed: ${name} finished.`;
+      summary = `Not needed: ${coveredName} finished.`;
+      counts.set(step.key, false);
+    } else if (covered?.status === "HELD") {
+      // Held is waiting on the person, not a failure: nothing goes round them.
+      status = "SKIPPED";
+      summary = `Not run: ${coveredName} is waiting for you.`;
       counts.set(step.key, false);
     } else if (blocked !== undefined) {
       status = "SKIPPED";

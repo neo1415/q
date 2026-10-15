@@ -500,3 +500,70 @@ describe("next steps and progress after the job", () => {
     });
   });
 });
+
+describe("a fallback never goes round the person or a contradiction", () => {
+  it("does not run when its step is held for the person, and inherits what that step rested on", async () => {
+    const ran: string[] = [];
+    const exec: AgentExecutor = (one) => {
+      ran.push(one.key);
+      if (one.key === "check") {
+        return Promise.resolve({
+          status: "DONE",
+          summary: "Found one.",
+          outputs: {
+            signals: [
+              { kind: "CONTRADICTION", note: "ARR differs", stepKey: "check" },
+            ],
+          },
+        });
+      }
+      if (one.key === "book") {
+        return Promise.resolve({ status: "FAILED", summary: "No slot." });
+      }
+      return Promise.resolve({
+        status: "HELD",
+        summary: "Below the bar; yours to look at.",
+      });
+    };
+    const outward = {
+      role: "CONVERSATION" as const,
+      executor: "CONVERSATION" as const,
+      outward: true,
+    };
+    const held = await runJob({
+      jobId: "job",
+      goal: "Reply",
+      steps: [
+        step("reply", outward),
+        step("alt_reply", { ...outward, fallbackFor: "reply" }),
+      ],
+      executors: { CONVERSATION: exec },
+      recorder: recorder(),
+    });
+    expect(ran).toEqual(["reply"]);
+    expect(held.steps.find((one) => one.key === "alt_reply")).toMatchObject({
+      status: "SKIPPED",
+      counts: false,
+    });
+
+    ran.length = 0;
+    const contradicted = await runJob({
+      jobId: "job",
+      goal: "Check, then book or offer times",
+      steps: [
+        step("check", { role: "DOCUMENTS", executor: "DOCUMENTS" }),
+        step("book", { ...outward, dependsOn: ["check"] }),
+        step("offer", { ...outward, fallbackFor: "book" }),
+      ],
+      executors: { DOCUMENTS: exec, CONVERSATION: exec },
+      recorder: recorder(),
+    });
+    // The booking is held on the contradiction, and so is its fallback.
+    expect(ran).toEqual(["check"]);
+    for (const key of ["book", "offer"]) {
+      const one = contradicted.steps.find((entry) => entry.key === key);
+      expect(one?.status).toBe("HELD");
+      expect(one?.summary).toMatch(/contradiction/iu);
+    }
+  });
+});
