@@ -10,8 +10,8 @@ select plan(4);
 
 select is(
   (select current_version from onboarding.definitions where journey_type = 'founder'),
-  4,
-  'new founder sessions pin to v4, the version after v3 (885 covers v4 itself)');
+  5,
+  'new founder sessions pin to v5, a later version than v3 (885 covers v4, 940 v5)');
 
 select ok(
   (select bool_and(v.published_at is not null)
