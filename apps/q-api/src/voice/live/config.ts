@@ -95,7 +95,10 @@ export function liveConfigFrom(
   env: Readonly<Record<string, string | undefined>>,
   deploymentEnvironment: string,
 ): LiveConfig {
-  const allowedUsers: ReadonlySet<string> = new Set(
+  // "*" opens the live line to every signed-in account (owner 2026-10-15);
+  // the daily spend cap and the per-person trial still apply.
+  const everyone = (env.CQ_VOICE_LIVE_USERS ?? "").trim() === "*";
+  const listedUsers: ReadonlySet<string> = new Set(
     (env.CQ_VOICE_LIVE_USERS ?? "")
       .split(",")
       .map((id) => id.trim().toLowerCase())
@@ -140,8 +143,9 @@ export function liveConfigFrom(
     },
     preview:
       on(env.CQ_VOICE_PREVIEW) &&
-      (deploymentEnvironment === "local" || allowedUsers.size > 0),
-    allowedUsers: deploymentEnvironment === "local" ? null : allowedUsers,
+      (deploymentEnvironment === "local" || everyone || listedUsers.size > 0),
+    allowedUsers:
+      deploymentEnvironment === "local" || everyone ? null : listedUsers,
     trial: liveTrialGrantsFrom(env.CQ_VOICE_LIVE_TRIAL),
   };
 }
