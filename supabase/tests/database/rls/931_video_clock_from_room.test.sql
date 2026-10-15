@@ -1,10 +1,11 @@
--- The GateQ founder's clock starts when Q is in the room, bounded by a 30 s
--- join grace; the ledger counts cap + grace (20261227140000).
+-- The founder's clock starts when the interviewer is in the room, bounded
+-- by a 30 s join grace, for GateQ and Rehearsals; the ledger counts what
+-- may have run (20261227140000).
 begin;
 create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
-select plan(11);
+select plan(16);
 
 update billing.video_allowance_config set monthly_cap_seconds = 1000000;
 
@@ -79,6 +80,42 @@ select is((select settled_seconds from billing.video_session_reservations
 select is((select billed_minutes from billing.video_usage_ledger
             where session_id = '00000000-0000-4000-8000-0000000931b5' and event = 'SETTLED'),
   4, 'billed in whole minutes, cap + grace at most');
+
+-- Rehearsals: the same rule (live run 22c3cc68: the face came 17 s late).
+insert into q_runtime.rehearsals (id, tenant_id, user_id, counterpart_kind, counterpart_id, counterpart_name, persona)
+values ('00000000-0000-4000-8000-0000000931a1', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'),
+        'COMPANY', gen_random_uuid(), 'Company', '{}');
+insert into q_runtime.rehearsal_video_sessions
+  (id, tenant_id, user_id, rehearsal_id, interviewer_id, bridge_token_hash, events_token_hash, created_at, ends_at)
+values ('00000000-0000-4000-8000-0000000931a2', pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'),
+        '00000000-0000-4000-8000-0000000931a1', 'partner-steve', repeat('d', 64), repeat('f', 64),
+        now() - interval '5 seconds', now() + interval '175 seconds');
+select lives_ok($$update q_runtime.rehearsal_video_sessions
+                    set status = 'LIVE', provider_key_index = 0, provider_pal_id = 'p931',
+                        provider_conversation_id = 'c931', sealed_join_url = repeat('x', 48),
+                        room_ready_at = now(), ends_at = now() + interval '210 seconds'
+                  where id = '00000000-0000-4000-8000-0000000931a2'$$,
+  'a joinable rehearsal room gets the hard stop, ready + 30 s + 180 s');
+select throws_ok($$update q_runtime.rehearsal_video_sessions
+                     set live_at = room_ready_at + interval '31 seconds',
+                         ends_at = room_ready_at + interval '211 seconds'
+                   where id = '00000000-0000-4000-8000-0000000931a2'$$,
+  '23514', null, 'a late interviewer never extends the rehearsal stop');
+select lives_ok($$update q_runtime.rehearsal_video_sessions
+                    set live_at = room_ready_at + interval '17 seconds',
+                        ends_at = room_ready_at + interval '197 seconds'
+                  where id = '00000000-0000-4000-8000-0000000931a2'$$,
+  'the interviewer in the room starts the founder''s 180 s');
+select throws_ok($$update q_runtime.rehearsal_video_sessions
+                     set ends_at = ends_at + interval '1 second'
+                   where id = '00000000-0000-4000-8000-0000000931a2'$$,
+  '23514', null, 'the rehearsal clock never moves again');
+update q_runtime.rehearsal_video_sessions
+   set status = 'ENDED', ended_reason = 'TIME_LIMIT', ended_at = created_at + interval '205 seconds', seconds = 205
+ where id = '00000000-0000-4000-8000-0000000931a2';
+select is((select settled_seconds from billing.video_session_reservations
+            where session_id = '00000000-0000-4000-8000-0000000931a2'),
+  205, 'a rehearsal settles what it ran, no longer clipped at 180');
 
 select * from finish();
 rollback;

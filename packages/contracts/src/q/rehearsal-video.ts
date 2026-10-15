@@ -28,6 +28,13 @@ export const Q_REHEARSAL_VIDEO_END_PATH =
 export const Q_REHEARSAL_VIDEO_BRIDGE_BASE_PATH =
   "/v1/q/rehearsals/video/bridge/:videoSessionId" as const;
 
+/**
+ * The provider's room events (its callback): the session id, then the
+ * per-session secret. Only "the replica joined" is acted on.
+ */
+export const Q_REHEARSAL_VIDEO_EVENTS_BASE_PATH =
+  "/v1/q/rehearsals/video/events/:videoSessionId" as const;
+
 /** The hard cap on one live video session, in seconds. */
 export const REHEARSAL_VIDEO_MAX_SECONDS = 180 as const;
 
@@ -36,6 +43,11 @@ export const qRehearsalVideoPath = (rehearsalId: string) =>
   Q_REHEARSAL_VIDEO_PATH.replace(":rehearsalId", enc(rehearsalId));
 export const qRehearsalVideoEndPath = (rehearsalId: string) =>
   Q_REHEARSAL_VIDEO_END_PATH.replace(":rehearsalId", enc(rehearsalId));
+export const qRehearsalVideoEventsBasePath = (videoSessionId: string) =>
+  Q_REHEARSAL_VIDEO_EVENTS_BASE_PATH.replace(
+    ":videoSessionId",
+    enc(videoSessionId),
+  );
 export const qRehearsalVideoBridgeBasePath = (videoSessionId: string) =>
   Q_REHEARSAL_VIDEO_BRIDGE_BASE_PATH.replace(
     ":videoSessionId",
@@ -103,8 +115,17 @@ export const RehearsalVideoSessionDtoSchema = z
      */
     joinUrl: z.string().url().max(2_000).nullable(),
     startedAt: UtcTimestampSchema,
-    /** Fixed when the session is created; a reconnect never extends it. */
+    /**
+     * While `liveAt` is null this is the hard stop (ready + join grace +
+     * cap); once the interviewer is in the room it is liveAt + maxSeconds.
+     * A reconnect never extends it.
+     */
     endsAt: UtcTimestampSchema,
+    /**
+     * When the interviewer joined and the founder's time began; null while
+     * they are still joining. Optional so a web release can accept it first.
+     */
+    liveAt: UtcTimestampSchema.nullable().optional(),
     maxSeconds: z.literal(REHEARSAL_VIDEO_MAX_SECONDS),
     endedReason: z.enum(REHEARSAL_VIDEO_ENDED_REASONS).nullable(),
     /** Shown on screen for the whole call. */

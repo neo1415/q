@@ -1,5 +1,6 @@
--- The GateQ founder's three minutes start when Q is in the room (live run
--- 2026-10-15, ga_60g4gydh0q9nscrsnj6wf6q5nc).
+-- The founder's three minutes start when the interviewer is in the room,
+-- for GateQ and Rehearsals alike (live runs 2026-10-15: GateQ
+-- ga_60g4gydh0q9nscrsnj6wf6q5nc left 167 s, rehearsal 22c3cc68 163 s).
 --
 -- 20261226160000 started the clock when the provider answered the create
 -- call. The interviewer's face then took another 13 s to join, so the
@@ -22,7 +23,8 @@
 --
 -- Billing never under-counts: a GateQ session may now run cap + grace
 -- (210 s), so the ledger's 180 s ceilings rise to 240 s and its minute
--- ceiling to 4. Rehearsals are unchanged (their own clock still caps 180).
+-- ceiling to 4. Rehearsals already settle their elapsed seconds; the
+-- ledger no longer clips them at 180.
 
 alter table gateq.application_video_sessions
   add column room_ready_at timestamptz,
@@ -148,5 +150,80 @@ begin
                     ceil(extract(epoch from (new.ended_at - new.created_at)))::integer) end,
     new.ended_reason = 'PROVIDER_FAILED' and new.provider_conversation_id is null);
   return null;
+end;
+$$;
+
+-- Rehearsals: the same two steps, with the fixed 180 s cap.
+alter table q_runtime.rehearsal_video_sessions
+  add column room_ready_at timestamptz,
+  add column events_token_hash text check (events_token_hash ~ '^[0-9a-f]{64}$');
+create unique index rehearsal_video_sessions_events_token_idx
+  on q_runtime.rehearsal_video_sessions (events_token_hash)
+  where events_token_hash is not null;
+
+alter table q_runtime.rehearsal_video_sessions drop constraint rehearsal_video_sessions_clock;
+alter table q_runtime.rehearsal_video_sessions
+  add constraint rehearsal_video_sessions_clock check (
+    ends_at > created_at
+    and (room_ready_at is null or room_ready_at >= created_at)
+    and (live_at is null or (live_at >= created_at and live_at <= created_at + interval '180 seconds'))
+    and (live_at is null or room_ready_at is null
+         or (live_at >= room_ready_at and live_at <= room_ready_at + interval '30 seconds'))
+    and ends_at <= coalesce(live_at, room_ready_at + interval '30 seconds', created_at)
+                   + interval '180 seconds');
+
+create or replace function q_runtime.rehearsal_video_sessions_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.ends_at <> old.ends_at
+     and not (
+       -- Before 20261227140000: ready was the start (kept for a rolling deploy).
+       (old.status = 'STARTING' and new.status = 'LIVE'
+        and old.live_at is null and new.live_at is not null and new.room_ready_at is null
+        and new.ends_at = new.live_at + interval '180 seconds')
+       -- The room is joinable: the provisional end, which is the hard stop.
+       or (old.status = 'STARTING' and new.status = 'LIVE'
+           and old.room_ready_at is null and new.room_ready_at is not null
+           and new.live_at is null
+           and new.ends_at = new.room_ready_at + interval '210 seconds')
+       -- The interviewer is in the room: 180 s from then.
+       or (old.status = 'LIVE' and new.status = 'LIVE'
+           and old.room_ready_at is not null and old.live_at is null
+           and new.live_at is not null
+           and new.ends_at = new.live_at + interval '180 seconds')) then
+    raise exception 'a video session keeps its owner, rehearsal, token and cap'
+      using errcode = '23514';
+  end if;
+  if old.live_at is not null and new.live_at is distinct from old.live_at then
+    raise exception 'a video session''s ready time never moves'
+      using errcode = '23514';
+  end if;
+  if (old.room_ready_at is not null and new.room_ready_at is distinct from old.room_ready_at)
+     or new.events_token_hash is distinct from old.events_token_hash then
+    raise exception 'a video session keeps its room time and callback secret'
+      using errcode = '23514';
+  end if;
+  if new.created_at <> old.created_at
+     or new.tenant_id <> old.tenant_id
+     or new.user_id <> old.user_id
+     or new.rehearsal_id <> old.rehearsal_id
+     or new.bridge_token_hash <> old.bridge_token_hash then
+    raise exception 'a video session keeps its owner, rehearsal, token and cap'
+      using errcode = '23514';
+  end if;
+  if old.status in ('ENDED', 'FAILED') and new.status <> old.status then
+    raise exception 'a closed video session never reopens'
+      using errcode = '23514';
+  end if;
+  if old.provider_key_index is not null
+     and new.provider_key_index is distinct from old.provider_key_index then
+    raise exception 'a video session keeps its provider key'
+      using errcode = '23514';
+  end if;
+  new.updated_at := clock_timestamp();
+  return new;
 end;
 $$;

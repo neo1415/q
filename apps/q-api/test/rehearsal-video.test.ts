@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   qRehearsalVideoBridgeBasePath,
+  qRehearsalVideoEventsBasePath,
   RehearsalVideoSessionDtoSchema,
   StartRehearsalVideoResponseSchema,
   type QRehearsalDto,
@@ -179,11 +180,17 @@ function fakeRehearsals() {
 
 /** The session table, faked with the same rules as the migration. */
 function memoryStore(now: () => Date): RehearsalVideoStore & {
-  rows: Map<string, VideoSessionRow & { tokenHash: string }>;
+  rows: Map<
+    string,
+    VideoSessionRow & { tokenHash: string; eventsTokenHash?: string }
+  >;
   /** The database's shared weekly allowance and monthly safeguard. */
   limits: { remaining: number; platformFull: boolean };
 } {
-  const rows = new Map<string, VideoSessionRow & { tokenHash: string }>();
+  const rows = new Map<
+    string,
+    VideoSessionRow & { tokenHash: string; eventsTokenHash?: string }
+  >();
   const limits = { remaining: 5, platformFull: false };
   const byRehearsal = (actor: ActorContext, rehearsalId: string) =>
     [...rows.values()].find(
@@ -231,6 +238,9 @@ function memoryStore(now: () => Date): RehearsalVideoStore & {
         endsAt: input.endsAt,
         endedAt: null,
         tokenHash: input.tokenHash,
+        eventsTokenHash: input.eventsTokenHash,
+        roomReadyAt: null,
+        liveAt: null,
       };
       rows.set(row.id, row);
       return Promise.resolve({ row, created: true });
@@ -266,15 +276,38 @@ function memoryStore(now: () => Date): RehearsalVideoStore & {
     markLive: (row, input) => {
       const held = rows.get(row.id);
       if (held?.status !== "STARTING") return Promise.resolve(null);
-      // As the database: the founder's clock starts when the room is ready.
+      // As the database: joinable, the provisional end is the hard stop.
       const next = {
         ...held,
         ...input,
         status: "LIVE" as const,
-        endsAt: new Date(now().getTime() + 180_000),
+        roomReadyAt: now(),
+        endsAt: new Date(now().getTime() + 210_000),
       };
       rows.set(row.id, next);
       return Promise.resolve(next);
+    },
+    markInRoom: (row) => {
+      const held = rows.get(row.id);
+      if (
+        held?.status !== "LIVE" ||
+        held.liveAt != null ||
+        held.roomReadyAt == null ||
+        held.endsAt.getTime() <= now().getTime()
+      )
+        return Promise.resolve(null);
+      const at = Math.min(now().getTime(), held.roomReadyAt.getTime() + 30_000);
+      const next = {
+        ...held,
+        liveAt: new Date(at),
+        endsAt: new Date(at + 180_000),
+      };
+      rows.set(row.id, next);
+      return Promise.resolve(next);
+    },
+    byEventsToken: (sessionId, tokenHash) => {
+      const row = rows.get(sessionId);
+      return Promise.resolve(row?.eventsTokenHash === tokenHash ? row : null);
     },
     close: (row, input) => {
       const held = rows.get(row.id);
@@ -391,6 +424,7 @@ function setup(
     pool: options.configured === false ? null : tavus.pool,
     publicBaseUrl: "https://q-api.example.test/",
     bridgePath: qRehearsalVideoBridgeBasePath,
+    eventsPath: qRehearsalVideoEventsBasePath,
     enabledInterviewers: enabledInterviewersFrom(undefined),
     now: () => new Date(clock),
     setTimer: (run, ms) => {
@@ -420,6 +454,7 @@ function setup(
       joinCipher: createTokenCipher(Buffer.alloc(32, 1).toString("base64")),
       publicBaseUrl: "https://q-api.example.test/",
       bridgePath: qRehearsalVideoBridgeBasePath,
+      eventsPath: qRehearsalVideoEventsBasePath,
       enabledInterviewers: enabledInterviewersFrom(undefined),
       now: () => new Date(clock),
     });
@@ -466,9 +501,45 @@ describe("starting a video rehearsal", () => {
       },
     );
     const session = await startVideo(harness);
+    // Joinable: only the hard stop, ready + 30 s grace + 180 s.
+    expect(session.liveAt).toBeNull();
     expect(session.endsAt).toBe(
-      new Date(T0.getTime() + 88_000 + 180_000).toISOString(),
+      new Date(T0.getTime() + 88_000 + 210_000).toISOString(),
     );
+    // Live run 22c3cc68: the face came 17 s after the room.
+    await harness.advance(17_000);
+    const callback = harness.tavus.calls.conversations[0]?.input.callbackUrl;
+    const token = callback?.split("/").at(-1) ?? "";
+    expect(callback).toBe(
+      `https://q-api.example.test/v1/q/rehearsals/video/events/${session.id}/${token}`,
+    );
+    expect(
+      await harness.service.providerEvent({
+        sessionId: session.id,
+        token: decodeURIComponent(token),
+        eventType: "system.replica_joined",
+        conversationId: null,
+      }),
+    ).toBe("ACCEPTED");
+    const joined = await harness.service.get(FOUNDER, REHEARSAL_ID);
+    expect(joined?.liveAt).toBe(new Date(T0.getTime() + 105_000).toISOString());
+    expect(joined?.endsAt).toBe(
+      new Date(T0.getTime() + 105_000 + 180_000).toISOString(),
+    );
+    // The cap timer follows the moved end: provider ended at exactly 180 s.
+    await harness.advance(179_000);
+    expect(harness.tavus.calls.ended).toHaveLength(0);
+    await harness.advance(1_000);
+    expect(harness.tavus.calls.ended).toHaveLength(1);
+    // A forged secret is unknown and moves nothing.
+    expect(
+      await harness.service.providerEvent({
+        sessionId: session.id,
+        token: "z".repeat(43),
+        eventType: "system.replica_joined",
+        conversationId: null,
+      }),
+    ).toBe("UNKNOWN_SESSION");
     expect(harness.tavus.calls.conversations[0]?.input.maxCallSeconds).toBe(
       180,
     );
@@ -485,7 +556,9 @@ describe("starting a video rehearsal", () => {
     const harness = setup();
     const session = await startVideo(harness);
     expect(RehearsalVideoSessionDtoSchema.parse(session)).toEqual(session);
-    expect(session.endsAt).toBe(new Date(T0.getTime() + 180_000).toISOString());
+    // The hard stop until the interviewer joins: ready + 30 s + 180 s.
+    expect(session.endsAt).toBe(new Date(T0.getTime() + 210_000).toISOString());
+    expect(session.liveAt).toBeNull();
     expect(session.joinUrl).toBe("https://tavus.daily.co/conv0?t=room-token");
     const pal = harness.tavus.calls.pals[0]?.input;
     expect(pal?.faceId).toBe("rdd4c86e5e1a");
@@ -499,6 +572,7 @@ describe("starting a video rehearsal", () => {
     const conversation = harness.tavus.calls.conversations[0]?.input;
     expect(conversation).toMatchObject({
       maxCallSeconds: 180,
+      joinGraceSeconds: 30,
       requireAuth: true,
       testMode: false,
       greeting: "Thanks for making the time. Tell me what you do.",
@@ -608,7 +682,7 @@ describe("starting a video rehearsal", () => {
     const createPal = client.createPal;
     vi.spyOn(client, "createPal").mockImplementation(async (input) => {
       const pal = await createPal(input);
-      await harness.advance(181000);
+      await harness.advance(211_000);
       return pal;
     });
     const result = await harness.service.start(
@@ -624,7 +698,7 @@ describe("starting a video rehearsal", () => {
   it("never restarts the clock: after the cap the same rehearsal has no second video", async () => {
     const harness = setup();
     await startVideo(harness);
-    await harness.advance(181_000);
+    await harness.advance(211_000);
     const again = await harness.service.start(
       FOUNDER,
       REHEARSAL_ID,
@@ -863,7 +937,10 @@ describe("the three-minute cap", () => {
     const harness = setup();
     const session = await startVideo(harness);
     const bearer = bearerOf(harness.tavus.calls);
-    await harness.advance(180_000);
+    // No joined event ever arrives: the hard stop, ready + 30 s + 180 s.
+    await harness.advance(209_000);
+    expect(harness.tavus.calls.ended).toEqual([]);
+    await harness.advance(1_000);
     expect(harness.tavus.calls.ended).toEqual([{ key: 0, id: "conv0" }]);
     expect(harness.rehearsals.finished).toEqual([REHEARSAL_ID]);
     const stored = [...harness.store.rows.values()][0];
@@ -886,7 +963,7 @@ describe("the three-minute cap", () => {
     const harness = setup();
     await startVideo(harness);
     for (const timer of harness.timers) timer.cancelled = true;
-    await harness.advance(200_000);
+    await harness.advance(210_000);
     expect(await harness.service.sweep()).toBe(1);
     expect(harness.tavus.calls.ended).toHaveLength(1);
     expect(harness.rehearsals.finished).toEqual([REHEARSAL_ID]);
@@ -1188,7 +1265,7 @@ describe("ending", () => {
     expect([...harness.store.rows.values()][0]?.status).toBe("ENDED");
     expect(harness.rehearsals.finished).toEqual([]);
     harness.service.close();
-    await harness.advance(181000);
+    await harness.advance(211_000);
     const restart = harness.restarted();
     expect(await restart.sweep()).toBe(1);
     expect(harness.rehearsals.finished).toEqual([REHEARSAL_ID]);
@@ -1358,6 +1435,45 @@ describe("the routes", () => {
     await app.close();
   });
 
+  it("the provider's joined event starts the founder's 180 s; a forged secret is a 404", async () => {
+    const { app, harness } = await server();
+    const started = await app.inject({
+      method: "POST",
+      url: `/v1/q/rehearsals/${REHEARSAL_ID}/video`,
+      payload: { interviewerId: "partner-steve" },
+    });
+    const body = StartRehearsalVideoResponseSchema.parse(started.json());
+    if (body.mode !== "VIDEO") throw new Error("expected video");
+    expect(body.session.liveAt).toBeNull();
+    const callback = new URL(
+      harness.tavus.calls.conversations[0]?.input.callbackUrl ?? "",
+    );
+    const forged = await app.inject({
+      method: "POST",
+      url: `${qRehearsalVideoEventsBasePath(body.session.id)}/${"z".repeat(43)}`,
+      payload: { event_type: "system.replica_joined" },
+    });
+    expect(forged.statusCode).toBe(404);
+    await harness.advance(12_000);
+    const joined = await app.inject({
+      method: "POST",
+      url: callback.pathname,
+      payload: {
+        event_type: "system.replica_joined",
+        message_type: "system",
+        conversation_id: "conv0",
+        properties: { replica_id: "r1" },
+      },
+    });
+    expect(joined.statusCode).toBe(204);
+    const now = await harness.service.get(FOUNDER, REHEARSAL_ID);
+    expect(now?.liveAt).toBe(new Date(T0.getTime() + 12_000).toISOString());
+    expect(now?.endsAt).toBe(
+      new Date(T0.getTime() + 12_000 + 180_000).toISOString(),
+    );
+    await app.close();
+  });
+
   it("answers the provider's setup probe without making it a founder turn", async () => {
     const { app, harness } = await server();
     const started = await app.inject({
@@ -1492,7 +1608,8 @@ describe("bounded wider video access", () => {
   it("asks the existing Q engine to wrap up near the immutable deadline", async () => {
     const harness = setup();
     const session = await startVideo(harness);
-    await harness.advance(151_000);
+    // The interviewer is in the room at the end of the 30 s grace.
+    await harness.advance(181_000);
     const signal = new AbortController().signal;
     await harness.service.bridge(
       session.id,
@@ -1585,7 +1702,7 @@ describe("durable provider allocation checkpoint", () => {
       conversationUrl: null,
       status: "ended",
     });
-    await harness.advance(181_000);
+    await harness.advance(211_000);
     await harness.service.sweep();
     expect(
       [...harness.store.rows.values()][0]?.providerRequestResolvedAt,

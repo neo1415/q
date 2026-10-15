@@ -150,7 +150,14 @@ export type VideoSessionRow = {
   readonly createdAt: Date;
   readonly endsAt: Date;
   readonly endedAt: Date | null;
+  /** The provider answered and the room is joinable. */
+  readonly roomReadyAt?: Date | null;
+  /** The interviewer is in the room and the 180 s are running. */
+  readonly liveAt?: Date | null;
 };
+
+/** Seconds the interviewer has to join before the clock starts anyway. */
+export const REHEARSAL_VIDEO_JOIN_GRACE_SECONDS = 30;
 
 export type RehearsalVideoStore = {
   /**
@@ -164,6 +171,8 @@ export type RehearsalVideoStore = {
       readonly rehearsalId: string;
       readonly interviewerId: string;
       readonly tokenHash: string;
+      /** SHA-256 of the secret in the provider's callback URL. */
+      readonly eventsTokenHash: string;
       readonly createdAt: Date;
       readonly endsAt: Date;
     },
@@ -197,6 +206,18 @@ export type RehearsalVideoStore = {
   readonly resolveProviderRequest: (
     row: VideoSessionRow,
     at: Date,
+  ) => Promise<VideoSessionRow | null>;
+  /**
+   * The interviewer is in the room: 180 s from now (at most ready + grace),
+   * once. Null when not live, already running, or past its end.
+   */
+  readonly markInRoom: (
+    row: VideoSessionRow,
+  ) => Promise<VideoSessionRow | null>;
+  /** The provider callback's lookup: the session id and its secret's hash. */
+  readonly byEventsToken: (
+    sessionId: string,
+    tokenHash: string,
   ) => Promise<VideoSessionRow | null>;
   readonly markLive: (
     row: VideoSessionRow,
@@ -239,6 +260,8 @@ type RawRow = {
   created_at: Date;
   ends_at: Date;
   ended_at: Date | null;
+  room_ready_at: Date | null;
+  live_at: Date | null;
 };
 
 const fromRaw = (row: RawRow): VideoSessionRow => ({
@@ -260,6 +283,8 @@ const fromRaw = (row: RawRow): VideoSessionRow => ({
   createdAt: row.created_at,
   endsAt: row.ends_at,
   endedAt: row.ended_at,
+  roomReadyAt: row.room_ready_at,
+  liveAt: row.live_at,
 });
 
 export function createPostgresRehearsalVideoStore(
@@ -267,7 +292,7 @@ export function createPostgresRehearsalVideoStore(
 ): RehearsalVideoStore {
   const columns = sql`id, tenant_id, user_id, organisation_id, membership_id,
     rehearsal_id, interviewer_id, provider_key_index, provider_pal_id,
-    provider_conversation_id, sealed_join_url, provider_request_started_at, provider_request_resolved_at, status, ended_reason, created_at, ends_at, ended_at`;
+    provider_conversation_id, sealed_join_url, provider_request_started_at, provider_request_resolved_at, status, ended_reason, created_at, ends_at, ended_at, room_ready_at, live_at`;
   const UUID =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
   const own = async (actor: ActorContext, rehearsalId: string) => {
@@ -287,10 +312,10 @@ export function createPostgresRehearsalVideoStore(
       const rows = await sql<RawRow[]>`
         insert into q_runtime.rehearsal_video_sessions
           (id, tenant_id, user_id, organisation_id, membership_id,
-           rehearsal_id, interviewer_id, bridge_token_hash, created_at, ends_at)
+           rehearsal_id, interviewer_id, bridge_token_hash, events_token_hash, created_at, ends_at)
         select ${input.id}, ${actor.tenantId}, ${actor.userId},
                ${actor.organisationId ?? null}, ${actor.membershipId ?? null},
-               r.id, ${input.interviewerId}, ${input.tokenHash},
+               r.id, ${input.interviewerId}, ${input.tokenHash}, ${input.eventsTokenHash},
                ${input.createdAt}, ${input.endsAt}
           from q_runtime.rehearsals r
          where r.id = ${input.rehearsalId}
@@ -344,21 +369,48 @@ export function createPostgresRehearsalVideoStore(
       return rows[0] === undefined ? null : fromRaw(rows[0]);
     },
     markLive: async (row, input) => {
-      // The clock starts when the room is ready (migration 20261226160000).
+      // Joinable, clock not started: the provisional end is the hard stop,
+      // ready + 30 s join grace + 180 s (migration 20261227140000).
       const rows = await sql<RawRow[]>`
         update q_runtime.rehearsal_video_sessions
            set status = 'LIVE', provider_key_index = ${input.keyIndex},
                provider_pal_id = ${input.palId},
                provider_conversation_id = ${input.conversationId},
                sealed_join_url = ${input.sealedJoinUrl},
-               -- One instant for both: the guard accepts exactly ready + cap.
-               live_at = now(),
-               ends_at = now() + interval '180 seconds'
+               -- One instant for both: the guard accepts exactly this stop.
+               room_ready_at = now(),
+               ends_at = now() + interval '210 seconds'
          where id = ${row.id} and tenant_id = ${row.tenantId}
            and user_id = ${row.userId} and status = 'STARTING'
         returning ${columns}`;
       const updated = rows[0];
       return updated === undefined ? null : fromRaw(updated);
+    },
+    markInRoom: async (row) => {
+      // The interviewer is in the room: 180 s from now, never later than
+      // the grace allows, so the end only ever moves earlier. Once.
+      const rows = await sql<RawRow[]>`
+        update q_runtime.rehearsal_video_sessions
+           set live_at = greatest(room_ready_at, least(now(), room_ready_at + interval '30 seconds')),
+               ends_at = greatest(room_ready_at, least(now(), room_ready_at + interval '30 seconds'))
+                         + interval '180 seconds'
+         where id = ${row.id} and tenant_id = ${row.tenantId}
+           and user_id = ${row.userId} and status = 'LIVE' and live_at is null
+           and room_ready_at is not null and ends_at > now()
+        returning ${columns}`;
+      const updated = rows[0];
+      return updated === undefined ? null : fromRaw(updated);
+    },
+    byEventsToken: async (sessionId, tokenHash) => {
+      if (!UUID.test(sessionId) || !/^[0-9a-f]{64}$/u.test(tokenHash)) {
+        return null;
+      }
+      const rows = await sql<RawRow[]>`
+        select ${columns} from q_runtime.rehearsal_video_sessions
+         where id = ${sessionId} and events_token_hash = ${tokenHash}
+         limit 1`;
+      const row = rows[0];
+      return row === undefined ? null : fromRaw(row);
     },
     close: async (row, input) => {
       const rows = await sql<RawRow[]>`
@@ -450,6 +502,17 @@ export type RehearsalVideoService = {
     messages: readonly BridgeMessage[],
     signal: AbortSignal,
   ) => Promise<BridgeResult>;
+  /**
+   * One room event from the provider's callback. The secret proves the
+   * session; only "the replica joined" means anything, and it can only
+   * start the clock (the end moves earlier, never later).
+   */
+  readonly providerEvent: (input: {
+    readonly sessionId: string;
+    readonly token: string;
+    readonly eventType: string;
+    readonly conversationId: string | null;
+  }) => Promise<"ACCEPTED" | "UNKNOWN_SESSION">;
   /** Ends sessions past their cap (a restart's leftovers). */
   readonly sweep: () => Promise<number>;
   /** Stops timers (tests, shutdown). */
@@ -556,6 +619,8 @@ export function createRehearsalVideoService(dependencies: {
   /** The Q API's public origin the provider calls back; null: not configured. */
   readonly publicBaseUrl: string | null;
   readonly bridgePath: (sessionId: string) => string;
+  /** Where the provider reports room events for a session. */
+  readonly eventsPath: (sessionId: string) => string;
   readonly enabledInterviewers: ReadonlySet<string>;
   /** Tavus test_mode: the room is created but no face joins (no minutes). */
   readonly testMode?: boolean | undefined;
@@ -675,6 +740,7 @@ export function createRehearsalVideoService(dependencies: {
       joinUrl: open ? recoveredJoinUrl(row) : null,
       startedAt: row.createdAt.toISOString(),
       endsAt: row.endsAt.toISOString(),
+      liveAt: row.liveAt?.toISOString() ?? null,
       maxSeconds: REHEARSAL_VIDEO_MAX_SECONDS,
       endedReason:
         row.endedReason === null || row.endedReason === "PROVIDER_UNAVAILABLE"
@@ -793,6 +859,16 @@ export function createRehearsalVideoService(dependencies: {
         });
       }, ms),
     );
+  }
+
+  /** Start the 180 s now if not started; reschedules the cap timer. */
+  async function inRoom(row: VideoSessionRow): Promise<VideoSessionRow> {
+    if (row.status !== "LIVE" || row.liveAt != null || row.roomReadyAt == null)
+      return row;
+    const started = await store.markInRoom(row);
+    if (started === null) return row;
+    scheduleCap(started);
+    return started;
   }
 
   async function canRecover(actor: ActorContext, row: VideoSessionRow) {
@@ -953,6 +1029,7 @@ export function createRehearsalVideoService(dependencies: {
       }
 
       const bearer = randomBytes(32).toString("base64url");
+      const eventsToken = randomBytes(32).toString("base64url");
       const createdAt = now();
       const endsAt = new Date(
         createdAt.getTime() + REHEARSAL_VIDEO_MAX_SECONDS * 1_000,
@@ -964,6 +1041,7 @@ export function createRehearsalVideoService(dependencies: {
           rehearsalId,
           interviewerId: interviewer.id,
           tokenHash: tokenHashOf(bearer),
+          eventsTokenHash: tokenHashOf(eventsToken),
           createdAt,
           endsAt,
         });
@@ -995,7 +1073,9 @@ export function createRehearsalVideoService(dependencies: {
       }
       const row = claimed.row;
       const greeting = latestThemLine(rehearsal)?.text ?? null;
-      const bridgeUrl = `${dependencies.publicBaseUrl.replace(/\/+$/u, "")}${dependencies.bridgePath(row.id)}`;
+      const publicBase = dependencies.publicBaseUrl.replace(/\/+$/u, "");
+      const bridgeUrl = `${publicBase}${dependencies.bridgePath(row.id)}`;
+      const eventsUrl = `${publicBase}${dependencies.eventsPath(row.id)}/${encodeURIComponent(eventsToken)}`;
       const disclosure = disclosureFor(rehearsal);
       try {
         const { value, keyIndex } = await pool.withHealthyKey(
@@ -1051,12 +1131,17 @@ export function createRehearsalVideoService(dependencies: {
                 faceId: interviewer.faceId,
                 // Traceable on the provider's side, not shown to the founder.
                 name: `cq-rehearsal-${row.id}`,
-                callbackUrl: null,
+                // Room events: the replica joining starts the founder's
+                // 180 s (live run 22c3cc68: the face came 17 s after the
+                // room). The secret is stored only as a hash and can only
+                // start this session's clock within its grace.
+                callbackUrl: eventsUrl,
                 greeting,
                 context: null,
-                // The founder's three minutes start when the room is ready
-                // (migration 20261226160000), so the provider gets the full cap.
+                // The clock waits up to the join grace for the interviewer,
+                // so the provider's own stop is cap + grace.
                 maxCallSeconds: REHEARSAL_VIDEO_MAX_SECONDS,
+                joinGraceSeconds: REHEARSAL_VIDEO_JOIN_GRACE_SECONDS,
                 testMode: dependencies.testMode === true,
                 requireAuth: true,
               });
@@ -1223,6 +1308,9 @@ export function createRehearsalVideoService(dependencies: {
         if (!open || row.endsAt.getTime() <= now().getTime()) {
           return { kind: "LINE", text: ALREADY_OVER };
         }
+        // The provider asked for a line, so the interviewer is in the room:
+        // the clock runs whether or not its joined event arrived first.
+        const current = await inRoom(row).catch(() => row);
         // The founder's latest words only; the provider's system messages
         // (its own prompt, perception notes) are data and never forwarded.
         const said = messages.filter((message) => message.role === "user");
@@ -1240,7 +1328,7 @@ export function createRehearsalVideoService(dependencies: {
 
         if (signal.aborted) return { kind: "SILENT" };
         const started = performance.now();
-        const remainingMs = row.endsAt.getTime() - now().getTime();
+        const remainingMs = current.endsAt.getTime() - now().getTime();
         const within = AbortSignal.any([
           signal,
           AbortSignal.timeout(Math.max(1, remainingMs)),
@@ -1260,7 +1348,7 @@ export function createRehearsalVideoService(dependencies: {
           },
           "rehearsal video: Q bridge timing",
         );
-        if (within.aborted || row.endsAt.getTime() <= now().getTime())
+        if (within.aborted || current.endsAt.getTime() <= now().getTime())
           return { kind: "SILENT" };
         let reply: BridgeResult;
         if (result.kind === "OK") {
@@ -1278,6 +1366,23 @@ export function createRehearsalVideoService(dependencies: {
         if (result.kind === "OK") answered.set(row.id, { key, reply });
         return reply;
       }),
+
+    providerEvent: async (input) => {
+      if (input.token.length < 32 || input.token.length > 128)
+        return "UNKNOWN_SESSION";
+      const row = await store.byEventsToken(
+        input.sessionId,
+        tokenHashOf(input.token),
+      );
+      if (row === null) return "UNKNOWN_SESSION";
+      if (
+        input.eventType === "system.replica_joined" &&
+        (input.conversationId === null ||
+          input.conversationId === row.conversationId)
+      )
+        await inRoom(row);
+      return "ACCEPTED";
+    },
 
     sweep: async () => {
       const due = await store.overdue(now());
