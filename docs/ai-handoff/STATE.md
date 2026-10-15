@@ -1,5 +1,56 @@
 # Capital Q — Current shared engineering state
 
+## Four-lane round — 15 October 2026, 07:10 WAT (Claude lead)
+
+Three releases on 15 October are live and checked against Railway: all four services are on `242460c1`.
+
+| Release | Merged PRs | Migrations applied to hosted |
+| --- | --- | --- |
+| A | #107 → #109 (`04a322ae`) | none |
+| B | #108 → #110 (`c747d651`) | `20261223120000`–`20261223160000`, `20261226200000` |
+| C | #111 → #112 (`242460c1`) | `20261226210000` (hosted 218 = local 218) |
+
+What each release delivered:
+
+- **CRM (lane C):**
+  - Results and Relationships are one **CRM** nav item, titled Investment Hub or Fundraising Hub; `/crm` is an alias.
+  - Server-backed saved views.
+  - A per-side read model for the pipeline (`network.relationship_party_states`).
+  - A time-in-stage strip and the GateQ applications list on each record.
+  - The background texture.
+  - LIVE VERIFIED: `/relationships`, `/results` and `/crm` for both roles at 1440 and 390.
+  - Not done: the read-model backfill script needs direct Postgres, which the sandbox lacks. The API lazily refreshes up to 200 rows per read instead.
+- **GateQ (lane G):**
+  - PR #98 rebased, plus a cap on the facts a dossier answer may cite.
+  - The "Needs clarification" wording.
+  - A coverage panel.
+  - Guest Evidence custody (PR #97):
+    - investors are shown only files with a CLEAN malware scan;
+    - a 5 GiB storage cap per gateway;
+    - disclosure lineage, which is UNKNOWN and fail-closed when it cannot be established.
+  - A fix so the dossier summary is offered for INVESTOR, COUNTERPARTY and GENERAL turns. The production acceptance failed before this fix; the re-run after release C is pending.
+  - Tablet lobby LIVE VERIFIED. Video is not offered because q-api has `CQ_TAVUS_TEST_MODE=true`.
+- **Q speed (lane S):** baseline `docs/ai-handoff/perf/BASELINE-2026-10-15.md`. Live re-measure:
+  - company facts answered by code: 9.4–9.8 s → 1.4–1.9 s;
+  - fit ranking and navigation: 0 model calls, with unchanged latency.
+  - The S3a re-search fix and S5 refresh-ahead shipped in release C; their measurement is pending.
+- **Q Pitch (lane P):**
+  - Runtime change record, a 5–7 minute premiere script, the host overlay, gating so only audience voice commands control the tour, and a stale-receipt fix.
+  - `CQ_Q_PITCH_TOUR=1` is set on web.
+  - Browser-certified: GateQ inbox and the relationship hub.
+  - Demo company decision: Option A (private, knowledge pack only).
+- **InvestIQ (lane M):**
+  - `investiq/v1` runs in shadow mode in `packages/readiness/src/investiq/`, with no consumers. Status: OWNER_DELEGATED_PENDING_CALIBRATION.
+  - Documents: `docs/product-sources/investiq/{RECONCILIATION,RESEARCH,CALIBRATION}.md` and ADR 0068 (Proposed).
+
+Open:
+
+- **Batch D (#113):**
+  - the GateQ native video interview, flag-gated on api (`CQ_GATEQ_VIDEO_*`), with migration `20261226100000`;
+  - the `?item=` deep-link fix;
+  - lane S's snapshot round-trip cut, still being merged against the release C read model.
+- **Paid Tavus test:** waits for the owner's credit top-up at 09:00 WAT. Seeded accounts for `CQ_TAVUS_PAID_USER_IDS`: Tensorgate's Daniel Park and Laura Bennett (internal ids are in the lane G report; they are not secrets).
+
 ## H2 production acceptance — 14 October 2026, 22:33 WAT
 
 This section supersedes older assertions below. Owner override: finish H2 first; preserve failing sibling98/97 and original WIPs.
