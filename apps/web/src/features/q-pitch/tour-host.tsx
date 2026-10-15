@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import {
   useCallback,
   useEffect,
@@ -239,6 +240,34 @@ export function QPitchHost({
   );
 }
 
+/**
+ * The open Q side panel, if any. It is a modal dialog, so while it is open
+ * everything outside it (the tour overlay too) is inert; the tour then
+ * renders its compact controls inside it (lead decision 15 Oct: tour
+ * controls stay usable without a keyboard).
+ */
+function findQPanel(): HTMLElement | null {
+  for (const dialog of document.querySelectorAll<HTMLElement>(
+    '[role="dialog"]',
+  )) {
+    const labelId = dialog.getAttribute("aria-labelledby");
+    const label =
+      labelId === null ? null : document.getElementById(labelId)?.textContent;
+    if (label?.trim() === "Q") return dialog;
+  }
+  return null;
+}
+
+function subscribePanel(notify: () => void): () => void {
+  const observer = new MutationObserver(() => notify());
+  observer.observe(document.body, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
+
+function useQPanel(): HTMLElement | null {
+  return useSyncExternalStore(subscribePanel, findQPanel, () => null);
+}
+
 function createSlot<T>() {
   let value: T | null = null;
   const listeners = new Set<() => void>();
@@ -336,8 +365,39 @@ function TourOverlay({
   const fallback =
     snapshot.notice?.kind === "FALLBACK" ? snapshot.notice.failureCode : null;
 
+  const panel = useQPanel();
+  const panelControls =
+    panel === null
+      ? null
+      : createPortal(
+          <div
+            role="toolbar"
+            aria-label="Tour controls"
+            data-q-pitch-panel-controls
+            className="absolute top-3 right-14 z-(--cq-z-popover) flex items-center gap-1 rounded-md border border-(--cq-border) bg-(--cq-surface-raised) p-1 shadow-(--cq-shadow-overlay)"
+          >
+            <TourButton label="Back" onPress={() => send("BACK")} />
+            {halted ? (
+              <TourButton
+                label="Resume tour"
+                primary
+                onPress={() => send("RESUME")}
+              />
+            ) : (
+              <TourButton
+                label="Pause tour"
+                primary
+                onPress={() => send("PAUSE")}
+              />
+            )}
+            <TourButton label="Skip" onPress={() => send("SKIP")} />
+          </div>,
+          panel,
+        );
+
   return (
     <TourFrame label={label} onExit={onExit}>
+      {panelControls}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="cq-label text-(--cq-text-primary)">
           {scene?.title ?? "Q Pitch"}

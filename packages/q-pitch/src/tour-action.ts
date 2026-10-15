@@ -37,9 +37,20 @@ export const TourActionIdSchema = z
   .regex(/^ta_[a-z0-9][a-z0-9_-]{2,62}$/u);
 export type TourActionId = z.infer<typeof TourActionIdSchema>;
 
-/** A stable key of a seeded demo record ("ledgerfold"), never a uuid or name. */
+/**
+ * A record key, never a uuid or a name. `card-N` (N = 1..9) is the Nth
+ * company card of the tour's latest acknowledged Q answer with cards: the
+ * company comes from what the actor was actually shown (scene receipt), so
+ * a script never hard-codes a company. Other keys name seeded demo records.
+ */
 export const FixtureKeySchema = z.string().regex(/^[a-z][a-z0-9-]{1,62}$/u);
 export type FixtureKey = z.infer<typeof FixtureKeySchema>;
+
+/** `card-N`: N (1-based) if the key is a receipt card key, else null. */
+export function receiptCardIndex(key: FixtureKey): number | null {
+  const match = /^card-([1-9])$/u.exec(key);
+  return match?.[1] === undefined ? null : Number(match[1]);
+}
 
 /**
  * An owner-approved question, by id. The text lives in the script's

@@ -244,7 +244,7 @@ const candidates: SceneScript[] = [
         actionId: "ta_ask-private",
         kind: "askApprovedQuestion",
         question: "q.private-runway",
-        subject: "ledgerfold",
+        subject: "card-1",
       },
     ],
     lines: [

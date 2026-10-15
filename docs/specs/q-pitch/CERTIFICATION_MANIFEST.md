@@ -125,4 +125,19 @@ The four original investor entries remain due for re-certification on the deploy
 
 **Default-gate cut on 242460c1:** pilot P1–P4 + GateQ + relationship + Home = **about 5:05**. The pilot scenes are blocked by the fixture drift above. Privacy and Q-to-Q are pending the paid run (after 08:00 UTC).
 
+## Lane P cost log (15 Oct)
+
+| Time (UTC)   | What                                            | Calls                  | Cost                                                                                          |
+| ------------ | ----------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------- |
+| 05:25        | pilot rehearsal; guard missed `POST /api/q-ask` | 1 top-three Q text run | paid, about $0.01 (lead estimate for the two runs: $0.02; not reconciled with vendor billing) |
+| 06:11        | pilot re-run (same gap)                         | 1 top-three Q text run | paid, about $0.01                                                                             |
+| 06:13 onward | guard aborts every non-GET request              | 0                      | $0                                                                                            |
+
+## Pilot change (lead decision, 15 Oct)
+
+- **Companies:** scenes 2–3 no longer name a company. `card-1` and `card-2` resolve to the first and second company cards of scene 1's acknowledged DONE answer, snapshotted when the receipt arrives. A key never resolves from a name, from another run, or from the person's own typed text.
+- **Narration:** the comparison intro is now "Let me put the first two side by side against your mandate." The company line no longer assumes founder statements. Narration states only what the receipt and the page show; never traction.
+- **Q panel:** while the Q side panel (a modal) is open, the tour renders Back, Pause/Resume tour and Skip inside it, so no keyboard is needed.
+- **Re-certification:** `INV-PROFILE-FINDINGS`, `INV-RISKS-FOLLOWUP` and `INV-COMPARE-TABLE` must be re-run on the receipt-bound pilot after deploy (paid Q runs, within the cap) before their fixture field changes from "Ledgerfold"/"F2".
+
 Every other atlas feature currently has no certification entry and must not be presented as live.

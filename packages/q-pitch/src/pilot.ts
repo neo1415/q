@@ -151,7 +151,7 @@ export const PILOT_SCRIPT: TourScript = TourScriptSchema.parse({
   scriptVersion: "0.1.0-draft",
   status: "DRAFT",
   reviewNote:
-    "DRAFT pending product-owner review (blueprint §15). Departures from §6: (1) the opening's 'you can interrupt me... calendar' sentence is held back until pause/interrupt is certified (QP-F09); (2) the §6 04:35 line 'every material point has a source and a confidence boundary' is narrowed to INV-RISKS-FOLLOWUP's allowed claim; (3) the top-three, comparison-outcome and fallback sentences are Lane B wording of manifest claimsAllowed; (4) askApprovedQuestion is PROPOSED r2 (QP-F01 §3). Questions are the exact ones of the certified browser run.",
+    "DRAFT pending product-owner review (blueprint §15). Departures from §6: (1) the opening's 'you can interrupt me... calendar' sentence is held back until pause/interrupt is certified (QP-F09); (2) the §6 04:35 line 'every material point has a source and a confidence boundary' is narrowed to INV-RISKS-FOLLOWUP's allowed claim; (3) the top-three, comparison-outcome and fallback sentences are Lane B wording of manifest claimsAllowed; (4) askApprovedQuestion is PROPOSED r2 (QP-F01 §3). Questions are the exact ones of the certified browser run. r3 (lead, 15 Oct): companies come from scene 1's DONE receipt (card-1, card-2), never a hard-coded fixture.",
   chapters: [
     {
       chapterId: "ch.pilot.discover",
@@ -253,28 +253,28 @@ export const PILOT_SCRIPT: TourScript = TourScriptSchema.parse({
     {
       sceneId: "s.pilot.company",
       chapterId: "ch.pilot.company",
-      title: "Findings and risks on one company",
+      title: "Findings and risks on the first card",
       featureIds: ["INV-PROFILE-FINDINGS", "INV-RISKS-FOLLOWUP"],
       approvedClaimIds: ["INV-PROFILE-FINDINGS.c1", "INV-RISKS-FOLLOWUP.c1"],
       actor: PILOT_ACTOR,
       expectedRoute: "/company/[companyId]",
       actions: [
         {
-          actionId: "ta_open-ledgerfold",
+          actionId: "ta_open-card-1",
           kind: "openCompany",
-          company: "ledgerfold",
+          company: "card-1",
         },
         {
           actionId: "ta_ask-profile",
           kind: "askApprovedQuestion",
           question: "q.company-profile",
-          subject: "ledgerfold",
+          subject: "card-1",
         },
         {
           actionId: "ta_ask-risks",
           kind: "askApprovedQuestion",
           question: "q.company-risks",
-          subject: "ledgerfold",
+          subject: "card-1",
         },
       ],
       lines: [
@@ -289,7 +289,7 @@ export const PILOT_SCRIPT: TourScript = TourScriptSchema.parse({
         {
           lineId: "l.company.separate",
           kind: "CLAIM",
-          text: "So I separate what the founder stated, what the documents support, what's missing, and what we haven't verified.",
+          text: "So I keep apart what is stated, what documents support, and what is missing or unverified.",
           claimIds: ["INV-PROFILE-FINDINGS.c1"],
           timing: "BEFORE_ACK",
           source: "Blueprint §6 02:30–03:35",
@@ -329,17 +329,17 @@ export const PILOT_SCRIPT: TourScript = TourScriptSchema.parse({
           actionId: "ta_compare-two",
           kind: "buildComparison",
           question: "q.compare-two",
-          companies: ["ledgerfold", "f2"],
+          companies: ["card-1", "card-2"],
         },
       ],
       lines: [
         {
           lineId: "l.compare.intro",
           kind: "CONNECTIVE",
-          text: "These companies aren't interchangeable. One may fit your cheque and stage. Another may have stronger recorded evidence but miss a key mandate condition.",
+          text: "Let me put the first two side by side against your mandate.",
           claimIds: [],
           timing: "BEFORE_ACK",
-          source: "Blueprint §6 03:35–04:35",
+          source: "r3: narrate only what is on screen (lead decision 15 Oct)",
         },
         {
           lineId: "l.compare.table",

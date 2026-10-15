@@ -5,6 +5,7 @@ import { QMessageSchema, type QMessage } from "@capital-q/contracts";
 import { demoTop } from "@/features/q/answer-canvas-fixtures";
 import {
   fixtureKeysOf,
+  receiptCompanies,
   resolveCompanyFixture,
 } from "@/features/q-pitch/fixtures";
 import { captionSpeak, readingMs } from "@/features/q-pitch/narrator";
@@ -45,35 +46,49 @@ function cardsMessage(
   });
 }
 
-describe("Q Pitch fixtures resolve only from what the actor was shown", () => {
-  it("resolves a key from the actor's own answer cards", () => {
-    const messages = [
-      cardsMessage([
-        { name: "Ledgerfold Labs", companyId: LEDGERFOLD },
-        { name: "F2 Health", companyId: F2 },
-      ]),
-    ];
-    expect(resolveCompanyFixture("ledgerfold", messages)).toEqual({
+const OTHER_RUN = "4c9a8c3e-4f61-4d2a-9c1e-5a7b3d2e1f04";
+
+describe("Q Pitch companies come only from the acknowledged receipt", () => {
+  it("card-N is the Nth company card of the acknowledged run, in order", () => {
+    const receipt = receiptCompanies(
+      [
+        cardsMessage([
+          { name: "Duplo", companyId: LEDGERFOLD },
+          { name: "Bumpa", companyId: F2 },
+        ]),
+      ],
+      RUN,
+    );
+    expect(resolveCompanyFixture("card-1", receipt)).toEqual({
       companyId: LEDGERFOLD,
-      name: "Ledgerfold Labs",
+      name: "Duplo",
     });
-    expect(resolveCompanyFixture("f2", messages)?.companyId).toBe(F2);
+    expect(resolveCompanyFixture("card-2", receipt)?.name).toBe("Bumpa");
+    expect(resolveCompanyFixture("card-3", receipt)).toBeNull();
   });
 
-  it("does not resolve a company the actor has not been shown", () => {
-    expect(resolveCompanyFixture("ledgerfold", [])).toBeNull();
-    // A name match without a resolved record is not a record.
+  it("never resolves a hard-coded name, or cards from another run", () => {
+    const messages = [
+      cardsMessage([{ name: "Ledgerfold", companyId: LEDGERFOLD }]),
+    ];
     expect(
-      resolveCompanyFixture("ledgerfold", [
-        cardsMessage([{ name: "Ledgerfold Labs", companyId: null }]),
-      ]),
+      resolveCompanyFixture("ledgerfold", receiptCompanies(messages, RUN)),
     ).toBeNull();
-    // An unknown fixture key never guesses.
-    expect(
-      resolveCompanyFixture("someone-else", [
-        cardsMessage([{ name: "Someone Else", companyId: LEDGERFOLD }]),
-      ]),
-    ).toBeNull();
+    expect(receiptCompanies(messages, OTHER_RUN)).toEqual([]);
+    expect(resolveCompanyFixture("card-1", [])).toBeNull();
+  });
+
+  it("skips cards without a resolved company record", () => {
+    const receipt = receiptCompanies(
+      [
+        cardsMessage([
+          { name: "Unresolved", companyId: null },
+          { name: "Bumpa", companyId: F2 },
+        ]),
+      ],
+      RUN,
+    );
+    expect(resolveCompanyFixture("card-1", receipt)?.name).toBe("Bumpa");
   });
 
   it("does not let a person's own typed text name a record", () => {
@@ -84,21 +99,21 @@ describe("Q Pitch fixtures resolve only from what the actor was shown", () => {
       text: "Open Ledgerfold",
       createdAt: "2026-10-15T00:00:00.000Z",
     });
-    expect(resolveCompanyFixture("ledgerfold", [typed])).toBeNull();
+    expect(receiptCompanies([typed], RUN)).toEqual([]);
   });
 
   it("lists every fixture a scene's actions name", () => {
     expect(
       fixtureKeysOf([
-        { actionId: "ta_open", kind: "openCompany", company: "ledgerfold" },
+        { actionId: "ta_open", kind: "openCompany", company: "card-1" },
         {
           actionId: "ta_cmp",
           kind: "buildComparison",
           question: "q.compare-two",
-          companies: ["ledgerfold", "f2"],
+          companies: ["card-1", "card-2"],
         },
       ]),
-    ).toEqual(["ledgerfold", "f2"]);
+    ).toEqual(["card-1", "card-2"]);
   });
 });
 
