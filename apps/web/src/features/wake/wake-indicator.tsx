@@ -48,7 +48,7 @@ export function WakeIndicator() {
     >
       <div
         role="status"
-        className="inline-flex items-center gap-2 rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-1 pr-1 pl-3 cq-caption text-(--cq-text-secondary)"
+        className="inline-flex items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-1 pr-1 pl-3 cq-caption text-(--cq-text-secondary)"
       >
         <Icon
           aria-hidden="true"
@@ -60,14 +60,14 @@ export function WakeIndicator() {
           <button
             type="button"
             onClick={() => setWakePausedByYou(live)}
-            className="inline-flex min-h-11 items-center rounded-full px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            className="inline-flex min-h-11 items-center px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           >
             {live ? "Pause" : "Resume"}
           </button>
         ) : (
           <Link
             href="/settings#q"
-            className="inline-flex min-h-11 items-center rounded-full px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            className="inline-flex min-h-11 items-center px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           >
             Settings
           </Link>

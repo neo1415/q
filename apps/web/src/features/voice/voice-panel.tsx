@@ -51,7 +51,7 @@ export function VoicePanel({
   return (
     <section
       aria-label="Talking with Q"
-      className="flex flex-col items-center gap-4 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-5"
+      className="flex flex-col items-center gap-4 border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-5"
       data-q-voice-panel={client.state}
     >
       <QPresence

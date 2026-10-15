@@ -479,7 +479,9 @@ describe("the profile, for its owner (founder 2026-10-08)", () => {
     const links = screen.getAllByRole("link", { name: "Add your raise" });
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) {
-      expect(link.getAttribute("href")).toBe("/capital?tab=raise");
+      expect(link.getAttribute("href")).toBe(
+        "/relationships?view=capital&tab=raise",
+      );
     }
   });
 });

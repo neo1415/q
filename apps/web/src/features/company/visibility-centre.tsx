@@ -332,7 +332,7 @@ function WhoSeesWhat({
         <div className="flex max-w-(--cq-layout-reading) flex-col gap-3">
           {/* P14 (ADR 0060): the network-wide share, off unless chosen. */}
           <div
-            className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-(--cq-border-subtle) p-3"
+            className="flex flex-wrap items-start justify-between gap-3 border border-(--cq-border-subtle) p-3"
             data-network-raise-share={networkShare === null ? "off" : "on"}
           >
             <span className="flex min-w-0 flex-1 flex-col gap-1">

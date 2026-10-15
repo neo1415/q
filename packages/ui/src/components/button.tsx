@@ -24,7 +24,7 @@ export const BUTTON_SIZES = ["compact", "regular", "large"] as const;
 export type ButtonSize = (typeof BUTTON_SIZES)[number];
 
 const base =
-  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors duration-(--cq-motion-fast) disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors duration-(--cq-motion-fast) disabled:pointer-events-none disabled:opacity-50";
 
 const variantClass: Record<ButtonVariant, string> = {
   primary:

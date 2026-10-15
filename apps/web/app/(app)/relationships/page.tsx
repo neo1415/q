@@ -22,6 +22,7 @@ import {
   type ReminderDto,
 } from "@capital-q/contracts";
 import { EmptyState, ErrorState } from "@capital-q/ui/states";
+import { Suspense } from "react";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
 
@@ -53,6 +54,9 @@ import {
   pipelineListHref,
 } from "@/features/relationships/hub-view";
 import { PipelineLayoutSwitch } from "@/features/relationships/pipeline-layout-switch";
+import { CapitalSkeleton } from "@/features/capital/capital-book";
+import { CapitalScreen } from "@/features/capital/capital-screen";
+import { capitalTabFrom } from "@/features/capital/capital-tabs";
 import { ResultsDashboard } from "@/features/results/results-dashboard";
 import { rangeOf } from "@/features/results/results-words";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
@@ -90,13 +94,32 @@ export default async function RelationshipsPage({
   if (listed !== null) redirect(listed);
   const view = hubViewOf(params["view"]);
   const layout = pipelineLayoutOf(params["layout"]);
+  if (view === "capital") {
+    // Capital, as the CRM's tab (owner 2026-10-16). The header paints
+    // while the open sub-tab reads only its own data.
+    const requested = params["tab"];
+    const horizon = params["horizon"];
+    const context = await resolveOwnContext();
+    return (
+      <PageContainer className={`flex flex-col gap-6 ${HUB_PAGE_PENDING}`}>
+        <HubHeader side={hubSideOf(context)} view={view} />
+        <Suspense fallback={<CapitalSkeleton />}>
+          <CapitalScreen
+            tab={capitalTabFrom({
+              tab: requested,
+              round: params["round"],
+              horizon,
+            })}
+            hadTabParam={requested !== undefined}
+            horizon={horizon}
+            inCrm
+          />
+        </Suspense>
+      </PageContainer>
+    );
+  }
   const context = await resolveOwnContext();
-  const side =
-    context.kind === "FOUNDER"
-      ? "COMPANY"
-      : context.kind === "INVESTOR"
-        ? "INVESTOR"
-        : "NONE";
+  const side = hubSideOf(context);
   if (view === "pipeline" && layout !== "list") {
     const [session, user] = await Promise.all([apiSession(), getSessionUser()]);
     const parsed = RelationshipPipelineQuerySchema.safeParse(
@@ -194,42 +217,51 @@ export default async function RelationshipsPage({
       side === "NONE"
         ? [null, null]
         : await Promise.all([apiSession(), qApiSession()]);
-    // The queue's reads run beside the period's, never after them.
-    const [results, usage, items, needs] = await Promise.all([
-      session === null ? null : getResults(session, period).catch(() => null),
-      qSession === null || side !== "INVESTOR"
-        ? null
-        : getMyUsage(qSession).catch(() => null),
-      side === "NONE" ? [] : ownRelationships(context),
-      side === "NONE"
-        ? { notices: [], reminders: [], unavailable: false }
-        : noticesAndReminders(),
-    ]);
-    const now = readClock();
-    // S4: the investor's portfolio, from the same list; each of the first
-    // rows reads its current commitment, side by side.
-    const portfolio =
-      side === "INVESTOR" && items !== undefined
-        ? portfolioOf(items)
-        : undefined;
-    const commitments = new Map(
-      session === null || portfolio === undefined
-        ? []
-        : await Promise.all(
-            portfolio
-              .slice(0, PORTFOLIO_READ_LIMIT)
-              .map(
-                async (item) =>
-                  [
-                    item.relationshipId,
-                    await getRelationshipCommitments(
-                      session,
+    // The queue's reads run beside the period's, never after them; the
+    // portfolio's commitments follow the list alone, so they run beside
+    // the period's read too instead of after it (tab switch latency,
+    // owner 2026-10-16).
+    const listed =
+      side === "NONE" ? Promise.resolve([]) : ownRelationships(context);
+    const withCommitments = listed.then(async (items) => {
+      // S4: the investor's portfolio, from the same list; each of the
+      // first rows reads its current commitment, side by side.
+      const portfolio =
+        side === "INVESTOR" && items !== undefined
+          ? portfolioOf(items)
+          : undefined;
+      const commitments = new Map(
+        session === null || portfolio === undefined
+          ? []
+          : await Promise.all(
+              portfolio
+                .slice(0, PORTFOLIO_READ_LIMIT)
+                .map(
+                  async (item) =>
+                    [
                       item.relationshipId,
-                    ).catch(() => undefined),
-                  ] as const,
-              ),
-          ),
-    );
+                      await getRelationshipCommitments(
+                        session,
+                        item.relationshipId,
+                      ).catch(() => undefined),
+                    ] as const,
+                ),
+            ),
+      );
+      return { items, portfolio, commitments };
+    });
+    const [results, usage, { items, portfolio, commitments }, needs] =
+      await Promise.all([
+        session === null ? null : getResults(session, period).catch(() => null),
+        qSession === null || side !== "INVESTOR"
+          ? null
+          : getMyUsage(qSession).catch(() => null),
+        withCommitments,
+        side === "NONE"
+          ? { notices: [], reminders: [], unavailable: false }
+          : noticesAndReminders(),
+      ]);
+    const now = readClock();
     // The Results endpoint authorises each projection. A conflicting role read
     // is unavailable, never silently rendered as the other party's perspective.
     const available =
@@ -242,8 +274,11 @@ export default async function RelationshipsPage({
       context.unavailable !== true;
     return (
       // The Overview's blocks are separate questions (what needs me, what
-      // I hold, how the period went): more air between them than within.
-      <PageContainer className={`flex flex-col gap-8 ${HUB_PAGE_PENDING}`}>
+      // I hold, how the period went): each its own panel, more air between
+      // them than within.
+      <PageContainer
+        className={`flex flex-col gap-6 sm:gap-8 ${HUB_PAGE_PENDING}`}
+      >
         <HubHeader side={side} view={view} />
         {unset ? (
           <EmptyState
@@ -397,6 +432,16 @@ export default async function RelationshipsPage({
       </QSection>
     </PageContainer>
   );
+}
+
+function hubSideOf(
+  context: Awaited<ReturnType<typeof resolveOwnContext>>,
+): "COMPANY" | "INVESTOR" | "NONE" {
+  return context.kind === "FOUNDER"
+    ? "COMPANY"
+    : context.kind === "INVESTOR"
+      ? "INVESTOR"
+      : "NONE";
 }
 
 /** R34: unread chat per relationship; an unreadable count is simply none. */

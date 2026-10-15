@@ -64,6 +64,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
   "onboarding/founder/page.tsx": ONBOARDING,
   "onboarding/investor/page.tsx": ONBOARDING,
   "crm/page.tsx": REDIRECT,
+  // Capital is the CRM's Capital tab (owner 2026-10-16).
+  "capital/page.tsx": REDIRECT,
   "find/page.tsx": REDIRECT,
   "gateway/page.tsx": REDIRECT,
   "results/page.tsx": REDIRECT,

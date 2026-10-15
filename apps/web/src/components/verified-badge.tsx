@@ -54,7 +54,7 @@ export function DemoVerifiedBadge({
   return (
     <span
       className={cx(
-        "cq-caption inline-flex items-center gap-1.5 rounded-full border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)",
+        "cq-caption inline-flex items-center gap-1.5 border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)",
         className,
       )}
       title={SYNTHETIC_ATTESTATION_BASIS}

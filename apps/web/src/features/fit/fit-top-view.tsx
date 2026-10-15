@@ -96,7 +96,7 @@ export function FitTopView({
       {state.kind === "LOADING" ? (
         <>
           <div
-            className="flex items-center gap-3 rounded-[14px] bg-(--cq-surface-subtle) p-4"
+            className="flex items-center gap-3 bg-(--cq-surface-subtle) p-4"
             role="status"
           >
             <QViewMark size={24} />

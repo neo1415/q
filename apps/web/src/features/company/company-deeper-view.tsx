@@ -423,7 +423,7 @@ function FactRow({
             {fact.statements.map((statement, index) => (
               <div
                 key={`${statement.value}-${String(index)}`}
-                className="rounded-(--cq-radius-md) border border-(--cq-border-subtle) p-3"
+                className="border border-(--cq-border-subtle) p-3"
               >
                 <Statement factKey={fact.key} statement={statement} />
               </div>

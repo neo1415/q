@@ -191,7 +191,8 @@ describe("a spoken answer's chain of client actions (with workstream C)", () => 
       },
       () => undefined,
     );
-    expect(calls[0]).toMatch(/^expect:\/capital/u);
+    // Capital is the CRM's Capital tab (owner 2026-10-16).
+    expect(calls[0]).toMatch(/^expect:\/relationships\?view=capital/u);
     expect(calls.slice(1)).toEqual([
       'act:{"kind":"SET_THEME","theme":"DARK"}',
       'act:{"kind":"RELOAD_PAGE"}',
@@ -276,7 +277,7 @@ describe("a spoken move reports its receipt like a typed one (with workstream C)
       noteRoute("/somewhere-else");
       performTurnChain(moveTurn, () => true);
       const expected = outcomes.length;
-      noteRoute("/capital");
+      noteRoute("/relationships?view=capital");
       expect(outcomes.slice(expected)[0]).toMatchObject({ status: "DONE" });
       vi.advanceTimersByTime(NAVIGATION_WAIT_MS + 10);
       expect(notes).toEqual([]);

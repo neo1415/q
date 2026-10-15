@@ -49,7 +49,7 @@ function editHref(journey: ProfileJourney, group: AnswerGroup): string {
   // Once the raise is a capital objective, Capital is where it changes.
   return group.id === "raise" &&
     group.lines.some((line) => line.stepKey === "objective.stage")
-    ? "/capital"
+    ? "/relationships?view=capital&tab=raise"
     : REVIEW_HREF[journey];
 }
 
@@ -195,7 +195,7 @@ function Chips({ items }: { readonly items: readonly string[] }) {
       {items.map((item) => (
         <li
           key={item}
-          className="cq-body-sm rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 py-0.5 text-(--cq-text-primary)"
+          className="cq-body-sm border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 py-0.5 text-(--cq-text-primary)"
         >
           {item}
         </li>
@@ -250,7 +250,7 @@ function AnswerGroupView({
       className={
         bare
           ? "border-t border-(--cq-border-subtle) pt-3"
-          : "rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-5"
+          : "border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-5"
       }
     >
       <div className="flex items-center justify-between gap-3 pb-1">
@@ -258,7 +258,7 @@ function AnswerGroupView({
           id={headingId}
           className="cq-title-sm flex items-center gap-2 text-(--cq-text-primary)"
         >
-          <span className="inline-flex size-8 items-center justify-center rounded-lg bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
+          <span className="inline-flex size-8 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
             <Icon size={ICON_SIZE.regular} aria-hidden="true" />
           </span>
           {group.label}

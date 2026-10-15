@@ -244,7 +244,7 @@ export function WelcomeScreen({
         {invitations}
 
         {voice.notice !== null ? (
-          <div className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
+          <div className="flex items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
             <span className="cq-body text-(--cq-text-primary)">
               {voice.notice}
             </span>
@@ -297,7 +297,7 @@ export function WelcomeScreen({
             <p className="cq-body text-center text-(--cq-text-secondary)">
               Are you here to raise capital, or to invest it?
             </p>
-            <div className="rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-4">
+            <div className="border border-(--cq-border-subtle) bg-(--cq-surface) p-4">
               <PersonaCards
                 autoFocus
                 onChoose={() => {

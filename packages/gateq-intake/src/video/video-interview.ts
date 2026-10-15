@@ -17,7 +17,7 @@ import { IntakeRefusedError } from "../contracts/index.js";
  * typing is always the fallback into the same interview.
  *
  * Limits are configuration (defaults approved by the lead):
- *   maxSeconds 480 (8 minutes) · perApplication 1 · concurrency 2 ·
+ *   maxSeconds 480 (8 minutes) · perApplication 2 · concurrency 2 ·
  *   paidRunCapSeconds 180, the existing hard cap for our own paid test
  *   runs, which stays the effective ceiling until the owner raises it.
  * The clock (live run 2026-10-15, migration 20261227150000): when the
@@ -49,7 +49,8 @@ export const GATEQ_VIDEO_DEFAULTS: GateqVideoConfig = {
   enabled: false,
   maxSeconds: 480,
   paidRunCapSeconds: 180,
-  perApplication: 1,
+  // Lead 2026-10-15: a second go within the person's weekly allowance.
+  perApplication: 2,
   concurrency: 2,
   testMode: true,
 };
@@ -76,7 +77,7 @@ export function gateqVideoConfigFrom(
       180,
       3600,
     ),
-    perApplication: positiveInt(env["CQ_GATEQ_VIDEO_PER_APPLICATION"], 1, 10),
+    perApplication: positiveInt(env["CQ_GATEQ_VIDEO_PER_APPLICATION"], 2, 10),
     concurrency: positiveInt(env["CQ_GATEQ_VIDEO_CONCURRENCY"], 2, 50),
     // Paid only when explicitly false, like CQ_TAVUS_TEST_MODE.
     testMode: env["CQ_GATEQ_VIDEO_TEST_MODE"] !== "false",
@@ -111,6 +112,13 @@ export type GateqVideoSessionRow = {
   /** Q is in the room and the cap is running; null before. */
   readonly liveAt: string | null;
 };
+
+/** Why video is not offered right now; typing is always offered. */
+export type GateqVideoUnavailableReason =
+  | "NOT_OFFERED"
+  | "SUBMITTED"
+  | "APPLICATION_SESSIONS_USED"
+  | "WEEKLY_ALLOWANCE_USED";
 
 export type GateqVideoAllowance = {
   readonly weeklySessions: number;
@@ -288,25 +296,44 @@ export function createGateqVideoInterview(deps: {
     return deps.store.end({ id: row.id, reason });
   };
 
+  /**
+   * Whether this applicant may start, and if not, why (so the person is
+   * told plainly rather than finding the offer gone).
+   */
+  const availability = async (
+    token: string,
+  ): Promise<{
+    readonly available: boolean;
+    readonly reason: GateqVideoUnavailableReason | null;
+  }> => {
+    if (!deps.config.enabled || deps.provider === null)
+      return { available: false, reason: "NOT_OFFERED" };
+    const guest = await deps.intake.authorise(token);
+    if (guest.application.status === "SUBMITTED")
+      return { available: false, reason: "SUBMITTED" };
+    // Live 2026-10-15: the offer stayed up after the allowance was spent,
+    // so the button led only to a refusal. A used allowance is no offer.
+    if (
+      (await deps.store.countForApplication(guest.application.id)) >=
+      deps.config.perApplication
+    )
+      return { available: false, reason: "APPLICATION_SESSIONS_USED" };
+    const allowance = await deps.store.allowanceFor({
+      applicationId: guest.application.id,
+      tenantId: guest.application.tenantId,
+    });
+    return allowance === null || allowance.remaining > 0
+      ? { available: true, reason: null }
+      : { available: false, reason: "WEEKLY_ALLOWANCE_USED" };
+  };
+
   return {
+    /** Sessions one application may have, for the offer's wording. */
+    perApplication: deps.config.perApplication,
+    availability,
     /** Whether this applicant may start (the lobby's question). */
-    available: async (token: string): Promise<boolean> => {
-      if (!deps.config.enabled || deps.provider === null) return false;
-      const guest = await deps.intake.authorise(token);
-      if (guest.application.status === "SUBMITTED") return false;
-      // Live 2026-10-15: the offer stayed up after the allowance was spent,
-      // so the button led only to a refusal. A used allowance is no offer.
-      if (
-        (await deps.store.countForApplication(guest.application.id)) >=
-        deps.config.perApplication
-      )
-        return false;
-      const allowance = await deps.store.allowanceFor({
-        applicationId: guest.application.id,
-        tenantId: guest.application.tenantId,
-      });
-      return allowance === null || allowance.remaining > 0;
-    },
+    available: async (token: string): Promise<boolean> =>
+      (await availability(token)).available,
 
     /** The person's shared weekly video allowance, for the offer's wording. */
     allowance: async (token: string): Promise<GateqVideoAllowance | null> => {

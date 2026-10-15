@@ -6,6 +6,11 @@ import { QApprovalViewSchema } from "./approval.js";
 
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
+import {
+  WorkforceFactRefSchema,
+  WorkforceJobReasoningSchema,
+  WorkforcePlanProgressSchema,
+} from "./workforce-reasoning.js";
 
 /**
  * Q's workforce, as the person follows it (founder brief J1-J9, J5): the
@@ -278,6 +283,8 @@ export const WorkforceJobDetailDtoSchema = z
     /** Native approval records prepared by this job; never a second approval path. */
     approvals: z.array(QApprovalViewSchema).max(12).optional(),
     approvalsUnavailable: z.boolean().optional(),
+    /** wf 2026-10-16: the approved plan as it stands; absent before it was queued. */
+    plan: WorkforcePlanProgressSchema.optional(),
   })
   .strict();
 export type WorkforceJobDetailDto = z.infer<typeof WorkforceJobDetailDtoSchema>;
@@ -466,6 +473,16 @@ export const WorkforcePlannedStepSchema = z
     /** A helper the lead Q spawned for this step, with only these tools. */
     spawned: z.boolean(),
     document: WorkforceDocumentRequestSchema.optional(),
+    /** Why the lead planned this step, in plain words (wf 2026-10-16). */
+    why: z.string().trim().min(1).max(300).optional(),
+    /** The situation facts (`F1`..) this step rests on; checked by code. */
+    evidence: z.array(WorkforceFactRefSchema).max(6).optional(),
+    /**
+     * A contingency: this step runs only if the named earlier step did not
+     * finish, and what waited on that step accepts this one's result. It is
+     * part of the approved plan, so recovery never runs unapproved work.
+     */
+    fallbackFor: z.string().trim().min(1).max(40).optional(),
   })
   .strict();
 export type WorkforcePlannedStep = z.infer<typeof WorkforcePlannedStepSchema>;
@@ -489,6 +506,11 @@ export const WorkforceJobStartPayloadSchema = z
     budgetUsd: UsdSchema,
     /** What it asked that no permitted tool can do, in plain words. */
     cannot: z.array(z.string().max(WORKFORCE_PLAN_CANNOT_MAX_LENGTH)).max(5),
+    /**
+     * wf 2026-10-16: the outcome, what is missing, the situation read and
+     * the next actions. Part of what the person approves; absent on older plans.
+     */
+    reasoning: WorkforceJobReasoningSchema.optional(),
   })
   .strict();
 export type WorkforceJobStartPayload = z.infer<

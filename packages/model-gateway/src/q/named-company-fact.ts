@@ -133,7 +133,10 @@ export type DeclaredProfile = {
   readonly shortDescription: string | null;
 };
 
-function profileOf(outcome: QToolCallOutcome | null): DeclaredProfile | null {
+/** A `get_company` outcome as its declared profile; null when not one. */
+export function profileOf(
+  outcome: QToolCallOutcome | null,
+): DeclaredProfile | null {
   if (outcome === null || !outcome.result.ok) return null;
   const data: unknown = outcome.result.data;
   if (typeof data !== "object" || data === null) return null;
@@ -165,11 +168,11 @@ const STAGE_WORDS: Readonly<Record<string, string>> = {
   series_c: "Series C",
 };
 
-function stageWords(code: string): string {
+export function stageWords(code: string): string {
   return STAGE_WORDS[code] ?? code.replace(/_/gu, " ");
 }
 
-function countryWords(code: string): string {
+export function countryWords(code: string): string {
   try {
     return (
       new Intl.DisplayNames(["en"], { type: "region" }).of(

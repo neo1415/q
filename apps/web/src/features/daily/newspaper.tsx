@@ -47,7 +47,7 @@ function Picture({
       loading={priority ? "eager" : "lazy"}
       decoding="async"
       referrerPolicy="no-referrer"
-      className="aspect-[16/9] w-full rounded-sm bg-(--cq-surface-subtle) object-cover"
+      className="aspect-[16/9] w-full bg-(--cq-surface-subtle) object-cover"
     />
   );
   return (
@@ -264,7 +264,7 @@ function DealsChart({ chart }: { readonly chart: QDailyChart }) {
             </a>
             <span
               aria-hidden="true"
-              className="h-3 rounded-sm bg-(--cq-accent)"
+              className="h-3 bg-(--cq-accent)"
               style={{
                 width: `${Math.max(2, Math.round((bar.value / top) * 100))}%`,
               }}
@@ -402,7 +402,7 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
       {edition.qTake === null ? null : (
         <aside
           aria-labelledby="section-q-take"
-          className="flex flex-col gap-2 rounded-md border border-(--cq-border-strong) p-5"
+          className="flex flex-col gap-2 border border-(--cq-border-strong) p-5"
           data-daily-q-take
         >
           <h2 id="section-q-take" className="cq-label text-(--cq-text-primary)">

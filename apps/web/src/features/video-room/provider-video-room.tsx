@@ -147,18 +147,18 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
     left === 0 ? (
       <div
         role="status"
-        className="cq-stage flex min-h-80 flex-1 items-center justify-center rounded-(--cq-radius-xl) p-8 text-center"
+        className="cq-stage flex min-h-80 flex-1 items-center justify-center p-8 text-center"
       >
         {props.closingNote}
       </div>
     ) : props.joinUrl === null ? (
-      <div className="cq-stage flex min-h-80 flex-1 flex-col items-center justify-center gap-3 rounded-(--cq-radius-xl) p-8 text-center">
+      <div className="cq-stage flex min-h-80 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
         {props.unavailableNote}
       </div>
     ) : (
       // A floor keeps the room usable on a landscape phone, where the
       // controls and footnote would otherwise squeeze it to a sliver.
-      <div className="cq-stage relative min-h-60 flex-1 overflow-hidden rounded-(--cq-radius-xl)">
+      <div className="cq-stage relative min-h-60 flex-1 overflow-hidden">
         <iframe
           src={
             joinUrlWithName(props.joinUrl, props.participantName ?? "") ??

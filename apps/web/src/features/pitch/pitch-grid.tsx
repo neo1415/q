@@ -106,7 +106,7 @@ export function PitchGrid({ companyId }: { readonly companyId: string }) {
         <ul
           // A short-video profile grid: three across on every screen,
           // hairline gaps, posters edge to edge.
-          className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-(--cq-radius-md) md:gap-1 lg:grid-cols-4"
+          className="grid grid-cols-3 gap-0.5 overflow-hidden md:gap-1 lg:grid-cols-4"
           data-pitch-grid
         >
           {videos.map((video) => (
@@ -162,7 +162,7 @@ function VideoTile({
       )}
       {/* The state, always in words; the stage is dark in both themes. */}
       <span
-        className="cq-caption absolute top-1.5 left-1.5 rounded-(--cq-radius-sm) bg-(--cq-stage-canvas)/80 px-1.5 py-0.5 text-(--cq-stage-text)"
+        className="cq-caption absolute top-1.5 left-1.5 bg-(--cq-stage-canvas)/80 px-1.5 py-0.5 text-(--cq-stage-text)"
         aria-hidden="true"
       >
         {state}

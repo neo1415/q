@@ -165,7 +165,7 @@ function RoundForm({
   const title = past ? "Record a past round" : "Add a round";
   return (
     <form
-      className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-4 rounded-2xl border border-(--cq-border) bg-(--cq-surface-raised) p-5 sm:p-6"
+      className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-4 border border-(--cq-border) bg-(--cq-surface-raised) p-5 sm:p-6"
       onSubmit={(event) => {
         event.preventDefault();
         submit(past ? "CLOSED" : "OPEN");

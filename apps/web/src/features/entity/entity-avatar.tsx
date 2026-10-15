@@ -127,9 +127,9 @@ export function EntityAvatar({
   }>({ source, status: "loading" });
   const current = state.source === source ? state.status : ("loading" as const);
   const showImage = source !== null && current !== "failed";
-  // People are round; organisations are a rounded square, as on their
+  // People are round; organisations are a square, as on their
   // profile. A company keeps the round frame Discover already uses.
-  const shape = kind === "investor" ? "rounded-md" : "rounded-full";
+  const shape = kind === "investor" ? "" : "rounded-full";
   const label = decorative
     ? { "aria-hidden": true as const }
     : { role: "img", "aria-label": name };

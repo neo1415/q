@@ -117,7 +117,7 @@ function Mark({
       aria-hidden="true"
       className={cx(
         "flex size-5 shrink-0 items-center justify-center border transition-colors duration-(--cq-motion-fast)",
-        round ? "rounded-full" : "rounded-xs",
+        round ? "rounded-full" : null,
         selected
           ? "border-(--cq-accent) bg-(--cq-accent) text-(--cq-text-inverse)"
           : "border-(--cq-border-strong) bg-(--cq-surface-raised)",

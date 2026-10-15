@@ -90,7 +90,7 @@ export async function RelationshipConversation({
             <Link
               href={basePath}
               aria-label={`Back to ${counterpart}`}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
+              className="flex size-11 shrink-0 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
             >
               <ArrowLeft size={ICON_SIZE.regular} aria-hidden="true" />
             </Link>
@@ -120,7 +120,7 @@ export async function RelationshipConversation({
               <Link
                 href={`${basePath}#calls`}
                 aria-label="Book a call"
-                className="flex size-11 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) max-sm:hidden"
+                className="flex size-11 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) max-sm:hidden"
               >
                 <CalendarDays size={ICON_SIZE.regular} aria-hidden="true" />
               </Link>

@@ -86,7 +86,7 @@ export function ContextIndicator({
         aria-label={name}
         title={name}
         className={cx(
-          "cq-caption inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 font-medium text-(--cq-text-secondary)",
+          "cq-caption inline-flex h-8 shrink-0 items-center justify-center gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 font-medium text-(--cq-text-secondary)",
           className,
         )}
       >
@@ -103,7 +103,7 @@ export function ContextIndicator({
     <span
       data-scope={scope}
       className={cx(
-        "inline-flex min-h-8 min-w-0 max-w-full shrink items-center gap-1.5 overflow-hidden rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 cq-caption font-medium text-(--cq-text-secondary)",
+        "inline-flex min-h-8 min-w-0 max-w-full shrink items-center gap-1.5 overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 cq-caption font-medium text-(--cq-text-secondary)",
         className,
       )}
     >

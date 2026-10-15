@@ -54,7 +54,7 @@ export function NavGroupToggle({
       onClick={onToggle}
       data-nav-group-toggle={label}
       className={cx(
-        "relative flex min-h-11 items-center rounded-md text-(--cq-text-tertiary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)",
+        "relative flex min-h-11 items-center text-(--cq-text-tertiary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)",
         compact
           ? "w-11 justify-center"
           : cx(

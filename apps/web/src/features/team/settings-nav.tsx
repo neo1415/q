@@ -48,7 +48,7 @@ export function SettingsNav({ current }: { readonly current: string }) {
                 href={section.href}
                 aria-current={section.id === current ? "page" : undefined}
                 className={cx(
-                  "flex min-h-10 items-center rounded-md px-2.5 cq-body-sm transition-colors duration-(--cq-motion-fast)",
+                  "flex min-h-10 items-center px-2.5 cq-body-sm transition-colors duration-(--cq-motion-fast)",
                   section.id === current
                     ? "bg-(--cq-surface-subtle) font-medium text-(--cq-text-primary)"
                     : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
@@ -69,7 +69,7 @@ function Skeleton({ className }: { readonly className: string }) {
     <div
       aria-hidden="true"
       className={cx(
-        "rounded-sm bg-(--cq-surface-subtle) motion-safe:animate-pulse",
+        "bg-(--cq-surface-subtle) motion-safe:animate-pulse",
         className,
       )}
     />
@@ -91,7 +91,7 @@ export function TeamSkeleton() {
               <Skeleton className="h-4 w-1/3" />
               <Skeleton className="h-3 w-1/2" />
             </div>
-            <Skeleton className="h-10 w-22 rounded-[10px]" />
+            <Skeleton className="h-10 w-22" />
           </div>
         ))}
       </div>
@@ -119,7 +119,7 @@ export function TeamError() {
         </p>
         <a
           href="/settings/team"
-          className="inline-flex min-h-11 items-center rounded-md border border-(--cq-border) px-4 cq-body-sm font-medium text-(--cq-text-primary)"
+          className="inline-flex min-h-11 items-center border border-(--cq-border) px-4 cq-body-sm font-medium text-(--cq-text-primary)"
         >
           Try again
         </a>

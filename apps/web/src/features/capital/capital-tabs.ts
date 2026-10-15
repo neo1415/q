@@ -7,7 +7,9 @@
  */
 
 export const CAPITAL_TABS = [
-  { key: "overview", label: "Overview" },
+  // "Summary": the CRM's own first tab is Overview, so Capital's first
+  // sub-tab may not repeat the word (its id stays `overview` for Q).
+  { key: "overview", label: "Summary" },
   { key: "raise", label: "Raise & rounds" },
   { key: "readiness", label: "Readiness" },
   { key: "action-plan", label: "Action plan" },
@@ -39,15 +41,20 @@ export function capitalTabFrom(params: {
   return "overview";
 }
 
-/** The address of one tab; Overview is the page itself. */
+/**
+ * The address of one tab, inside the CRM's Capital tab (owner 2026-10-16);
+ * the summary is the tab itself. `/capital?tab=` still forwards here.
+ */
 export function capitalTabHref(
   tab: CapitalTab,
   extra: Readonly<Record<string, string>> = {},
 ): string {
   const query = new URLSearchParams(
-    tab === "overview" ? extra : { tab, ...extra },
+    tab === "overview"
+      ? { view: "capital", ...extra }
+      : { view: "capital", tab, ...extra },
   ).toString();
-  return query === "" ? "/capital" : `/capital?${query}`;
+  return `/relationships?${query}`;
 }
 
 /**

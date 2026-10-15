@@ -83,7 +83,7 @@ export function ChatTranscript({
           key={index}
           className={
             line.from === "YOU"
-              ? "cq-body max-w-[85%] self-end rounded-2xl bg-(--cq-surface-raised) px-4 py-2 text-(--cq-text-primary)"
+              ? "cq-body max-w-[85%] self-end bg-(--cq-surface-raised) px-4 py-2 text-(--cq-text-primary)"
               : "flex max-w-[92%] items-start gap-2.5 self-start"
           }
         >
@@ -158,7 +158,7 @@ export function ChatComposer({
         maxLength={2000}
         aria-label={label}
         placeholder={placeholder}
-        className="cq-body min-h-11 flex-1 resize-none rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+        className="cq-body min-h-11 flex-1 resize-none border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
       />
       <Button
         type="submit"
@@ -251,7 +251,7 @@ function Criteria({
         {lines.map((line) => (
           <li
             key={line.label}
-            className="cq-caption flex items-center gap-1 rounded-full border border-(--cq-border-subtle) px-2.5 py-1 text-(--cq-text-secondary)"
+            className="cq-caption flex items-center gap-1 border border-(--cq-border-subtle) px-2.5 py-1 text-(--cq-text-secondary)"
           >
             <StandingIcon standing={line.standing} />
             <span>{line.label}</span>
@@ -574,10 +574,7 @@ export function ApplyExperience({
       }
     >
       {compact ? null : typeof gateway.organisationCoverUrl === "string" ? (
-        <EntityCover
-          src={gateway.organisationCoverUrl}
-          className="rounded-xl"
-        />
+        <EntityCover src={gateway.organisationCoverUrl} />
       ) : null}
       <div className="flex min-w-0 items-center gap-3">
         <EntityAvatar
@@ -669,7 +666,7 @@ export function ApplyExperience({
           key={index}
           className={
             line.from === "YOU"
-              ? "cq-body max-w-[85%] self-end rounded-2xl bg-(--cq-surface-raised) px-4 py-2 text-(--cq-text-primary)"
+              ? "cq-body max-w-[85%] self-end bg-(--cq-surface-raised) px-4 py-2 text-(--cq-text-primary)"
               : "flex max-w-[92%] items-start gap-2.5 self-start"
           }
         >
@@ -723,7 +720,7 @@ export function ApplyExperience({
           maxLength={2000}
           aria-label="Your answer"
           placeholder="Answer, or paste a link"
-          className="cq-body min-h-11 flex-1 resize-none rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="cq-body min-h-11 flex-1 resize-none border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         />
         <Button
           type="submit"
@@ -787,7 +784,7 @@ export function ApplyExperience({
   const result =
     verdict === null ? null : (
       <section
-        className="flex flex-col gap-4 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
+        className="flex flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
         aria-labelledby="fit-verdict"
       >
         <div className="flex items-start gap-3">
@@ -878,7 +875,7 @@ export function ApplyExperience({
   const problemNote =
     problem === null ? null : (
       <div
-        className="flex items-start gap-3 rounded-2xl bg-(--cq-surface-subtle) p-3"
+        className="flex items-start gap-3 bg-(--cq-surface-subtle) p-3"
         role="alert"
       >
         <CircleAlert
@@ -966,7 +963,7 @@ export function ApplyExperience({
               update(event.target.value);
               setCodeSent(false);
             }}
-            className="min-h-11 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-3"
+            className="min-h-11 border border-(--cq-border-subtle) bg-(--cq-surface) px-3"
           />
         </label>
       ))}
@@ -989,7 +986,7 @@ export function ApplyExperience({
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
-              className="min-h-11 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-3"
+              className="min-h-11 border border-(--cq-border-subtle) bg-(--cq-surface) px-3"
             />
           </label>
           <Button

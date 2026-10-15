@@ -139,7 +139,7 @@ export function VoiceRecorder({
         disabled={disabled}
         onClick={() => void start()}
         aria-label="Record a voice note"
-        className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover) disabled:opacity-50"
+        className="flex size-11 shrink-0 items-center justify-center bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover) disabled:opacity-50"
       >
         <Mic size={ICON_SIZE.regular} aria-hidden="true" />
       </button>

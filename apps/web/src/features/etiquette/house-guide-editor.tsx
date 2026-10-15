@@ -75,7 +75,7 @@ export function HouseGuideEditor({
           <summary className="cq-body-sm min-h-11 cursor-pointer content-center font-medium text-(--cq-text-primary)">
             Read it
           </summary>
-          <div className="cq-body-sm mt-2 max-h-96 overflow-y-auto rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3 whitespace-pre-wrap text-(--cq-text-primary)">
+          <div className="cq-body-sm mt-2 max-h-96 overflow-y-auto border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3 whitespace-pre-wrap text-(--cq-text-primary)">
             {guide.activeText}
           </div>
         </details>
@@ -99,7 +99,7 @@ export function HouseGuideEditor({
             maxLength={120}
             disabled={pending}
             placeholder="How we talk to investors and founders"
-            className="cq-body min-h-11 w-full rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+            className="cq-body min-h-11 w-full border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           />
         </div>
         <GuideInput

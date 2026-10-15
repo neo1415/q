@@ -81,7 +81,7 @@ export default async function SearchPage({
           <input type="hidden" name="tab" value={tab} />
           <label className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="sr-only">Search</span>
-            <span className="flex min-h-11 items-center gap-2 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3 focus-within:outline-2 focus-within:outline-(--cq-focus-ring)">
+            <span className="flex min-h-11 items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 focus-within:outline-2 focus-within:outline-(--cq-focus-ring)">
               <Search
                 size={ICON_SIZE.compact}
                 aria-hidden="true"
@@ -182,7 +182,7 @@ export default async function SearchPage({
           <Link
             href={`/@${card.handle}`}
             data-find-result={card.handle}
-            className="flex min-h-14 items-center gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3 hover:bg-(--cq-surface-raised) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+            className="flex min-h-14 items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3 hover:bg-(--cq-surface-raised) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           >
             {/* The card's own photo field, only as its scope shows it. */}
             <EntityAvatar

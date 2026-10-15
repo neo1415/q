@@ -229,7 +229,7 @@ function Plans({
         {offered.map((candidate) => (
           <li
             key={candidate.key}
-            className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) p-4"
+            className="flex flex-col gap-3 border border-(--cq-border-subtle) p-4"
           >
             <div className="flex flex-col gap-1">
               <span className="cq-title-sm text-(--cq-text-primary)">

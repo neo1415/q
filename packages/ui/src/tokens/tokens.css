@@ -87,13 +87,20 @@
     0 4px 12px -4px oklch(0.19 0.012 258 / 0.1);
   --cq-shadow-overlay: 0 12px 32px -8px oklch(0.19 0.012 258 / 0.28);
 
-  /* Radius (doc 18 §25). Pills are for chips and statuses only. */
-  --cq-radius-xs: 4px;
-  --cq-radius-sm: 6px;
-  --cq-radius-md: 10px;
-  --cq-radius-lg: 14px;
-  --cq-radius-xl: 18px;
-  --cq-radius-full: 999px;
+  /*
+   * Radius (owner 2026-10-16: "remove curves ... from the entire app ...
+   * straight like LinkedIn"; amends doc 18 §25). Every surface, control,
+   * chip and pill is square. Only a shape whose meaning is a circle (an
+   * avatar, a status dot, a switch and its knob, a radio, Q's aperture)
+   * uses --cq-radius-circle (or Tailwind's rounded-full).
+   */
+  --cq-radius-xs: 0;
+  --cq-radius-sm: 0;
+  --cq-radius-md: 0;
+  --cq-radius-lg: 0;
+  --cq-radius-xl: 0;
+  --cq-radius-full: 0;
+  --cq-radius-circle: 9999px;
 
   /* Semantic z-layers. Never a bare number in a component. */
   --cq-z-base: 0;

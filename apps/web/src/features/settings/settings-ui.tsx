@@ -72,7 +72,7 @@ export function SettingRow({
 
 /** A secondary action that opens another page: 44 px on every screen. */
 export const rowLinkClassName =
-  "cq-body-sm inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-(--cq-border) bg-(--cq-surface) pr-3 pl-4 font-medium text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)";
+  "cq-body-sm inline-flex min-h-11 items-center justify-center gap-1 border border-(--cq-border) bg-(--cq-surface) pr-3 pl-4 font-medium text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)";
 
 export function RowLink({
   href,
@@ -112,7 +112,7 @@ export function SettingsIndex({
           <li key={section.id} className="shrink-0">
             <a
               href={`#${section.id}`}
-              className="cq-body-sm flex min-h-11 items-center rounded-(--cq-radius-md) px-3 whitespace-nowrap text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"
+              className="cq-body-sm flex min-h-11 items-center px-3 whitespace-nowrap text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"
             >
               {section.label}
             </a>

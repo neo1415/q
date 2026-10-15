@@ -43,7 +43,7 @@ export function Badge({
     <span
       data-tone={tone}
       className={cx(
-        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 cq-caption font-medium",
+        "inline-flex items-center gap-1 border px-1.5 py-0.5 cq-caption font-medium",
         toneClass[tone],
         className,
       )}

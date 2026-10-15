@@ -12,6 +12,11 @@ import { ViewTransition } from "@/components/view-transition";
 
 import { artifactTypeLabel } from "./artifact-type";
 import { ArtifactCard } from "./artifact-card";
+import {
+  SlidePictures,
+  slidePicturesOf,
+  type SlidePicture,
+} from "./slide-pictures";
 import { slideSource } from "./slide-source";
 import {
   arrangeBoard,
@@ -104,9 +109,31 @@ const LABELS: Readonly<Record<BoardObject["kind"], string>> = {
 // and a cache kept forever showed the old one until a reload (founder live
 // 2026-09-30).
 const SLIDE_CACHE_MS = 20_000;
-const slideCache = new Map<string, Promise<string | null>>();
+const slideCache = new Map<string, Promise<FirstSlide | null>>();
 const slideCachedAt = new Map<string, number>();
-function firstSlide(artifactId: string): Promise<string | null> {
+/** The first slide, and the pictures the server places over it. */
+export type FirstSlide = {
+  readonly svg: string;
+  readonly pictures: readonly SlidePicture[];
+};
+
+/**
+ * Reads the first slide of a deck from the slides response. A slide is an
+ * SVG shown as an image, which loads nothing of its own: its photos come
+ * back beside it as `images` and are drawn over it (exported for its test).
+ */
+export function firstSlideOf(body: unknown): FirstSlide | null {
+  const slides: unknown = Reflect.get(Object(body), "slides");
+  if (!Array.isArray(slides) || typeof slides[0] !== "string") return null;
+  return {
+    svg: slides[0],
+    pictures: slidePicturesOf(Reflect.get(Object(body), "images")).filter(
+      (picture) => picture.slide === 0,
+    ),
+  };
+}
+
+function firstSlide(artifactId: string): Promise<FirstSlide | null> {
   const at = slideCachedAt.get(artifactId);
   if (at !== undefined && Date.now() - at > SLIDE_CACHE_MS) {
     slideCache.delete(artifactId);
@@ -118,10 +145,7 @@ function firstSlide(artifactId: string): Promise<string | null> {
       .then(async (response) => {
         if (!response.ok) return null;
         const body: unknown = await response.json();
-        const slides: unknown = Reflect.get(Object(body), "slides");
-        return Array.isArray(slides) && typeof slides[0] === "string"
-          ? slides[0]
-          : null;
+        return firstSlideOf(body);
       })
       .catch(() => null);
     slideCache.set(artifactId, pending);
@@ -136,29 +160,34 @@ function SlidePreview({
   readonly artifactId: string;
   readonly title: string;
 }) {
-  const [svg, setSvg] = useState<string | null>(null);
+  const [slide, setSlide] = useState<FirstSlide | null>(null);
   useEffect(() => {
     let alive = true;
     void firstSlide(artifactId).then((slide) => {
-      if (alive) setSvg(slide);
+      if (alive) setSlide(slide);
     });
     return () => {
       alive = false;
     };
   }, [artifactId]);
-  if (svg === null) {
+  if (slide === null) {
     return <div className="cq-q-board-slide is-empty" aria-hidden="true" />;
   }
   return (
-    // A data-URI SVG the Q API drew: an img cannot run it, and there is
-    // nothing for an image optimiser to fetch.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      className="cq-q-board-slide"
-      src={slideSource(svg)}
-      alt={`First slide of ${title}`}
-      data-q-board-slide
-    />
+    // The pictures sit over the slide where the layout put them, exactly
+    // as in the viewer: without them a photo slot drew a broken image.
+    <div className="relative" data-q-board-slide-frame>
+      {/* A data-URI SVG the Q API drew: an img cannot run it, and there is
+          nothing for an image optimiser to fetch. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        className="cq-q-board-slide"
+        src={slideSource(slide.svg)}
+        alt={`First slide of ${title}`}
+        data-q-board-slide
+      />
+      <SlidePictures pictures={slide.pictures} />
+    </div>
   );
 }
 

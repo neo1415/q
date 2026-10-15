@@ -232,7 +232,7 @@ function StepForm({
     >
       {warning === null ? null : (
         <p
-          className="cq-body-sm rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-3 text-(--cq-text-primary)"
+          className="cq-body-sm border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-3 text-(--cq-text-primary)"
           role="note"
         >
           {warning}

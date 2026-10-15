@@ -34,7 +34,7 @@ export function WorkforceCost({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section
           aria-labelledby="cost-month"
-          className="rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4.5 py-4"
+          className="border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4.5 py-4"
         >
           <h2
             id="cost-month"
@@ -52,11 +52,11 @@ export function WorkforceCost({
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Math.round(share)}
-              className="h-2 overflow-hidden rounded-[4px] bg-(--cq-surface-subtle)"
+              className="h-2 overflow-hidden bg-(--cq-surface-subtle)"
             >
               <div
                 className={cx(
-                  "h-full rounded-[4px]",
+                  "h-full",
                   overview.paused ? "bg-(--cq-warning)" : "bg-(--cq-accent)",
                 )}
                 style={{ width: `${String(share)}%` }}
@@ -73,7 +73,7 @@ export function WorkforceCost({
         </section>
         <section
           aria-labelledby="cost-role"
-          className="rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4.5 py-4"
+          className="border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4.5 py-4"
         >
           <h2 id="cost-role" className="mt-0 mb-2.5 text-[15px] font-semibold">
             By specialist
@@ -94,9 +94,9 @@ export function WorkforceCost({
                       {row.name}
                     </th>
                     <td className="py-1.5 align-middle">
-                      <div className="h-2 rounded-[4px] bg-(--cq-surface-subtle)">
+                      <div className="h-2 bg-(--cq-surface-subtle)">
                         <div
-                          className="h-full rounded-[4px] bg-(--cq-text-primary)"
+                          className="h-full bg-(--cq-text-primary)"
                           style={{ width: `${String(row.share)}%` }}
                         />
                       </div>
@@ -114,7 +114,7 @@ export function WorkforceCost({
       {spending.length === 0 ? null : (
         <section
           aria-labelledby="cost-job"
-          className="rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4.5 py-4"
+          className="border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4.5 py-4"
         >
           <h2 id="cost-job" className="mt-0 mb-1 text-[15px] font-semibold">
             By job

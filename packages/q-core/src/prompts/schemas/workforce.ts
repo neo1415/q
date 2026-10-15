@@ -458,6 +458,67 @@ export const JobPlanResultV4Schema = JobPlanResultV2Schema.extend({
 }).strict();
 export type JobPlanResultV4 = z.infer<typeof JobPlanResultV4Schema>;
 
+/**
+ * v5 (wf 2026-10-16): the lead reasons before it plans. It reads the
+ * situation code wrote from the person's authorised records (facts F1..),
+ * states the outcome, what is missing, why each step is there and what it
+ * rests on, contingency steps, and what should come next. Code grounds
+ * every reference and decides what needs approval.
+ */
+export const JOB_PLAN_V5_SCHEMA_VERSION = 5;
+
+export const JobPlanVariablesV5Schema = JobPlanVariablesSchema.extend({
+  /** Facts code wrote from authorised reads. UNTRUSTED (names, titles). */
+  situation: z.string().max(8_000),
+}).strict();
+export type JobPlanVariablesV5 = z.infer<typeof JobPlanVariablesV5Schema>;
+
+export const JOB_PLAN_V5_UNTRUSTED = ["goal", "situation"] as const;
+
+const FactRef = z.string().regex(/^F[1-9][0-9]?$/u);
+
+export const JobPlanResultV5Schema = JobPlanResultV4Schema.extend({
+  /** The outcome the person wants, in one sentence. */
+  outcome: z.string().trim().min(1).max(400),
+  prerequisites: z
+    .array(
+      z
+        .object({
+          what: z.string().trim().min(1).max(300),
+          status: z.enum(["MET", "MISSING", "UNKNOWN"]),
+          blocking: z.boolean(),
+          evidence: z.array(FactRef).max(6),
+          resolvedBy: z.string().max(32).nullable(),
+        })
+        .strict(),
+    )
+    .max(8),
+  steps: z
+    .array(
+      JobPlanResultV4Schema.shape.steps.element
+        .extend({
+          why: z.string().trim().min(1).max(300),
+          evidence: z.array(FactRef).max(6),
+          fallbackFor: z.string().max(32).nullable(),
+        })
+        .strict(),
+    )
+    .max(12),
+  nextActions: z
+    .array(
+      z
+        .object({
+          action: z.string().trim().min(1).max(300),
+          why: z.string().trim().min(1).max(300),
+          evidence: z.array(FactRef).max(6),
+          tool: z.string().max(80).nullable(),
+        })
+        .strict(),
+    )
+    .max(6),
+}).strict();
+export type JobPlanResultV5 = z.infer<typeof JobPlanResultV5Schema>;
+
 // SUBSTANCE_CRITIQUE (2026-10-12): a second specialist's critique of a
 // prepared document, against the evidence it was built from.
 export const SUBSTANCE_CRITIQUE_SCHEMA_NAME = "SubstanceCritiqueResult";

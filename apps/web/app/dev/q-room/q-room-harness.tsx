@@ -343,7 +343,7 @@ export function QRoomHarness() {
         <div
           role="dialog"
           aria-label="Clearwater preview"
-          className="fixed inset-x-4 bottom-4 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised) p-4"
+          className="fixed inset-x-4 bottom-4 border border-(--cq-border) bg-(--cq-surface-raised) p-4"
         >
           Clearwater Pay: a seed round.
         </div>

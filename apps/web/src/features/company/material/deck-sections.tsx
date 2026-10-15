@@ -99,7 +99,7 @@ export function DeckReadSummary({
   // 2026-10-11). Native <details>: opens by keyboard and AT with no script.
   return (
     <details
-      className="group rounded-lg bg-(--cq-surface-subtle)"
+      className="group bg-(--cq-surface-subtle)"
       aria-labelledby="deck-read-title"
       data-deck-read
     >
@@ -139,7 +139,7 @@ export function DeckReadSummary({
                 type="button"
                 onClick={() => onPick(index)}
                 aria-current={current === index ? "true" : undefined}
-                className={`cq-body-sm flex min-h-11 w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-(--cq-text-primary) ${
+                className={`cq-body-sm flex min-h-11 w-full items-center gap-2 border px-3 py-2 text-left text-(--cq-text-primary) ${
                   current === index
                     ? "border-(--cq-text-primary) border-2"
                     : section.status === "NOT_IN_DECK"
@@ -197,7 +197,7 @@ function SectionCard({
   const where = slides(section.pages);
   return (
     <article
-      className="flex h-full flex-col gap-4 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+      className="flex h-full flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
       aria-label={label}
       data-deck-section={section.section}
     >
@@ -374,7 +374,7 @@ export function DeckCarousel({
             role="tab"
             aria-selected={visible === at}
             onClick={() => go(at)}
-            className={`cq-body-sm min-h-11 shrink-0 rounded-full border px-4 ${
+            className={`cq-body-sm min-h-11 shrink-0 border px-4 ${
               visible === at
                 ? "border-(--cq-text-primary) bg-(--cq-text-primary) text-(--cq-text-inverse)"
                 : "border-(--cq-border) text-(--cq-text-primary)"
@@ -414,7 +414,7 @@ export function DeckCarousel({
             onClick={() => go(visible - 1)}
             disabled={visible === 0}
             aria-label="Previous section"
-            className="flex size-11 items-center justify-center rounded-full border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
+            className="flex size-11 items-center justify-center border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
           >
             <ChevronLeft size={ICON_SIZE.regular} aria-hidden="true" />
           </button>
@@ -426,7 +426,7 @@ export function DeckCarousel({
             onClick={() => go(visible + 1)}
             disabled={visible === sections.length - 1}
             aria-label="Next section"
-            className="flex size-11 items-center justify-center rounded-full border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
+            className="flex size-11 items-center justify-center border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
           >
             <ChevronRight size={ICON_SIZE.regular} aria-hidden="true" />
           </button>

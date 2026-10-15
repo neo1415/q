@@ -11,24 +11,24 @@ export default function Loading() {
       data-daily-loading
     >
       <div className="flex flex-col items-center gap-3">
-        <div className="h-12 w-64 rounded-sm bg-(--cq-surface-strong)" />
-        <div className="h-4 w-full max-w-xl rounded-sm bg-(--cq-surface-subtle)" />
+        <div className="h-12 w-64 bg-(--cq-surface-strong)" />
+        <div className="h-4 w-full max-w-xl bg-(--cq-surface-subtle)" />
       </div>
       <div className="grid gap-5 md:grid-cols-[3fr_2fr]">
         <div className="flex flex-col gap-3">
-          <div className="h-9 w-full rounded-sm bg-(--cq-surface-strong)" />
-          <div className="h-9 w-4/5 rounded-sm bg-(--cq-surface-strong)" />
-          <div className="h-4 w-full rounded-sm bg-(--cq-surface-subtle)" />
-          <div className="h-4 w-11/12 rounded-sm bg-(--cq-surface-subtle)" />
+          <div className="h-9 w-full bg-(--cq-surface-strong)" />
+          <div className="h-9 w-4/5 bg-(--cq-surface-strong)" />
+          <div className="h-4 w-full bg-(--cq-surface-subtle)" />
+          <div className="h-4 w-11/12 bg-(--cq-surface-subtle)" />
         </div>
-        <div className="aspect-[16/9] w-full rounded-sm bg-(--cq-surface-subtle)" />
+        <div className="aspect-[16/9] w-full bg-(--cq-surface-subtle)" />
       </div>
       <div className="grid gap-8 md:grid-cols-2">
         {[0, 1].map((column) => (
           <div key={column} className="flex flex-col gap-3">
-            <div className="h-6 w-3/4 rounded-sm bg-(--cq-surface-strong)" />
-            <div className="h-4 w-full rounded-sm bg-(--cq-surface-subtle)" />
-            <div className="h-4 w-5/6 rounded-sm bg-(--cq-surface-subtle)" />
+            <div className="h-6 w-3/4 bg-(--cq-surface-strong)" />
+            <div className="h-4 w-full bg-(--cq-surface-subtle)" />
+            <div className="h-4 w-5/6 bg-(--cq-surface-subtle)" />
           </div>
         ))}
       </div>

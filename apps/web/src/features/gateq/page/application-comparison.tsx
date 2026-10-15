@@ -33,24 +33,31 @@ function Fact({
     USER_CLAIM: "Applicant claim",
     ESTIMATE: "Estimate",
     UNKNOWN: "Unknown",
+    Q_INFERENCE: "Q inference",
   }[fact.truthClass];
   const evidence = {
     NO_EVIDENCE: "No evidence recorded",
     SELF_REPORTED: "Self reported",
     DOCUMENT_SUPPORTED: "Document support recorded",
   }[fact.evidenceStatus];
-  const origin = {
-    APPLICANT_PROVIDED: "Applicant provided",
-    DOCUMENT_SUPPORTED: "Document supported",
-    ESTIMATED: "Estimated",
-    UNKNOWN: "Unknown",
-  }[fact.provenance];
+  const origin =
+    fact.truthClass === "Q_INFERENCE"
+      ? "Derived by Q, not said in these words"
+      : {
+          APPLICANT_PROVIDED: "Applicant provided",
+          DOCUMENT_SUPPORTED: "Document supported",
+          ESTIMATED: "Estimated",
+          UNKNOWN: "Unknown",
+        }[fact.provenance];
   return (
     <div className="flex flex-col gap-1">
       <p className="whitespace-pre-wrap break-words">{fact.summary}</p>
       <p className="cq-caption gq-t2">
         Origin: {origin} · Truth: {truth} · Evidence: {evidence}
       </p>
+      {fact.derivation === undefined ? null : (
+        <p className="cq-caption gq-t2">{fact.derivation}</p>
+      )}
     </div>
   );
 }

@@ -56,7 +56,7 @@ export function SignOutControl({
       type="submit"
       aria-label={appearance === "icon" ? "Sign out" : undefined}
       className={cx(
-        "flex items-center rounded-md text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)",
+        "flex items-center text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)",
         appearance === "icon"
           ? "size-11 justify-center pointer-fine:size-9"
           : "min-h-12 w-full gap-3 px-3 cq-body",

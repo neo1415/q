@@ -43,7 +43,7 @@ export function ArrivalDock() {
   return (
     <aside
       aria-label="Q's briefing"
-      className="fixed right-4 bottom-24 z-(--cq-z-presence) flex w-[min(380px,calc(100vw-32px))] flex-col rounded-(--cq-radius-xl) border border-(--cq-border) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-overlay) empty:hidden sm:bottom-6"
+      className="fixed right-4 bottom-24 z-(--cq-z-presence) flex w-[min(380px,calc(100vw-32px))] flex-col border border-(--cq-border) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-overlay) empty:hidden sm:bottom-6"
       data-arrival-dock
     >
       <ArrivalBriefing

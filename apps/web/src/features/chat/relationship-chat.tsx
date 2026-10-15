@@ -416,7 +416,7 @@ export function RelationshipChat({
           type="button"
           onClick={() => invokeQ(draft.replace(Q_PREFIX, "").trim())}
           aria-label="Ask Q"
-          className="flex size-11 items-center justify-center rounded-full hover:bg-(--cq-surface-subtle)"
+          className="flex size-11 items-center justify-center hover:bg-(--cq-surface-subtle)"
         >
           <QAperture state="IDLE" size="chrome" />
         </button>
@@ -445,7 +445,7 @@ export function RelationshipChat({
       >
         {messages.length === 0 ? (
           <li className="m-auto max-w-xs text-center">
-            <p className="cq-body-sm rounded-xl bg-(--cq-surface-subtle) px-4 py-2 text-(--cq-text-secondary)">
+            <p className="cq-body-sm bg-(--cq-surface-subtle) px-4 py-2 text-(--cq-text-secondary)">
               {status === "OPEN"
                 ? `Say hello to ${counterpart}.`
                 : status === "BLOCKED"
@@ -479,10 +479,10 @@ export function RelationshipChat({
               </span>
             ) : null}
             <div
-              className={`max-w-full min-w-0 rounded-2xl px-3 py-2 ${
+              className={`max-w-full min-w-0 px-3 py-2 ${
                 message.mine
-                  ? "rounded-br-sm bg-(--cq-accent-soft) text-(--cq-text-primary)"
-                  : "rounded-bl-sm bg-(--cq-surface-subtle) text-(--cq-text-primary)"
+                  ? "bg-(--cq-accent-soft) text-(--cq-text-primary)"
+                  : "bg-(--cq-surface-subtle) text-(--cq-text-primary)"
               }`}
             >
               {message.unsent ? (
@@ -676,7 +676,7 @@ export function RelationshipChat({
               aria-label="Attach"
               aria-expanded={attachOpen}
               onClick={() => setAttachOpen((open) => !open)}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
+              className="flex size-11 shrink-0 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
             >
               <Plus size={ICON_SIZE.regular} aria-hidden="true" />
             </button>
@@ -691,14 +691,14 @@ export function RelationshipChat({
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onKeyDown}
               placeholder="Message"
-              className="cq-body field-sizing-content max-h-40 min-h-11 flex-1 resize-none rounded-3xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary)"
+              className="cq-body field-sizing-content max-h-40 min-h-11 flex-1 resize-none border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary)"
             />
             {hasDraft ? (
               <button
                 type="submit"
                 disabled={busy}
                 aria-label="Send"
-                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover) disabled:opacity-50"
+                className="flex size-11 shrink-0 items-center justify-center bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover) disabled:opacity-50"
               >
                 <ArrowUp size={ICON_SIZE.regular} aria-hidden="true" />
               </button>

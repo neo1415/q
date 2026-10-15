@@ -8,7 +8,7 @@ import type { QVoiceDestination } from "@capital-q/contracts";
 const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   HOME: "/home",
   PROFILE: "/profile",
-  CAPITAL: "/capital",
+  CAPITAL: "/relationships?view=capital",
   DISCOVER: "/discover",
   COMPANY_VISIBILITY: "/company/visibility",
   // Hub overview is the Q entry; existing direct record-list links stay valid.
@@ -50,12 +50,12 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   SAVED_COMPARE: "/discover/saved/compare",
   REVIEWS: "/reviews",
   TOP_INVESTORS: "/investors/top",
-  // capital-tabs: a founder's Capital page, by its tab.
-  CAPITAL_RAISE: "/capital?tab=raise",
-  CAPITAL_READINESS: "/capital?tab=readiness",
-  CAPITAL_ACTION_PLAN: "/capital?tab=action-plan",
-  CAPITAL_PLAN: "/capital?tab=plan",
-  CAPITAL_INVESTORS: "/capital?tab=investors",
+  // capital-tabs: a founder's Capital (the CRM's Capital tab), by its tab.
+  CAPITAL_RAISE: "/relationships?view=capital&tab=raise",
+  CAPITAL_READINESS: "/relationships?view=capital&tab=readiness",
+  CAPITAL_ACTION_PLAN: "/relationships?view=capital&tab=action-plan",
+  CAPITAL_PLAN: "/relationships?view=capital&tab=plan",
+  CAPITAL_INVESTORS: "/relationships?view=capital&tab=investors",
   INTERVIEW: null,
   INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
   INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",

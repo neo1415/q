@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 
-import { z } from "zod";
-
 import type {
   QArtifactDetail,
   QDocumentAudit,
@@ -29,6 +27,11 @@ import { artifactTypeLabel } from "./artifact-type";
 import { readQArtifactAction, readQArtifactVersionAction } from "./actions";
 import { ArtifactDownloads, artifactFileUrl } from "./artifact-download";
 import { formatDayTime } from "@/components/date-format";
+import {
+  SlidePictures,
+  slidePicturesOf,
+  type SlidePicture,
+} from "./slide-pictures";
 import { slideSource } from "./slide-source";
 
 /**
@@ -273,15 +276,9 @@ export function ArtifactViewer({
           Array.isArray(slides) &&
           slides.every((s) => typeof s === "string")
         ) {
-          const listed: unknown = Reflect.get(Object(body), "images");
           // Each picture is checked on its own: one that is not an https
           // picture is dropped, the rest are drawn.
-          const images = (Array.isArray(listed) ? listed : [])
-            .slice(0, 48)
-            .flatMap((raw: unknown) => {
-              const picture = SlidePictureSchema.safeParse(raw);
-              return picture.success ? [picture.data] : [];
-            });
+          const images = slidePicturesOf(Reflect.get(Object(body), "images"));
           setDrawn({ version, slides, images });
         } else {
           setDrawn({ version, slides: null });
@@ -352,7 +349,7 @@ export function ArtifactViewer({
       >
         <span
           aria-hidden="true"
-          className="mt-0.5 hidden size-10 shrink-0 items-center justify-center rounded-md bg-(--cq-surface-subtle) text-(--cq-text-secondary) sm:flex"
+          className="mt-0.5 hidden size-10 shrink-0 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary) sm:flex"
         >
           {isDeck ? (
             <Presentation size={ICON_SIZE.regular} strokeWidth={ICON_STROKE} />
@@ -494,7 +491,7 @@ export function ArtifactViewer({
         {drawingPending && current !== undefined ? (
           <div
             aria-hidden="true"
-            className="aspect-video w-full animate-pulse rounded-md bg-(--cq-surface-strong)"
+            className="aspect-video w-full animate-pulse bg-(--cq-surface-strong)"
             data-q-artifact-slides-loading
           />
         ) : null}
@@ -532,8 +529,8 @@ export function ArtifactViewer({
                   alt={`Slide ${String(page + 1)}`}
                   className={
                     fit === "page"
-                      ? "h-auto max-h-[calc(100dvh-260px)] w-auto max-w-full rounded-md border border-(--cq-border-subtle) object-contain"
-                      : "h-auto w-full rounded-md border border-(--cq-border-subtle)"
+                      ? "h-auto max-h-[calc(100dvh-260px)] w-auto max-w-full border border-(--cq-border-subtle) object-contain"
+                      : "h-auto w-full border border-(--cq-border-subtle)"
                   }
                   data-q-artifact-slide={String(page + 1)}
                 />
@@ -626,7 +623,7 @@ export function ArtifactViewer({
             className={
               current.content.look?.background === undefined
                 ? "mx-auto flex w-full max-w-(--cq-layout-narrow) flex-col gap-5"
-                : "mx-auto flex w-full max-w-(--cq-layout-narrow) flex-col gap-5 rounded-lg p-6"
+                : "mx-auto flex w-full max-w-(--cq-layout-narrow) flex-col gap-5 p-6"
             }
             style={documentLookStyle(current.content.look)}
             data-q-artifact-body
@@ -785,68 +782,5 @@ function DocumentChecks({ audit }: { readonly audit: QDocumentAudit }) {
         </ul>
       )}
     </section>
-  );
-}
-
-/** DOCS: one picture the server placed on a slide, in slide units. */
-const SlidePictureSchema = z.object({
-  slide: z.number().int().min(0),
-  x: z.number(),
-  y: z.number(),
-  width: z.number().positive(),
-  height: z.number().positive(),
-  // A stock photo's CDN or a signed storage URL: https only.
-  url: z.string().url().startsWith("https://"),
-  alt: z.string().max(200),
-  credit: z.string().max(120),
-  fit: z.enum(["cover", "contain"]),
-});
-type SlidePicture = z.infer<typeof SlidePictureSchema>;
-
-/** The layout's slide size (deck-render SLIDE_WIDTH × SLIDE_HEIGHT). */
-const SLIDE_W = 960;
-const SLIDE_H = 540;
-
-/**
- * DOCS: the slide's pictures, drawn over the slide where the layout put
- * them. A slide shown as an SVG image cannot load pictures itself, so
- * they come straight from where they live: a stock photo from its CDN, a
- * generated one by a short-lived signed URL from private storage (never
- * through this app). Each says where it came from on the picture itself.
- */
-function SlidePictures({
-  pictures,
-}: {
-  readonly pictures: readonly SlidePicture[];
-}) {
-  return (
-    <>
-      {pictures.map((picture) => (
-        <figure
-          key={`${picture.url}:${String(picture.x)}`}
-          className="absolute m-0 overflow-hidden"
-          style={{
-            left: `${String((picture.x / SLIDE_W) * 100)}%`,
-            top: `${String((picture.y / SLIDE_H) * 100)}%`,
-            width: `${String((picture.width / SLIDE_W) * 100)}%`,
-            height: `${String((picture.height / SLIDE_H) * 100)}%`,
-          }}
-          data-q-slide-picture
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived URL; an optimiser would proxy it through this app */}
-          <img
-            src={picture.url}
-            alt={picture.alt}
-            referrerPolicy="no-referrer"
-            className={`size-full ${picture.fit === "contain" ? "object-contain" : "object-cover"}`}
-          />
-          {picture.credit.length === 0 ? null : (
-            <figcaption className="cq-caption absolute bottom-1 left-1 rounded-sm bg-(--cq-surface-raised) px-1.5 py-0.5 text-(--cq-text-secondary)">
-              {picture.credit}
-            </figcaption>
-          )}
-        </figure>
-      ))}
-    </>
   );
 }

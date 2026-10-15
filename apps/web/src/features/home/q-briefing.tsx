@@ -23,13 +23,13 @@ import { useClaimWhenSeen } from "./use-claim-when-seen";
  */
 
 const CARD_CLASS = [
-  "group flex min-h-11 w-full items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-left",
+  "group flex min-h-11 w-full items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-left",
   "transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:bg-(--cq-surface-subtle)",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
 ].join(" ");
 
 const QUIET_CONTROL_CLASS = [
-  "inline-flex min-h-11 items-center rounded-md px-3 cq-body-sm",
+  "inline-flex min-h-11 items-center px-3 cq-body-sm",
   "transition-colors duration-(--cq-motion-fast)",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
 ].join(" ");
@@ -52,7 +52,7 @@ function SetupNudgeCard({
   return (
     <div
       ref={ref}
-      className="flex min-h-11 w-full flex-col gap-2 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5"
+      className="flex min-h-11 w-full flex-col gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5"
       data-briefing-card={item.id}
     >
       <span className="flex min-w-0 flex-col">

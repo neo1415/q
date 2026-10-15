@@ -145,8 +145,9 @@ describe("Capital's tab bar (tab.*)", () => {
     expect(screen.getAllByRole("tab")).toHaveLength(6);
   });
 
-  it("SELECT_TAB is DONE only when the tab is selected and the router settled on /capital?tab=readiness", async () => {
-    noteRoute("/capital");
+  it("SELECT_TAB is DONE only when the tab is selected and the router settled on the Capital tab's readiness", async () => {
+    // Capital is the CRM's Capital tab (owner 2026-10-16).
+    noteRoute("/relationships?view=capital");
     render(<CapitalTabBar active="overview" hadTabParam />);
     const pending = performUiAct(
       intent("SELECT_TAB", { target: "tab.readiness" }),
@@ -158,13 +159,13 @@ describe("Capital's tab bar (tab.*)", () => {
         .getByRole("tab", { name: "Readiness" })
         .getAttribute("aria-selected"),
     ).toBe("true");
-    noteRoute("/capital?tab=readiness");
+    noteRoute("/relationships?view=capital&tab=readiness");
     expect((await act(() => pending)).status).toBe("DONE");
   });
 
   it("is FAILED when the router never arrives", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    noteRoute("/capital");
+    noteRoute("/relationships?view=capital");
     render(<CapitalTabBar active="overview" hadTabParam />);
     const pending = performUiAct(intent("SELECT_TAB", { target: "tab.plan" }));
     await act(() => vi.advanceTimersByTimeAsync(7_000));

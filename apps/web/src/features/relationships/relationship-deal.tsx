@@ -190,7 +190,7 @@ function Confirm({
 }
 
 const INPUT =
-  "cq-body min-h-11 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)";
+  "cq-body min-h-11 w-full border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)";
 
 function TermsForm({
   view,
@@ -731,7 +731,7 @@ export function RelationshipDeal({
                   </span>
                 </span>
                 <a
-                  className="cq-body-sm inline-flex min-h-11 items-center rounded-md border border-(--cq-border) px-3 text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"
+                  className="cq-body-sm inline-flex min-h-11 items-center border border-(--cq-border) px-3 text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"
                   href={`${base}/reports/${report.reportId}`}
                   download
                 >
@@ -776,7 +776,7 @@ export function RelationshipDeal({
             File a report
           </Button>
           <a
-            className="cq-body-sm inline-flex min-h-11 items-center rounded-md px-3 text-(--cq-text-secondary) underline underline-offset-2"
+            className="cq-body-sm inline-flex min-h-11 items-center px-3 text-(--cq-text-secondary) underline underline-offset-2"
             href={`${base}/audit`}
             download
           >
