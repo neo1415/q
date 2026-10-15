@@ -1,6 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
+  NETWORK_COMPANY_RELATIONSHIP_VIEWS_PATH,
+  NETWORK_RELATIONSHIP_VIEWS_PATH,
+  SavedRelationshipViewListSchema,
   CompanyInterestStatusDtoSchema,
   ConnectionStatusDtoSchema,
   IncomingConnectionRequestListDtoSchema,
@@ -444,6 +447,25 @@ export function registerNetworkInterestRoutes(
     { onRequest: withContext },
     (request, reply) => exportPipeline(request, reply, true),
   );
+
+  // CRM saved views (2026-10-15): the list read. Saving and deleting are
+  // app actions (ADR 0040; @capital-q/app-actions relationship-views).
+  const views = service.relationshipViews;
+  if (views !== undefined) {
+    for (const [listPath, company] of [
+      [NETWORK_RELATIONSHIP_VIEWS_PATH, false],
+      [NETWORK_COMPANY_RELATIONSHIP_VIEWS_PATH, true],
+    ] as const) {
+      const party = (request: FastifyRequest) =>
+        company ? companyIdOf(request) : undefined;
+      app.get(listPath, { onRequest: withContext }, async (request, reply) => {
+        void reply.header("Cache-Control", "no-store");
+        return SavedRelationshipViewListSchema.parse(
+          await views.list(getActorContext(request), party(request)),
+        );
+      });
+    }
+  }
 
   // Each side's own relationships (CQ-WEB-030), each row the per-party fold.
   app.get(
