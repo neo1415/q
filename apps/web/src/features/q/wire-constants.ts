@@ -39,6 +39,8 @@ export const Q_MANIFEST_SECTIONS_MAX = 12;
 export const Q_MANIFEST_SECTION_REFS_MAX = 12;
 export const Q_MANIFEST_DIALOGS_MAX = 3;
 export const Q_MANIFEST_DIALOG_REFS_MAX = 4;
+export const Q_MANIFEST_VISIBLE_REFS_MAX = 6;
+export const Q_MANIFEST_NOTICES_MAX = 6;
 
 /** The manifest's filter keys, and the shape of a value (q/screen-manifest). */
 export const Q_MANIFEST_FILTER_KEYS = [

@@ -182,6 +182,7 @@ import {
   controlBindingOf,
   focusFromHistory,
   listsFromHistory,
+  hereFromManifest,
   listsFromManifest,
   referenceAskOf,
   resolutionNote,
@@ -247,6 +248,7 @@ function pointedAt(
     const latestQ = [...history].reverse().find((one) => one.role === "Q");
     const resolved = resolveReference(ask, {
       page: listsFromManifest(manifest),
+      here: hereFromManifest(manifest),
       answers: listsFromHistory(history),
       answerIsNewest: (latestQ?.blocks ?? []).some(
         (block) => block.kind === "ANSWER_CARDS",

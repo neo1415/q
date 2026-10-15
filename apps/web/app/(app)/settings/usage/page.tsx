@@ -12,6 +12,7 @@ import {
 import { UsageView } from "@/features/billing/usage-view";
 import { monthName } from "@/features/billing/usage-words";
 import { qApiSession } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Usage · Settings" };
 
@@ -26,30 +27,32 @@ export default async function UsagePage() {
     session === null ? null : await getMyUsage(session).catch(() => null);
   return (
     <PageContainer>
-      <PageHeader
-        title="Usage"
-        description={
-          usage === null
-            ? undefined
-            : `${monthName(usage.month)} · what Q's work for you cost, nothing charged`
-        }
-      />
-      {usage === null ? (
-        <ErrorState
-          title="Usage couldn't load"
-          description="Nothing is charged either way."
-          action={
-            <Link
-              href="/settings/usage"
-              className={buttonClassName("secondary", "compact")}
-            >
-              Try again
-            </Link>
+      <QSection id="usage" kind="BILLING" label="usage">
+        <PageHeader
+          title="Usage"
+          description={
+            usage === null
+              ? undefined
+              : `${monthName(usage.month)} · what Q's work for you cost, nothing charged`
           }
         />
-      ) : (
-        <UsageView usage={usage} />
-      )}
+        {usage === null ? (
+          <ErrorState
+            title="Usage couldn't load"
+            description="Nothing is charged either way."
+            action={
+              <Link
+                href="/settings/usage"
+                className={buttonClassName("secondary", "compact")}
+              >
+                Try again
+              </Link>
+            }
+          />
+        ) : (
+          <UsageView usage={usage} />
+        )}
+      </QSection>
     </PageContainer>
   );
 }

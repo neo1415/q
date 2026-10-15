@@ -11,14 +11,23 @@ import { QNavIcon } from "@/components/app-shell/q-nav-icon";
 export function StatusPage({
   title,
   description,
+  notice,
   children,
 }: {
   readonly title: string;
   readonly description: string;
+  /**
+   * Lane W: what Q is told this page shows, as a closed kind and code
+   * (`data-q-notice`, features/q/manifest.ts); the words never travel.
+   */
+  readonly notice?: "ERROR:PAGE_FAILED" | "ERROR:NOT_FOUND" | undefined;
   readonly children: ReactNode;
 }) {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col justify-center gap-6 px-4 py-10">
+    <main
+      data-q-notice={notice}
+      className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col justify-center gap-6 px-4 py-10"
+    >
       <a
         href="/home"
         className="-mx-2 flex min-h-11 w-fit items-center gap-2 rounded-md px-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary)"

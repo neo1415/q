@@ -7,6 +7,7 @@ import { getSessionUser } from "@/auth/session";
 import { apiSession } from "@/features/q/context";
 import { JoinCard } from "@/features/team/join-card";
 import { loadMyOrganisations } from "@/features/team/load-organisations";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Join your team" };
 export const dynamic = "force-dynamic";
@@ -36,17 +37,24 @@ export default async function JoinPage({
   const current =
     organisations.find((organisation) => organisation.active) ?? null;
   return (
-    <JoinCard
-      token={valid.success ? valid.data : ""}
-      preview={preview}
-      signedInAs={user?.email ?? null}
-      keeps={current === null ? null : current.name}
-      alreadyIn={
-        preview !== null &&
-        organisations.some(
-          (organisation) => organisation.name === preview.organisationName,
-        )
-      }
-    />
+    <QSection
+      id="invitation"
+      kind="OTHER"
+      total={0}
+      label="an invitation to join"
+    >
+      <JoinCard
+        token={valid.success ? valid.data : ""}
+        preview={preview}
+        signedInAs={user?.email ?? null}
+        keeps={current === null ? null : current.name}
+        alreadyIn={
+          preview !== null &&
+          organisations.some(
+            (organisation) => organisation.name === preview.organisationName,
+          )
+        }
+      />
+    </QSection>
   );
 }

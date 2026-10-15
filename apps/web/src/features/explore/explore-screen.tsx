@@ -528,6 +528,7 @@ export function ExploreScreen({
     toast === null ? null : (
       <div
         role="status"
+        data-q-notice="TOAST"
         className="fixed bottom-[calc(var(--cq-bottom-nav-height)+20px)] left-1/2 z-(--cq-z-toast) -translate-x-1/2 rounded-(--cq-radius-md) bg-(--cq-text-primary) px-4 py-3 text-sm text-(--cq-canvas) shadow-(--cq-shadow-overlay) lg:bottom-6"
       >
         {toast}

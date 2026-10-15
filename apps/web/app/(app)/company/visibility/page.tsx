@@ -14,6 +14,7 @@ import {
 } from "@/features/company/visibility-screen";
 import { InvestorVisibilityScreen } from "@/features/investor/visibility-screen";
 import { resolveOwnContext } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Visibility and discovery" };
 
@@ -31,37 +32,55 @@ export default async function VisibilityPage() {
   const context = await resolveOwnContext();
   return (
     <PageContainer>
-      <PageHeader
-        title="Visibility and discovery"
-        description={
-          context.kind === "INVESTOR"
-            ? "Who can see your investor profile, what they see, and whether founders can find you."
-            : "Who can see your company, what they see, and whether investors can find you."
+      <QSection
+        id="visibility"
+        kind="VISIBILITY"
+        refs={
+          context.kind === "FOUNDER"
+            ? [{ kind: "COMPANY", id: context.companyId }]
+            : context.kind === "INVESTOR"
+              ? [
+                  {
+                    kind: "INVESTOR_ORGANISATION",
+                    id: context.investorOrganisationId,
+                  },
+                ]
+              : []
         }
-      />
-      {context.kind === "FOUNDER" ? (
-        <VisibilityScreen companyId={context.companyId} />
-      ) : context.kind === "INVESTOR" ? (
-        <InvestorVisibilityScreen
-          investorOrganisationId={context.investorOrganisationId}
-        />
-      ) : context.unavailable === true ? (
-        // Not known to be nobody: Capital Q did not answer this render.
-        <EmptyState
-          title="Visibility couldn't load."
-          description="Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment."
-          action={
-            <Link
-              href="/company/visibility"
-              className={buttonClassName("secondary")}
-            >
-              Try again
-            </Link>
+        label="visibility and discovery"
+      >
+        <PageHeader
+          title="Visibility and discovery"
+          description={
+            context.kind === "INVESTOR"
+              ? "Who can see your investor profile, what they see, and whether founders can find you."
+              : "Who can see your company, what they see, and whether investors can find you."
           }
         />
-      ) : (
-        <VisibilityUnavailable />
-      )}
+        {context.kind === "FOUNDER" ? (
+          <VisibilityScreen companyId={context.companyId} />
+        ) : context.kind === "INVESTOR" ? (
+          <InvestorVisibilityScreen
+            investorOrganisationId={context.investorOrganisationId}
+          />
+        ) : context.unavailable === true ? (
+          // Not known to be nobody: Capital Q did not answer this render.
+          <EmptyState
+            title="Visibility couldn't load."
+            description="Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment."
+            action={
+              <Link
+                href="/company/visibility"
+                className={buttonClassName("secondary")}
+              >
+                Try again
+              </Link>
+            }
+          />
+        ) : (
+          <VisibilityUnavailable />
+        )}
+      </QSection>
     </PageContainer>
   );
 }

@@ -20,6 +20,8 @@ import {
   WifiOff,
 } from "@capital-q/ui/icons";
 
+import { registerQMedia } from "@/features/q/screen-media";
+
 import type { FeedPreloadPolicy } from "../feed/feed-state";
 import {
   attachNativeSource,
@@ -311,6 +313,24 @@ export function PitchPlayer({
 
   // Only for the source that failed: a new authorization is a new chance.
   const cannotPlay = unplayable !== null && unplayable === playbackUrl;
+
+  // Lane W: the card meant to be on screen (or one playing) tells Q which
+  // pitch it is; its state is read from the element when a turn is sent.
+  const qCanNotPlay = useRef(false);
+  useEffect(() => {
+    qCanNotPlay.current = failed || cannotPlay;
+  }, [failed, cannotPlay]);
+  const onScreen = policy === "ACTIVE" || playing;
+  const companyId = company.companyId;
+  useEffect(() => {
+    if (!onScreen) return;
+    return registerQMedia({
+      companyId,
+      mediaAssetId,
+      video: () => videoRef.current,
+      failed: () => qCanNotPlay.current,
+    });
+  }, [onScreen, companyId, mediaAssetId]);
 
   // Autoplay only where the controller said ACTIVE and motion is allowed.
   // A rejected play() promise is normal -- browsers refuse autoplay under

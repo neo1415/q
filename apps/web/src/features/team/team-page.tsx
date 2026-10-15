@@ -584,6 +584,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
       <div
         role="status"
         aria-live="polite"
+        data-q-notice={toast === null ? undefined : "TOAST"}
         className={cx(
           "pointer-events-none fixed inset-x-4 bottom-[calc(var(--cq-safe-bottom,0px)+88px)] z-(--cq-z-toast) mx-auto w-fit max-w-[min(420px,calc(100vw-32px))] rounded-full bg-(--cq-text-primary) px-4 py-2.5 text-center cq-body-sm text-(--cq-canvas) shadow-(--cq-shadow-overlay) transition-opacity duration-(--cq-motion-base) lg:bottom-8",
           toast === null ? "opacity-0" : "opacity-100",

@@ -10,6 +10,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { qApiSession } from "@/features/q/context";
 import { readRehearsalRoom } from "@/features/rehearsal/read-rehearsal-room";
 import { RehearsalReview } from "@/features/rehearsal/rehearsal-review";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Rehearsal review" };
 export const dynamic = "force-dynamic";
@@ -38,23 +39,37 @@ export default async function RehearsalReviewPage({
   if (rehearsal === null) {
     return (
       <PageContainer>
-        <EmptyState
-          title="This rehearsal isn't available."
-          description="Your rehearsals are listed on the Rehearsals page."
-          action={
-            <Link href="/rehearsals" className={buttonClassName("secondary")}>
-              Rehearsals
-            </Link>
-          }
-        />
+        <QSection
+          id="rehearsal"
+          kind="REHEARSAL"
+          total={1}
+          label="a rehearsal review"
+        >
+          <EmptyState
+            title="This rehearsal isn't available."
+            description="Your rehearsals are listed on the Rehearsals page."
+            action={
+              <Link href="/rehearsals" className={buttonClassName("secondary")}>
+                Rehearsals
+              </Link>
+            }
+          />
+        </QSection>
       </PageContainer>
     );
   }
   return (
     <PageContainer>
-      <div className="mx-auto w-full max-w-3xl">
-        <RehearsalReview rehearsal={rehearsal} />
-      </div>
+      <QSection
+        id="rehearsal"
+        kind="REHEARSAL"
+        total={1}
+        label="a rehearsal review"
+      >
+        <div className="mx-auto w-full max-w-3xl">
+          <RehearsalReview rehearsal={rehearsal} />
+        </div>
+      </QSection>
     </PageContainer>
   );
 }
