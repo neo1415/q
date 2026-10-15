@@ -18,6 +18,7 @@ import {
   type BoundStep,
   type JobRecorder,
   type PriorRun,
+  type StepRefusal,
   type StepResult,
 } from "@capital-q/q-orchestrator";
 import {
@@ -846,6 +847,26 @@ export type DurableSteps = {
   ) => Promise<void>;
 };
 
+/** Why code refused a step, in words the lead reads when it replans. */
+const REFUSAL_WORDS: Readonly<Record<StepRefusal, string>> = {
+  UNKNOWN_ROLE: "that role does not exist here",
+  LEAD_IS_NOT_A_STEP: "the lead is never a step",
+  NO_EXECUTOR: "no agent here carries out that role",
+  NO_PERMITTED_TOOL: "none of its tools is that role's and allowed",
+  MISSING_REQUIRED_TOOL:
+    "it lacks the tool its role acts through (see 'must include' in the roster); a step that only reads does nothing",
+  INVALID_DOCUMENT_REQUEST: "its document request is not valid for that role",
+  NO_NAMED_COMPANY: "the job names no single company on record",
+  INVALID_CRITIQUE_SOURCE:
+    "a critique must name an earlier PREPARE step it waits on",
+  WAITS_ON_MISSING_STEP: "it waits on a step that is not in the plan before it",
+  INVALID_FALLBACK:
+    "a fallback must cover one earlier ordinary step, never wait on it, and nothing may wait on a fallback",
+  DUPLICATE_KEY: "its key is used twice",
+  OVER_BUDGET: "the job's budget is used up before it",
+  TOO_MANY_STEPS: "the plan has too many steps",
+};
+
 /** The default budget of one job the lead Q proposes, USD. */
 export const DEFAULT_JOB_BUDGET_USD = 0.5;
 
@@ -902,46 +923,73 @@ export function createWorkforceJobs(dependencies: {
       documents: dependencies.ports.documents !== undefined,
       diligence: dependencies.ports.diligence !== undefined,
     });
-    const planned = await dependencies.models.plan(owner, trace, {
-      goal: input.goal.slice(0, 2_000),
-      roster: executorRosterText(executors, permitted),
-      allowed: `Tools and actions: ${[...permitted].join(", ") || "none"}. Budget for the whole job: $${input.budgetUsd.toFixed(2)}.${
-        input.namedCompany == null
-          ? " The job names no single company on record, so a NAMED_COMPANY document cannot be planned."
-          : ` The company the job names is on record${input.namedCompany.name === "" ? "" : `: ${input.namedCompany.name.slice(0, 120)}`}.`
-      }`,
-      situation: situationText(situation).slice(0, 8_000),
-    });
-    if (planned === null) return null;
-    let droppedRefs = 0;
-    const bound = boundPlan(
-      planned.steps.map((step) => {
-        // Only facts the lead was shown may stand behind a step.
-        const grounded = groundStepEvidence(step.evidence, situation);
-        droppedRefs += grounded.dropped;
-        return {
-          key: step.key,
-          role: step.role,
-          agentName: null,
-          goal: step.goal,
-          tools: step.tools,
-          dependsOn: step.dependsOn,
-          ...(step.document === undefined ? {} : { document: step.document }),
-          why: step.why,
-          evidence: grounded.evidence,
-          ...(step.fallbackFor === null
-            ? {}
-            : { fallbackFor: step.fallbackFor }),
-        };
-      }),
-      {
-        permitted,
-        // The lead's own planning comes out of the same budget.
-        budgetUsd: Math.max(0, input.budgetUsd - AGENT_REGISTRY.LEAD.budgetUsd),
-        executors,
-        namedCompanyId: input.namedCompany?.companyId ?? null,
-      },
-    );
+    const allowed = `Tools and actions: ${[...permitted].join(", ") || "none"}. Budget for the whole job: $${input.budgetUsd.toFixed(2)}.${
+      input.namedCompany == null
+        ? " The job names no single company on record, so a NAMED_COMPANY document cannot be planned."
+        : ` The company the job names is on record${input.namedCompany.name === "" ? "" : `: ${input.namedCompany.name.slice(0, 120)}`}.`
+    }`;
+    const attempt = async (feedback: string) => {
+      const planned = await dependencies.models.plan(owner, trace, {
+        goal: input.goal.slice(0, 2_000),
+        roster: executorRosterText(executors, permitted),
+        allowed: `${allowed}${feedback}`.slice(0, 2_000),
+        situation: situationText(situation).slice(0, 8_000),
+      });
+      if (planned === null) return null;
+      let droppedRefs = 0;
+      const bound = boundPlan(
+        planned.steps.map((step) => {
+          // Only facts the lead was shown may stand behind a step.
+          const grounded = groundStepEvidence(step.evidence, situation);
+          droppedRefs += grounded.dropped;
+          return {
+            key: step.key,
+            role: step.role,
+            agentName: null,
+            goal: step.goal,
+            tools: step.tools,
+            dependsOn: step.dependsOn,
+            ...(step.document === undefined ? {} : { document: step.document }),
+            why: step.why,
+            evidence: grounded.evidence,
+            ...(step.fallbackFor === null
+              ? {}
+              : { fallbackFor: step.fallbackFor }),
+          };
+        }),
+        {
+          permitted,
+          // The lead's own planning comes out of the same budget.
+          budgetUsd: Math.max(
+            0,
+            input.budgetUsd - AGENT_REGISTRY.LEAD.budgetUsd,
+          ),
+          executors,
+          namedCompanyId: input.namedCompany?.companyId ?? null,
+        },
+      );
+      return { planned, bound, droppedRefs };
+    };
+    let made = await attempt("");
+    if (made === null) return null;
+    if (!planIsValid(made.bound) && made.bound.refused.length > 0) {
+      // Replanning before approval: the lead hears, in code's words, why
+      // each step was refused and plans once more. A plan still refused is
+      // never offered (D-02), and nothing has run either way.
+      dependencies.logger?.info(
+        { refused: made.bound.refused, steps: made.bound.steps.length },
+        "workforce plan refused before approval; replanning once",
+      );
+      const again = await attempt(
+        ` YOUR LAST PLAN WAS REFUSED BY CODE, step by step: ${made.bound.refused
+          .map((one) => `${one.key}: ${REFUSAL_WORDS[one.reason]}`)
+          .join(
+            "; ",
+          )}. Plan again: fix those steps, or put what no role can do in cannot.`,
+      );
+      if (again !== null) made = again;
+    }
+    const { planned, bound, droppedRefs } = made;
     if (!planIsValid(bound)) {
       // Refused whole, before anyone is asked to approve it (D-02).
       dependencies.logger?.info(

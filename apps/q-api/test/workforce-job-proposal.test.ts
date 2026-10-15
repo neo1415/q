@@ -99,7 +99,7 @@ function asPlanV5(plan: JobPlanResultV2): JobPlanResultV5 {
 
 function world(
   withinLimit: boolean | (() => Promise<boolean>) = true,
-  plan: JobPlanResultV2 | null = PLAN,
+  plan: JobPlanResultV2 | null | readonly JobPlanResultV2[] = PLAN,
 ) {
   const checkLimit = () =>
     typeof withinLimit === "function"
@@ -129,7 +129,11 @@ function world(
       models: {
         plan: () => {
           plans += 1;
-          return Promise.resolve(plan === null ? null : asPlanV5(plan));
+          // A list: the lead's successive answers (a replan reads the next).
+          const answers: readonly (JobPlanResultV2 | null)[] =
+            plan === null || !("length" in plan) ? [plan] : plan;
+          const one = answers[Math.min(plans, answers.length) - 1] ?? null;
+          return Promise.resolve(one === null ? null : asPlanV5(one));
         },
         readReply: () => Promise.resolve(null),
       },
@@ -324,11 +328,74 @@ describe("a job the lead Q proposes (J1, J4)", () => {
     ]);
   });
 
+  it("replans once when a step lacks its role's required tool, and offers only the plan that can run (production 2026-10-15)", async () => {
+    // As planned live for savanna-seed: a CONVERSATION step with only
+    // list_messages was approved, then held "Not allowed to do this step".
+    const readOnly: JobPlanResultV2 = {
+      summary: "Shortlist, research, then draft an intro.",
+      steps: [
+        {
+          key: "shortlist",
+          role: "DISCOVERY",
+          goal: "Shortlist the best fits",
+          tools: ["search_companies"],
+          dependsOn: [],
+        },
+        {
+          key: "intro",
+          role: "CONVERSATION",
+          goal: "Prepare an intro for approval; do not send it",
+          tools: ["list_messages"],
+          dependsOn: ["shortlist"],
+        },
+      ],
+      cannot: [],
+    };
+    const fixed: JobPlanResultV2 = {
+      summary: "Shortlist, then express interest in the strongest fit.",
+      steps: [
+        {
+          key: "shortlist",
+          role: "DISCOVERY",
+          goal: "Shortlist the best fits",
+          tools: ["search_companies"],
+          dependsOn: [],
+        },
+        {
+          key: "reach",
+          role: "OUTREACH",
+          goal: "Express interest in the strongest fit",
+          tools: ["relationship.interest.express"],
+          dependsOn: ["shortlist"],
+        },
+      ],
+      cannot: [
+        "Writing a first introduction message: Q only answers people who already wrote.",
+      ],
+    };
+    const { board, plans } = world(true, [readOnly, fixed]);
+    const prepared = await board.port.prepare(
+      actor,
+      "run-r",
+      "Draft an intro to the strongest fit",
+    );
+    expect(prepared.status).toBe("PREPARED");
+    expect(plans()).toBe(2);
+    const proposal = await board.proposer.propose({ runId: "run-r", actor });
+    const payload = WorkforceJobStartPayloadSchema.parse(proposal?.payload);
+    expect(payload.steps.map((step) => [step.role, step.tools])).toEqual([
+      ["MANDATE_WATCHER", ["search_companies"]],
+      ["OUTREACH", ["relationship.interest.express"]],
+    ]);
+  });
+
   it("never offers a plan with a step no registered executor can run (D1)", async () => {
     const { board, plans } = world(true, UNRUNNABLE);
     const prepared = await board.port.prepare(actor, "run-u", "Make a deck");
     expect(prepared.status).toBe("NOT_PLANNED");
-    expect(plans()).toBe(1);
+    // Refused, the lead replans once with code's reasons; still refused,
+    // nothing is offered.
+    expect(plans()).toBe(2);
     expect(
       await board.proposer.propose({
         runId: "run-u",
