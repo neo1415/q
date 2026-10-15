@@ -32,6 +32,10 @@ import {
   startRehearsalAction,
   startRehearsalVideoAction,
 } from "./rehearsal-actions";
+import {
+  videoAllowanceLine,
+  videoAllowanceUsedUp,
+} from "@/features/video-room/video-allowance";
 import { RehearsalVideoStage } from "./rehearsal-video-stage";
 import { CounterpartIdentity } from "./counterpart-identity";
 import { RehearsalRoom } from "./rehearsal-room";
@@ -230,7 +234,7 @@ export function RehearsalLobby({
           opened.ok &&
             opened.value.mode === "VOICE_FALLBACK" &&
             opened.value.reason === "ALLOWANCE_EXHAUSTED"
-            ? "Your two video interviews have been used. You can carry on in the voice room."
+            ? "Your video sessions are used up for now. You can carry on in the voice room."
             : opened.ok &&
                 opened.value.mode === "VOICE_FALLBACK" &&
                 opened.value.reason === "CONCURRENCY_LIMIT"
@@ -426,8 +430,9 @@ export function RehearsalLobby({
         interviewers.videoAvailable ? null : (
           <div role="alert" className="flex flex-col items-start gap-2">
             <p>
-              Video interviews aren&apos;t switched on for this account right
-              now. No video room has been started.
+              {interviewers.allowance?.remaining === 0
+                ? `${videoAllowanceUsedUp(interviewers.allowance)} No video room has been started.`
+                : "Video interviews aren’t switched on for this account right now. No video room has been started."}
             </p>
             <Button variant="secondary" onClick={() => setMeetBy("VOICE")}>
               Use voice instead
@@ -463,6 +468,11 @@ export function RehearsalLobby({
                 </label>
               ))}
             </div>
+            {videoAllowanceLine(interviewers.allowance) === null ? null : (
+              <p className="cq-caption text-(--cq-text-tertiary)">
+                {videoAllowanceLine(interviewers.allowance)}
+              </p>
+            )}
             {meetBy !== "VIDEO" ? null : (
               <div className="flex flex-col gap-2">
                 <p className="cq-caption text-(--cq-text-tertiary)">

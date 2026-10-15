@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { VideoAllowanceDtoSchema } from "../common/video-allowance.js";
+
 /**
  * `/v1/gateq/apply` — the public applicant surface (CQ-GATE-002 §42).
  *
@@ -348,6 +350,12 @@ export const GateqVideoStateDtoSchema = z
     /** Whether a video interview may be started now; typing always may. */
     available: z.boolean(),
     session: GateqVideoSessionDtoSchema.nullable(),
+    /**
+     * Video sessions left this week for the person applying, shared with
+     * Rehearsals. Optional so a web release can accept it before an API
+     * sends it; null when the server cannot say.
+     */
+    allowance: VideoAllowanceDtoSchema.nullable().optional(),
   })
   .strict();
 export type GateqVideoStateDto = z.infer<typeof GateqVideoStateDtoSchema>;

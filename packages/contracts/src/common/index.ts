@@ -69,3 +69,8 @@ export {
 export { CountryCodeSchema, type CountryCode } from "./geography.js";
 
 export { NamedPictureSchema, type NamedPicture } from "./named-picture.js";
+
+export {
+  VideoAllowanceDtoSchema,
+  type VideoAllowanceDto,
+} from "./video-allowance.js";

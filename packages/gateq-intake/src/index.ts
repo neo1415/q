@@ -209,6 +209,7 @@ export {
   type GateqVideoSealer,
   type GateqVideoSessionRow,
   type GateqVideoSessionStore,
+  type GateqVideoAllowance,
   type GateqVideoSessionView,
 } from "./video/video-interview.js";
 export { createPostgresGateqVideoSessions } from "./video/postgres-video-sessions.js";
