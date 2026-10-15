@@ -24,9 +24,15 @@ afterEach(() => {
   }
 });
 
-function Thread({ newest }: { readonly newest: string }) {
+function Thread({
+  newest,
+  anchor,
+}: {
+  readonly newest: string;
+  readonly anchor?: "scroller" | "element";
+}) {
   const end = useRef<HTMLDivElement>(null);
-  useFollowNewest(end, newest, false);
+  useFollowNewest(end, newest, false, anchor);
   return (
     <div data-testid="scroller" style={{ overflowY: "auto" }}>
       <div ref={end} />
@@ -52,5 +58,20 @@ describe("useFollowNewest", () => {
     const { container, rerender } = render(<Thread newest="" />);
     rerender(<Thread newest="turn-1" />);
     expect(scroller(container).scrollTop).toBe(900);
+  });
+
+  it("anchored to the element, brings the end element (not the scroller's end) into view", () => {
+    // The Q panel: the exchange ends 300px below the visible bottom, with
+    // the Board below it; the panel scrolls by 300, not to its end.
+    const rect = (bottom: number) => ({ bottom }) as DOMRect;
+    const { container, rerender } = render(
+      <Thread newest="" anchor="element" />,
+    );
+    const box = scroller(container);
+    const end = box.firstElementChild as HTMLElement;
+    box.getBoundingClientRect = () => rect(600);
+    end.getBoundingClientRect = () => rect(900);
+    rerender(<Thread newest="answer-1" anchor="element" />);
+    expect(box.scrollTop).toBe(300);
   });
 });

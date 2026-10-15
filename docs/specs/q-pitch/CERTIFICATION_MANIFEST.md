@@ -179,3 +179,38 @@ Recording of the full 8-scene premiere: `qpitch-review/41b3b4ee/premiere-cert2-4
 - **Re-certification:** `INV-PROFILE-FINDINGS`, `INV-RISKS-FOLLOWUP` and `INV-COMPARE-TABLE` must be re-run on the receipt-bound pilot after deploy (paid Q runs, within the cap) before their fixture field changes from "Ledgerfold"/"F2".
 
 Every other atlas feature currently has no certification entry and must not be presented as live.
+
+## Premiere v5 acceptance — production `f28ab37d` (batch Q), 15 Oct 2026 21:55–22:20 UTC (Lane P)
+
+- **Method:** Playwright (Chromium 1194, 1440×900, recorded video), signed in through the product's own form as `investor.savanna-seed@fictional.capitalq.local`, `?qpitch=premiere`, "Start the tour". **Nothing was blocked**: every request ran as a person's would. The microphone was denied (no WebRTC here), so after about 20 s the live line gave way to Q's standard voice. Receipts are private scratchpad files under `v5-acc/run1..3/` (run log, a screenshot per scene, video), not committed.
+- **Runs:** runs 1 and 2 stopped at scene 3 (the driver idled after the honest fallback; nothing else ran). Run 3 is the full tour: the driver carried on past each fallback from the Tour menu (Chapters → the next scene), as a presenter would.
+- **Run 3:** RUNNING 21 s after Start; 17 scenes in **6:28** (tour complete at 388 s); hand-over: the strip left by itself and Q stayed on `/home`. 2 honest fallbacks, 0 page errors, 0 console errors.
+
+| #   | Scene                                 | Start (s) | Took (s) | Result                                                                                    |
+| --- | ------------------------------------- | --------- | -------- | ----------------------------------------------------------------------------------------- |
+| 1   | Hello, I'm Q                          | 0         | 41       | complete                                                                                  |
+| 2   | Your mandate                          | 43        | 16       | complete                                                                                  |
+| 3   | Discover: pitches                     | 60        | 4        | **FAILED**: `carousel.feed` NEXT never confirmed (fixed, see below)                       |
+| 4   | Save one for later                    | 72        | 8        | complete; `button.feed-save` DONE, Saved list says the company isn't told                 |
+| 5   | Top three                             | 82        | 13       | complete                                                                                  |
+| 6   | Harbourline Cargo, deck and data room | 97        | 33       | complete                                                                                  |
+| 7   | Harbourline vs Clinicrest             | 131       | 45       | complete, **with the live question**                                                      |
+| 8   | GateQ: Maji Loop                      | 177       | 26       | complete; brief and rule fit on screen                                                    |
+| 9   | CRM overview                          | 204       | 12       | complete                                                                                  |
+| 10  | Clinicrest record                     | 217       | 9        | complete; stage on screen, history below the fold                                         |
+| 11  | Preparing a meeting                   | 227       | 11       | complete; Book a call dialog open, nothing booked ("Google Calendar isn't connected")     |
+| 12  | Q Work                                | 240       | 9        | complete                                                                                  |
+| 13  | Documents                             | 250       | 7        | **FAILED**: the By Q filter was applied, but its act was not confirmed (fixed, see below) |
+| 14  | Notifications                         | 266       | 6        | complete                                                                                  |
+| 15  | Q-to-Q rehearsal                      | 274       | 79       | complete; review page `/rehearsals/r/e08621b7…`                                           |
+| 16  | Capital Q's own profile               | 354       | 11       | complete                                                                                  |
+| 17  | Your move (Home)                      | 366       | 20       | complete; tour complete, hand-over                                                        |
+
+- **Live question (interrupt → answer → resume): PASS.** Typed into Q's panel during scene 7 ("What cheque range does my mandate allow?"). The tour showed "Paused for your question"; Q run `524b92cd` completed in 5 s ("cheques from USD 250,000 to USD 1 million, typical USD 600,000"); the tour resumed by itself 3 s later and finished the scene. The panel then listed older cards with "1 more on the Q page", so the new answer was not visible in the panel itself (the spoken answer played).
+- **Narration audio: DEGRADED.** From 190 s, `POST /api/q-speech` returned 429: the standard voice allows 30 lines per person per 10 minutes (`SPEECH_QUOTA`, q-api), and the main cut has 48 lines plus the rehearsal turns. Scenes 8–17 ran on captions only, which is also why they were short. The live voice (GPT-Live) narrates without this quota; with sound, expect the tour at roughly 7–8 minutes. **Not changed here** (a cost cap: lead or owner decision).
+- **Promoted to PRODUCTION_LIVE_VERIFIED** (ledger): `FEED-SAVE`, `MEETING-PREP-VIEW`, `NOTIFICATIONS-VIEW`.
+- **Stay CODE_VERIFIED:** `FEED-VIEW` and `DOCUMENT-OPEN` (failed; fixed, not deployed). `GATEQ-DOSSIER-VIEW` and `CRM-RECORD-VIEW`: the scenes passed, but their claims (interview transcript and dossier; a dated history) sit below the fold and were not on screen in the receipt.
+- **Fixes on `claude/p-premiere-fix-oct16`** (from `origin/build/int-rc`):
+  - The investor feed never published its card in focus to the page manifest, so `carousel.feed` Next or Previous could never be confirmed, for the tour or for Q itself.
+  - The By Q filter act now sets the filter and is DONE once it reads By Q.
+- **Flags:** `/api/company-photo/<id>` still answers 404 for companies without a photo (13 times in run 3; the avatar falls back to initials). The Discover card in focus was Basketari, which is not a fictional-world company; the feed scene names no company.

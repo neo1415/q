@@ -4,6 +4,8 @@ import type {
   ApplicationTranscriptTurnDto,
 } from "@capital-q/contracts";
 
+import { QControl } from "@/features/q/control/q-control";
+
 import { FitGlyph } from "../fit-glyph";
 
 const STATUS = {
@@ -452,34 +454,37 @@ export function SubmittedTranscript({
         </p>
       </section>
     );
+  // Q's EXPAND (premiere v5): the transcript opened and on screen.
   return (
-    <details className="gq-sect group">
-      <summary className="cq-title-sm min-h-11 cursor-pointer py-2">
-        Interview transcript · {turns.length} turns
-      </summary>
-      <p className="cq-caption gq-t2 mb-3">
-        The founder&apos;s interview exactly as submitted. Claims and Q&apos;s
-        questions retain their original wording.
-      </p>
-      <ol
-        className="flex flex-col gap-4"
-        aria-label="Submitted interview transcript"
-      >
-        {turns.map((turn) => (
-          <li
-            key={turn.seq}
-            className="border-l border-(--cq-border-subtle) pl-3"
-          >
-            <p className="cq-caption gq-t2 mb-1">
-              {turn.role === "PERSON" ? "Founder" : "Q"} · Turn {turn.seq} ·{" "}
-              <time dateTime={turn.at}>{dateWords(turn.at)} UTC</time>
-            </p>
-            <p className="cq-body-sm whitespace-pre-wrap break-words">
-              {turn.text}
-            </p>
-          </li>
-        ))}
-      </ol>
-    </details>
+    <QControl id="disclosure.gateq-transcript" kind="DISCLOSURE">
+      <details className="gq-sect group">
+        <summary className="cq-title-sm min-h-11 cursor-pointer py-2">
+          Interview transcript · {turns.length} turns
+        </summary>
+        <p className="cq-caption gq-t2 mb-3">
+          The founder&apos;s interview exactly as submitted. Claims and Q&apos;s
+          questions retain their original wording.
+        </p>
+        <ol
+          className="flex flex-col gap-4"
+          aria-label="Submitted interview transcript"
+        >
+          {turns.map((turn) => (
+            <li
+              key={turn.seq}
+              className="border-l border-(--cq-border-subtle) pl-3"
+            >
+              <p className="cq-caption gq-t2 mb-1">
+                {turn.role === "PERSON" ? "Founder" : "Q"} · Turn {turn.seq} ·{" "}
+                <time dateTime={turn.at}>{dateWords(turn.at)} UTC</time>
+              </p>
+              <p className="cq-body-sm whitespace-pre-wrap break-words">
+                {turn.text}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </details>
+    </QControl>
   );
 }
