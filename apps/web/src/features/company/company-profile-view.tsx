@@ -14,7 +14,7 @@ import { deckAskTerms } from "@capital-q/contracts";
 import { ChevronRight, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { formatLongDay } from "@/components/date-format";
-import { VerifiedBadge } from "@/components/verified-badge";
+import { DemoVerifiedBadge, VerifiedBadge } from "@/components/verified-badge";
 import { capitalTabHref } from "@/features/capital/capital-tabs";
 
 import { ExpressInterest } from "../network/express-interest";
@@ -394,14 +394,19 @@ export function CompanyProfileView({
             {line === "" ? null : (
               <p className="cq-caption text-(--cq-text-secondary)">{line}</p>
             )}
-            <VerifiedBadge
-              status={
-                overview?.organisationVerified === true ? "VERIFIED" : null
-              }
-              className="self-start"
-            >
-              Organisation verified by Capital Q
-            </VerifiedBadge>
+            {overview?.organisationVerified === true &&
+            overview.organisationDemoAttested === true ? (
+              <DemoVerifiedBadge className="self-start" />
+            ) : (
+              <VerifiedBadge
+                status={
+                  overview?.organisationVerified === true ? "VERIFIED" : null
+                }
+                className="self-start"
+              >
+                Organisation verified by Capital Q
+              </VerifiedBadge>
+            )}
           </div>
         </header>
 
@@ -803,7 +808,9 @@ export function CompanyProfileView({
                       ? "Founded date not declared"
                       : `Founded ${foundedYear}`,
                     overview.organisationVerified
-                      ? "Verified by Capital Q"
+                      ? overview.organisationDemoAttested === true
+                        ? "Demo verified (synthetic)"
+                        : "Verified by Capital Q"
                       : "Not verified by Capital Q yet",
                   ].join(" · ")}
                 >
@@ -819,7 +826,9 @@ export function CompanyProfileView({
                       [
                         "Verification",
                         overview.organisationVerified
-                          ? "Organisation verified by Capital Q"
+                          ? overview.organisationDemoAttested === true
+                            ? "Demo verified (synthetic): demo data, not a real verification"
+                            : "Organisation verified by Capital Q"
                           : "Not verified by Capital Q yet",
                       ],
                       ...(overview.websiteUrl === null
