@@ -170,12 +170,13 @@ select is((select count(*)::int from information_schema.columns
 -- Gateway (3), application (8: incl. the interview transcript and the
 -- applicant contact, GateQ slice 1), mandate-reading provenance (P7), the founder
 -- inbox (9: items, messages, notes, labels, item labels, activity, settings,
--- per-user state, pass reasons) and startup alerts.
+-- per-user state, pass reasons) and startup alerts; the native video interview
+-- session (C3, migration 20261226100000) belongs to the application set.
 select is(
   array(select table_name::text from information_schema.tables
          where table_schema = 'gateq' order by 1),
   array['application_contacts', 'application_documents', 'application_facts', 'application_founders',
-        'application_sessions', 'application_submissions', 'application_turns', 'applications',
+        'application_sessions', 'application_submissions', 'application_turns', 'application_video_sessions', 'applications',
         'contact_verification_limits', 'gateway_criteria', 'gateway_versions', 'gateways',
         'inbox_activity', 'inbox_item_labels', 'inbox_items', 'inbox_labels',
         'inbox_messages', 'inbox_notes', 'inbox_settings', 'inbox_user_state',

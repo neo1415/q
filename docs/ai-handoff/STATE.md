@@ -4,11 +4,11 @@
 
 Three releases on 15 October are live and checked against Railway: all four services are on `242460c1`.
 
-| Release | Merged PRs | Migrations applied to hosted |
-| --- | --- | --- |
-| A | #107 → #109 (`04a322ae`) | none |
-| B | #108 → #110 (`c747d651`) | `20261223120000`–`20261223160000`, `20261226200000` |
-| C | #111 → #112 (`242460c1`) | `20261226210000` (hosted 218 = local 218) |
+| Release | Merged PRs               | Migrations applied to hosted                        |
+| ------- | ------------------------ | --------------------------------------------------- |
+| A       | #107 → #109 (`04a322ae`) | none                                                |
+| B       | #108 → #110 (`c747d651`) | `20261223120000`–`20261223160000`, `20261226200000` |
+| C       | #111 → #112 (`242460c1`) | `20261226210000` (hosted 218 = local 218)           |
 
 What each release delivered:
 
