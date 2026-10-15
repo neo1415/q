@@ -4,6 +4,10 @@ import { Menu as BaseMenu } from "@base-ui/react/menu";
 import type { ReactElement, ReactNode } from "react";
 
 import { cx } from "../primitives/class-names.js";
+import {
+  POPUP_LAYER_CLASS,
+  useOverlayLayer,
+} from "../primitives/overlay-layer.js";
 
 /**
  * Dropdown menu on Base UI. Keyboard navigation, typeahead, focus return and
@@ -22,7 +26,7 @@ export function MenuContent({
   children,
   align = "start",
   className,
-  layer = "page",
+  layer,
 }: {
   readonly children: ReactNode;
   readonly align?: "start" | "center" | "end" | undefined;
@@ -30,17 +34,17 @@ export function MenuContent({
   /**
    * `modal` for a menu opened from inside a dialog: the menu is portalled
    * to the body, so on the page layer it would open behind the dialog.
+   * Unset: whatever the nearest sheet or dialog says (page outside one).
    */
   readonly layer?: "page" | "modal" | undefined;
 }) {
+  const inherited = useOverlayLayer();
   return (
     <BaseMenu.Portal>
       <BaseMenu.Positioner
         align={align}
         sideOffset={6}
-        className={
-          layer === "modal" ? "z-(--cq-z-modal-popover)" : "z-(--cq-z-popover)"
-        }
+        className={POPUP_LAYER_CLASS[layer ?? inherited]}
       >
         <BaseMenu.Popup
           className={cx(

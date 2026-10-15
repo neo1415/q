@@ -156,13 +156,16 @@ export function ArtifactDownloads({
   artifactId,
   formats,
   version,
-  layer = "page",
+  layer,
 }: {
   readonly artifactId: string;
   readonly formats: readonly QArtifactExportFormat[];
   /** The version on screen; null for whatever is current. */
   readonly version: number | null;
-  /** `modal` inside the viewer, so the menu opens above it. */
+  /**
+   * Unset: the nearest sheet or dialog decides (the Q sheet's card opens
+   * its menu above the sheet), the page layer outside one.
+   */
   readonly layer?: "page" | "modal" | undefined;
 }) {
   const [busy, setBusy] = useState<QArtifactExportFormat | null>(null);

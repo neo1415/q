@@ -152,6 +152,14 @@ function memoryTeamStore(db: MemoryTeamDb): TeamStore<MemoryTeamDb> {
       ),
     invitationByTokenHash: (_tx, hash) =>
       Promise.resolve(db.invitations.find((i) => i.tokenHash === hash) ?? null),
+    invitationById: (_tx, id) =>
+      Promise.resolve(db.invitations.find((i) => i.id === id) ?? null),
+    pendingInvitationsForEmail: (_tx, email) =>
+      Promise.resolve(
+        db.invitations.filter(
+          (i) => i.email === email && i.status === "pending",
+        ),
+      ),
     insertInvitation: (_tx, input) => {
       if (
         db.invitations.some(

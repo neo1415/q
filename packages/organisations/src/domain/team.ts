@@ -233,15 +233,16 @@ export function hashInvitationToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
-export type InvitationStatus = "pending" | "accepted" | "revoked";
+export type InvitationStatus = "pending" | "accepted" | "revoked" | "declined";
 
 export function invitationState(
   status: InvitationStatus,
   expiresAt: Date,
   now: Date,
-): "PENDING" | "EXPIRED" | "ACCEPTED" | "REVOKED" {
+): "PENDING" | "EXPIRED" | "ACCEPTED" | "REVOKED" | "DECLINED" {
   if (status === "accepted") return "ACCEPTED";
   if (status === "revoked") return "REVOKED";
+  if (status === "declined") return "DECLINED";
   return expiresAt.getTime() <= now.getTime() ? "EXPIRED" : "PENDING";
 }
 

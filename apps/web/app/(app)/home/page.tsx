@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { HomeScreen } from "@/features/home/home-screen";
+import { PendingInvitations } from "@/features/team/pending-invitations";
 import { onboardingPath, resolveOnboardingState } from "@/features/q/context";
 
 export const metadata: Metadata = { title: "Home" };
@@ -44,10 +45,14 @@ export default async function HomePage({
   const raw = params["c"];
   const conversationId = typeof raw === "string" && raw.length > 0 ? raw : null;
   return (
-    <HomeScreen
-      conversationId={conversationId}
-      fresh={params["new"] === "1"}
-      openBoard={params["board"] === "1"}
-    />
+    <>
+      {/* F2: an invitation to their verified email, where they land. */}
+      <PendingInvitations />
+      <HomeScreen
+        conversationId={conversationId}
+        fresh={params["new"] === "1"}
+        openBoard={params["board"] === "1"}
+      />
+    </>
   );
 }

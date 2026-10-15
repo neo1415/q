@@ -12,7 +12,9 @@ import {
   JOIN_REQUESTS_PATH,
   JoinRequestDecisionRequestSchema,
   JoinRequestResultDtoSchema,
+  DeclineInvitationResultDtoSchema,
   LeaveResultDtoSchema,
+  MY_INVITATION_DECLINE_PATH,
   OwnershipOfferRequestSchema,
   OwnershipOfferResponseRequestSchema,
   RemoveMemberRequestSchema,
@@ -74,6 +76,8 @@ export type TeamPort = Pick<
   | "respondToOwnershipOffer"
   | "decideJoinRequest"
   | "acceptInvitation"
+  | "acceptInvitationById"
+  | "declineInvitation"
   | "requestToJoin"
 >;
 
@@ -638,12 +642,20 @@ const ACCEPT = definePersonAction<
   does: "Joins the company or firm an invitation is for, signed in as the invited email.",
   input: Accept,
   output: result(),
+  // By the emailed link, or by id from the invitee's own list; the service
+  // accepts either only for the invitation's verified email.
   run: (ports, context, input) =>
-    team(ports).acceptInvitation(
-      context.person.userId,
-      input.input.token,
-      context.correlationId,
-    ),
+    "token" in input.input
+      ? team(ports).acceptInvitation(
+          context.person.userId,
+          input.input.token,
+          context.correlationId,
+        )
+      : team(ports).acceptInvitationById(
+          context.person.userId,
+          input.input.invitationId,
+          context.correlationId,
+        ),
   http: {
     method: "POST",
     path: INVITATION_ACCEPT_PATH,
@@ -687,7 +699,41 @@ const JOIN = definePersonAction<
   qCapability: "offer.team_join",
 });
 
-export const TEAM_PERSON_ACTIONS: readonly AnyPersonAction[] = [ACCEPT, JOIN];
+const Decline = z.object({ invitationId: UuidSchema }).strict();
+
+const DECLINE = definePersonAction<
+  z.infer<typeof Decline>,
+  TeamOutcome<{ readonly declined: true }>
+>({
+  name: "team.invitation.decline",
+  short: "decline a team invitation",
+  area: "team",
+  classification: "CONSEQUENTIAL",
+  does: "Declines an invitation sent to the signed-in person's verified email.",
+  input: Decline,
+  output: result(),
+  run: (ports, context, input) =>
+    team(ports).declineInvitation(
+      context.person.userId,
+      input.invitationId,
+      context.correlationId,
+    ),
+  http: {
+    method: "POST",
+    path: MY_INVITATION_DECLINE_PATH,
+    fromRequest: (params) => ({ invitationId: params["invitationId"] }),
+    ...teamHttp((value: { readonly declined: true }) =>
+      DeclineInvitationResultDtoSchema.parse(value),
+    ),
+  },
+  qCapability: "offer.team_join",
+});
+
+export const TEAM_PERSON_ACTIONS: readonly AnyPersonAction[] = [
+  ACCEPT,
+  DECLINE,
+  JOIN,
+];
 
 // --- read_my("team") -------------------------------------------------------
 

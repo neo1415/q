@@ -19,7 +19,7 @@ import {
 
 import { defineAppAction, portMissing } from "../define.js";
 import type { AppActionPorts } from "../ports.js";
-import { INSTRUMENT_WORDS, moneyText } from "./commitments.js";
+import { instrumentWords, moneyText } from "./commitments.js";
 
 /**
  * Round lifecycle and corrections (plan P8, 2026-10-06): record a close, a
@@ -69,7 +69,7 @@ export function revisionPreview(input: ReviseCapitalRoundRequest): string {
     );
   }
   if (input.instrument !== undefined) {
-    parts.push(INSTRUMENT_WORDS[input.instrument]);
+    parts.push(instrumentWords(input.instrument));
   }
   if (input.openedOn !== undefined) parts.push(`opened ${input.openedOn}`);
   for (const [field, value] of Object.entries(input.terms ?? {})) {

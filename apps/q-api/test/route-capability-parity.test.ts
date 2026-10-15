@@ -608,6 +608,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/team.ts GET MY_ORGANISATIONS_PATH": exempt(
     "the switcher's own list of the person's companies and firms; switching is the existing activate route, and Q reads the team itself with read_my(team)",
   ),
+  "api/http/team.ts GET MY_INVITATIONS_PATH": exempt(
+    "the invitee's own pending invitations, shown where they land with Accept and Decline (the team.invitation.* actions); Q offers joining, never takes it",
+  ),
   "api/http/team.ts GET INVITATION_PREVIEW_PATH": PUBLIC,
 
   "api/http/q-cards.ts GET cardPath": cap("tool.get_q_card"),
