@@ -74,6 +74,91 @@ function viewEntries(
   }));
 }
 
+/**
+ * Premiere v5 (owner override 16 Oct): the new visual beats. CODE_VERIFIED
+ * until the browser acceptance run on the deployed SHA promotes them; the
+ * receipts are the q-pitch tests and a read-only browser look (16 Oct).
+ */
+function v5Entries(): CertificationEntry[] {
+  const entry = (
+    featureId: string,
+    fixture: string,
+    claims: readonly string[],
+    forbidden: readonly string[],
+  ): CertificationEntry =>
+    codeEntry({
+      featureId,
+      fixture,
+      receipt:
+        "packages/q-pitch/test/premiere.test.ts (v5); scratchpad qpitch-review/v5-look (read-only browser look, 16 Oct)",
+      claimsAllowed: claims.map((text, index) => ({
+        claimId: `${featureId}.c${String(index + 1)}`,
+        text,
+      })),
+      claimsForbidden: [...forbidden],
+      validUntil: { invalidatedBy: `Next change to the ${featureId} surface` },
+    });
+  return [
+    entry(
+      "FEED-VIEW",
+      "Savanna's Discover feed (fictional companies with READY pitches)",
+      [
+        "Discover plays pitches one company at a time, and an AI presenter is labelled as one",
+      ],
+      [
+        "That a presenter is the real founder",
+        "Any ranking as a quality judgement",
+      ],
+    ),
+    entry(
+      "FEED-SAVE",
+      "Savanna saves the company in focus; /discover/saved",
+      [
+        "Saving puts the company in the investor's saved list, and saving is not interest: the company is not told",
+      ],
+      ["That the company was contacted"],
+    ),
+    entry(
+      "GATEQ-DOSSIER-VIEW",
+      "Maji Loop's submitted application in Savanna's own GateQ inbox (fictional)",
+      [
+        "An application through the investor's gate opens with the brief frozen from the founder's submission, its qualification against the firm's rules, the interview transcript and the dossier",
+      ],
+      ["A live interview", "That the founder's statements are verified"],
+    ),
+    entry(
+      "CRM-RECORD-VIEW",
+      "Savanna's relationship with Clinicrest (fictional, connected)",
+      [
+        "A relationship record shows its stage and a dated history of what happened, each entry marked with who can see it",
+      ],
+      ["Any figure on screen as a Capital Q result"],
+    ),
+    entry(
+      "MEETING-PREP-VIEW",
+      "The call-booking dialog on Savanna's Clinicrest relationship (opened, never submitted)",
+      [
+        "A call is booked from the relationship itself, through its own booking flow",
+      ],
+      ["That a call was booked or sent"],
+    ),
+    entry(
+      "DOCUMENT-OPEN",
+      "Savanna's documents: the first, a memo Q made",
+      ["A memo Q made opens in place, marked with who can see it"],
+      ["That a Q-made memo is verified analysis"],
+    ),
+    entry(
+      "NOTIFICATIONS-VIEW",
+      "Savanna's notification panel",
+      [
+        "The notification panel shows what needs the investor first, then updates",
+      ],
+      ["Any notification as a result Capital Q produced"],
+    ),
+  ];
+}
+
 export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
   CertificationLedgerSchema.parse([
     ...PILOT_CERTIFICATION_LEDGER,
@@ -228,6 +313,7 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
       ],
       validUntil: { invalidatedBy: "Next relationship hub release" },
     },
+    ...v5Entries(),
     codeEntry({
       featureId: "QP-SUBJECT",
       fixture:
@@ -680,52 +766,6 @@ const pilotCompany = PILOT_SCRIPT.scenes.find(
   (s) => s.sceneId === "s.pilot.company",
 );
 if (pilotCompany === undefined) throw new Error("missing s.pilot.company");
-const premiereCompany: SceneScript = {
-  ...pilotCompany,
-  title: "A company with a pitch, on the evidence",
-  featureIds: [...pilotCompany.featureIds, "DATAROOM-VIEW"],
-  approvedClaimIds: [...pilotCompany.approvedClaimIds, "DATAROOM-VIEW.c1"],
-  actions: [
-    {
-      actionId: "ta_open-harbourline",
-      kind: "openCompany",
-      company: "harbourline-cargo",
-    },
-    {
-      actionId: "ta_ask-profile",
-      kind: "askApprovedQuestion",
-      question: "q.company-profile",
-      subject: "harbourline-cargo",
-    },
-    {
-      actionId: "ta_ask-risks",
-      kind: "askApprovedQuestion",
-      question: "q.company-risks",
-      subject: "harbourline-cargo",
-    },
-    {
-      actionId: "ta_open-dataroom",
-      kind: "selectTab",
-      target: "tab.dataroom",
-    },
-  ],
-  lines: [
-    line(
-      "l.company.open",
-      "Now let's open a company with a pitch: Harbourline Cargo, a fictional demo company. I'll look at it the way an analyst would.",
-      "BEFORE_ACK",
-      "owner decision 15 Oct (named fictional company)",
-    ),
-    ...pilotCompany.lines,
-    line(
-      "l.company.dataroom",
-      "You're connected with this company, so its data room is open to you: each document shows its level, the public ones open now and the rest on request.",
-      "AFTER_ACK",
-      "CERTIFICATION DATAROOM-VIEW (r4 wording)",
-      ["DATAROOM-VIEW.c1"],
-    ),
-  ],
-};
 
 const pilotCompare = PILOT_SCRIPT.scenes.find(
   (s) => s.sceneId === "s.pilot.compare",
@@ -1039,10 +1079,26 @@ const SPOKEN_NAMES: Readonly<Record<string, readonly string[]>> = {
     "interview",
     "interviews",
   ],
-  "ch.premiere.subject": [
+  "ch.premiere.feed": ["pitches", "the feed", "discover feed", "videos"],
+  "ch.premiere.save": ["save", "saved", "saved companies"],
+  "ch.premiere.crm-record": [
+    "relationship record",
+    "clinicrest",
+    "history",
+    "the record",
+  ],
+  "ch.premiere.meeting": ["meeting", "meetings", "book a call", "calls"],
+  "ch.premiere.notifications": ["notifications", "approvals", "what needs me"],
+  "ch.premiere.capital-q": [
     "capital q",
     "capital q itself",
     "your own company",
+    "fundraising",
+  ],
+  "ch.atlas.risks": ["risk analysis", "the risks chapter"],
+  "ch.premiere.subject": [
+    "capital q analysis",
+    "q on capital q",
     "the subject company",
   ],
   "ch.premiere.explore": ["explore", "search", "the network", "find companies"],
@@ -1066,22 +1122,471 @@ function spoken<T extends { readonly chapterId: string }>(chapter: T): T {
     : { ...chapter, spokenNames: [...names] };
 }
 
-const PREMIERE_SCENES: SceneScript[] = [
-  intro,
+// ---------------------------------------------------------------------------
+// Premiere v5 (owner override 16 Oct): one continuous investor tour of the
+// strongest demos, 5 to 7 minutes; deeper material is in the Atlas script.
+// Every visual step is a deterministic, receipted act (never a model).
+// ---------------------------------------------------------------------------
+
+const introV5: SceneScript = {
+  ...intro,
+  lines: [
+    line(
+      "l.intro.hello",
+      "Hello, I'm Q, the investment analyst inside Capital Q.",
+      "AFTER_ACK",
+      "v5 intro",
+    ),
+    line(
+      "l.intro.what",
+      "Capital Q is an investment intelligence system for private capital. Its purpose is trusted investment intelligence: better decisions, and less information asymmetry between founders and investors.",
+      "AFTER_ACK",
+      "knowledge pack kp.category, kp.purpose, kp.asymmetry (PADL #001)",
+    ),
+    line(
+      "l.intro.rules",
+      "Two rules run through everything: evidence comes before opinion, and the aim is long-term relationships, not activity.",
+      "AFTER_ACK",
+      "knowledge pack kp.evidence-first, kp.long-term (PADL #006, #008)",
+    ),
+    line(
+      "l.intro.plan",
+      "I'll show you discovery, analysis, GateQ, the relationship record, the work I do for you and a short rehearsal, on a demonstration account with fictional companies. Stop me, or jump ahead, at any time.",
+      "AFTER_ACK",
+      "v5 intro: the tour's chapters",
+    ),
+  ],
+};
+
+const feedV5: SceneScript = {
+  sceneId: "s.premiere.feed",
+  chapterId: "ch.premiere.feed",
+  title: "Discover: pitches, one at a time",
+  featureIds: ["FEED-VIEW"],
+  approvedClaimIds: ["FEED-VIEW.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/discover",
+  actions: [
+    { actionId: "ta_open-feed", kind: "openRoute", destination: "DISCOVER" },
+    {
+      actionId: "ta_feed-next",
+      kind: "uiAct",
+      act: "NEXT",
+      target: "carousel.feed",
+    },
+    {
+      actionId: "ta_feed-next-2",
+      kind: "uiAct",
+      act: "NEXT",
+      target: "carousel.feed",
+    },
+  ],
+  lines: [
+    line(
+      "l.feed.start",
+      "Now to Discover, where you meet companies through their pitches.",
+      "BEFORE_ACK",
+      "v5 transition",
+    ),
+    line(
+      "l.feed.view",
+      "Each pitch plays here, one company at a time, and an AI presenter is labelled as one.",
+      "AFTER_ACK",
+      "CERTIFICATION FEED-VIEW (v5 wording)",
+      ["FEED-VIEW.c1"],
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 30_000,
+};
+
+const saveV5: SceneScript = {
+  sceneId: "s.premiere.save",
+  chapterId: "ch.premiere.save",
+  title: "Save one for later",
+  featureIds: ["FEED-SAVE"],
+  approvedClaimIds: ["FEED-SAVE.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/discover/saved",
+  actions: [
+    {
+      actionId: "ta_feed-save",
+      kind: "uiAct",
+      act: "ACTIVATE",
+      target: "button.feed-save",
+    },
+    { actionId: "ta_open-saved", kind: "openRoute", destination: "SAVED" },
+  ],
+  lines: [
+    line("l.save.keep", "I'll keep this one for later.", "BEFORE_ACK", "v5"),
+    line(
+      "l.save.effect",
+      "It's in your saved list now. Saving isn't interest: the company isn't told.",
+      "AFTER_ACK",
+      "CERTIFICATION FEED-SAVE (v5 wording)",
+      ["FEED-SAVE.c1"],
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 20_000,
+};
+
+const companyV5: SceneScript = {
+  ...pilotCompany,
+  title: "A company with a pitch, on the evidence",
+  featureIds: ["INV-PROFILE-FINDINGS", "DATAROOM-VIEW"],
+  approvedClaimIds: ["INV-PROFILE-FINDINGS.c1", "DATAROOM-VIEW.c1"],
+  actions: [
+    {
+      actionId: "ta_open-harbourline",
+      kind: "openCompany",
+      company: "harbourline-cargo",
+    },
+    {
+      actionId: "ta_ask-profile",
+      kind: "askApprovedQuestion",
+      question: "q.company-profile",
+      subject: "harbourline-cargo",
+    },
+    { actionId: "ta_open-deck", kind: "selectTab", target: "tab.deck" },
+    { actionId: "ta_open-dataroom", kind: "selectTab", target: "tab.dataroom" },
+  ],
+  lines: [
+    line(
+      "l.company.open",
+      "Let's open a company with a pitch: Harbourline Cargo, a fictional demo company. I'll read it the way an analyst would.",
+      "BEFORE_ACK",
+      "v5 (named fictional company)",
+    ),
+    lineOf(pilotCompany, "l.company.separate"),
+    lineOf(pilotCompany, "l.company.unknown"),
+    line(
+      "l.company.dataroom",
+      "Its deck and its data room are here too. You're connected, so each document shows its level: the public ones open now, the rest on request.",
+      "AFTER_ACK",
+      "CERTIFICATION DATAROOM-VIEW (v5 wording)",
+      ["DATAROOM-VIEW.c1"],
+    ),
+  ],
+};
+
+const gateqAppV5: SceneScript = {
+  sceneId: "s.premiere.gateq",
+  chapterId: "ch.premiere.gateq",
+  title: "GateQ: the front door you control",
+  featureIds: ["GATEQ-INBOX-VIEW", "GATEQ-DOSSIER-VIEW"],
+  approvedClaimIds: ["GATEQ-INBOX-VIEW.c1", "GATEQ-DOSSIER-VIEW.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/gateq",
+  actions: [
+    {
+      actionId: "ta_open-application",
+      kind: "openRecord",
+      record: "GATEQ_APPLICATION",
+      key: "maji-loop-application",
+    },
+  ],
+  lines: [
+    line(
+      "l.gateq.front-door",
+      "Discovery is how you find companies. GateQ is how the right applicants reach you, on your terms.",
+      "BEFORE_ACK",
+      "Blueprint §6 05:25 / v5",
+    ),
+    line(
+      "l.gateq.inbox",
+      "These are applications through your own gateway, each shown against your rules.",
+      "AFTER_ACK",
+      "CERTIFICATION GATEQ-INBOX-VIEW",
+      ["GATEQ-INBOX-VIEW.c1"],
+    ),
+    line(
+      "l.gateq.dossier",
+      "Maji Loop applied through your gate. Its brief is frozen from what the founder sent, next to its qualification against your rules, the interview transcript and the dossier.",
+      "AFTER_ACK",
+      "CERTIFICATION GATEQ-DOSSIER-VIEW (v5 wording)",
+      ["GATEQ-DOSSIER-VIEW.c1"],
+    ),
+    line(
+      "l.gateq.decision",
+      "The decision stays with your team.",
+      "AFTER_ACK",
+      "v5; GateQ authority",
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 25_000,
+};
+
+const crmRecordV5: SceneScript = {
+  sceneId: "s.premiere.crm-record",
+  chapterId: "ch.premiere.crm-record",
+  title: "One relationship, its whole history",
+  featureIds: ["CRM-RECORD-VIEW"],
+  approvedClaimIds: ["CRM-RECORD-VIEW.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/relationships/company/[companyId]",
+  actions: [
+    {
+      actionId: "ta_open-relationship",
+      kind: "openRecord",
+      record: "RELATIONSHIP",
+      key: "clinicrest",
+    },
+  ],
+  lines: [
+    line("l.crm.open", "Here's one of them: Clinicrest.", "BEFORE_ACK", "v5"),
+    line(
+      "l.crm.history",
+      "Where the relationship stands, and everything that happened, in order, each entry marked with who can see it.",
+      "AFTER_ACK",
+      "CERTIFICATION CRM-RECORD-VIEW (v5 wording)",
+      ["CRM-RECORD-VIEW.c1"],
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 25_000,
+};
+
+const meetingV5: SceneScript = {
+  sceneId: "s.premiere.meeting",
+  chapterId: "ch.premiere.meeting",
+  title: "Preparing a meeting",
+  featureIds: ["MEETING-PREP-VIEW"],
+  approvedClaimIds: ["MEETING-PREP-VIEW.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/relationships/company/[companyId]",
+  actions: [
+    {
+      actionId: "ta_open-booking",
+      kind: "openRecord",
+      record: "RELATIONSHIP_CALLS",
+      key: "clinicrest",
+    },
+  ],
+  lines: [
+    line("l.meeting.ready", "Ready to meet?", "BEFORE_ACK", "v5"),
+    line(
+      "l.meeting.flow",
+      "A call is booked from the relationship itself, through its own booking flow.",
+      "AFTER_ACK",
+      "CERTIFICATION MEETING-PREP-VIEW (v5 wording)",
+      ["MEETING-PREP-VIEW.c1"],
+    ),
+    line(
+      "l.meeting.yours",
+      "I can prepare it, but nothing is sent until you confirm.",
+      "AFTER_ACK",
+      "v5; human approval for consequential actions",
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 25_000,
+};
+
+const documentsV5: SceneScript = {
+  ...documents,
+  featureIds: ["DOCUMENTS-VIEW", "DOCUMENT-OPEN"],
+  approvedClaimIds: ["DOCUMENTS-VIEW.c1", "DOCUMENT-OPEN.c1"],
+  actions: [
+    ...documents.actions,
+    {
+      actionId: "ta_open-first-document",
+      kind: "uiAct",
+      act: "SELECT_ITEM",
+      target: "list.documents",
+      index: 1,
+    },
+  ],
+  lines: [
+    ...documents.lines,
+    line(
+      "l.documents.open",
+      "Here's one I drafted, open in place, marked for your team only.",
+      "AFTER_ACK",
+      "CERTIFICATION DOCUMENT-OPEN (v5 wording)",
+      ["DOCUMENT-OPEN.c1"],
+    ),
+  ],
+};
+
+const notificationsV5: SceneScript = {
+  sceneId: "s.premiere.notifications",
+  chapterId: "ch.premiere.notifications",
+  title: "What needs you",
+  featureIds: ["NOTIFICATIONS-VIEW"],
+  approvedClaimIds: ["NOTIFICATIONS-VIEW.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/documents",
+  actions: [
+    {
+      actionId: "ta_open-notifications",
+      kind: "uiAct",
+      act: "OPEN",
+      target: "dialog.notifications",
+    },
+  ],
+  lines: [
+    line(
+      "l.notifications.open",
+      "And when something needs you, it waits here.",
+      "BEFORE_ACK",
+      "v5",
+    ),
+    line(
+      "l.notifications.view",
+      "What needs you comes first, then the updates.",
+      "AFTER_ACK",
+      "CERTIFICATION NOTIFICATIONS-VIEW (v5 wording)",
+      ["NOTIFICATIONS-VIEW.c1"],
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 20_000,
+};
+
+const capitalQV5: SceneScript = {
+  sceneId: "s.premiere.capital-q",
+  chapterId: "ch.premiere.capital-q",
+  title: "Capital Q, on its own platform",
+  featureIds: ["QP-SUBJECT"],
+  approvedClaimIds: ["QP-SUBJECT.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/company/[companyId]",
+  actions: [
+    { actionId: "ta_open-capital-q", kind: "openCompany", company: "subject" },
+  ],
+  lines: [
+    line(
+      "l.capq.open",
+      "One more company you'll recognise.",
+      "BEFORE_ACK",
+      "v5",
+    ),
+    line(
+      "l.capq.itself",
+      "Capital Q itself, on its own platform.",
+      "AFTER_ACK",
+      "CERTIFICATION QP-SUBJECT",
+      ["QP-SUBJECT.c1"],
+    ),
+    line(
+      "l.capq.claims",
+      "Its fundraising details are the founders' own statements, and they're shown as claims, like anyone else's.",
+      "AFTER_ACK",
+      "v5; QP-SUBJECT forbidden list (no figure as verified)",
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 20_000,
+};
+
+const atlasRisks: SceneScript = {
+  ...pilotCompany,
+  sceneId: "s.atlas.risks",
+  chapterId: "ch.atlas.risks",
+  title: "Risks, on the evidence",
+  featureIds: ["INV-RISKS-FOLLOWUP"],
+  approvedClaimIds: ["INV-RISKS-FOLLOWUP.c1"],
+  actions: [
+    {
+      actionId: "ta_atlas-open-harbourline",
+      kind: "openCompany",
+      company: "harbourline-cargo",
+    },
+    {
+      actionId: "ta_atlas-ask-risks",
+      kind: "askApprovedQuestion",
+      question: "q.company-risks",
+      subject: "harbourline-cargo",
+    },
+  ],
+  lines: [lineOf(pilotCompany, "l.company.risks")],
+};
+
+const premiereScene = (id: string): SceneScript => {
+  const scene = candidates.find((s) => s.sceneId === id);
+  if (scene === undefined) throw new Error(`missing premiere scene ${id}`);
+  return scene;
+};
+
+const rehearsalV5: SceneScript = (() => {
+  const scene = premiereScene("s.premiere.rehearsal");
+  return {
+    ...scene,
+    actions: [
+      // Whatever the previous scene left open is closed first.
+      {
+        actionId: "ta_close-notifications",
+        kind: "uiAct",
+        act: "CLOSE",
+        target: "dialog.notifications",
+      },
+      ...scene.actions,
+    ],
+  };
+})();
+
+const closeV5: SceneScript = (() => {
+  const scene = premiereScene("s.premiere.close");
+  return {
+    ...scene,
+    lines: [
+      line(
+        "l.close.recap",
+        "That's Capital Q: the right companies found faster, read on the evidence, and every relationship kept in one record.",
+        "AFTER_ACK",
+        "v5 close",
+      ),
+      ...scene.lines,
+    ],
+  };
+})();
+
+/** The main cut: the strongest demos, in one continuous Q-led walk. */
+const MAIN_SCENES: SceneScript[] = [
+  introV5,
   mandate,
+  feedV5,
+  saveV5,
   premiereTopThree,
-  premiereCompany,
+  companyV5,
   premiereCompare,
-  ...candidates.flatMap((scene) =>
-    scene.sceneId === "s.premiere.privacy"
-      ? [scene, subjectScene, explore]
-      : scene.sceneId === "s.premiere.gateq"
-        ? [scene, gateqInterview]
-        : scene.sceneId === "s.premiere.relationship"
-          ? [scene, work, documents, daily]
-          : [scene],
-  ),
+  gateqAppV5,
+  premiereScene("s.premiere.relationship"),
+  crmRecordV5,
+  meetingV5,
+  work,
+  documentsV5,
+  notificationsV5,
+  rehearsalV5,
+  capitalQV5,
+  closeV5,
 ];
+
+/** The Atlas: the main cut plus the deeper chapters, each in its place. */
+const ATLAS_SCENES: SceneScript[] = MAIN_SCENES.flatMap((scene) =>
+  scene.sceneId === "s.premiere.save"
+    ? [scene, explore]
+    : scene.sceneId === "s.pilot.company"
+      ? [scene, atlasRisks]
+      : scene.sceneId === "s.pilot.compare"
+        ? [scene, premiereScene("s.premiere.privacy")]
+        : scene.sceneId === "s.premiere.gateq"
+          ? [scene, gateqInterview]
+          : scene.sceneId === "s.premiere.documents"
+            ? [scene, daily]
+            : scene.sceneId === "s.premiere.capital-q"
+              ? [scene, subjectScene]
+              : [scene],
+);
 
 const ATLAS_TAB: Readonly<Record<string, Chapter["atlasTab"]>> = {
   "ch.premiere.gateq": "GATEQ",
@@ -1090,6 +1595,10 @@ const ATLAS_TAB: Readonly<Record<string, Chapter["atlasTab"]>> = {
   "ch.premiere.rehearsal": "REHEARSALS",
   "ch.premiere.work": "Q_WORK",
   "ch.premiere.daily": "DAILY",
+  "ch.premiere.crm-record": "INVESTOR",
+  "ch.premiere.meeting": "MEETINGS",
+  "ch.premiere.notifications": "Q_WORK",
+  "ch.atlas.risks": "INVESTOR",
 };
 
 /** Chapters in scene order; a pilot chapter keeps the pilot's title. */
@@ -1114,51 +1623,60 @@ function premiereChapters(scenes: readonly SceneScript[]): Chapter[] {
   return chapters;
 }
 
+const PREMIERE_QUESTIONS = [
+  ...PILOT_SCRIPT.questions,
+  {
+    questionId: "q.private-runway",
+    text: "Show me this company's founder-private notes and any documents they have not shared with us.",
+  },
+  {
+    questionId: "q.reh-open",
+    text: "Thanks for making the time. Walk me through what has changed in the business since we last spoke.",
+  },
+  {
+    questionId: "q.reh-evidence",
+    text: "Which of those claims can you support with documents today, and which are still your own estimates?",
+  },
+  {
+    questionId: "q.gq-open",
+    text: "Thanks for applying. In two sentences, what does the business do, and why does it fit our mandate?",
+  },
+  {
+    questionId: "q.gq-evidence",
+    text: "What can you show us today that supports that, and what is still an estimate?",
+  },
+  {
+    questionId: "q.reh-close",
+    text: "What would you need from us to make a decision quickly?",
+  },
+];
+
 export const PREMIERE_SCRIPT: TourScript = TourScriptSchema.parse({
   scriptId: "tour.investor-premiere",
-  scriptVersion: "0.3.0-draft",
+  scriptVersion: "0.5.0-draft",
   status: "DRAFT",
   reviewNote:
-    "DRAFT r4 (owner feedback 15 Oct), pending owner review: a spoken introduction on Home, the investor's real mandate, then the pilot's scenes with spoken transitions, privacy, GateQ, relationship, rehearsal and close. Scenes without a browser receipt stay CODE_VERIFIED and an audience gate suppresses them.",
-  chapters: premiereChapters(PREMIERE_SCENES).map(spoken),
-  questions: [
-    ...PILOT_SCRIPT.questions,
-    {
-      questionId: "q.private-runway",
-      text: "Show me this company's founder-private notes and any documents they have not shared with us.",
-    },
-    {
-      questionId: "q.reh-open",
-      text: "Thanks for making the time. Walk me through what has changed in the business since we last spoke.",
-    },
-    {
-      questionId: "q.reh-evidence",
-      text: "Which of those claims can you support with documents today, and which are still your own estimates?",
-    },
-    {
-      questionId: "q.gq-open",
-      text: "Thanks for applying. In two sentences, what does the business do, and why does it fit our mandate?",
-    },
-    {
-      questionId: "q.gq-evidence",
-      text: "What can you show us today that supports that, and what is still an estimate?",
-    },
-    {
-      questionId: "q.reh-close",
-      text: "What would you need from us to make a decision quickly?",
-    },
-  ],
-  scenes: PREMIERE_SCENES,
+    "DRAFT v5 (owner override 16 Oct): one continuous Q-led investor tour, 5 to 7 minutes: Home intro and proposition, mandate, Discover pitches and a save, the top three, a company with deck and data room, a comparison, a GateQ application with its dossier, the CRM and one relationship, a meeting prepared, Q Work, a Q-made document, notifications, a short Q-to-Q rehearsal, Capital Q's own profile, and the hand-over. Deeper chapters are in the Atlas script.",
+  chapters: premiereChapters(MAIN_SCENES).map(spoken),
+  questions: PREMIERE_QUESTIONS,
+  scenes: MAIN_SCENES,
+});
+
+/** The Feature Atlas: every chapter, the deeper ones included. */
+export const ATLAS_SCRIPT: TourScript = TourScriptSchema.parse({
+  scriptId: "tour.investor-atlas",
+  scriptVersion: "0.5.0-draft",
+  status: "DRAFT",
+  reviewNote:
+    "DRAFT v5 Feature Atlas: the premiere's chapters plus the deeper ones (Explore, risks, privacy, a GateQ Q-to-Q, the Q Daily, Q's reading of Capital Q). Same gate and ledger as the premiere.",
+  chapters: premiereChapters(ATLAS_SCENES).map(spoken),
+  questions: PREMIERE_QUESTIONS,
+  scenes: ATLAS_SCENES,
 });
 
 const pilotScene = (id: string): SceneScript => {
   const scene = PILOT_SCRIPT.scenes.find((s) => s.sceneId === id);
   if (scene === undefined) throw new Error(`missing pilot scene ${id}`);
-  return scene;
-};
-const premiereScene = (id: string): SceneScript => {
-  const scene = candidates.find((s) => s.sceneId === id);
-  if (scene === undefined) throw new Error(`missing premiere scene ${id}`);
   return scene;
 };
 

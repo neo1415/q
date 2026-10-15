@@ -63,6 +63,8 @@ function subscribeSplash(onChange: () => void): () => void {
   return () => window.removeEventListener(SPLASH_DONE_EVENT, onChange);
 }
 import { useReducedMotionPreference } from "./player/use-pitch-playback";
+import { useQControl } from "@/features/q/control/q-control";
+import { effectShown } from "@/features/q/control/perform";
 
 /**
  * Discover, for an investor (CQ-WEB-022).
@@ -350,6 +352,34 @@ function InvestorFeed({
     window.addEventListener(Q_FEED_EVENT, onQ);
     return () => window.removeEventListener(Q_FEED_EVENT, onQ);
   }, [next, previous, feed, cardForQ]);
+
+  // Q Pitch (premiere v5): "save this one" as a deterministic, receipted
+  // act. Save is optimistic and non-consequential; DONE only once the
+  // company in focus shows as saved.
+  const latestFeed = useRef(feed);
+  useEffect(() => {
+    latestFeed.current = feed;
+  });
+  useQControl({
+    id: "button.feed-save",
+    kind: "BUTTON",
+    ref: stageRef,
+    onAct: async (intent) => {
+      if (intent.act !== "ACTIVATE") return "NOT_APPLICABLE";
+      const current = latestFeed.current.card;
+      if (current === null) return "FAILED";
+      const id = current.companyId;
+      if (!latestFeed.current.decisionFor(id).saved) {
+        latestFeed.current.save(id);
+      }
+      return (await effectShown(
+        () => latestFeed.current.decisionFor(id).saved,
+        3_000,
+      ))
+        ? "DONE"
+        : "FAILED";
+    },
+  });
 
   const card = feed.card;
   const notes = feed.state.notes;

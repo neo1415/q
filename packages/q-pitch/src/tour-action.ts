@@ -155,6 +155,53 @@ export const RunShortRehearsalActionSchema = z
   })
   .strict();
 
+/**
+ * A non-consequential act on a control the page registered (Q's own
+ * deterministic UI acts, never a model): next/previous pitch, the nth item
+ * of a list, a button whose click is not consequential (Save, open a panel),
+ * a dialog or disclosure. Acknowledged by the page's own UI-act receipt.
+ * Consequential actions (send, approve, book) are never tour actions.
+ */
+export const TOUR_UI_ACTS = [
+  "NEXT",
+  "PREVIOUS",
+  "SELECT_ITEM",
+  "ACTIVATE",
+  "OPEN",
+  "CLOSE",
+  "EXPAND",
+  "SCROLL_TO",
+] as const;
+export const UiActActionSchema = z
+  .object({
+    ...base,
+    kind: z.literal("uiAct"),
+    act: z.enum(TOUR_UI_ACTS),
+    target: QControlIdSchema,
+    /** SELECT_ITEM: 1-based position. */
+    index: z.number().int().min(1).max(50).optional(),
+  })
+  .strict()
+  .refine((a) => (a.act === "SELECT_ITEM") === (a.index !== undefined), {
+    message: "SELECT_ITEM names a position, and only SELECT_ITEM does",
+    path: ["index"],
+  });
+
+/**
+ * Open one record page by fixture key (never a URL or id in a script): a
+ * GateQ application in the actor's own inbox, or the actor's relationship
+ * with a company, optionally at its call-booking dialog (the real flow,
+ * opened, never submitted by the tour).
+ */
+export const OpenRecordActionSchema = z
+  .object({
+    ...base,
+    kind: z.literal("openRecord"),
+    record: z.enum(["GATEQ_APPLICATION", "RELATIONSHIP", "RELATIONSHIP_CALLS"]),
+    key: FixtureKeySchema,
+  })
+  .strict();
+
 export const TourActionSchema = z.discriminatedUnion("kind", [
   OpenRouteActionSchema,
   OpenCompanyActionSchema,
@@ -165,6 +212,8 @@ export const TourActionSchema = z.discriminatedUnion("kind", [
   BuildComparisonActionSchema,
   AskApprovedQuestionActionSchema,
   RunShortRehearsalActionSchema,
+  UiActActionSchema,
+  OpenRecordActionSchema,
 ]);
 export type TourAction = z.infer<typeof TourActionSchema>;
 export type TourActionKind = TourAction["kind"];
@@ -179,6 +228,8 @@ export const TOUR_ACTION_KINDS = [
   "buildComparison",
   "askApprovedQuestion",
   "runShortRehearsal",
+  "uiAct",
+  "openRecord",
 ] as const satisfies readonly TourActionKind[];
 export const TourActionKindSchema = z.enum(TOUR_ACTION_KINDS);
 
