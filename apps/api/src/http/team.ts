@@ -5,7 +5,9 @@ import {
   INVITATION_TOKEN_HEADER,
   InvitationPreviewDtoSchema,
   InvitationTokenSchema,
+  MY_INVITATIONS_PATH,
   MY_ORGANISATIONS_PATH,
+  MyInvitationsDtoSchema,
   MyOrganisationsDtoSchema,
   TEAM_PATH,
   TeamDtoSchema,
@@ -37,11 +39,14 @@ import type { NamedPhotos } from "./named-photos.js";
  *   creating their account). The token travels in a header so it never
  *   lands in a URL the API logs; an unknown or malformed token is the one
  *   404, never a hint about which part was wrong.
+ * - GET /v1/me/invitations: pending invitations to the caller's VERIFIED
+ *   sign-in email, read on the server (the client names no address), so
+ *   an invitee need not find the email to accept or decline.
  */
 export type TeamRoutesDependencies = OnboardingActorDependencies & {
   readonly team: Pick<
     TeamService,
-    "team" | "myOrganisations" | "previewInvitation"
+    "team" | "myOrganisations" | "myInvitations" | "previewInvitation"
   >;
   /**
    * P14: teammates' photos. A teammate's name is already on this response
@@ -91,6 +96,16 @@ export function registerTeamRoutes(
       );
       void reply.header("Cache-Control", "no-store");
       return MyOrganisationsDtoSchema.parse(mine);
+    },
+  );
+
+  app.get(
+    MY_INVITATIONS_PATH,
+    { onRequest: withPerson },
+    async (request, reply) => {
+      const mine = await team.myInvitations(getOnboardingActor(request).userId);
+      void reply.header("Cache-Control", "no-store");
+      return MyInvitationsDtoSchema.parse(mine);
     },
   );
 

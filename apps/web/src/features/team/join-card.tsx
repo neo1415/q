@@ -109,6 +109,14 @@ export function JoinCard({
       />
     );
   }
+  if (preview.state === "DECLINED") {
+    return (
+      <Problem
+        title="You declined this invitation"
+        body={`Ask ${inviterFirst} at ${preview.organisationName} for a new one if you'd like to join.`}
+      />
+    );
+  }
   if (preview.state === "ACCEPTED") {
     return alreadyIn ? (
       <Problem

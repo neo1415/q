@@ -65,7 +65,7 @@ export function moneyText(amount: string, currency: string): string {
 }
 
 export const INSTRUMENT_WORDS: Readonly<
-  Record<CapitalRoundDto["instrument"], string>
+  Record<NonNullable<CapitalRoundDto["instrument"]>, string>
 > = {
   SAFE: "SAFE",
   EQUITY: "Equity",
@@ -73,6 +73,12 @@ export const INSTRUMENT_WORDS: Readonly<
   ASA: "Advance subscription (ASA)",
   OTHER: "Other instrument",
 };
+
+/** A round's instrument in words; unknown said as unknown, never a default. */
+export const instrumentWords = (
+  instrument: CapitalRoundDto["instrument"],
+): string =>
+  instrument === null ? "Instrument not stated" : INSTRUMENT_WORDS[instrument];
 
 const onCompany = (input: {
   readonly companyId: string;
@@ -127,7 +133,7 @@ export const OPEN_ROUND = defineAppAction<
         : `Open a ${input.input.name} round`,
     preview: [
       `Target ${moneyText(input.input.target.amount, input.input.target.currency)}`,
-      INSTRUMENT_WORDS[input.input.instrument],
+      instrumentWords(input.input.instrument),
       input.input.status === "PLANNED"
         ? "Planned"
         : "Becomes your current round",

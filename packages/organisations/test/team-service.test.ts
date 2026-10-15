@@ -909,3 +909,102 @@ describe("the switcher's list", () => {
     ).toEqual([true]);
   });
 });
+
+describe("F2: invitations in the invitee's own list", () => {
+  const invitePeter = async (w: World) =>
+    ok(
+      await w.service.invite(
+        w.actorOf(SARA),
+        { emails: ["peter@northbound.example"], role: "MEMBER" },
+        correlation,
+      ),
+    );
+
+  it("lists a pending invitation to the verified email, and accepts it by id", async () => {
+    const w = world();
+    await invitePeter(w);
+    const mine = await w.service.myInvitations(PETER);
+    expect(mine.items).toHaveLength(1);
+    expect(mine.items[0]).toMatchObject({
+      organisationName: "Northbound Capital",
+      kind: "FIRM",
+      role: "MEMBER",
+      invitedByName: "Sara Kimani",
+    });
+    const id = mine.items[0]?.invitationId ?? "";
+    const joined = ok(
+      await w.service.acceptInvitationById(PETER, id, correlation),
+    );
+    expect(joined).toMatchObject({ organisationId: ORG, role: "MEMBER" });
+    expect(w.db.invitations[0]?.status).toBe("accepted");
+    expect((await w.service.myInvitations(PETER)).items).toEqual([]);
+  });
+
+  it("a different email can't see it, accept it or decline it", async () => {
+    const w = world();
+    await invitePeter(w);
+    expect((await w.service.myInvitations(OUTSIDER)).items).toEqual([]);
+    const id = w.db.invitations[0]?.id ?? "";
+    const accepted = await w.service.acceptInvitationById(
+      OUTSIDER,
+      id,
+      correlation,
+    );
+    // Someone else's invitation reads like none at all.
+    expect(accepted.ok === false && accepted.code).toBe("NOT_FOUND");
+    const declined = await w.service.declineInvitation(
+      OUTSIDER,
+      id,
+      correlation,
+    );
+    expect(declined.ok === false && declined.code).toBe("NOT_FOUND");
+    expect(w.db.invitations[0]?.status).toBe("pending");
+    expect(
+      w.db.memberships.some(
+        (m) => m.userId === OUTSIDER && m.organisationId === ORG,
+      ),
+    ).toBe(false);
+  });
+
+  it("an unverified email sees nothing", async () => {
+    const w = world();
+    await invitePeter(w);
+    w.db.people.set(PETER, { id: PETER, name: "Peter Musa", email: null });
+    expect((await w.service.myInvitations(PETER)).items).toEqual([]);
+    const out = await w.service.acceptInvitationById(
+      PETER,
+      w.db.invitations[0]?.id ?? "",
+      correlation,
+    );
+    expect(out.ok === false && out.code).toBe("NOT_FOUND");
+  });
+
+  it("declines: no membership, the link stops working, and it leaves the list", async () => {
+    const w = world();
+    await invitePeter(w);
+    const id = w.db.invitations[0]?.id ?? "";
+    expect(
+      ok(await w.service.declineInvitation(PETER, id, correlation)),
+    ).toEqual({ declined: true });
+    expect(w.db.invitations[0]?.status).toBe("declined");
+    expect(w.db.journal.at(-1)?.action).toBe("invitation.declined");
+    expect((await w.service.myInvitations(PETER)).items).toEqual([]);
+    expect(ok(await w.service.previewInvitation(w.tokens[0] ?? "")).state).toBe(
+      "DECLINED",
+    );
+    const late = await w.service.acceptInvitation(
+      PETER,
+      w.tokens[0] ?? "",
+      correlation,
+    );
+    expect(late.ok).toBe(false);
+    expect(w.db.memberships.some((m) => m.userId === PETER)).toBe(false);
+  });
+
+  it("an expired invitation is not listed", async () => {
+    const w = world();
+    await invitePeter(w);
+    w.clock = new Date(w.clock.getTime() + 8 * 86_400_000);
+    expect((await w.service.myInvitations(PETER)).items).toEqual([]);
+  });
+});

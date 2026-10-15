@@ -6,7 +6,7 @@ import { formatDay } from "@/components/date-format";
 
 import { figure, money, percent, shareOf } from "./money";
 import { RoundControls } from "./round-controls";
-import { INSTRUMENT_LABELS } from "./round-labels";
+import { instrumentLabel } from "./round-labels";
 import type { LeadOption } from "./round-terms-fields";
 import {
   isLive,
@@ -15,7 +15,7 @@ import {
   STATUS_WORDS,
 } from "./round-words";
 
-export { INSTRUMENT_LABELS } from "./round-labels";
+export { INSTRUMENT_LABELS, instrumentLabel } from "./round-labels";
 
 type Round = CapitalLedgerDto["rounds"][number];
 
@@ -202,7 +202,7 @@ export function RoundCard({
             {round.name}
           </h3>
           <span className="cq-caption text-(--cq-text-tertiary)">
-            {INSTRUMENT_LABELS[round.instrument]}
+            {instrumentLabel(round.instrument)}
             {datesOf(round) === "" ? null : `, ${datesOf(round)}`}
           </span>
         </div>
@@ -472,7 +472,7 @@ function TimelineItem({
             {round.name}
           </span>
           <span className="cq-caption text-(--cq-text-tertiary)">
-            {INSTRUMENT_LABELS[round.instrument]}
+            {instrumentLabel(round.instrument)}
             {datesOf(round) === "" ? null : `, ${datesOf(round)}`}
           </span>
         </div>

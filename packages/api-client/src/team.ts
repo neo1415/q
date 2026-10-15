@@ -1,5 +1,6 @@
 import {
   AcceptInvitationResultDtoSchema,
+  DeclineInvitationResultDtoSchema,
   INVITATION_ACCEPT_PATH,
   INVITATION_PREVIEW_PATH,
   INVITATION_TOKEN_HEADER,
@@ -8,7 +9,10 @@ import {
   JOIN_REQUESTS_PATH,
   JoinRequestResultDtoSchema,
   LeaveResultDtoSchema,
+  MY_INVITATION_DECLINE_PATH,
+  MY_INVITATIONS_PATH,
   MY_ORGANISATIONS_PATH,
+  MyInvitationsDtoSchema,
   MyOrganisationsDtoSchema,
   ORGANISATIONS_PATH,
   ActivateOrganisationResponseSchema,
@@ -160,6 +164,31 @@ export const acceptInvitation = (session: ApiSession, token: string) =>
     {
       body: { token },
     },
+  );
+
+/** Invitations to the signed-in person's verified email; the server matches. */
+export const getMyInvitations = (session: ApiSession) =>
+  call(session, "GET", MY_INVITATIONS_PATH, MyInvitationsDtoSchema);
+
+/** Accept one from that list: by id, never by an address the client names. */
+export const acceptInvitationById = (
+  session: ApiSession,
+  invitationId: string,
+) =>
+  call(
+    session,
+    "POST",
+    INVITATION_ACCEPT_PATH,
+    AcceptInvitationResultDtoSchema,
+    { body: { invitationId } },
+  );
+
+export const declineInvitation = (session: ApiSession, invitationId: string) =>
+  call(
+    session,
+    "POST",
+    at(MY_INVITATION_DECLINE_PATH, { invitationId }),
+    DeclineInvitationResultDtoSchema,
   );
 
 export const requestToJoin = (

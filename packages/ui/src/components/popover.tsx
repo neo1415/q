@@ -4,6 +4,10 @@ import { Popover as BasePopover } from "@base-ui/react/popover";
 import type { ReactElement, ReactNode } from "react";
 
 import { cx } from "../primitives/class-names.js";
+import {
+  POPUP_LAYER_CLASS,
+  useOverlayLayer,
+} from "../primitives/overlay-layer.js";
 
 /** Popover on Base UI, for small contextual detail anchored to a control. */
 
@@ -28,9 +32,13 @@ export function PopoverContent({
   readonly children: ReactNode;
   readonly className?: string | undefined;
 }) {
+  const layer = useOverlayLayer();
   return (
     <BasePopover.Portal>
-      <BasePopover.Positioner sideOffset={8} className="z-(--cq-z-popover)">
+      <BasePopover.Positioner
+        sideOffset={8}
+        className={POPUP_LAYER_CLASS[layer]}
+      >
         <BasePopover.Popup
           className={cx(
             "w-72 max-w-[calc(100vw-32px)] rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-base) data-[ending-style]:translate-y-1 data-[ending-style]:opacity-0 data-[starting-style]:translate-y-1 data-[starting-style]:opacity-0",
