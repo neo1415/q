@@ -32,6 +32,8 @@ create temp table cq_seed_tenants on commit drop as
      and not exists (select 1 from identity.tenant_organisations o
                       where o.tenant_id = t.tenant_id
                         and o.organisation_id not in (select organisation_id from cq_seed_orgs));
+-- Rows that restrict a person's deletion (daily_preferences references the profile).
+delete from q_runtime.daily_preferences where user_id in (select user_id from (${SEEDED_USERS}) s);
 delete from identity.tenants where id in (select tenant_id from cq_seed_tenants);
 delete from auth.users where raw_app_meta_data->>'cq_seed' = '${SEED_MARKER}';
 commit;`;
