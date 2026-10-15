@@ -41,6 +41,7 @@ import { RelationshipDeal } from "./relationship-deal";
 import { RelationshipErrands } from "./relationship-errands";
 import { RelationshipOutcome } from "./relationship-outcome";
 import { nextStepFor, type NextStep } from "./relationships-view";
+import { StageDurations } from "./stage-durations";
 import { RelationshipTimeline } from "./relationship-timeline";
 import { JOURNEY, journeyStep } from "./journey";
 import {
@@ -261,6 +262,10 @@ export function RelationshipDetail({
               collapsible
               count={relationship.milestones.length}
             >
+              <StageDurations
+                milestones={relationship.milestones}
+                now={readAt}
+              />
               <RelationshipTimeline
                 milestones={relationship.milestones}
                 meetings={meetings}
