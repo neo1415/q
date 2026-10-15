@@ -15,6 +15,7 @@ import {
   PILOT_SCRIPT,
   PREMIERE_CERTIFICATION_LEDGER,
   PREMIERE_SCRIPT,
+  SHORT_SCRIPT,
   TourActorSchema,
   TourRunner,
   certifyTour,
@@ -83,7 +84,7 @@ function actionWords(snapshot: TourSnapshot): string | null {
   }
 }
 
-export type TourChoice = "pilot" | "premiere";
+export type TourChoice = "pilot" | "premiere" | "short";
 
 /**
  * Which script, and what the gate may admit. The premiere opts into
@@ -96,6 +97,12 @@ const TOURS = {
     ledger: PILOT_CERTIFICATION_LEDGER,
     accepted: ["PRODUCTION_LIVE_VERIFIED"],
     label: "Internal rehearsal · draft script · demonstration data",
+  },
+  short: {
+    script: SHORT_SCRIPT,
+    ledger: PREMIERE_CERTIFICATION_LEDGER,
+    accepted: ["PRODUCTION_LIVE_VERIFIED"],
+    label: "Internal rehearsal · two-minute draft · demonstration data",
   },
   premiere: {
     script: PREMIERE_SCRIPT,
@@ -115,11 +122,14 @@ export function QPitchHost({
   account,
   role,
   tour,
+  chapter,
   onExit,
 }: {
   readonly account: string;
   readonly role: "INVESTOR" | "FOUNDER";
   readonly tour: TourChoice;
+  /** Feature Atlas: start at this chapter (a director jump, never a URL). */
+  readonly chapter: string | null;
   readonly onExit: () => void;
 }) {
   const choice = TOURS[tour];
@@ -165,13 +175,27 @@ export function QPitchHost({
     };
     slot.set(next);
     next.start();
+    if (chapter !== null) {
+      // The Atlas entry: an audience jump through the gate, like the
+      // Chapters control; an unknown chapter is refused by the director.
+      next.control(
+        {
+          intentId: `qp-atlas-${String(Date.now())}`,
+          source: "AUDIENCE_MIC",
+          modality: "POINTER",
+          kind: "JUMP",
+          chapterId: chapter,
+        },
+        NO_AUDIO,
+      );
+    }
     return () => {
       transcript.current = null;
       next.dispose();
       slot.set(null);
       heard.set(null);
     };
-  }, [actor, ports, slot, heard, choice, transcript]);
+  }, [actor, ports, slot, heard, choice, transcript, chapter]);
 
   // The voice line's transcript. The person's lines are AUDIENCE_MIC and
   // offered to the gate; Q's own spoken lines are recorded as NARRATOR_Q

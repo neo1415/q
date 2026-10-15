@@ -118,3 +118,19 @@ describe("audience speech classifier", () => {
     expect(decision).toEqual({ admitted: false, reason: "ECHO_UNGUARDED" });
   });
 });
+
+describe("two-minute cut", () => {
+  it("parses, and the default gate admits all of it (certified features only)", async () => {
+    const { SHORT_SCRIPT } = await import("../src/index.js");
+    const gate = certifyTour(SHORT_SCRIPT, PREMIERE_CERTIFICATION_LEDGER, {
+      now: NOW,
+      staleFeatureIds: [],
+      audience: "INTERNAL_REHEARSAL",
+    });
+    expect(gate.scenes.map((s) => s.sceneId)).toEqual([
+      "s.pilot.opening",
+      "s.short.risks",
+      "s.premiere.close",
+    ]);
+  });
+});

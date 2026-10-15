@@ -59,6 +59,13 @@ Audited what `packages/q-pitch/src/` actually implements, against the rows above
 - The default gate admits only the 3 browser-certified scenes. `?qpitch=premiere` (INTERNAL_REHEARSAL) opts into CODE_VERIFIED.
 - New action `runShortRehearsal` (PROPOSED r3) is wired to the existing rehearsal actions.
 
+## Tour entry (15 Oct, Lane P / `claude/p-nav-oct15`)
+
+- A "Q Pitch" sidebar item sits in the Workspace group. It shows only to founder or investor workspaces, and only when `CQ_Q_PITCH_TOUR=1`.
+- It opens `/q-pitch`, which offers the investor premiere, the two-minute version (`SHORT_SCRIPT`) and Feature Atlas chapters, each with its certified or internal-only standing.
+- Founders are told that no founder edition exists yet.
+- Tests in `apps/web/test/q-pitch-entry.test.ts`; route registered; parity regenerated.
+
 ## Dependencies
 
 | Depends on                                                      | Status                                                            | Notes                                                                           |

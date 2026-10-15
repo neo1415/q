@@ -50,7 +50,8 @@ export type NavigationItem = {
     | "/documents"
     | "/work"
     | "/admin"
-    | "/gateq";
+    | "/gateq"
+    | "/q-pitch";
   readonly label: string;
   readonly icon: ComponentType<{
     readonly size?: number;
@@ -139,6 +140,17 @@ export const DOCUMENTS_NAVIGATION: NavigationItem = {
  * The Q Daily (DAILY): the person's own newspaper of news about their
  * sectors, markets, deals and the people they know, with its archive.
  */
+/**
+ * Q Pitch (owner request, 15 Oct): the guided tour entry. Shown only when
+ * the server enables Q Pitch (CQ_Q_PITCH_TOUR) and only to a founder or
+ * investor workspace; the page and the host re-check both.
+ */
+export const Q_PITCH_NAVIGATION: NavigationItem = {
+  href: "/q-pitch",
+  label: "Q Pitch",
+  icon: Play,
+};
+
 export const DAILY_NAVIGATION: NavigationItem = {
   href: "/daily",
   label: "The Q Daily",
@@ -227,9 +239,15 @@ export type NavigationGroup = {
   readonly items: readonly NavigationItem[];
 };
 
+export type NavigationOptions = {
+  readonly admin?: boolean | undefined;
+  /** The server enabled Q Pitch (CQ_Q_PITCH_TOUR=1). */
+  readonly qPitch?: boolean | undefined;
+};
+
 export function navigationGroupsFor(
   scope: ContextScope,
-  options: { readonly admin?: boolean | undefined } = {},
+  options: NavigationOptions = {},
 ): readonly NavigationGroup[] {
   const founder = scope === "founder_private";
   const investor = scope === "investor_private";
@@ -244,6 +262,9 @@ export function navigationGroupsFor(
         ...(investor ? [COMPANY_REQUESTS_NAVIGATION] : []),
         DOCUMENTS_NAVIGATION,
         ...(founder || investor ? [REHEARSALS_NAVIGATION] : []),
+        ...((founder || investor) && options.qPitch === true
+          ? [Q_PITCH_NAVIGATION]
+          : []),
         DAILY_NAVIGATION,
       ],
     },
@@ -264,7 +285,7 @@ export function navigationGroupsFor(
  */
 export function sectionsFor(
   scope: ContextScope,
-  options: { readonly admin?: boolean | undefined } = {},
+  options: NavigationOptions = {},
 ): readonly NavigationItem[] {
   const account = new Set(ACCOUNT_NAVIGATION.map((item) => item.href));
   return [
@@ -280,7 +301,7 @@ export function sectionsFor(
  */
 export function moreGroupsFor(
   scope: ContextScope,
-  options: { readonly admin?: boolean | undefined } = {},
+  options: NavigationOptions = {},
 ): readonly NavigationGroup[] {
   const onTabs = new Set(MOBILE_NAVIGATION.map((item) => item.href));
   return navigationGroupsFor(scope, options)
@@ -296,7 +317,7 @@ export function moreGroupsFor(
 /** What the More sheet lists, flat: Profile, then every group's. */
 export function moreSectionsFor(
   scope: ContextScope,
-  options: { readonly admin?: boolean | undefined } = {},
+  options: NavigationOptions = {},
 ): readonly NavigationItem[] {
   return [
     PROFILE_NAVIGATION,

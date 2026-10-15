@@ -56,7 +56,10 @@ export function DesktopSidebar({
     setOverride({ onQ, collapsed: next });
   };
 
-  const groups = navigationGroupsFor(context.scope, { admin: context.admin });
+  const groups = navigationGroupsFor(context.scope, {
+    admin: context.admin,
+    qPitch: context.qPitch,
+  });
   // What waits on them, from the shell's one notice read (no extra call).
   const needsYou = useNeedsYouCount();
   // Workspace, You and Admin fold away, closed until opened (2026-10-07).

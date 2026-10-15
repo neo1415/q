@@ -31,6 +31,8 @@ export type ShellContext = {
   readonly label?: string | undefined;
   /** A platform admin (WORK-58): the sidebar adds the Admin group. */
   readonly admin?: boolean | undefined;
+  /** The server enabled Q Pitch (CQ_Q_PITCH_TOUR=1): the sidebar lists it. */
+  readonly qPitch?: boolean | undefined;
   /**
    * G2: the person's companies and firms, for the switcher (shown only for
    * two or more). Read on the server; switching is the server's to do.
@@ -119,6 +121,7 @@ export function AppShell({
           <MobileNavigation
             scope={context.scope}
             admin={context.admin === true}
+            qPitch={context.qPitch === true}
             organisations={context.organisations ?? []}
             verifyNudge={verifyNudge}
           />
