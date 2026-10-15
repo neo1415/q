@@ -744,6 +744,41 @@ async function seedCompany(c) {
       readiness: after.marketplaceReadinessState,
     });
   }
+  if (!s.steps.round) {
+    // The raise as a round on the Capital page: open when raising now,
+    // planned when preparing. The objective above stays the source of the
+    // target; the round carries the same figure, never a second one.
+    const ledger = await api(f, "GET", `${base}/capital-ledger`);
+    if ((ledger.rounds ?? []).length === 0) {
+      const instrument = {
+        safe: "SAFE",
+        priced: "EQUITY",
+        convertible: "CONVERTIBLE",
+        unsure: "OTHER",
+      }[c.raise.instrument];
+      const name = {
+        pre_seed: "Pre-seed round",
+        seed: "Seed round",
+        series_a: "Series A",
+        series_b: "Series B",
+        series_c_plus: "Growth round",
+        unsure: "First round",
+      }[c.stageOption];
+      await api(
+        f,
+        "POST",
+        `${base}/capital-rounds`,
+        {
+          name,
+          target: c.raise.target,
+          instrument,
+          status: c.raise.raising === "active" ? "OPEN" : "PLANNED",
+        },
+        idem(c.seedKey, "round"),
+      );
+    }
+    await done("round");
+  }
   if (!s.steps.verify) {
     // Ask Capital Q to verify, as the founder would. The deployment decides
     // it under its own synthetic attestation, or leaves it pending.

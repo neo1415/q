@@ -12,7 +12,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "12df3f55-4e28-4a1b-a48f-077b5ab1d93f",
       "memberUserIds": [
@@ -41,7 +42,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "74fe8f85-cfb7-4a86-9977-6bbfeabffb8c",
       "memberUserIds": [
@@ -68,7 +70,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "30bf5c4d-745b-4bde-b372-ef972f2e0d08",
       "memberUserIds": [
@@ -95,7 +98,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "4419a737-2259-44a9-82fb-f690bd47e98b",
       "memberUserIds": [
@@ -122,7 +126,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "1aea0768-485b-4dc1-98f5-533e2553a433",
       "memberUserIds": [
@@ -151,7 +156,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "15345df8-3946-497b-8d5b-1478434dc7ab",
       "memberUserIds": [
@@ -179,7 +185,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "d953786a-1b00-48f3-b98a-daa2fd71ec4f",
       "memberUserIds": [
@@ -207,7 +214,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "9889c4a0-2dc1-4b52-8836-e96a6a56358e",
       "memberUserIds": [
@@ -234,7 +242,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "ad559e54-cbdd-4007-8cdb-071631fa96d7",
       "memberUserIds": [
@@ -262,7 +271,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "c9549cbb-da88-4653-b2aa-118b2badffd6",
       "memberUserIds": [
@@ -290,7 +300,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "4448d293-4069-4aa1-a801-e0798fd3ce67",
       "memberUserIds": [
@@ -320,7 +331,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "cde6592f-a0ec-43bf-9913-d7dd615c08e5",
       "memberUserIds": [
@@ -347,7 +359,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "5c71eaab-ef21-4a77-9cea-64a34050b3be",
       "memberUserIds": [
@@ -373,7 +386,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "0e19db90-237a-48c4-9e0f-bf7e6fbaae81",
       "memberUserIds": [
@@ -402,7 +416,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "001adb3b-f171-4378-aeee-197ec7129049",
       "memberUserIds": [
@@ -430,7 +445,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "9a4b452b-57b0-4b0f-87e5-7036b090c450",
       "memberUserIds": [
@@ -456,7 +472,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "63706006-c237-4109-b8c2-ef4fd269e148",
       "memberUserIds": [
@@ -483,7 +500,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "a40ec36f-6637-4c76-bee7-2ef86fc5ca33",
       "memberUserIds": [
@@ -511,7 +529,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "4182c2b2-25ba-47bb-919c-4e83fb2ebabb",
       "memberUserIds": [
@@ -538,7 +557,8 @@
         "q": true,
         "team": true,
         "visible": true,
-        "verify": true
+        "verify": true,
+        "round": true
       },
       "founderUserId": "3dadfc34-b101-4e1f-966a-2ccbc16fd67d",
       "memberUserIds": [
