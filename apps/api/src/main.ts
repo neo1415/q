@@ -2272,6 +2272,33 @@ const { app, logger } = createApp(config, security, {
     // disclosure-checked company read the network preview uses.
     networkPitches: createPostgresNetworkPitchQueryPort({ sql: database.sql }),
     explore,
+    // A company without a pitch stays findable by name (owner direction
+    // 2026-10-15): the company search over discoverable companies, each
+    // through the same network-visibility rule as the pitch pool.
+    exploreCompanies: async (actor, text) => {
+      const page = await exploreCompanyQuery.searchCompanies({
+        viewer: {
+          tenantId: actor.tenantId,
+          organisationId: actor.organisationId,
+        },
+        text,
+        limit: 30,
+      });
+      const visible = await Promise.all(
+        page.items.map(async (item) =>
+          item.ownedByViewer || (await isCompanyNetworkVisible(actor, item.id))
+            ? [item]
+            : [],
+        ),
+      );
+      return visible.flat().map((item) => ({
+        companyId: item.id,
+        canonicalName: item.canonicalName,
+        shortDescription: item.shortDescription,
+        headquartersCountry: item.headquartersCountry,
+        currentStageCode: item.currentStageCode,
+      }));
+    },
     // ADR 0023: an investor's own photo and cover on founder-facing reads,
     // asked only for investors discovery already returned to the reader.
     investorImages: (investorOrganisationId) =>

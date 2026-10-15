@@ -52,6 +52,11 @@ export const FOUNDER_UTTERANCE_ALIASES: OnboardingUtteranceAliases = {
     sg: ["singapore"],
     br: ["brazil", "sao paulo", "brazilian"],
     ca: ["canada", "toronto", "vancouver", "canadian"],
+    qa: ["qatar", "doha", "qatari"],
+    sa: ["saudi arabia", "saudi", "ksa", "riyadh", "jeddah"],
+    kw: ["kuwait", "kuwaiti"],
+    bh: ["bahrain", "manama", "bahraini"],
+    om: ["oman", "muscat", "omani"],
     other: ["elsewhere", "somewhere else", "another country"],
   },
   [FOUNDER_STEPS.founderRole]: {

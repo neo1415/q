@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   answerPreparedFollowUp,
+  preparedEntityIdFor,
   cardFromKnownEntity,
   createInMemoryKnownEntityStore,
   decidePreparedFollowUp,
@@ -313,19 +314,24 @@ describe("source status honesty", () => {
 describe("no invented quotes", () => {
   const norm = (text: string): string => text.replace(/\s+/gu, " ").trim();
 
-  it("every stored quote is verbatim inside an excerpt of its own source", () => {
-    let quotes = 0;
-    for (const record of records) {
-      for (const quote of record.quotes) {
-        quotes += 1;
-        const source = record.sources.find(
-          (s) => s.sourceId === quote.sourceId,
-        );
-        expect(source, `${record.displayName}: ${quote.text}`).toBeDefined();
-        expect(norm(source?.excerpt ?? "")).toContain(norm(quote.text));
-      }
-    }
-    expect(quotes).toBeGreaterThanOrEqual(5);
+  it("no prepared public profile carries a quote (owner direction 2026-10-15)", () => {
+    expect(records.flatMap((record) => record.quotes)).toEqual([]);
+    const withQuote = structuredClone(rawSeed) as {
+      entities: { short_public_quotes: unknown[] }[];
+    };
+    withQuote.entities[0]?.short_public_quotes.push({
+      quote: "x",
+      source_id: "S02",
+      verification: {
+        status: "VERIFIED",
+        checkedAt: "",
+        basis: "",
+        note: null,
+      },
+      label: "x",
+      speaker: "x",
+    });
+    expect(() => parsePreparedSeed(withQuote)).toThrow(/no quotes/u);
   });
 
   it("every quoted string an answer prints is inside a stored quote or excerpt", () => {
@@ -360,11 +366,11 @@ describe("no invented quotes", () => {
 });
 
 describe("the migration is the seed", () => {
-  it("20261222110000 carries exactly what the loader writes", () => {
+  it("20261227100000 carries exactly what the loader writes, for both research seeds", () => {
     const sql = readFileSync(
       fileURLToPath(
         new URL(
-          "supabase/migrations/20261222110000_qatar_five_source_status_and_enrichment.sql",
+          "supabase/migrations/20261227100000_qatar_research_investors_and_evidence_axes.sql",
           root,
         ),
       ),
@@ -372,6 +378,7 @@ describe("the migration is the seed", () => {
     );
     const doc = /\$j\$(.*)\$j\$/su.exec(sql)?.[1] ?? "[]";
     const rows = JSON.parse(doc) as {
+      id: string;
       profileKey: string;
       lastResearchedAt: string;
       facts: unknown;
@@ -379,19 +386,65 @@ describe("the migration is the seed", () => {
       quotes: unknown;
       profile: unknown;
     }[];
-    expect(rows).toHaveLength(5);
-    for (const entity of seed.entities) {
-      const want = toPreparedUpsert(seed, entity, options);
+    const investors = parsePreparedSeed(
+      JSON.parse(
+        readFileSync(
+          fileURLToPath(
+            new URL("scripts/seed/research/qatar-investors.v1.json", root),
+          ),
+          "utf8",
+        ),
+      ),
+    );
+    expect(rows).toHaveLength(seed.entities.length + investors.entities.length);
+    for (const [from, entity] of [
+      ...seed.entities.map((e) => [seed, e] as const),
+      ...investors.entities.map((e) => [investors, e] as const),
+    ]) {
+      const want = toPreparedUpsert(from, entity, options);
       const got = rows.find((r) => r.profileKey === entity.demo_id);
-      expect(got).toBeDefined();
+      expect(got, entity.demo_id).toBeDefined();
       const plain = (value: unknown): unknown =>
         JSON.parse(JSON.stringify(value));
+      expect(got?.id).toBe(preparedEntityIdFor(entity.demo_id));
       expect(got?.lastResearchedAt).toBe(want.lastResearchedAt);
       expect(got?.facts).toEqual(plain(want.facts));
       expect(got?.sources).toEqual(plain(want.sources));
-      expect(got?.quotes).toEqual(plain(want.quotes));
+      expect(got?.quotes).toEqual([]);
       expect(got?.profile).toEqual(plain(want.profile));
     }
     expect(sql).not.toMatch(/\bdelete\s+from\b/iu);
+    // No login, membership, representative or mandate for a real organisation.
+    expect(sql).not.toMatch(
+      /organisation_memberships|investor_representatives|investor_mandates|auth\.users/u,
+    );
+  });
+
+  it("every researched fact carries the three ADR-001 axes, and none is platform-verified", () => {
+    for (const file of ["qatar-five.v1.json", "qatar-investors.v1.json"]) {
+      const one = parsePreparedSeed(
+        JSON.parse(
+          readFileSync(
+            fileURLToPath(new URL(`scripts/seed/research/${file}`, root)),
+            "utf8",
+          ),
+        ),
+      );
+      for (const entity of one.entities) {
+        for (const fact of entity.facts) {
+          expect(
+            fact.truth_class,
+            `${entity.demo_id}: ${fact.claim}`,
+          ).toBeDefined();
+          expect(fact.evidence_status).toBeDefined();
+          expect(fact.lifecycle_status).toBeDefined();
+          expect(fact.uncertainty).toBeDefined();
+          expect(fact.truth_class).not.toBe("VERIFIED");
+          for (const id of fact.source_ids) {
+            expect(one.sources[id]?.url).toMatch(/^https:\/\//u);
+          }
+        }
+      }
+    }
   });
 });
