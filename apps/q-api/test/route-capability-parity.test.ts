@@ -244,6 +244,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/gateq-video.ts POST GATEQ_APPLY_VIDEO_PATH": PUBLIC,
   "api/http/gateq-video.ts POST GATEQ_APPLY_VIDEO_END_PATH": PUBLIC,
   "api/http/gateq-video.ts POST GATEQ_VIDEO_BRIDGE_PATH": WEBHOOK,
+  // G3: the provider's room events (joined, left, ended), signed by a
+  // per-session token in the path; the room's clock, not a person.
+  "api/http/gateq-video.ts POST `${GATEQ_VIDEO_EVENTS_PATH}/:token`": WEBHOOK,
   ...Object.fromEntries(
     [
       "POST GATEQ_GATEWAYS_PATH",
@@ -753,6 +756,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/rehearsal-video.ts POST Q_REHEARSAL_VIDEO_END_PATH": Q_TRANSPORT,
   "q-api/http/rehearsal-video.ts POST `${Q_REHEARSAL_VIDEO_BRIDGE_BASE_PATH}/chat/completions`":
     WEBHOOK,
+  // G3: the provider's room events, signed by a per-session path token.
+  "q-api/http/rehearsal-video.ts POST `${Q_REHEARSAL_VIDEO_EVENTS_BASE_PATH}/:token`":
+    WEBHOOK,
   // end REHEARSE block
   "q-api/http/meeting-assistant.ts GET Q_MEETING_ASSISTANT_PATH": exempt(
     "the organiser reading whether Q is in their call and its notes; shown on the meeting itself",
@@ -1171,6 +1177,8 @@ const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "api/http/gateq-video.ts POST GATEQ_APPLY_VIDEO_PATH",
   "api/http/gateq-video.ts POST GATEQ_APPLY_VIDEO_END_PATH",
   "api/http/gateq-video.ts POST GATEQ_VIDEO_BRIDGE_PATH",
+  // G3: the provider's room events (a per-session path token, not a person).
+  "api/http/gateq-video.ts POST `${GATEQ_VIDEO_EVENTS_PATH}/:token`",
   // Q's opening question for a form-started interview, under the same
   // guest credential. Pending the lead's decision.
   "api/http/gateq-apply.ts POST GATEQ_APPLY_INTERVIEW_OPEN_PATH",
@@ -1201,6 +1209,8 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/http/rehearsal-video.ts POST Q_REHEARSAL_VIDEO_PATH",
   "q-api/http/rehearsal-video.ts POST Q_REHEARSAL_VIDEO_END_PATH",
   "q-api/http/rehearsal-video.ts POST `${Q_REHEARSAL_VIDEO_BRIDGE_BASE_PATH}/chat/completions`",
+  // G3: the provider's room events drive the room's clock (its transport).
+  "q-api/http/rehearsal-video.ts POST `${Q_REHEARSAL_VIDEO_EVENTS_BASE_PATH}/:token`",
   // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
   // conversation's own transport, never a person's action.
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",

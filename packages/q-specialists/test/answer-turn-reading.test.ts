@@ -1128,6 +1128,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
           // CRM saved views: save, rename, share with the team or delete.
           expect.objectContaining({ destination: "RELATIONSHIPS" }),
+          // CRM S3: add or correct a private note on a relationship.
+          expect.objectContaining({ destination: "RELATIONSHIPS" }),
           // DOCS: confirm a brand (Documents) and an answer as a PDF.
           expect.objectContaining({ destination: "DOCUMENTS" }),
           expect.objectContaining({ destination: "HOME" }),
