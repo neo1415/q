@@ -213,7 +213,7 @@ describe("the specialist reads the public web only when asked (S7)", () => {
         ...explicit,
         turnKind,
         questionKind,
-      } as QAnswerRequest);
+      });
       expect(s.investigated.at(-1)?.publicResearch).toBe(web);
     },
   );
