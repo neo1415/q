@@ -465,7 +465,7 @@ describe("founder journey over the runtime contract", () => {
     });
   });
 
-  it("refuses a session pinned to a definition version this build cannot present", async () => {
+  it("refuses a session whose definition has a step this build cannot present", async () => {
     const port = createFixtureRuntimePort({ storage: null, seed: "reset" });
     const unknownVersion: RuntimePort = {
       ...port,
@@ -473,8 +473,24 @@ describe("founder journey over the runtime contract", () => {
         const view = await port.current();
         return view === null
           ? null
-          : // 3 is presentable since founder v3 (a superset of v2).
-            { ...view, session: { ...view.session, definitionVersion: 99 } };
+          : // A later version is presentable unless its path holds a step
+            // this build cannot draw.
+            {
+              ...view,
+              session: { ...view.session, definitionVersion: 99 },
+              progress: {
+                ...view.progress,
+                eligibleSteps: [
+                  ...view.progress.eligibleSteps,
+                  {
+                    stepKey: "F9.unknown_question",
+                    phaseKey: "F9",
+                    required: false,
+                    status: "PENDING" as const,
+                  },
+                ],
+              },
+            };
       },
     };
     await expect(
