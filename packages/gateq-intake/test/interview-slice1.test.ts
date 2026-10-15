@@ -152,6 +152,7 @@ function world(
     contactCodeSecret?: string;
     transcript?: false;
     documentDisclosure?: IntakeDependencies["documentDisclosure"];
+    coverageSources?: boolean;
   } = {},
 ) {
   let now = NOW;
@@ -464,6 +465,9 @@ function world(
   };
 
   const intake = createIntakeService({
+    ...(options.coverageSources === undefined
+      ? {}
+      : { coverageSources: options.coverageSources }),
     ...(options.documentDisclosure === undefined
       ? {}
       : { documentDisclosure: options.documentDisclosure }),
@@ -1928,6 +1932,37 @@ describe("review: dossier evidence lineage", () => {
     expect(
       facts.find((f) => f.dimension === "company.country")?.sourceTurnSeq,
     ).toBeNull();
+  });
+});
+
+describe("live 2026-10-15: coverage names the turn a spoken fact came from", () => {
+  it("a fact heard on the voice channel carries its person turn's seq", async () => {
+    const w = world({ coverageSources: true });
+    const { token } = await readyToSubmit(w);
+    w.script.push({
+      reply: "Noted.",
+      facts: [
+        fact("company.customers", { kind: "TEXT", text: "Tier-2 banks" }),
+      ],
+    });
+    // The video bridge's turn: same canonical turn, voice channel.
+    await w.conversation.turn({
+      token,
+      message: "Our customers are tier-2 banks.",
+      clientTurnId: "video-0000000000000001",
+      channel: "voice",
+      correlationId: "c1",
+    });
+    const coverage = await w.intake.coverage(token);
+    const heard = coverage.coverage.answered.find(
+      (a) => a.dimension === "company.customers",
+    );
+    const personTurn = w.turnRows.find(
+      (t) => t.role === "PERSON" && t.clientTurnId === "video-0000000000000001",
+    );
+    expect(personTurn?.seq).toBeGreaterThan(0);
+    expect(heard?.sourceTurnSeq).toBe(personTurn?.seq);
+    expect(heard?.sourceFactId).toBeDefined();
   });
 });
 
