@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ATLAS_SCRIPT,
   PILOT_SCRIPT,
   PREMIERE_CERTIFICATION_LEDGER,
   PREMIERE_SCRIPT,
@@ -14,46 +15,94 @@ import {
 
 const NOW = "2026-10-15T12:00:00Z";
 
-describe("r3 premiere and the certification gate", () => {
-  it("the default gate admits only the browser-certified scenes", () => {
+const MAIN = [
+  "s.premiere.intro",
+  "s.premiere.mandate",
+  "s.premiere.feed",
+  "s.premiere.save",
+  "s.pilot.opening",
+  "s.pilot.company",
+  "s.pilot.compare",
+  "s.premiere.gateq",
+  "s.premiere.relationship",
+  "s.premiere.crm-record",
+  "s.premiere.meeting",
+  "s.premiere.work",
+  "s.premiere.documents",
+  "s.premiere.notifications",
+  "s.premiere.rehearsal",
+  "s.premiere.capital-q",
+  "s.premiere.close",
+];
+
+describe("v5 premiere and the certification gate", () => {
+  it("is one continuous Q-led cut of the owner's beats, in order", () => {
+    expect(PREMIERE_SCRIPT.scenes.map((s) => s.sceneId)).toEqual(MAIN);
+    expect(PREMIERE_SCRIPT.chapters).toHaveLength(MAIN.length);
+  });
+
+  it("the default gate admits exactly the scenes whose features are browser-certified", () => {
     const gate = certifyTour(PREMIERE_SCRIPT, PREMIERE_CERTIFICATION_LEDGER, {
       now: NOW,
       staleFeatureIds: [],
       audience: "INTERNAL_REHEARSAL",
     });
-    expect(gate.scenes.map((s) => s.sceneId)).toEqual([
-      "s.premiere.intro",
-      "s.premiere.mandate",
-      "s.pilot.opening",
-      "s.pilot.company",
-      "s.pilot.compare",
-      "s.premiere.privacy",
-      "s.premiere.explore",
-      "s.premiere.gateq",
-      "s.premiere.relationship",
-      "s.premiere.work",
-      "s.premiere.documents",
-      "s.premiere.daily",
-      "s.premiere.close",
-    ]);
-    // Q-to-Q stays CODE_VERIFIED until the microphone "skip" test runs.
-    const suppressed = gate.decisions.filter((d) => d.verdict === "SUPPRESSED");
-    expect(suppressed.map((d) => d.sceneId)).toEqual([
-      "s.premiere.subject",
-      "s.premiere.gateq-interview",
-      "s.premiere.rehearsal",
-    ]);
+    const live = new Set(
+      PREMIERE_CERTIFICATION_LEDGER.filter(
+        (e) => e.status === "PRODUCTION_LIVE_VERIFIED",
+      ).map((e) => e.featureId),
+    );
+    const expected = PREMIERE_SCRIPT.scenes
+      .filter((s) => s.featureIds.every((f) => live.has(f)))
+      .map((s) => s.sceneId);
+    expect(gate.scenes.map((s) => s.sceneId)).toEqual(expected);
+    expect(expected).toContain("s.premiere.intro");
+    expect(expected).toContain("s.premiere.close");
   });
 
-  it("a rehearsal that opts into CODE_VERIFIED runs the full cut", () => {
+  it("a rehearsal that opts into CODE_VERIFIED runs the full cut, every line approved", () => {
     const gate = certifyTour(PREMIERE_SCRIPT, PREMIERE_CERTIFICATION_LEDGER, {
       now: NOW,
       staleFeatureIds: [],
       audience: "INTERNAL_REHEARSAL",
       acceptedStatuses: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
     });
-    expect(gate.scenes).toHaveLength(16);
+    expect(gate.scenes).toHaveLength(MAIN.length);
     expect(gate.rejectedLines).toEqual([]);
+    const atlas = certifyTour(ATLAS_SCRIPT, PREMIERE_CERTIFICATION_LEDGER, {
+      now: NOW,
+      staleFeatureIds: [],
+      audience: "INTERNAL_REHEARSAL",
+      acceptedStatuses: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
+    });
+    expect(atlas.scenes).toHaveLength(ATLAS_SCRIPT.scenes.length);
+    expect(atlas.rejectedLines).toEqual([]);
+  });
+
+  it("the Atlas holds every main chapter plus the deeper ones, each once", () => {
+    const atlas = ATLAS_SCRIPT.scenes.map((s) => s.sceneId);
+    for (const id of MAIN) expect(atlas).toContain(id);
+    for (const id of [
+      "s.premiere.explore",
+      "s.atlas.risks",
+      "s.premiere.privacy",
+      "s.premiere.gateq-interview",
+      "s.premiere.daily",
+      "s.premiere.subject",
+    ]) {
+      expect(atlas).toContain(id);
+      expect(MAIN).not.toContain(id);
+    }
+    expect(new Set(atlas).size).toBe(atlas.length);
+  });
+
+  it("speaks at a pace that fits 5 to 7 minutes (narration estimate, without waits)", () => {
+    const words = PREMIERE_SCRIPT.scenes
+      .flatMap((s) => s.lines)
+      .reduce((n, l) => n + l.text.split(/\s+/u).length, 0);
+    // About 150 words a minute: the narration alone stays under 5 minutes,
+    // leaving room for the screens and Q's answers.
+    expect(words / 150).toBeLessThan(5);
   });
 
   it("a DRAFT script never runs for an audience", () => {
@@ -69,10 +118,48 @@ describe("r3 premiere and the certification gate", () => {
   it("stale certified features are suppressed when the integration owner marks them", () => {
     const gate = certifyTour(PREMIERE_SCRIPT, PREMIERE_CERTIFICATION_LEDGER, {
       now: NOW,
-      staleFeatureIds: ["INV-RISKS-FOLLOWUP"],
+      staleFeatureIds: ["INV-COMPARE-TABLE"],
       audience: "INTERNAL_REHEARSAL",
     });
-    expect(gate.scenes.map((s) => s.sceneId)).not.toContain("s.pilot.company");
+    expect(gate.scenes.map((s) => s.sceneId)).not.toContain("s.pilot.compare");
+  });
+
+  it("consequential steps are never tour actions: the meeting dialog opens, nothing is booked", () => {
+    const acts = PREMIERE_SCRIPT.scenes.flatMap((s) => s.actions);
+    for (const action of acts) {
+      if (action.kind === "uiAct") {
+        expect([
+          "NEXT",
+          "PREVIOUS",
+          "SELECT_ITEM",
+          "ACTIVATE",
+          "OPEN",
+          "CLOSE",
+          "EXPAND",
+          "SCROLL_TO",
+        ]).toContain(action.act);
+      }
+    }
+    const activated = acts.flatMap((a) =>
+      a.kind === "uiAct" && a.act === "ACTIVATE" ? [a.target] : [],
+    );
+    // Save (reversible, private) and a list filter; never a booking button.
+    expect(activated).toEqual(["button.feed-save", "button.documents-by-q"]);
+    const meeting = PREMIERE_SCRIPT.scenes.find(
+      (s) => s.sceneId === "s.premiere.meeting",
+    );
+    expect(meeting?.actions.map((a) => a.kind)).toEqual([
+      "openRecord",
+      "uiAct",
+    ]);
+    expect(
+      meeting?.actions.some(
+        (a) =>
+          a.kind === "uiAct" &&
+          a.target === "dialog.book-call" &&
+          a.act === "OPEN",
+      ),
+    ).toBe(true);
   });
 });
 
@@ -151,7 +238,7 @@ describe("two-minute cut", () => {
     expect(ids.slice(0, 3)).toEqual([
       "s.premiere.intro",
       "s.premiere.mandate",
-      "s.pilot.opening",
+      "s.premiere.feed",
     ]);
     const intro = PREMIERE_SCRIPT.scenes[0];
     expect(intro?.lines.map((l) => l.kind)).toEqual([
@@ -189,7 +276,7 @@ describe("spoken chapter jumps (slice 6)", () => {
     text,
     final: true,
   });
-  const chapters = PREMIERE_SCRIPT.chapters;
+  const chapters = ATLAS_SCRIPT.chapters;
 
   it.each([
     ["Show me GateQ.", "ch.premiere.gateq"],
@@ -217,7 +304,7 @@ describe("spoken chapter jumps (slice 6)", () => {
 
 describe("coverage (slice 7)", () => {
   it("every premiere chapter can be named aloud, and every major area has one", () => {
-    for (const chapter of PREMIERE_SCRIPT.chapters) {
+    for (const chapter of ATLAS_SCRIPT.chapters) {
       expect(
         chapter.spokenNames?.length ?? 0,
         chapter.chapterId,
@@ -232,7 +319,7 @@ describe("coverage (slice 7)", () => {
           text,
           final: true,
         },
-        PREMIERE_SCRIPT.chapters,
+        ATLAS_SCRIPT.chapters,
       );
     for (const [text, chapterId] of [
       ["show me the mandate", "ch.premiere.mandate"],
@@ -245,7 +332,7 @@ describe("coverage (slice 7)", () => {
       ["show me the q daily", "ch.premiere.daily"],
       ["demo rehearsals", "ch.premiere.rehearsal"],
       ["show me privacy", "ch.premiere.privacy"],
-      ["show me capital q", "ch.premiere.subject"],
+      ["show me capital q", "ch.premiere.capital-q"],
       ["show me the gateq interview", "ch.premiere.gateq-interview"],
     ] as const) {
       expect(said(text), text).toBe(chapterId);

@@ -57,6 +57,7 @@ export {
   type PackEntry,
 } from "./knowledge-pack.js";
 export {
+  ATLAS_SCRIPT,
   PREMIERE_CERTIFICATION_LEDGER,
   PREMIERE_SCRIPT,
   SHORT_SCRIPT,

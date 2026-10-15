@@ -46,6 +46,7 @@ import {
 } from "@/features/relationships/relationship-data";
 import { HubHeader } from "@/features/relationships/hub-header";
 import {
+  HUB_PAGE_PENDING,
   hubOverviewRefs,
   hubViewOf,
   pipelineLayoutOf,
@@ -127,7 +128,7 @@ export default async function RelationshipsPage({
     return (
       // The Overview's blocks are separate questions (what needs me, what
       // I hold, how the period went): more air between them than within.
-      <PageContainer className="flex flex-col gap-8">
+      <PageContainer className={`flex flex-col gap-8 ${HUB_PAGE_PENDING}`}>
         <HubHeader side={side} view={view} />
         {data === null ||
         user === null ||
@@ -242,7 +243,7 @@ export default async function RelationshipsPage({
     return (
       // The Overview's blocks are separate questions (what needs me, what
       // I hold, how the period went): more air between them than within.
-      <PageContainer className="flex flex-col gap-8">
+      <PageContainer className={`flex flex-col gap-8 ${HUB_PAGE_PENDING}`}>
         <HubHeader side={side} view={view} />
         {unset ? (
           <EmptyState
@@ -335,7 +336,7 @@ export default async function RelationshipsPage({
     : RelationshipPipelineQuerySchema.parse({});
 
   return (
-    <PageContainer className="flex flex-col gap-4">
+    <PageContainer className={`flex flex-col gap-4 ${HUB_PAGE_PENDING}`}>
       <HubHeader
         side={side}
         view={view}

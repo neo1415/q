@@ -21,10 +21,16 @@ export const dynamic = "force-dynamic";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function notFound(): NextResponse {
+function notFound(kept = false): NextResponse {
   return new NextResponse(null, {
     status: 404,
-    headers: { "Cache-Control": "private, no-store" },
+    headers: {
+      // Perf lane 2026-10-16: the API's answer "no photo for you" is kept
+      // briefly in this browser, like a photo's redirect, so every list and
+      // page view does not ask again (hosted: ten 404s per Pipeline view).
+      // A missing session or a malformed id is never kept.
+      "Cache-Control": kept ? "private, max-age=300" : "private, no-store",
+    },
   });
 }
 
@@ -47,7 +53,8 @@ export async function GET(
   // plain http); anything else is no photo.
   const protocol = target === null ? null : URL.parse(target)?.protocol;
   if (target === null || (protocol !== "https:" && protocol !== "http:")) {
-    return notFound();
+    // Only the API's own answer is kept: a read that failed asks again.
+    return notFound(photo !== null);
   }
   return new NextResponse(null, {
     status: 302,

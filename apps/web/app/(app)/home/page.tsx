@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 
 import { redirect } from "next/navigation";
@@ -46,8 +47,11 @@ export default async function HomePage({
   const conversationId = typeof raw === "string" && raw.length > 0 ? raw : null;
   return (
     <>
-      {/* F2: an invitation to their verified email, where they land. */}
-      <PendingInvitations />
+      {/* F2: an invitation to their verified email, where they land.
+          Streamed: its read never holds Q's page (perf lane 2026-10-16). */}
+      <Suspense fallback={null}>
+        <PendingInvitations />
+      </Suspense>
       <HomeScreen
         conversationId={conversationId}
         fresh={params["new"] === "1"}
