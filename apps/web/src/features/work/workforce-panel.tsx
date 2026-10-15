@@ -49,6 +49,7 @@ import {
 } from "./workforce-view";
 import { workStateOf } from "./job-state";
 import { WorkforceDocuments } from "./workforce-documents";
+import { WorkforcePlan } from "./workforce-plan";
 
 /**
  * Q's team (founder brief J5; approved mockup 2026-10-06 b/workforce): on
@@ -364,6 +365,7 @@ function JobCard({
           {status.label}
         </span>
       </div>
+      <WorkforcePlan plan={job.plan} />
       {lines.length > shown.length ? (
         <button
           type="button"
