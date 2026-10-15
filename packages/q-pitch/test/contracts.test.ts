@@ -28,6 +28,9 @@ describe("TourAction v1", () => {
         "buildComparison",
         "openCompany",
         "openRoute",
+        // PROPOSED r3 (blueprint §16.1 P8): backed by the existing
+        // rehearsal session actions, bounded and always ended explicitly.
+        "runShortRehearsal",
         "scrollTo",
         "selectTab",
         "showQJob",

@@ -219,3 +219,45 @@ export function eventOf(intent: TourControlIntent): GuideEvent | null {
       return null;
   }
 }
+
+const AUDIENCE_PHRASES: readonly (readonly [TourControlKind, RegExp])[] = [
+  [
+    "REPEAT",
+    /^(?:q,? )?(?:show me that again|show that again|again|repeat that|say that again)$/u,
+  ],
+  [
+    "PAUSE",
+    /^(?:q,? )?(?:pause|stop|hold on|wait|pause the tour|stop the tour)$/u,
+  ],
+  [
+    "RESUME",
+    /^(?:q,? )?(?:resume|continue|carry on|go on|keep going|resume the tour)$/u,
+  ],
+  ["BACK", /^(?:q,? )?(?:go back|back|rewind|previous)$/u],
+  ["SKIP", /^(?:q,? )?(?:skip|next|skip this|skip that|next scene)$/u],
+];
+
+/**
+ * The tour's own reading of what the AUDIENCE said: a short, closed set of
+ * control phrases. Anything longer that the audience says while the tour
+ * runs is a question, so it interrupts. A segment from any other source
+ * yields nothing, whatever it says. This is the classifier, not the
+ * boundary: the boundary is `TourControlGate` (source and segment ledger,
+ * echo gating).
+ */
+export function classifyAudienceSpeech(
+  segment: TranscriptSegment,
+): TourControlKind | null {
+  if (segment.source !== "AUDIENCE_MIC" || !segment.final) return null;
+  const said = segment.text
+    .toLowerCase()
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}\s,]/gu, "")
+    .replace(/\s+/gu, " ")
+    .trim();
+  if (said.length === 0) return null;
+  for (const [kind, pattern] of AUDIENCE_PHRASES) {
+    if (pattern.test(said)) return kind;
+  }
+  return "INTERRUPT";
+}
