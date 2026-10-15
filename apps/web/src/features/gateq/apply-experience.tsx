@@ -35,6 +35,7 @@ import {
   startApplicationAction,
   submitApplicationAction,
 } from "./apply-actions";
+import { CoveragePanel } from "./coverage-panel";
 import { readRecovery, amendRecovery } from "./form/session-recovery";
 import {
   criterionLines,
@@ -1205,6 +1206,17 @@ export function ApplyExperience({
       </>
     );
 
+  // C2: the durable coverage check, beside the live interview.
+  const coveragePanel =
+    interview &&
+    loaded &&
+    confirmed &&
+    coverage !== null &&
+    stage === "TALKING" &&
+    closing === null ? (
+      <CoveragePanel coverage={coverage} fund={fund} />
+    ) : null;
+
   if (compact) {
     return (
       <section
@@ -1215,6 +1227,7 @@ export function ApplyExperience({
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
           {body}
           {problemNote}
+          {coveragePanel}
         </div>
         {showComposer ? (
           <div className="border-t border-(--cq-border-subtle) px-4 pt-3">
@@ -1234,9 +1247,22 @@ export function ApplyExperience({
       aria-label={`${fund}: fit check with Q`}
     >
       {header}
-      {body}
-      {problemNote}
-      {showComposer ? composer : null}
+      {coveragePanel === null ? (
+        <>
+          {body}
+          {problemNote}
+          {showComposer ? composer : null}
+        </>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="flex min-w-0 flex-col gap-6">
+            {body}
+            {problemNote}
+            {showComposer ? composer : null}
+          </div>
+          {coveragePanel}
+        </div>
+      )}
     </section>
   );
 }
