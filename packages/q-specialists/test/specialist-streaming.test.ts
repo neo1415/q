@@ -70,7 +70,11 @@ function request(): QAnswerRequest {
   };
 }
 
-function seam(withBus: boolean, said = "What are the main risks here?") {
+function seam(
+  withBus: boolean,
+  said = "What are the main risks here?",
+  extra: Partial<Parameters<typeof createSpecialistQAnswer>[0]> = {},
+) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
     tenantId: TENANT as QConversationMessage["tenantId"],
@@ -84,6 +88,7 @@ function seam(withBus: boolean, said = "What are the main risks here?") {
   const published: { messageId: string; text: string }[] = [];
   const stored: { id?: string; content: string }[] = [];
   const investigated: { publicResearch?: boolean | undefined }[] = [];
+  const delegatedWith: QAnswerRequest[] = [];
   const bus = {
     publish: (delta: { messageId: string; text: string }) => {
       published.push(delta);
@@ -134,7 +139,15 @@ function seam(withBus: boolean, said = "What are the main risks here?") {
     },
     delegate: {
       warm: () => undefined,
-      answer: () => Promise.reject(new Error("not the specialist path")),
+      answer: (delegated) => {
+        delegatedWith.push(delegated);
+        return Promise.resolve({
+          kind: "ANSWERED",
+          messageId: randomUUID(),
+          modelPolicyVersion: "test",
+          promptBundleVersion: "test",
+        } as never);
+      },
     },
     repositories: {
       messages: {
@@ -156,8 +169,9 @@ function seam(withBus: boolean, said = "What are the main risks here?") {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     ...(withBus ? { deltas: bus } : {}),
+    ...extra,
   });
-  return { answer, published, stored, investigated };
+  return { answer, published, stored, investigated, delegatedWith };
 }
 
 describe("the company specialist's answer on the live bus (S3)", () => {
@@ -217,4 +231,63 @@ describe("the specialist reads the public web only when asked (S7)", () => {
       expect(s.investigated.at(-1)?.publicResearch).toBe(web);
     },
   );
+});
+
+/**
+ * Lane S 2026-10-15 (audit, run 941eac44): Maji Loop in focus, "What does
+ * Spheros actually do?" was answered about Maji Loop. A named counterpart
+ * of their own that is not the focus is preferred, by code.
+ */
+describe("a named counterpart is preferred over the company in focus", () => {
+  const SPHEROS = "e1e1e1e1-e1e1-4e1e-8e1e-e1e1e1e1e1e1";
+  const lookups: string[] = [];
+  const extra = {
+    counterpartNames: () => Promise.resolve(["Spheros", "Maji Loop"]),
+    openRecord: {
+      open: (
+        _request: QAnswerRequest,
+        target: { name?: string | undefined },
+      ) => {
+        lookups.push(target.name ?? "");
+        const id =
+          target.name === "Spheros"
+            ? SPHEROS
+            : target.name === "Maji Loop"
+              ? COMPANY
+              : null;
+        return Promise.resolve(
+          id === null
+            ? null
+            : {
+                kind: "OPEN_RECORD_PAGE" as const,
+                page: "COMPANY" as const,
+                id,
+              },
+        );
+      },
+    },
+  } as unknown as Partial<Parameters<typeof createSpecialistQAnswer>[0]>;
+
+  it("hands the turn to the conversational path, marked about someone else", async () => {
+    const s = seam(true, "What does Spheros actually do?", extra);
+    await s.answer.answer(request());
+    expect(s.investigated).toHaveLength(0);
+    expect(s.delegatedWith.at(-1)?.aboutNamedOther).toBe(true);
+    // The plan's subjects are untouched: nothing is widened.
+    expect(s.delegatedWith.at(-1)?.subjects).toEqual([
+      { kind: "COMPANY", companyId: COMPANY },
+    ]);
+  });
+
+  it("keeps the analysis when the named one is the company in focus, or none is named", async () => {
+    for (const said of [
+      "What are the main risks with Maji Loop?",
+      "What are the main risks here?",
+    ]) {
+      const s = seam(true, said, extra);
+      await s.answer.answer(request());
+      expect(s.investigated).toHaveLength(1);
+      expect(s.delegatedWith).toHaveLength(0);
+    }
+  });
 });

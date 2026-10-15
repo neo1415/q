@@ -1877,3 +1877,61 @@ describe("the selected dossier is read beside context assembly", () => {
     },
   );
 });
+
+/**
+ * Lane S 2026-10-15 (lane A): "put those three in a table" after an answer
+ * is a re-render: no public-web tool is offered and none is run, even when
+ * the turn's reading asked for research.
+ */
+describe("a re-render ask never reaches the public web", () => {
+  const WEB: QOfferedTool = {
+    ...GET_COMPANY,
+    toolName: "public_web.search",
+    definition: { ...GET_COMPANY.definition, name: "research_public_web" },
+  };
+  it.each([
+    ["put those three in a table", 1],
+    ["What are the risks with Northwind Ledger?", 2],
+  ] as const)("%s -> %s tools offered", async (said, offeredCount) => {
+    const tools = toolPort([WEB, GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, request, messages, logLines } = build({
+      tools,
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) }],
+    });
+    const first = messages[0];
+    if (first === undefined) throw new Error("fixture");
+    messages.splice(
+      0,
+      1,
+      { ...first, content: "Which three companies fit my mandate?" },
+      {
+        ...first,
+        id: randomUUID() as QConversationMessage["id"],
+        role: "Q",
+        content: "Ledgerfold, Baridi and Maji Loop fit best.",
+      },
+      {
+        ...first,
+        id: randomUUID() as QConversationMessage["id"],
+        content: said,
+      },
+    );
+    await seam.answer({
+      ...request,
+      turnKind: "QUESTION_TO_Q",
+      research: Promise.resolve({
+        mode: "EXPLICIT",
+        announceSourceChange: false,
+      }),
+    });
+    const path = logLines
+      .map((line) => JSON.parse(line) as [Record<string, unknown>, string])
+      .find(([, message]) => message === "q answer path");
+    expect(path?.[0]).toMatchObject({ tools: offeredCount });
+    if (offeredCount === 1) {
+      expect(tools.executed.some((p) => p.name === "research_public_web")).toBe(
+        false,
+      );
+    }
+  });
+});

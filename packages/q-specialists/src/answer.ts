@@ -99,6 +99,7 @@ import {
 import {
   asksForOwnMandate,
   ownInvestorOrganisationIn,
+  reRenderAskOf,
   withoutStatusTalk,
 } from "@capital-q/model-gateway/q";
 import {
@@ -316,7 +317,10 @@ import {
   type TabAsk,
 } from "./tab-request.js";
 import { movePhaseLine } from "@capital-q/q-core/speech";
-import { namedRecordRequestOf } from "./named-record-request.js";
+import {
+  namedRecordRequestOf,
+  ownCounterpartWithin,
+} from "./named-record-request.js";
 import type { TurnReference, TurnSkimResult } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
@@ -2206,11 +2210,19 @@ export function createSpecialistQAnswer(
     ) {
       return null;
     }
+    // Lane S 2026-10-15 (audit 10-14: "Open the first relationship in this
+    // pipeline." answered "Understood."): a relationship, a deal or a row of
+    // the pipeline is that relationship's page, not the profile.
+    const relationship = /\b(?:relationships?|pipeline|deals?)\b/iu.test(text);
     const page =
       resolved.entity.kind === "COMPANY"
-        ? ("COMPANY" as const)
+        ? relationship
+          ? ("RELATIONSHIP_COMPANY" as const)
+          : ("COMPANY" as const)
         : resolved.entity.kind === "INVESTOR_ORGANISATION"
-          ? ("INVESTOR" as const)
+          ? relationship
+            ? ("RELATIONSHIP_INVESTOR" as const)
+            : ("INVESTOR" as const)
           : null;
     if (page === null) return null;
     return {
@@ -3547,7 +3559,13 @@ export function createSpecialistQAnswer(
       );
     }
     const research: Promise<QResearchDirective> = Promise.resolve(
-      read === null
+      read === null ||
+        // Lane S: "put those three in a table" re-renders what was shown;
+        // whatever the reading, it never reaches the public web.
+        reRenderAskOf(
+          latest.content,
+          history.some((message) => message.role === "Q"),
+        )
         ? NO_RESEARCH
         : researchDirectiveFor(state, readingFromTurnReader(read), {
             available: dependencies.researchAvailable ?? true,
@@ -4468,6 +4486,26 @@ export function createSpecialistQAnswer(
     !NAMES_THE_WEB.test(text) &&
     !namesWebAddress(text);
 
+  /** Lane S: their words name one of their own counterparts other than `focus`. */
+  const namesOtherCounterpart = async (
+    request: QAnswerRequest,
+    text: string,
+    focusCompanyId: string,
+  ): Promise<boolean> => {
+    const port = dependencies.openRecord;
+    if (port === undefined) return false;
+    const name = ownCounterpartWithin(text, await counterpartsOf(request));
+    if (name === null) return false;
+    const intent = await port
+      .open(request, { page: "COMPANY", name })
+      .catch(() => null);
+    return (
+      intent !== null &&
+      intent.id !== undefined &&
+      intent.id.toLowerCase() !== focusCompanyId.toLowerCase()
+    );
+  };
+
   const answerOnce = async (
     request: QAnswerRequest,
     route: {
@@ -4516,6 +4554,25 @@ export function createSpecialistQAnswer(
     );
     if (company === undefined || company.kind !== "COMPANY") {
       return delegate.answer(withReferences(request));
+    }
+    // Lane S 2026-10-15 (audit, run 941eac44: Maji Loop on screen, "What
+    // does Spheros actually do?" answered about Maji Loop): the words name
+    // one of their own counterparts, and that is not the company in focus.
+    // The named one is meant, so the focus company's analysis is not run;
+    // the conversational path answers with the turn marked as about someone
+    // else, and reads the named company under the plan as always. Settled
+    // by code from their counterparts list and open_page's own lookup; no
+    // model call, and nothing is widened (the plan's subjects stay as they are).
+    if (
+      await namesOtherCounterpart(request, latest.content, company.companyId)
+    ) {
+      logger?.info(
+        { qRunId: request.runId },
+        "q named counterpart differs from the company in focus",
+      );
+      return delegate.answer(
+        withReferences({ ...request, aboutNamedOther: true }),
+      );
     }
 
     last = null;
