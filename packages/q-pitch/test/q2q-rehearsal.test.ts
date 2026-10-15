@@ -63,7 +63,7 @@ function fakeRehearsal(options: {
 }
 
 const PLAN = {
-  founderLines: [
+  narratorLines: [
     "We reduce analyst screening time with sourced evidence.",
     "Our wedge is investor-controlled inbound.",
     "We have no revenue figures to share yet.",

@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -11,6 +12,8 @@ import {
 import {
   PILOT_CERTIFICATION_LEDGER,
   PILOT_SCRIPT,
+  PREMIERE_CERTIFICATION_LEDGER,
+  PREMIERE_SCRIPT,
   TourActorSchema,
   TourRunner,
   certifyTour,
@@ -18,9 +21,12 @@ import {
   type TourActor,
   type TourControlKind,
   type TourSnapshot,
+  type TranscriptSegment,
 } from "@capital-q/q-pitch";
 
-import { useTourPorts } from "./use-tour-ports";
+import { useQSessionOptional } from "@/features/q/q-session";
+
+import { useTourPorts, type TranscriptSink } from "./use-tour-ports";
 
 /**
  * Q Pitch host (QP-F08/F09): Q narrates the real app. Mounted once in the
@@ -71,35 +77,78 @@ function actionWords(snapshot: TourSnapshot): string | null {
     case "askApprovedQuestion":
     case "buildComparison":
       return "Q is answering. Waiting for the answer on screen";
+    case "runShortRehearsal":
+      return "Simulation running. It ends on its own in about half a minute";
   }
+}
+
+export type TourChoice = "pilot" | "premiere";
+
+/**
+ * Which script, and what the gate may admit. The premiere opts into
+ * CODE_VERIFIED scenes, as an INTERNAL_REHEARSAL only, to rehearse the full
+ * r3 cut and collect the browser receipts that would promote them.
+ */
+const TOURS = {
+  pilot: {
+    script: PILOT_SCRIPT,
+    ledger: PILOT_CERTIFICATION_LEDGER,
+    accepted: ["PRODUCTION_LIVE_VERIFIED"],
+    label: "Internal rehearsal · draft script · demonstration data",
+  },
+  premiere: {
+    script: PREMIERE_SCRIPT,
+    ledger: PREMIERE_CERTIFICATION_LEDGER,
+    accepted: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
+    label:
+      "Internal rehearsal · draft r3 · includes code-verified scenes without a browser receipt · demonstration data",
+  },
+} as const;
+
+/** A spoken line id as a segment id (the gate's opaque id grammar). */
+function segmentIdOf(prefix: string, id: string): string {
+  return `${prefix}-${id.replace(/[^A-Za-z0-9:._-]/gu, "_")}`.slice(0, 128);
 }
 
 export function QPitchHost({
   account,
   role,
+  tour,
   onExit,
 }: {
   readonly account: string;
   readonly role: "INVESTOR" | "FOUNDER";
+  readonly tour: TourChoice;
   readonly onExit: () => void;
 }) {
+  const choice = TOURS[tour];
   const actor = useMemo<TourActor | null>(() => {
     const parsed = TourActorSchema.safeParse({ role, account });
     return parsed.success ? parsed.data : null;
   }, [account, role]);
-  const ports = useTourPorts(PILOT_SCRIPT);
+  const transcript: TranscriptSink = useRef(null);
+  const ports = useTourPorts(choice.script, transcript);
+  const session = useQSessionOptional();
   // The live runner, held in a tiny external store: the effect that owns
   // its lifetime publishes it, so a remount (Strict Mode) builds a fresh one.
   const slot = useMemo(() => createSlot<TourRunner>(), []);
   const runner = useSyncExternalStore(slot.subscribe, slot.get, slot.none);
+  const heard = useMemo(() => createSlot<TranscriptSegment>(), []);
+  const simulation = useSyncExternalStore(
+    heard.subscribe,
+    heard.get,
+    heard.none,
+  );
+  const seen = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     if (actor === null || ports === null) return;
-    const gate = certifyTour(PILOT_SCRIPT, PILOT_CERTIFICATION_LEDGER, {
+    const gate = certifyTour(choice.script, choice.ledger, {
       now: new Date().toISOString(),
       // Rehearsal: the integration owner marks stale ids before any audience run.
       staleFeatureIds: [],
       audience: "INTERNAL_REHEARSAL",
+      acceptedStatuses: choice.accepted,
     });
     const next = new TourRunner({
       scenes: gate.scenes,
@@ -108,17 +157,70 @@ export function QPitchHost({
       ports,
       checkpointBeatMs: CHECKPOINT_BEAT_MS,
     });
+    // Rehearsal turns are transcript for the gate, and captions; never control.
+    transcript.current = (segment) => {
+      next.noteTranscript(segment);
+      heard.set(segment);
+    };
     slot.set(next);
     next.start();
     return () => {
+      transcript.current = null;
       next.dispose();
       slot.set(null);
+      heard.set(null);
     };
-  }, [actor, ports, slot]);
+  }, [actor, ports, slot, heard, choice, transcript]);
+
+  // The voice line's transcript. The person's lines are AUDIENCE_MIC and
+  // offered to the gate; Q's own spoken lines are recorded as NARRATOR_Q
+  // and can never steer. Lines said before the tour started are ignored.
+  const spoken = session?.spoken;
+  const qSpeaking = session?.presence.state === "SPEAKING";
+  useEffect(() => {
+    if (runner === null || spoken === undefined) return;
+    if (seen.current === null) {
+      seen.current = new Set(spoken.map((line) => line.id));
+      return;
+    }
+    for (const line of spoken) {
+      if (seen.current.has(line.id)) continue;
+      seen.current.add(line.id);
+      const text = line.text.trim().slice(0, 2000);
+      if (text.length === 0) continue;
+      if (line.role === "user") {
+        runner.hearAudience(
+          {
+            segmentId: segmentIdOf("mic", line.id),
+            source: "AUDIENCE_MIC",
+            channelId: "mic",
+            text,
+            final: true,
+          },
+          {
+            narratorPlaying: qSpeaking,
+            counterpartPlaying: false,
+            // The voice providers ask for echo cancellation but do not
+            // report it back, so it is not assumed: spoken control while
+            // Q is talking is refused (ECHO_UNGUARDED); buttons still work.
+            echoCancellation: false,
+          },
+        );
+      } else {
+        runner.noteTranscript({
+          segmentId: segmentIdOf("q", line.id),
+          source: "NARRATOR_Q",
+          channelId: "q-voice",
+          text,
+          final: true,
+        });
+      }
+    }
+  }, [runner, spoken, qSpeaking]);
 
   if (actor === null) {
     return (
-      <TourFrame onExit={onExit}>
+      <TourFrame label={choice.label} onExit={onExit}>
         <p className="cq-body-sm text-(--cq-text-secondary)">
           Q Pitch runs only on a fictional demo account. This account is not
           one, so the tour has not started.
@@ -127,7 +229,14 @@ export function QPitchHost({
     );
   }
   if (runner === null) return null;
-  return <TourOverlay runner={runner} onExit={onExit} />;
+  return (
+    <TourOverlay
+      runner={runner}
+      label={choice.label}
+      simulation={simulation}
+      onExit={onExit}
+    />
+  );
 }
 
 function createSlot<T>() {
@@ -160,9 +269,13 @@ function useSnapshot(runner: TourRunner): TourSnapshot {
 
 function TourOverlay({
   runner,
+  label,
+  simulation,
   onExit,
 }: {
   readonly runner: TourRunner;
+  readonly label: string;
+  readonly simulation: TranscriptSegment | null;
   readonly onExit: () => void;
 }) {
   const snapshot = useSnapshot(runner);
@@ -224,7 +337,7 @@ function TourOverlay({
     snapshot.notice?.kind === "FALLBACK" ? snapshot.notice.failureCode : null;
 
   return (
-    <TourFrame onExit={onExit}>
+    <TourFrame label={label} onExit={onExit}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="cq-label text-(--cq-text-primary)">
           {scene?.title ?? "Q Pitch"}
@@ -240,6 +353,17 @@ function TourOverlay({
       >
         {snapshot.caption?.text ?? working ?? ""}
       </p>
+      {simulation === null ||
+      snapshot.awaiting?.kind !== "runShortRehearsal" ? null : (
+        <p
+          className="cq-body-sm text-(--cq-text-secondary)"
+          data-q-pitch-simulation
+        >
+          Simulation ·{" "}
+          {simulation.source === "REHEARSAL_COUNTERPART" ? "Counterpart" : "Q"}:{" "}
+          {simulation.text}
+        </p>
+      )}
       {fallback === null ? null : (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
           Q stopped here and won&apos;t describe it ({fallback}). Resume, or go
@@ -286,9 +410,11 @@ function TourOverlay({
 
 function TourFrame({
   children,
+  label,
   onExit,
 }: {
   readonly children: React.ReactNode;
+  readonly label: string;
   readonly onExit: () => void;
 }) {
   return (
@@ -298,9 +424,7 @@ function TourFrame({
       className="fixed inset-x-4 bottom-24 z-(--cq-z-presence) mx-auto flex max-w-xl flex-col gap-3 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          Internal rehearsal · draft script · demonstration data
-        </p>
+        <p className="cq-body-sm text-(--cq-text-secondary)">{label}</p>
         <TourButton label="End tour" onPress={onExit} />
       </div>
       {children}

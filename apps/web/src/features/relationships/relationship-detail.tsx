@@ -41,6 +41,7 @@ import { RelationshipDeal } from "./relationship-deal";
 import { RelationshipErrands } from "./relationship-errands";
 import { RelationshipOutcome } from "./relationship-outcome";
 import { nextStepFor, type NextStep } from "./relationships-view";
+import { StageDurations } from "./stage-durations";
 import { RelationshipTimeline } from "./relationship-timeline";
 import { JOURNEY, journeyStep } from "./journey";
 import {
@@ -106,6 +107,7 @@ export function RelationshipDetail({
   brief = null,
   fitAndInterest = null,
   work = null,
+  gateq = null,
 }: {
   readonly side: RelationshipSide;
   readonly counterpart: string;
@@ -135,6 +137,8 @@ export function RelationshipDetail({
   readonly fitAndInterest?: ReactNode;
   /** Q's work with this counterpart; null when there is none to show. */
   readonly work?: ReactNode;
+  /** GateQ applications on this relationship; null when there are none. */
+  readonly gateq?: ReactNode;
 }) {
   // The match outlives CONNECTED (relationship-state.v2).
   const connected =
@@ -261,6 +265,10 @@ export function RelationshipDetail({
               collapsible
               count={relationship.milestones.length}
             >
+              <StageDurations
+                milestones={relationship.milestones}
+                now={readAt}
+              />
               <RelationshipTimeline
                 milestones={relationship.milestones}
                 meetings={meetings}
@@ -268,6 +276,12 @@ export function RelationshipDetail({
                 side={side}
                 counterpart={counterpart}
               />
+            </Card>
+          )}
+
+          {gateq === null || gateq === undefined ? null : (
+            <Card title="GateQ" id="gateq">
+              {gateq}
             </Card>
           )}
 

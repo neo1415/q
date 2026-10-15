@@ -24,6 +24,8 @@ import {
   NETWORK_COMPANY_RELATIONSHIPS_PATH,
   NETWORK_RELATIONSHIP_BRIEF_PATH,
   NETWORK_RELATIONSHIP_BRIEFS_PATH,
+  NETWORK_RELATIONSHIP_GATEQ_APPLICATIONS_PATH,
+  RelationshipGateqApplicationsDtoSchema,
   RelationshipBriefListSchema,
   RelationshipBriefSchema,
   RelationshipListDtoSchema,
@@ -151,6 +153,25 @@ export function getRelationshipBrief(
       encodeURIComponent(relationshipId),
     ),
     RelationshipBriefSchema,
+  );
+}
+
+/**
+ * `GET /v1/network/relationships/:relationshipId/gateq-applications`: the
+ * GateQ applications on one canonical relationship, for the caller's side.
+ */
+export function getRelationshipGateqApplications(
+  session: ApiSession,
+  relationshipId: string,
+) {
+  return call(
+    session,
+    "GET",
+    NETWORK_RELATIONSHIP_GATEQ_APPLICATIONS_PATH.replace(
+      ":relationshipId",
+      encodeURIComponent(relationshipId),
+    ),
+    RelationshipGateqApplicationsDtoSchema,
   );
 }
 

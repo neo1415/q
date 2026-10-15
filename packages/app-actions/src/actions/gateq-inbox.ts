@@ -199,6 +199,23 @@ const PURPOSES: readonly QTaskClass[] = [
   "RELATIONSHIP_QUESTION",
 ];
 
+/**
+ * Reading ONE application in the investor's own inbox (a READ under GateQ's
+ * own gateway authority) is also offered when the turn is classified as a
+ * question about their own organisation, a company or nothing in
+ * particular. Live 2026-10-15: with the selected dossier on screen, an
+ * "explain this founder's business" turn was classified INVESTOR_QUESTION,
+ * the tool was not offered, the on-screen prefetch skipped it, and Q said
+ * the authorised dossier was unavailable. Consequential inbox actions keep
+ * the narrower PURPOSES.
+ */
+const SUMMARY_PURPOSES: readonly QTaskClass[] = [
+  ...PURPOSES,
+  "INVESTOR_QUESTION",
+  "COUNTERPARTY_COMPANY_QUESTION",
+  "GENERAL_QUESTION",
+];
+
 const respond = (out: Result) =>
   GateqInboxChangedDtoSchema.parse(
     out.ok
@@ -981,7 +998,7 @@ const SUMMARISE = defineAppAction<
         "Provide a company name or an exact application id, not both.",
       ),
     references: {},
-    purposes: PURPOSES,
+    purposes: SUMMARY_PURPOSES,
     eval: {
       say: [
         "Summarise Sunline Energy's application.",

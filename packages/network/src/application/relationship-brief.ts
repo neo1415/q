@@ -21,7 +21,7 @@ import {
   type ProjectableEvent,
 } from "../domain/state-projector.js";
 import type { ExpressInterestDependencies } from "./express-interest.js";
-import { readHistory } from "./relationship-projection.js";
+import { readHistory } from "./relationship-history.js";
 import {
   createListRelationshipsForCompany,
   createListRelationshipsForInvestor,
