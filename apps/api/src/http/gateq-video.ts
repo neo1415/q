@@ -62,7 +62,7 @@ function problem(
 const REFUSAL_WORDS: Record<GateqVideoRefusedError["reason"], string> = {
   DISABLED: "Video interviews aren't switched on. You can continue by typing.",
   ALLOWANCE_EXHAUSTED:
-    "This application has used its video interview. You can continue by typing.",
+    "Your video interviews are used up for now. You can continue by typing.",
   CONCURRENCY_LIMIT:
     "Video interviews are busy right now. You can continue by typing.",
   PROVIDER_UNAVAILABLE:
@@ -126,14 +126,17 @@ export function registerGateqVideoRoutes(
   app.get(GATEQ_APPLY_VIDEO_PATH, async (request, reply) => {
     const token = credential(request);
     try {
-      const [available, session] = await Promise.all([
+      const [available, session, allowance] = await Promise.all([
         video.available(token),
         video.current(token),
+        // Wording only: a failed read never hides typing or the session.
+        video.allowance(token).catch(() => null),
       ]);
       void reply.header("Cache-Control", "no-store");
       return GateqVideoStateDtoSchema.parse({
         available,
         session: dto(session),
+        allowance,
       });
     } catch (error: unknown) {
       return notFound(error, request, reply);

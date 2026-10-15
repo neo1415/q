@@ -20,13 +20,23 @@ const OTHER_TOKEN = "gqs_applicant_token_000000000000002";
 
 function memoryStore(clock: () => number): GateqVideoSessionStore & {
   rows: GateqVideoSessionRow[];
+  /** Stands in for the database's shared allowance and monthly safeguard. */
+  limits: { remaining: number; platformFull: boolean };
 } {
   const rows: GateqVideoSessionRow[] = [];
+  const limits = { remaining: 5, platformFull: false };
   const hashes = new Map<string, string>();
   const open = (r: GateqVideoSessionRow) =>
     r.status !== "ENDED" && Date.parse(r.endsAt) > clock();
   return {
     rows,
+    limits,
+    allowanceFor: () =>
+      Promise.resolve({
+        weeklySessions: 5,
+        remaining: limits.remaining,
+        resetsAt: "2026-10-19T00:00:00.000Z",
+      }),
     reserve: (input) => {
       const existing = rows.find(
         (r) => r.applicationId === input.applicationId && open(r),
@@ -40,6 +50,11 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
         return Promise.resolve({ kind: "ALLOWANCE" as const });
       if (rows.filter(open).length >= input.concurrency)
         return Promise.resolve({ kind: "CONCURRENCY" as const });
+      if (limits.platformFull)
+        return Promise.resolve({ kind: "PLATFORM_LIMIT" as const });
+      if (limits.remaining <= 0)
+        return Promise.resolve({ kind: "WEEKLY_ALLOWANCE" as const });
+      limits.remaining -= 1;
       const now = clock();
       const row: GateqVideoSessionRow = {
         id: input.id,
@@ -250,6 +265,26 @@ describe("the GateQ video interview session", () => {
     await expect(
       w.video.start({ token: TOKEN, correlationId: "c" }),
     ).rejects.toMatchObject({ reason: "ALLOWANCE_EXHAUSTED" });
+  });
+
+  it("offers no video once the person's shared weekly allowance is spent, and refuses a start", async () => {
+    const w = world();
+    w.store.limits.remaining = 0;
+    expect(await w.video.available(TOKEN)).toBe(false);
+    expect(await w.video.allowance(TOKEN)).toMatchObject({ remaining: 0 });
+    await expect(
+      w.video.start({ token: TOKEN, correlationId: "c" }),
+    ).rejects.toMatchObject({ reason: "ALLOWANCE_EXHAUSTED" });
+    expect(w.provider.createRoom).not.toHaveBeenCalled();
+  });
+
+  it("fails closed, before any provider call, when the account's monthly safeguard is reached", async () => {
+    const w = world();
+    w.store.limits.platformFull = true;
+    await expect(
+      w.video.start({ token: TOKEN, correlationId: "c" }),
+    ).rejects.toMatchObject({ reason: "PROVIDER_UNAVAILABLE" });
+    expect(w.provider.createRoom).not.toHaveBeenCalled();
   });
 
   it("caps concurrent sessions across applications", async () => {

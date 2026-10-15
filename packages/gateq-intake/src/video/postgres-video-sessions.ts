@@ -46,6 +46,36 @@ const toRow = (raw: unknown): GateqVideoSessionRow => {
 };
 
 /** Server-only store for gateq.application_video_sessions. */
+const AllowanceRow = z.object({
+  weekly_sessions: z.coerce.number().int().min(0),
+  remaining: z.coerce.number().int().min(0),
+  resets_at: z.coerce.date(),
+});
+
+/**
+ * The shared weekly allowance and the account's monthly safeguard are
+ * enforced by the database when the session row is inserted (migration
+ * 20261226150000), inside this same transaction: a refusal rolls the
+ * whole reservation back, so no room is ever created without one.
+ */
+async function reserveWithinAllowance<T>(
+  run: () => Promise<T>,
+): Promise<
+  | T
+  | { readonly kind: "WEEKLY_ALLOWANCE" }
+  | { readonly kind: "PLATFORM_LIMIT" }
+> {
+  try {
+    return await run();
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "CQ_VIDEO_WEEKLY_ALLOWANCE_EXHAUSTED")
+      return { kind: "WEEKLY_ALLOWANCE" };
+    if (message === "CQ_VIDEO_GLOBAL_CAP") return { kind: "PLATFORM_LIMIT" };
+    throw error;
+  }
+}
+
 export function createPostgresGateqVideoSessions(deps: {
   readonly sql: DatabaseExecutor;
   readonly transactions: TransactionManager;
@@ -53,45 +83,61 @@ export function createPostgresGateqVideoSessions(deps: {
   const { sql, transactions } = deps;
   return {
     reserve: (input) =>
-      transactions.run(async (tx) => {
-        // The application row lock orders this with Submit and with another
-        // start for the same application; the advisory lock orders starts
-        // across applications for the concurrency cap.
-        const app = await tx.sql`
+      reserveWithinAllowance(() =>
+        transactions.run(async (tx) => {
+          // The application row lock orders this with Submit and with another
+          // start for the same application; the advisory lock orders starts
+          // across applications for the concurrency cap.
+          const app = await tx.sql`
           select status from gateq.applications
           where id = ${input.applicationId} and tenant_id = ${input.tenantId} for update`;
-        if (app.length !== 1 || app[0]?.["status"] === "SUBMITTED")
-          return { kind: "ALLOWANCE" as const };
-        await tx.sql`select pg_advisory_xact_lock(hashtextextended('gateq-video-sessions', 0))`;
-        const open = await tx.sql`
+          if (app.length !== 1 || app[0]?.["status"] === "SUBMITTED")
+            return { kind: "ALLOWANCE" as const };
+          await tx.sql`select pg_advisory_xact_lock(hashtextextended('gateq-video-sessions', 0))`;
+          const open = await tx.sql`
           select * from gateq.application_video_sessions
            where application_id = ${input.applicationId} and status <> 'ENDED' and ends_at > now()
            order by created_at desc limit 1`;
-        if (open[0] !== undefined)
-          return { kind: "EXISTING" as const, row: toRow(open[0]) };
-        const counts = z
-          .object({ used: z.coerce.number(), live: z.coerce.number() })
-          .parse(
-            (
-              await tx.sql`
+          if (open[0] !== undefined)
+            return { kind: "EXISTING" as const, row: toRow(open[0]) };
+          const counts = z
+            .object({ used: z.coerce.number(), live: z.coerce.number() })
+            .parse(
+              (
+                await tx.sql`
             select
               (select count(*) from gateq.application_video_sessions where application_id = ${input.applicationId}) as used,
               (select count(*) from gateq.application_video_sessions where status <> 'ENDED' and ends_at > now()) as live`
-            )[0],
-          );
-        if (counts.used >= input.perApplication)
-          return { kind: "ALLOWANCE" as const };
-        if (counts.live >= input.concurrency)
-          return { kind: "CONCURRENCY" as const };
-        const created = await tx.sql`
+              )[0],
+            );
+          if (counts.used >= input.perApplication)
+            return { kind: "ALLOWANCE" as const };
+          if (counts.live >= input.concurrency)
+            return { kind: "CONCURRENCY" as const };
+          const created = await tx.sql`
           insert into gateq.application_video_sessions
             (id, tenant_id, application_id, bridge_token_hash, guest_credential_sealed, max_seconds, created_at, ends_at)
           values (${input.id}, ${input.tenantId}, ${input.applicationId}, ${input.bridgeTokenHash},
                   ${input.guestCredentialSealed}, ${input.maxSeconds}, now(),
                   now() + make_interval(secs => ${input.maxSeconds}))
           returning *`;
-        return { kind: "CREATED" as const, row: toRow(created[0]) };
-      }),
+          return { kind: "CREATED" as const, row: toRow(created[0]) };
+        }),
+      ),
+    allowanceFor: async (input) => {
+      const rows = await sql`
+        select weekly_sessions, remaining, resets_at
+          from billing.video_allowance_status(
+            billing.video_subject_for_application(${input.applicationId}, ${input.tenantId}))`;
+      const row = AllowanceRow.safeParse(rows[0]);
+      return row.success
+        ? {
+            weeklySessions: row.data.weekly_sessions,
+            remaining: row.data.remaining,
+            resetsAt: row.data.resets_at.toISOString(),
+          }
+        : null;
+    },
     markLive: async (input) => {
       await sql`
         update gateq.application_video_sessions

@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import type {
   ApplicationCoverageDto,
   GateqVideoSessionDto,
+  VideoAllowanceDto,
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
@@ -13,6 +14,11 @@ import {
   startVideoAction,
   videoStateAction,
 } from "./apply-actions";
+import {
+  videoAllowanceLine,
+  videoAllowanceUsedUp,
+} from "@/features/video-room/video-allowance";
+
 import { GateqVideoRoom } from "./gateq-video-room";
 
 /**
@@ -38,6 +44,7 @@ export function GateqVideoEntry({
   readonly onEnded: (typed: boolean) => Promise<void>;
 }) {
   const [available, setAvailable] = useState(false);
+  const [allowance, setAllowance] = useState<VideoAllowanceDto | null>(null);
   const [session, setSession] = useState<GateqVideoSessionDto | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
@@ -48,6 +55,7 @@ export function GateqVideoEntry({
     void videoStateAction(token).then((result) => {
       if (!live || !result.ok) return;
       setAvailable(result.state.available);
+      setAllowance(result.state.allowance ?? null);
       // Recovery: a live session reopens in its room with its own clock.
       if (result.state.session?.status === "LIVE")
         setSession(result.state.session);
@@ -75,12 +83,19 @@ export function GateqVideoEntry({
       />
     );
   }
-  if (!available)
-    return message === null ? null : (
+  if (!available) {
+    // Typing is never limited; say why video is not offered when we know.
+    const why =
+      message ??
+      (allowance?.remaining === 0
+        ? `${videoAllowanceUsedUp(allowance)} You can carry on by typing.`
+        : null);
+    return why === null ? null : (
       <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-        {message}
+        {why}
       </p>
     );
+  }
 
   return (
     <div
@@ -90,6 +105,11 @@ export function GateqVideoEntry({
       <p className="cq-label text-(--cq-text-primary)">
         Prefer to talk it through?
       </p>
+      {videoAllowanceLine(allowance) === null ? null : (
+        <p className="cq-caption text-(--cq-text-tertiary)">
+          {videoAllowanceLine(allowance)}
+        </p>
+      )}
       <label className="cq-body-sm flex min-h-11 cursor-pointer items-start gap-3 text-(--cq-text-secondary)">
         <input
           type="checkbox"

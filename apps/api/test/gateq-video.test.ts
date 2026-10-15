@@ -38,6 +38,15 @@ function build(overrides: Partial<GateqVideoInterview> = {}) {
     current: vi.fn((token: string) =>
       token === TOKEN ? Promise.resolve(SESSION) : forged(),
     ),
+    allowance: vi.fn((token: string) =>
+      token === TOKEN
+        ? Promise.resolve({
+            weeklySessions: 5,
+            remaining: 3,
+            resetsAt: "2026-10-19T00:00:00.000Z",
+          })
+        : forged(),
+    ),
     start: vi.fn((input: { token: string }) =>
       input.token === TOKEN ? Promise.resolve(SESSION) : forged(),
     ),
@@ -82,8 +91,23 @@ describe("the GateQ video interview routes", () => {
       session: {
         id: SESSION.id,
       },
+      // The shared weekly allowance, for "3 video sessions left this week".
+      allowance: { weeklySessions: 5, remaining: 3 },
     });
     expect(response.body).toMatch(/AI interviewer/);
+  });
+
+  it("still answers when the allowance cannot be read; typing is never blocked by it", async () => {
+    const { app } = build({
+      allowance: vi.fn(() => Promise.reject(new Error("db down"))),
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/gateq/apply/video",
+      headers: auth(TOKEN),
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ allowance: null });
   });
 
   it("a forged or missing credential is the same 404 as a missing application", async () => {

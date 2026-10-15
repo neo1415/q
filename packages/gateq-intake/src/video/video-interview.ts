@@ -100,6 +100,12 @@ export type GateqVideoSessionRow = {
   readonly endsAt: string;
 };
 
+export type GateqVideoAllowance = {
+  readonly weeklySessions: number;
+  readonly remaining: number;
+  readonly resetsAt: string;
+};
+
 export type GateqVideoSessionStore = {
   /**
    * Reserve a session under the application's row lock and a global lock:
@@ -121,7 +127,16 @@ export type GateqVideoSessionStore = {
     | { readonly kind: "EXISTING"; readonly row: GateqVideoSessionRow }
     | { readonly kind: "ALLOWANCE" }
     | { readonly kind: "CONCURRENCY" }
+    /** The person's shared weekly allowance (GateQ + Rehearsals) is spent. */
+    | { readonly kind: "WEEKLY_ALLOWANCE" }
+    /** The provider account's monthly safeguard would be exceeded. */
+    | { readonly kind: "PLATFORM_LIMIT" }
   >;
+  /** The applying person's shared weekly video allowance, if known. */
+  readonly allowanceFor: (input: {
+    readonly applicationId: string;
+    readonly tenantId: string;
+  }) => Promise<GateqVideoAllowance | null>;
   readonly markLive: (input: {
     readonly id: string;
     readonly providerConversationId: string;
@@ -236,10 +251,26 @@ export function createGateqVideoInterview(deps: {
       if (guest.application.status === "SUBMITTED") return false;
       // Live 2026-10-15: the offer stayed up after the allowance was spent,
       // so the button led only to a refusal. A used allowance is no offer.
-      return (
-        (await deps.store.countForApplication(guest.application.id)) <
+      if (
+        (await deps.store.countForApplication(guest.application.id)) >=
         deps.config.perApplication
-      );
+      )
+        return false;
+      const allowance = await deps.store.allowanceFor({
+        applicationId: guest.application.id,
+        tenantId: guest.application.tenantId,
+      });
+      return allowance === null || allowance.remaining > 0;
+    },
+
+    /** The person's shared weekly video allowance, for the offer's wording. */
+    allowance: async (token: string): Promise<GateqVideoAllowance | null> => {
+      if (!deps.config.enabled || deps.provider === null) return null;
+      const guest = await deps.intake.authorise(token);
+      return deps.store.allowanceFor({
+        applicationId: guest.application.id,
+        tenantId: guest.application.tenantId,
+      });
     },
 
     start: async (input: {
@@ -268,6 +299,11 @@ export function createGateqVideoInterview(deps: {
         throw new GateqVideoRefusedError("ALLOWANCE_EXHAUSTED");
       if (reserved.kind === "CONCURRENCY")
         throw new GateqVideoRefusedError("CONCURRENCY_LIMIT");
+      if (reserved.kind === "WEEKLY_ALLOWANCE")
+        throw new GateqVideoRefusedError("ALLOWANCE_EXHAUSTED");
+      // The account's monthly safeguard: fail closed, typing carries on.
+      if (reserved.kind === "PLATFORM_LIMIT")
+        throw new GateqVideoRefusedError("PROVIDER_UNAVAILABLE");
       // A reconnect or retry: the same session and clock, never a new room.
       if (reserved.kind === "EXISTING") return view(reserved.row);
       const row = reserved.row;
