@@ -1677,3 +1677,64 @@ describe("a named company read ahead of the model is not looked up again", () =>
     },
   );
 });
+
+/**
+ * S3 (live 2026-10-15 run f854c339, a GateQ dossier question): on a screen
+ * focused on one record the wide reads start when the turn is warmed,
+ * beside the readers, rather than after the reading.
+ */
+describe("wide reads start at warm on a focused screen", () => {
+  const SEARCH: QOfferedTool = {
+    ...GET_COMPANY,
+    toolName: "company.search",
+    definition: { ...GET_COMPANY.definition, name: "search_companies" },
+  };
+  it.each([true, false])("focused=%s", async (focused) => {
+    const tools = toolPort([SEARCH, GET_COMPANY], (p) =>
+      succeeded(p, { items: [], nextCursor: null, truthClass: "USER_CLAIM" }),
+    );
+    const { seam, request, messages } = build({
+      tools,
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) }],
+    });
+    if (messages[0])
+      messages[0] = {
+        ...messages[0],
+        content: "What are the risks with Northwind Ledger?",
+      };
+    const bound = {
+      ...request,
+      plan: {
+        ...request.plan,
+        screen: {
+          route: "OTHER" as const,
+          ...(focused
+            ? {
+                manifest: {
+                  v: 2,
+                  seq: 1,
+                  focus: { kind: "GATEQ_APPLICATION", id: randomUUID() },
+                  inView: [],
+                  dialogs: [],
+                  controls: [],
+                  sections: [],
+                },
+              }
+            : {}),
+        },
+      },
+    } as typeof request;
+    if (!seam.warm) throw new Error("Warm seam missing");
+    seam.warm(bound);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const before = tools.executed.filter(
+      (p) => p.name === "search_companies",
+    ).length;
+    expect(before > 0).toBe(focused);
+    await seam.answer(bound);
+    // Read once either way: the warm read is the one the answer takes.
+    expect(
+      tools.executed.filter((p) => p.name === "search_companies"),
+    ).toHaveLength(1);
+  });
+});
