@@ -36,3 +36,31 @@ export function VerifiedBadge({
     </span>
   );
 }
+
+/** What the synthetic-demo attestation rests on, said in the tooltip. */
+export const SYNTHETIC_ATTESTATION_BASIS =
+  "Decided automatically by the synthetic-demo attestation on this staging deployment: the company and its people are invented. Capital Q has not verified a real organisation.";
+
+/**
+ * A verification that rests on the synthetic-demo attestation, not on an
+ * operator's decision or a provider. It is never gold: a quiet, neutral
+ * mark that says it is demo data, with the basis in its tooltip.
+ */
+export function DemoVerifiedBadge({
+  className,
+}: {
+  readonly className?: string | undefined;
+}) {
+  return (
+    <span
+      className={cx(
+        "cq-caption inline-flex items-center gap-1.5 rounded-full border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)",
+        className,
+      )}
+      title={SYNTHETIC_ATTESTATION_BASIS}
+      data-demo-attestation=""
+    >
+      Demo verified (synthetic)
+    </span>
+  );
+}

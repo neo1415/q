@@ -139,6 +139,9 @@ export type CompanyProfilePorts = {
     companyId: string,
   ) => Promise<Money | null>;
   readonly organisationVerified: (companyId: string) => Promise<boolean>;
+  /** The verification above rests on the synthetic-demo attestation. */
+  readonly organisationDemoAttested?:
+    ((companyId: string) => Promise<boolean>) | undefined;
   readonly sectorNodeIds: (companyId: string) => Promise<readonly string[]>;
   /** The newest pitch deck the company shared with the actor, or null. */
   readonly sharedDeck: (
@@ -422,6 +425,13 @@ export function registerCompanyProfileRoutes(
               sectorNodeIds: [...sectors].slice(0, 32),
               raise,
               organisationVerified: verified,
+              organisationDemoAttested:
+                verified && profile.organisationDemoAttested !== undefined
+                  ? await quietly(
+                      profile.organisationDemoAttested(company.id),
+                      false,
+                    )
+                  : false,
               facts: declaredFactsForNetwork(projection),
               deck:
                 deck === null

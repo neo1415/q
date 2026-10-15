@@ -2387,6 +2387,17 @@ const { app, logger } = createApp(config, security, {
     organisationVerified: async (companyId) =>
       (await discoverFilterFacts.verified?.([companyId]))?.has(companyId) ===
       true,
+    organisationDemoAttested: async (companyId) => {
+      const id = CompanyIdSchema.safeParse(companyId);
+      if (!id.success) return false;
+      const company = await companyFacts.findCanonicalCompanyProfile(id.data);
+      if (company === null) return false;
+      const standings = await cardVerification.companyStandings({
+        tenantId: TenantIdSchema.parse(company.tenantId),
+        organisationId: OrganisationIdSchema.parse(company.organisationId),
+      });
+      return standings.organisation.syntheticDemo;
+    },
     sectorNodeIds: async (companyId) =>
       (await companySectors.sectors?.([companyId]))?.get(companyId) ?? [],
     // A deck reaches another organisation one way today: the company sends

@@ -287,6 +287,7 @@ type ProfileBody = {
   overview: {
     raise: { amount: string; currency: string } | null;
     organisationVerified: boolean;
+    organisationDemoAttested?: boolean;
     deck: { title: string } | null;
     facts: { key: string }[];
   } | null;
@@ -319,6 +320,46 @@ describe("GET /v1/companies/:id/profile", () => {
     expect(response.body).not.toContain("deck.pdf");
     expect(calls.download).toBe(0);
     await app.close();
+  });
+
+  it("says when the organisation verification rests on the synthetic-demo attestation", async () => {
+    const { profile } = ports({ investor: true });
+    const asked: string[] = [];
+    const app = buildApp({
+      profile: {
+        ...profile,
+        organisationDemoAttested: (companyId) => {
+          asked.push(companyId);
+          return Promise.resolve(true);
+        },
+      },
+    });
+    const body = (
+      await app.inject({ method: "GET", url: PROFILE_URL })
+    ).json<ProfileBody>();
+    expect(body.overview?.organisationVerified).toBe(true);
+    expect(body.overview?.organisationDemoAttested).toBe(true);
+    expect(asked).toEqual([COMPANY_ID]);
+  });
+
+  it("an unverified organisation is never demo-attested, and the port is not asked", async () => {
+    const { profile } = ports({ investor: true });
+    let asked = 0;
+    const app = buildApp({
+      profile: {
+        ...profile,
+        organisationVerified: () => Promise.resolve(false),
+        organisationDemoAttested: () => {
+          asked += 1;
+          return Promise.resolve(true);
+        },
+      },
+    });
+    const body = (
+      await app.inject({ method: "GET", url: PROFILE_URL })
+    ).json<ProfileBody>();
+    expect(body.overview?.organisationDemoAttested).toBe(false);
+    expect(asked).toBe(0);
   });
 
   it("carries the card's cover beside the photo when the images port answers (founder ask 2026-10-04)", async () => {

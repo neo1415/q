@@ -171,6 +171,13 @@ export const CompanyProfileOverviewSchema = z
     raise: MoneySchema.nullable(),
     /** Capital Q's own organisation verification, never a self-claim. */
     organisationVerified: z.boolean(),
+    /**
+     * True when that verification rests on the synthetic-demo attestation
+     * (a staging demo's invented company), not an operator or a provider:
+     * the reader shows "Demo verified (synthetic)", never the gold badge.
+     * Absent: an older server; treated as not attested.
+     */
+    organisationDemoAttested: z.boolean().optional(),
     facts: z.array(CompanyNetworkFactSchema).max(8),
     /**
      * Null: the company has shared no deck with this reader. That is not
