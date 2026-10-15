@@ -256,6 +256,21 @@ export function createPostgresRelationshipEventRepository(): RelationshipEventRe
         ${eventSelect(executor)} where e.id = ${relationshipEventId}`;
       return rows.length === 0 ? null : toEvent(rows[0]);
     },
+    listFirstByRelationships: async (executor, relationshipIds, limit) => {
+      if (relationshipIds.length === 0) return [];
+      const rows = await executor`
+        select ev.*
+          from unnest(${[...new Set(relationshipIds)]}::uuid[])
+               with ordinality as r(id, ord)
+         cross join lateral (
+           ${eventSelect(executor)}
+            where e.relationship_id = r.id
+            order by e.sequence
+            limit ${limit}
+         ) ev
+         order by r.ord, ev.sequence`;
+      return rows.map(toEvent);
+    },
     listByRelationship: async (executor, relationshipId, page) => {
       const rows = await executor`
         ${eventSelect(executor)}

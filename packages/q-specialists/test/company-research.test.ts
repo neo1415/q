@@ -162,12 +162,23 @@ function harness(options: {
   const requests: unknown[] = [];
   const executeOptions: {
     schema?: { safeParse: (value: unknown) => { success: boolean } };
+    onTextDelta?: (text: string) => void;
   }[] = [];
   const reads = { canonical: 0, knowledge: 0, evidence: 0 };
   const gateway = {
     execute: (request: unknown, option: (typeof executeOptions)[number]) => {
       requests.push(request);
       executeOptions.push(option);
+      // S3: a streaming provider writes the JSON object a few characters
+      // at a time, the answer first.
+      if (option.onTextDelta !== undefined) {
+        const json = JSON.stringify(
+          options.analyst ?? analyst("Here is what I found."),
+        );
+        for (let at = 0; at < json.length; at += 7) {
+          option.onTextDelta(json.slice(at, at + 7));
+        }
+      }
       return Promise.resolve({
         providerCode: "fake",
         modelCode: "fake-model",
@@ -741,5 +752,43 @@ describe("authorized evidence-only document preparation", () => {
     expect(result.blocked).toBe("CANCELLED");
     expect(world.reads.canonical).toBe(0);
     expect(world.requests).toHaveLength(0);
+  });
+});
+
+/**
+ * S3 (lane S, live 2026-10-15: a selected-record answer reached the person
+ * only at 31.6 s, all at once): the specialist's answer goes out sentence
+ * by sentence as the model writes it, never its last sentence early.
+ */
+describe("the company specialist streams its answer (S3)", () => {
+  it("hands over each whole answer sentence but the last, and only the answer", async () => {
+    const h = harness({
+      analyst: analyst(
+        "Kobo360 moves freight for enterprise shippers. Its revenue is not on record. Ask for the last three months.",
+      ),
+    });
+    const sentences: string[] = [];
+    await h.specialist.investigate(
+      {
+        company: { kind: "COMPANY", companyId: COMPANY },
+        question: "What are the main risks here?",
+        publicResearch: false,
+      },
+      {
+        ...h.context,
+        onAnswerSentence: (sentence) => sentences.push(sentence),
+      },
+    );
+    expect(sentences).toEqual([
+      "Kobo360 moves freight for enterprise shippers.",
+      "Its revenue is not on record.",
+    ]);
+    expect(h.executeOptions[0]?.onTextDelta).toBeTypeOf("function");
+  });
+
+  it("asks for no stream when nobody listens", async () => {
+    const h = harness({});
+    await h.investigate("What are the main risks here?");
+    expect(h.executeOptions[0]?.onTextDelta).toBeUndefined();
   });
 });

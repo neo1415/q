@@ -596,6 +596,14 @@ export function createPostgresCompanyQueryPort(options: {
          where c.id = ${companyId}`;
       return rows.length === 0 ? null : toIdentity(rows[0]);
     },
+    findCanonicalCompanies: async (companyIds) => {
+      if (companyIds.length === 0) return [];
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.company_status
+          from core.companies c
+         where c.id = any(${[...companyIds]}::uuid[])`;
+      return rows.map(toIdentity);
+    },
     findOrganisationCompany: async (tenantId, organisationId) => {
       const rows = await sql`
         select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.company_status

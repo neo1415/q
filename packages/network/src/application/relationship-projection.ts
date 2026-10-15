@@ -17,7 +17,7 @@ import {
 
 // Kept here too for older importers; the history read lives on its own so
 // the per-party fold (relationship-status) can use it without a cycle.
-export { readHistory } from "./relationship-history.js";
+export { readHistories, readHistory } from "./relationship-history.js";
 
 /**
  * The relationship state projector at work (CQ-NET-012).

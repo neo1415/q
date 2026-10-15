@@ -464,6 +464,11 @@ export function composeQIntelligence(
   const answer = createSpecialistQAnswer({
     specialist,
     delegate: conversational,
+    // S3: the same bus the conversational answer streams on, so the
+    // company specialist's answer reaches a person sentence by sentence.
+    ...(dependencies.deltas === undefined
+      ? {}
+      : { deltas: dependencies.deltas }),
     ...(dependencies.speculation === undefined
       ? {}
       : {
