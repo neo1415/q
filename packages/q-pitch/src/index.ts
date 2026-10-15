@@ -37,3 +37,13 @@ export {
   PILOT_CERTIFICATION_LEDGER,
   PILOT_SCRIPT,
 } from "./pilot.js";
+export {
+  runShortRehearsal,
+  SHORT_REHEARSAL_MAX_MS,
+  SHORT_REHEARSAL_MIN_MS,
+  type RehearsalPorts,
+  type RehearsalRead,
+  type RehearsalTurn,
+  type ShortRehearsalOutcome,
+  type ShortRehearsalPlan,
+} from "./q2q-rehearsal.js";
