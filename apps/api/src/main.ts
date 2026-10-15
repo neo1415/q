@@ -746,7 +746,11 @@ function composeGateqVideo(apply: {
     CQ_TAVUS_API_KEYS: process.env["CQ_TAVUS_API_KEYS"],
     TAVUS_API_KEY: process.env["TAVUS_API_KEY"],
   });
-  const publicBaseUrl = process.env["API_PUBLIC_URL"]?.trim() ?? "";
+  // This API's own public origin (the provider calls the bridge here).
+  const publicBaseUrl = (process.env["API_PUBLIC_URL"]?.trim() ?? "").replace(
+    /\/+$/u,
+    "",
+  );
   const sealKey = process.env["CQ_GATEQ_VIDEO_SEAL_KEY"]?.trim() ?? "";
   const cipher = (() => {
     try {
