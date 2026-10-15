@@ -392,3 +392,22 @@ describe("a page's tabs from the screen", () => {
     expect(c.opened).toEqual([]);
   });
 });
+
+describe("lane S: their documents are the on-screen record's data room", () => {
+  it("reads a pronoun's documents as the data room tab of the record on screen", () => {
+    for (const said of [
+      "show me their documents",
+      "open its files",
+      "open their docs",
+    ]) {
+      expect(tabAskOf(said)).toEqual({
+        tab: "dataroom",
+        subTab: null,
+        name: null,
+        viewer: false,
+      });
+    }
+    expect(tabAskOf("open my documents")).toBeNull();
+    expect(tabAskOf("open the documents")).toBeNull();
+  });
+});
