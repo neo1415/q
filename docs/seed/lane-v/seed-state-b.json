@@ -89,7 +89,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "photos": true
+        "photos": true,
+        "visible": true
       },
       "team": [
         {
@@ -105,7 +106,7 @@
       ],
       "pitchId": "40702af3-f50b-449c-ab88-ebfe14f74a98",
       "visibility": "network_visible",
-      "readiness": "requirements_outstanding"
+      "readiness": "marketplace_ready"
     },
     "110": {
       "company": "Studio Ekun",
@@ -121,7 +122,9 @@
         "documents": true,
         "q": true,
         "team": true,
-        "photos": true
+        "photos": true,
+        "visible": true,
+        "pitch": true
       },
       "team": [
         {
@@ -136,7 +139,8 @@
         }
       ],
       "visibility": "network_visible",
-      "readiness": "requirements_outstanding"
+      "readiness": "marketplace_ready",
+      "pitchId": "d6cc9eff-efbf-40a2-a911-35b6734c5e73"
     },
     "111": {
       "company": "Kliniqa",
@@ -153,7 +157,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "photos": true
+        "photos": true,
+        "visible": true
       },
       "team": [
         {
@@ -169,7 +174,7 @@
       ],
       "pitchId": "64623a00-9cda-4285-9d6f-2943e1904eac",
       "visibility": "network_visible",
-      "readiness": "requirements_outstanding"
+      "readiness": "marketplace_ready"
     },
     "113": {
       "company": "Umoja Cover",
@@ -186,7 +191,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "photos": true
+        "photos": true,
+        "visible": true
       },
       "team": [
         {
@@ -202,7 +208,7 @@
       ],
       "pitchId": "26775a11-0294-4f54-9e85-59c11951f689",
       "visibility": "network_visible",
-      "readiness": "requirements_outstanding"
+      "readiness": "marketplace_ready"
     },
     "116": {
       "company": "Rankpay",

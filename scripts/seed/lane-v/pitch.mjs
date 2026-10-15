@@ -99,18 +99,23 @@ for (const job of jobs) {
     // Caption/transcript states move the version just after READY.
     await page.waitForTimeout(20000);
     await login(page, job.email, `/pitch/${s.mediaId}`);
-    await page.goto(`${lib.WEB}/pitch/${s.mediaId}`, {
-      waitUntil: "domcontentloaded",
-    });
-    await page.waitForTimeout(7000);
-    const R = page.getByRole("region", { name: "Who sees it" });
-    await R.getByRole("textbox", { name: "Title" }).fill(job.title);
-    await R.getByRole("combobox", { name: "Who can watch it" }).selectOption({
-      label: "Everyone on Capital Q",
-    });
-    await R.getByRole("button", { name: "Save" }).click();
-    await page.waitForTimeout(6000);
-    a = (await assets(job.companyId)).find((x) => x.id === s.mediaId);
+    // Caption and transcript states move the version after READY; a save on
+    // a stale version is refused, so reload and try again (up to 3 times).
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await page.goto(`${lib.WEB}/pitch/${s.mediaId}`, {
+        waitUntil: "domcontentloaded",
+      });
+      await page.waitForTimeout(7000 + attempt * 10000);
+      const R = page.getByRole("region", { name: "Who sees it" });
+      await R.getByRole("textbox", { name: "Title" }).fill(job.title);
+      await R.getByRole("combobox", { name: "Who can watch it" }).selectOption({
+        label: "Everyone on Capital Q",
+      });
+      await R.getByRole("button", { name: "Save" }).click();
+      await page.waitForTimeout(6000);
+      a = (await assets(job.companyId)).find((x) => x.id === s.mediaId);
+      if (a.audience === "NETWORK" && a.title === job.title) break;
+    }
     if (a.audience !== "NETWORK" || a.title !== job.title)
       throw new Error(`details not saved (${a.audience}, ${a.title})`);
     s.published = true;

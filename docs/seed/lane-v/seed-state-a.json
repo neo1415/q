@@ -82,7 +82,9 @@
         "capital": true,
         "q": true,
         "team": true,
-        "visible": true
+        "visible": true,
+        "documents": true,
+        "pitch": true
       },
       "team": [
         {
@@ -97,7 +99,8 @@
         }
       ],
       "visibility": "network_visible",
-      "readiness": "marketplace_ready"
+      "readiness": "marketplace_ready",
+      "pitchId": "cb9ec9d8-ca28-4a47-8686-59194ccd1dda"
     },
     "105": {
       "company": "Xam Xam Learn",
@@ -148,7 +151,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "photos": true
+        "photos": true,
+        "visible": true
       },
       "team": [
         {
@@ -164,7 +168,7 @@
       ],
       "pitchId": "6acffc7c-e415-4fa6-88d3-4bcee4cbc1e8",
       "visibility": "network_visible",
-      "readiness": "requirements_outstanding"
+      "readiness": "marketplace_ready"
     },
     "112": {
       "company": "Sahel Pumps",
@@ -181,7 +185,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "photos": true
+        "photos": true,
+        "visible": true
       },
       "team": [
         {
@@ -197,7 +202,7 @@
       ],
       "pitchId": "4869a403-6510-47a9-b658-46403d93f593",
       "visibility": "network_visible",
-      "readiness": "requirements_outstanding"
+      "readiness": "marketplace_ready"
     },
     "114": {
       "company": "Clausekind",
@@ -214,7 +219,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "photos": true
+        "photos": true,
+        "visible": true
       },
       "team": [
         {
@@ -230,7 +236,7 @@
       ],
       "pitchId": "b6bb5da6-077d-47d6-ae1c-995cc4047650",
       "visibility": "network_visible",
-      "readiness": "requirements_outstanding"
+      "readiness": "marketplace_ready"
     },
     "115": {
       "company": "Kivu Traceworks",
@@ -247,7 +253,8 @@
         "q": true,
         "team": true,
         "pitch": true,
-        "photos": true
+        "photos": true,
+        "visible": true
       },
       "team": [
         {
@@ -263,7 +270,7 @@
       ],
       "pitchId": "fd9d9490-e61e-420f-a1f2-1caa82f14e40",
       "visibility": "network_visible",
-      "readiness": "requirements_outstanding"
+      "readiness": "marketplace_ready"
     },
     "117": {
       "company": "Kefet Rx",
@@ -276,8 +283,28 @@
         "onboarding": true,
         "profile": true,
         "capital": true,
-        "photos": true
-      }
+        "photos": true,
+        "documents": true,
+        "q": true,
+        "pitch": true,
+        "visible": true,
+        "team": true
+      },
+      "team": [
+        {
+          "name": "Dawit Alemu",
+          "userId": "aef83b84-8200-466c-b8f5-74850ac1c830",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Hanna Bekele",
+          "userId": "832a1a32-e19e-4dbe-a453-6bf40e778d2b",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "e27feba2-fc91-4b21-ad82-03b57e12f877",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
     }
   }
 }
