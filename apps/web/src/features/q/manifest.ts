@@ -1,6 +1,10 @@
 import type {
   QManifestDialogKind,
   QManifestDrawnKind,
+  QManifestNotice,
+  QManifestNoticeCode,
+  QManifestNoticeKind,
+  QManifestRefKind,
   QManifestRef,
   QManifestSectionKind,
   QManifestTab,
@@ -9,6 +13,13 @@ import type {
 
 import { renderedObject, subscribeRendered } from "./artifact-rendered-store";
 import { manifestControls, subscribeControls } from "./control/registry";
+import { mediaNow } from "./screen-media";
+import {
+  isLookedAt,
+  isOnScreen,
+  observeInViewport,
+  pruneViewport,
+} from "./viewport";
 import { wireNow, type WireContracts } from "./wire";
 import {
   isUuid,
@@ -16,6 +27,8 @@ import {
   Q_MANIFEST_DIALOGS_MAX,
   Q_MANIFEST_DIALOG_REFS_MAX,
   Q_MANIFEST_FILTER_KEYS,
+  Q_MANIFEST_NOTICES_MAX,
+  Q_MANIFEST_VISIBLE_REFS_MAX,
   Q_MANIFEST_SECTIONS_MAX,
   Q_MANIFEST_SECTION_REFS_MAX,
   type QManifestFilterKey,
@@ -31,6 +44,13 @@ import {
  * (`currentManifest`); the labels kept here are for the person's own
  * "Q can see" line and never travel. The Q API reads every id back as the
  * person, so a section can only name what the page already showed them.
+ *
+ * Lane W (2026-10-15) adds, still as ids and closed kinds: which records
+ * of a section are visible now (`[data-q-ref]`, one shared observer), the
+ * error, empty, loading and toast states showing, and the pitch video on
+ * screen. The privacy line: what the person is typing and has not saved
+ * or sent is never read here -- no field values, no "has typed" flag, no
+ * page text, no screenshots. Q says it cannot see unsaved typing.
  */
 
 export type QSectionEntry = {
@@ -40,6 +60,13 @@ export type QSectionEntry = {
   readonly total: number;
   /** For the person's own "Q can see" line; never sent. */
   readonly label?: string | undefined;
+};
+
+/** Lane W: a state the page shows, by closed kind and code. */
+type QNoticeEntry = {
+  readonly kind: QManifestNoticeKind;
+  readonly code?: QManifestNoticeCode | undefined;
+  readonly section?: string | undefined;
 };
 
 export type QDialogEntry = {
@@ -97,6 +124,10 @@ export function registerQSection(entry: QSectionEntry): () => void {
   if (!SLUG.test(entry.id)) return () => undefined;
   sections.set(entry.id, entry);
   changed();
+  // Lane W: watched from now on, so a turn reads the observer's report.
+  queueMicrotask(() => {
+    for (const box of boxesOf(entry.id)) observeInViewport(box);
+  });
   return () => {
     if (sections.get(entry.id) === entry) {
       sections.delete(entry.id);
@@ -156,21 +187,144 @@ function hidden(id: string): boolean {
   return elementOf(id)?.closest("[data-q-hidden]") != null;
 }
 
-function inViewport(id: string): boolean {
+/** A `display: contents` marker has no box of its own: its children do. */
+function boxesOf(id: string): Element[] {
   const element = elementOf(id);
-  if (element === null || typeof window === "undefined") return false;
-  // A `display: contents` marker has no box of its own: its children do.
-  const boxes = [element, ...element.children].map((one) =>
-    one.getBoundingClientRect(),
-  );
-  return boxes.some(
-    (rect) =>
-      rect.width + rect.height > 0 &&
-      rect.bottom > 0 &&
-      rect.top < window.innerHeight &&
-      rect.right > 0 &&
-      rect.left < window.innerWidth,
-  );
+  return element === null ? [] : [element, ...element.children];
+}
+
+function inViewport(id: string): boolean {
+  if (typeof window === "undefined") return false;
+  return boxesOf(id).some(isOnScreen);
+}
+
+const REF_KINDS: ReadonlySet<string> = new Set<QManifestRefKind>([
+  "COMPANY",
+  "INVESTOR_ORGANISATION",
+  "ARTIFACT",
+  "UPLOADED_DOCUMENT",
+  "MEETING",
+  "REMINDER",
+  "APPROVAL",
+  "Q_WORK",
+  "CAPITAL_ROUND",
+  "GATEQ_APPLICATION",
+  "MEDIA",
+]);
+
+/**
+ * Lane W: the section's records visible now, in screen order, from the
+ * `[data-q-ref]` marks its rows carry (q-ref.ts). A mark inside a part
+ * hidden from Q, or of a kind the contract does not know, is skipped.
+ */
+function visibleRefs(id: string): QManifestRef[] {
+  const element = elementOf(id);
+  if (element === null) return [];
+  const out: QManifestRef[] = [];
+  for (const marked of element.querySelectorAll("[data-q-ref]")) {
+    if (out.length >= Q_MANIFEST_VISIBLE_REFS_MAX) break;
+    if (marked.closest("[data-q-hidden]") !== null) continue;
+    const [kind = "", refId = ""] = (
+      marked.getAttribute("data-q-ref") ?? ""
+    ).split(":");
+    if (!REF_KINDS.has(kind) || !isUuid(refId)) continue;
+    if (!isLookedAt(marked)) continue;
+    out.push({ kind: kind as QManifestRefKind, id: refId.toLowerCase() });
+  }
+  return out;
+}
+
+const NOTICE_KINDS: ReadonlySet<string> = new Set<QManifestNoticeKind>([
+  "ERROR",
+  "EMPTY",
+  "LOADING",
+  "TOAST",
+]);
+const NOTICE_CODES: ReadonlySet<string> = new Set<QManifestNoticeCode>([
+  "PAGE_FAILED",
+  "NOT_FOUND",
+  "OFFLINE",
+  "PLAYBACK_FAILED",
+  "DONE",
+  "FAILED",
+]);
+
+/**
+ * Lane W: the states the page shows, read from
+ * the closed marks the shared components already carry (`data-state` on
+ * EmptyState and ErrorState, the page skeleton) or `data-q-notice`
+ * ("KIND" or "KIND:CODE", on toasts and status pages). The element's text
+ * is never read.
+ */
+function domNotices(shownIds: ReadonlySet<string>): QNoticeEntry[] {
+  if (typeof document === "undefined") return [];
+  const found: QNoticeEntry[] = [];
+  for (const element of document.querySelectorAll(
+    '[data-state="error"], [data-state="empty"], [data-page-skeleton], [data-q-notice]',
+  )) {
+    if (element.closest("[data-q-self], [data-q-hidden]") !== null) continue;
+    if (element instanceof HTMLElement && element.hidden) continue;
+    const marked = element.getAttribute("data-q-notice");
+    const state = element.getAttribute("data-state");
+    const [kind, code] =
+      marked !== null
+        ? marked.split(":")
+        : element.hasAttribute("data-page-skeleton")
+          ? ["LOADING"]
+          : [state === "error" ? "ERROR" : "EMPTY"];
+    if (kind === undefined || !NOTICE_KINDS.has(kind)) continue;
+    const section = element
+      .closest("[data-q-section]")
+      ?.getAttribute("data-q-section");
+    found.push({
+      kind: kind as QManifestNoticeKind,
+      ...(code !== undefined && NOTICE_CODES.has(code)
+        ? { code: code as QManifestNoticeCode }
+        : {}),
+      ...(section != null && shownIds.has(section) ? { section } : {}),
+    });
+  }
+  return found;
+}
+
+/** The page's notices, distinct and bounded. */
+function noticesNow(shownIds: ReadonlySet<string>): QManifestNotice[] {
+  const seen = new Set<string>();
+  const out: QManifestNotice[] = [];
+  for (const notice of domNotices(shownIds)) {
+    const section =
+      notice.section !== undefined && shownIds.has(notice.section)
+        ? notice.section
+        : undefined;
+    const key = `${notice.kind}:${notice.code ?? ""}:${section ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      kind: notice.kind,
+      ...(notice.code === undefined ? {} : { code: notice.code }),
+      ...(section === undefined ? {} : { section }),
+    });
+    if (out.length >= Q_MANIFEST_NOTICES_MAX) break;
+  }
+  return out;
+}
+
+/** Lane W: the pitch on screen, with ids the contract can carry. */
+function mediaManifest(): QPageManifest["media"] {
+  const now = mediaNow();
+  if (now === undefined) return undefined;
+  return {
+    kind: "PITCH",
+    ...(now.companyId !== null && isUuid(now.companyId)
+      ? { companyId: now.companyId.toLowerCase() }
+      : {}),
+    ...(now.mediaAssetId !== null && isUuid(now.mediaAssetId)
+      ? { mediaAssetId: now.mediaAssetId.toLowerCase() }
+      : {}),
+    state: now.state,
+    ...(now.position === undefined ? {} : { position: now.position }),
+    ...(now.muted === undefined ? {} : { muted: now.muted }),
+  };
 }
 
 /**
@@ -251,17 +405,26 @@ export function currentManifest(): QPageManifest | undefined {
   const stack = dialogStack();
   const controls = manifestControls();
   const drawn = drawnNow();
+  pruneViewport();
+  const kept = shown.slice(0, Q_MANIFEST_SECTIONS_MAX);
+  const keptIds = new Set(kept.map((entry) => entry.id));
+  const states = noticesNow(keptIds);
+  const media = mediaManifest();
   if (
     shown.length === 0 &&
     stack.length === 0 &&
     tab === null &&
     focus === null &&
     controls.length === 0 &&
-    drawn === undefined
+    drawn === undefined &&
+    states.length === 0 &&
+    media === undefined
   ) {
     return undefined;
   }
-  const kept = shown.slice(0, Q_MANIFEST_SECTIONS_MAX);
+  const inView = new Set(
+    kept.filter((entry) => inViewport(entry.id)).map((entry) => entry.id),
+  );
   const manifest = {
     v: 2 as const,
     seq,
@@ -269,13 +432,19 @@ export function currentManifest(): QPageManifest | undefined {
     ...(Object.keys(filters).length === 0
       ? {}
       : { filters: wire === null ? manifestFilters(filters) : filters }),
-    inView: kept.filter((entry) => inViewport(entry.id)).map((e) => e.id),
-    sections: kept.map((entry) => ({
-      id: entry.id,
-      kind: entry.kind,
-      refs: bounded(wire, entry.refs, Q_MANIFEST_SECTION_REFS_MAX),
-      total: Math.max(0, Math.min(10_000, Math.round(entry.total))),
-    })),
+    inView: [...inView],
+    sections: kept.map((entry) => {
+      const visible = inView.has(entry.id)
+        ? bounded(wire, visibleRefs(entry.id), Q_MANIFEST_VISIBLE_REFS_MAX)
+        : [];
+      return {
+        id: entry.id,
+        kind: entry.kind,
+        refs: bounded(wire, entry.refs, Q_MANIFEST_SECTION_REFS_MAX),
+        total: Math.max(0, Math.min(10_000, Math.round(entry.total))),
+        ...(visible.length === 0 ? {} : { visible }),
+      };
+    }),
     dialogs: stack.slice(-Q_MANIFEST_DIALOGS_MAX).map((dialog) => ({
       id: dialog.id,
       kind: dialog.kind,
@@ -286,6 +455,8 @@ export function currentManifest(): QPageManifest | undefined {
       : { focus }),
     ...(controls.length === 0 ? {} : { controls }),
     ...(drawn === undefined ? {} : { drawn }),
+    ...(states.length === 0 ? {} : { notices: states }),
+    ...(media === undefined ? {} : { media }),
   };
   if (wire === null) return manifest;
   const parsed = wire.QPageManifestSchema.safeParse(manifest);

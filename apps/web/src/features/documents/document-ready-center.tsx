@@ -277,6 +277,7 @@ export function DocumentReadyCenter({
         <div
           ref={stack}
           data-document-ready-stack
+          data-q-notice="TOAST:DONE"
           className="pointer-events-none fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+8px)] z-(--cq-z-toast) mx-auto flex max-w-sm flex-col gap-2 lg:right-6 lg:bottom-6 lg:left-auto lg:mx-0 lg:w-96"
         >
           {ready.map((document) => (

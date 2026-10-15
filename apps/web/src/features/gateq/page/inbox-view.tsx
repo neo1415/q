@@ -2010,6 +2010,7 @@ function Toast({ message }: { readonly message: string | null }) {
     <div
       role="status"
       aria-live="polite"
+      data-q-notice={message === null ? undefined : "TOAST"}
       className="pointer-events-none fixed bottom-[calc(var(--cq-bottom-nav-height)+16px)] left-1/2 z-(--cq-z-toast) -translate-x-1/2 lg:bottom-6"
     >
       {message === null ? null : (
