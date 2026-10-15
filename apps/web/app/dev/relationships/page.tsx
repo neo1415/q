@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import type {
   DiligenceDto,
-  NotificationDto,
   RelationshipStatusDto,
   RelationshipSummaryDto,
 } from "@capital-q/contracts";
@@ -135,69 +134,6 @@ export default async function RelationshipsReviewPage({
           nextCall: { startsAt: ago(-30) },
         }),
       };
-  const notice = (
-    n: number,
-    over: Partial<NotificationDto>,
-  ): NotificationDto => ({
-    id: id("d", n),
-    kind: "MEETING_SCHEDULED",
-    title: "New call: check something",
-    body: null,
-    linkPath: null,
-    read: false,
-    createdAt: ago(n),
-    priority: "UPDATE",
-    ...over,
-  });
-  // The founder's screenshot: ten raw notices, several repeated.
-  const notices: NotificationDto[] =
-    state === "few"
-      ? []
-      : founder
-        ? [
-            notice(1, {
-              kind: "DILIGENCE",
-              title: "Savanna Seed Partners asked for Pitch deck",
-              linkPath: `/relationships/investor/${id("b", 1)}/diligence`,
-              priority: "NEEDS_YOU",
-            }),
-            notice(2, {
-              kind: "INTEREST_RECEIVED",
-              title: "Harbour Angels is interested in Ajopot",
-              linkPath: `/relationships/investor/${id("b", 5)}`,
-            }),
-            notice(3, {
-              kind: "INTEREST_RECEIVED",
-              title: "Harbour Angels is interested in Ajopot",
-              linkPath: `/relationships/investor/${id("b", 5)}`,
-            }),
-            notice(4, {}),
-            notice(5, {}),
-            notice(6, {
-              kind: "MEETING_PREP_READY",
-              title: "Rehearse your call: intro",
-              linkPath: "/rehearsals",
-            }),
-            notice(7, {
-              kind: "MEETING_PREP_READY",
-              title: "Rehearse your call: intro",
-              linkPath: "/rehearsals",
-            }),
-            notice(8, { kind: "Q_WORK", title: "Q is waiting to be let in" }),
-            notice(9, { kind: "Q_WORK", title: "Q is waiting to be let in" }),
-            notice(10, {
-              kind: "Q_SCOUT",
-              title: "Q found something new about Ajopot",
-            }),
-          ]
-        : [
-            notice(1, {
-              kind: "DILIGENCE",
-              title: "Ajopot shared Pitch deck v3 for your request",
-              linkPath: `/relationships/company/${id("c", 1)}/diligence`,
-              priority: "NEEDS_YOU",
-            }),
-          ];
 
   const body = () => {
     if (view === "list") {
@@ -214,8 +150,6 @@ export default async function RelationshipsReviewPage({
             }
             digests={digests}
             unread={new Map(founder ? [[id("a", 3), 2]] : [])}
-            notices={notices}
-            reminders={[]}
             now={now}
           />
         </PageContainer>

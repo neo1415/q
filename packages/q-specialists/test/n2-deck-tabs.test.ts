@@ -21,6 +21,7 @@ import { ActorContextSchema } from "@capital-q/security";
 import { createSpecialistQAnswer } from "../src/answer.js";
 import type { QOpenRecordPort } from "../src/references.js";
 import { tabAskOf } from "../src/tab-request.js";
+import { pageRequestOf } from "../src/page-request.js";
 import type { DeckSpeech } from "../src/deck-speech.js";
 
 /**
@@ -384,6 +385,35 @@ describe("a page's tabs from the screen", () => {
       viewer: "OPEN",
     });
     expect(said.content).toContain("Clinics lose a third");
+  });
+
+  it("'open their documents' on a company page opens its Data room tab, by code", async () => {
+    for (const words of [
+      "Open their documents.",
+      "Show me this company's files.",
+      "Open its docs.",
+    ]) {
+      const c = chat({ canOpenDeck: true, deckRead: READ });
+      const said = await c.say(words, { route: "COMPANY", companyId: NIXO });
+      expect(c.opened).toEqual([{ page: "COMPANY_DATA_ROOM", id: NIXO }]);
+      expect(intents(said.blocks)[0]).toMatchObject({
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY_DATA_ROOM",
+        id: NIXO,
+        tab: "dataroom",
+      });
+      expect(c.delegated()).toBe(0);
+    }
+  });
+
+  it("'the documents' and 'my documents' stay their own Documents page", () => {
+    for (const words of ["open the documents", "open my documents"]) {
+      expect(tabAskOf(words)).toBeNull();
+      expect(pageRequestOf(words)).toMatchObject({
+        target: { destination: "DOCUMENTS" },
+      });
+    }
+    expect(pageRequestOf("open their documents")).toBeNull();
   });
 
   it("with nothing relevant on screen it leaves the words to the other readers", async () => {

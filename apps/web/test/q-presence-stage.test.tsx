@@ -13,20 +13,24 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { QPresenceStage } = await import("../src/features/q/q-presence-stage");
-const { SHOWN_FOR_ANSWERS } = await import("../src/features/q/shown");
+const { resetCards } =
+  await import("../src/features/q/cards/card-visibility-store");
 const { clearResultShelf } = await import("../src/features/q/result-shelf");
 
 /**
  * The Q page's presence view (founder request 2026-10-03): Q's presence
- * and no transcript; an object Q shows appears over it and steps back
- * after a few answers; a waiting approval stays; "Shown recently" brings
- * an object back.
+ * and no transcript; an object Q shows appears over it and stays while
+ * the conversation is on it (lane A); a waiting approval stays; "Shown
+ * recently" brings an object back.
  */
 
 afterEach(() => {
   cleanup();
   // INC-1: the per-tab shelf of shown sets is module state.
   clearResultShelf();
+  // Lane A: Dismiss and "Shown recently" live in the one controller.
+  resetCards();
+  window.sessionStorage.clear();
 });
 
 const person = (id: string, text: string): QTurn => ({
@@ -125,16 +129,24 @@ describe("the Q page's presence view", () => {
     expect(screen.getByText("CAPTION TEXT")).toBeTruthy();
   });
 
-  it("shows an object over the presence, then steps it back after a few answers", () => {
+  it("shows an object over the presence, keeps it while it is talked about, and puts it away out loud", () => {
     const { container, rerender } = render(stage(WITH_BRIEF));
     expect(container.querySelector('[data-q-shown="q-1"]')).not.toBeNull();
     expect(screen.getAllByText("Acme brief").length).toBeGreaterThan(0);
 
-    rerender(stage(plus(WITH_BRIEF, SHOWN_FOR_ANSWERS - 1)));
+    const about = [
+      ...WITH_BRIEF,
+      person("p-2", "What does the brief say about risks?"),
+      answer("q-2", "It flags customer concentration."),
+    ];
+    rerender(stage(about));
     expect(container.querySelector('[data-q-shown="q-1"]')).not.toBeNull();
 
-    rerender(stage(plus(WITH_BRIEF, SHOWN_FOR_ANSWERS)));
+    rerender(stage(plus(about, 1)));
     expect(container.querySelector("[data-q-shown]")).toBeNull();
+    expect(
+      container.querySelector("[data-q-stage-note]")?.textContent,
+    ).toContain("Put “Acme brief” away as we moved on.");
   });
 
   it("steps an object back when dismissed", async () => {
@@ -148,13 +160,13 @@ describe("the Q page's presence view", () => {
   it("keeps a waiting approval reachable however many answers follow", () => {
     const waiting = <div data-testid="waiting">Needs you · Approve</div>;
     const { rerender } = render(stage(WITH_BRIEF, waiting));
-    rerender(stage(plus(WITH_BRIEF, SHOWN_FOR_ANSWERS + 2), waiting));
+    rerender(stage(plus(WITH_BRIEF, 5), waiting));
     expect(screen.getByTestId("waiting")).toBeTruthy();
     expect(screen.getByText("Needs you · Approve")).toBeTruthy();
   });
 
   it("brings an object back from Shown recently", async () => {
-    const later = plus(WITH_BRIEF, SHOWN_FOR_ANSWERS + 1);
+    const later = plus(WITH_BRIEF, 2);
     const { container } = render(stage(later));
     expect(container.querySelector("[data-q-shown]")).toBeNull();
     const toggle = screen.getByRole("button", { name: /Shown recently/ });

@@ -44,8 +44,10 @@ import { hubOverviewRefs, hubViewOf } from "@/features/relationships/hub-view";
 import { ResultsDashboard } from "@/features/results/results-dashboard";
 import { rangeOf } from "@/features/results/results-words";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
+import { NeedsYouQueue } from "@/features/relationships/needs-you-queue";
 import {
   listOrder,
+  needsYouCards,
   pageAfter,
 } from "@/features/relationships/relationships-view";
 
@@ -172,24 +174,32 @@ export default async function RelationshipsPage({
       side === "NONE"
         ? [null, null]
         : await Promise.all([apiSession(), qApiSession()]);
-    const [results, usage] = await Promise.all([
+    // The queue's reads run beside the period's, never after them.
+    const [results, usage, items, needs] = await Promise.all([
       session === null ? null : getResults(session, period).catch(() => null),
       qSession === null || side !== "INVESTOR"
         ? null
         : getMyUsage(qSession).catch(() => null),
+      side === "NONE" ? [] : ownRelationships(context),
+      side === "NONE"
+        ? { notices: [], reminders: [], unavailable: false }
+        : noticesAndReminders(),
     ]);
+    const now = readClock();
     // The Results endpoint authorises each projection. A conflicting role read
     // is unavailable, never silently rendered as the other party's perspective.
     const available =
       results !== null &&
       ((side === "INVESTOR" && results.side === "INVESTOR") ||
         (side === "COMPANY" && results.side === "FOUNDER"));
+    const unset =
+      side === "NONE" &&
+      context.kind === "NONE" &&
+      context.unavailable !== true;
     return (
       <PageContainer className="flex flex-col gap-4">
         <HubHeader side={side} view={view} />
-        {side === "NONE" &&
-        context.kind === "NONE" &&
-        context.unavailable !== true ? (
+        {unset ? (
           <EmptyState
             title="Set up your organisation"
             description="Your relationships and capital activity will gather here."
@@ -199,9 +209,24 @@ export default async function RelationshipsPage({
               </Link>
             }
           />
-        ) : !available || results === null ? (
+        ) : null}
+        {side === "NONE" ? null : (
+          <NeedsYouQueue
+            cards={needsYouCards({
+              notices: needs.notices,
+              reminders: needs.reminders,
+              items: items ?? [],
+              side,
+              now,
+            })}
+            now={now}
+            unavailable={needs.unavailable}
+          />
+        )}
+        {unset ? null : !available || results === null ? (
+          // Partial: the queue above still stands when the period cannot.
           <ErrorState
-            title="Overview couldn't load"
+            title="The period report couldn't load"
             description="Your records are unchanged. Try again in a moment."
             action={
               <Link
@@ -236,10 +261,9 @@ export default async function RelationshipsPage({
       </PageContainer>
     );
   }
-  const [items, unread, needs] = await Promise.all([
+  const [items, unread] = await Promise.all([
     ownRelationships(context),
     unreadByRelationship(),
-    noticesAndReminders(),
   ]);
   // The first page's cards are read in full (later pages by cursor), beside
   // the investor's fit read: both need only the list (L1 latency sweep).
@@ -302,8 +326,6 @@ export default async function RelationshipsPage({
           items={items}
           unread={unread}
           digests={digests}
-          notices={needs.notices}
-          reminders={needs.reminders}
           now={now}
           fits={fits}
         />
@@ -333,18 +355,25 @@ function readClock(): number {
 async function noticesAndReminders(): Promise<{
   readonly notices: readonly NotificationDto[];
   readonly reminders: readonly ReminderDto[];
+  /** The notices could not be read: the queue says so, never "nothing". */
+  readonly unavailable: boolean;
 }> {
   const session = await apiSession();
-  if (session === null) return { notices: [], reminders: [] };
+  if (session === null)
+    return { notices: [], reminders: [], unavailable: true };
   const [notices, reminders] = await Promise.all([
     listNotifications(session)
       .then((list) => list.items)
-      .catch(() => [] as const),
+      .catch(() => null),
     listReminders(session)
       .then((list) => list.items)
       .catch(() => [] as const),
   ]);
-  return { notices, reminders };
+  return {
+    notices: notices ?? [],
+    reminders,
+    unavailable: notices === null,
+  };
 }
 
 /**

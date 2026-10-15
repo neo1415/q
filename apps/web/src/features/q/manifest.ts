@@ -1,11 +1,13 @@
 import type {
   QManifestDialogKind,
+  QManifestDrawnKind,
   QManifestRef,
   QManifestSectionKind,
   QManifestTab,
   QPageManifest,
 } from "@capital-q/contracts";
 
+import { renderedObject, subscribeRendered } from "./artifact-rendered-store";
 import { manifestControls, subscribeControls } from "./control/registry";
 import { wireNow, type WireContracts } from "./wire";
 import {
@@ -76,6 +78,8 @@ function changed(): void {
 // RECOVERY-2026-10 (C1): a control registering or leaving moves the
 // sequence like a section does, so a receipt's seq reads the new page.
 subscribeControls(changed);
+// Lane A: an object drawn on (or leaving) the Q stage changes the page.
+subscribeRendered(changed);
 
 export function subscribeManifest(listener: () => void): () => void {
   listeners.add(listener);
@@ -246,12 +250,14 @@ export function currentManifest(): QPageManifest | undefined {
   const shown = [...sections.values()].filter((entry) => !hidden(entry.id));
   const stack = dialogStack();
   const controls = manifestControls();
+  const drawn = drawnNow();
   if (
     shown.length === 0 &&
     stack.length === 0 &&
     tab === null &&
     focus === null &&
-    controls.length === 0
+    controls.length === 0 &&
+    drawn === undefined
   ) {
     return undefined;
   }
@@ -279,10 +285,46 @@ export function currentManifest(): QPageManifest | undefined {
       ? {}
       : { focus }),
     ...(controls.length === 0 ? {} : { controls }),
+    ...(drawn === undefined ? {} : { drawn }),
   };
   if (wire === null) return manifest;
   const parsed = wire.QPageManifestSchema.safeParse(manifest);
   return parsed.success ? parsed.data : undefined;
+}
+
+const DRAWN_KINDS: ReadonlySet<string> = new Set([
+  "ANSWER_CARDS",
+  "COMPARISON",
+  "COMPARISON_CARDS",
+  "TABLE",
+  "CHART",
+  "MAP",
+  "TIMELINE",
+  "ARTIFACT_REFERENCE",
+  "CLARIFICATION_REQUEST",
+]);
+
+/**
+ * Lane A: the Q object this tab has drawn (artifact-rendered-store), in
+ * the contract's closed kinds; undefined when none, or when its run has
+ * no id the contract can carry.
+ */
+function drawnNow():
+  | {
+      readonly run: string;
+      readonly kinds: QManifestDrawnKind[];
+    }
+  | undefined {
+  const now = renderedObject();
+  if (now === null || !isUuid(now.run)) return undefined;
+  const kinds = [
+    ...new Set(
+      now.kinds.filter((kind): kind is QManifestDrawnKind =>
+        DRAWN_KINDS.has(kind),
+      ),
+    ),
+  ].slice(0, 8);
+  return kinds.length === 0 ? undefined : { run: now.run, kinds };
 }
 
 /** The filters the contract allows, before the contracts are in (W7). */

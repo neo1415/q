@@ -641,3 +641,40 @@ describe("the Live context package (part 6)", () => {
     );
   });
 });
+
+describe("Q Pitch narration on the live line (owner 15 Oct)", () => {
+  it("speaks an approved line verbatim as commentary, never as a request", () => {
+    const h = harness();
+    const line = "Let me put the first two side by side against your mandate.";
+    h.bridge.narrate(`  ${line}  `);
+    expect(h.sent).toHaveLength(1);
+    expect(h.sent[0]?.type).toBe("session.commentary.append");
+    expect(h.sent[0]?.delegation_id).toBeNull();
+    expect(h.sent[0]?.content.endsWith(`Words: ${line}`)).toBe(true);
+    expect(h.sent[0]?.content).toMatch(/exactly/u);
+    // Not a turn: nothing goes to Q Brain, and the transcript is untouched.
+    h.advance(10_000);
+    expect(h.asked).toEqual([]);
+    expect(h.bridge.state().transcript).toEqual([]);
+  });
+
+  it("a tour brief is a standing instruction, not speech and not a request", () => {
+    const h = harness();
+    h.bridge.brief("Present the tour.");
+    expect(h.sent).toEqual([
+      expect.objectContaining({
+        type: "session.instructions.append",
+        delegation_id: null,
+        content: "Present the tour.",
+      }),
+    ]);
+    h.advance(10_000);
+    expect(h.asked).toEqual([]);
+  });
+
+  it("sends nothing for an empty line", () => {
+    const h = harness();
+    h.bridge.narrate("   ");
+    expect(h.sent).toEqual([]);
+  });
+});

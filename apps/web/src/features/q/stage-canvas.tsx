@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import type { QAnswerCardsBlock } from "@capital-q/contracts";
 
 import { AnswerCanvas } from "./answer-canvas";
+import { hideKey, useCardsState } from "./cards/card-visibility";
 import type { QTurn } from "./conversation";
 import { useAnswerPlayback } from "./use-answer-playback";
 import { useSpotlight } from "./use-spotlight";
@@ -49,12 +50,20 @@ export function StageCanvas({
     answerId,
     saidFocus: live ? playback.focus : -1,
   });
-  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set());
+  // Lane A: a card's X is kept by the one presentation controller, so a
+  // closed card stays closed on the way back from another page.
+  const { keys } = useCardsState();
+  const prefix = `card:${answerId}:`;
+  const closed: ReadonlySet<string> = new Set(
+    keys
+      .filter((key) => key.startsWith(prefix))
+      .map((key) => key.slice(prefix.length)),
+  );
   const closeCard = (key: string) => {
     const next = new Set([...closed, key]);
     // The last card closed closes the answer.
     if (block.cards.every((card) => next.has(card.key))) onCloseAll();
-    else setClosed(next);
+    else hideKey(`${prefix}${key}`);
   };
   return (
     <div className="w-full" data-q-canvas={answerId}>

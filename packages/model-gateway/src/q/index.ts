@@ -172,6 +172,12 @@ import {
   createScreenClaimGuard,
   withoutUnbackedScreenClaims,
 } from "./screen-claims.js";
+import {
+  createArtifactClaimGuard,
+  drawnArtifacts,
+  drawnOnScreen,
+  withoutUnbackedArtifactClaims,
+} from "./artifact-claims.js";
 import { ownProfileFact } from "./own-profile.js";
 import { asksForOwnMandate, ownMandateAnswer } from "./own-mandate-answer.js";
 import { pitchMomentFact } from "./pitch-moment-fact.js";
@@ -3675,6 +3681,18 @@ export function createModelGatewayQAnswer(
       // its object, or two or more fits this run computed (code lays those
       // out when the model wrote none).
       const caveats = createCaveatGuard();
+      // Lane A: a table, map, chart or timeline is said to be shown only
+      // once a block of that kind exists; the visuals code builds after
+      // the prose are not known yet, so such a sentence is held back here
+      // and the finished answer says the truth.
+      const artifactClaims = createArtifactClaimGuard(
+        () =>
+          new Set([
+            ...drawnArtifacts(clientActionBlocks),
+            ...drawnOnScreen(plan.screen?.manifest?.drawn?.kinds),
+          ]),
+        "stream",
+      );
       const screenClaims = createScreenClaimGuard(
         () =>
           clientActionBlocks.some((block) => block.kind === "UI_INTENT") ||
@@ -3695,10 +3713,14 @@ export function createModelGatewayQAnswer(
         );
         firstSentence = false;
         // Nothing is "on your screen" unless a tool put it there (R0).
-        const guarded =
+        const screenGuarded =
           sentenceGuarded === null
             ? null
             : screenClaims.sentence(sentenceGuarded);
+        const guarded =
+          screenGuarded === null
+            ? null
+            : artifactClaims.sentence(screenGuarded);
         // One boilerplate disclaimer at most (lead live replay 2026-10-07).
         const caveated = guarded === null ? null : caveats.sentence(guarded);
         if (caveated === null || caveated.length === 0) {
@@ -5691,17 +5713,31 @@ export function createModelGatewayQAnswer(
                 block.kind === "COMPARISON_CARDS",
             ),
         );
+        // Lane A: "here's the table" / "see the map" stands only when the
+        // answer carries that kind of object (artifact-claims.ts).
+        // What the browser confirms it has drawn backs a mention of it.
+        const artifactSafe = withoutUnbackedArtifactClaims(
+          screenSafe.text,
+          [...(analystBlocks ?? []), ...clientActionBlocks],
+          drawnOnScreen(plan.screen?.manifest?.drawn?.kinds),
+        );
+        if (artifactSafe.removed > 0) {
+          logger?.warn(
+            { qRunId: request.runId, removed: artifactSafe.removed },
+            "an answer said a table, map, chart or timeline was shown that the answer did not carry; corrected",
+          );
+        }
         // The names went with the guard (orphan "Pros: …" sentences) and
         // code built the cards: say the gist, by name, and point at them.
         const cardsShown = (analystBlocks ?? []).some(
           (block) => block.kind === "ANSWER_CARDS",
         );
         const answerText =
-          builtCards !== null && hasOrphanListItems(screenSafe.text)
+          builtCards !== null && hasOrphanListItems(artifactSafe.text)
             ? fitCardsSummary(builtCards)
             : request.spoken === true && cardsShown
-              ? spokenBeforeCards(screenSafe.text)
-              : screenSafe.text;
+              ? spokenBeforeCards(artifactSafe.text)
+              : artifactSafe.text;
         if (screenSafe.removed > 0) {
           logger?.warn(
             { qRunId: request.runId, removed: screenSafe.removed },
