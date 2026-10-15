@@ -1,5 +1,6 @@
 import type { QAgentRole } from "@capital-q/contracts";
 
+import { signalsOf } from "./goal-plan.js";
 import type { BoundStep } from "./plan.js";
 import { AGENT_REGISTRY, type AgentRole } from "./registry.js";
 
@@ -91,6 +92,11 @@ export type JobRunResult = {
     readonly runId: string;
     readonly status: StepStatus;
     readonly summary: string;
+    /**
+     * False for a fallback that was not needed, and for a step that did
+     * not finish but whose fallback did: neither decides the job's status.
+     */
+    readonly counts?: boolean | undefined;
   }[];
 };
 
@@ -137,6 +143,42 @@ export async function runJob(input: {
     status: StepStatus;
     summary: string;
   } | null)[] = input.steps.map(() => null);
+  /** Steps that do not decide the job's status (see JobRunResult). */
+  const counts = new Map<string, boolean>();
+
+  const fallbacksOf = (key: string) =>
+    input.steps.filter((one) => one.fallbackFor === key);
+  /** A step's result, or its fallback's when the step did not finish. */
+  const effective = (key: string): StepResult | undefined => {
+    const own = results.get(key);
+    if (own?.status === "DONE") return own;
+    const covered = fallbacksOf(key)
+      .map((one) => results.get(one.key))
+      .find((one) => one?.status === "DONE");
+    return covered ?? own;
+  };
+  /** What a step reads: each dependency's effective result. */
+  const viewFor = (step: BoundStep): ReadonlyMap<string, StepResult> => {
+    const view = new Map(results);
+    for (const key of step.dependsOn) {
+      const one = effective(key);
+      if (one !== undefined) view.set(key, one);
+    }
+    return view;
+  };
+  /** Every step this one waits on, directly or through others. */
+  const upstream = (step: BoundStep): ReadonlySet<string> => {
+    const seen = new Set<string>();
+    const visit = (key: string) => {
+      if (seen.has(key)) return;
+      seen.add(key);
+      for (const fallback of fallbacksOf(key)) visit(fallback.key);
+      const found = input.steps.find((one) => one.key === key);
+      for (const next of found?.dependsOn ?? []) visit(next);
+    };
+    for (const key of step.dependsOn) visit(key);
+    return seen;
+  };
 
   const runStep = async (step: BoundStep, index: number): Promise<void> => {
     const before = await recorder.prior?.(jobId, step.key);
@@ -148,6 +190,9 @@ export async function runJob(input: {
         summary: before.summary,
         outputs: before.outputs,
       });
+      if (before.status === "DONE" && step.fallbackFor !== undefined) {
+        counts.set(step.fallbackFor, false);
+      }
       out[index] = {
         key: step.key,
         runId: before.runId ?? "",
@@ -187,17 +232,42 @@ export async function runJob(input: {
       }
     }
     const blocked = step.dependsOn.find(
-      (key) => results.get(key)?.status !== "DONE",
+      (key) => effective(key)?.status !== "DONE",
     );
+    // An outward step never goes out on top of a contradiction an earlier
+    // step found: contradictions coexist until the person reconciles them.
+    const contradiction = step.outward
+      ? [...upstream(step)]
+          .flatMap((key) => signalsOf(results.get(key)?.outputs))
+          .find((signal) => signal.kind === "CONTRADICTION")
+      : undefined;
+    const covered =
+      step.fallbackFor === undefined
+        ? undefined
+        : results.get(step.fallbackFor);
     let status: StepStatus;
     let summary: string;
-    if (blocked !== undefined) {
+    if (covered?.status === "DONE") {
+      status = "SKIPPED";
+      const name =
+        input.steps.find((one) => one.key === step.fallbackFor)?.agentName ??
+        "the step it covers";
+      summary = `Not needed: ${name} finished.`;
+      counts.set(step.key, false);
+    } else if (blocked !== undefined) {
       status = "SKIPPED";
       // Plain words: the step's own agent, never its plan key.
       const waitedOn =
         input.steps.find((one) => one.key === blocked)?.agentName ??
         "an earlier step";
       summary = `Waited on ${waitedOn}, which did not finish.`;
+    } else if (contradiction !== undefined) {
+      status = "HELD";
+      summary =
+        `Held before anything went out: an earlier step found a contradiction (${contradiction.note}). It needs your eye first.`.slice(
+          0,
+          500,
+        );
     } else {
       const executor = executorFor(step, input.executors);
       if (executor === null) {
@@ -207,7 +277,7 @@ export async function runJob(input: {
         const result = await executor(step, {
           jobId,
           runId,
-          results,
+          results: viewFor(step),
         }).catch((error: unknown): StepResult => {
           // Kept for whoever operates the job; the person sees plain words.
           input.onStepError?.({ jobId, stepKey: step.key, runId, error });
@@ -219,6 +289,10 @@ export async function runJob(input: {
         status = result.status;
         summary = result.summary;
         results.set(step.key, result);
+        // A fallback that finished stands in for the step it covers.
+        if (status === "DONE" && step.fallbackFor !== undefined) {
+          counts.set(step.fallbackFor, false);
+        }
       }
     }
     await recorder.endRun(runId, status, summary.slice(0, 500));
@@ -228,14 +302,28 @@ export async function runJob(input: {
   // Steps start as soon as the steps they wait on have settled, so
   // independent work (research beside a shortlist) runs side by side.
   // Steps that reach the other side still go one at a time, in plan
-  // order: two sends or bookings never race on the same thread.
-  const settled = new Map<string, Promise<void>>();
+  // order: two sends or bookings never race on the same thread. A step
+  // also waits on the fallbacks of what it waits on, and a fallback on the
+  // step it covers, so recovery is settled before anything reads it.
+  const settled = new Map<string, { promise: Promise<void>; resolve: () => void }>();
+  for (const step of input.steps) {
+    let resolve: () => void = () => undefined;
+    const promise = new Promise<void>((done) => {
+      resolve = done;
+    });
+    settled.set(step.key, { promise, resolve });
+  }
+  const waitOn = (key: string) => settled.get(key)?.promise ?? Promise.resolve();
   const all: Promise<void>[] = [];
   let outwardTail: Promise<void> = Promise.resolve();
   for (const [index, step] of input.steps.entries()) {
-    const ready = Promise.all(
-      step.dependsOn.map((key) => settled.get(key) ?? Promise.resolve()),
-    );
+    const ready = Promise.all([
+      ...step.dependsOn.flatMap((key) => [
+        waitOn(key),
+        ...fallbacksOf(key).map((one) => waitOn(one.key)),
+      ]),
+      ...(step.fallbackFor === undefined ? [] : [waitOn(step.fallbackFor)]),
+    ]);
     let running: Promise<void>;
     if (step.outward) {
       running = Promise.all([ready, outwardTail]).then(() =>
@@ -245,25 +333,31 @@ export async function runJob(input: {
     } else {
       running = ready.then(() => runStep(step, index));
     }
-    settled.set(
-      step.key,
-      running.catch(() => undefined),
+    const own = settled.get(step.key);
+    void running.then(
+      () => own?.resolve(),
+      () => own?.resolve(),
     );
     all.push(running);
   }
   // A recorder failure still ends the pass, as it did when steps ran in
   // a line: the queue takes the job back and resumes it.
   await Promise.all(all);
-  const finished = out.filter(
-    (one): one is NonNullable<typeof one> => one !== null,
-  );
-  const done = finished.filter((step) => step.status === "DONE").length;
+  const finished: JobRunResult["steps"][number][] = out
+    .filter((one): one is NonNullable<typeof one> => one !== null)
+    .map((one) =>
+      counts.get(one.key) === false ? { ...one, counts: false } : one,
+    );
+  const counted = finished.filter((step) => step.counts !== false);
+  const done = counted.filter((step) => step.status === "DONE").length;
   // The lead's run says DONE only when every step is done: a job with a
-  // failed or held step is not finished, whatever else got through.
+  // failed or held step is not finished, whatever else got through. A
+  // fallback that was not needed, or a step a fallback stood in for, is
+  // not counted either way.
   await recorder.endRun(
     leadRunId,
-    finished.length > 0 && done === finished.length ? "DONE" : "HELD",
-    `${String(done)} of ${String(finished.length)} steps done.`,
+    counted.length > 0 && done === counted.length ? "DONE" : "HELD",
+    `${String(done)} of ${String(counted.length)} steps done.`,
   );
   return { leadRunId, steps: finished };
 }
