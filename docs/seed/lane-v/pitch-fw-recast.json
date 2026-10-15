@@ -1,0 +1,50 @@
+[
+ {
+  "slug": "fw-tarmacly-v2",
+  "email": "founder.tarmacly@fictional.capitalq.local",
+  "companyId": "94ec9c88-d157-49d1-9bf4-fc01d1e7b8d3",
+  "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/final/fw-tarmacly-v2-9x16.mp4",
+  "title": "Tarmacly: pitch summary (AI presenter, AI-generated)",
+  "replaces": "f3aec1c0-1dca-4c6b-a645-1d7b904b5aca"
+ },
+ {
+  "slug": "fw-yamfield-agro-v2",
+  "email": "founder.yamfield-agro@fictional.capitalq.local",
+  "companyId": "e850cde3-bc05-443a-92d6-5b327d41644f",
+  "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/final/fw-yamfield-agro-v2-9x16.mp4",
+  "title": "Yamfield Agro: pitch summary (AI presenter, AI-generated)",
+  "replaces": "2c025df1-cdd4-4cd3-b0da-990a1c01fe2d"
+ },
+ {
+  "slug": "fw-tallyloom-v2",
+  "email": "founder.tallyloom@fictional.capitalq.local",
+  "companyId": "40b1e42b-8b81-45ac-bacd-688c70852b17",
+  "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/final/fw-tallyloom-v2-9x16.mp4",
+  "title": "Tallyloom: pitch summary (AI presenter, AI-generated)",
+  "replaces": "f6b7f1e5-6f63-4c80-a594-170bffe329b1"
+ },
+ {
+  "slug": "fw-nsuo-labs-v2",
+  "email": "founder.nsuo-labs@fictional.capitalq.local",
+  "companyId": "b439cd80-55d4-491a-922f-95650c38a056",
+  "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/final/fw-nsuo-labs-v2-9x16.mp4",
+  "title": "Nsuo Labs: pitch summary (AI presenter, AI-generated)",
+  "replaces": "47dd744d-386f-42e3-b4fa-8cc4ff45d2c9"
+ },
+ {
+  "slug": "fw-kazikit-v2",
+  "email": "founder.kazikit@fictional.capitalq.local",
+  "companyId": "8e2c40e7-d1e2-4063-a179-abdea4f0cd83",
+  "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/final/fw-kazikit-v2-9x16.mp4",
+  "title": "Kazikit: pitch summary (AI presenter, AI-generated)",
+  "replaces": "cd27062e-9f4e-44c4-b60e-536bf19c31f9"
+ },
+ {
+  "slug": "fw-brightkloof-energy-v2",
+  "email": "founder.brightkloof-energy@fictional.capitalq.local",
+  "companyId": "37b0c9a0-c160-406e-9b83-04496665965d",
+  "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/final/fw-brightkloof-energy-v2-9x16.mp4",
+  "title": "Brightkloof Energy: pitch summary (AI presenter, AI-generated)",
+  "replaces": "520ef763-f165-4b3a-bd2d-7091cce694a2"
+ }
+]

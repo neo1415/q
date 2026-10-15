@@ -177,11 +177,18 @@ export async function ensureAccount({ email, displayName, seedKey }) {
 
 /** A one-time magic-link token hash (no email is sent by generate_link). */
 export async function magicTokenHash(email) {
+  const t0 = Date.now();
   const r = await admin("/generate_link", {
     method: "POST",
     body: JSON.stringify({ type: "magiclink", email }),
   });
   const body = await r.json().catch(() => ({}));
+  // Lead's stop rule (15 Oct, DB overload): sign-in slower than 5 s stops the run.
+  const ms = Date.now() - t0;
+  if (ms > Number(process.env.CQ_SIGNIN_STOP_MS ?? 5000)) {
+    console.log(`STOP: sign-in latency ${ms} ms`);
+    process.exit(4);
+  }
   if (!r.ok) throw new Error(`generate_link: HTTP ${r.status}`);
   return body.hashed_token ?? body.properties?.hashed_token;
 }
