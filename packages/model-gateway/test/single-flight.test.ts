@@ -6,7 +6,9 @@ import { createSingleFlight, stableArguments } from "../src/q/single-flight.js";
 
 /**
  * K4: identical concurrent reads within one run share one call; nothing
- * else is shared -- not a write, not another run, not a finished read.
+ * else is shared -- not a write, not another run. Lead 2026-10-16: a read
+ * that succeeded is kept for the rest of its run, until a change in the
+ * run or the run's end.
  */
 
 const proposal = (
@@ -64,7 +66,7 @@ describe("single-flight reads (K4)", () => {
     expect(flight.takeShared("run-1")).toBe(0);
   });
 
-  it("never shares a write, another run's read, or a read that already finished", async () => {
+  it("never shares a write or another run's read; keeps this run's finished read", async () => {
     const flight = createSingleFlight();
     const fake = counted();
     fake.release();
@@ -90,7 +92,56 @@ describe("single-flight reads (K4)", () => {
       true,
       fake.work("e"),
     );
-    expect(fake.calls()).toBe(5);
+    // "e" is run-2's finished read of the same company: answered from it.
+    expect(fake.calls()).toBe(4);
+  });
+
+  it("reads again after a change in the run, after the run ends, and after a failure", async () => {
+    const flight = createSingleFlight();
+    const fake = counted();
+    fake.release();
+    const read = (id: string) =>
+      flight.execute(
+        "run-1",
+        proposal(id, { companyId: "c1" }),
+        true,
+        fake.work(id),
+      );
+    const first = await read("a");
+    const again = await read("b");
+    expect(again.callId).toBe("b");
+    expect(again.result).toEqual(first.result);
+    expect(fake.calls()).toBe(1);
+    await flight.execute(
+      "run-1",
+      proposal("w", {}, "express_interest"),
+      false,
+      fake.work("w"),
+    );
+    await read("c");
+    expect(fake.calls()).toBe(3);
+    expect(flight.takeShared("run-1")).toBeGreaterThan(0);
+    await read("d");
+    expect(fake.calls()).toBe(4);
+    let failures = 0;
+    const failing = (): Promise<QToolCallOutcome> => {
+      failures += 1;
+      const outcome: QToolCallOutcome = {
+        callId: "f",
+        toolName: "fit.profile",
+        toolVersion: 1,
+        classification: "READ_ONLY",
+        status: "FAILED",
+        failureCode: "NOT_AVAILABLE",
+        sensitivity: "CONFIDENTIAL",
+        result: { ok: false, error: { code: "NOT_AVAILABLE", message: "x" } },
+        latencyMs: 1,
+      };
+      return Promise.resolve(outcome);
+    };
+    await flight.execute("run-9", proposal("f1", {}), true, failing);
+    await flight.execute("run-9", proposal("f2", {}), true, failing);
+    expect(failures).toBe(2);
   });
 
   it("keys arguments whatever their order", () => {
