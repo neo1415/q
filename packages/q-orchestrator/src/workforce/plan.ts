@@ -47,6 +47,12 @@ export type ProposedStep = {
    * company: code binds it), or an approved payload's, already bound.
    */
   readonly document?: unknown;
+  /** Why the lead planned it (plain words). */
+  readonly why?: string | undefined;
+  /** Situation facts it rests on, already grounded by code. */
+  readonly evidence?: readonly string[] | undefined;
+  /** A contingency for an earlier step (wf 2026-10-16). */
+  readonly fallbackFor?: string | undefined;
 };
 
 export type BoundStep = {
@@ -65,6 +71,14 @@ export type BoundStep = {
   /** It reaches the other side: every draft is written and reviewed inside. */
   readonly outward: boolean;
   readonly spawned: boolean;
+  readonly why?: string | undefined;
+  readonly evidence?: readonly string[] | undefined;
+  /**
+   * Runs only if this earlier step did not finish; what waited on that step
+   * then takes this one's result. Approved with the plan, so recovery never
+   * runs work the person did not approve.
+   */
+  readonly fallbackFor?: string | undefined;
 };
 
 export const STEP_REFUSALS = [
@@ -79,6 +93,12 @@ export const STEP_REFUSALS = [
   /** A critique of a step that is not an earlier, awaited preparation. */
   "INVALID_CRITIQUE_SOURCE",
   "WAITS_ON_MISSING_STEP",
+  /**
+   * A fallback for a step that is not an earlier, ordinary kept step; a
+   * second fallback for one step; a fallback that waits on its own step;
+   * or a step that waits on a fallback rather than the step it covers.
+   */
+  "INVALID_FALLBACK",
   "DUPLICATE_KEY",
   "OVER_BUDGET",
   "TOO_MANY_STEPS",
@@ -224,6 +244,10 @@ export function boundPlan(
       refuse("WAITS_ON_MISSING_STEP");
       continue;
     }
+    if (!fallbackIsValid(step, kept)) {
+      refuse("INVALID_FALLBACK");
+      continue;
+    }
     const stored = STORED_ROLE[role];
     const budgetUsd = AGENT_REGISTRY[stored].budgetUsd;
     if (spent + budgetUsd > bounds.budgetUsd + 1e-9) {
@@ -248,9 +272,43 @@ export function boundPlan(
       outward: executor.outward && tools.some((tool) => isOutwardTool(tool)),
       spawned: false,
       ...(document?.ok === true ? { document: document.document } : {}),
+      ...(step.why === undefined ? {} : { why: step.why }),
+      ...(step.evidence === undefined || step.evidence.length === 0
+        ? {}
+        : { evidence: [...step.evidence] }),
+      ...(step.fallbackFor === undefined
+        ? {}
+        : { fallbackFor: step.fallbackFor }),
     });
   }
   return { steps: kept, refused, budgetUsd: spent };
+}
+
+/**
+ * A fallback covers one earlier ordinary step, once, and never waits on it
+ * (it runs because that step did not finish). Nothing waits on a fallback:
+ * a step waits on the step it covers, and takes the fallback's result.
+ */
+function fallbackIsValid(
+  step: ProposedStep,
+  kept: readonly BoundStep[],
+): boolean {
+  if (
+    step.dependsOn.some((key) =>
+      kept.some((one) => one.key === key && one.fallbackFor !== undefined),
+    )
+  ) {
+    return false;
+  }
+  const target = step.fallbackFor;
+  if (target === undefined) return true;
+  const covered = kept.find((one) => one.key === target);
+  return (
+    covered !== undefined &&
+    covered.fallbackFor === undefined &&
+    !step.dependsOn.includes(target) &&
+    !kept.some((one) => one.fallbackFor === target)
+  );
 }
 
 /** Tools that reach another person, beyond the messaging ones. */

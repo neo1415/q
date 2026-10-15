@@ -41,7 +41,7 @@ import {
   StopYourRaise,
 } from "./capital-overview";
 import { CapitalTabBar, TabBadge } from "./capital-tab-bar";
-import type { CapitalTab } from "./capital-tabs";
+import { capitalTabHref, type CapitalTab } from "./capital-tabs";
 import { MandateSummary } from "./mandate-summary";
 import { RaiseTerms } from "./raise-terms";
 import {
@@ -128,7 +128,13 @@ export async function CapitalScreen({
   tab = "overview",
   hadTabParam = false,
   horizon,
+  inCrm = false,
 }: {
+  /**
+   * Shown as the CRM's Capital tab: the relationships list is the CRM's
+   * own Pipeline there, so it is not repeated under the investor's book.
+   */
+  readonly inCrm?: boolean | undefined;
   /** capital-tabs: the founder's open tab, from `?tab=`. */
   readonly tab?: CapitalTab | undefined;
   /** Whether the URL named the tab (an old `#anchor` maps only when not). */
@@ -181,7 +187,7 @@ export async function CapitalScreen({
   }
 
   const [relationships, mine] = await Promise.all([
-    relationshipsOf(context),
+    inCrm ? Promise.resolve(undefined) : relationshipsOf(context),
     context.kind === "INVESTOR" ? investorCommitments() : Promise.resolve(null),
   ]);
   return (
@@ -209,10 +215,12 @@ export async function CapitalScreen({
           <QuietEmpty sentence="Your rounds couldn't load." retry />
         </PageSection>
       )}
-      <RelationshipsPanel
-        relationships={relationships}
-        investor={context.kind === "INVESTOR"}
-      />
+      {inCrm ? null : (
+        <RelationshipsPanel
+          relationships={relationships}
+          investor={context.kind === "INVESTOR"}
+        />
+      )}
     </div>
   );
 }
@@ -237,7 +245,7 @@ export async function FounderTab({
       ]);
       return (
         <div className="flex flex-col gap-6" data-capital-overview>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
             <RaiseSummary ledger={ledger} />
             <StopYourRaise readiness={readiness} />
           </div>
@@ -424,14 +432,17 @@ function QuietEmpty({
 }) {
   return (
     <div
-      className="flex max-w-(--cq-layout-reading) flex-col gap-3 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+      className="flex max-w-(--cq-layout-reading) flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
       data-state={retry ? "error" : "empty"}
     >
       <p className="cq-body text-(--cq-text-primary)">{sentence}</p>
       {action ?? null}
       {retry ? (
         <div>
-          <Link href="/capital" className={buttonClassName("secondary")}>
+          <Link
+            href={capitalTabHref("overview")}
+            className={buttonClassName("secondary")}
+          >
             Try again
           </Link>
         </div>

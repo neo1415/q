@@ -1,52 +1,19 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-import {
-  PageContainer,
-  PageHeader,
-} from "@/components/app-shell/page-container";
-import { CapitalSkeleton } from "@/features/capital/capital-book";
-import { CapitalScreen } from "@/features/capital/capital-screen";
-import { capitalTabFrom } from "@/features/capital/capital-tabs";
-
-export const metadata: Metadata = { title: "Capital" };
-
-// The objective is read under the person's own session on every request.
-export const dynamic = "force-dynamic";
-
-function one(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
+import { capitalTarget } from "@/features/relationships/hub-view";
 
 /**
- * Capital workspace: for a founder, in tabs (`?tab=`, design
- * docs/design/2026-10-08/capital-tabs), each reading only its own data;
- * for an investor, their commitments, mandate and relationships. The round
- * card's shape holds the page while it loads.
+ * `/capital` (owner 2026-10-16: "the stuff in Capital would be like a tab
+ * in CRM"): Capital is the CRM's Capital tab now. This address forwards
+ * there with its tab, round and plan horizon kept, so every saved link,
+ * Q round card and spoken "open Capital" still lands on the same content.
  */
 export default async function CapitalPage({
   searchParams,
 }: {
-  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const params = await searchParams;
-  const horizon = one(params["horizon"]);
-  const requested = one(params["tab"]);
-  const tab = capitalTabFrom({
-    tab: requested,
-    round: one(params["round"]),
-    horizon,
-  });
-  return (
-    <PageContainer>
-      <PageHeader title="Capital" />
-      <Suspense fallback={<CapitalSkeleton />}>
-        <CapitalScreen
-          tab={tab}
-          hadTabParam={requested !== undefined}
-          horizon={horizon}
-        />
-      </Suspense>
-    </PageContainer>
-  );
+  readonly searchParams?: Promise<
+    Readonly<Record<string, string | string[] | undefined>>
+  >;
+} = {}) {
+  redirect(capitalTarget((await searchParams) ?? {}));
 }

@@ -1,5 +1,6 @@
 import type {
   GateqDossierV1,
+  GateqSynthesisV1,
   ApplicationTranscriptTurnDto,
 } from "@capital-q/contracts";
 
@@ -23,6 +24,7 @@ const TRUTH = {
   USER_CLAIM: "Applicant claim",
   ESTIMATE: "Estimate",
   UNKNOWN: "Unknown",
+  Q_INFERENCE: "Q inference",
 } as const;
 const EVIDENCE = {
   NO_EVIDENCE: "No evidence recorded",
@@ -72,12 +74,29 @@ function websiteHref(value: string | null): string | null {
   }
 }
 
-/** Only the saved dossier is rendered: no inferred strengths, scores or sources. */
+const POINT = {
+  STRENGTH: "Strength",
+  RISK: "Risk",
+  QUESTION: "To ask",
+} as const;
+
+/**
+ * The saved dossier, then Q's separate reading of it when one is recorded:
+ * labelled as Q's inference, each point with the facts or turns it cites,
+ * and never a score or a decision.
+ */
 export function SubmittedBrief({
   dossier,
+  synthesis = null,
 }: {
   readonly dossier: GateqDossierV1;
+  readonly synthesis?: GateqSynthesisV1 | null | undefined;
 }) {
+  const factLabels = new Map(
+    dossier.dimensions.flatMap((group) =>
+      group.facts.map((fact) => [fact.sourceFactId, fact.label] as const),
+    ),
+  );
   const website = websiteHref(dossier.company.website);
   const contact = dossier.contact;
   const hasSupportedClaims = dossier.dimensions.some((group) =>
@@ -247,7 +266,9 @@ export function SubmittedBrief({
                         <div>
                           <dt className="inline">Origin: </dt>
                           <dd className="inline">
-                            {PROVENANCE[fact.provenance]}
+                            {fact.truthClass === "Q_INFERENCE"
+                              ? "Derived by Q, not said in these words"
+                              : PROVENANCE[fact.provenance]}
                           </dd>
                         </div>
                         <div>
@@ -261,6 +282,11 @@ export function SubmittedBrief({
                           </dd>
                         </div>
                       </dl>
+                      {fact.derivation === undefined ? null : (
+                        <p className="cq-caption gq-t2 mt-1">
+                          {fact.derivation}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -355,9 +381,46 @@ export function SubmittedBrief({
             ))}
           </ol>
         )}
-        <p className="cq-caption gq-t2 mt-3">
-          Q investment synthesis has not been recorded for this submission.
-        </p>
+        {synthesis === null ? (
+          <p className="cq-caption gq-t2 mt-3">
+            Q&apos;s reading of this submission isn&apos;t ready yet.
+          </p>
+        ) : (
+          <section
+            className="mt-4 flex flex-col gap-2"
+            aria-label="Q's reading"
+          >
+            <h5 className="cq-label">Q&apos;s reading</h5>
+            <p className="cq-caption gq-t2">
+              Q&apos;s inference from this submission only. Not verified, not a
+              score and not a decision.
+            </p>
+            <p className="cq-body-sm">{synthesis.takeaway}</p>
+            {synthesis.points.length === 0 ? null : (
+              <ul className="gq-hair">
+                {synthesis.points.map((point, index) => (
+                  <li key={index} className="flex flex-col gap-0.5 py-2">
+                    <span className="cq-caption gq-t2">
+                      {POINT[point.kind]}
+                    </span>
+                    <span className="cq-body-sm">{point.text}</span>
+                    <span className="cq-caption gq-t3">
+                      From:{" "}
+                      {[
+                        ...point.factIds.map(
+                          (id) => factLabels.get(id) ?? "a recorded fact",
+                        ),
+                        ...point.turnSeqs.map(
+                          (seq) => `interview turn ${String(seq)}`,
+                        ),
+                      ].join(", ")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
       </section>
     </section>
   );

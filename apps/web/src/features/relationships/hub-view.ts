@@ -5,19 +5,22 @@ import type {
 } from "@capital-q/contracts";
 
 /**
- * URL-owned Hub state. Two views (research 2026-10-15 §3.2): the Overview
- * and the Pipeline, the one record list. "relationships" was the same
- * records as a list; it is the Pipeline's List layout now, and its old
- * links redirect there (`pipelineListHref`). A bare `/relationships`
- * still opens that list, as it always has. Reports are part of the
+ * URL-owned Hub state. Three views: the Overview (the CRM's front page),
+ * the Pipeline (the one record list) and Capital (owner 2026-10-16: "the
+ * stuff in Capital would be like a tab in CRM"; `/capital` redirects
+ * there). "relationships" was the same records as a list; it is the
+ * Pipeline's List layout now, and its old links redirect there
+ * (`pipelineListHref`). A bare `/relationships` opens the Overview (owner
+ * 2026-10-16: the CRM landed on Pipeline). Reports are part of the
  * Overview; `/results` and `/crm?view=reports` redirect there.
  */
-export type HubView = "overview" | "pipeline";
+export type HubView = "overview" | "pipeline" | "capital";
 export type HubSide = "INVESTOR" | "COMPANY" | "NONE";
 export type PipelineLayout = "list" | "table" | "board";
 
 export function hubViewOf(value: string | undefined): HubView {
-  return value === "overview" ? "overview" : "pipeline";
+  if (value === "pipeline" || value === "relationships") return "pipeline";
+  return value === "capital" ? "capital" : "overview";
 }
 
 /** The Pipeline's layout: List unless the link names Table or Board. */
@@ -66,10 +69,37 @@ export function hubTabs(): readonly {
       label: "Pipeline",
       href: "/relationships?view=pipeline",
     },
+    {
+      view: "capital",
+      label: "Capital",
+      href: CAPITAL_VIEW_HREF,
+    },
   ];
 }
 
-const CRM_VIEWS = new Set(["overview", "pipeline", "relationships"]);
+/** The CRM's Capital tab: what the Capital page was. */
+export const CAPITAL_VIEW_HREF = "/relationships?view=capital";
+
+/** The Capital page's own parameters, kept when `/capital` forwards. */
+const CAPITAL_KEPT = ["tab", "round", "horizon"] as const;
+
+/**
+ * Where an old `/capital` link goes: the CRM's Capital tab, with its
+ * sub-tab, round and plan horizon kept (Q's round cards, saved links).
+ */
+export function capitalTarget(
+  params: Readonly<Record<string, string | string[] | undefined>>,
+): string {
+  const kept = new URLSearchParams({ view: "capital" });
+  for (const key of CAPITAL_KEPT) {
+    const value = params[key];
+    if (typeof value === "string" && value.length > 0 && value.length <= 200)
+      kept.set(key, value);
+  }
+  return `/relationships?${kept.toString()}`;
+}
+
+const CRM_VIEWS = new Set(["overview", "pipeline", "relationships", "capital"]);
 const CRM_FORWARDED = [
   "q",
   "state",
@@ -110,6 +140,7 @@ export function crmTarget(
     return `/relationships?${report.toString()}`;
   }
   const target = view !== undefined && CRM_VIEWS.has(view) ? view : "overview";
+  if (target === "capital") return capitalTarget(params);
   if (target === "relationships") {
     kept.set("layout", "list");
     return `/relationships?${new URLSearchParams([["view", "pipeline"], ...kept]).toString()}`;
@@ -128,7 +159,7 @@ export function hubTitle(side: HubSide): string {
 /**
  * The one module a relationship's work continues in that the sidebar does
  * not already name for this place: GateQ, opened at the side's own tab.
- * Discover, Capital and Q Work are primary or workspace sidebar entries,
+ * Discover and Q Work are primary or workspace sidebar entries,
  * so repeating them here was a third route to the same page (redesign
  * 2026-10-15). A submission is not investor interest.
  */

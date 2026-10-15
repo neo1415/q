@@ -408,15 +408,25 @@ describe("the GateQ video interview session", () => {
     expect(w.provider.createRoom).toHaveBeenCalledTimes(1);
   });
 
-  it("allows one session per application by default, even after it ended", async () => {
+  it("allows two sessions per application by default, then says why there is no third", async () => {
     const w = world();
-    expect(await w.video.available(TOKEN)).toBe(true);
+    expect(await w.video.availability(TOKEN)).toEqual({
+      available: true,
+      reason: null,
+    });
     await w.video.start({ token: TOKEN, correlationId: "c" });
     await w.video.end({ token: TOKEN, continueByTyping: true });
+    // Lead 2026-10-15: a second go, within the weekly allowance.
+    expect(await w.video.available(TOKEN)).toBe(true);
+    await w.video.start({ token: TOKEN, correlationId: "c2" });
+    await w.video.end({ token: TOKEN, continueByTyping: true });
     // No offer that can only lead to a refusal (live 2026-10-15).
-    expect(await w.video.available(TOKEN)).toBe(false);
+    expect(await w.video.availability(TOKEN)).toEqual({
+      available: false,
+      reason: "APPLICATION_SESSIONS_USED",
+    });
     await expect(
-      w.video.start({ token: TOKEN, correlationId: "c" }),
+      w.video.start({ token: TOKEN, correlationId: "c3" }),
     ).rejects.toMatchObject({ reason: "ALLOWANCE_EXHAUSTED" });
   });
 
@@ -424,6 +434,9 @@ describe("the GateQ video interview session", () => {
     const w = world();
     w.store.limits.remaining = 0;
     expect(await w.video.available(TOKEN)).toBe(false);
+    expect((await w.video.availability(TOKEN)).reason).toBe(
+      "WEEKLY_ALLOWANCE_USED",
+    );
     expect(await w.video.allowance(TOKEN)).toMatchObject({ remaining: 0 });
     await expect(
       w.video.start({ token: TOKEN, correlationId: "c" }),

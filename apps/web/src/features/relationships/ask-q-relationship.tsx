@@ -37,7 +37,7 @@ export function AskQRelationshipPanel({
   return (
     <section
       aria-label="Ask Q about this relationship"
-      className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-4"
+      className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-4"
     >
       <h2 className="cq-body flex items-center gap-2 font-semibold text-(--cq-text-primary)">
         <QAperture state="IDLE" size="chrome" />
@@ -49,7 +49,7 @@ export function AskQRelationshipPanel({
             <button
               type="button"
               onClick={() => askNow(suggestion.prompt)}
-              className="cq-body-sm flex min-h-11 w-full items-center rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-left text-(--cq-text-primary) hover:bg-(--cq-surface-raised) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+              className="cq-body-sm flex min-h-11 w-full items-center border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-left text-(--cq-text-primary) hover:bg-(--cq-surface-raised) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
             >
               {suggestion.label}
             </button>
@@ -74,7 +74,7 @@ export function AskQRelationshipPanel({
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Ask anything…"
-          className="cq-body-sm min-h-11 min-w-0 flex-1 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary)"
+          className="cq-body-sm min-h-11 min-w-0 flex-1 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary)"
         />
         <Button
           type="submit"

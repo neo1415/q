@@ -206,6 +206,11 @@ export function DossierSection({
                       )}
                     </span>
                     <span className="cq-body-sm gq-t2">{fact.summary}</span>
+                    {fact.derivation === undefined ? null : (
+                      <span className="cq-caption gq-t3">
+                        {fact.derivation}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

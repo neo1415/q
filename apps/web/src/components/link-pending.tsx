@@ -19,7 +19,7 @@ export function LinkPending() {
     <span
       data-link-pending
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-(--cq-accent) motion-safe:animate-pulse"
+      className="pointer-events-none absolute inset-x-2 bottom-0 h-0.5 bg-(--cq-accent) motion-safe:animate-pulse"
     />
   );
 }

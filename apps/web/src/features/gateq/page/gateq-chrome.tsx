@@ -145,17 +145,10 @@ export function ErrorBlock({
 export function Skeleton({
   width,
   height,
-  radius = 8,
 }: {
   readonly width: string;
   readonly height: number;
-  readonly radius?: number;
 }) {
-  return (
-    <div
-      className="gq-sk"
-      style={{ width, height, borderRadius: radius }}
-      aria-hidden
-    />
-  );
+  // Square, like every surface (owner 2026-10-16).
+  return <div className="gq-sk" style={{ width, height }} aria-hidden />;
 }

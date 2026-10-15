@@ -111,7 +111,7 @@ function RelationshipRow({
       {unread > 0 ? (
         // Said in words, not by colour alone.
         <span
-          className="cq-caption cq-numeric shrink-0 rounded-full bg-(--cq-accent-soft) px-2 py-0.5 text-(--cq-text-primary)"
+          className="cq-caption cq-numeric shrink-0 bg-(--cq-accent-soft) px-2 py-0.5 text-(--cq-text-primary)"
           data-unread={unread}
         >
           {unread === 1
@@ -148,7 +148,7 @@ export function RelationshipNeedsYou({
         <li key={item.relationshipId} data-needs-you={item.nextStep}>
           <Link
             href={relationshipHref(item)}
-            className="flex min-h-11 flex-col justify-center gap-0.5 rounded-(--cq-radius-sm) px-2 py-2 hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+            className="flex min-h-11 flex-col justify-center gap-0.5 px-2 py-2 hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           >
             <span className="cq-body-sm text-(--cq-text-primary)">
               {item.nextStep === "ANSWER_INTEREST"

@@ -244,7 +244,7 @@ export function ApertureGallery({
 
       <section
         aria-label="Stage surface"
-        className="cq-stage flex flex-col gap-8 rounded-lg p-6"
+        className="cq-stage flex flex-col gap-8 p-6"
         data-gallery-stage
       >
         <h2 className="cq-title-sm">Stage</h2>

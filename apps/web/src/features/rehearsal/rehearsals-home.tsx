@@ -198,7 +198,7 @@ export function RehearsalsHome({
           </p>
         </div>
         {nothingToPick ? (
-          <div className="flex flex-col items-start gap-3 rounded-(--cq-radius-lg) border border-dashed border-(--cq-border) p-5">
+          <div className="flex flex-col items-start gap-3 border border-dashed border-(--cq-border) p-5">
             <p className="cq-body text-(--cq-text-primary)">
               Once you’re in touch with {other}, you can rehearse with any of
               them here.
@@ -213,7 +213,7 @@ export function RehearsalsHome({
               <li key={call.meetingId}>
                 <Link
                   href={lobbyHref(call.counterpart, call.meetingId)}
-                  className="group flex h-full min-h-44 flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-accent) bg-(--cq-surface-raised) p-4 transition-transform duration-(--cq-motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                  className="group flex h-full min-h-44 flex-col gap-3 border border-(--cq-accent) bg-(--cq-surface-raised) p-4 transition-transform duration-(--cq-motion-fast) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                 >
                   <Avatar counterpart={call.counterpart} size="lg" />
                   <span className="flex min-w-0 flex-col gap-0.5">
@@ -236,7 +236,7 @@ export function RehearsalsHome({
                 <li key={person.relationshipId}>
                   <Link
                     href={lobbyHref(person.counterpart)}
-                    className="group flex h-full min-h-44 flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 transition-[transform,border-color] duration-(--cq-motion-fast) hover:border-(--cq-border) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                    className="group flex h-full min-h-44 flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 transition-[transform,border-color] duration-(--cq-motion-fast) hover:border-(--cq-border) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                   >
                     <Avatar counterpart={person.counterpart} size="lg" />
                     <span className="flex min-w-0 flex-col gap-0.5">
@@ -284,7 +284,7 @@ export function RehearsalsHome({
               <li key={entity.externalPersonId}>
                 <Link
                   href={researchedHref(entity)}
-                  className="group flex h-full min-h-44 flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 transition-[transform,border-color] duration-(--cq-motion-fast) hover:border-(--cq-border) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                  className="group flex h-full min-h-44 flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 transition-[transform,border-color] duration-(--cq-motion-fast) hover:border-(--cq-border) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                 >
                   <EntityAvatar
                     kind="investor"
@@ -316,7 +316,7 @@ export function RehearsalsHome({
       {latest === undefined || scored.length < 2 ? null : (
         <section
           aria-labelledby="trend-title"
-          className="grid gap-4 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 sm:grid-cols-[10rem_1fr] sm:items-center sm:p-5"
+          className="grid gap-4 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 sm:grid-cols-[10rem_1fr] sm:items-center sm:p-5"
         >
           <div className="flex flex-col gap-0.5">
             <h2
@@ -377,7 +377,7 @@ export function RehearsalsHome({
                         }
                         aria-current={on ? "page" : undefined}
                         className={cx(
-                          "cq-body-sm inline-flex min-h-11 items-center rounded-(--cq-radius-full) border px-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
+                          "cq-body-sm inline-flex min-h-11 items-center border px-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
                           on
                             ? "border-(--cq-text-primary) bg-(--cq-surface-strong) text-(--cq-text-primary)"
                             : "border-(--cq-border) text-(--cq-text-secondary) hover:text-(--cq-text-primary)",

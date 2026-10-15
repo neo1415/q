@@ -63,3 +63,25 @@ export {
   type StepResult,
   type StepStatus,
 } from "./job-runner.js";
+export {
+  EMPTY_SITUATION,
+  READ_ONLY_JOB_TOOLS,
+  movesAsNextActions,
+  needsApproval,
+  situationFrom,
+  situationText,
+  type JobSituation,
+  type RelationshipOverview,
+} from "./situation.js";
+export {
+  groundReasoning,
+  groundStepEvidence,
+  nextSteps,
+  planProgress,
+  reviewSignals,
+  signalsOf,
+  type GroundedReasoning,
+  type PlanStepRecord,
+  type ProposedReasoning,
+  type StepOutcome,
+} from "./goal-plan.js";

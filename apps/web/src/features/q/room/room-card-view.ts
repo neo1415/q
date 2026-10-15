@@ -50,9 +50,9 @@ export function roomCardHref(intent: QShowInQRoomIntent): string {
       return "/documents";
     // Q.03/Q.04/Q.01: the founder's own sections on Capital and Home.
     case "READINESS":
-      return "/capital#readiness";
+      return "/relationships?view=capital&tab=readiness";
     case "ACTION_PLAN":
-      return "/capital#action-plan";
+      return "/relationships?view=capital&tab=action-plan";
     case "FOLLOW_UPS":
       return "/home#follow-ups";
     // Investor promises (2026-10-07).
@@ -67,7 +67,7 @@ export function roomCardHref(intent: QShowInQRoomIntent): string {
       return "/discover";
     // Overdeliver: the founder's plan on Capital; one investor's page.
     case "READINESS_BLUEPRINT":
-      return "/capital#readiness-blueprint";
+      return "/relationships?view=capital&tab=plan";
     case "INVESTOR_LOOKS_FOR":
       return `/investors/${encodeURIComponent(id)}#looks-for`;
     // Founder documents (2026-10-08): their own Documents tabs.

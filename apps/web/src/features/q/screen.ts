@@ -34,8 +34,14 @@ const EXACT: Readonly<Record<string, QScreenRoute>> = {
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function screenOf(pathname: string): QScreenContext {
+export function screenOf(pathname: string, search = ""): QScreenContext {
   const path = pathname.replace(/\/+$/, "") || "/";
+  // Capital is the CRM's Capital tab (owner 2026-10-16): still Capital to Q.
+  if (
+    path === "/relationships" &&
+    new URLSearchParams(search).get("view") === "capital"
+  )
+    return { route: "CAPITAL" };
   const exact = EXACT[path];
   if (exact !== undefined) return { route: exact };
   const segments = path.split("/").filter((segment) => segment.length > 0);
@@ -191,7 +197,10 @@ export function currentViewing(): QViewingMoment | undefined {
 export function currentScreen(
   pathname: string = window.location.pathname,
 ): QScreenContext {
-  let screen = screenOf(pathname);
+  let screen = screenOf(
+    pathname,
+    typeof window === "undefined" ? "" : window.location.search,
+  );
   const focus = focusNow();
   if (
     screen.companyId === undefined &&

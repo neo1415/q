@@ -356,7 +356,7 @@ export function QResultCard({
 }) {
   return (
     <section
-      className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+      className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
       data-q-result-card
     >
       <div className="flex flex-col gap-1">

@@ -387,6 +387,21 @@ export const GateqVideoStateDtoSchema = z
      * sends it; null when the server cannot say.
      */
     allowance: VideoAllowanceDtoSchema.nullable().optional(),
+    /**
+     * Why video is not offered (null when it is). Optional so a web release
+     * can accept it before an API sends it.
+     */
+    unavailableReason: z
+      .enum([
+        "NOT_OFFERED",
+        "SUBMITTED",
+        "APPLICATION_SESSIONS_USED",
+        "WEEKLY_ALLOWANCE_USED",
+      ])
+      .nullable()
+      .optional(),
+    /** Video sessions this application may have in all. */
+    perApplication: z.number().int().min(1).max(10).optional(),
   })
   .strict();
 export type GateqVideoStateDto = z.infer<typeof GateqVideoStateDtoSchema>;
@@ -698,12 +713,24 @@ export const GateqDossierV1Schema = z
                      * null for the form, a document or an older fact.
                      */
                     sourceTurnSeq: z.number().int().min(1).nullable(),
-                    truthClass: z.enum(["USER_CLAIM", "ESTIMATE", "UNKNOWN"]),
+                    /**
+                     * Q_INFERENCE: a value Q derived (e.g. multiplied) from
+                     * what was said, never the person's own words; it then
+                     * carries its `derivation` (ADR-001 truth axis).
+                     */
+                    truthClass: z.enum([
+                      "USER_CLAIM",
+                      "ESTIMATE",
+                      "UNKNOWN",
+                      "Q_INFERENCE",
+                    ]),
                     evidenceStatus: z.enum([
                       "NO_EVIDENCE",
                       "SELF_REPORTED",
                       "DOCUMENT_SUPPORTED",
                     ]),
+                    /** How a Q_INFERENCE was reached, with the words it came from. */
+                    derivation: z.string().max(600).optional(),
                   })
                   .strict(),
               )

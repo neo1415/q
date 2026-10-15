@@ -61,7 +61,7 @@ const FILTERS: readonly (readonly [InboxFilter, string])[] = [
 ];
 
 const selectClass =
-  "cq-body-sm min-h-11 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)";
+  "cq-body-sm min-h-11 w-full border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)";
 
 /**
  * A server action that throws (a lost connection, an ended session) reads
@@ -159,7 +159,7 @@ function Who({
 
 function Chip({ children }: { readonly children: React.ReactNode }) {
   return (
-    <span className="cq-caption inline-flex shrink-0 items-center rounded-full bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)">
+    <span className="cq-caption inline-flex shrink-0 items-center bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)">
       {children}
     </span>
   );
@@ -243,7 +243,7 @@ function DocumentRequestCard({
       id={`request-${item.itemId}`}
       tabIndex={-1}
       aria-label={`Request from ${who}: ${item.title}`}
-      className={`flex flex-col gap-3 rounded-xl border bg-(--cq-surface-raised) p-4 outline-none ${focused ? "border-(--cq-accent) ring-2 ring-(--cq-accent-soft)" : "border-(--cq-border-subtle)"}`}
+      className={`flex flex-col gap-3 border bg-(--cq-surface-raised) p-4 outline-none ${focused ? "border-(--cq-accent) ring-2 ring-(--cq-accent-soft)" : "border-(--cq-border-subtle)"}`}
       data-request-item={item.itemId}
       data-request-status={item.status}
     >
@@ -412,7 +412,7 @@ function DocumentRequestCard({
                   value={note}
                   maxLength={1000}
                   onChange={(event) => setNote(event.target.value)}
-                  className="cq-body-sm min-h-20 rounded-md border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
+                  className="cq-body-sm min-h-20 border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
                   placeholder="For example: after a term sheet."
                 />
               </label>
@@ -519,7 +519,7 @@ function QuestionRow({
         </p>
       )}
       {question.answer !== null ? (
-        <div className="flex flex-col gap-1 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-3">
+        <div className="flex flex-col gap-1 border border-(--cq-border-subtle) bg-(--cq-surface) p-3">
           <p className="cq-caption text-(--cq-text-tertiary)">
             Your answer, {shortDate(question.answer.answeredAt)} ·{" "}
             {question.answer.evidenceStatus === "DOCUMENT_SUPPORTED"
@@ -561,7 +561,7 @@ function QuestionRow({
             maxLength={2000}
             onChange={(event) => setText(event.target.value)}
             placeholder="Your answer, in your words."
-            className="cq-body-sm min-h-24 rounded-md border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
+            className="cq-body-sm min-h-24 border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
             data-question-text
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -600,7 +600,7 @@ function QuestionRow({
                     )
                       setAttached((now) => [...now, chosen].slice(0, 5));
                   }}
-                  className="cq-body-sm min-h-11 rounded-md border border-(--cq-border) bg-(--cq-surface) px-2 text-(--cq-text-primary)"
+                  className="cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface) px-2 text-(--cq-text-primary)"
                 >
                   <option value="">Or one you have…</option>
                   {documents.map((document) => (
@@ -617,7 +617,7 @@ function QuestionRow({
             {attached.map((document) => (
               <span
                 key={document.documentId}
-                className="cq-caption inline-flex items-center gap-1 rounded-full bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)"
+                className="cq-caption inline-flex items-center gap-1 bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)"
               >
                 {document.title}
                 <button
@@ -688,7 +688,7 @@ function QuestionSetCard({
       id={`request-${item.itemId}`}
       tabIndex={-1}
       aria-label={`Questions from ${investor}`}
-      className={`flex flex-col gap-3 rounded-xl border bg-(--cq-surface-raised) p-4 outline-none ${focused ? "border-(--cq-accent) ring-2 ring-(--cq-accent-soft)" : "border-(--cq-border-subtle)"}`}
+      className={`flex flex-col gap-3 border bg-(--cq-surface-raised) p-4 outline-none ${focused ? "border-(--cq-accent) ring-2 ring-(--cq-accent-soft)" : "border-(--cq-border-subtle)"}`}
       data-request-item={item.itemId}
       data-request-kind="QUESTIONS"
     >
@@ -792,8 +792,8 @@ export function RequestsInbox({
             onClick={() => setFilter(value)}
             className={
               filter === value
-                ? "min-h-11 rounded-full bg-(--cq-text-primary) px-3.5 cq-body-sm text-(--cq-canvas) lg:min-h-9"
-                : "min-h-11 rounded-full border border-(--cq-border-subtle) px-3.5 cq-body-sm text-(--cq-text-secondary) hover:border-(--cq-border-strong) lg:min-h-9"
+                ? "min-h-11 bg-(--cq-text-primary) px-3.5 cq-body-sm text-(--cq-canvas) lg:min-h-9"
+                : "min-h-11 border border-(--cq-border-subtle) px-3.5 cq-body-sm text-(--cq-text-secondary) hover:border-(--cq-border-strong) lg:min-h-9"
             }
             data-requests-filter={value}
           >

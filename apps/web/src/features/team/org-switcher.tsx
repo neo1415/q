@@ -43,7 +43,7 @@ function Monogram({
   return (
     <span
       aria-hidden="true"
-      className="grid shrink-0 place-items-center rounded-[9px] border border-(--cq-border-subtle) bg-(--cq-surface-subtle) cq-label font-semibold text-(--cq-text-primary)"
+      className="grid shrink-0 place-items-center border border-(--cq-border-subtle) bg-(--cq-surface-subtle) cq-label font-semibold text-(--cq-text-primary)"
       style={{ width: size, height: size }}
     >
       {(name.trim()[0] ?? "?").toUpperCase()}
@@ -95,7 +95,7 @@ function OrganisationList({
               switchTo(organisation.organisationId, onPicked);
           }}
           className={cx(
-            "flex min-h-13 w-full items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-left transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
+            "flex min-h-13 w-full items-center gap-2.5 px-2.5 py-1.5 text-left transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
             organisation.active ? "bg-(--cq-surface-subtle)" : null,
           )}
         >
@@ -152,7 +152,7 @@ export function SidebarOrganisationSwitcher({
           type="button"
           aria-label={`Acting for ${active.name}. Switch`}
           className={cx(
-            "flex min-h-12 items-center gap-2.5 rounded-[10px] text-left transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
+            "flex min-h-12 items-center gap-2.5 text-left transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
             compact ? "w-11 justify-center" : "w-full px-2.5 py-1.5",
           )}
           data-org-switcher
@@ -195,7 +195,7 @@ export function MoreOrganisationSwitcher({
 }) {
   if (organisations.length < 2) return null;
   return (
-    <div className="mb-3 rounded-[14px] border border-(--cq-border-subtle) p-1.5">
+    <div className="mb-3 border border-(--cq-border-subtle) p-1.5">
       <OrganisationList organisations={organisations} onPicked={onPicked} />
     </div>
   );

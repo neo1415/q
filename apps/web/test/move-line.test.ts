@@ -65,7 +65,7 @@ describe("R3: the typed row says opened only on the browser's VERIFIED", () => {
       kind: "UI_INTENT",
       intent: { kind: "NAVIGATE", destination: "CAPITAL" },
     };
-    expect(routeOfBlocks([navigate])).toBe("/capital");
+    expect(routeOfBlocks([navigate])).toBe("/relationships?view=capital");
     const record = {
       kind: "UI_INTENT",
       intent: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: COMPANY },

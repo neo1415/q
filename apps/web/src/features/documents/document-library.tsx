@@ -149,31 +149,31 @@ function putWithProgress(
 /** A first page drawn from what is known: the title on a sheet of paper. */
 function PagePreview({ item }: { readonly item: LibraryItem }) {
   return (
-    <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-lg bg-(--cq-surface-subtle)">
+    <div className="relative grid aspect-[4/3] place-items-center overflow-hidden bg-(--cq-surface-subtle)">
       <div
         aria-hidden="true"
         className={
           item.isDeck
-            ? "flex aspect-video w-[78%] flex-col gap-1.5 rounded-[3px] bg-(--cq-surface-raised) px-[8%] py-[7%] shadow-(--cq-shadow-sm)"
-            : "flex aspect-[1/1.3] w-[56%] flex-col gap-1.5 rounded-[3px] bg-(--cq-surface-raised) px-[10%] py-[12%] shadow-(--cq-shadow-sm)"
+            ? "flex aspect-video w-[78%] flex-col gap-1.5 bg-(--cq-surface-raised) px-[8%] py-[7%] shadow-(--cq-shadow-sm)"
+            : "flex aspect-[1/1.3] w-[56%] flex-col gap-1.5 bg-(--cq-surface-raised) px-[10%] py-[12%] shadow-(--cq-shadow-sm)"
         }
       >
         <span className="line-clamp-3 font-(family-name:--cq-font-editorial) text-[13px] leading-tight text-(--cq-text-primary)">
           {item.title}
         </span>
-        <span className="mt-1 h-[3px] w-full rounded-full bg-(--cq-border-subtle)" />
-        <span className="h-[3px] w-4/5 rounded-full bg-(--cq-border-subtle)" />
+        <span className="mt-1 h-[3px] w-full bg-(--cq-border-subtle)" />
+        <span className="h-[3px] w-4/5 bg-(--cq-border-subtle)" />
         {item.isDeck ? null : (
-          <span className="h-[3px] w-3/5 rounded-full bg-(--cq-border-subtle)" />
+          <span className="h-[3px] w-3/5 bg-(--cq-border-subtle)" />
         )}
       </div>
       {item.state === "PREPARING" ? (
-        <span className="absolute bottom-2 left-2 rounded-sm bg-(--cq-surface-raised) px-2 py-0.5 cq-caption text-(--cq-text-secondary)">
+        <span className="absolute bottom-2 left-2 bg-(--cq-surface-raised) px-2 py-0.5 cq-caption text-(--cq-text-secondary)">
           Q is writing this
         </span>
       ) : null}
       {item.state === "FAILED" ? (
-        <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-sm bg-(--cq-surface-raised) px-2 py-0.5 cq-caption text-(--cq-danger)">
+        <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 bg-(--cq-surface-raised) px-2 py-0.5 cq-caption text-(--cq-danger)">
           <CircleAlert size={14} aria-hidden="true" /> Couldn&apos;t be finished
         </span>
       ) : null}
@@ -234,7 +234,7 @@ function ItemMenu({
         <button
           type="button"
           aria-label={`Actions for ${item.title}`}
-          className="grid size-11 place-items-center rounded-md text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) lg:size-9"
+          className="grid size-11 place-items-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) lg:size-9"
           data-document-menu
         >
           <MoreHorizontal size={ICON_SIZE.regular} strokeWidth={ICON_STROKE} />
@@ -281,7 +281,7 @@ function Card({
     >
       <button
         type="button"
-        className="rounded-lg text-left transition-transform duration-(--cq-motion-fast) active:scale-[0.98] disabled:active:scale-100"
+        className="text-left transition-transform duration-(--cq-motion-fast) active:scale-[0.98] disabled:active:scale-100"
         onClick={() => actions.open(item)}
         disabled={item.state !== "READY"}
         aria-label={`Open ${item.title}`}
@@ -289,7 +289,7 @@ function Card({
       >
         <PagePreview item={item} />
       </button>
-      <div className="absolute right-1.5 top-1.5 rounded-md bg-(--cq-surface-raised) shadow-(--cq-shadow-xs)">
+      <div className="absolute right-1.5 top-1.5 bg-(--cq-surface-raised) shadow-(--cq-shadow-xs)">
         <ItemMenu item={item} actions={actions} />
       </div>
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -333,8 +333,8 @@ function Row({
           aria-hidden="true"
           className={
             item.isDeck
-              ? "h-6 w-10 shrink-0 rounded-[3px] border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
-              : "h-10 w-8 shrink-0 rounded-[3px] border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
+              ? "h-6 w-10 shrink-0 border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
+              : "h-10 w-8 shrink-0 border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
           }
         />
         <span className="flex min-w-0 flex-col">
@@ -650,7 +650,7 @@ export function DocumentLibrary({
         <div className="flex flex-wrap items-center gap-2">
           <label
             htmlFor={searchId}
-            className="flex h-11 min-w-0 flex-1 basis-60 items-center gap-2 rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 focus-within:border-(--cq-accent) lg:h-10"
+            className="flex h-11 min-w-0 flex-1 basis-60 items-center gap-2 border border-(--cq-border) bg-(--cq-surface) px-3 focus-within:border-(--cq-accent) lg:h-10"
           >
             <Search
               size={ICON_SIZE.compact}
@@ -686,7 +686,7 @@ export function DocumentLibrary({
             <div
               role="group"
               aria-label="View"
-              className="inline-flex shrink-0 overflow-hidden rounded-md border border-(--cq-border)"
+              className="inline-flex shrink-0 overflow-hidden border border-(--cq-border)"
             >
               {(
                 [
@@ -751,8 +751,8 @@ export function DocumentLibrary({
               onClick={() => setFilter(option.value)}
               className={
                 filter === option.value
-                  ? "min-h-11 shrink-0 rounded-full bg-(--cq-text-primary) px-3.5 cq-body-sm text-(--cq-canvas) lg:min-h-8"
-                  : "min-h-11 shrink-0 rounded-full border border-(--cq-border-subtle) px-3.5 cq-body-sm text-(--cq-text-secondary) hover:border-(--cq-border-strong) lg:min-h-8"
+                  ? "min-h-11 shrink-0 bg-(--cq-text-primary) px-3.5 cq-body-sm text-(--cq-canvas) lg:min-h-8"
+                  : "min-h-11 shrink-0 border border-(--cq-border-subtle) px-3.5 cq-body-sm text-(--cq-text-secondary) hover:border-(--cq-border-strong) lg:min-h-8"
               }
               data-documents-filter={option.value}
               ref={option.value === "BY_Q" ? byQRef : undefined}
@@ -768,7 +768,7 @@ export function DocumentLibrary({
           {uploads.map((entry) => (
             <li
               key={entry.id}
-              className="flex items-center gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5"
+              className="flex items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5"
               data-documents-uploading
             >
               <span className="cq-body-sm min-w-0 flex-1 truncate text-(--cq-text-primary) sm:flex-none sm:basis-64">
@@ -782,10 +782,10 @@ export function DocumentLibrary({
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={Math.round(entry.progress * 100)}
-                    className="hidden h-1 flex-1 overflow-hidden rounded-full bg-(--cq-surface-strong) sm:block"
+                    className="hidden h-1 flex-1 overflow-hidden bg-(--cq-surface-strong) sm:block"
                   >
                     <span
-                      className="block h-full origin-left rounded-full bg-(--cq-accent) transition-transform duration-(--cq-motion-fast)"
+                      className="block h-full origin-left bg-(--cq-accent) transition-transform duration-(--cq-motion-fast)"
                       style={{ transform: `scaleX(${String(entry.progress)})` }}
                     />
                   </span>
@@ -802,7 +802,7 @@ export function DocumentLibrary({
                 <button
                   type="button"
                   aria-label={`Dismiss ${entry.name}`}
-                  className="grid size-9 place-items-center rounded-md text-(--cq-text-tertiary) hover:bg-(--cq-surface-subtle)"
+                  className="grid size-9 place-items-center text-(--cq-text-tertiary) hover:bg-(--cq-surface-subtle)"
                   onClick={() =>
                     setUploads((current) =>
                       current.filter((u) => u.id !== entry.id),
@@ -920,7 +920,7 @@ export function DocumentLibrary({
           {[0, 1, 2, 3].map((n) => (
             <li
               key={n}
-              className="aspect-[4/3] animate-pulse rounded-lg bg-(--cq-surface-subtle) motion-reduce:animate-none"
+              className="aspect-[4/3] animate-pulse bg-(--cq-surface-subtle) motion-reduce:animate-none"
             />
           ))}
         </ul>
@@ -944,7 +944,7 @@ export function DocumentLibrary({
       {dragging ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-(--cq-z-sticky) grid place-items-center rounded-xl border-2 border-dashed border-(--cq-accent) bg-(--cq-accent-soft)/90 cq-body font-medium text-(--cq-accent)"
+          className="pointer-events-none absolute inset-0 z-(--cq-z-sticky) grid place-items-center border-2 border-dashed border-(--cq-accent) bg-(--cq-accent-soft)/90 cq-body font-medium text-(--cq-accent)"
         >
           Drop to upload
         </div>

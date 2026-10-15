@@ -750,7 +750,7 @@ export function PitchPlayer({
         leaves the decision controls on the first screen.
       */}
       <div
-        className="relative w-full overflow-hidden rounded-lg bg-(--cq-surface-strong)"
+        className="relative w-full overflow-hidden bg-(--cq-surface-strong)"
         style={{ aspectRatio: frame.aspectRatio, maxWidth: frame.maxWidth }}
         data-pitch-frame
       >
@@ -810,7 +810,7 @@ export function PitchPlayer({
             disabled={requested && playbackUrl === null}
             data-pitch-poster-play
           >
-            <span className="flex size-14 items-center justify-center rounded-full bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-overlay)">
+            <span className="flex size-14 items-center justify-center bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-overlay)">
               <Play size={ICON_SIZE.prominent} strokeWidth={ICON_STROKE} />
             </span>
           </button>

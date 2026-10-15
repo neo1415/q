@@ -309,7 +309,7 @@ function StageNotice({
       data-q-turn-role={turn === undefined ? undefined : "Q"}
       data-q-disposition={turn?.disposition}
       data-q-failure={turn?.failure ?? undefined}
-      className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 rounded-md border border-(--cq-border) bg-(--cq-surface) px-4 py-3 text-left"
+      className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 border border-(--cq-border) bg-(--cq-surface) px-4 py-3 text-left"
     >
       <span className="cq-label text-(--cq-text-primary)">{title}</span>
       <span className="cq-body-sm text-(--cq-text-secondary)">{children}</span>
@@ -886,7 +886,7 @@ export function QConversationPanel({
         <div
           role="status"
           aria-live="polite"
-          className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
+          className="flex items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
         >
           <span className="cq-body text-(--cq-text-primary)">
             {voiceNotice}
@@ -976,7 +976,7 @@ export function QConversationPanel({
                 <div
                   role="group"
                   aria-label="View"
-                  className="flex items-center rounded-md border border-(--cq-border-subtle) p-0.5"
+                  className="flex items-center border border-(--cq-border-subtle) p-0.5"
                   data-q-control="view"
                 >
                   {(["presence", "chat"] as const).map((option) => (

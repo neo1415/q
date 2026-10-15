@@ -266,7 +266,7 @@ describe("the submitted investor brief", () => {
       ),
     ).toBeTruthy();
     expect(
-      within(brief).getByText(/Q investment synthesis has not been recorded/),
+      within(brief).getByText(/reading of this submission isn.t ready yet/),
     ).toBeTruthy();
     expect(screen.queryByText("Legacy-only answer")).toBeNull();
     expect(screen.queryByText(/Q's view, not a verified fact/)).toBeNull();
@@ -471,6 +471,71 @@ describe("the submitted investor brief", () => {
     expect(screen.getByText("No published criteria were checked")).toBeTruthy();
     expect(screen.queryByText("Meets the published mandate")).toBeNull();
     expect(screen.queryByRole("link")).toBeNull();
+  });
+  it("shows a computed amount as Q's inference with the founder's words, never as their claim", () => {
+    const traction = dossier.dimensions[0];
+    const first = traction?.facts[0];
+    if (traction === undefined || first === undefined)
+      throw new Error("fixture");
+    render(
+      <SubmittedBrief
+        dossier={{
+          ...dossier,
+          dimensions: [
+            {
+              ...traction,
+              facts: [
+                {
+                  ...first,
+                  summary: "360000 USD",
+                  sourceTurnSeq: 6,
+                  truthClass: "Q_INFERENCE",
+                  derivation:
+                    "Not said in these words: Q derived it from interview turn 6, where the founder said “Two pay $180,000 each”",
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText("Q inference")).toBeTruthy();
+    expect(
+      screen.getByText("Derived by Q, not said in these words"),
+    ).toBeTruthy();
+    expect(screen.getByText(/Two pay \$180,000 each/)).toBeTruthy();
+    expect(screen.queryByText("Applicant claim")).toBeNull();
+  });
+  it("shows Q's recorded reading as Q's inference, each point with what it rests on", () => {
+    render(
+      <SubmittedBrief
+        dossier={dossier}
+        synthesis={{
+          schemaVersion: 1,
+          generatedAt: "2026-10-15T20:05:00.000Z",
+          truthClass: "Q_INFERENCE",
+          takeaway: "Early, founder-reported traction.",
+          points: [
+            {
+              kind: "QUESTION",
+              text: "Ask for the customer contracts.",
+              factIds: [id(501)],
+              turnSeqs: [2],
+            },
+          ],
+        }}
+      />,
+    );
+    const reading = screen.getByRole("region", { name: "Q's reading" });
+    expect(
+      within(reading).getByText(/not a score and not a decision/),
+    ).toBeTruthy();
+    expect(
+      within(reading).getByText("Early, founder-reported traction."),
+    ).toBeTruthy();
+    expect(
+      within(reading).getByText("From: Revenue, interview turn 2"),
+    ).toBeTruthy();
   });
   it("distinguishes a missing transcript response from a snapshot with no interview", () => {
     render(<SubmittedTranscript turns={undefined} recordedTurnCount={3} />);

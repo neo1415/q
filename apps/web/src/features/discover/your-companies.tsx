@@ -179,7 +179,7 @@ function YourCompanyCard({
               <EntityCover
                 src={item.coverUrl}
                 aspect="band"
-                className="max-w-[48ch] rounded-md"
+                className="max-w-[48ch]"
               />
             ) : null}
             {/* Unknown stays unknown: the API cannot say whether a pitch

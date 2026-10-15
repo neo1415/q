@@ -100,7 +100,7 @@ export function AppShell({
       <div className="cq-shell">
         <a
           href="#main"
-          className="sr-only z-(--cq-z-toast) rounded-md bg-(--cq-surface-raised) px-4 py-3 cq-body-sm font-medium text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+          className="sr-only z-(--cq-z-toast) bg-(--cq-surface-raised) px-4 py-3 cq-body-sm font-medium text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
         >
           Skip to content
         </a>

@@ -14,18 +14,18 @@ export default function Loading() {
     <PageContainer className="flex flex-col gap-5">
       <div className="flex items-center gap-3">
         <ParticleLoader size={28} />
-        <div className="h-7 w-48 rounded-sm bg-(--cq-surface-strong) motion-safe:animate-pulse" />
+        <div className="h-7 w-48 bg-(--cq-surface-strong) motion-safe:animate-pulse" />
       </div>
       <div
         className="flex flex-col gap-3"
         aria-hidden="true"
         data-page-skeleton
       >
-        <div className="h-4 w-full max-w-xl rounded-sm bg-(--cq-surface-subtle)" />
+        <div className="h-4 w-full max-w-xl bg-(--cq-surface-subtle)" />
         {[0, 1, 2].map((block) => (
           <div
             key={block}
-            className="h-24 w-full rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) motion-safe:animate-pulse"
+            className="h-24 w-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) motion-safe:animate-pulse"
           />
         ))}
       </div>

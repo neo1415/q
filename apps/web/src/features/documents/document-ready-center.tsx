@@ -32,7 +32,7 @@ const ArtifactViewer = dynamic(
     ssr: false,
     loading: () => (
       <div
-        className="min-h-[60vh] w-full rounded-md bg-(--cq-surface-subtle)"
+        className="min-h-[60vh] w-full bg-(--cq-surface-subtle)"
         aria-busy="true"
         aria-label="Opening the document"
       />
@@ -210,12 +210,12 @@ function ReadyCard({
           setHeld(false);
         }
       }}
-      className="cq-document-ready pointer-events-auto flex w-full flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-overlay)"
+      className="cq-document-ready pointer-events-auto flex w-full flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-overlay)"
     >
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-md bg-(--cq-surface-subtle) text-(--cq-text-secondary)"
+          className="flex size-10 shrink-0 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)"
         >
           <Icon size={ICON_SIZE.regular} strokeWidth={ICON_STROKE} />
         </span>

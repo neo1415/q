@@ -122,7 +122,7 @@ export function CommitmentCard({
   const waiting = waitingWords(item, side);
   return (
     <article
-      className="flex flex-col gap-3 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+      className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
       data-commitment={item.status}
       aria-labelledby={`${id}-who`}
     >
@@ -152,7 +152,7 @@ export function CommitmentCard({
           {item.counterpartName}
         </Link>
         <span
-          className={`cq-caption inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 ${TONES[state.tone]}`}
+          className={`cq-caption inline-flex items-center gap-1.5 px-2.5 py-1 ${TONES[state.tone]}`}
         >
           <Icon aria-hidden size={14} strokeWidth={1.75} />
           {state.label}

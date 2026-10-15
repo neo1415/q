@@ -73,7 +73,7 @@ export function ReadinessStatusBadge({
 }) {
   return (
     <span
-      className={`cq-label inline-flex shrink-0 items-center gap-1.5 rounded-full py-0.5 ps-2 pe-2.5 whitespace-nowrap ${TONE[status]}`}
+      className={`cq-label inline-flex shrink-0 items-center gap-1.5 py-0.5 ps-2 pe-2.5 whitespace-nowrap ${TONE[status]}`}
       data-readiness-status={status}
     >
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">

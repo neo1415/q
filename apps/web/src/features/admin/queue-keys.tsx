@@ -96,7 +96,7 @@ export function QueueKeys({
 export function DecisionBar({ children }: { readonly children: ReactNode }) {
   return (
     <div
-      className="flex gap-2 max-lg:sticky max-lg:bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+0.5rem)] max-lg:z-(--cq-z-sticky) max-lg:rounded-(--cq-radius-lg) max-lg:border max-lg:border-(--cq-border-subtle) max-lg:bg-(--cq-surface-raised) max-lg:p-2 max-lg:shadow-(--cq-shadow-sm) lg:flex-wrap"
+      className="flex gap-2 max-lg:sticky max-lg:bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+0.5rem)] max-lg:z-(--cq-z-sticky) max-lg:border max-lg:border-(--cq-border-subtle) max-lg:bg-(--cq-surface-raised) max-lg:p-2 max-lg:shadow-(--cq-shadow-sm) lg:flex-wrap"
       data-decision-bar
     >
       {children}

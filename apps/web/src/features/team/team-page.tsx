@@ -70,7 +70,7 @@ const firstName = (name: string) => name.split(" ")[0] ?? name;
 
 /** Dark, quiet confirm for removing or leaving: never red, never loud. */
 const INK =
-  "inline-flex h-11 select-none items-center justify-center gap-2 rounded-md bg-(--cq-text-primary) px-4 cq-body-sm font-medium whitespace-nowrap text-(--cq-canvas) transition-opacity duration-(--cq-motion-fast) hover:opacity-90 disabled:opacity-50 lg:h-10";
+  "inline-flex h-11 select-none items-center justify-center gap-2 bg-(--cq-text-primary) px-4 cq-body-sm font-medium whitespace-nowrap text-(--cq-canvas) transition-opacity duration-(--cq-motion-fast) hover:opacity-90 disabled:opacity-50 lg:h-10";
 
 export function TeamPage({ initial }: { readonly initial: TeamDto }) {
   const [team, setTeam] = useState(initial);
@@ -221,7 +221,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
       {head}
       {can.invite ? null : (
         <p
-          className="flex items-start gap-2.5 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-3.5 py-3 cq-body-sm text-(--cq-text-secondary)"
+          className="flex items-start gap-2.5 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-3.5 py-3 cq-body-sm text-(--cq-text-secondary)"
           data-team-limited
         >
           <Lock
@@ -249,7 +249,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
             {team.members.length === 1 ? "person" : "people"}
           </h2>
           {team.members.length > 5 ? (
-            <label className="flex min-h-10 w-full items-center gap-2 rounded-full bg-(--cq-surface-subtle) px-3.5 text-(--cq-text-tertiary) sm:w-56">
+            <label className="flex min-h-10 w-full items-center gap-2 bg-(--cq-surface-subtle) px-3.5 text-(--cq-text-tertiary) sm:w-56">
               <span className="sr-only">Search people</span>
               <Search
                 aria-hidden="true"
@@ -586,7 +586,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
         aria-live="polite"
         data-q-notice={toast === null ? undefined : "TOAST"}
         className={cx(
-          "pointer-events-none fixed inset-x-4 bottom-[calc(var(--cq-safe-bottom,0px)+88px)] z-(--cq-z-toast) mx-auto w-fit max-w-[min(420px,calc(100vw-32px))] rounded-full bg-(--cq-text-primary) px-4 py-2.5 text-center cq-body-sm text-(--cq-canvas) shadow-(--cq-shadow-overlay) transition-opacity duration-(--cq-motion-base) lg:bottom-8",
+          "pointer-events-none fixed inset-x-4 bottom-[calc(var(--cq-safe-bottom,0px)+88px)] z-(--cq-z-toast) mx-auto w-fit max-w-[min(420px,calc(100vw-32px))] bg-(--cq-text-primary) px-4 py-2.5 text-center cq-body-sm text-(--cq-canvas) shadow-(--cq-shadow-overlay) transition-opacity duration-(--cq-motion-base) lg:bottom-8",
           toast === null ? "opacity-0" : "opacity-100",
         )}
       >
@@ -657,7 +657,7 @@ function MemberRow({
           <button
             type="button"
             aria-label={`Role for ${member.name}: ${ROLE_WORD[member.role]}. Change`}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border border-(--cq-border) bg-(--cq-surface-raised) pr-2.5 pl-3 cq-body-sm whitespace-nowrap text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:min-h-10"
+            className="inline-flex min-h-11 items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) pr-2.5 pl-3 cq-body-sm whitespace-nowrap text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:min-h-10"
             onClick={onRole}
           >
             {ROLE_WORD[member.role]}
@@ -678,7 +678,7 @@ function MemberRow({
             aria-label={
               member.isYou ? "More for you" : `More for ${member.name}`
             }
-            className="grid size-11 place-items-center rounded-full text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)"
+            className="grid size-11 place-items-center text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)"
             onClick={onMore}
           >
             <MoreHorizontal
@@ -836,7 +836,7 @@ function Waiting({
 }) {
   return (
     <div
-      className="flex flex-wrap items-center gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-3.5 py-3"
+      className="flex flex-wrap items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-3.5 py-3"
       data-team-waiting={data}
     >
       <Avatar name={avatar} size="md" className="size-11!" />
@@ -928,7 +928,7 @@ function InviteSheet({
               setRaw(event.target.value);
             }}
             placeholder="One or more, separated by commas"
-            className="w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3.5 py-3 cq-body leading-normal text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) focus-visible:border-(--cq-accent)"
+            className="w-full border border-(--cq-border) bg-(--cq-surface) px-3.5 py-3 cq-body leading-normal text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) focus-visible:border-(--cq-accent)"
           />
           <span className="cq-caption text-(--cq-text-tertiary)">
             Personal emails are fine.
@@ -944,7 +944,7 @@ function InviteSheet({
           <div
             role="radiogroup"
             aria-labelledby="team-role-label"
-            className="flex gap-0.5 rounded-[10px] bg-(--cq-surface-subtle) p-[3px]"
+            className="flex gap-0.5 bg-(--cq-surface-subtle) p-[3px]"
           >
             {(["MEMBER", "ADMIN"] as const).map((option) => (
               <button
@@ -956,7 +956,7 @@ function InviteSheet({
                   setRole(option);
                 }}
                 className={cx(
-                  "min-h-10 flex-1 rounded-lg cq-body-sm font-medium transition-colors duration-(--cq-motion-fast)",
+                  "min-h-10 flex-1 cq-body-sm font-medium transition-colors duration-(--cq-motion-fast)",
                   role === option
                     ? "border border-(--cq-border) bg-(--cq-surface-raised) text-(--cq-text-primary)"
                     : "text-(--cq-text-secondary)",
@@ -986,7 +986,7 @@ function InviteSheet({
               setMessage(event.target.value);
             }}
             placeholder="Welcome aboard!"
-            className="min-h-11 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3.5 cq-body text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) focus-visible:border-(--cq-accent)"
+            className="min-h-11 w-full border border-(--cq-border) bg-(--cq-surface) px-3.5 cq-body text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) focus-visible:border-(--cq-accent)"
           />
         </div>
         <button
@@ -1119,7 +1119,7 @@ function RemoveSheet({
             onChange={(event) => {
               setHeir(event.target.value);
             }}
-            className="min-h-11 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 cq-body text-(--cq-text-primary)"
+            className="min-h-11 w-full border border-(--cq-border) bg-(--cq-surface) px-3 cq-body text-(--cq-text-primary)"
           >
             {heirs.map((m) => (
               <option key={m.membershipId} value={m.membershipId}>
@@ -1211,7 +1211,7 @@ function TransferSheet({
               onChange={(event) => {
                 setChosen(event.target.value);
               }}
-              className="min-h-11 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 cq-body text-(--cq-text-primary)"
+              className="min-h-11 w-full border border-(--cq-border) bg-(--cq-surface) px-3 cq-body text-(--cq-text-primary)"
             >
               {choices.map((m) => (
                 <option key={m.membershipId} value={m.membershipId}>
@@ -1289,7 +1289,7 @@ export function UnsentInvites({
     <section
       role="status"
       aria-label="Invitations not emailed"
-      className="flex flex-col gap-3 rounded-[14px] border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-4"
+      className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-4"
       data-team-unsent
     >
       <p className="flex items-center gap-2 cq-body-sm font-medium text-(--cq-text-primary)">

@@ -77,12 +77,12 @@ function PlanCard({ action }: { readonly action: ReadinessAction }) {
 
   return (
     <li
-      className="flex flex-col gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+      className="flex flex-col gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
       data-plan-step={action.key}
       data-state={action.state}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="cq-caption rounded-full border border-(--cq-border) px-2 py-0.5 text-(--cq-text-secondary)">
+        <span className="cq-caption border border-(--cq-border) px-2 py-0.5 text-(--cq-text-secondary)">
           {PILLAR_LABEL[action.pillar] ?? action.pillar}
         </span>
         {status === null ? null : <ReadinessStatusBadge status={status} />}
@@ -121,7 +121,7 @@ function PlanCard({ action }: { readonly action: ReadinessAction }) {
             onClick={() => {
               if (action.askQ !== null) askNow(action.askQ);
             }}
-            className="cq-label inline-flex min-h-11 items-center rounded-(--cq-radius-md) bg-(--cq-accent) px-3 text-(--cq-text-inverse) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
+            className="cq-label inline-flex min-h-11 items-center bg-(--cq-accent) px-3 text-(--cq-text-inverse) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
           >
             Let Q do it
           </button>
@@ -129,7 +129,7 @@ function PlanCard({ action }: { readonly action: ReadinessAction }) {
         {action.state === "OPEN" && action.href !== null ? (
           <Link
             href={action.href}
-            className="cq-label inline-flex min-h-11 items-center rounded-(--cq-radius-md) border border-(--cq-border) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
+            className="cq-label inline-flex min-h-11 items-center border border-(--cq-border) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
           >
             {action.href === "/home" ? "Answer Q's question" : "Go there"}
           </Link>
@@ -170,7 +170,7 @@ export function ActionPlanBoard({
       <div
         role="tablist"
         aria-label="Plan columns"
-        className="flex gap-1 rounded-(--cq-radius-md) border border-(--cq-border) p-1 lg:hidden"
+        className="flex gap-1 border border-(--cq-border) p-1 lg:hidden"
       >
         {COLUMNS.map((column) => (
           <button
@@ -179,7 +179,7 @@ export function ActionPlanBoard({
             role="tab"
             aria-selected={shown === column.key}
             onClick={() => setShown(column.key)}
-            className={`cq-body-sm min-h-11 flex-1 rounded-(--cq-radius-sm) ${shown === column.key ? "bg-(--cq-surface-raised) font-semibold text-(--cq-text-primary)" : "text-(--cq-text-secondary)"}`}
+            className={`cq-body-sm min-h-11 flex-1 ${shown === column.key ? "bg-(--cq-surface-raised) font-semibold text-(--cq-text-primary)" : "text-(--cq-text-secondary)"}`}
           >
             {column.label} {byColumn(column.key).length}
           </button>
@@ -192,7 +192,7 @@ export function ActionPlanBoard({
             <section
               key={column.key}
               aria-label={column.label}
-              className={`flex-col gap-3 rounded-(--cq-radius-lg) lg:flex lg:min-h-80 lg:bg-(--cq-surface-subtle) lg:p-3 ${shown === column.key ? "flex" : "hidden"}`}
+              className={`flex-col gap-3 lg:flex lg:min-h-80 lg:bg-(--cq-surface-subtle) lg:p-3 ${shown === column.key ? "flex" : "hidden"}`}
             >
               <h3 className="cq-body hidden items-center justify-between px-1.5 font-semibold text-(--cq-text-primary) lg:flex">
                 {column.label}

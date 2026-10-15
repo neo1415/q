@@ -22,7 +22,7 @@ export type FounderBackgroundValues = {
 };
 
 const AREA =
-  "min-h-24 w-full rounded-[10px] border border-(--cq-border-strong) bg-(--cq-surface) px-3 py-2 cq-body-sm text-(--cq-text-primary)";
+  "min-h-24 w-full border border-(--cq-border-strong) bg-(--cq-surface) px-3 py-2 cq-body-sm text-(--cq-text-primary)";
 
 export function FounderBackground({
   initial,

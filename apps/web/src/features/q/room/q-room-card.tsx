@@ -160,7 +160,7 @@ export function QRoomStage({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: reduced ? 0 : 0.24, ease: EASE }}
-              className="cq-body-sm flex items-center gap-2 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 py-2.5 text-(--cq-text-secondary)"
+              className="cq-body-sm flex items-center gap-2 border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 py-2.5 text-(--cq-text-secondary)"
               data-q-room-note
             >
               <X
@@ -210,7 +210,7 @@ function RoomCardBody({
   );
   return (
     <div
-      className={`flex w-full flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) ${
+      className={`flex w-full flex-col overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface) ${
         deck ? "max-h-[85dvh]" : "max-h-[60dvh]"
       }`}
       data-q-room-card={card.intent.object}
@@ -257,9 +257,9 @@ function RoomCardBody({
             aria-busy="true"
             data-q-room-loading
           >
-            <div className="h-4 w-2/3 rounded bg-(--cq-surface-subtle)" />
-            <div className="h-4 w-1/2 rounded bg-(--cq-surface-subtle)" />
-            <div className="h-4 w-3/5 rounded bg-(--cq-surface-subtle)" />
+            <div className="h-4 w-2/3 bg-(--cq-surface-subtle)" />
+            <div className="h-4 w-1/2 bg-(--cq-surface-subtle)" />
+            <div className="h-4 w-3/5 bg-(--cq-surface-subtle)" />
           </div>
         ) : result.ok ? (
           <CardView view={result.view} />
@@ -387,7 +387,7 @@ function SourceCards({
             href={source.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex min-h-11 flex-col gap-0.5 rounded-(--cq-radius-md) border border-(--cq-border-subtle) px-3 py-2 hover:bg-(--cq-surface-subtle)"
+            className="flex min-h-11 flex-col gap-0.5 border border-(--cq-border-subtle) px-3 py-2 hover:bg-(--cq-surface-subtle)"
           >
             <span className="cq-body-sm text-(--cq-text-primary)">
               {source.title}

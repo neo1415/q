@@ -121,7 +121,6 @@ export function QSheetConversation({
             <IconButton
               aria-label={voice.active ? "End voice" : "Talk with Q"}
               variant={voice.active ? "secondary" : "primary"}
-              className="rounded-full"
               onClick={
                 voice.active
                   ? () => void voice.end()
@@ -153,7 +152,7 @@ export function QSheetConversation({
               }
               variant="quiet"
               className={cx(
-                "rounded-full",
+                "",
                 voice.client.muted ? "bg-(--cq-accent-soft)" : "",
               )}
               aria-pressed={voice.client.muted}
@@ -195,7 +194,7 @@ export function QSheetConversation({
             whole conversation is the Q page's Transcript. */}
         {lastPerson !== undefined ? (
           <p
-            className="cq-body-sm self-end rounded-lg bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)"
+            className="cq-body-sm self-end bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)"
             data-q-panel-person
           >
             <span className="sr-only">You: </span>
@@ -282,7 +281,7 @@ export function QSheetConversation({
             <MenuTrigger>
               <button
                 type="button"
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 cq-caption text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"
+                className="inline-flex min-h-11 items-center gap-1.5 px-2 cq-caption text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"
                 data-q-dock-menu
               >
                 <Move
@@ -303,7 +302,7 @@ export function QSheetConversation({
           </MenuRoot>
           <Link
             href={homeHref(q.conversationId)}
-            className="inline-flex min-h-11 items-center rounded-md px-2 cq-label text-(--cq-accent) underline-offset-2 hover:underline"
+            className="inline-flex min-h-11 items-center px-2 cq-label text-(--cq-accent) underline-offset-2 hover:underline"
             data-q-open-page
           >
             Open Q

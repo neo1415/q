@@ -35,7 +35,7 @@ import { useClaimWhenSeen } from "./use-claim-when-seen";
  */
 
 const CARD_CLASS = [
-  "group flex min-h-11 w-full items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-left",
+  "group flex min-h-11 w-full items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-left",
   "transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:bg-(--cq-surface-subtle)",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
   "disabled:cursor-progress disabled:opacity-70",
@@ -228,7 +228,7 @@ export function ReturningWelcome({
             setPutOff(true);
             void remindSetupLaterAction();
           }}
-          className="inline-flex min-h-11 items-center rounded-md px-3 cq-body-sm text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+          className="inline-flex min-h-11 items-center px-3 cq-body-sm text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           data-setup-reminder-later
         >
           Remind me later

@@ -170,7 +170,7 @@ export function ProfileImageEditor(props: ProfileImageEditorProps) {
         disabled={phase.step === "SAVING"}
         className={
           props.className ??
-          "inline-flex size-11 items-center justify-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-sm) transition-colors hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
+          "inline-flex size-11 items-center justify-center border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-sm) transition-colors hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
         }
         data-image-editor={props.kind}
       >
@@ -282,7 +282,7 @@ function Toast({
   return (
     <div
       role={tone === "error" ? "alert" : undefined}
-      className="fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+16px)] z-(--cq-z-toast) mx-auto flex max-w-md items-center justify-between gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2 pr-2 pl-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
+      className="fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+16px)] z-(--cq-z-toast) mx-auto flex max-w-md items-center justify-between gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2 pr-2 pl-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
       data-image-toast={tone}
       data-q-notice={tone === "error" ? "TOAST:FAILED" : "TOAST:DONE"}
     >
@@ -295,7 +295,7 @@ function Toast({
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss"
-        className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
+        className="inline-flex size-11 shrink-0 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
       >
         <X size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} aria-hidden />
       </button>
@@ -480,9 +480,7 @@ function CropDialog({
           onPointerCancel={onPointerUp}
           onKeyDown={onKeyDown}
           className={`relative w-full cursor-grab touch-none overflow-hidden bg-(--cq-surface-sunken) select-none focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) active:cursor-grabbing ${
-            kind === "AVATAR"
-              ? "aspect-square rounded-lg"
-              : "aspect-[4/1] rounded-md"
+            kind === "AVATAR" ? "aspect-square" : "aspect-[4/1]"
           }`}
           data-crop-frame={kind}
         >

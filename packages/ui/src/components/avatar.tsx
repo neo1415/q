@@ -33,7 +33,7 @@ export function Avatar({
   const px = AVATAR_SIZES[size];
   const frame = cx(
     "inline-flex shrink-0 items-center justify-center overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-subtle) text-(--cq-text-secondary) cq-label",
-    shape === "circle" ? "rounded-full" : "rounded-md",
+    shape === "circle" ? "rounded-full" : null,
     className,
   );
   if (src !== undefined) {

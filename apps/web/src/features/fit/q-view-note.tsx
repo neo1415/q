@@ -40,7 +40,7 @@ export function QViewNote({
   return (
     <div
       className={cx(
-        "relative flex items-start gap-2.5 rounded-xl bg-(--cq-surface-subtle) px-3 py-2.5 text-sm",
+        "relative flex items-start gap-2.5 bg-(--cq-surface-subtle) px-3 py-2.5 text-sm",
         className,
       )}
       data-q-view={view.verdict}

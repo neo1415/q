@@ -87,12 +87,12 @@ export function GuideInput({
         disabled={disabled || reading}
         aria-describedby={statusId}
         placeholder={placeholder}
-        className="cq-body w-full resize-y rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+        className="cq-body w-full resize-y border border-(--cq-border-subtle) bg-(--cq-surface) p-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
       />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <label
           htmlFor={fileId}
-          className="cq-body-sm inline-flex min-h-11 cursor-pointer items-center rounded-md border border-(--cq-border) bg-(--cq-surface) px-4 font-medium text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-(--cq-focus-ring)"
+          className="cq-body-sm inline-flex min-h-11 cursor-pointer items-center border border-(--cq-border) bg-(--cq-surface) px-4 font-medium text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-(--cq-focus-ring)"
         >
           {reading ? "Reading the file…" : "Upload a file"}
           <input

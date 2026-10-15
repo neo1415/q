@@ -99,7 +99,7 @@ export function BrandEditor({
               type="button"
               aria-pressed={accent === null}
               onClick={() => chooseAccent(null)}
-              className="cq-body-sm min-h-11 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary) aria-pressed:border-2 aria-pressed:border-(--cq-accent)"
+              className="cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary) aria-pressed:border-2 aria-pressed:border-(--cq-accent)"
             >
               The theme&apos;s own
             </button>
@@ -111,7 +111,7 @@ export function BrandEditor({
                 aria-pressed={pick.hex === accent}
                 title={pick.name}
                 onClick={() => chooseAccent(pick.hex)}
-                className="size-11 rounded-(--cq-radius-md) border border-(--cq-border) outline-offset-2 aria-pressed:outline-2 aria-pressed:outline-(--cq-text-primary) aria-pressed:outline-solid"
+                className="size-11 border border-(--cq-border) outline-offset-2 aria-pressed:outline-2 aria-pressed:outline-(--cq-text-primary) aria-pressed:outline-solid"
                 style={{ backgroundColor: pick.hex }}
               />
             ))}
@@ -122,7 +122,7 @@ export function BrandEditor({
               aria-label="Pick a colour"
               value={accent ?? chosen.swatch[1]}
               onChange={(event) => chooseAccent(event.target.value)}
-              className="size-11 shrink-0 cursor-pointer rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) p-1"
+              className="size-11 shrink-0 cursor-pointer border border-(--cq-border) bg-(--cq-surface) p-1"
             />
             <input
               id="brand-hex"
@@ -149,7 +149,7 @@ export function BrandEditor({
                 if (typed === "") chooseAccent(null);
                 else if (typedValid) chooseAccent(typed);
               }}
-              className="cq-body cq-numeric h-11 w-36 rounded-md border border-(--cq-border-strong) bg-(--cq-surface) px-3 text-(--cq-text-primary) aria-invalid:border-(--cq-danger)"
+              className="cq-body cq-numeric h-11 w-36 border border-(--cq-border-strong) bg-(--cq-surface) px-3 text-(--cq-text-primary) aria-invalid:border-(--cq-danger)"
             />
           </div>
           <p
@@ -220,11 +220,11 @@ function PresetButton({
       aria-pressed={on}
       onClick={onPick}
       data-brand-preset={preset.key}
-      className="grid min-h-14 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-left aria-pressed:border-2 aria-pressed:border-(--cq-accent)"
+      className="grid min-h-14 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3 border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-left aria-pressed:border-2 aria-pressed:border-(--cq-accent)"
     >
       <span
         aria-hidden="true"
-        className="grid size-10 grid-cols-2 overflow-hidden rounded-(--cq-radius-sm) border border-(--cq-border)"
+        className="grid size-10 grid-cols-2 overflow-hidden border border-(--cq-border)"
       >
         <span style={{ backgroundColor: preset.swatch[0] }} />
         <span style={{ backgroundColor: preset.swatch[1] }} />
@@ -319,7 +319,7 @@ function ContrastPanel({
                   </td>
                   <td className="py-1.5">
                     <span
-                      className="inline-grid h-6 w-11 place-items-center rounded-(--cq-radius-xs) font-semibold"
+                      className="inline-grid h-6 w-11 place-items-center font-semibold"
                       style={
                         {
                           color: row.fg.slice(0, 7),

@@ -70,7 +70,20 @@ export {
   factSummary,
   INVESTMENT_DIMENSIONS,
 } from "./application/coverage.js";
-export { buildDossier } from "./application/dossier.js";
+export {
+  buildDossier,
+  withDerivedAmountsMarked,
+} from "./application/dossier.js";
+export { amountStatedIn, amountsIn } from "./application/stated-amount.js";
+export {
+  citedSynthesis,
+  createDossierSynthesis,
+  GATEQ_SYNTHESIS_PROMPT_VERSION,
+  synthesisContext,
+  type DossierSynthesis,
+  type PendingSynthesis,
+  type SynthesisStore,
+} from "./application/dossier-synthesis.js";
 export {
   contactDto,
   CONTACT_CODE_MAX_ATTEMPTS,
@@ -156,6 +169,7 @@ export {
   type InboxService,
 } from "./inbox/service.js";
 export { createPostgresInboxRepository } from "./infrastructure/postgres-inbox.js";
+export { createPostgresSynthesisStore } from "./infrastructure/postgres-syntheses.js";
 export {
   createGateqInbox,
   gateqInboxActionsPort,
@@ -210,6 +224,7 @@ export {
   type GateqVideoSessionRow,
   type GateqVideoSessionStore,
   type GateqVideoAllowance,
+  type GateqVideoUnavailableReason,
   type GateqVideoSessionView,
 } from "./video/video-interview.js";
 export { createPostgresGateqVideoSessions } from "./video/postgres-video-sessions.js";

@@ -312,7 +312,8 @@ export function InterviewStep({
             if (transcript?.ok === true)
               setLines(linesFromTranscript(transcript.turns));
             if (typed) {
-              setChose(false);
+              // Typing by choice: a second session can still be offered.
+              setChose(true);
               setVideoNote(null);
               setMode("text");
             } else onFinish();

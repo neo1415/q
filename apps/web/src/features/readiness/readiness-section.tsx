@@ -104,7 +104,7 @@ export function ReadinessSection({
         <QControl id="section.risks" kind="SECTION">
           <section
             aria-labelledby="stop-raise-heading"
-            className="rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-5"
+            className="border border-(--cq-border-subtle) bg-(--cq-surface) p-5"
           >
             <h3
               id="stop-raise-heading"
@@ -128,7 +128,7 @@ export function ReadinessSection({
                     >
                       <span
                         aria-hidden="true"
-                        className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
+                        className="cq-caption grid size-6 place-items-center bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
                       >
                         {index + 1}
                       </span>
@@ -147,8 +147,8 @@ export function ReadinessSection({
             )}
             <div className="flex flex-wrap gap-2 pt-3">
               <Link
-                href="/capital?tab=action-plan"
-                className="cq-label inline-flex min-h-11 items-center rounded-(--cq-radius-md) bg-(--cq-accent) px-4 text-(--cq-text-inverse) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
+                href="/relationships?view=capital&tab=action-plan"
+                className="cq-label inline-flex min-h-11 items-center bg-(--cq-accent) px-4 text-(--cq-text-inverse) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
               >
                 Open the action plan
               </Link>
@@ -166,7 +166,7 @@ export function ReadinessSection({
         </QControl>
         <section
           aria-labelledby="glance-heading"
-          className="rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-5"
+          className="border border-(--cq-border-subtle) bg-(--cq-surface) p-5"
         >
           <h3
             id="glance-heading"
@@ -193,7 +193,7 @@ export function ReadinessSection({
       <QControl id="list.pillars" kind="LIST">
         <ul
           aria-label="Readiness by pillar"
-          className="overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
+          className="overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)"
         >
           {readiness.pillars.map((pillar) => (
             <li
@@ -234,7 +234,7 @@ export function ReadinessSection({
                             <span className="text-(--cq-text-primary)">
                               {line.label}
                             </span>
-                            <span className="cq-caption shrink-0 rounded-(--cq-radius-sm) border border-(--cq-border) px-1.5 py-0.5 text-(--cq-text-secondary)">
+                            <span className="cq-caption shrink-0 border border-(--cq-border) px-1.5 py-0.5 text-(--cq-text-secondary)">
                               {evidenceTag(line)}
                             </span>
                           </li>

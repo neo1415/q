@@ -37,7 +37,7 @@ export function ExploreSearchBar({ value = "" }: { readonly value?: string }) {
           spellCheck={false}
           maxLength={80}
           placeholder="Search companies, investors, people"
-          className="cq-body min-h-12 w-full rounded-(--cq-radius-full) border border-transparent bg-(--cq-surface-subtle) pr-4 pl-11 text-[16px] text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="cq-body min-h-12 w-full border border-transparent bg-(--cq-surface-subtle) pr-4 pl-11 text-[16px] text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           data-explore-search
         />
       </label>
@@ -140,13 +140,13 @@ export function ExploreSearchResults({
           {view.chips.map((chip) => (
             <span
               key={`${chip.kind}:${chip.label}`}
-              className="inline-flex min-h-8 items-center gap-1 rounded-(--cq-radius-full) bg-(--cq-accent-soft) py-0 pr-1.5 pl-3 text-[13.5px] text-(--cq-text-primary)"
+              className="inline-flex min-h-8 items-center gap-1 bg-(--cq-accent-soft) py-0 pr-1.5 pl-3 text-[13.5px] text-(--cq-text-primary)"
             >
               {chip.label}
               <Link
                 href={searchHref(chip.without, tab)}
                 aria-label={`Remove ${chip.label}`}
-                className="grid size-7 place-items-center rounded-full hover:bg-(--cq-surface-subtle)"
+                className="grid size-7 place-items-center hover:bg-(--cq-surface-subtle)"
               >
                 <X size={14} aria-hidden="true" />
               </Link>

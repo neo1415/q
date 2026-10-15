@@ -153,7 +153,7 @@ export function MatchReview({ view, state, sheet, now }: MatchReviewProps) {
         )}
       </PageHeader>
       {state === "limited" ? (
-        <p className="cq-body-sm mb-4 rounded-xl bg-(--cq-surface-subtle) px-3.5 py-2.5 text-(--cq-text-primary)">
+        <p className="cq-body-sm mb-4 bg-(--cq-surface-subtle) px-3.5 py-2.5 text-(--cq-text-primary)">
           You&apos;re a Member at Northbound Capital. You can read requests;
           admins accept or decline.
         </p>
@@ -163,7 +163,7 @@ export function MatchReview({ view, state, sheet, now }: MatchReviewProps) {
           {[1, 2, 3, 4].map((n) => (
             <div
               key={n}
-              className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) p-4"
+              className="flex flex-col gap-3 border border-(--cq-border-subtle) p-4"
             >
               <Skeleton lines={3} />
               <Skeleton lines={2} />

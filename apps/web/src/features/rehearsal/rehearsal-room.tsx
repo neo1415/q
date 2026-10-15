@@ -129,7 +129,7 @@ function RoundButton({
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex size-11 shrink-0 items-center sm:size-12 justify-center rounded-(--cq-radius-full) transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-50 motion-reduce:transition-none ${
+      className={`inline-flex size-11 shrink-0 items-center sm:size-12 justify-center transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-50 motion-reduce:transition-none ${
         off
           ? "bg-(--cq-danger) text-(--cq-text-inverse) hover:opacity-90"
           : pressed === true
@@ -729,13 +729,13 @@ export function RehearsalRoom({
   const personaView = (
     <div
       ref={personaTile}
-      className="relative flex h-full min-h-40 w-full items-center justify-center overflow-hidden rounded-(--cq-radius-lg) bg-(--cq-stage-surface)"
+      className="relative flex h-full min-h-40 w-full items-center justify-center overflow-hidden bg-(--cq-stage-surface)"
       style={{ ["--level" as string]: "0" }}
     >
       <div className="relative">
         <span
           aria-hidden="true"
-          className="absolute -inset-2 rounded-(--cq-radius-full) border-4 border-(--cq-stage-accent)"
+          className="absolute -inset-2 rounded-full border-4 border-(--cq-stage-accent)"
           style={{ opacity: "var(--level)" }}
         />
         <CounterpartMark name={name} simulation={simulation} size="stage" />
@@ -751,7 +751,7 @@ export function RehearsalRoom({
           {simulation.headline}
         </span>
       ) : null}
-      <span className="cq-body-sm absolute bottom-3 left-3 max-w-[80%] truncate rounded-(--cq-radius-sm) bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
+      <span className="cq-body-sm absolute bottom-3 left-3 max-w-[80%] truncate bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
         {name}
         {thinking ? (
           <span className="text-(--cq-stage-text-muted)"> · thinking</span>
@@ -765,7 +765,7 @@ export function RehearsalRoom({
   const selfView = (compact: boolean) => (
     <div
       ref={selfTile}
-      className={`relative flex items-center justify-center overflow-hidden rounded-(--cq-radius-lg) bg-(--cq-stage-surface-strong) ${
+      className={`relative flex items-center justify-center overflow-hidden bg-(--cq-stage-surface-strong) ${
         compact ? "aspect-video w-32 sm:w-48" : "h-full min-h-40 w-full"
       }`}
       style={{ ["--level" as string]: "0" }}
@@ -782,23 +782,23 @@ export function RehearsalRoom({
         <div className="relative">
           <span
             aria-hidden="true"
-            className="absolute -inset-1.5 rounded-(--cq-radius-full) border-2 border-(--cq-stage-accent)"
+            className="absolute -inset-1.5 rounded-full border-2 border-(--cq-stage-accent)"
             style={{ opacity: "var(--level)" }}
           />
-          <div className="flex size-10 items-center justify-center rounded-(--cq-radius-full) bg-(--cq-stage-surface) text-(--cq-stage-text) sm:size-14">
+          <div className="flex size-10 items-center justify-center rounded-full bg-(--cq-stage-surface) text-(--cq-stage-text) sm:size-14">
             You
           </div>
         </div>
       )}
       {micOn ? null : (
-        <span className="absolute top-2 right-2 rounded-(--cq-radius-full) bg-(--cq-overlay) p-1 text-(--cq-stage-text)">
+        <span className="absolute top-2 right-2 bg-(--cq-overlay) p-1 text-(--cq-stage-text)">
           <MicOff size={14} aria-label="Your microphone is off" />
         </span>
       )}
       {qSees && camOn ? (
         <span
           role="status"
-          className="cq-caption absolute top-2 left-2 inline-flex items-center gap-1 rounded-(--cq-radius-sm) bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)"
+          className="cq-caption absolute top-2 left-2 inline-flex items-center gap-1 bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)"
         >
           <Eye size={12} aria-hidden="true" />
           {name} can see you
@@ -810,13 +810,13 @@ export function RehearsalRoom({
         <button
           type="button"
           onClick={toggleSeeing}
-          className="cq-caption absolute top-2 left-2 inline-flex min-h-11 items-center gap-1 rounded-(--cq-radius-md) bg-(--cq-surface-raised) px-2 text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="cq-caption absolute top-2 left-2 inline-flex min-h-11 items-center gap-1 bg-(--cq-surface-raised) px-2 text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
           <EyeOff size={14} aria-hidden="true" />
           {name} can&rsquo;t see you &middot; Let Q see you
         </button>
       ) : null}
-      <span className="cq-caption absolute bottom-2 left-2 rounded-(--cq-radius-sm) bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)">
+      <span className="cq-caption absolute bottom-2 left-2 bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)">
         You
         {hand ? " · hand raised" : ""}
       </span>
@@ -837,7 +837,7 @@ export function RehearsalRoom({
         <main className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           {sharing ? (
             <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-              <div className="relative min-h-0 flex-1 overflow-hidden rounded-(--cq-radius-lg) bg-(--cq-stage-surface)">
+              <div className="relative min-h-0 flex-1 overflow-hidden bg-(--cq-stage-surface)">
                 <video
                   ref={screenVideo}
                   autoPlay
@@ -845,7 +845,7 @@ export function RehearsalRoom({
                   playsInline
                   className="h-full w-full object-contain"
                 />
-                <span className="cq-caption absolute top-2 left-2 rounded-(--cq-radius-sm) bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
+                <span className="cq-caption absolute top-2 left-2 bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
                   You’re presenting · {name} can see your screen
                 </span>
               </div>
@@ -871,7 +871,7 @@ export function RehearsalRoom({
               aria-live="polite"
               className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4"
             >
-              <p className="cq-body max-w-3xl rounded-(--cq-radius-md) bg-(--cq-overlay) px-4 py-2 text-(--cq-stage-text)">
+              <p className="cq-body max-w-3xl bg-(--cq-overlay) px-4 py-2 text-(--cq-stage-text)">
                 <span className="font-medium">{caption.who}: </span>
                 {caption.text.length > 280
                   ? `…${caption.text.slice(-280)}`
@@ -884,7 +884,7 @@ export function RehearsalRoom({
         {panel ? (
           <aside
             aria-label="Transcript"
-            className="fixed inset-x-0 bottom-20 z-(--cq-z-sheet) flex max-h-[60vh] flex-col rounded-t-(--cq-radius-lg) bg-(--cq-surface-raised) text-(--cq-text-primary) md:static md:max-h-none md:w-80 md:rounded-(--cq-radius-lg)"
+            className="fixed inset-x-0 bottom-20 z-(--cq-z-sheet) flex max-h-[60vh] flex-col bg-(--cq-surface-raised) text-(--cq-text-primary) md:static md:max-h-none md:w-80"
           >
             <div className="flex items-center justify-between px-4 pt-3">
               <h2 className="cq-label">Transcript</h2>
@@ -892,7 +892,7 @@ export function RehearsalRoom({
                 type="button"
                 aria-label="Close transcript"
                 onClick={() => setPanel(false)}
-                className="inline-flex size-11 items-center justify-center rounded-(--cq-radius-full) hover:bg-(--cq-surface-subtle)"
+                className="inline-flex size-11 items-center justify-center hover:bg-(--cq-surface-subtle)"
               >
                 <X size={18} aria-hidden="true" />
               </button>
@@ -928,12 +928,12 @@ export function RehearsalRoom({
                   onChange={(event) => setDraft(event.target.value)}
                   maxLength={4000}
                   placeholder={`Say something to ${name}`}
-                  className="cq-body-sm min-h-11 min-w-0 flex-1 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) px-3"
+                  className="cq-body-sm min-h-11 min-w-0 flex-1 border border-(--cq-border) bg-(--cq-surface) px-3"
                 />
                 <button
                   type="submit"
                   disabled={draft.trim().length === 0 || sending}
-                  className="cq-label min-h-11 rounded-(--cq-radius-md) bg-(--cq-accent) px-3 text-(--cq-text-inverse) disabled:opacity-50"
+                  className="cq-label min-h-11 bg-(--cq-accent) px-3 text-(--cq-text-inverse) disabled:opacity-50"
                 >
                   Send
                 </button>
@@ -946,7 +946,7 @@ export function RehearsalRoom({
       {notice === null ? null : (
         <div
           role="status"
-          className="cq-body-sm mx-auto mb-2 flex max-w-xl items-center gap-2 rounded-(--cq-radius-md) bg-(--cq-stage-surface-strong) px-3 py-2"
+          className="cq-body-sm mx-auto mb-2 flex max-w-xl items-center gap-2 bg-(--cq-stage-surface-strong) px-3 py-2"
         >
           <span>{notice}</span>
           {typedMode && !ended ? (
@@ -956,7 +956,7 @@ export function RehearsalRoom({
                 setNotice(null);
                 void connect(true);
               }}
-              className="cq-label min-h-11 rounded-(--cq-radius-md) bg-(--cq-stage-accent) px-3 text-(--cq-stage-canvas)"
+              className="cq-label min-h-11 bg-(--cq-stage-accent) px-3 text-(--cq-stage-canvas)"
             >
               Reconnect voice
             </button>
@@ -1041,7 +1041,7 @@ export function RehearsalRoom({
             {more ? (
               <div
                 role="menu"
-                className="absolute bottom-14 left-1/2 flex w-56 -translate-x-1/2 flex-col rounded-(--cq-radius-md) bg-(--cq-surface-raised) py-1 text-(--cq-text-primary) shadow-(--cq-shadow-overlay)"
+                className="absolute bottom-14 left-1/2 flex w-56 -translate-x-1/2 flex-col bg-(--cq-surface-raised) py-1 text-(--cq-text-primary) shadow-(--cq-shadow-overlay)"
               >
                 <button
                   type="button"
@@ -1123,7 +1123,7 @@ export function RehearsalRoom({
             onClick={() => void leave()}
             aria-label="Leave the rehearsal"
             title="Leave the rehearsal"
-            className="inline-flex h-11 w-14 shrink-0 items-center justify-center rounded-(--cq-radius-full) bg-(--cq-danger) sm:h-12 sm:w-16 text-(--cq-text-inverse) hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            className="inline-flex h-11 w-14 shrink-0 items-center justify-center bg-(--cq-danger) sm:h-12 sm:w-16 text-(--cq-text-inverse) hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           >
             <PhoneOff size={20} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </button>

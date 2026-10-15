@@ -79,10 +79,10 @@ export function ScoreTrend({
               onPointerEnter={() => setActive(index)}
               onFocus={() => setActive(index)}
               onBlur={() => setActive(null)}
-              className="flex size-6 items-center justify-center rounded-(--cq-radius-full) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+              className="flex size-6 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
             >
               <span
-                className={`block rounded-(--cq-radius-full) border-2 border-(--cq-surface-raised) bg-(--cq-accent) ${
+                className={`block rounded-full border-2 border-(--cq-surface-raised) bg-(--cq-accent) ${
                   active === index || index === points.length - 1
                     ? "size-3"
                     : "size-2.5"
@@ -95,7 +95,7 @@ export function ScoreTrend({
       {shown === null || shown === undefined ? null : (
         <span
           role="status"
-          className="cq-caption pointer-events-none absolute -top-1 right-0 -translate-y-full rounded-(--cq-radius-sm) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-2 py-1 text-(--cq-text-primary) shadow-(--cq-shadow-sm)"
+          className="cq-caption pointer-events-none absolute -top-1 right-0 -translate-y-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-2 py-1 text-(--cq-text-primary) shadow-(--cq-shadow-sm)"
         >
           {shown.name} ·{" "}
           {new Date(shown.at).toLocaleDateString("en-GB", {

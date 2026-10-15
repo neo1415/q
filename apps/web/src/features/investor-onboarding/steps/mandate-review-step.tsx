@@ -369,7 +369,7 @@ function QReading({
       aria-labelledby="q-reading"
       data-q-reading={reading.length}
       data-q-questions={questions.length}
-      className="flex flex-col gap-4 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface-sunken) p-4"
+      className="flex flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface-sunken) p-4"
     >
       <div className="flex flex-col gap-1">
         <h2 id="q-reading" className="cq-label text-(--cq-text-primary)">
@@ -443,7 +443,7 @@ function QReading({
             <li
               key={question.id}
               data-question-reason={question.reason}
-              className="flex flex-col gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) p-3"
+              className="flex flex-col gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) p-3"
             >
               <p className="cq-body text-(--cq-text-primary)">
                 {question.question}

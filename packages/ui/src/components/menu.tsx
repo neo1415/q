@@ -48,7 +48,7 @@ export function MenuContent({
       >
         <BaseMenu.Popup
           className={cx(
-            "min-w-48 rounded-md border border-(--cq-border) bg-(--cq-surface-raised) p-1 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-fast) data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0",
+            "min-w-48 border border-(--cq-border) bg-(--cq-surface-raised) p-1 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-fast) data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0",
             className,
           )}
         >
@@ -75,7 +75,7 @@ export function MenuItem({
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        "flex min-h-11 cursor-default select-none items-center gap-2 rounded-sm px-2.5 cq-body-sm outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-(--cq-surface-subtle)",
+        "flex min-h-11 cursor-default select-none items-center gap-2 px-2.5 cq-body-sm outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-(--cq-surface-subtle)",
         tone === "danger" ? "text-(--cq-danger)" : "text-(--cq-text-primary)",
       )}
     >
@@ -127,7 +127,7 @@ export function MenuRadioItem({
     <BaseMenu.RadioItem
       value={value}
       closeOnClick
-      className="flex min-h-11 cursor-default select-none items-center gap-2 rounded-sm px-2.5 cq-body-sm text-(--cq-text-primary) outline-none data-[highlighted]:bg-(--cq-surface-subtle)"
+      className="flex min-h-11 cursor-default select-none items-center gap-2 px-2.5 cq-body-sm text-(--cq-text-primary) outline-none data-[highlighted]:bg-(--cq-surface-subtle)"
     >
       {children}
       <BaseMenu.RadioItemIndicator className="ml-auto inline-flex text-(--cq-text-primary)">
