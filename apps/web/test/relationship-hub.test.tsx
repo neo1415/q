@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   digests: vi.fn(),
   notices: vi.fn(),
   reminders: vi.fn(),
+  commitments: vi.fn(),
 }));
 vi.mock("next/navigation", async (load) => ({
   ...(await load<typeof import("next/navigation")>()),
@@ -55,6 +56,7 @@ vi.mock("@capital-q/api-client", async (load) => ({
   listNotifications: mocks.notices,
   listReminders: mocks.reminders,
   getChatUnread: vi.fn().mockResolvedValue({ items: [] }),
+  getRelationshipCommitments: mocks.commitments,
 }));
 vi.mock("@/features/results/results-dashboard", () => ({
   ResultsDashboard: ({
@@ -429,5 +431,102 @@ describe("S2: the Pipeline is the one record list", () => {
     mocks.digests.mockResolvedValue({});
     render(await RelationshipsPage({ searchParams: Promise.resolve({}) }));
     expect(screen.getByRole("group", { name: "Layout" })).toBeDefined();
+  });
+});
+
+describe("S4: the investor's portfolio on the Overview", () => {
+  const invested = (n: number, since: string) => ({
+    relationshipId: `d0000000-0000-4000-8000-00000000010${String(n)}`,
+    counterpart: {
+      kind: "COMPANY" as const,
+      id: `c0000000-0000-4000-8000-00000000010${String(n)}`,
+      name: `Portfolio ${String(n)}`,
+    },
+    state: "INVESTED" as const,
+    stateSince: since,
+    nextStep: "NONE" as const,
+  });
+  const current = (status: string) => ({
+    current: {
+      id: "e0000000-0000-4000-8000-000000000101",
+      amount: "250000.00",
+      currencyCode: "USD",
+      level: "FIRM",
+      status,
+      source: "PERSON",
+      quote: null,
+      statedByYourSide: true,
+      statedAt: "2026-10-01T10:00:00.000Z",
+      confirmedAt: null,
+      note: null,
+      meetingId: null,
+      canConfirm: false,
+    },
+    history: [],
+    detected: [],
+    connected: true,
+  });
+  beforeEach(() => {
+    mocks.results.mockResolvedValue({
+      side: "INVESTOR",
+      organisationName: "Fund",
+      pipelineFit: [],
+    });
+  });
+
+  it("lists invested companies only, newest first, each with its money in words", async () => {
+    mocks.relationships.mockResolvedValue([
+      invested(1, "2026-09-01T10:00:00.000Z"),
+      invested(2, "2026-10-01T10:00:00.000Z"),
+      {
+        ...invested(3, "2026-10-02T10:00:00.000Z"),
+        state: "CONNECTED" as const,
+      },
+    ]);
+    mocks.commitments.mockImplementation((_session: unknown, id: string) =>
+      id.endsWith("101")
+        ? Promise.resolve(current("RECEIVED"))
+        : Promise.reject(new Error("down")),
+    );
+    await overview();
+    const section = screen.getByRole("region", { name: /Portfolio/u });
+    const rows = within(section).getAllByRole("link");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Portfolio 2"),
+      expect.stringContaining("Portfolio 1"),
+    ]);
+    expect(rows[1]?.textContent).toContain("USD 250,000 · received");
+    // Unknown stays unknown: a failed read is said, never zero.
+    expect(rows[0]?.textContent).toContain("Commitment couldn't be read");
+    expect(rows[0]?.getAttribute("href")).toBe(
+      "/relationships/company/c0000000-0000-4000-8000-000000000102",
+    );
+  });
+
+  it("says none yet when nothing is invested, and unavailable when the list fails", async () => {
+    await overview();
+    expect(screen.getByText(/No investments recorded yet/u)).toBeDefined();
+    cleanup();
+    mocks.relationships.mockResolvedValue(undefined);
+    await overview();
+    expect(
+      screen.getByText(/Your portfolio couldn't be read just now/u),
+    ).toBeDefined();
+  });
+
+  it("is the investor's alone: a founder's Overview has no portfolio", async () => {
+    mocks.context.mockResolvedValue({
+      kind: "FOUNDER",
+      companyId: "c0000000-0000-4000-8000-000000000001",
+      label: "Company",
+    });
+    mocks.results.mockResolvedValue({
+      side: "FOUNDER",
+      organisationName: "Founder company",
+      pipeline: { rows: [], byState: [] },
+    });
+    await overview();
+    expect(screen.queryByRole("region", { name: /Portfolio/u })).toBeNull();
+    expect(mocks.commitments).not.toHaveBeenCalled();
   });
 });
