@@ -46,6 +46,7 @@
   th, td { text-align: left; vertical-align: top; border: 1px solid var(--line); padding: 6px 10px; }
   th { background: var(--wash); }
   code { font-family: Menlo, Consolas, monospace; font-size: 14px; }
+  td code { font-size: 12.5px; overflow-wrap: anywhere; }
   .story ol > li { margin-bottom: 10px; }
   dl.glossary dt { font-weight: 700; margin-top: 12px; }
   dl.glossary dd { margin: 2px 0 0 0; }
@@ -60,6 +61,7 @@
     .toc-page { break-after: page; }
     a { color: #000; text-decoration: none; }
     figure.shot { break-inside: avoid; }
+    h3[id^="s-"] { break-before: page; }
   }
 </style>
 </head>
@@ -113,7 +115,7 @@
 
 <div class="box limit">
   <h4>Good to know</h4>
-  <p>These are shared demo accounts. Please don’t change their passwords or delete anything. If you want to try a brand-new sign-up, click <b>Sign up</b> on the sign-in page and use your own email address.</p>
+  <p>These are shared demo accounts. Please don’t change their passwords or delete anything. If you want to try a brand-new sign-up, click <b>Create account</b> on the sign-in page and use your own email address. You can also sign in with Google or ask for an emailed sign-in link.</p>
 </div>
 
 <!-- ===================================================================== -->
@@ -172,12 +174,12 @@
 <shot id="inv-q-conversations" caption="Previous conversations. Click any one to reopen it."></shot>
 
 <h4>What Q’s answers look like</h4>
-<p>Q answers in plain words first, then adds a card when a picture helps. A <b>Q card</b> shows each company, what is known, what does not match, and what is still unknown. Each measure has its own label, such as <i>Good</i>, <i>Partial</i> or <i>Unknown</i>, so you never rely on colour alone. Q always says how many sources it used, and that a fit score is about your mandate, not the quality of the business.</p>
-<shot id="inv-q-compare" caption="A Q comparison card: mandate fit for each company, with the known and unknown measures."></shot>
+<p>Q answers in plain words first, then adds a card or table when a picture helps. Switch between the <b>Q</b> view (Q’s light and what needs you) and the <b>Chat</b> view (the full conversation) with the buttons at the top. A <b>Q card</b> shows each company, what is known, what does not match, and what is still unknown. Each measure has its own label, such as <i>Good</i>, <i>Partial</i> or <i>Unknown</i>, so you never rely on colour alone. Q always says how many sources it used, and that a fit score is about your mandate, not the quality of the business.</p>
+<shot id="inv-q-compare" caption="Q’s Chat view. Every answer lists its sources. When asked for a founder’s private notes, Q says plainly that they are not available to you."></shot>
 <shot id="inv-q-risk" caption="Q’s risk assessment of one company, with the evidence behind each point."></shot>
-<shot id="inv-q-board" caption="The Board keeps Q’s cards side by side so you can come back to them."></shot>
-<shot id="inv-q-ask" caption="A fresh question to Q: “Where are my deals?”, answered as a table."></shot>
-<shot id="fnd-q-ask" caption="A founder asks Q what is missing before investors will take a first call."></shot>
+<shot id="inv-q-board" caption="The Board keeps Q’s cards, such as comparisons against your mandate with a fit score for each company, so you can come back to them."></shot>
+<shot id="inv-q-ask" caption="A fresh question: “Where are my deals?”. Q answers from your CRM records and shows its sources."></shot>
+<shot id="fnd-q-chat" caption="A founder asks Q what is missing before investors will take a first call. Q answers with a short, ordered list and its sources."></shot>
 
 <div class="box q">
   <h4>How Q helps here</h4>
@@ -259,7 +261,7 @@
 <!-- Investor profile -->
 <h3 id="p-investor" class="toc">4.7 An investor profile</h3>
 <p><b>What it’s for (founders):</b> what an investor looks for, checked against your company, rule by rule. It uses only their public profile and their published GateQ rules, never their private thesis.</p>
-<shot id="fnd-investor" caption="Savanna Seed Partners, seen by a founder: which published rules you meet, and how to connect." marks="1:Request connection"></shot>
+<shot id="fnd-investor" caption="Savanna Seed Partners, seen by a founder: which published rules you meet, and how to connect."></shot>
 <ol>
   <li>Read <b>What this investor looks for</b>. Each rule says Met, Not met or Unknown.</li>
   <li>Use <b>Draft my application</b> to have Q start a GateQ application for you.</li>
@@ -269,7 +271,7 @@
 <!-- Capital -->
 <h3 id="p-capital" class="toc">4.8 Capital</h3>
 <p><b>What it’s for (investors):</b> your money and your mandate in one place: what you have committed, what needs you, and the rules you invest by.</p>
-<shot id="inv-capital" caption="Capital for an investor: commitments at the top, your mandate below." marks="1:Mark as sent,2:Review my mandate"></shot>
+<shot id="inv-capital" caption="Capital for an investor: commitments at the top, your mandate below." marks="1:Mark as sent"></shot>
 <ol>
   <li>Under <b>Needs you</b>, click <b>Mark as sent</b> once you have wired agreed money. The company then confirms it arrived.</li>
   <li>Click <b>Review my mandate</b> to change your stage, cheque size, sectors, places or red flags.</li>
@@ -277,7 +279,7 @@
 </ol>
 <shot id="inv-mandate" caption="Reviewing your mandate."></shot>
 <p><b>What it’s for (founders):</b> your raise. Tabs show <b>Overview</b>, <b>Raise &amp; rounds</b>, <b>Readiness</b>, <b>Action plan</b>, <b>12-month plan</b> and <b>Investors</b>.</p>
-<shot id="fnd-capital" caption="Capital for a founder: the round, what could stop the raise, and next steps." marks="1:Readiness,2:Action plan,3:Make my pitch deck"></shot>
+<shot id="fnd-capital" caption="Capital for a founder: the round, what could stop the raise, and next steps." marks="1:Readiness,2:Action plan"></shot>
 <shot id="fnd-readiness" caption="Readiness: how ready you look to an investor today, in words, with the evidence behind it. Only your team sees this."></shot>
 <shot id="fnd-action-plan" caption="Action plan: the steps to do now, next and later."></shot>
 <div class="box q"><h4>How Q helps here</h4><p>Founders can click <b>Plan this raise</b>, <b>Make my pitch deck</b> or <b>What’s missing?</b>. Investors can click <b>Sharpen my mandate</b>. Q drafts; you confirm.</p></div>
@@ -299,9 +301,9 @@
   <li>Click <b>Preview</b> for a quick look, or click a name to open its record.</li>
 </ol>
 <h4>A record</h4>
-<shot id="inv-crm-record" caption="The Ledgerfold record: the stage bar, the deal steps and the next step." marks="1:Book a call,2:Messages,3:Calls,4:Record the terms"></shot>
+<shot id="inv-crm-record" caption="The Ledgerfold record: the stage bar, the deal steps and the next step." marks="1:Book a call,2:Messages,3:Calls"></shot>
 <p>The bar across the top shows the stages: Interest, Connected, Met, Diligence, Invested. Under <b>Deal</b> you see Soft commit, Terms, Signed, Funds received and Closed. Any change makes a new version; nothing is overwritten.</p>
-<shot id="inv-crm-notes" caption="Private notes (only your team sees them) and the Next panel." marks="1:Save note,2:Let Q handle this,3:Set a reminder"></shot>
+<shot id="inv-crm-notes" caption="Private notes (only your team sees them) and the Next panel." marks="1:Save note"></shot>
 <shot id="inv-crm-decision" caption="Recording a decision: Pause for now, or Not proceeding for now. A relationship is archived, never deleted." marks="1:Pause for now,2:Not proceeding for now"></shot>
 <shot id="inv-crm-book" caption="Book a call: find a time, or have Q join the call."></shot>
 <shot id="inv-crm-messages" caption="Messages with the company, kept on the record."></shot>
@@ -323,7 +325,7 @@
 <!-- Requests / interest -->
 <h3 id="p-requests" class="toc">4.10 Company requests and investor interest</h3>
 <p><b>Company requests (investors):</b> companies that asked to connect with you, ranked by fit. Accepting connects you; it is not an investment.</p>
-<shot id="inv-requests" caption="Company requests, with Q’s view and the main risk for each." marks="1:Q, give me the top three"></shot>
+<shot id="inv-requests" caption="Company requests, with Q’s view and the main risk for each."></shot>
 <p><b>Investor interest (founders):</b> investors who expressed interest in your company. Click <b>Accept</b> to connect, or <b>Decline</b>.</p>
 <shot id="led-interest" caption="Ledgerfold has interest from Zino Aviation waiting for an answer." marks="1:Accept,2:Decline"></shot>
 
@@ -331,8 +333,8 @@
 <h3 id="p-gateq" class="toc">4.11 GateQ</h3>
 <p><b>What it’s for:</b> GateQ is an investor’s front door. The investor publishes a few simple rules (stage, place, sector, cheque size). Founders check their fit in two minutes and apply. Q interviews them and turns the answers into a short dossier for the investor.</p>
 <h4>Investors: the inbox and the dossier</h4>
-<shot id="inv-gateq-inbox" caption="The GateQ inbox. Applications are sorted into Fits, Partial and Not a fit; the dossier opens on the right." marks="1:Inbox,2:Your gate,3:Find a startup,4:Triage,5:Reply,6:Pass"></shot>
-<p class="key"><b>1</b> Inbox <b>2</b> Your gate <b>3</b> Find a startup <b>4</b> Triage <b>5</b> Reply <b>6</b> Pass</p>
+<shot id="inv-gateq-inbox" caption="The GateQ inbox. Applications are sorted into Fits, Partial and Not a fit; the dossier opens on the right." marks="1:Inbox,2:Find a startup,3:Your gate,4:Triage,5:Reply,6:Pass"></shot>
+<p class="key"><b>1</b> Inbox <b>2</b> Find a startup <b>3</b> Your gate <b>4</b> Triage <b>5</b> Reply <b>6</b> Pass</p>
 <shot id="inv-gateq-dossier" caption="An application dossier: the submitted brief, what they shared, team notes, and what has happened."></shot>
 <ol>
   <li>Click <b>GateQ</b>, then <b>Inbox</b>.</li>
@@ -352,7 +354,7 @@
 <h4>Founders: applying</h4>
 <shot id="fnd-gateq" caption="GateQ for a founder: your applications, and Find my startup."></shot>
 <shot id="fnd-gate-form" caption="An investor’s gate, seen by a founder. The rules are on the left; your application on the right. Nothing is sent until you press Submit."></shot>
-<shot id="fnd-gate-interview" caption="The GateQ interview: Q asks short questions by text, with the option of a video interview."></shot>
+<shot id="fnd-gate-interview" caption="Applying, step 1 of 4: Q fills in what it already knows from your profile. You check it and click Continue."></shot>
 <div class="box q"><h4>How Q helps here</h4><p>Investors can ask Q to triage the inbox, summarise an application, draft a reply or a pass, label or star applications. Founders get a short interview from Q instead of a long form, and can ask Q “do we fit?” before applying.</p></div>
 <div class="box limit"><h4>Limits</h4><p>The video interview uses a paid video service with a monthly allowance, so it appears only when it is switched on and there is time left. Typing is always available.</p></div>
 
@@ -360,11 +362,12 @@
 <h3 id="p-rehearsals" class="toc">4.12 Rehearsals</h3>
 <p><b>What it’s for:</b> practising a meeting before the real one. Q plays the other side by voice (an investor for founders, a founder for investors), based only on public and shared information. Afterwards you get a scored review.</p>
 <shot id="inv-rehearsals" caption="Rehearsals: pick who to practise with, see your latest score and past rehearsals."></shot>
-<shot id="inv-rehearsal-lobby" caption="The lobby: what Q knows about how they are likely to come across. Click Join now to start." marks="1:Join now"></shot>
+<shot id="inv-rehearsal-lobby" caption="The lobby: what Q knows about how they are likely to come across. Click Join now to start."></shot>
 <shot id="inv-rehearsal-review" caption="The review: a score, what went right, what to improve, tips, and the transcript."></shot>
 <ol>
   <li>Click <b>Rehearsals</b>, then <b>Rehearse</b> next to a name.</li>
-  <li>Read the lobby notes, then click <b>Join now</b> and allow your microphone.</li>
+  <li>Read the lobby notes. Pick Q’s voice, how hard they should be (<b>Gentle</b>, <b>Realistic</b> or <b>Tough</b>), and how you’ll meet (<b>Voice room</b>, or <b>Video</b> for up to 3 minutes when available).</li>
+  <li>Click <b>Join now</b> and allow your microphone.</li>
   <li>Talk as you would in the real meeting. End when you are ready.</li>
   <li>Read the review and click <b>Rehearse again</b> to try once more.</li>
 </ol>
@@ -399,6 +402,7 @@
 <h4>Data room (founders)</h4>
 <p>Click <b>Data room &amp; deck</b> in the sidebar. Documents sit in standard folders. For each document you choose <b>Public</b>, <b>On request</b>, <b>Shared only</b> or <b>Private</b>. Investors see the data room once you accept their interest. Capital Q shows how many of the usual documents for your round you already have.</p>
 <shot id="fnd-dataroom" caption="The founder’s data room, folder by folder, with a visibility choice for each document." marks="1:Public,2:On request,3:Shared only,4:Private"></shot>
+<p>When an investor asks for a document, it shows under <b>Waiting for you</b>. Click <b>Share</b> to send it for a set time (for example 30 days), or <b>Not now</b>.</p>
 <h4>Deck (founders)</h4>
 <p>When you upload a deck, Q reads it section by section. Investors see a section only after you confirm Q read it correctly.</p>
 <shot id="fnd-deck" caption="Checking Q’s reading of your deck: Looks right, This is wrong, or Correct it." marks="1:Confirm all and show,2:Looks right,3:This is wrong"></shot>
@@ -471,7 +475,7 @@
 <p><b>Founders:</b> “upload what you already have, Q works first, then fill gaps.” The steps are: what brings you here, your company, stage, what the company does, how you would categorise it, what you already have (pitch deck, financial model, management accounts, company memo), then “Here’s what we have so far”, your founding team, business and traction, and whether you are raising now. You can skip any step; unknown is fine. Q shows you useful results before it asks for a video or verification.</p>
 <p><b>Investors:</b> capture your mandate quickly: which mandate, whether you are deploying now, stage and cheque, where you invest, sectors, business attributes, green and red flags, then “Your mandate is ready”. Your personalised feed appears straight away.</p>
 <shot id="fnd-onboarding" caption="A founder who has finished set-up sees this. You can return to any answer from your profile."></shot>
-<div class="box limit"><h4>Limits</h4><p>The demo accounts have already finished onboarding, so this guide doesn’t show the first-time screens. To see them, sign up with your own email address.</p></div>
+<div class="box limit"><h4>Limits</h4><p>The demo accounts have already finished onboarding, so this guide doesn’t show the first-time screens. To see them, click <b>Create account</b> on the sign-in page and use your own email address.</p></div>
 
 <!-- ===================================================================== -->
 <h2 id="stories">5. Step-by-step stories</h2>
@@ -521,10 +525,10 @@
     <shot id="fnd-investor" caption="Savanna Seed Partners’ profile."></shot></li>
   <li><b>Apply through GateQ.</b> Open the investor’s gate. Confirm your details. Q interviews you with a few short questions. Answer by typing, or choose the video interview if it is offered. Review, then press <b>Submit</b>.
     <shot id="fnd-gate-form" caption="The gate: rules on the left, your application on the right."></shot>
-    <shot id="fnd-gate-interview" caption="The interview step."></shot></li>
+    <shot id="fnd-gate-interview" caption="Step 1 of 4, already filled in from your profile."></shot></li>
   <li><b>Rehearse.</b> Click <b>Rehearsals</b>, then <b>Rehearse</b> beside the investor. Q plays the investor by voice. Read your review afterwards.
     <shot id="fnd-rehearsal-lobby" caption="Ready to rehearse with Savanna Seed Partners."></shot>
-    <shot id="led-rehearsal-review" caption="A rehearsal review."></shot></li>
+    <shot id="inv-rehearsal-review" caption="A rehearsal review: a score, what went right, what to improve, and the transcript."></shot></li>
   <li><b>Track interest in the CRM.</b> When an investor expresses interest, it appears on <b>Q</b> and under <b>Investor interest</b>. Click <b>Accept</b> to connect. Then follow each investor in your <b>Fundraising Hub</b>.
     <shot id="led-interest" caption="Answering investor interest."></shot>
     <shot id="led-crm" caption="Ledgerfold’s Fundraising Hub."></shot></li>
@@ -548,7 +552,7 @@
 <div class="story"><ol>
   <li>Click <b>You</b> in the sidebar, then <b>Settings</b>, then <b>Team</b>.
     <shot id="fnd-team" caption="The team page."></shot></li>
-  <li>Click <b>Invite people</b>. Type the person’s work email and choose their role (Admin or Member). Click send.
+  <li>Click <b>Invite people</b>. Type the person’s email (you can add several, separated by commas), choose <b>Member</b> or <b>Admin</b>, add a short message if you like, and click <b>Send invitation</b>.
     <shot id="fnd-invite" caption="The invite form."></shot></li>
   <li>The teammate gets an email. When they sign in to Capital Q with that email, they see an invitation card. They click <b>Accept</b> and join the company. They can also decline.</li>
   <li>Back on the Team page, the new person appears with their role. You can change their role, resend or cancel an invitation, or remove someone.</li>
@@ -560,15 +564,17 @@
 <div class="story"><ol>
   <li>Click <b>Work</b> in the Workspace group.
     <shot id="inv-work" caption="Q Work."></shot></li>
-  <li>Click <b>Give Q a task</b> and type the job, for example: “Look at the three best fits in my feed, compare them against my mandate, and draft a short intro message to the strongest one for my approval.”
-    <shot id="inv-work-task" caption="Giving Q a task."></shot></li>
-  <li>Q breaks the job into steps and shows them under <b>In progress</b>. Reading and comparing happen straight away.</li>
-  <li>When Q reaches a step that affects someone else, like sending the message, it stops and puts it under <b>Needs you</b>. You also get a notification.
-    <shot id="inv-notifications" caption="“Needs your yes” items in notifications."></shot></li>
-  <li>Read the exact message. Click <b>Approve</b> to send it as written, or change it. A changed message needs your approval again.</li>
-  <li>The finished job appears under <b>Done for you</b>. Click <b>Thread</b> to see what was sent and any reply.
-    <shot id="inv-work-thread" caption="A finished job and the reply it got."></shot></li>
+  <li>Click <b>Give Q a task</b> and type the job, for example: “Look at the three best fits in my feed, compare them against my mandate, and draft a short intro message to the strongest one for my approval.” Press Enter.</li>
+  <li>Q writes a plan: who on Q’s team does each step, what it will and won’t do, and a budget. Nothing has happened yet.
+    <shot id="inv-work-task" caption="Q’s plan for the job, with Approve, Edit and Close."></shot></li>
+  <li>The plan waits under <b>Needs you</b>, and a small “Approval needed” note appears. Read it. Click <b>Edit</b> to change it, or <b>Approve</b> to start.
+    <shot id="inv-work-needs" caption="The plan waiting under Needs you."></shot></li>
+  <li>After you approve, the job moves to <b>In progress</b>. Q researches and compares straight away. Before anything goes to another person, such as the intro message, Q stops and asks you again under <b>Needs you</b>. You approve the exact words; if they change, Q asks again.
+    <shot id="inv-work-progress" caption="In progress. Finished jobs above show their result, such as an investment memo you can open." marks="1:Open document"></shot></li>
+  <li>When a job is done, it appears under <b>Done for you</b> with its result. For messages, click <b>Thread</b> to see what was sent and any reply.
+    <shot id="inv-work-thread" caption="A finished job: the approved message to a founder and the conversation that followed."></shot></li>
 </ol></div>
+<div class="box limit"><h4>What we saw when we tried it</h4><p>In our test on the demo account, the new job stopped with “Waiting for you · Not allowed to do this step”: one step needed a permission the demo firm hasn’t given Q. Some earlier test jobs show “Failed” with a plain reason, and nothing was sent. Jobs that finished produced an investment memo, which you can open from Q Work or Documents.</p></div>
 
 <h3 id="s-qpitch" class="toc">Story 6. Running Q Pitch</h3>
 <p class="meta">Sign in as Amara. Turn your sound on.</p>

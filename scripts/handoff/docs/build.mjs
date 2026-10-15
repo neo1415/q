@@ -85,8 +85,9 @@ for (const m of src.matchAll(shotRe)) {
     const [n, ...rest] = entry.split(":");
     const box = boxes[rest.join(":")];
     if (!box) return "";
-    const left = ((box.x + Math.min(box.w, 200) / 2) / 1440) * 100;
-    const top = ((box.y + box.h / 2) / 900) * 100;
+    // Top-left corner of the control, so the dot points at it without hiding its label.
+    const left = ((box.x + 2) / 1440) * 100;
+    const top = ((box.y + 2) / 900) * 100;
     return `<span class="dot" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%">${esc(n)}</span>`;
   }).join("");
   parts.push(`<figure class="shot"><div class="frame">` +

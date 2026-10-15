@@ -114,8 +114,8 @@ const SHOTS = [
   { id: "inv-company-dataroom", acct: "investor", title: "Company profile, data room", path: () => `/company/${ids.ledgerfold}?tab=dataroom`, run: async (c) => { await c.scrollToText("Request all on-request documents"); } },
   { id: "inv-company-team", acct: "investor", title: "Company profile, team", path: () => `/company/${ids.ledgerfold}?tab=team`, run: async (c) => { await c.scrollTo(/^Team$/); } },
   { id: "inv-q-conversations", acct: "investor", title: "Q, previous conversations", path: "/home", run: async (c) => { await c.openConversations(); } },
-  { id: "inv-q-compare", acct: "investor", title: "Q answer, comparison card", path: "/home", run: async (c) => { await c.openConversation(/Top companies against mandate/); } },
-  { id: "inv-q-risk", acct: "investor", title: "Q answer, company risks", path: "/home", run: async (c) => { await c.openConversation(/Ledgerfold risk assessment/); } },
+  { id: "inv-q-compare", acct: "investor", title: "Q answer, comparison card", path: "/home", run: async (c) => { await c.openConversation(/Top companies against mandate/, "out of 10"); } },
+  { id: "inv-q-risk", acct: "investor", title: "Q answer, company risks", path: "/home", run: async (c) => { await c.openConversation(/Ledgerfold risk assessment/, "Hide from Q", true); } },
   { id: "inv-q-board", acct: "investor", title: "Q Board", path: "/home", run: async (c) => {
       await c.openConversation(/Top companies against mandate/);
       await c.clickButton(/^Board/, { optional: true });
@@ -131,28 +131,39 @@ const SHOTS = [
   { id: "inv-crm-record", acct: "investor", title: "CRM record", path: () => `/relationships/company/${ids.ledgerfold}` },
   { id: "inv-crm-notes", acct: "investor", title: "CRM record, private notes and next steps", path: () => `/relationships/company/${ids.ledgerfold}`, run: async (c) => { await c.scrollTo("Private notes"); } },
   { id: "inv-crm-book", acct: "investor", title: "CRM record, book a call", path: () => `/relationships/company/${ids.ledgerfold}`, run: async (c) => { await c.clickButton(/^Book a call$/); } },
-  { id: "inv-crm-decision", acct: "investor", title: "CRM record, decision buttons", path: () => `/relationships/company/${ids.ledgerfold}`, run: async (c) => { await c.scrollToText("Not proceeding for now", "button"); } },
+  { id: "inv-crm-decision", acct: "investor", title: "CRM record, decision buttons", path: () => `/relationships/company/${ids.ledgerfold}`, run: async (c) => {
+      const more = c.page.locator("main").getByText("More", { exact: true }).first();
+      if (await more.count()) { await more.click().catch(() => {}); await c.page.waitForTimeout(1500); }
+      await c.scrollToText("Not proceeding for now", "button");
+    } },
   { id: "inv-crm-messages", acct: "investor", title: "CRM record, messages", path: () => `/relationships/company/${ids.ledgerfold}/messages` },
   { id: "inv-capital", acct: "investor", title: "Capital, investor", path: "/capital" },
   { id: "inv-mandate", acct: "investor", title: "Mandate review", path: "/onboarding/investor?review=1", wait: 4000 },
-  { id: "inv-gateq-inbox", acct: "investor", title: "GateQ inbox and dossier", path: "/gateq?tab=inbox", wait: 4000 },
+  { id: "inv-gateq-inbox", acct: "investor", title: "GateQ inbox and dossier", path: "/gateq?tab=inbox", run: async (c) => { await c.selectApplication("Maji Loop"); } },
   { id: "inv-gateq-dossier", acct: "investor", title: "GateQ dossier, details", path: "/gateq?tab=inbox", run: async (c) => {
-      const row = c.page.getByRole("button", { name: /^Select Maji Loop/ }).first();
-      const link = c.page.locator("main").getByText("Maji Loop", { exact: true }).first();
-      await link.click().catch(() => row.click().catch(() => {}));
-      await c.page.waitForTimeout(3500);
+      await c.selectApplication("Maji Loop");
+      await c.scrollToText("What they shared");
     } },
   { id: "inv-gateq-gate", acct: "investor", title: "GateQ, your gate", path: "/gateq?tab=gate" },
   { id: "inv-gateq-find", acct: "investor", title: "GateQ, find a startup", path: "/gateq?tab=find" },
   { id: "inv-requests", acct: "investor", title: "Company requests", path: "/investors" },
   { id: "inv-rehearsals", acct: "investor", title: "Rehearsals", path: "/rehearsals" },
-  { id: "inv-rehearsal-lobby", acct: "investor", title: "Rehearsal lobby", path: () => `/rehearsals/company/${ids.ledgerfold}` },
+  { id: "inv-rehearsal-lobby", acct: "investor", title: "Rehearsal lobby", path: () => `/rehearsals/company/${ids.ledgerfold}`, wait: 8000 },
   { id: "inv-rehearsal-review", acct: "investor", title: "Rehearsal review", path: () => ids.rehearsal ? `/rehearsals/r/${ids.rehearsal}` : "/rehearsals" },
   { id: "inv-work", acct: "investor", title: "Q Work", path: "/work" },
   { id: "inv-work-thread", acct: "investor", title: "Q Work, a finished job", path: "/work", run: async (c) => { await c.clickButton(/^Thread$/, { optional: true }); await c.page.waitForTimeout(2500); } },
   { id: "inv-work-task", acct: "investor", title: "Q Work, giving Q a task", path: "/work", needs: "q", run: async (c) => {
       await c.askWork("Look at the three best fits in my feed, compare them against my mandate, and draft a short intro message to the strongest one for my approval.");
     } },
+  { id: "inv-work-needs", acct: "investor", title: "Q Work, a plan waiting for your yes", path: "/work", needs: "q", run: async (c) => {
+      await c.scrollToText("Needs you");
+    } },
+  { id: "inv-work-approved", acct: "investor", title: "Q Work, after approving the plan", path: "/work", needs: "q", run: async (c) => {
+      // Approves the plan only: Q then researches and drafts; any message it
+      // wants to send comes back to Needs you for its own approval.
+      if (await c.clickButton(/^Approve$/, { optional: true })) await waitForQ(c.page);
+    } },
+  { id: "inv-work-progress", acct: "investor", title: "Q Work, jobs in progress", path: "/work", run: async (c) => { await c.scrollTo(/^In progress/); } },
   { id: "inv-documents", acct: "investor", title: "Documents, investor", path: "/documents" },
   { id: "inv-daily", acct: "investor", title: "The Q Daily", path: "/daily" },
   { id: "inv-qpitch", acct: "investor", title: "Q Pitch", path: "/q-pitch" },
@@ -181,16 +192,30 @@ const SHOTS = [
   { id: "fnd-gateq", acct: "founder", title: "GateQ, founder", path: "/gateq?tab=applications" },
   { id: "fnd-gate-form", acct: "founder", title: "An investor's gate", path: () => `/g/${ids.gate}` },
   { id: "fnd-gate-interview", acct: "founder", title: "GateQ interview", path: () => `/g/${ids.gate}`, needs: "apply", run: async (c) => {
+      const name = c.page.getByLabel(/^Full name/).first();
+      if (await name.count() && !(await name.inputValue())) await name.fill("Babatunde Oyelaran");
+      const role = c.page.getByLabel(/^Your role/).first();
+      if (await role.count() && !(await role.inputValue())) await role.fill("Founder & CEO");
       await c.clickButton(/^Confirm and continue$/, { optional: true });
       await c.page.waitForTimeout(6000);
       for (const name of [/^Continue$/, /^Start$/, /^Begin$/, /Start the interview/]) await c.clickButton(name, { optional: true, quiet: true });
       await c.page.waitForTimeout(20000);
     } },
   { id: "fnd-rehearsals", acct: "founder", title: "Rehearsals, founder", path: "/rehearsals" },
-  { id: "fnd-rehearsal-lobby", acct: "founder", title: "Rehearsal lobby, founder", path: () => `/rehearsals/investor/${ids.savanna}` },
+  { id: "fnd-rehearsal-lobby", acct: "founder", title: "Rehearsal lobby, founder", path: () => `/rehearsals/investor/${ids.savanna}`, wait: 20000 },
   { id: "fnd-work", acct: "founder", title: "Q Work, founder", path: "/work" },
   { id: "fnd-q-ask", acct: "founder", title: "Q answer, founder", path: "/home", needs: "q", run: async (c) => {
       await c.askQ("What is missing before investors will take a first call with us? Keep it short.");
+      await c.showChat();
+    } },
+  { id: "fnd-q-chat", acct: "founder", title: "Q answer, founder (reopened)", path: "/home", run: async (c) => {
+      await c.openConversations();
+      await c.page.getByRole("dialog").locator("li").first().click().catch(() => {});
+      await c.page.waitForTimeout(6000);
+      const x = c.page.getByRole("dialog").getByRole("button", { name: /^Close/ }).first();
+      if (await x.count()) await x.click().catch(() => {});
+      await c.page.waitForTimeout(2000);
+      await c.showChat();
     } },
   { id: "fnd-profile", acct: "founder", title: "Profile", path: "/profile" },
   { id: "fnd-qcard", acct: "founder", title: "Q Card", path: "/profile", run: async (c) => { await c.scrollTo("Q Card"); } },
@@ -205,10 +230,6 @@ const SHOTS = [
   { id: "led-crm", acct: "ledgerfold", title: "Fundraising Hub, Ledgerfold", path: "/relationships" },
   { id: "led-crm-board", acct: "ledgerfold", title: "Fundraising Hub board", path: "/relationships?view=pipeline&layout=board" },
   { id: "led-deck", acct: "ledgerfold", title: "Deck Q prepared", path: () => `/company/${ids.ledgerfold}?tab=deck`, run: async (c) => { await c.scrollTo(/deck/i); } },
-  { id: "led-rehearsal-review", acct: "ledgerfold", title: "Rehearsal review, founder", path: "/rehearsals", run: async (c) => {
-      const r = c.page.locator("a[href^='/rehearsals/r/']").first();
-      if (await r.count()) { await r.click(); await c.page.waitForLoadState("networkidle").catch(() => {}); await c.page.waitForTimeout(3000); }
-    } },
 ];
 
 const ids = {};
@@ -263,6 +284,18 @@ function helpers(page) {
       await page.waitForTimeout(2500);
       await page.addStyleTag({ content: DECLUTTER }).catch(() => {});
     },
+    /** Close Q's spoken-greeting caption (bottom right); it is local and comes back next visit. */
+    async closeArrival() {
+      const closed = await page.evaluate(() => {
+        const b = [...document.querySelectorAll("button")].find((x) => {
+          const r = x.getBoundingClientRect();
+          return x.textContent.trim() === "Close" && r.top > 650 && r.left > 950 && r.width > 0;
+        });
+        if (b) b.click();
+        return Boolean(b);
+      });
+      if (closed) await page.waitForTimeout(800);
+    },
     async clickButton(name, { optional = false, quiet = false } = {}) {
       const b = page.getByRole("button", { name }).first();
       if (!(await b.count())) {
@@ -289,6 +322,10 @@ function helpers(page) {
         await page.waitForTimeout(1200);
       }
     },
+    async selectApplication(name) {
+      await c.page.locator("main").getByText(name, { exact: true }).first().click().catch(() => {});
+      await c.page.waitForTimeout(3500);
+    },
     async expandNav() {
       for (const label of ["Workspace", "You"]) {
         const b = page.locator("nav").getByRole("button", { name: new RegExp(`^${label}`) }).first();
@@ -303,12 +340,31 @@ function helpers(page) {
       await page.getByRole("button", { name: /Conversations/ }).first().click();
       await page.waitForTimeout(4000);
     },
-    async openConversation(title) {
+    /** Reopen a past chat; `anchor` scrolls that text (first match, or last if `last`) to the top. */
+    async openConversation(title, anchor, last = false) {
       await c.openConversations();
       await page.getByRole("dialog").getByText(title).first().click();
-      await page.waitForTimeout(5000);
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(2500);
+      await page.waitForTimeout(6000);
+      const x = page.getByRole("dialog").getByRole("button", { name: /^Close/ }).first();
+      if (await x.count()) await x.click().catch(() => {});
+      await page.waitForTimeout(3000);
+      // The Q room opens on its stage; the Chat view shows the conversation and its cards.
+      const chat = page.getByRole("button", { name: /^Chat$/ }).or(page.getByRole("tab", { name: /^Chat$/ })).first();
+      if (await chat.count()) { await chat.click().catch(() => {}); await page.waitForTimeout(3000); }
+      if (anchor) {
+        await page.evaluate(({ anchor, last }) => {
+          const walker = document.createTreeWalker(document.querySelector("main") ?? document.body, NodeFilter.SHOW_TEXT);
+          const hits = [];
+          for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.textContent.includes(anchor)) hits.push(n.parentElement);
+          const el = last ? hits.at(-1) : hits[0];
+          if (el) { el.scrollIntoView({ block: "start" }); for (let p = el.parentElement; p; p = p.parentElement) if (p.scrollHeight > p.clientHeight + 10) { p.scrollTop -= 90; break; } }
+        }, { anchor, last });
+        await page.waitForTimeout(1500);
+      }
+    },
+    async showChat() {
+      const chat = page.getByRole("button", { name: /^Chat$/ }).first();
+      if (await chat.count()) { await chat.click().catch(() => {}); await page.waitForTimeout(3000); }
     },
     async askQ(text) {
       const box = page.getByRole("textbox", { name: /Message Q/i }).or(page.getByPlaceholder("Message Q")).first();
@@ -358,7 +414,9 @@ async function boxesFor(page, labels) {
         const cs = getComputedStyle(el);
         return cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.05;
       });
-      const hit = visible.find((el) => name(el) === label) ?? visible.find((el) => name(el).startsWith(label));
+      // Buttons first: a rail button and a same-named tab or link can both match.
+      const ranked = [...visible].sort((x, y) => Number(y.tagName === "BUTTON") - Number(x.tagName === "BUTTON"));
+      const hit = ranked.find((el) => name(el) === label) ?? ranked.find((el) => name(el).startsWith(label));
       if (hit) { const r = hit.getBoundingClientRect(); out[label] = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }; }
     }
     return out;
@@ -428,6 +486,7 @@ async function main() {
           await c.go(p);
           if (s.wait) await page.waitForTimeout(s.wait);
           if (s.run) await s.run(c);
+          await c.closeArrival();
           if (s.marks) writeFileSync(resolve(OUT, `${s.id}.marks.json`), JSON.stringify(await boxesFor(page, s.marks), null, 1));
           await page.screenshot({ path: resolve(OUT, `${s.id}.png`) });
           manifest[s.id] = { title: s.title, url: p, at: new Date().toISOString(), ok: true };
