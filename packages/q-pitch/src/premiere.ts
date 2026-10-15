@@ -388,6 +388,55 @@ const premiereCompany = withLines("s.pilot.company", (scene) => [
   ...scene.lines,
 ]);
 
+/**
+ * A first GateQ conversation, Q to Q (owner 15 Oct, item 5): Q as the
+ * investor and a labelled simulation of the fictional applicant Maji Loop,
+ * through the same short-rehearsal path (one of the actor's own rehearsal
+ * partners, resolved on the server). Short: two approved lines.
+ */
+const gateqInterview: SceneScript = {
+  sceneId: "s.premiere.gateq-interview",
+  chapterId: "ch.premiere.gateq",
+  title: "A first conversation with an applicant, Q to Q",
+  featureIds: ["REH-Q2Q-SHORT"],
+  approvedClaimIds: ["REH-Q2Q-SHORT.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/rehearsals/r/[rehearsalId]",
+  actions: [
+    {
+      actionId: "ta_gateq-q2q",
+      kind: "runShortRehearsal",
+      counterpart: "maji-loop",
+      lines: ["q.gq-open", "q.gq-evidence"],
+      maxMs: 45_000,
+    },
+  ],
+  lines: [
+    line(
+      "l.gq.both",
+      "Here's what a first conversation with an applicant can sound like. I'll play both sides: my own voice is the investor, the other voice is a labelled simulation of the founder, not the real person.",
+      "BEFORE_ACK",
+      "r4 (owner 15 Oct: Q plays both sides)",
+    ),
+    line(
+      "l.gq.saved",
+      "That's the end of it. The session is closed, and its transcript and review are saved.",
+      "AFTER_ACK",
+      "CERTIFICATION REH-Q2Q-SHORT (r3 wording)",
+      ["REH-Q2Q-SHORT.c1"],
+    ),
+    line(
+      "l.gq.decision",
+      "The decision still stays with you.",
+      "AFTER_ACK",
+      "r4; GateQ authority",
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 120_000,
+};
+
 const candidates: SceneScript[] = [
   {
     sceneId: "s.premiere.privacy",
@@ -509,8 +558,8 @@ const candidates: SceneScript[] = [
         actionId: "ta_rehearse-short",
         kind: "runShortRehearsal",
         counterpart: "ledgerfold",
-        lines: ["q.reh-open", "q.reh-evidence", "q.reh-close"],
-        maxMs: 30_000,
+        lines: ["q.reh-open", "q.reh-evidence"],
+        maxMs: 45_000,
       },
     ],
     lines: [
@@ -519,6 +568,12 @@ const candidates: SceneScript[] = [
         "Before a meeting, it helps to rehearse the hard questions. This is a labelled simulation, not a real conversation.",
         "BEFORE_ACK",
         "Appendix A2 / §16.1 P8",
+      ),
+      line(
+        "l.reh.voices",
+        "I'll play both sides: in my own voice, the investor; in the other voice, a simulation of the founder.",
+        "BEFORE_ACK",
+        "r4 (owner 15 Oct: Q plays both sides)",
       ),
       line(
         "l.reh.review",
@@ -530,7 +585,7 @@ const candidates: SceneScript[] = [
     ],
     fallbackLines: [FALLBACK],
     fallbackSceneId: null,
-    ackTimeoutMs: 60_000,
+    ackTimeoutMs: 120_000,
   },
   {
     sceneId: "s.premiere.close",
@@ -658,7 +713,10 @@ export const PREMIERE_SCRIPT: TourScript = TourScriptSchema.parse({
             : scene.sceneId === "s.premiere.rehearsal"
               ? "REHEARSALS"
               : "INVESTOR",
-      sceneIds: [scene.sceneId],
+      sceneIds:
+        scene.sceneId === "s.premiere.gateq"
+          ? [scene.sceneId, gateqInterview.sceneId]
+          : [scene.sceneId],
     })),
   ].map(spoken),
   questions: [
@@ -676,6 +734,14 @@ export const PREMIERE_SCRIPT: TourScript = TourScriptSchema.parse({
       text: "Which of those claims can you support with documents today, and which are still your own estimates?",
     },
     {
+      questionId: "q.gq-open",
+      text: "Thanks for applying. In two sentences, what does the business do, and why does it fit our mandate?",
+    },
+    {
+      questionId: "q.gq-evidence",
+      text: "What can you show us today that supports that, and what is still an estimate?",
+    },
+    {
       questionId: "q.reh-close",
       text: "What would you need from us to make a decision quickly?",
     },
@@ -686,7 +752,9 @@ export const PREMIERE_SCRIPT: TourScript = TourScriptSchema.parse({
     premiereTopThree,
     premiereCompany,
     pilotSceneOf("s.pilot.compare"),
-    ...candidates,
+    ...candidates.flatMap((scene) =>
+      scene.sceneId === "s.premiere.gateq" ? [scene, gateqInterview] : [scene],
+    ),
   ],
 });
 

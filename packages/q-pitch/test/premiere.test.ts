@@ -33,7 +33,10 @@ describe("r3 premiere and the certification gate", () => {
     ]);
     // Q-to-Q stays CODE_VERIFIED until the microphone "skip" test runs.
     const suppressed = gate.decisions.filter((d) => d.verdict === "SUPPRESSED");
-    expect(suppressed.map((d) => d.sceneId)).toEqual(["s.premiere.rehearsal"]);
+    expect(suppressed.map((d) => d.sceneId)).toEqual([
+      "s.premiere.gateq-interview",
+      "s.premiere.rehearsal",
+    ]);
   });
 
   it("a rehearsal that opts into CODE_VERIFIED runs the full cut", () => {
@@ -43,7 +46,7 @@ describe("r3 premiere and the certification gate", () => {
       audience: "INTERNAL_REHEARSAL",
       acceptedStatuses: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
     });
-    expect(gate.scenes).toHaveLength(10);
+    expect(gate.scenes).toHaveLength(11);
     expect(gate.rejectedLines).toEqual([]);
   });
 

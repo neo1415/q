@@ -91,7 +91,9 @@ export const SceneScriptSchema = z
     fallbackLines: z.array(SceneLineSchema).min(1).max(4),
     /** The scene that replaces this one at tour start when it is uncertified. */
     fallbackSceneId: SceneIdSchema.nullable(),
-    ackTimeoutMs: z.number().int().min(250).max(60_000),
+    // Up to two minutes: a spoken Q-to-Q scene starts a session, speaks
+    // both sides, ends it explicitly and reads its review back.
+    ackTimeoutMs: z.number().int().min(250).max(120_000),
   })
   .strict()
   .refine(
