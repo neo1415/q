@@ -85,8 +85,10 @@ function v5Entries(): CertificationEntry[] {
     fixture: string,
     claims: readonly string[],
     forbidden: readonly string[],
-  ): CertificationEntry =>
-    codeEntry({
+    /** The acceptance run's browser receipt, when the scene passed on production. */
+    live?: string,
+  ): CertificationEntry => {
+    const base = codeEntry({
       featureId,
       fixture,
       receipt:
@@ -98,6 +100,19 @@ function v5Entries(): CertificationEntry[] {
       claimsForbidden: [...forbidden],
       validUntil: { invalidatedBy: `Next change to the ${featureId} surface` },
     });
+    return live === undefined
+      ? base
+      : {
+          ...base,
+          status: "PRODUCTION_LIVE_VERIFIED",
+          appCommit: "web production f28ab37d (batch Q)",
+          verifiedAt: "2026-10-15 22:13 UTC",
+          verifierType: "BROWSER",
+          receipt: live,
+        };
+  };
+  const run3 = (scene: string) =>
+    `Premiere v5 acceptance run 3 (Playwright, savanna-seed, every request live): ${scene}; scratchpad v5-acc/run3 run-log.json + video`;
   return [
     entry(
       "FEED-VIEW",
@@ -117,6 +132,9 @@ function v5Entries(): CertificationEntry[] {
         "Saving puts the company in the investor's saved list, and saving is not interest: the company is not told",
       ],
       ["That the company was contacted"],
+      run3(
+        "scene 4 complete: button.feed-save DONE, /discover/saved shows the saved company under \"Saving isn't interest. The company isn't told.\" (scene-04.png)",
+      ),
     ),
     entry(
       "GATEQ-DOSSIER-VIEW",
@@ -141,6 +159,9 @@ function v5Entries(): CertificationEntry[] {
         "A call is booked from the relationship itself, through its own booking flow",
       ],
       ["That a call was booked or sent"],
+      run3(
+        "scene 11 complete: relationship opened, dialog.book-call OPEN DONE, Book a call dialog on screen; nothing booked (Google Calendar not connected, shown honestly) (scene-11.png)",
+      ),
     ),
     entry(
       "DOCUMENT-OPEN",
@@ -155,6 +176,9 @@ function v5Entries(): CertificationEntry[] {
         "The notification panel shows what needs the investor first, then updates",
       ],
       ["Any notification as a result Capital Q produced"],
+      run3(
+        "scene 14 complete: dialog.notifications OPEN DONE, panel lists updates by day (scene-14.png)",
+      ),
     ),
   ];
 }
