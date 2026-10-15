@@ -48,6 +48,11 @@ export default async function QPitchPage() {
         draft script on demonstration data. You can pause, go back, skip or ask
         a question at any point.
       </p>
+      <p className="mt-2 cq-body-sm text-(--cq-text-secondary)">
+        {subject === null
+          ? "No subject company is set, or it is not visible to you."
+          : `Subject company: ${subject.name}, as its founder has made it visible to you.`}
+      </p>
 
       <h2 className="mt-8 cq-title text-(--cq-text-primary)">Guided tours</h2>
       <ul className="mt-3 flex flex-col gap-3">
