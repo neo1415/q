@@ -448,3 +448,88 @@ export const PREMIERE_SCRIPT: TourScript = TourScriptSchema.parse({
   ],
   scenes: [...PILOT_SCRIPT.scenes, ...candidates],
 });
+
+const pilotScene = (id: string): SceneScript => {
+  const scene = PILOT_SCRIPT.scenes.find((s) => s.sceneId === id);
+  if (scene === undefined) throw new Error(`missing pilot scene ${id}`);
+  return scene;
+};
+const premiereScene = (id: string): SceneScript => {
+  const scene = candidates.find((s) => s.sceneId === id);
+  if (scene === undefined) throw new Error(`missing premiere scene ${id}`);
+  return scene;
+};
+
+/**
+ * The 2-minute emergency cut (blueprint §16.3): top three, risks on the
+ * first card, Home. Certified features only; the comparison (a long run)
+ * is offered as the first follow-up instead.
+ */
+const shortRisks: SceneScript = {
+  sceneId: "s.short.risks",
+  chapterId: "ch.short.risks",
+  title: "Risks on the first card",
+  featureIds: ["INV-RISKS-FOLLOWUP"],
+  approvedClaimIds: ["INV-RISKS-FOLLOWUP.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/company/[companyId]",
+  actions: [
+    {
+      actionId: "ta_short-open-card-1",
+      kind: "openCompany",
+      company: "card-1",
+    },
+    {
+      actionId: "ta_short-ask-risks",
+      kind: "askApprovedQuestion",
+      question: "q.company-risks",
+      subject: "card-1",
+    },
+  ],
+  lines: [
+    line(
+      "l.short.risks",
+      "Each risk carries its source and the uncertainty I've stated.",
+      "AFTER_ACK",
+      "Blueprint §16.3 (r3 wording), INV-RISKS-FOLLOWUP",
+      ["INV-RISKS-FOLLOWUP.c1"],
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 30_000,
+};
+
+export const SHORT_SCRIPT: TourScript = TourScriptSchema.parse({
+  scriptId: "tour.investor-short",
+  scriptVersion: "0.1.0-draft",
+  status: "DRAFT",
+  reviewNote:
+    "DRAFT r3 two-minute cut (blueprint §16.3), pending owner review. Companies come from the scene-1 receipt (card-1).",
+  chapters: [
+    {
+      chapterId: "ch.pilot.discover",
+      title: "Your mandate's top three",
+      atlasTab: "INVESTOR",
+      sceneIds: ["s.pilot.opening"],
+    },
+    {
+      chapterId: "ch.short.risks",
+      title: "Risks on the first card",
+      atlasTab: "INVESTOR",
+      sceneIds: ["s.short.risks"],
+    },
+    {
+      chapterId: "ch.premiere.close",
+      title: "Your move",
+      atlasTab: "INVESTOR",
+      sceneIds: ["s.premiere.close"],
+    },
+  ],
+  questions: PILOT_SCRIPT.questions,
+  scenes: [
+    pilotScene("s.pilot.opening"),
+    shortRisks,
+    premiereScene("s.premiere.close"),
+  ],
+});

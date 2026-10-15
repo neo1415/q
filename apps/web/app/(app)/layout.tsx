@@ -21,6 +21,7 @@ import { BrandStyle, loadBrandStyle } from "@/features/brand-theme/brand-style";
 import { InstallPrompt } from "@/pwa/install-prompt";
 import { loadMyOrganisations } from "@/features/team/load-organisations";
 import { PitchWarmup } from "@/features/discover/player/pitch-warmup-trigger";
+import { qPitchEnabled } from "@/features/q-pitch/flag";
 import { QPitchEntry } from "@/features/q-pitch/tour-entry";
 
 // Session-bound HTML is rendered per request and never prerendered or
@@ -59,6 +60,7 @@ export default async function ApplicationLayout({
     .catch(() => false);
   const brandRead = loadBrandStyle().catch(() => null);
   const context = await resolveOwnContext();
+  const qPitch = qPitchEnabled();
   const shell: ShellContext =
     context.kind === "FOUNDER"
       ? { scope: "founder_private", label: context.label ?? undefined }
@@ -109,7 +111,7 @@ export default async function ApplicationLayout({
   ]);
   return (
     <AppShell
-      context={{ ...shell, admin, organisations }}
+      context={{ ...shell, admin, organisations, qPitch }}
       subject={subject}
       qConnected={qConnected}
       onboarding={unfinished}
@@ -125,7 +127,7 @@ export default async function ApplicationLayout({
       <QSwarmPointer />
       {/* Q Pitch rehearsal host (QP-F08): off unless the server enables it;
           the host itself admits only fictional demo accounts. */}
-      {process.env.CQ_Q_PITCH_TOUR === "1" &&
+      {qPitch &&
       unfinished === null &&
       user.email !== null &&
       (context.kind === "INVESTOR" || context.kind === "FOUNDER") ? (
