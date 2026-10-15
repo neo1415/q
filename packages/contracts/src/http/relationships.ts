@@ -668,6 +668,38 @@ export const networkRelationshipOutcomePath = (
   verb: "pass" | "pause" | "resume" | "meeting-outcome",
 ) => `/v1/network/relationships/${encodeURIComponent(relationshipId)}/${verb}`;
 
+/**
+ * The GateQ applications linked to one canonical relationship (CRM record).
+ * Authorized for the caller's side: an investor sees submitted applications
+ * to gateways they may view; the company sees submitted ones plus the
+ * caller's own drafts. Linked by relationship id, never by name.
+ */
+export const NETWORK_RELATIONSHIP_GATEQ_APPLICATIONS_PATH =
+  "/v1/network/relationships/:relationshipId/gateq-applications" as const;
+export const RelationshipGateqApplicationsDtoSchema = z
+  .object({
+    relationshipId: z.string().uuid(),
+    side: z.enum(["COMPANY", "INVESTOR"]),
+    items: z
+      .array(
+        z
+          .object({
+            applicationId: z.string().uuid(),
+            reference: z.string().max(64),
+            gatewayName: z.string().max(160).nullable(),
+            status: z.enum(["IN_PROGRESS", "READY_TO_SUBMIT", "SUBMITTED"]),
+            startedAt: z.string().datetime(),
+            submittedAt: z.string().datetime().nullable(),
+          })
+          .strict(),
+      )
+      .max(50),
+  })
+  .strict();
+export type RelationshipGateqApplicationsDto = z.infer<
+  typeof RelationshipGateqApplicationsDtoSchema
+>;
+
 /** The Relationship Brief (R1): the asking party's standing, one read. */
 export const NETWORK_RELATIONSHIP_BRIEF_PATH =
   "/v1/network/relationships/:relationshipId/brief" as const;

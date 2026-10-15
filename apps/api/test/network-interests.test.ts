@@ -171,6 +171,8 @@ function buildApp(
     readonly views?: RelationshipViewService | undefined;
     /** The pipeline read model (slice 3b); composed only when given. */
     readonly pipeline?: RelationshipPipelineQueryService | undefined;
+    /** The party side relationshipById answers; null: not a party. */
+    readonly side?: "COMPANY" | "INVESTOR" | null | undefined;
   } = {},
 ): {
   readonly app: FastifyInstance;
@@ -245,7 +247,20 @@ function buildApp(
         ? Promise.resolve(options.noRelationship === true ? null : STATUS)
         : Promise.reject(options.failWith);
     },
-    relationshipById: () => Promise.reject(new Error("not under test")),
+    relationshipById: (query) => {
+      reads.push({ side: "BY_ID", ...query });
+      return options.side === undefined
+        ? Promise.reject(new Error("not under test"))
+        : Promise.resolve(
+            options.side === null
+              ? null
+              : {
+                  side: options.side,
+                  counterpart: { kind: "COMPANY" as const, id: COMPANY },
+                  status: null,
+                },
+          );
+    },
     relationshipBrief: (query) => {
       reads.push({ side: "BRIEF", ...query });
       return options.brief === undefined
@@ -273,6 +288,22 @@ function buildApp(
     },
     identities: { lookup: () => Promise.resolve(null) },
   };
+  const gateqApplications = (input: {
+    readonly relationshipId: string;
+    readonly side: "COMPANY" | "INVESTOR";
+  }) => {
+    reads.push({ ...input, read: "GATEQ" });
+    return Promise.resolve([
+      {
+        applicationId: "00000000-0000-4000-8000-0000000000a1",
+        reference: "ga_0123456789abcdefghjkmnpqrs",
+        gatewayName: input.side === "INVESTOR" ? "Seed gate" : null,
+        status: "SUBMITTED" as const,
+        startedAt: "2026-10-14T10:00:00.000Z",
+        submittedAt: "2026-10-14T11:00:00.000Z",
+      },
+    ]);
+  };
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     interests: {
       ...interests,
@@ -284,6 +315,7 @@ function buildApp(
         : { relationshipPipeline: options.pipeline }),
     },
     namedPhotos,
+    gateqRelationshipApplications: gateqApplications,
   });
   return { app, calls, answers, reads, asked };
 }
@@ -1023,5 +1055,51 @@ describe("CRM pipeline read model HTTP boundary (slice 3b)", () => {
     const response = await app.inject({ method: "GET", url });
     expect(response.statusCode).toBe(400);
     expect(reads).toHaveLength(0);
+  });
+});
+
+describe("GET /v1/network/relationships/:relationshipId/gateq-applications", () => {
+  const RELATIONSHIP = "00000000-0000-4000-8000-0000000000b1";
+  const url = `/v1/network/relationships/${RELATIONSHIP}/gateq-applications`;
+  it("answers the caller's own side, read with the server-resolved actor", async () => {
+    const { app, reads } = buildApp({ side: "INVESTOR" });
+    const response = await app.inject({ method: "GET", url });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toMatchObject({
+      relationshipId: RELATIONSHIP,
+      side: "INVESTOR",
+      items: [{ status: "SUBMITTED", gatewayName: "Seed gate" }],
+    });
+    const gateq = reads.find((r) => r["read"] === "GATEQ");
+    // The side comes from relationshipById, never from the request.
+    expect(gateq).toMatchObject({
+      relationshipId: RELATIONSHIP,
+      side: "INVESTOR",
+    });
+    expect(reads.find((r) => r["side"] === "BY_ID")).toMatchObject({
+      relationshipId: RELATIONSHIP,
+    });
+  });
+  it("a relationship the caller is not party to is 404 and reads no applications", async () => {
+    const { app, reads } = buildApp({ side: null });
+    const response = await app.inject({ method: "GET", url });
+    expect(response.statusCode).toBe(404);
+    expect(reads.some((r) => r["read"] === "GATEQ")).toBe(false);
+  });
+  it("ignores a client-supplied side", async () => {
+    const { app, reads } = buildApp({ side: "COMPANY" });
+    const response = await app.inject({
+      method: "GET",
+      url: `${url}?side=INVESTOR`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      side: "COMPANY",
+      items: [{ gatewayName: null }],
+    });
+    expect(reads.find((r) => r["read"] === "GATEQ")).toMatchObject({
+      side: "COMPANY",
+    });
   });
 });

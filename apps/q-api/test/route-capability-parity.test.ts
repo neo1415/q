@@ -529,6 +529,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/network-interests.ts GET NETWORK_RELATIONSHIP_BRIEFS_PATH": cap(
     "navigate.RELATIONSHIPS",
   ),
+  // CRM record: the GateQ applications on one relationship, shown on the
+  // relationship page; Q reaches the same submissions through the inbox.
+  "api/http/network-interests.ts GET NETWORK_RELATIONSHIP_GATEQ_APPLICATIONS_PATH":
+    cap("navigate.RELATIONSHIPS"),
   // Diligence (2026-10-02): the area Q acts in through diligence_documents;
   // a download is the person's own browser fetching a signed URL.
   "api/http/network-interests.ts GET NETWORK_RELATIONSHIP_DILIGENCE_PATH": cap(

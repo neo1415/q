@@ -19,6 +19,8 @@ import {
   NETWORK_PASS_REASONS_PATH,
   NETWORK_RELATIONSHIP_BRIEF_PATH,
   NETWORK_RELATIONSHIP_BRIEFS_PATH,
+  NETWORK_RELATIONSHIP_GATEQ_APPLICATIONS_PATH,
+  RelationshipGateqApplicationsDtoSchema,
   RelationshipBriefListQuerySchema,
   RelationshipBriefListSchema,
   NETWORK_RELATIONSHIP_DILIGENCE_PATH,
@@ -61,6 +63,8 @@ import {
 } from "@capital-q/network";
 import { reportCsvRows } from "@capital-q/results";
 import type { DiligenceService } from "@capital-q/permissions";
+
+import type { ActorContext } from "@capital-q/security";
 
 import { photoLookup, type NamedPhotos } from "./named-photos.js";
 
@@ -110,6 +114,26 @@ export type NetworkInterestRoutesDependencies = ActorContextDependencies & {
   readonly briefSources?: RelationshipBriefSources | undefined;
   /** The batch readers for the list's briefs (R1). Absent: those sources UNAVAILABLE. */
   readonly briefBatchSources?: RelationshipBriefBatchSources | undefined;
+  /**
+   * GateQ applications on a relationship (CRM record). The route proves the
+   * party and side first; this narrows by side. Absent: route not registered.
+   */
+  readonly gateqApplications?:
+    | ((input: {
+        readonly actor: ActorContext;
+        readonly relationshipId: string;
+        readonly side: "COMPANY" | "INVESTOR";
+      }) => Promise<
+        readonly {
+          readonly applicationId: string;
+          readonly reference: string;
+          readonly gatewayName: string | null;
+          readonly status: "IN_PROGRESS" | "READY_TO_SUBMIT" | "SUBMITTED";
+          readonly startedAt: string;
+          readonly submittedAt: string | null;
+        }[]
+      >)
+    | undefined;
 };
 
 function investorIdOf(request: FastifyRequest): string {
@@ -251,6 +275,35 @@ export function registerNetworkInterestRoutes(
       return RelationshipBriefSchema.parse(brief);
     },
   );
+
+  const gateqApplications = dependencies.gateqApplications;
+  if (gateqApplications !== undefined) {
+    app.get(
+      NETWORK_RELATIONSHIP_GATEQ_APPLICATIONS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const raw = (request.params as { relationshipId?: unknown })
+          .relationshipId;
+        const relationshipId = typeof raw === "string" ? raw : "";
+        const actor = getActorContext(request);
+        // Party and side from the actor's own membership; a relationship
+        // they are not party to is the same 404 as one that does not exist.
+        const view = await service.relationshipById({ actor, relationshipId });
+        if (view === null) throw new InterestNotFoundError();
+        const items = await gateqApplications({
+          actor,
+          relationshipId,
+          side: view.side,
+        });
+        void reply.header("Cache-Control", "no-store");
+        return RelationshipGateqApplicationsDtoSchema.parse({
+          relationshipId,
+          side: view.side,
+          items,
+        });
+      },
+    );
+  }
 
   // Every brief on one page of the viewer's own list (R1 batching): one
   // call instead of a thread, calls and diligence read per relationship.
