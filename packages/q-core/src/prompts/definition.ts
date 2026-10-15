@@ -118,6 +118,8 @@ export const PROMPT_IDS = [
   "TURN_SKIM",
   /** W2 (2026-10-10): public pages about a person or organisation, read into a quoted brief. */
   "PERSON_BRIEF_READER",
+  /** Lead decision 2026-10-15: Q's cited, nonbinding reading of a GateQ submission. */
+  "GATEQ_DOSSIER_SYNTHESIS",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -143,6 +145,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   APP_ACTION_ARGUMENTS: "app-action-arguments",
   APP_ACTION_ROUTER: "app-action-router",
   GATEQ_INTERVIEWER: "gateq-interviewer",
+  GATEQ_DOSSIER_SYNTHESIS: "gateq-dossier-synthesis",
   ARTIFACT_REVISION: "artifact-revision",
   TURN_READER: "turn-reader",
   INTERVIEW_AGENT: "interview-agent",

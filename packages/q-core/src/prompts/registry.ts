@@ -202,6 +202,7 @@ import { FIT_Q_VIEW_V2 } from "./tasks/fit-q-view.v2.js";
 import { FIT_Q_VIEW_V3 } from "./tasks/fit-q-view.v3.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-extraction.v2.js";
+import { GATEQ_DOSSIER_SYNTHESIS_V1 } from "./tasks/gateq-dossier-synthesis.v1.js";
 import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
 import { GATEQ_INTERVIEWER_V2 } from "./tasks/gateq-interviewer.v2.js";
 import { GATEQ_INTERVIEWER_V3 } from "./tasks/gateq-interviewer.v3.js";
@@ -593,6 +594,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_SKIM_V5,
     PERSON_BRIEF_READER_V1,
     BRIEFING_COMMAND_V1,
+    GATEQ_DOSSIER_SYNTHESIS_V1,
   ];
 
 /** The production registry: the source-controlled definitions above. */

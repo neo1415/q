@@ -7,6 +7,33 @@ import {
 } from "./gateq-intake.js";
 
 /**
+ * Q's reading of one submitted application. Every point is Q's inference
+ * (ADR-001 truth axis), cites the frozen dossier fact ids or transcript
+ * turns it rests on, and carries no score, rank or decision.
+ */
+export const GateqSynthesisV1Schema = z
+  .object({
+    schemaVersion: z.literal(1),
+    generatedAt: z.string().datetime({ offset: true }),
+    truthClass: z.literal("Q_INFERENCE"),
+    takeaway: z.string().min(1).max(600),
+    points: z
+      .array(
+        z
+          .object({
+            kind: z.enum(["STRENGTH", "RISK", "QUESTION"]),
+            text: z.string().min(1).max(400),
+            factIds: z.array(z.string().uuid()).max(4),
+            turnSeqs: z.array(z.number().int().min(1)).max(4),
+          })
+          .strict(),
+      )
+      .max(9),
+  })
+  .strict();
+export type GateqSynthesisV1 = z.infer<typeof GateqSynthesisV1Schema>;
+
+/**
  * F4 (2026-10-06): an investor organisation's GateQ inbox, modelled on a
  * mail client. Every founder who applied through its gate, what the engine
  * made of them against the gate's rules, and what the organisation does
@@ -250,6 +277,12 @@ export const GateqInboxDetailDtoSchema = z
       .max(GATEQ_TRANSCRIPT_MAX_TURNS)
       .nullable()
       .optional(),
+    /**
+     * Q's cited, nonbinding reading of the frozen submission (lead decision
+     * 2026-10-15). Recorded after submission and never part of what the
+     * founder sent; null until it is ready or when it could not be made.
+     */
+    synthesis: GateqSynthesisV1Schema.nullable().optional(),
   })
   .strict();
 export type GateqInboxDetailDto = z.infer<typeof GateqInboxDetailDtoSchema>;

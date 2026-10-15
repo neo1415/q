@@ -287,7 +287,14 @@ type DossierFact = GateqDossierV1["dimensions"][number]["facts"][number];
  */
 export function factProvenanceWords(
   fact: Pick<DossierFact, "evidenceStatus" | "truthClass">,
-): "Document-supported" | "Estimated" | "Unknown" | "Founder stated" {
+):
+  | "Document-supported"
+  | "Estimated"
+  | "Unknown"
+  | "Founder stated"
+  | "Derived by Q" {
+  // A figure Q computed is never the founder's statement.
+  if (fact.truthClass === "Q_INFERENCE") return "Derived by Q";
   if (fact.evidenceStatus === "DOCUMENT_SUPPORTED") return "Document-supported";
   if (fact.truthClass === "ESTIMATE") return "Estimated";
   if (fact.truthClass === "UNKNOWN") return "Unknown";

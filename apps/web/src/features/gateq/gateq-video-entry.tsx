@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import type {
   ApplicationCoverageDto,
   GateqVideoSessionDto,
+  GateqVideoStateDto,
   VideoAllowanceDto,
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
@@ -66,6 +67,7 @@ export function GateqVideoEntry({
   const [allowance, setAllowance] = useState<VideoAllowanceDto | null>(null);
   const [session, setSession] = useState<GateqVideoSessionDto | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [why, setWhy] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
   const [pending, startTransition] = useTransition();
   // Latest callbacks, so the state read runs once per token.
@@ -92,12 +94,9 @@ export function GateqVideoEntry({
         if (result.state.session?.status === "LIVE")
           setSession(result.state.session);
         else if (!result.state.available) {
-          const spent = result.state.allowance;
-          unavailable.current?.(
-            spent !== undefined && spent !== null && spent.remaining === 0
-              ? `${videoAllowanceUsedUp(spent)} You can carry on by typing.`
-              : null,
-          );
+          const why = whyNotOffered(result.state);
+          setWhy(why);
+          unavailable.current?.(why);
         }
       })
       .catch(() => {
@@ -164,14 +163,15 @@ export function GateqVideoEntry({
   if (primary && !available) return null;
   if (!available) {
     // Typing is never limited; say why video is not offered when we know.
-    const why =
+    const said =
       message ??
+      why ??
       (allowance?.remaining === 0
         ? `${videoAllowanceUsedUp(allowance)} You can carry on by typing.`
         : null);
-    return why === null ? null : (
+    return said === null ? null : (
       <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-        {why}
+        {said}
       </p>
     );
   }
@@ -264,4 +264,29 @@ export function GateqVideoEntry({
       )}
     </div>
   );
+}
+
+/** Plain words for why video is not offered; null when there is nothing to say. */
+export function whyNotOffered(state: GateqVideoStateDto): string | null {
+  switch (state.unavailableReason) {
+    case "APPLICATION_SESSIONS_USED": {
+      const n = state.perApplication ?? 1;
+      return `You’ve used ${n === 1 ? "this application’s video session" : `the ${String(n)} video sessions this application allows`}. Carry on by typing; everything you said is kept.`;
+    }
+    case "WEEKLY_ALLOWANCE_USED":
+      return state.allowance === null || state.allowance === undefined
+        ? "You’ve used this week’s video sessions. You can carry on by typing."
+        : `${videoAllowanceUsedUp(state.allowance)} You can carry on by typing.`;
+    case "SUBMITTED":
+    case "NOT_OFFERED":
+      return null;
+    case null:
+    case undefined:
+      // An older API without a reason: the allowance is the one we can name.
+      return state.allowance !== null &&
+        state.allowance !== undefined &&
+        state.allowance.remaining === 0
+        ? `${videoAllowanceUsedUp(state.allowance)} You can carry on by typing.`
+        : null;
+  }
 }

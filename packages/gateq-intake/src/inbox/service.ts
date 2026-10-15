@@ -5,6 +5,7 @@ import {
   GATEQ_INBOX_VIEWS,
   GATEQ_TRANSCRIPT_MAX_TURNS,
   GateqDossierV1Schema,
+  GateqSynthesisV1Schema,
   GateqPassReasonSchema,
   type GateqInboxDetailDto,
   type GateqInboxDto,
@@ -32,6 +33,7 @@ import {
   triage,
   type TriageProposal,
 } from "./domain.js";
+import { withDerivedAmountsMarked } from "../application/dossier.js";
 import { buildPack, packFileName, type PackFile } from "./pack.js";
 import type {
   InboxActivityKind,
@@ -411,8 +413,13 @@ export function createInboxService(dependencies: {
           body: message.body,
           at: message.createdAt,
         })),
-        dossier: dossier.success ? dossier.data : null,
+        // A frozen amount Q computed reads as Q's inference, not "you said".
+        dossier: dossier.success
+          ? withDerivedAmountsMarked(dossier.data, transcript ?? [])
+          : null,
         transcript,
+        // Q's reading of the same frozen submission; never a guess when absent.
+        synthesis: GateqSynthesisV1Schema.safeParse(row.synthesis).data ?? null,
       } satisfies GateqInboxDetailDto;
     },
 

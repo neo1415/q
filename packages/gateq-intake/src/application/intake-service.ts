@@ -46,7 +46,7 @@ import {
   SESSION_LIFETIME_MS,
 } from "../domain/session-credential.js";
 import { coverageFor } from "./coverage.js";
-import { buildDossier } from "./dossier.js";
+import { buildDossier, withDerivedAmountsMarked } from "./dossier.js";
 import {
   projectSelectedDisclosure,
   type DisclosureDocumentIdentity,
@@ -802,24 +802,28 @@ export function createIntakeService(
               transcriptTruncated: kept.length < transcript.length,
               coverage,
             },
-            dossier: buildDossier({
-              reference: application.publicReference,
-              declaredName: application.declaredName,
-              submittedAt,
-              generatedAt: submittedAt,
-              facts: current,
-              qualification,
-              coverage,
-              contact,
-              documents: documentIds.map((documentId) => ({
-                documentId,
-                title: (titles.get(documentId) ?? "Shared document").slice(
-                  0,
-                  200,
-                ),
-              })),
-              turnCount: transcript.length,
-            }),
+            // A heard amount the person never said is Q's inference.
+            dossier: withDerivedAmountsMarked(
+              buildDossier({
+                reference: application.publicReference,
+                declaredName: application.declaredName,
+                submittedAt,
+                generatedAt: submittedAt,
+                facts: current,
+                qualification,
+                coverage,
+                contact,
+                documents: documentIds.map((documentId) => ({
+                  documentId,
+                  title: (titles.get(documentId) ?? "Shared document").slice(
+                    0,
+                    200,
+                  ),
+                })),
+                turnCount: transcript.length,
+              }),
+              transcript,
+            ),
           };
         }
 
