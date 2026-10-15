@@ -5896,6 +5896,17 @@ const presenceTrigger =
         // The name to look a person up by, read from their own profile
         // row. Their own only: the query is keyed on the acting user.
         people: { displayNameFor },
+        // Same markers as the workers' typed-onboarding guard.
+        isFictionalAccount: async (userId) => {
+          const rows = await database.sql<{ fictional: boolean }[]>`
+            select coalesce(u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb
+                        and u.raw_app_meta_data -> 'fictional_demo' = 'true'::jsonb,
+                        false) as fictional
+              from identity.user_profiles p
+              join auth.users u on u.id = p.auth_user_id
+             where p.id = ${userId}::uuid`;
+          return rows[0]?.fictional === true;
+        },
         logger,
       });
 

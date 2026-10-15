@@ -57,7 +57,12 @@ type Built = {
   readonly websiteUrl: string | null;
 };
 
-function build(options: { readonly personName?: string | null } = {}) {
+function build(
+  options: {
+    readonly personName?: string | null;
+    readonly fictional?: boolean | "THROWS";
+  } = {},
+) {
   const builds: Built[] = [];
   const presence = {
     build: (command: {
@@ -81,6 +86,14 @@ function build(options: { readonly personName?: string | null } = {}) {
 
   const trigger = createPresenceTrigger({
     presence,
+    ...(options.fictional === undefined
+      ? {}
+      : {
+          isFictionalAccount: () =>
+            options.fictional === "THROWS"
+              ? Promise.reject(new Error("read failed"))
+              : Promise.resolve(options.fictional === true),
+        }),
     ...(options.personName === undefined
       ? {}
       : {
@@ -122,6 +135,36 @@ describe("what Capital Q looks up when somebody arrives", () => {
       qualifier: "The Vaultlyne",
       websiteUrl: null,
     });
+  });
+
+  it("researches nothing for a fictional synthetic account, company or person", async () => {
+    const { builds, trigger } = build({
+      personName: "Ada Okafor",
+      fictional: true,
+    });
+    trigger.afterInterviewTurn(
+      ACTOR,
+      view({ "F1.company_name": "The Vaultlyne" }),
+    );
+    await settle();
+    await settle();
+    expect(builds).toEqual([]);
+  });
+
+  it("a real account is still researched, and a failed fictional read keeps the old behaviour", async () => {
+    for (const fictional of [false, "THROWS"] as const) {
+      const { builds, trigger } = build({
+        personName: "Ada Okafor",
+        fictional,
+      });
+      trigger.afterInterviewTurn(
+        ACTOR,
+        view({ "F1.company_name": "The Vaultlyne" }),
+      );
+      await settle();
+      await settle();
+      expect(builds.map((b) => b.subjectType)).toEqual(["COMPANY", "PERSON"]);
+    }
   });
 
   it("looks up only the company when nothing knows the person's name", async () => {
