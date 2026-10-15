@@ -1222,6 +1222,7 @@ export function ApplyExperience({
             token={token}
             fund={fund}
             coverage={coverage}
+            participantName={contactName}
             onEnded={async (typed) => {
               await loadProgress();
               if (!typed) setStage("STOPPED");
