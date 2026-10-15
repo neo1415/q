@@ -345,3 +345,104 @@ describe("P4: the snapshot carries the person's prepared Q Daily stories", () =>
     expect((await none.snapshots.forActor(ACTOR))?.daily).toEqual([]);
   });
 });
+
+/**
+ * S5 (lane S, 2026-10-15): a person who keeps using Q never pays the cold
+ * build (live: 1.4 s, 126 round trips) because ten minutes passed, and a
+ * write of theirs rebuilds in the background so the next read is warm.
+ * Authorisation is unchanged: entries live under the actor's epoch.
+ */
+describe("arrival snapshot refresh-ahead (S5)", () => {
+  function scene() {
+    let clock = NOW.getTime();
+    const counts = { probe: 0, builds: 0 };
+    const state = { epoch: "a".repeat(32), stamp: "s1" };
+    const snapshots = createArrivalSnapshots({
+      now: () => new Date(clock),
+      trustMs: 0,
+      cacheTtlMs: 10 * 60_000,
+      attention: () => {
+        counts.builds += 1;
+        return Promise.resolve(tensorGateReport());
+      },
+      briefs: () => Promise.resolve([tensorGateBrief({ sequence: 7 })]),
+      probe: () => {
+        counts.probe += 1;
+        return Promise.resolve({ epoch: state.epoch, stamp: state.stamp });
+      },
+    });
+    return {
+      snapshots,
+      counts,
+      state,
+      advance: (ms: number) => {
+        clock += ms;
+      },
+    };
+  }
+
+  it("a validated entry is renewed, so steady use never rebuilds past ten minutes", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR);
+    for (let i = 0; i < 6; i += 1) {
+      s.advance(4 * 60_000);
+      await s.snapshots.forActor(ACTOR);
+    }
+    // 24 minutes of use, one build; each read still probed.
+    expect(s.counts.builds).toBe(1);
+    expect(s.counts.probe).toBe(7);
+  });
+
+  it("without use the entry still expires: nothing lives past its lifetime unprobed", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR);
+    s.advance(11 * 60_000);
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.builds).toBe(2);
+  });
+
+  it("a renewal never survives changed data or a changed epoch", async () => {
+    const s = scene();
+    const first = await s.snapshots.forActor(ACTOR);
+    s.advance(6 * 60_000);
+    s.state.stamp = "s2";
+    expect(await s.snapshots.forActor(ACTOR)).not.toBe(first);
+    s.state.epoch = "b".repeat(32);
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.builds).toBe(3);
+  });
+
+  it("after their write, the rebuild happens in the background and the next read is warm", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR);
+    s.state.stamp = "s2";
+    s.snapshots.refreshAfterWrite(ACTOR);
+    await s.snapshots.settled();
+    expect(s.counts.builds).toBe(2);
+    const probes = s.counts.probe;
+    await s.snapshots.forActor(ACTOR);
+    // Served from the rebuilt entry: one probe, no build on the read path.
+    expect(s.counts.builds).toBe(2);
+    expect(s.counts.probe).toBe(probes + 1);
+  });
+
+  it("a second write during the rebuild forces the next read to probe and rebuild", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR);
+    s.state.stamp = "s2";
+    s.snapshots.refreshAfterWrite(ACTOR);
+    s.snapshots.invalidateActor(ACTOR.userId);
+    s.state.stamp = "s3";
+    await s.snapshots.settled();
+    const builds = s.counts.builds;
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.builds).toBe(builds + 1);
+  });
+
+  it("a non-human actor is never rebuilt in the background", async () => {
+    const s = scene();
+    s.snapshots.refreshAfterWrite({ ...ACTOR, actorType: "SERVICE" } as never);
+    await s.snapshots.settled();
+    expect(s.counts.builds).toBe(0);
+  });
+});

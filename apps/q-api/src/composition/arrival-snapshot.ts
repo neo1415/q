@@ -477,6 +477,8 @@ export function createPostgresArrivalProbe(dependencies: {
 type Held = {
   readonly snapshot: ArrivalSnapshot;
   readonly stamp: string;
+  /** When a probe last proved this entry current (built or re-validated). */
+  readonly validatedAt: number;
 };
 
 export type ArrivalSnapshots = {
@@ -487,6 +489,15 @@ export type ArrivalSnapshots = {
   ) => Promise<ArrivalSnapshot | null>;
   /** Ends trust for this actor at once (a write in this process). */
   readonly invalidateActor: (userId: string) => number;
+  /**
+   * S5 refresh-ahead: ends trust, then rebuilds in the background for this
+   * live actor (deduplicated per actor), so the next read is warm. The
+   * rebuilt entry lives under the actor's current authorisation epoch:
+   * a changed membership or role never reads it.
+   */
+  readonly refreshAfterWrite: (actor: ActorContext) => void;
+  /** Settles once no background rebuild is running (tests, shutdown). */
+  readonly settled: () => Promise<void>;
   readonly invalidateOrganisation: (organisationId: string) => number;
 };
 
@@ -508,6 +519,8 @@ export function createArrivalSnapshots(dependencies: {
   readonly now?: (() => Date) | undefined;
   /** How long a probe is trusted without asking again. */
   readonly trustMs?: number | undefined;
+  /** How long an entry lives without a matching probe (default 10 min). */
+  readonly cacheTtlMs?: number | undefined;
 }): ArrivalSnapshots {
   const now = dependencies.now ?? (() => new Date());
   // 30 s: a Q turn takes longer than the old 15 s, so the snapshot read
@@ -516,8 +529,24 @@ export function createArrivalSnapshots(dependencies: {
   // revoked person never reaches this cache; only another party's new
   // data waits up to this long, and the person's own writes end trust now.
   const trustMs = dependencies.trustMs ?? DEFAULT_TRUST_MS;
+  const ttlMs = dependencies.cacheTtlMs ?? 10 * 60_000;
   const cache =
-    dependencies.cache ?? createContextCache<Held>({ ttlMs: 10 * 60_000 });
+    dependencies.cache ??
+    createContextCache<Held>({ ttlMs, now: () => now().getTime() });
+  /**
+   * S5 sliding lifetime: an entry a probe has just proved current is put
+   * back once it is past half its lifetime, so a person who keeps using Q
+   * never pays the cold build (live 2026-10-15: 1.4 s, 126 round trips)
+   * just because ten minutes passed. Only a matching probe stamp renews.
+   */
+  const renewed = (scope: ContextCacheScope, held: Held): Held => {
+    const at = now().getTime();
+    if (at - held.validatedAt < ttlMs / 2) return held;
+    const fresh: Held = { ...held, validatedAt: at };
+    cache.invalidateActor(scope.actor.userId);
+    void cache.getOrLoad(scope, () => Promise.resolve(fresh));
+    return fresh;
+  };
   /** The last probe per actor: its epoch and when it was taken. */
   const verified = new Map<string, { epoch: string; at: number }>();
   const keyOf = (actor: ActorContext): string =>
@@ -550,6 +579,7 @@ export function createArrivalSnapshots(dependencies: {
     return {
       snapshot: buildArrivalSnapshot({ report, briefs, now: at }),
       stamp,
+      validatedAt: at.getTime(),
     };
   }
 
@@ -608,7 +638,7 @@ export function createArrivalSnapshots(dependencies: {
       const held = cache.get(scope);
       if (held !== undefined && held.stamp === probed.stamp) {
         verified.set(key, { epoch: probed.epoch, at: now().getTime() });
-        return held.snapshot;
+        return renewed(scope, held).snapshot;
       }
       // Changed data or access: nothing old is served.
       if (held !== undefined) cache.invalidateActor(actor.userId);
@@ -622,20 +652,48 @@ export function createArrivalSnapshots(dependencies: {
       return fresh.snapshot;
     }
   };
+  /** Bumped by every invalidation, so a rebuild begun before one is distrusted. */
+  const generations = new Map<string, number>();
+  const invalidateActor = (userId: string): number => {
+    generations.set(userId, (generations.get(userId) ?? 0) + 1);
+    for (const key of [...dailyHeld.keys()]) {
+      if (key.split("|")[1] === userId) dailyHeld.delete(key);
+    }
+    for (const key of [...verified.keys()]) {
+      if (key.split("|")[1] === userId) verified.delete(key);
+    }
+    return cache.invalidateActor(userId);
+  };
+  /** Background rebuilds in flight, one per actor. */
+  const rebuilding = new Map<string, Promise<void>>();
   return {
     forActor: async (actor) => {
       const base = await forActorCore(actor);
       return base === null ? null : withDaily(actor, base);
     },
-    invalidateActor: (userId) => {
-      for (const key of [...dailyHeld.keys()]) {
-        if (key.split("|")[1] === userId) dailyHeld.delete(key);
-      }
-      for (const key of [...verified.keys()]) {
-        if (key.split("|")[1] === userId) verified.delete(key);
-      }
-      return cache.invalidateActor(userId);
+    refreshAfterWrite: (actor) => {
+      invalidateActor(actor.userId);
+      const key = keyOf(actor);
+      if (actor.actorType !== "HUMAN" || rebuilding.has(key)) return;
+      const generation = generations.get(actor.userId) ?? 0;
+      const work = forActorCore(actor)
+        .then(() => undefined)
+        .catch(() => undefined)
+        .finally(() => {
+          rebuilding.delete(key);
+          // Another write landed while it was built: the entry may predate
+          // it, so the next read must probe (its stamp decides) rather than
+          // trust the window.
+          if ((generations.get(actor.userId) ?? 0) !== generation) {
+            verified.delete(key);
+          }
+        });
+      rebuilding.set(key, work);
     },
+    settled: async () => {
+      await Promise.all([...rebuilding.values()]);
+    },
+    invalidateActor,
     invalidateOrganisation: (organisationId) => {
       for (const key of [...verified.keys()]) {
         if (key.split("|")[2] === organisationId) verified.delete(key);
