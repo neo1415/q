@@ -19,6 +19,7 @@ import { DocumentsTabBar } from "@/features/documents/requests/documents-tab-bar
 import { RequestsInbox } from "@/features/documents/requests/requests-inbox";
 import { documentsTabOf } from "@/features/documents/requests/requests-model";
 import { resolveOwnContext } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Documents" };
 export const dynamic = "force-dynamic";
@@ -71,52 +72,77 @@ export default async function DocumentsPage({
 
   return (
     <PageContainer className="flex flex-col gap-6">
-      <PageHeader title="Documents" />
-      {companyId === null ? null : (
-        <DocumentsTabBar
-          active={tab}
-          counts={{
-            ...(inbox === null || inbox.counts.open === 0
-              ? {}
-              : { requested: `${String(inbox.counts.open)} open` }),
-          }}
-        />
-      )}
-      <div
-        id="documents-panel"
-        role={companyId === null ? undefined : "tabpanel"}
-        aria-labelledby={
-          companyId === null ? undefined : `documents-tab-${tab}`
+      <QSection
+        id="documents"
+        kind="DOCUMENT_LIST"
+        refs={[
+          ...(first?.ok === true ? first.value.items : []).map((item) => ({
+            kind:
+              item.source === "Q"
+                ? ("ARTIFACT" as const)
+                : ("UPLOADED_DOCUMENT" as const),
+            id: item.id,
+          })),
+          ...(owner?.documents ?? []).map((document) => ({
+            kind: "UPLOADED_DOCUMENT" as const,
+            id: document.documentId,
+          })),
+        ].slice(0, 12)}
+        total={
+          (first?.ok === true ? first.value.items.length : 0) +
+          (owner?.documents.length ?? 0)
         }
-        className="flex flex-col gap-8"
+        label="your documents"
       >
-        {tab === "mine" ? (
-          <DocumentsScreen
-            initial={first?.ok === true ? first.value : null}
-            companyId={companyId}
-            brand={brand}
-            openOnArrival={typeof open === "string" ? open.slice(0, 64) : null}
+        <PageHeader title="Documents" />
+        {companyId === null ? null : (
+          <DocumentsTabBar
+            active={tab}
+            counts={{
+              ...(inbox === null || inbox.counts.open === 0
+                ? {}
+                : { requested: `${String(inbox.counts.open)} open` }),
+            }}
           />
-        ) : null}
-        {tab === "requested" && companyId !== null ? (
-          <RequestsInbox
-            companyId={companyId}
-            initial={inbox}
-            documents={(owner?.documents ?? []).map((document) => ({
-              documentId: document.documentId,
-              title: document.title,
-            }))}
-            focusItem={typeof item === "string" ? item.slice(0, 64) : null}
-          />
-        ) : null}
-        {tab === "data-room" && companyId !== null ? (
-          <DataRoomTab
-            companyId={companyId}
-            view={owner}
-            items={inbox?.items ?? []}
-          />
-        ) : null}
-      </div>
+        )}
+        <div
+          id="documents-panel"
+          role={companyId === null ? undefined : "tabpanel"}
+          aria-labelledby={
+            companyId === null ? undefined : `documents-tab-${tab}`
+          }
+          className="flex flex-col gap-8"
+        >
+          {tab === "mine" ? (
+            <DocumentsScreen
+              initial={first?.ok === true ? first.value : null}
+              companyId={companyId}
+              brand={brand}
+              openOnArrival={
+                typeof open === "string" ? open.slice(0, 64) : null
+              }
+            />
+          ) : null}
+          {tab === "requested" && companyId !== null ? (
+            <RequestsInbox
+              companyId={companyId}
+              initial={inbox}
+              documents={(owner?.documents ?? []).map((document) => ({
+                documentId: document.documentId,
+                title: document.title,
+              }))}
+              focusItem={typeof item === "string" ? item.slice(0, 64) : null}
+            />
+          ) : null}
+          {tab === "data-room" && companyId !== null ? (
+            <DataRoomTab
+              companyId={companyId}
+              view={owner}
+              items={inbox?.items ?? []}
+            />
+          ) : null}
+        </div>
+      </QSection>
     </PageContainer>
   );
 }

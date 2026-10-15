@@ -362,6 +362,30 @@ describe("a company's documents are its data room (owner 2026-10-15)", () => {
     }
     expect(namedRecordRequestOf("open documents for my seed round")).toBeNull();
   });
+
+  it("lane S: a lower-case name is held to their own counterparts", () => {
+    expect(namedRecordRequestOf("open tensorgate's documents")).toEqual({
+      name: "tensorgate",
+      facet: "DATA_ROOM",
+      explicit: true,
+      ownOnly: true,
+    });
+    expect(namedRecordRequestOf("show me their documents")).toBeNull();
+    expect(namedRecordRequestOf("open its files")).toBeNull();
+  });
+
+  it("lane S: a kind of company in the plural is a search, not a record", () => {
+    for (const said of [
+      "show me fintech companies in Nigeria",
+      "show me seed-stage startups in Kenya",
+      "open climate investors in Lagos",
+    ]) {
+      expect(namedRecordRequestOf(said)).toBeNull();
+    }
+    expect(namedRecordRequestOf("open Clearwater Investors")).toMatchObject({
+      name: "Clearwater Investors",
+    });
+  });
 });
 
 describe("the answer opens exactly that record (INC-1 regression)", () => {
@@ -397,6 +421,19 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
       { kind: "OPEN_RECORD_PAGE", page: "COMPANY_DATA_ROOM", id: SHIFTWELL },
     ]);
     expect(answer.content).toBe("Opening Shiftwell Health's data room…");
+  });
+
+  it("lane S: typed in lower case, their own company's documents are still its data room", async () => {
+    for (const said of [
+      "open shiftwell's documents",
+      "show me the files for shiftwell",
+    ]) {
+      const q = conversation(own);
+      const answer = await q.say(said);
+      expect(intentOf(answer.blocks)).toEqual([
+        { kind: "OPEN_RECORD_PAGE", page: "COMPANY_DATA_ROOM", id: SHIFTWELL },
+      ]);
+    }
   });
 
   it('"Show me the data room for Shiftwell." opens Shiftwell\'s data room', async () => {

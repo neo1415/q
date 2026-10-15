@@ -31,8 +31,10 @@ import {
 import {
   CLIENT_ACTION_DONE_LINE,
   createModelGatewayQAnswer,
+  noAuthorisedContext,
   Q_TOOL_LOOP_MAX_CALLS,
   Q_TOOL_LOOP_MAX_ROUNDS,
+  type QAuthorisedContextPort,
 } from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 import { fitFixture } from "./fit-fixture.js";
@@ -151,6 +153,7 @@ function denied(proposal: QToolProposal): QToolCallOutcome {
 function build(options: {
   readonly script: readonly FakeBehaviour[];
   readonly tools?: QToolPort | undefined;
+  readonly context?: QAuthorisedContextPort | undefined;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -238,6 +241,7 @@ function build(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     tools: options.tools,
+    ...(options.context === undefined ? {} : { context: options.context }),
     logger,
   });
   const request: QAnswerRequest = {
@@ -1674,6 +1678,202 @@ describe("a named company read ahead of the model is not looked up again", () =>
       expect(
         tools.executed.filter((p) => p.name === "get_company"),
       ).toHaveLength(1);
+    },
+  );
+});
+
+/**
+ * S3 (live 2026-10-15 run f854c339, a GateQ dossier question): on a screen
+ * focused on one record the wide reads start when the turn is warmed,
+ * beside the readers, rather than after the reading.
+ */
+describe("wide reads start at warm on a focused screen", () => {
+  const SEARCH: QOfferedTool = {
+    ...GET_COMPANY,
+    toolName: "company.search",
+    definition: { ...GET_COMPANY.definition, name: "search_companies" },
+  };
+  it.each([true, false])("focused=%s", async (focused) => {
+    const tools = toolPort([SEARCH, GET_COMPANY], (p) =>
+      succeeded(p, { items: [], nextCursor: null, truthClass: "USER_CLAIM" }),
+    );
+    const { seam, request, messages } = build({
+      tools,
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) }],
+    });
+    if (messages[0])
+      messages[0] = {
+        ...messages[0],
+        content: "What are the risks with Northwind Ledger?",
+      };
+    const bound = {
+      ...request,
+      plan: {
+        ...request.plan,
+        screen: {
+          route: "OTHER" as const,
+          ...(focused
+            ? {
+                manifest: {
+                  v: 2,
+                  seq: 1,
+                  focus: { kind: "GATEQ_APPLICATION", id: randomUUID() },
+                  inView: [],
+                  dialogs: [],
+                  controls: [],
+                  sections: [],
+                },
+              }
+            : {}),
+        },
+      },
+    } as typeof request;
+    if (!seam.warm) throw new Error("Warm seam missing");
+    seam.warm(bound);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const before = tools.executed.filter(
+      (p) => p.name === "search_companies",
+    ).length;
+    expect(before > 0).toBe(focused);
+    await seam.answer(bound);
+    // Read once either way: the warm read is the one the answer takes.
+    expect(
+      tools.executed.filter((p) => p.name === "search_companies"),
+    ).toHaveLength(1);
+  });
+});
+
+/**
+ * S6 (live 2026-10-15 run ddf0738b, a GateQ dossier review): the screen's
+ * own reads -- here the selected application's summarise -- start from the
+ * run's tool set, beside context assembly, not after it; and are read once.
+ */
+describe("the selected dossier is read beside context assembly", () => {
+  const SUMMARISE: QOfferedTool = {
+    ...GET_COMPANY,
+    toolName: "app.gateq.inbox.summarise",
+    definition: { ...GET_COMPANY.definition, name: "gateq_inbox_summarise" },
+  };
+  it("starts before assembly settles and is read once", async () => {
+    const tools = toolPort([SUMMARISE], (p) =>
+      succeeded(p, { status: "NOT_DONE", says: "Not in your inbox." }),
+    );
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let assembling = 0;
+    const context: QAuthorisedContextPort = {
+      assemble: async (request) => {
+        assembling += 1;
+        await held;
+        return noAuthorisedContext.assemble(request);
+      },
+    };
+    const { seam, request } = build({
+      tools,
+      context,
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) }],
+    });
+    const applicationId = randomUUID();
+    const bound = {
+      ...request,
+      plan: {
+        ...request.plan,
+        screen: {
+          route: "OTHER" as const,
+          manifest: {
+            v: 2,
+            seq: 1,
+            focus: { kind: "GATEQ_APPLICATION", id: applicationId },
+            inView: [],
+            dialogs: [],
+            controls: [],
+            sections: [],
+          },
+        },
+      },
+    } as typeof request;
+    const answered = seam.answer(bound);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(assembling).toBe(1);
+    // Assembly is still held: the summarise has already been asked.
+    expect(
+      tools.executed.filter((p) => p.name === "gateq_inbox_summarise"),
+    ).toEqual([expect.objectContaining({ arguments: { applicationId } })]);
+    release();
+    await answered;
+    expect(
+      tools.executed.filter((p) => p.name === "gateq_inbox_summarise"),
+    ).toHaveLength(1);
+  });
+
+  it.each([
+    ["the dossier read", true, "PREPARED_CONTEXT", 0],
+    ["the dossier refused", false, "DEEP_ANALYSIS", 1],
+  ] as const)(
+    "a review of %s routes over it with no tools, or keeps the full path",
+    async (_label, read, path, toolsOffered) => {
+      const applicationId = randomUUID();
+      const tools = toolPort([SUMMARISE], (p) =>
+        succeeded(
+          p,
+          read
+            ? {
+                status: "DONE",
+                says: "Read the application.",
+                reading: {
+                  v: 1,
+                  subject: {
+                    kind: "GATEQ_SUBMISSION",
+                    gatewayId: randomUUID(),
+                    applicationId,
+                    reference: "ga_submitted",
+                    submittedAt: "2026-10-14T13:12:00.000Z",
+                    dossierSchemaVersion: "gateq-dossier.v1",
+                  },
+                  text: "Customers pay by the litre [truth=USER_CLAIM]",
+                  sources: [],
+                },
+              }
+            : { status: "NOT_DONE", says: "Not in your inbox." },
+        ),
+      );
+      const { seam, request, logLines } = build({
+        tools,
+        script: [
+          { kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) },
+        ],
+      });
+      const bound = {
+        ...request,
+        turnKind: "QUESTION_TO_Q",
+        questionKind: "ADVICE",
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        plan: {
+          ...request.plan,
+          screen: {
+            route: "OTHER" as const,
+            manifest: {
+              v: 2,
+              seq: 1,
+              focus: { kind: "GATEQ_APPLICATION", id: applicationId },
+              inView: [],
+              dialogs: [],
+              controls: [],
+              sections: [],
+            },
+          },
+        },
+      } as typeof request;
+      await seam.answer(bound);
+      const logged = logLines
+        .map((line) => JSON.parse(line) as [Record<string, unknown>, string])
+        .find(([, message]) => message === "q answer path");
+      expect(logged?.[0]).toMatchObject({ path, tools: toolsOffered });
     },
   );
 });

@@ -37,6 +37,12 @@ export type NamedRecordRequest = {
    * unknown name is then said so, never handed to a model to improvise.
    */
   readonly explicit: boolean;
+  /**
+   * Lane S 2026-10-15: read from a part only a company has ("tensorgate's
+   * documents") with the name in lower case, as typed. Opened only when the
+   * name is one of their own counterparts; anything else is left to Q.
+   */
+  readonly ownOnly?: true | undefined;
 };
 
 type FacetWords = {
@@ -89,6 +95,11 @@ function asName(raw: string): string | null {
   if (name.length < 2 || name.length > 60) return null;
   if (!/\p{L}/u.test(name)) return null;
   if (NOT_A_NAME.test(name)) return null;
+  // Lane S 2026-10-15 (audit, 10-10: "show me fintech companies in
+  // Nigeria" said "I can't find ..." three times): a kind of record in the
+  // plural, in lower case, names a search, not a record. A firm's own name
+  // ("Kilima Angel Network", "Clearwater Investors") carries its capitals.
+  if (CATEGORY_PLURAL.test(name)) return null;
   // A part's own name ("the data room", "the deck") names no record.
   if (
     FACETS.some(({ words }) => new RegExp(`^(?:${words})$`, "iu").test(name))
@@ -117,11 +128,20 @@ function fromObject(object: string): NamedRecordRequest | null {
     if (raw === undefined) continue;
     const name = asName(raw);
     if (name === null) continue;
-    if (properOnly === true && !/\p{Lu}/u.test(name)) continue;
+    // Typed in lower case, a part only a company has is still that
+    // company's when the name is one of their own (resolveNamedRecord).
+    if (properOnly === true && !/\p{Lu}/u.test(name)) {
+      if (!/^(?:their|its|his|her|the|my|our|your)\b/iu.test(raw.trim())) {
+        return { name, facet, explicit: true, ownOnly: true };
+      }
+      continue;
+    }
     return { name, facet, explicit: true };
   }
   const name = asName(said);
   if (name === null) return null;
+  // "their documents", "its files": the record on screen (tab-request.ts).
+  if (/^(?:their|its|his|her)\s/iu.test(name)) return null;
   // A bare name: a record when it is a proper name (spoken transcripts and
   // typed names carry the capital), or two words or fewer of plain text.
   const proper = /\p{Lu}/u.test(name);
@@ -324,6 +344,9 @@ function soundMisheard(
 }
 
 /** Words no company or investor name is made of. */
+const CATEGORY_PLURAL =
+  /\b(?:companies|startups|start-ups|businesses|investors|funds|firms|founders|deals|opportunities|vcs|angels)\b/u;
+
 const NOT_NAME_WORD = new Set([
   "i",
   "me",

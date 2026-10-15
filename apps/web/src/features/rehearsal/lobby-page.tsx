@@ -9,6 +9,7 @@ import { z } from "zod";
 import { PageContainer } from "@/components/app-shell/page-container";
 import { resolveOwnContext } from "@/features/q/context";
 import { RehearsalLobby } from "@/features/rehearsal/rehearsal-lobby";
+import { QSection } from "@/features/q/q-section";
 
 /**
  * A rehearsal's lobby (REHEARSE): a founder rehearses with an investor, an
@@ -35,39 +36,53 @@ export async function RehearsalLobbyPage({
   if (context.kind !== needs || !id.success) {
     return (
       <PageContainer>
-        <EmptyState
-          title="This rehearsal isn't available."
-          description={
-            needs === "FOUNDER"
-              ? "A founder rehearses a meeting with an investor they can see or are connected to."
-              : "An investor rehearses a meeting with a company they are connected to."
-          }
-          action={
-            <Link href="/rehearsals" className={buttonClassName("secondary")}>
-              Rehearsals
-            </Link>
-          }
-        />
+        <QSection id="rehearsal" kind="REHEARSAL" total={0} label="a rehearsal">
+          <EmptyState
+            title="This rehearsal isn't available."
+            description={
+              needs === "FOUNDER"
+                ? "A founder rehearses a meeting with an investor they can see or are connected to."
+                : "An investor rehearses a meeting with a company they are connected to."
+            }
+            action={
+              <Link href="/rehearsals" className={buttonClassName("secondary")}>
+                Rehearsals
+              </Link>
+            }
+          />
+        </QSection>
       </PageContainer>
     );
   }
   return (
     <PageContainer>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <Link
-          href="/rehearsals"
-          className="cq-body-sm inline-flex min-h-11 items-center gap-1 text-(--cq-text-secondary)"
-        >
-          <ChevronLeft size={ICON_SIZE.compact} aria-hidden="true" />
-          Rehearsals
-        </Link>
-        <RehearsalLobby
-          requestedVideo={requestedVideo}
-          kind={kind}
-          counterpartId={id.data}
-          meetingId={meetingId.success ? meetingId.data : undefined}
-        />
-      </div>
+      <QSection
+        id="rehearsal"
+        kind="REHEARSAL"
+        refs={
+          kind === "COMPANY" || kind === "INVESTOR_ORGANISATION"
+            ? [{ kind, id: id.data }]
+            : []
+        }
+        total={1}
+        label="a rehearsal lobby"
+      >
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+          <Link
+            href="/rehearsals"
+            className="cq-body-sm inline-flex min-h-11 items-center gap-1 text-(--cq-text-secondary)"
+          >
+            <ChevronLeft size={ICON_SIZE.compact} aria-hidden="true" />
+            Rehearsals
+          </Link>
+          <RehearsalLobby
+            requestedVideo={requestedVideo}
+            kind={kind}
+            counterpartId={id.data}
+            meetingId={meetingId.success ? meetingId.data : undefined}
+          />
+        </div>
+      </QSection>
     </PageContainer>
   );
 }

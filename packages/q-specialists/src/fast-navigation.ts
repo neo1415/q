@@ -124,6 +124,9 @@ export async function resolveNamedRecord(input: {
   if (match.kind === "SEVERAL") {
     return { kind: "ASK", said: whichOneLine(match.names), log: "SEVERAL" };
   }
+  // A lower-case name read from a company's part counts only when it is
+  // one of their own (named-record-request.ts `ownOnly`); otherwise Q.
+  if (asked.ownOnly === true && match.kind !== "ONE") return null;
   // Not one of theirs and not plainly a name: Q answers, nothing is quoted.
   if (
     match.kind === "NONE" &&

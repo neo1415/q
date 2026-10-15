@@ -284,6 +284,7 @@ function Toast({
       role={tone === "error" ? "alert" : undefined}
       className="fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+16px)] z-(--cq-z-toast) mx-auto flex max-w-md items-center justify-between gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2 pr-2 pl-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
       data-image-toast={tone}
+      data-q-notice={tone === "error" ? "TOAST:FAILED" : "TOAST:DONE"}
     >
       <p
         className={`cq-body-sm ${tone === "error" ? "text-(--cq-danger)" : "text-(--cq-text-primary)"}`}

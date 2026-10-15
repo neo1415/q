@@ -15,6 +15,7 @@ import {
 } from "@/components/app-shell/page-container";
 import { IncomingInterest } from "@/features/network/incoming-interest";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Investor interest" };
 export const dynamic = "force-dynamic";
@@ -42,19 +43,26 @@ export default async function InvestorInterestPage() {
     // The investor's own side of interest is their relationships (R30 #16).
     return (
       <PageContainer>
-        {header}
-        <EmptyState
-          title="This is a founder's page."
-          description="Interest you have expressed, and each company's answer, is under Relationships."
-          action={
-            <Link
-              href="/relationships"
-              className={buttonClassName("secondary")}
-            >
-              Go to Relationships
-            </Link>
-          }
-        />
+        <QSection
+          id="interest"
+          kind="INTEREST_LIST"
+          total={0}
+          label="investor interest"
+        >
+          {header}
+          <EmptyState
+            title="This is a founder's page."
+            description="Interest you have expressed, and each company's answer, is under Relationships."
+            action={
+              <Link
+                href="/relationships"
+                className={buttonClassName("secondary")}
+              >
+                Go to Relationships
+              </Link>
+            }
+          />
+        </QSection>
       </PageContainer>
     );
   }
@@ -62,16 +70,23 @@ export default async function InvestorInterestPage() {
   if (context.kind !== "FOUNDER" || session === null) {
     return (
       <PageContainer>
-        {header}
-        <EmptyState
-          title="Nothing to answer here."
-          description="Investor interest is addressed to a company. It appears here for the company's own team."
-          action={
-            <Link href="/home" className={buttonClassName("secondary")}>
-              Back to Home
-            </Link>
-          }
-        />
+        <QSection
+          id="interest"
+          kind="INTEREST_LIST"
+          total={0}
+          label="investor interest"
+        >
+          {header}
+          <EmptyState
+            title="Nothing to answer here."
+            description="Investor interest is addressed to a company. It appears here for the company's own team."
+            action={
+              <Link href="/home" className={buttonClassName("secondary")}>
+                Back to Home
+              </Link>
+            }
+          />
+        </QSection>
       </PageContainer>
     );
   }
@@ -90,23 +105,34 @@ export default async function InvestorInterestPage() {
   );
   return (
     <PageContainer>
-      {header}
-      {incoming === null ? (
-        <EmptyState
-          title="Investor interest couldn't load."
-          description="Nothing is wrong with your company. Capital Q didn't answer just now; try again in a moment."
-          action={
-            <Link
-              href="/company/interest"
-              className={buttonClassName("secondary")}
-            >
-              Try again
-            </Link>
-          }
-        />
-      ) : (
-        <IncomingInterest items={incoming.items} currentStates={now} />
-      )}
+      <QSection
+        id="interest"
+        kind="INTEREST_LIST"
+        refs={(incoming?.items ?? []).slice(0, 12).map((item) => ({
+          kind: "INVESTOR_ORGANISATION" as const,
+          id: item.investorOrganisationId,
+        }))}
+        total={incoming?.items.length ?? 0}
+        label="investor interest"
+      >
+        {header}
+        {incoming === null ? (
+          <EmptyState
+            title="Investor interest couldn't load."
+            description="Nothing is wrong with your company. Capital Q didn't answer just now; try again in a moment."
+            action={
+              <Link
+                href="/company/interest"
+                className={buttonClassName("secondary")}
+              >
+                Try again
+              </Link>
+            }
+          />
+        ) : (
+          <IncomingInterest items={incoming.items} currentStates={now} />
+        )}
+      </QSection>
     </PageContainer>
   );
 }

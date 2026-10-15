@@ -7,6 +7,7 @@ import type { PitchSummaryDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
+import { qRef } from "@/features/q/q-ref";
 
 import { CompanyPitch } from "./company-pitch";
 import { undoPassAction } from "./feed/feed-actions";
@@ -68,6 +69,7 @@ export function PassedCompanies({
           return (
             <li
               key={company.companyId}
+              {...qRef("COMPANY", company.companyId)}
               className="flex flex-col gap-2 py-3"
               data-passed-company={company.companyId}
             >

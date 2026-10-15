@@ -1,6 +1,7 @@
 import { RELATIONSHIP_STATES_V2 } from "@capital-q/contracts";
 import type {
   QPageManifest,
+  QManifestRef,
   QManifestRefKind,
   QManifestSectionKind,
   QResultBlock,
@@ -53,6 +54,8 @@ export type ReferenceAsk =
       readonly correction: boolean;
     }
   | { readonly kind: "PAIR" }
+  /** Lane W: "this one", "this company", "the one I'm looking at". */
+  | { readonly kind: "THIS"; readonly entityKind: EntityKind | null }
   | { readonly kind: "BACK" }
   | { readonly kind: "COUNTERPART" };
 
@@ -113,11 +116,23 @@ const BACK =
 const COUNTERPART =
   /\b(?:with|to|email|message|call|ping|meet|book|introduce\s+me\s+to)\s+(?:him|her|them)\b/iu;
 
+/** "this one", "this company/investor/pitch", "the one I'm looking at". */
+const THIS =
+  /\bthis\s+(one|compan(?:y)|startup|business|investor|fund|firm|pitch|video)\b|\bthe\s+one\s+(?:i'?m|i\s+am)\s+(?:looking\s+at|watching|on)\b/iu;
+
 /** What the words point at, if they point at all. */
 export function referenceAskOf(text: string): ReferenceAsk | null {
   const said = text.replace(/[’]/gu, "'");
   if (PAIR.test(said)) return { kind: "PAIR" };
   if (BACK.test(said)) return { kind: "BACK" };
+  const self = ORDINAL_WORD.test(said) ? null : THIS.exec(said);
+  if (self !== null) {
+    const named = self[1] ?? "";
+    const entityKind = /^(?:pitch|video)$/iu.test(named)
+      ? "COMPANY"
+      : (KIND_WORDS.find(([pattern]) => pattern.test(named))?.[1] ?? null);
+    return { kind: "THIS", entityKind };
+  }
   const ordinal = ORDINAL_WORD.exec(said);
   if (ordinal !== null) {
     const word = (ordinal[1] ?? ordinal[3] ?? "").toLowerCase();
@@ -157,6 +172,9 @@ const LIST_SECTIONS: ReadonlySet<QManifestSectionKind> = new Set([
   "DOCUMENT_LIST",
   "UPLOAD_LIST",
   "GATEQ_INBOX",
+  "SEARCH_RESULTS",
+  "EXPLORE",
+  "INTEREST_LIST",
 ]);
 
 /**
@@ -171,12 +189,52 @@ export function listsFromManifest(
   const sections = [...manifest.sections]
     .filter((section) => LIST_SECTIONS.has(section.kind))
     .sort((a, b) => Number(inView.has(b.id)) - Number(inView.has(a.id)));
-  return sections.flatMap((section): ShownList[] => {
-    const items = section.refs.flatMap((ref): ConversationEntity[] => {
-      const kind = REF_KINDS[ref.kind];
-      return kind === undefined ? [] : [{ kind, id: ref.id, name: null }];
-    });
+  const listOf = (refs: readonly QManifestRef[]): ShownList[] => {
+    const items = entitiesOf(refs);
     return items.length === 0 ? [] : [{ via: "PAGE", items }];
+  };
+  // Lane W: what is visible now counts first ("the second one" is the
+  // second they can see), then each whole list as before.
+  const visible = sections
+    .filter((section) => inView.has(section.id))
+    .flatMap((section) => listOf(section.visible ?? []));
+  return [...visible, ...sections.flatMap((section) => listOf(section.refs))];
+}
+
+function entitiesOf(refs: readonly QManifestRef[]): ConversationEntity[] {
+  return refs.flatMap((ref): ConversationEntity[] => {
+    const kind = REF_KINDS[ref.kind];
+    return kind === undefined ? [] : [{ kind, id: ref.id, name: null }];
+  });
+}
+
+/**
+ * Lane W: what "this one" means on the page, best first: the top open
+ * window's record, the record in focus, the pitch playing, then what is
+ * visible in the sections in view. Ids only; every one is read back as
+ * the person before anything about it is said.
+ */
+export function hereFromManifest(
+  manifest: QPageManifest | null | undefined,
+): readonly ConversationEntity[] {
+  if (manifest === undefined || manifest === null) return [];
+  const inView = new Set(manifest.inView);
+  const refs: QManifestRef[] = [
+    ...(manifest.dialogs.at(-1)?.refs ?? []),
+    ...(manifest.focus === undefined ? [] : [manifest.focus]),
+    ...(manifest.media?.companyId === undefined
+      ? []
+      : [{ kind: "COMPANY" as const, id: manifest.media.companyId }]),
+    ...manifest.sections
+      .filter((section) => inView.has(section.id))
+      .flatMap((section) => section.visible ?? []),
+  ];
+  const seen = new Set<string>();
+  return entitiesOf(refs).filter((entity) => {
+    const key = `${entity.kind}:${entity.id.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 }
 
@@ -276,6 +334,8 @@ export function resolveReference(
     /** True when Q's latest message carried cards. */
     readonly answerIsNewest: boolean;
     readonly focus: readonly ConversationEntity[];
+    /** Lane W: what "this one" means on the page now (hereFromManifest). */
+    readonly here?: readonly ConversationEntity[] | undefined;
   },
 ): ResolvedReference | null {
   const lists = context.answerIsNewest
@@ -323,6 +383,12 @@ export function resolveReference(
       return list === undefined
         ? null
         : { kind: "PAIR", entities: list.items.slice(0, 2) };
+    }
+    case "THIS": {
+      const entity = (context.here ?? []).find(
+        (one) => ask.entityKind === null || one.kind === ask.entityKind,
+      );
+      return entity === undefined ? null : { kind: "ONE", entity, via: "PAGE" };
     }
     case "BACK": {
       // The topic before the current one.
@@ -586,11 +652,13 @@ export function resolutionNote(
   const what =
     ask.kind === "ORDINAL"
       ? `${ask.position === -1 ? "the last" : `number ${String(ask.position)}`}${ask.entityKind === null ? "" : ` ${KIND_LABEL[ask.entityKind]}`}${ask.correction ? " (a correction: not the one before)" : ""}`
-      : ask.kind === "PAIR"
-        ? "the two to compare"
-        : ask.kind === "BACK"
-          ? "what was being discussed before"
-          : "the person they mean";
+      : ask.kind === "THIS"
+        ? "what they are looking at on their screen"
+        : ask.kind === "PAIR"
+          ? "the two to compare"
+          : ask.kind === "BACK"
+            ? "what was being discussed before"
+            : "the person they mean";
   const bound =
     resolved.kind === "ONE"
       ? described(resolved.entity)

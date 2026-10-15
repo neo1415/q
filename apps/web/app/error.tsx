@@ -35,6 +35,7 @@ export default function PageError({
   }, [error]);
   return (
     <StatusPage
+      notice="ERROR:PAGE_FAILED"
       title={stale ? "Capital Q was just updated." : "This page couldn't load."}
       description={
         stale

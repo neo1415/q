@@ -7,6 +7,7 @@ import { EmptyState, ErrorState } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
 import { resolveOwnContext } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Data room and deck" };
 export const dynamic = "force-dynamic";
@@ -40,40 +41,42 @@ export default async function OwnDataRoomPage({
   }
   return (
     <PageContainer>
-      {context.kind === "INVESTOR" ? (
-        <EmptyState
-          title="Data rooms belong to companies"
-          description="A company's data room opens from its page, as far as it has shared it with you."
-          action={
-            <Link className={buttonClassName("secondary")} href="/discover">
-              Open Discover
-            </Link>
-          }
-        />
-      ) : context.unavailable === true ? (
-        <ErrorState
-          title="Your data room couldn't open"
-          description="Capital Q didn't answer just now. Nothing is lost; try again in a moment."
-          action={
-            <Link
-              className={buttonClassName("secondary")}
-              href={`/company/data-room?tab=${tab}`}
-            >
-              Try again
-            </Link>
-          }
-        />
-      ) : (
-        <EmptyState
-          title="Set up your company first"
-          description="Your data room and deck live on your company's page once it is set up."
-          action={
-            <Link className={buttonClassName("primary")} href="/welcome">
-              Set up with Q
-            </Link>
-          }
-        />
-      )}
+      <QSection id="data-room" kind="DATA_ROOM" total={0} label="the data room">
+        {context.kind === "INVESTOR" ? (
+          <EmptyState
+            title="Data rooms belong to companies"
+            description="A company's data room opens from its page, as far as it has shared it with you."
+            action={
+              <Link className={buttonClassName("secondary")} href="/discover">
+                Open Discover
+              </Link>
+            }
+          />
+        ) : context.unavailable === true ? (
+          <ErrorState
+            title="Your data room couldn't open"
+            description="Capital Q didn't answer just now. Nothing is lost; try again in a moment."
+            action={
+              <Link
+                className={buttonClassName("secondary")}
+                href={`/company/data-room?tab=${tab}`}
+              >
+                Try again
+              </Link>
+            }
+          />
+        ) : (
+          <EmptyState
+            title="Set up your company first"
+            description="Your data room and deck live on your company's page once it is set up."
+            action={
+              <Link className={buttonClassName("primary")} href="/welcome">
+                Set up with Q
+              </Link>
+            }
+          />
+        )}
+      </QSection>
     </PageContainer>
   );
 }

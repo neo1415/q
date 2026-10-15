@@ -49,6 +49,7 @@ import {
   type RelationshipSide,
   STATE_WORDS,
 } from "./relationship-words";
+import { QSection } from "@/features/q/q-section";
 
 /** States whose next step is the outcome itself, shown above More. */
 export const OUTCOME_FIRST: ReadonlySet<string> = new Set([
@@ -513,7 +514,29 @@ export function RelationshipSection({
         diligence={diligence}
         calls={connected}
       />
-      {children}
+      {/* Lane W: the tab on screen, by the counterpart's record. */}
+      <QSection
+        id={current === "CALLS" ? "calls" : "diligence"}
+        kind={current === "CALLS" ? "SCHEDULE" : "DILIGENCE"}
+        refs={[
+          side === "INVESTOR"
+            ? { kind: "COMPANY", id: relationship.companyId }
+            : {
+                kind: "INVESTOR_ORGANISATION",
+                id: relationship.investorOrganisationId,
+              },
+          ...(current === "CALLS"
+            ? meetings.slice(0, 11).map((meeting) => ({
+                kind: "MEETING" as const,
+                id: meeting.id,
+              }))
+            : []),
+        ]}
+        total={current === "CALLS" ? meetings.length : 1}
+        label={`${current === "CALLS" ? "calls" : "diligence"} with ${counterpart}`}
+      >
+        {children}
+      </QSection>
     </PageContainer>
   );
 }

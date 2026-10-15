@@ -70,19 +70,20 @@ function request(): QAnswerRequest {
   };
 }
 
-function seam(withBus: boolean) {
+function seam(withBus: boolean, said = "What are the main risks here?") {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
     tenantId: TENANT as QConversationMessage["tenantId"],
     conversationId: randomUUID() as QConversationMessage["conversationId"],
     runId: randomUUID() as QConversationMessage["runId"],
     role: "USER",
-    content: "What are the main risks here?",
+    content: said,
     contentType: "TEXT",
     createdAt: new Date().toISOString(),
   };
   const published: { messageId: string; text: string }[] = [];
   const stored: { id?: string; content: string }[] = [];
+  const investigated: { publicResearch?: boolean | undefined }[] = [];
   const bus = {
     publish: (delta: { messageId: string; text: string }) => {
       published.push(delta);
@@ -94,7 +95,8 @@ function seam(withBus: boolean) {
       id: "company-intelligence",
       version: "v1",
       supports: () => true,
-      investigate: (_input, context) => {
+      investigate: (input, context) => {
+        investigated.push(input);
         context.onAnswerSentence?.("Credit performance is the first risk.");
         context.onAnswerSentence?.("It is a 91% fit with your mandate.");
         context.onAnswerSentence?.("I've prepared a draft for your approval.");
@@ -155,7 +157,7 @@ function seam(withBus: boolean) {
     transactions: { run: (work) => work({} as never) },
     ...(withBus ? { deltas: bus } : {}),
   });
-  return { answer, published, stored };
+  return { answer, published, stored, investigated };
 }
 
 describe("the company specialist's answer on the live bus (S3)", () => {
@@ -177,4 +179,42 @@ describe("the company specialist's answer on the live bus (S3)", () => {
     expect(s.published).toEqual([]);
     expect(s.stored.at(-1)?.content).toContain("Credit performance");
   });
+});
+
+/**
+ * S7 (live 2026-10-15 d3fdbd12, f72d9994): advice about a company Capital Q
+ * holds is answered from its records; the web is read only when the turn
+ * asks for public information.
+ */
+describe("the specialist reads the public web only when asked (S7)", () => {
+  const explicit = {
+    research: Promise.resolve({
+      mode: "EXPLICIT" as const,
+      announceSourceChange: false,
+    }),
+  };
+  it.each([
+    ["What are the main risks here?", "QUESTION_TO_Q", "ADVICE", false],
+    [
+      "Search the web for risks with this company.",
+      "QUESTION_TO_Q",
+      "ADVICE",
+      true,
+    ],
+    ["What does the press say about them?", "QUESTION_TO_Q", "ADVICE", true],
+    ["What has been reported publicly?", "QUESTION_TO_Q", "PUBLIC_FACTS", true],
+    ["Research their competitors.", "RESEARCH_REQUEST", "ADVICE", true],
+  ] as const)(
+    "%s -> publicResearch=%s",
+    async (said, turnKind, questionKind, web) => {
+      const s = seam(true, said);
+      await s.answer.answer({
+        ...request(),
+        ...explicit,
+        turnKind,
+        questionKind,
+      });
+      expect(s.investigated.at(-1)?.publicResearch).toBe(web);
+    },
+  );
 });

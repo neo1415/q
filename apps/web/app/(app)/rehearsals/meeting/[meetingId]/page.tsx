@@ -8,6 +8,7 @@ import { EmptyState } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
 import { qApiSession } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Rehearse" };
 export const dynamic = "force-dynamic";
@@ -38,15 +39,23 @@ export default async function MeetingRehearsalPage({
   }
   return (
     <PageContainer>
-      <EmptyState
-        title="That call has passed or isn't yours."
-        description="You can still rehearse with anyone you're connected to."
-        action={
-          <Link href="/rehearsals" className={buttonClassName("secondary")}>
-            Rehearsals
-          </Link>
-        }
-      />
+      <QSection
+        id="rehearsal"
+        kind="REHEARSAL"
+        refs={[{ kind: "MEETING", id: meetingId }]}
+        total={1}
+        label="a rehearsal for a meeting"
+      >
+        <EmptyState
+          title="That call has passed or isn't yours."
+          description="You can still rehearse with anyone you're connected to."
+          action={
+            <Link href="/rehearsals" className={buttonClassName("secondary")}>
+              Rehearsals
+            </Link>
+          }
+        />
+      </QSection>
     </PageContainer>
   );
 }

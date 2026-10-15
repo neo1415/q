@@ -13,6 +13,7 @@ import {
   MANIFEST_COMPANY_READS_MAX,
   manifestFacts,
   manifestReads,
+  selectedDossierRead,
 } from "../src/q/manifest-fact.js";
 
 /**
@@ -124,7 +125,26 @@ describe("the selected GateQ dossier", () => {
           .map((f) => f.statement)
           .join("\n"),
       ).not.toContain("Foreign secret");
+      // S6: nor does such a read count as the dossier being read (routing).
+      expect(selectedDossierRead(manifest, new Map([[key, result]]))).toBe(
+        false,
+      );
     }
+  });
+  it("S6: counts the dossier as read only for the focused application's own DONE reading", () => {
+    const done = new Map([
+      [
+        `gateq_inbox_summarise:${id(7)}`,
+        { status: "DONE", says: "Read", reading: sourceReading("Facts") },
+      ],
+    ]);
+    expect(selectedDossierRead(manifest, done)).toBe(true);
+    expect(selectedDossierRead(manifest, new Map())).toBe(false);
+    const company = QPageManifestSchema.parse({
+      ...manifest,
+      focus: { kind: "COMPANY", id: id(7) },
+    });
+    expect(selectedDossierRead(company, done)).toBe(false);
   });
   it("follows a changed focus and never reuses the previous application's reading", () => {
     const results = new Map<string, unknown>([
@@ -409,5 +429,133 @@ describe("the page on their screen", () => {
     expect(screenLines({ route: "DISCOVER" }).join("\n")).not.toMatch(
       /below the fold/u,
     );
+  });
+});
+
+/**
+ * Lane W (2026-10-15): Q sees what is visible now, the pitch playing, and
+ * the error, empty, loading and toast states -- as ids and closed codes.
+ */
+describe("what they are looking at (lane W)", () => {
+  const base = {
+    v: 2,
+    seq: 3,
+    inView: ["feed"],
+    dialogs: [],
+    sections: [
+      {
+        id: "feed",
+        kind: "COMPANY_LIST",
+        refs: [1, 2, 3, 4].map((n) => ({ kind: "COMPANY", id: id(n) })),
+        total: 4,
+        visible: [3, 4].map((n) => ({ kind: "COMPANY", id: id(n) })),
+      },
+    ],
+  };
+  const results = new Map<string, unknown>(
+    [1, 2, 3, 4, 9].map((n) => [
+      `get_company:${id(n)}`,
+      company(n, `Co ${String(n)}`),
+    ]),
+  );
+
+  it("accepts an older manifest without the new fields, and refuses free text in them", () => {
+    const { visible: _visible, ...older } = base.sections[0] ?? {};
+    expect(
+      QPageManifestSchema.safeParse({ ...base, sections: [older] }).success,
+    ).toBe(true);
+    expect(
+      QPageManifestSchema.safeParse({
+        ...base,
+        notices: [{ kind: "ERROR", code: "Payment declined for card 4242" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      QPageManifestSchema.safeParse({
+        ...base,
+        notices: [{ kind: "TOAST", message: "Saved" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      QPageManifestSchema.safeParse({
+        ...base,
+        media: { kind: "PITCH", state: "PLAYING", currentTime: 12.4 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("leads with the records visible now and reads them first", () => {
+    const manifest = QPageManifestSchema.parse(base);
+    expect(manifestReads(manifest, ALL)[0]?.arguments).toEqual({
+      companyId: id(3),
+    });
+    const text = manifestFacts(manifest, results)
+      .map((fact) => fact.statement)
+      .join("\n");
+    expect(text).toContain(
+      "Visible on their screen right now, in order: Co 3 (seed); Co 4 (seed).",
+    );
+    expect(text.indexOf("• Co 3")).toBeLessThan(text.indexOf("• Co 1"));
+  });
+
+  it("names the playing pitch only through the person's own company read", () => {
+    const manifest = QPageManifestSchema.parse({
+      ...base,
+      media: {
+        kind: "PITCH",
+        companyId: id(9),
+        state: "PAUSED",
+        position: "MIDDLE",
+        muted: true,
+      },
+    });
+    expect(
+      manifestReads(manifest, ALL).some(
+        (read) => read.arguments["companyId"] === id(9),
+      ),
+    ).toBe(true);
+    const text = manifestFacts(manifest, results)
+      .map((fact) => fact.statement)
+      .join("\n");
+    expect(text).toContain(
+      "A pitch video is on screen, paused, about halfway through, sound off: the pitch of Co 9 (seed).",
+    );
+    // A company whose read was refused leaves the pitch unnamed.
+    const refused = new Map(results);
+    refused.delete(`get_company:${id(9)}`);
+    const unnamed = manifestFacts(manifest, refused)
+      .map((fact) => fact.statement)
+      .join("\n");
+    expect(unnamed).toContain(
+      'A pitch video is on screen, paused, about halfway through, sound off. "This pitch"',
+    );
+    expect(unnamed).not.toContain(id(9));
+  });
+
+  it("says which states show, by code, never by wording", () => {
+    const manifest = QPageManifestSchema.parse({
+      ...base,
+      notices: [
+        { kind: "EMPTY", section: "feed" },
+        { kind: "TOAST", code: "DONE" },
+        { kind: "ERROR", code: "PAGE_FAILED" },
+      ],
+    });
+    const text = manifestFacts(manifest, results)
+      .map((fact) => fact.statement)
+      .join("\n");
+    expect(text).toContain(
+      "in view now, showing an empty state (nothing to show yet)",
+    );
+    expect(text).toContain(
+      "Also on the page: a brief confirmation message (what they did worked); an error message (the page failed to load).",
+    );
+  });
+
+  it("tells Q it cannot see unsaved typing", () => {
+    const text = manifestFacts(QPageManifestSchema.parse(base), results)
+      .map((fact) => fact.statement)
+      .join("\n");
+    expect(text).toContain("can't see unsaved typing");
   });
 });
