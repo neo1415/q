@@ -119,12 +119,17 @@ export function recordGateq(
   dto: RelationshipGateqApplicationsDto,
   day: (iso: string) => string,
 ): readonly RecordGateqRow[] {
-  return dto.items.map((item) => ({
+  // The reference is an opaque internal id: never shown as a title. Two
+  // applications through the same gate are told apart by their order.
+  const names = dto.items.map(
+    (item) => item.gatewayName ?? "GateQ application",
+  );
+  return dto.items.map((item, at) => ({
     key: item.applicationId,
     title:
-      item.gatewayName === null
-        ? `Application ${item.reference}`
-        : `${item.gatewayName} · ${item.reference}`,
+      names.filter((name) => name === names[at]).length > 1
+        ? `${names[at] ?? ""} · ${String(names.slice(0, at + 1).filter((name) => name === names[at]).length)}`
+        : (names[at] ?? "GateQ application"),
     status:
       item.status === "SUBMITTED"
         ? `Submitted${item.submittedAt === null ? "" : ` ${day(item.submittedAt)}`}`
