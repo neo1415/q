@@ -175,6 +175,7 @@ import {
 import {
   createArtifactClaimGuard,
   drawnArtifacts,
+  drawnOnScreen,
   withoutUnbackedArtifactClaims,
 } from "./artifact-claims.js";
 import { ownProfileFact } from "./own-profile.js";
@@ -3685,7 +3686,11 @@ export function createModelGatewayQAnswer(
       // the prose are not known yet, so such a sentence is held back here
       // and the finished answer says the truth.
       const artifactClaims = createArtifactClaimGuard(
-        () => drawnArtifacts(clientActionBlocks),
+        () =>
+          new Set([
+            ...drawnArtifacts(clientActionBlocks),
+            ...drawnOnScreen(plan.screen?.manifest?.drawn?.kinds),
+          ]),
         "stream",
       );
       const screenClaims = createScreenClaimGuard(
@@ -5710,10 +5715,12 @@ export function createModelGatewayQAnswer(
         );
         // Lane A: "here's the table" / "see the map" stands only when the
         // answer carries that kind of object (artifact-claims.ts).
-        const artifactSafe = withoutUnbackedArtifactClaims(screenSafe.text, [
-          ...(analystBlocks ?? []),
-          ...clientActionBlocks,
-        ]);
+        // What the browser confirms it has drawn backs a mention of it.
+        const artifactSafe = withoutUnbackedArtifactClaims(
+          screenSafe.text,
+          [...(analystBlocks ?? []), ...clientActionBlocks],
+          drawnOnScreen(plan.screen?.manifest?.drawn?.kinds),
+        );
         if (artifactSafe.removed > 0) {
           logger?.warn(
             { qRunId: request.runId, removed: artifactSafe.removed },

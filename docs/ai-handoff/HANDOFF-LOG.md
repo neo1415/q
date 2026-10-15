@@ -714,3 +714,16 @@ PR99 exactefd2 protectedCI38617987342 allPASS; normalproductionmerge48c6. Web/AP
   - OpenAI about $0.46: lane S $0.41, lane G about $0.05;
   - Tavus $0.
 - Next: batch D (#113), the paid Tavus test after 09:00 WAT, the dossier-Q re-acceptance, the Q Pitch pilot re-run, CRM screenshots and walkthroughs, and the S3 after-deploy measures.
+
+## 2026-10-15 — Claude Code (Opus 5.5) — lane A, Q artifacts reliability
+
+- **Workspace:** `/home/user/q-a` (worktree). Branches from `origin/build/int-rc`:
+  - `claude/a-artifacts-oct15`: web, the stage rule and one controller.
+  - `claude/a-claims-oct15`: server, grounded artifact claims and the company map.
+  - `claude/a-rendered-oct15`: both of the above, plus the `drawn` manifest field.
+- **Status:** IMPLEMENTED + LOCAL TESTED (targeted vitest, web `tsc`, eslint/prettier on changed files). NOT merged, NOT deployed, NOT live-verified after the fix.
+- **Audit:** `docs/ai-handoff/ARTIFACTS-AUDIT-2026-10-15.md` covers the inventory, failures F-1 to F-8 and the fixes.
+- **Merge note:** `claude/a-rendered-oct15` adds an optional field to the strict `QPageManifestSchema`. Deploy q-api/api with or before web.
+- **Next action:** merge `claude/a-rendered-oct15` into `build/int-rc`. Run CI, deploy, then re-run the live checks in the audit:
+  - top three, then "what should I ask them first?" keeps the cards;
+  - "show me on a map where they are based" draws a company map.

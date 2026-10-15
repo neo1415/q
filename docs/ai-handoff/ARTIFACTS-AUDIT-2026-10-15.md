@@ -96,15 +96,33 @@ It is in sessionStorage, so it holds across route changes and reload. "Clear all
 
 Tests: `apps/web/test/artifact-stage.test.tsx` (F-1 to F-5, 11 cases). Updated: `q-presence-stage.test.tsx`.
 
-### Slice 2 (server): grounded artifact claims
+### Slice 2 (server): grounded artifact claims (`claude/a-claims-oct15`)
 
-See section 5.
+- `model-gateway/src/q/artifact-claims.ts` handles sentences that present a table, map, chart or timeline ("here's", "I've put", "see", "below", "the map shows"):
+  - It is backed only by a block of that kind. Side-by-side cards or `COMPARISON` back a table.
+  - Offers, questions and refusals are not claims.
+  - While streaming, an unbacked claim is held back and never said. The finished answer says once: "I couldn't build a map from what I could read, so there isn't one on screen."
+- `screen-claims.ts` reads typographic apostrophes as plain ones, which fixes F-6 "I’ve opened…".
+- `result-blocks.ts` adds `companiesMapBlock` for F-7. When the model asks for a map and no investor has a published place, it maps the run's companies (names and countries from authorised reads). An unknown country stays `null`.
+- Tests: `packages/model-gateway/test/q-artifact-claims.test.ts`.
+
+### Slice 3 (browser confirmation to the Q API) (`claude/a-rendered-oct15`, includes slices 1 and 2)
+
+- Contract: `QPageManifestSchema.drawn = { run: uuid, kinds: closed list }`. This is additive and optional (`packages/contracts/src/q/screen-manifest.ts`).
+- Web: `artifact-rendered-store.ts` is a plain module that the manifest reads. `RenderedMark` sets it after commit. `manifest.ts` adds `drawn` and bumps `seq` when it changes.
+- Server: `drawnOnScreen(plan.screen.manifest.drawn.kinds)` also backs claims. So a follow-up "as the map shows, Baridi is in Kenya" stands while that map is drawn, and is corrected when it is not.
+- **Deploy order:** `screen.manifest` is a `.strict()` schema. A q-api/api still on the old contracts would refuse a run request carrying `drawn`, so deploy q-api and api before or with web.
+- Tests:
+  - `artifact-stage.test.tsx`: the manifest carries `drawn` and clears it on unmount; the kinds are closed.
+  - `q-artifact-claims.test.ts`: browser-drawn backing.
 
 ## 4. Remaining / not done
 
 - The Board's pin and dismiss marks are still their own sessionStorage store. Spotlight taps are module memory. Both are presentation-only and reload-safe enough, but they are not in the one controller yet.
 - The chip on other pages still keeps "dismissed" per page.
-- The `RenderedMark` registry is not yet sent to the Q API. The page manifest has no field for a drawn result block, and that needs an additive contract change (proposed as slice 3).
+- The chat view and the Q sheet on other pages draw blocks inline in the thread. Only the Q stage reports `drawn`.
+- F-8 (public research on "tables side by side in Word") belongs to lane S's research topic continuity.
+- A company _table_ is still built only as side-by-side cards. `visualBlock("TABLE")` remains investors-only.
 
 ## 5. Log
 

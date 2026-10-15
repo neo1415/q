@@ -7,6 +7,7 @@ import {
   claimedArtifacts,
   createArtifactClaimGuard,
   drawnArtifacts,
+  drawnOnScreen,
   notDrawnLine,
   withoutUnbackedArtifactClaims,
 } from "../src/q/artifact-claims.js";
@@ -84,6 +85,22 @@ describe("artifact claims", () => {
     const final = createArtifactClaimGuard(() => new Set(), "final");
     expect(final.sentence("Here's the map.")).toBe(notDrawnLine("MAP"));
     expect(final.sentence("See the chart below.")).toBeNull();
+  });
+});
+
+describe("an object the browser confirms drawn backs a mention of it (lane A slice 3)", () => {
+  it("keeps “as the map shows” when the map from an earlier answer is on screen", () => {
+    const said = "As the map shows, Baridi is in Kenya.";
+    expect(claimedArtifacts(said)).toEqual(["MAP"]);
+    // Nothing this run carries, but the browser reports the map drawn.
+    expect(
+      withoutUnbackedArtifactClaims(said, [], drawnOnScreen(["MAP"])),
+    ).toEqual({ text: said, removed: 0 });
+    // Not drawn: corrected.
+    expect(withoutUnbackedArtifactClaims(said, []).removed).toBe(1);
+    expect([...drawnOnScreen(["COMPARISON", "ANSWER_CARDS"])]).toEqual([
+      "TABLE",
+    ]);
   });
 });
 

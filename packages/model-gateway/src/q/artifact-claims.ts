@@ -92,6 +92,24 @@ export function drawnArtifacts(
   return drawn;
 }
 
+/**
+ * What the person's browser reports it has drawn on the Q stage now (the
+ * page manifest's `drawn`, browser-confirmed after commit): a map shown
+ * by an earlier answer and still on screen backs "as the map shows".
+ */
+export function drawnOnScreen(
+  kinds: readonly string[] | undefined,
+): ReadonlySet<ClaimedArtifact> {
+  const drawn = new Set<ClaimedArtifact>();
+  for (const kind of kinds ?? []) {
+    if (kind === "TABLE" || kind === "COMPARISON") drawn.add("TABLE");
+    if (kind === "MAP") drawn.add("MAP");
+    if (kind === "CHART") drawn.add("CHART");
+    if (kind === "TIMELINE") drawn.add("TIMELINE");
+  }
+  return drawn;
+}
+
 const ARTICLE: Readonly<Record<ClaimedArtifact, string>> = {
   TABLE: "a table",
   MAP: "a map",
@@ -135,8 +153,9 @@ export function createArtifactClaimGuard(
 export function withoutUnbackedArtifactClaims(
   text: string,
   blocks: readonly QResultBlock[],
+  onScreen: ReadonlySet<ClaimedArtifact> = new Set(),
 ): { readonly text: string; readonly removed: number } {
-  const drawn = drawnArtifacts(blocks);
+  const drawn = new Set([...drawnArtifacts(blocks), ...onScreen]);
   const guard = createArtifactClaimGuard(() => drawn, "final");
   const lines = text.split("\n").map((line) => {
     const sentences = splitSentences(line)

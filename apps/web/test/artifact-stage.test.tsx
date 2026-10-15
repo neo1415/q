@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { QResultBlock } from "@capital-q/contracts";
+import { QPageManifestSchema, type QResultBlock } from "@capital-q/contracts";
 
 import { demoTop } from "../src/features/q/answer-canvas-fixtures";
 import type { QTurn } from "../src/features/q/conversation";
@@ -20,6 +20,7 @@ const { shownItems, stageOf, stageNoteOf } =
 const { clearResultShelf, rememberResults } =
   await import("../src/features/q/result-shelf");
 const store = await import("../src/features/q/cards/card-visibility-store");
+const { currentManifest } = await import("../src/features/q/manifest");
 const { clearRendered, renderedObject } =
   await import("../src/features/q/artifact-rendered");
 
@@ -300,5 +301,35 @@ describe("presentation state has one controller (FAIL-5)", () => {
     await waitFor(() =>
       expect(container.querySelector('[data-q-canvas="a1"]')).not.toBeNull(),
     );
+  });
+});
+
+describe("the browser confirms what it drew (slice 3)", () => {
+  const RUN = "9b2f6c1e-3d4a-4c5b-8e6f-7a8b9c0d1e2f";
+  it("reports the drawn object in the page manifest, and nothing once it leaves", async () => {
+    const turns = [
+      person("p1", "Show me on a map"),
+      answer("a1", "Here's where they're based.", [MAP], { runId: RUN }),
+    ];
+    const view = render(stage(turns));
+    await waitFor(
+      () =>
+        expect(currentManifest()?.drawn).toEqual({ run: RUN, kinds: ["MAP"] }),
+      { timeout: 10_000 },
+    );
+    expect(QPageManifestSchema.safeParse(currentManifest()).success).toBe(true);
+    view.unmount();
+    expect(currentManifest()?.drawn).toBeUndefined();
+    // The contract's kinds are closed.
+    expect(
+      QPageManifestSchema.safeParse({
+        v: 2,
+        seq: 1,
+        inView: [],
+        sections: [],
+        dialogs: [],
+        drawn: { run: RUN, kinds: ["TEXT"] },
+      }).success,
+    ).toBe(false);
   });
 });
