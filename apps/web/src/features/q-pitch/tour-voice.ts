@@ -43,10 +43,16 @@ export async function openTourVoice(
     // Another kind of line already open: leave it; the narrator reads in
     // the standard voice beside it.
     if (session.voice.active) return "STANDARD";
-    if ((await liveAvailabilityFor()) !== true) return "STANDARD";
+    // A cold answer can take a few seconds; the person has just pressed
+    // Start and sees "Opening Q's voice…" meanwhile.
+    if ((await liveAvailabilityFor(5_000)) !== true) return "STANDARD";
     void session.talk({ greeting: TOUR_GREETING }).catch(() => undefined);
     const opened = performance.now();
-    while (!liveNow() && performance.now() - opened < 12_000) {
+    // Opening a line is a server action, and those run one at a time per
+    // tab (production 15 Oct: queued behind page reads). If it is not up
+    // in time the tour starts in the standard voice, and the line takes
+    // over the narration whenever it comes up (the narrator briefs it).
+    while (!liveNow() && performance.now() - opened < 20_000) {
       await abortableWait(POLL_MS, never);
     }
     if (!liveNow()) return "STANDARD";
@@ -64,6 +70,5 @@ export async function openTourVoice(
       await abortableWait(POLL_MS, never);
     }
   }
-  current()?.voice.client.brief?.(TOUR_BRIEF);
   return "LIVE";
 }

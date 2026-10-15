@@ -126,27 +126,26 @@ export function createNarrator(deps: NarratorDeps): Narrator {
     live.hush(false);
   };
 
+  /** Live lines sent but never heard in a row; two mean the line is mute. */
+  let unheard = 0;
+  const UNHEARD_LIMIT = 2;
+
   const speakLive = async (
     live: LiveNarration,
     text: string,
     signal: AbortSignal,
-  ): Promise<boolean> => {
+  ): Promise<"HEARD" | "UNHEARD" | "NOT_SENT"> => {
     const sentAt = deps.now();
-    if (!live.say(text)) return false;
+    if (!live.say(text)) return "NOT_SENT";
     last = "LIVE";
     const onAbort = () => void hushRest(live, sentAt);
     signal.addEventListener("abort", onAbort, { once: true });
     try {
-      // A line never heard keeps its caption time, so the scene never
-      // rushes past unread words.
       while (!live.speaking() && deps.now() - sentAt < LIVE_START_MS) {
-        if (signal.aborted) return true;
+        if (signal.aborted) return "HEARD";
         await deps.wait(POLL_MS, signal);
       }
-      if (!live.speaking()) {
-        await deps.wait(readingMs(text) - (deps.now() - sentAt), signal);
-        return true;
-      }
+      if (!live.speaking()) return signal.aborted ? "HEARD" : "UNHEARD";
       const cap = sentAt + readingMs(text) * 3 + 8_000;
       let lastSound = deps.now();
       while (!signal.aborted && deps.now() < cap) {
@@ -154,21 +153,47 @@ export function createNarrator(deps: NarratorDeps): Narrator {
         else if (deps.now() - lastSound > LIVE_QUIET_MS) break;
         await deps.wait(POLL_MS, signal);
       }
-      return true;
+      return "HEARD";
     } finally {
       signal.removeEventListener("abort", onAbort);
     }
   };
 
-  const speakOne = async (text: string, signal: AbortSignal) => {
-    const live = deps.live();
-    if (live !== null && (await speakLive(live, text, signal))) return;
-    if (signal.aborted) return;
+  const speakStandard = async (text: string, signal: AbortSignal) => {
     const started = deps.now();
     last = "TTS";
     if (await deps.tts(text, signal)) return;
+    // No audio at all: the caption keeps its reading time, so the scene
+    // never rushes past unread words.
     last = "CAPTION";
     await deps.wait(readingMs(text) - (deps.now() - started), signal);
+  };
+
+  const speakOne = async (text: string, signal: AbortSignal) => {
+    const live = unheard >= UNHEARD_LIMIT ? null : deps.live();
+    if (live !== null) {
+      const outcome = await speakLive(live, text, signal);
+      if (outcome === "HEARD") {
+        unheard = 0;
+        return;
+      }
+      if (outcome === "UNHEARD") {
+        // A line that reports open but plays nothing (seen 15 Oct: media
+        // never connected): this line in the standard voice, with the live
+        // output silenced so a late start cannot talk over it.
+        unheard += 1;
+        if (signal.aborted) return;
+        live.hush(true);
+        try {
+          await speakStandard(text, signal);
+        } finally {
+          live.hush(false);
+        }
+        return;
+      }
+    }
+    if (signal.aborted) return;
+    await speakStandard(text, signal);
   };
 
   return {
@@ -214,6 +239,40 @@ function speechMuted(): boolean {
   }
 }
 
+const speechCache = new Map<string, Promise<Blob | null>>();
+const SPEECH_CACHE_MAX = 32;
+
+function fetchSpeech(text: string, voice: QVoiceChoice): Promise<Blob | null> {
+  return fetch("/api/q-speech", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text, voice }),
+  })
+    .then(async (response) => {
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      return blob.size === 0 ? null : blob;
+    })
+    .catch(() => null);
+}
+
+/**
+ * Synthesise a coming line ahead of time (production 15 Oct: 2-7.5 s per
+ * line at the voice gateway), so it plays as soon as its turn comes. Only
+ * lines the tour is about to say, in the same request a play would make.
+ */
+export function prefetchStandardVoice(text: string, voice: QVoiceChoice): void {
+  if (!voiceOn || speechMuted()) return;
+  const key = `${voice}|${text}`;
+  if (speechCache.has(key)) return;
+  speechCache.set(key, fetchSpeech(text, voice));
+  while (speechCache.size > SPEECH_CACHE_MAX) {
+    const oldest = speechCache.keys().next().value;
+    if (oldest === undefined) break;
+    speechCache.delete(oldest);
+  }
+}
+
 /**
  * Q's standard voice for one line, through the existing `/api/q-speech`
  * route (Q API voice gateway and its caps). Honours the person's Q speech
@@ -225,21 +284,20 @@ export async function standardVoiceLine(
   signal: AbortSignal,
 ): Promise<boolean> {
   if (!voiceOn || speechMuted() || signal.aborted) return false;
-  let url: string;
-  try {
-    const response = await fetch("/api/q-speech", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, voice }),
-      signal,
-    });
-    if (!response.ok) return false;
-    const blob = await response.blob();
-    if (blob.size === 0) return false;
-    url = URL.createObjectURL(blob);
-  } catch {
-    return signal.aborted;
-  }
+  const key = `${voice}|${text}`;
+  const pending = speechCache.get(key) ?? fetchSpeech(text, voice);
+  speechCache.delete(key);
+  const blob = await Promise.race([
+    pending,
+    new Promise<"aborted">((resolve) => {
+      signal.addEventListener("abort", () => resolve("aborted"), {
+        once: true,
+      });
+    }),
+  ]);
+  if (blob === "aborted") return true;
+  if (blob === null) return false;
+  const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
   standardPlaying += 1;
   try {

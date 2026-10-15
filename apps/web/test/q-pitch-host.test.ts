@@ -271,6 +271,18 @@ describe("the voiced narrator (Q's own voice; captions stay)", () => {
     expect(h.hush).toEqual([]);
   });
 
+  it("a live line that plays nothing: the standard voice reads it, and after two misses the live line is no longer used", async () => {
+    const h = voiced({ live: true, speakingAt: () => false });
+    const signal = new AbortController().signal;
+    await h.narrator.speak([LINE("One.")], signal);
+    expect(h.tts).toEqual(["One."]);
+    expect(h.hush).toEqual([true, false]);
+    await h.narrator.speak([LINE("Two.")], signal);
+    await h.narrator.speak([LINE("Three.")], signal);
+    expect(h.said).toEqual(["One.", "Two."]);
+    expect(h.tts).toEqual(["One.", "Two.", "Three."]);
+  });
+
   it("speaks nothing once aborted", async () => {
     const controller = new AbortController();
     controller.abort();

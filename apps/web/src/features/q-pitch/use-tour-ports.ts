@@ -35,10 +35,12 @@ import {
   abortableWait,
   createNarrator,
   narrationVoiceOn,
+  prefetchStandardVoice,
   standardVoiceLine,
   type Narrator,
 } from "./narrator";
 import { rehearsalPorts } from "./rehearsal-ports";
+import { TOUR_BRIEF } from "./tour-voice";
 
 /**
  * The tour's ports onto the real app (blueprint §5 "No per-click LLM
@@ -126,6 +128,8 @@ export type TranscriptSink = {
  * It reads the session at speaking time, never during render.
  */
 function sessionNarrator(current: () => QSessionValue | null): Narrator {
+  // A live line that comes up mid-tour is briefed once, on first use.
+  let briefed = false;
   return createNarrator({
     live: () => {
       const voice = current()?.voice;
@@ -138,8 +142,10 @@ function sessionNarrator(current: () => QSessionValue | null): Narrator {
         !isLineLive(client) ||
         client.narrate === undefined
       ) {
+        briefed = false;
         return null;
       }
+      if (!briefed) briefed = client.brief?.(TOUR_BRIEF) ?? false;
       return {
         say: (text) => client.narrate?.(text) ?? false,
         speaking: () => current()?.voice.client.state === "Q_SPEAKING",
@@ -405,10 +411,28 @@ export function useTourPorts(
       }
     };
 
+    // The coming lines in Q's standard voice, unless the live line speaks
+    // them (it needs no synthesis ahead).
+    const prefetchLines = (scenes: readonly SceneScript[]) => {
+      const voice = qRef.current?.voice;
+      const live =
+        voice !== undefined &&
+        voice.active &&
+        isLineLive(voice.client) &&
+        voice.client.narrate !== undefined;
+      if (live) return;
+      for (const scene of scenes) {
+        for (const line of scene.lines) {
+          prefetchStandardVoice(line.text, voice?.voice ?? "FEMALE");
+        }
+      }
+    };
+
     const prepare: TourPorts["prepare"] = (
       scene: SceneScript,
       actor: TourActor,
     ) => {
+      prefetchLines([scene]);
       const resolved = fixtureKeysOf(scene.actions).map((key) =>
         companyOf(key),
       );
@@ -439,6 +463,7 @@ export function useTourPorts(
     return {
       prepare,
       prefetch: (scenes) => {
+        prefetchLines(scenes);
         for (const scene of scenes) {
           for (const action of scene.actions) {
             const path =
