@@ -191,8 +191,8 @@ try {
         .waitFor({ timeout: 45000 });
       await closeBriefing();
       const nav = page.getByRole("navigation", {
-        name: "Relationship Hub",
-        exact: true,
+        // The Hub's strip is named CRM since 2026-10-15; older revisions say Relationship Hub.
+        name: /^(?:CRM|Relationship Hub)$/u,
       });
       await nav.getByRole("link", { name: "Pipeline", exact: true }).click();
       await page

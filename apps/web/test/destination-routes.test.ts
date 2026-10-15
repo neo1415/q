@@ -73,6 +73,7 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/admin": "platform operators only",
   "/find": "old address, redirects to /search",
   "/gateway": "old address, redirects to /gateq",
+  "/crm": "the CRM's alias, redirects to /relationships (Q's RELATIONSHIPS)",
   "/discover/yours": "old address, redirects to /discover?tab=yours",
   "/settings/reconnect/google": "a hand-off from Google, not a page to visit",
   "/join": "an invitation link",
