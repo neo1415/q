@@ -186,6 +186,7 @@ export {
   DisclosureLineageSchema,
   projectSelectedDisclosure,
   disclosureLineageFromContext,
+  APPLICANT_TEXT_LINEAGE,
   type DisclosureDocumentIdentity,
   type DisclosureLineage,
 } from "./application/disclosure-projection.js";

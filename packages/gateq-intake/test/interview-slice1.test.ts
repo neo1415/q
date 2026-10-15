@@ -35,6 +35,7 @@ import {
 } from "../src/contracts/index.js";
 import { createConversationService } from "../src/application/conversation-service.js";
 import { coverageFor } from "../src/application/coverage.js";
+import { APPLICANT_TEXT_LINEAGE } from "../src/application/disclosure-projection.js";
 import {
   CONTACT_CODE_MAX_ATTEMPTS,
   createIntakeService,
@@ -245,8 +246,13 @@ function world(
         turnId: input.clientTurnId,
         outcome: prior?.outcome ?? null,
       });
+      // As the Postgres repository: the applicant's words are text-only.
       if (input.recordPerson !== false)
-        await turns.append({ ...input, role: "PERSON" });
+        await turns.append({
+          ...input,
+          role: "PERSON",
+          disclosureLineage: APPLICANT_TEXT_LINEAGE,
+        });
       return id;
     },
     readOutcome: (applicationId: string) =>
@@ -309,6 +315,7 @@ function world(
         askingDimension?: StoredTurn["askingDimension"] | null | undefined;
         intent?: string | null | undefined;
         latencyMs?: number | null | undefined;
+        disclosureLineage?: StoredTurn["disclosureLineage"];
       }) =>
         transactions.run(async (tx) => {
           await lockRow(tx, input.applicationId);
@@ -339,6 +346,9 @@ function world(
             intent: input.intent ?? null,
             latencyMs: input.latencyMs ?? null,
             createdAt: now.toISOString(),
+            ...(input.disclosureLineage === undefined
+              ? {}
+              : { disclosureLineage: input.disclosureLineage }),
           });
           return { seq };
         }),
@@ -545,6 +555,9 @@ function world(
             recordedAt: input.at,
             supersededAt: null,
             sourceTurnSeq: input.sourceTurnSeq ?? null,
+            ...(input.disclosureLineage === undefined
+              ? {}
+              : { disclosureLineage: input.disclosureLineage }),
           };
           factRows.push(row);
           written.push(row);
@@ -840,6 +853,60 @@ describe("the interview transcript", () => {
       [1, "PERSON", "We build payment rails."],
       [2, "Q", "Who pays you?"],
     ]);
+  });
+
+  it("stamps every turn and fact with the lineage of what the model was shown", async () => {
+    const w = world();
+    const { token } = await w.start();
+    w.script.push({
+      reply: "Who pays you?",
+      asking: "company.customers",
+      facts: [
+        fact("company.description", { kind: "TEXT", text: "Payment rails" }),
+      ],
+    });
+    await w.conversation.turn({
+      token,
+      message: "We build payment rails.",
+      clientTurnId: "turn-000001",
+      correlationId: "c1",
+    });
+    const [person, q] = w.turnRows;
+    expect(person?.disclosureLineage).toEqual(APPLICANT_TEXT_LINEAGE);
+    // Q's reply depends on the utterance it answered; no document was shown.
+    expect(q?.disclosureLineage).toEqual({
+      state: "COMPLETE",
+      documents: [],
+      turnSeqs: [1],
+    });
+    const recorded = w.factRows.find(
+      (f) => f.dimension === "company.description",
+    );
+    expect(recorded?.sourceTurnSeq).toBe(1);
+    expect(recorded?.disclosureLineage).toEqual(q?.disclosureLineage);
+  });
+
+  it("stamps UNKNOWN, never text-only, when any context lacks recorded lineage", async () => {
+    const w = world();
+    const { token } = await w.start();
+    // A fact from before lineage existed is in the model's context.
+    await w.intake.recordFacts({
+      token,
+      facts: [fact("company.stage", { kind: "CODE", code: "seed" })],
+    });
+    w.script.push({
+      reply: "Tell me about customers.",
+      asking: "company.customers",
+    });
+    await w.conversation.turn({
+      token,
+      message: "Hello",
+      clientTurnId: "turn-000002",
+      correlationId: "c2",
+    });
+    expect(w.turnRows.find((t) => t.role === "Q")?.disclosureLineage).toEqual({
+      state: "UNKNOWN",
+    });
   });
 
   it("returns the stored reply on a retry, without a second model call or row", async () => {

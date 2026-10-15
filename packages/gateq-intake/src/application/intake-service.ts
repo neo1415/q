@@ -50,6 +50,7 @@ import { buildDossier } from "./dossier.js";
 import {
   projectSelectedDisclosure,
   type DisclosureDocumentIdentity,
+  type DisclosureLineage,
 } from "./disclosure-projection.js";
 import type {
   ApplicationContactRepository,
@@ -82,6 +83,11 @@ import type {
  */
 
 export type IntakeDependencies = {
+  /**
+   * Send answered facts' source ids in the applicant's coverage. Off until
+   * every web replica parses the optional fields (strict schemas).
+   */
+  readonly coverageSources?: boolean | undefined;
   readonly applications: ApplicationRepository;
   readonly sessions: ApplicationSessionRepository;
   readonly facts: ApplicationFactRepository;
@@ -222,6 +228,12 @@ export type IntakeService = {
     readonly token: string;
     readonly facts: readonly NewApplicationFact[];
     readonly sourceTurnSeq?: number | undefined;
+    /**
+     * What these facts were derived from, stamped by the server. Omitted
+     * means unknown (stored null), which a document-aware Submit withholds:
+     * a caller must never claim text-only it cannot prove.
+     */
+    readonly disclosureLineage?: DisclosureLineage | undefined;
   }) => Promise<ApplicationView>;
   readonly attachDocument: (input: {
     readonly token: string;
@@ -270,6 +282,8 @@ export type IntakeService = {
     readonly facts: readonly NewApplicationFact[];
     readonly sourceTurnSeq?: number | undefined;
     readonly latencyMs?: number | undefined;
+    /** The model context this reply and its facts were produced from. */
+    readonly disclosureLineage?: DisclosureLineage | undefined;
   }) => Promise<void>;
 };
 
@@ -463,6 +477,7 @@ export function createIntakeService(
             facts: proposed,
             at: clock().toISOString(),
             sourceTurnSeq: input.sourceTurnSeq,
+            disclosureLineage: input.disclosureLineage,
           });
           const name = proposed.find(
             (fact) => fact.dimension === "company.name",
@@ -483,6 +498,7 @@ export function createIntakeService(
           askingDimension: input.asking,
           intent: input.intent,
           latencyMs: input.latencyMs,
+          disclosureLineage: input.disclosureLineage,
         });
         await turns.finishExchange(tx, application.id, input.claimId);
       });
@@ -579,6 +595,7 @@ export function createIntakeService(
           facts: proposed,
           at,
           sourceTurnSeq: input.sourceTurnSeq,
+          disclosureLineage: input.disclosureLineage,
         });
         const name = proposed.find((fact) => fact.dimension === "company.name");
         if (name !== undefined && name.value.kind === "TEXT") {
@@ -989,7 +1006,12 @@ export function createIntakeService(
       const current = await facts.currentFor(application.id);
       const standing = await contactStanding(application);
       return ApplicationCoverageDtoSchema.parse({
-        coverage: coverageFor({ policy, qualification, facts: current }),
+        coverage: coverageFor({
+          policy,
+          qualification,
+          facts: current,
+          includeSources: dependencies.coverageSources === true,
+        }),
         contact: {
           required: standing.required,
           confirmed: standing.confirmed,

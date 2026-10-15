@@ -8,6 +8,16 @@ import {
 export { DisclosureDocumentIdentitySchema, DisclosureLineageSchema };
 export type { DisclosureDocumentIdentity, DisclosureLineage };
 
+/**
+ * The applicant's own words or form answers: they depend on no document and
+ * no earlier turn. Stamp only where that is provably true.
+ */
+export const APPLICANT_TEXT_LINEAGE: DisclosureLineage = {
+  state: "COMPLETE",
+  documents: [],
+  turnSeqs: [],
+};
+
 const identityKey = (document: DisclosureDocumentIdentity): string =>
   `${document.documentId}:${document.versionId}:${document.sha256}`;
 

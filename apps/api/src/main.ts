@@ -729,6 +729,8 @@ const gateqApply =
           transactions: database.transactions,
         });
         const intake = createIntakeService({
+          // C2 two-phase rollout: enable after the web release that parses it.
+          coverageSources: process.env["CQ_GATEQ_COVERAGE_SOURCES"] === "1",
           applications: createPostgresApplicationRepository({
             sql: database.sql,
           }),

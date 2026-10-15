@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { DisclosureLineageSchema } from "../contracts/disclosure-lineage.js";
+import { APPLICANT_TEXT_LINEAGE } from "../application/disclosure-projection.js";
 
 import {
   decodeJsonbString,
@@ -548,22 +549,28 @@ export function createPostgresApplicationTurnRepository(options: {
           throw new IntakeRefusedError("TOO_MANY_REQUESTS");
         const claimId = randomUUID();
         await tx.sql`update gateq.applications set interview_claim_id = ${claimId}, interview_claim_turn_id = ${input.clientTurnId}, interview_claim_expires_at = clock_timestamp() + interval '5 minutes' where id = ${input.applicationId}`;
+        // The applicant's own words depend on no document or earlier
+        // turn: what they choose to say is theirs to disclose.
         if (input.recordPerson !== false)
-          await appendInTransaction(tx, { ...input, role: "PERSON" });
+          await appendInTransaction(tx, {
+            ...input,
+            role: "PERSON",
+            disclosureLineage: APPLICANT_TEXT_LINEAGE,
+          });
         return claimId;
       }),
     listFor: async (applicationId, limit) => {
       const rows =
         limit === undefined
           ? await sql`
-              select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at
+              select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
                 from gateq.application_turns
                where application_id = ${applicationId}
                order by seq asc
                limit 400`
           : await sql`
               select * from (
-                select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at
+                select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
                   from gateq.application_turns
                  where application_id = ${applicationId}
                  order by seq desc
@@ -574,7 +581,7 @@ export function createPostgresApplicationTurnRepository(options: {
 
     findExchange: async (applicationId, clientTurnId) => {
       const rows = await sql`
-        select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at
+        select seq, role, text, client_turn_id, asking_dimension, intent, latency_ms, created_at, disclosure_lineage
           from gateq.application_turns
          where application_id = ${applicationId}
            and client_turn_id = ${clientTurnId}`;
