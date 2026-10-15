@@ -1,6 +1,7 @@
 "use client";
 
 import type { ApplicationCoverageDto } from "@capital-q/contracts";
+import { ChevronDown } from "@capital-q/ui/icons";
 
 import { coveragePanelModel } from "./coverage-panel-model";
 
@@ -129,9 +130,14 @@ export function CoveragePanel({
       data-coverage-panel
     >
       {/* Phones and tablets: folded under the conversation, one tap away. */}
-      <details className="lg:hidden">
-        <summary className="cq-title-sm flex min-h-11 cursor-pointer items-center text-(--cq-text-primary)">
+      <details className="group lg:hidden">
+        <summary className="cq-title-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-(--cq-text-primary) [&::-webkit-details-marker]:hidden">
           What we have, what&apos;s still needed
+          <ChevronDown
+            size={18}
+            aria-hidden="true"
+            className="shrink-0 transition-transform duration-(--cq-motion-fast) group-open:rotate-180 motion-reduce:transition-none"
+          />
         </summary>
         <div className="pt-2">{content}</div>
       </details>
