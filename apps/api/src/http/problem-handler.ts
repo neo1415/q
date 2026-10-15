@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   createProblemDetails,
+  GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
+  GATEQ_SUBMIT_NOT_READY_DETAIL,
   PROBLEM_CONTENT_TYPE,
   problemFromUnknownError,
   type ProblemDetails,
@@ -287,7 +289,20 @@ function toProblem(
     return createProblemDetails({
       code: "RESOURCE_CONFLICT",
       requestId,
-      detail: "Confirm your contact email before submitting.",
+      detail: GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
+    });
+  }
+  // Submit with a required answer still missing. Only the submit route lets
+  // this refusal through (every other route keeps it a 404), and only after
+  // the credential verified: the applicant answers and submits again.
+  if (
+    error instanceof IntakeRefusedError &&
+    error.refusal === "NOT_READY_TO_SUBMIT"
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: GATEQ_SUBMIT_NOT_READY_DETAIL,
     });
   }
 

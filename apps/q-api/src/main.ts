@@ -292,6 +292,7 @@ import {
   QApprovalIdSchema,
   QRunIdSchema,
   qRehearsalVideoBridgeBasePath,
+  qRehearsalVideoEventsBasePath,
   createEventRegistry,
   type ModelDataPosture,
   type QViewingMoment,
@@ -6049,6 +6050,7 @@ const rehearsalVideo = createRehearsalVideoService({
         }),
   publicBaseUrl: process.env.Q_API_PUBLIC_URL?.trim() || null,
   bridgePath: qRehearsalVideoBridgeBasePath,
+  eventsPath: qRehearsalVideoEventsBasePath,
   enabledInterviewers: enabledInterviewersFrom(
     process.env.CQ_REHEARSAL_VIDEO_INTERVIEWERS,
   ),

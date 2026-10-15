@@ -9,6 +9,7 @@ import {
   EndRehearsalVideoResponseSchema,
   PROBLEM_CONTENT_TYPE,
   Q_REHEARSAL_VIDEO_BRIDGE_BASE_PATH,
+  Q_REHEARSAL_VIDEO_EVENTS_BASE_PATH,
   Q_REHEARSAL_VIDEO_END_PATH,
   Q_REHEARSAL_VIDEO_INTERVIEWERS_PATH,
   Q_REHEARSAL_VIDEO_PATH,
@@ -53,6 +54,20 @@ const RehearsalParamsSchema = z
 const BridgeParamsSchema = z
   .object({ videoSessionId: z.string().uuid() })
   .strict();
+
+const EventParamsSchema = z
+  .object({
+    videoSessionId: z.string().uuid(),
+    token: z.string().min(32).max(128),
+  })
+  .strict();
+/** The provider's callback: only these fields are read. */
+const EventBodySchema = z
+  .object({
+    event_type: z.string().max(80),
+    conversation_id: z.string().max(128).optional(),
+  })
+  .passthrough();
 
 /** What the provider sends; anything beyond messages is ignored. */
 const BridgeBodySchema = z
@@ -246,6 +261,30 @@ export function registerRehearsalVideoRoutes(
             "Q couldn't finish the review just now. Try again in a moment.",
           );
       }
+    },
+  );
+
+  // The provider's room events. No actor hook: the path secret is the
+  // session's own, and an unknown one is the same 404 as any unknown route.
+  app.post(
+    `${Q_REHEARSAL_VIDEO_EVENTS_BASE_PATH}/:token`,
+    { bodyLimit: 64_000 },
+    async (request, reply) => {
+      const params = EventParamsSchema.safeParse(request.params);
+      const body = EventBodySchema.safeParse(request.body);
+      if (!params.success)
+        return problem(request, reply, "RESOURCE_NOT_FOUND", "Not found.");
+      if (!body.success)
+        return problem(request, reply, "INVALID_REQUEST", "Invalid request.");
+      const result = await video.providerEvent({
+        sessionId: params.data.videoSessionId,
+        token: params.data.token,
+        eventType: body.data.event_type,
+        conversationId: body.data.conversation_id ?? null,
+      });
+      if (result === "UNKNOWN_SESSION")
+        return problem(request, reply, "RESOURCE_NOT_FOUND", "Not found.");
+      return reply.status(204).header("Cache-Control", "no-store").send();
     },
   );
 

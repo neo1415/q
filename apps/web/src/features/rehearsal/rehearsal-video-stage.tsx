@@ -39,6 +39,8 @@ export function RehearsalVideoStage({
       }
       tileLabel={`Video rehearsal with ${name} (AI interviewer)`}
       endsAt={session.endsAt}
+      // Held at the full three minutes until the interviewer joins.
+      clockStarted={session.liveAt !== null}
       maxSeconds={session.maxSeconds}
       endLabel="End and see my review"
       fallbackLabel="Carry on by voice instead"

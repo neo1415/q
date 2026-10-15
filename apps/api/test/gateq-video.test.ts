@@ -24,6 +24,7 @@ const SESSION = {
   status: "LIVE" as const,
   joinUrl: "https://tavus.daily.co/c1?t=x",
   endsAt: "2026-10-15T09:03:00.000Z",
+  liveAt: "2026-10-15T09:00:00.000Z",
   maxSeconds: 180,
   endedReason: null,
 };
@@ -65,6 +66,13 @@ function build(overrides: Partial<GateqVideoInterview> = {}) {
           : { kind: "UNKNOWN_SESSION" as const },
       ),
     ),
+    providerEvent: vi.fn((input: { token: string }) =>
+      Promise.resolve(
+        input.token === "e".repeat(43)
+          ? { kind: "ACCEPTED" as const, liveAt: SESSION.liveAt }
+          : { kind: "UNKNOWN_SESSION" as const },
+      ),
+    ),
     sweep: vi.fn(),
     ...overrides,
   };
@@ -75,6 +83,56 @@ function build(overrides: Partial<GateqVideoInterview> = {}) {
 }
 
 const auth = (token: string) => ({ authorization: `Bearer ${token}` });
+
+describe("the provider's room events", () => {
+  it("passes the joined event with the path secret, and answers 204", async () => {
+    const { app, video } = build();
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/gateq/video/events/${"e".repeat(43)}`,
+      payload: {
+        event_type: "system.replica_joined",
+        conversation_id: "c1",
+        message_type: "system",
+        properties: { replica_id: "r1" },
+      },
+    });
+    expect(response.statusCode).toBe(204);
+    expect(video.providerEvent).toHaveBeenCalledWith({
+      token: "e".repeat(43),
+      eventType: "system.replica_joined",
+      conversationId: "c1",
+    });
+  });
+
+  it("an unknown secret is a 404 and a body without an event is a 422", async () => {
+    const { app } = build();
+    const unknown = await app.inject({
+      method: "POST",
+      url: `/v1/gateq/video/events/${"x".repeat(43)}`,
+      payload: { event_type: "system.replica_joined" },
+    });
+    expect(unknown.statusCode).toBe(404);
+    const malformed = await app.inject({
+      method: "POST",
+      url: `/v1/gateq/video/events/${"e".repeat(43)}`,
+      payload: { nothing: true },
+    });
+    expect([400, 422]).toContain(malformed.statusCode);
+  });
+
+  it("reports when the applicant's time began", async () => {
+    const { app } = build();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/gateq/apply/video",
+      headers: auth(TOKEN),
+    });
+    expect(
+      response.json<{ session: { liveAt: string | null } }>().session.liveAt,
+    ).toBe(SESSION.liveAt);
+  });
+});
 
 describe("the GateQ video interview routes", () => {
   it("reads the applicant's own session, with the AI disclosure", async () => {

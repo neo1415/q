@@ -84,8 +84,8 @@ import type {
 
 export type IntakeDependencies = {
   /**
-   * Send answered facts' source ids in the applicant's coverage. Off until
-   * every web replica parses the optional fields (strict schemas).
+   * Send answered facts' source ids (fact id, transcript turn seq) in the
+   * applicant's coverage. The API composition turns it on by default.
    */
   readonly coverageSources?: boolean | undefined;
   readonly applications: ApplicationRepository;

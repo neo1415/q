@@ -21,6 +21,8 @@ import { CoveragePanel } from "./coverage-panel";
 export type GateqVideoSession = {
   readonly joinUrl: string | null;
   readonly endsAt: string;
+  /** Null while Q is still joining; absent from an older server. */
+  readonly liveAt?: string | null | undefined;
   readonly maxSeconds: number;
   readonly disclosure: string;
 };
@@ -48,6 +50,7 @@ export function GateqVideoRoom({
       participantName={participantName}
       tileLabel={`Video interview for ${fund} (Q, an AI interviewer)`}
       endsAt={session.endsAt}
+      clockStarted={session.liveAt !== null}
       maxSeconds={session.maxSeconds}
       endLabel="End and review my application"
       fallbackLabel="Continue by typing instead"
