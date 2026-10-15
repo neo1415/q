@@ -106,6 +106,17 @@ export type ExpressInterestDependencies = NetworkServiceDependencies & {
       actor: ActorContext,
       companyId: CompanyId,
     ) => Promise<boolean>;
+    /**
+     * S5 (lane S): the same rule for many companies in one evaluation; the
+     * ids it returns are exactly those isVisibleToInvestor would allow.
+     * Optional: lists fall back to one check per company.
+     */
+    readonly visibleToInvestorAmong?:
+      | ((
+          actor: ActorContext,
+          companyIds: readonly CompanyId[],
+        ) => Promise<ReadonlySet<string>>)
+      | undefined;
   };
   readonly interests: InterestRepository;
   readonly interestRequests: InterestRequestStore;

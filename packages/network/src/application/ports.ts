@@ -150,6 +150,15 @@ export type RelationshipEventRepository = {
       readonly limit: number;
     },
   ) => Promise<readonly RelationshipEvent[]>;
+  /**
+   * S5 (lane S): the first `limit` events of each relationship, in order,
+   * in one read. Optional: callers fall back to listByRelationship.
+   */
+  readonly listFirstByRelationships?: (
+    executor: DatabaseExecutor,
+    relationshipIds: readonly RelationshipId[],
+    limit: number,
+  ) => Promise<readonly RelationshipEvent[]>;
 };
 
 /**
