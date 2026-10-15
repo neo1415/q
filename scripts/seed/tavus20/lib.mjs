@@ -30,7 +30,10 @@ export const DATASET = process.env.CQ_SEED_DATASET
   ? join(ROOT, process.env.CQ_SEED_DATASET)
   : join(ROOT, "docs/seed/tavus-20");
 export const SEED_PREFIX = process.env.CQ_SEED_PREFIX ?? "tavus20";
-export const STATE_FILE = join(DATASET, "seed-state.json");
+// Parallel runs keep separate state files (no lost writes between processes).
+export const STATE_FILE = process.env.CQ_SEED_STATE
+  ? join(DATASET, process.env.CQ_SEED_STATE)
+  : join(DATASET, "seed-state.json");
 export const FINDINGS_FILE = join(DATASET, "SEED-FINDINGS.md");
 
 let cached = null;

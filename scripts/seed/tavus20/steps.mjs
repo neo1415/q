@@ -227,7 +227,7 @@ async function onboardingForm(page, c) {
         await revenue.check();
         const n = payingCustomers(c);
         const box = page.getByRole("textbox", { name: "Paying customers" });
-        if (n !== null && (await box.isVisible().catch(() => false)))
+        if (n !== null && (await box.isEditable().catch(() => false)))
           await box.fill(String(n));
         else
           await page
@@ -242,6 +242,32 @@ async function onboardingForm(page, c) {
           })
           .check();
       }
+      await page.waitForTimeout(800);
+      const pilots = page.getByRole("textbox", {
+        name: "How many pilots or design partners?",
+      });
+      if (c.pilots && (await pilots.isVisible().catch(() => false)))
+        await pilots.fill(String(c.pilots));
+      // v4+: optional financials. What the dataset does not state is marked
+      // "Not sure / not tracked" (unknown, never 0).
+      const marked = await page.evaluate(() => {
+        let n = 0;
+        for (const label of document.querySelectorAll("main form label")) {
+          const box = label.querySelector("input[type=checkbox]");
+          if (!box || box.checked || !/Not sure/.test(label.textContent ?? ""))
+            continue;
+          const field = label.parentElement;
+          const answered = [
+            ...(field?.querySelectorAll("input:not([type=checkbox])") ?? []),
+          ].some((x) => (x.type === "radio" ? x.checked : x.value !== ""));
+          if (!answered) {
+            box.click();
+            n += 1;
+          }
+        }
+        return n;
+      });
+      log(c, `traction: ${marked} optional answers left unknown`);
       await page.waitForTimeout(800);
       await clickContinue(page);
     } else if (/raising now/.test(head)) {
@@ -319,7 +345,7 @@ async function onboardingForm(page, c) {
 /** Last count of the customer-like KPI, or null when the data has none. */
 function payingCustomers(c) {
   const re =
-    /customer|business|client|agenc|bank|corporate|school|site|distributor|hospital|trust|grower|partner|pharmac|railroad|yard|member/;
+    /customer|business|client|agenc|bank|corporate|school|site|distributor|hospital|trust|grower|partner|pharmac|railroad|yard|member|importer|shipper|producer|smes|agents|installer|warung|shops|clinic|subs|famil|contractor|programme/;
   const kpi = c.metrics.kpis.find((k) => k.unit === "count" && re.test(k.code));
   const last = c.metrics.points.at(-1)?.values ?? {};
   return kpi && Number.isFinite(last[kpi.code])
@@ -367,6 +393,26 @@ export async function stepOnboarding(page, c) {
   });
   mark(c, { founderUserId: acct.id });
   if (isDone(c, "onboarding")) return;
+  // A journey completed by an earlier, interrupted run is recorded, not redone.
+  {
+    const t = await lib.accessToken(email);
+    const cur = await lib.call(
+      lib.API,
+      t,
+      "GET",
+      "/v1/onboarding/sessions/current?journeyType=founder",
+    );
+    const sub = cur.body?.session?.subject;
+    if (cur.body?.session?.status === "COMPLETED" && sub?.type === "COMPANY") {
+      const org = await lib.sql(
+        `select organisation_id from core.companies where id='${sub.id}'`,
+      );
+      mark(c, { companyId: sub.id, organisationId: org[0]?.organisation_id });
+      done(c, "onboarding");
+      log(c, "onboarding already complete", sub.id);
+      return;
+    }
+  }
   await login(page, email, "/home");
   if (page.url().includes("/welcome")) await ui.welcomeAsFounder(page);
   // A resumed journey lands in live voice (?talk=1); open the form instead.
@@ -547,17 +593,24 @@ export async function stepProfile(page, c) {
 
 export async function stepCapital(page, c) {
   if (isDone(c, "capital")) return;
-  const { s } = stateOf(c);
   const email = lib.emailFor(c.founderPerson.name, c.company);
-  await login(page, email, "/capital");
-  await page.goto(`${lib.WEB}/capital`, { waitUntil: "domcontentloaded" });
+  // Onboarding already saved the capital objective. A round and its terms are
+  // added only when the dataset states them: the round form has no "not
+  // stated" instrument, so an unknown instrument never opens one (V-F3).
+  if (!c.capital.instrument) {
+    log(c, "capital: objective from onboarding only (terms unknown)");
+    return done(c, "capital");
+  }
+  await login(page, email, "/capital?tab=raise");
+  await page.goto(`${lib.WEB}/capital?tab=raise`, {
+    waitUntil: "domcontentloaded",
+  });
   await page.waitForTimeout(7000);
-  const open = page.getByRole("button", { name: "Open a round" }).first();
-  const none = page.getByRole("heading", { name: "No round open" });
-  if (await none.isVisible().catch(() => false)) {
-    await open.click();
+  const add = page.getByRole("button", { name: "Add a round" });
+  if (await add.isVisible().catch(() => false)) {
+    await add.click();
     await page.waitForTimeout(1500);
-    const f = page.getByRole("form", { name: "Open a round" });
+    const f = page.getByRole("form", { name: "Add a round" });
     await f
       .getByRole("textbox", { name: "Name" })
       .fill(c.roundName ?? plan.STAGE_LABEL[c.currentStageCode]);
@@ -568,42 +621,56 @@ export async function stepCapital(page, c) {
     await f
       .getByRole("textbox", { name: "Target" })
       .fill(String(c.capital.targetRaise.amount));
-    if (c.capital.instrument)
-      await f
-        .getByRole("radio", {
-          name: plan.instrumentOf(c.capital.instrument).round,
-          exact: true,
-        })
-        .check();
+    await f
+      .getByRole("radio", {
+        name: plan.instrumentOf(c.capital.instrument).round,
+        exact: true,
+      })
+      .check();
     await f.getByRole("button", { name: "Open now" }).click();
     await page.waitForTimeout(5000);
   }
-  // F5: close date and use-of-funds detail have no editor.
-  const token = await lib.accessToken(email);
-  const cur = await lib.call(
-    lib.API,
-    token,
-    "GET",
-    `/v1/companies/${s.companyId}/capital-objectives/current`,
-  );
-  if (cur.status === 200 && c.capital.useOfFunds?.length) {
+  // Terms (private to the company): close date, valuation, minimum cheque, use of funds.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(7000);
+  const t = page.getByRole("form", { name: "Raise terms" });
+  const inst = plan.instrumentOf(c.capital.instrument).onboarding;
+  await t
+    .getByRole("combobox", { name: "Instrument" })
+    .selectOption({
+      label: inst === "Priced equity round" ? "Priced equity" : inst,
+    })
+    .catch(() => {});
+  if (c.capital.targetCloseDate)
+    await t
+      .getByRole("textbox", { name: "Target close date" })
+      .fill(c.capital.targetCloseDate);
+  const cap = c.capital.valuationCap ?? c.capital.preMoneyValuation;
+  if (cap) {
+    await t.getByRole("combobox", { name: "Valuation" }).selectOption({
+      label: c.capital.valuationCap ? "Valuation cap" : "Pre-money valuation",
+    });
+    await t
+      .getByRole("textbox", { name: /^Valuation amount/ })
+      .fill(String(cap.amount));
+  }
+  if (c.capital.minimumCheque)
+    await t
+      .getByRole("textbox", { name: /^Minimum cheque/ })
+      .fill(String(c.capital.minimumCheque.amount));
+  if (c.capital.useOfFunds?.length) {
     const fmt = (n) => Number(n).toLocaleString("en-US");
-    const uof = c.capital.useOfFunds
-      .map((u) => `${u.line}: ${u.percent}% (${u.currency} ${fmt(u.amount)})`)
-      .join("; ");
-    const r = await lib.call(
-      lib.API,
-      token,
-      "PATCH",
-      `/v1/companies/${s.companyId}/capital-objectives/${cur.body.id}`,
-      {
-        expectedVersion: cur.body.version,
-        targetCloseDate: c.capital.targetCloseDate,
-        useOfFundsSummary: uof.slice(0, 2000),
-      },
+    await t.getByRole("textbox", { name: "Use of funds" }).fill(
+      c.capital.useOfFunds
+        .map((u) => `${u.line}: ${u.percent}% (${u.currency} ${fmt(u.amount)})`)
+        .join("; ")
+        .slice(0, 2000),
     );
-    log(c, "capital objective", r.status);
-  } else log(c, "no capital objective", cur.status);
+  }
+  await t.getByRole("button", { name: "Save terms" }).click();
+  await page.waitForTimeout(4000);
+  const status = (await page.getByRole("status").allInnerTexts()).join(" ");
+  log(c, "capital: round and terms saved", status.slice(0, 120));
   done(c, "capital");
 }
 
@@ -629,7 +696,9 @@ export async function stepDocuments(page, c) {
   await page.goto(`${lib.WEB}/documents`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(7000);
   // Deck, when onboarding did not take it.
-  const deckTitle = `${c.company} ${(plan.STAGE_LABEL[c.currentStageCode] ?? "Funding").toLowerCase()} deck (Oct 2026)`;
+  const deckTitle =
+    c.deckTitle ??
+    `${c.company} ${(plan.STAGE_LABEL[c.currentStageCode] ?? "Funding").toLowerCase()} deck (Oct 2026)`;
   const deckDoc = (dr0.documents ?? []).find(
     (d) => d.kind && /deck/i.test(d.title),
   );

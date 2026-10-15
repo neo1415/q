@@ -1,5 +1,5 @@
 {
- "activeKey": 1,
+ "activeKey": 3,
  "keys": {
   "key#1": {
    "videos": 13,
@@ -7,8 +7,18 @@
    "refusal": "HTTP 402 {\"message\":\"Payment required\"}"
   },
   "key#2": {
-   "videos": 0,
-   "seconds": 0,
+   "videos": 13,
+   "seconds": 426,
+   "refusal": "HTTP 402 {\"message\":\"Payment required\"}"
+  },
+  "key#3": {
+   "videos": 21,
+   "seconds": 678.8,
+   "refusal": "HTTP 402 {\"message\":\"Payment required\"}"
+  },
+  "key#4": {
+   "videos": 26,
+   "seconds": 843.7,
    "refusal": null
   }
  },
@@ -105,59 +115,424 @@
    "seconds": 33.3
   },
   "fw-souqsheet-v2": {
-   "videoId": "e1063c3cd6",
+   "videoId": "(see gen-fw2 run)",
    "key": "key#2",
-   "replica": "r983d5889432"
+   "replica": "r9d30b0e55ac",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-souqsheet-v2.mp4",
+   "seconds": 44.5
   },
   "nf-103-tunde-cargo": {
    "videoId": "ec54c03dae",
    "key": "key#2",
-   "replica": "r4ba1277e4fb"
+   "replica": "r4ba1277e4fb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-103-tunde-cargo.mp4",
+   "seconds": 32.7
   },
   "nf-102-pesaflow": {
    "videoId": "38918930b0",
    "key": "key#2",
-   "replica": "rcd970fadf46"
+   "replica": "rcd970fadf46",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-102-pesaflow.mp4",
+   "seconds": 34.7
   },
   "nf-108-karoo-grid": {
    "videoId": "e263e89d05",
    "key": "key#2",
-   "replica": "rccbeedfc684"
+   "replica": "rccbeedfc684",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-108-karoo-grid.mp4",
+   "seconds": 32.3
   },
   "nf-122-kisan-ledger": {
    "videoId": "46f100947c",
    "key": "key#2",
-   "replica": "r4dc9377a68e"
+   "replica": "r4dc9377a68e",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-122-kisan-ledger.mp4",
+   "seconds": 31.1
   },
   "nf-132-riyadh-site": {
    "videoId": "c8d05cf94f",
    "key": "key#2",
-   "replica": "rc39f215e8cb"
+   "replica": "rc39f215e8cb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-132-riyadh-site.mp4",
+   "seconds": 32.1
   },
   "nf-109-afya-scan": {
    "videoId": "517da3ff25",
    "key": "key#2",
-   "replica": "r5d40691d88d"
+   "replica": "r5d40691d88d",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-109-afya-scan.mp4",
+   "seconds": 30.9
   },
   "nf-113-umoja-insure": {
    "videoId": "bad9da5372",
    "key": "key#2",
-   "replica": "rccbeedfc684"
+   "replica": "rccbeedfc684",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-113-umoja-insure.mp4",
+   "seconds": 31.8
   },
   "nf-119-brixton-build": {
    "videoId": "50f5df3ef5",
    "key": "key#2",
-   "replica": "rccbeedfc684"
+   "replica": "rccbeedfc684",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-119-brixton-build.mp4",
+   "seconds": 33.5
   },
   "nf-127-hanoi-ev": {
    "videoId": "1293ca9d68",
    "key": "key#2",
-   "replica": "r8495a788aa1"
+   "replica": "r8495a788aa1",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-127-hanoi-ev.mp4",
+   "seconds": 29.5
   },
   "nf-129-sao-paulo-freight": {
    "videoId": "b23a6741f5",
    "key": "key#2",
-   "replica": "r3a715eeff8d"
+   "replica": "r3a715eeff8d",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-129-sao-paulo-freight.mp4",
+   "seconds": 28.8
+  },
+  "nf-106-mavuno-cold": {
+   "videoId": "6f7b412cfc",
+   "key": "key#2",
+   "replica": "r1a0108fbd75",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-106-mavuno-cold.mp4",
+   "seconds": 30.1
+  },
+  "nf-105-dakar-learn": {
+   "videoId": "3ec1b5332a",
+   "key": "key#2",
+   "replica": "rccbeedfc684",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-105-dakar-learn.mp4",
+   "seconds": 34
+  },
+  "nf-121-toronto-credit": {
+   "videoId": "6200d1c204",
+   "key": "key#3",
+   "replica": "r4ba1277e4fb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-121-toronto-credit.mp4",
+   "seconds": 34.9
+  },
+  "nf-115-kivu-coffee": {
+   "videoId": "41b6c46b8a",
+   "key": "key#3",
+   "replica": "rcd970fadf46",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-115-kivu-coffee.mp4",
+   "seconds": 32.4
+  },
+  "nf-116-joburg-fleet": {
+   "videoId": "cac70424a7",
+   "key": "key#3",
+   "replica": "r4ba1277e4fb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-116-joburg-fleet.mp4",
+   "seconds": 36.4
+  },
+  "nf-135-austin-ag": {
+   "videoId": "9bf7a419c8",
+   "key": "key#3",
+   "replica": "rc8992fe8e8e",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-135-austin-ag.mp4",
+   "seconds": 35.3
+  },
+  "nf-110-naija-reels": {
+   "videoId": "09e8da0c35",
+   "key": "key#3",
+   "replica": "r38a383b0173",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-110-naija-reels.mp4",
+   "seconds": 32
+  },
+  "nf-112-sahel-solar": {
+   "videoId": "1ad4a58421",
+   "key": "key#3",
+   "replica": "radb9683b0eb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-112-sahel-solar.mp4",
+   "seconds": 31.7
+  },
+  "nf-101-kilnworks": {
+   "videoId": "ad0fc1d8d0",
+   "key": "key#3",
+   "replica": "r4f5b5ef55c8",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-101-kilnworks.mp4",
+   "seconds": 34.7
+  },
+  "nf-126-manila-nurse": {
+   "videoId": "34f82b519a",
+   "key": "key#3",
+   "replica": "r1ce7f5b22d4",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-126-manila-nurse.mp4",
+   "seconds": 33.6
+  },
+  "nf-123-pune-robotics": {
+   "videoId": "a97ae8c113",
+   "key": "key#3",
+   "replica": "rf8f3aa4b33e",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-123-pune-robotics.mp4",
+   "seconds": 30.3
+  },
+  "nf-128-bogota-shop": {
+   "videoId": "274907656b",
+   "key": "key#3",
+   "replica": "rbb3d627a705",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-128-bogota-shop.mp4",
+   "seconds": 29.1
+  },
+  "nf-120-paris-care": {
+   "videoId": "f98160efe5",
+   "key": "key#3",
+   "replica": "radb9683b0eb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-120-paris-care.mp4",
+   "seconds": 31.6
+  },
+  "nf-118-hairline": {
+   "videoId": "3611411106",
+   "key": "key#3",
+   "replica": "r1a0108fbd75",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-118-hairline.mp4",
+   "seconds": 30.8
+  },
+  "nf-125-jakarta-stock": {
+   "videoId": "4d20f7758c",
+   "key": "key#3",
+   "replica": "r31e11adf1d3",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-125-jakarta-stock.mp4",
+   "seconds": 31.2
+  },
+  "nf-133-cairo-tutor": {
+   "videoId": "ee32e3b746",
+   "key": "key#3",
+   "replica": "r983d5889432",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-133-cairo-tutor.mp4",
+   "seconds": 32.3
+  },
+  "nf-131-cdmx-health": {
+   "videoId": "29cf53242f",
+   "key": "key#3",
+   "replica": "rc8992fe8e8e",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-131-cdmx-health.mp4",
+   "seconds": 34.3
+  },
+  "nf-134-berlin-heat": {
+   "videoId": "3a0be184ab",
+   "key": "key#3",
+   "replica": "rff4f230c435",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-134-berlin-heat.mp4",
+   "seconds": 30.1
+  },
+  "nf-107-ledgerkid": {
+   "videoId": "92f74f96df",
+   "key": "key#3",
+   "replica": "red9211eea81",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-107-ledgerkid.mp4",
+   "seconds": 30.3
+  },
+  "nf-104-shamba-sense": {
+   "videoId": "ef28e5d205",
+   "key": "key#3",
+   "replica": "r38a383b0173",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-104-shamba-sense.mp4",
+   "seconds": 31.8
+  },
+  "nf-124-ashaa-care": {
+   "videoId": "d312e68a58",
+   "key": "key#3",
+   "replica": "rf0a4c22b435",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-124-ashaa-care.mp4",
+   "seconds": 32.1
+  },
+  "nf-114-lagos-legal": {
+   "videoId": "231e90cda6",
+   "key": "key#3",
+   "replica": "r4f5b5ef55c8",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-114-lagos-legal.mp4",
+   "seconds": 31.1
+  },
+  "nf-111-accra-health": {
+   "videoId": "61942667ab",
+   "key": "key#3",
+   "replica": "r4ba1277e4fb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-111-accra-health.mp4",
+   "seconds": 32.8
+  },
+  "nf-117-addis-pharma": {
+   "videoId": "8ccd6e9894",
+   "key": "key#4",
+   "replica": "red9211eea81",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-117-addis-pharma.mp4",
+   "seconds": 32
+  },
+  "nf-130-lima-water": {
+   "videoId": "a7e87335b9",
+   "key": "key#4",
+   "replica": "r983d5889432",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-130-lima-water.mp4",
+   "seconds": 31.1
+  },
+  "nf-136-lisbon-tourism": {
+   "videoId": "1aa662cc2a",
+   "key": "key#4",
+   "replica": "r011ad7b5727",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-136-lisbon-tourism.mp4",
+   "seconds": 31.7
+  },
+  "fw-tarmacly-v2": {
+   "videoId": "32af110773",
+   "key": "key#4",
+   "replica": "rfb0463909e3",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-tarmacly-v2.mp4",
+   "seconds": 33.9
+  },
+  "fw-yamfield-agro-v2": {
+   "videoId": "51e6068be6",
+   "key": "key#4",
+   "replica": "rbf278df2604",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-yamfield-agro-v2.mp4",
+   "seconds": 31.6
+  },
+  "fw-tallyloom-v2": {
+   "videoId": "2b6f2b63da",
+   "key": "key#4",
+   "replica": "r2a31940a5f0",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-tallyloom-v2.mp4",
+   "seconds": 34.3
+  },
+  "fw-nsuo-labs-v2": {
+   "videoId": "e113ad001c",
+   "key": "key#4",
+   "replica": "r2d564127497",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-nsuo-labs-v2.mp4",
+   "seconds": 32.3
+  },
+  "fw-kazikit-v2": {
+   "videoId": "8267c5aa33",
+   "key": "key#4",
+   "replica": "r2a1cea82862",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-kazikit-v2.mp4",
+   "seconds": 31.3
+  },
+  "nf-105-dakar-learn-v2": {
+   "videoId": "f6afadcee5",
+   "key": "key#4",
+   "replica": "rbb3ca3630f7",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-105-dakar-learn-v2.mp4",
+   "seconds": 29.6
+  },
+  "nf-108-karoo-grid-v2": {
+   "videoId": "bde1fea74f",
+   "key": "key#4",
+   "replica": "r1a4e22fa0d9",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-108-karoo-grid-v2.mp4",
+   "seconds": 31.6
+  },
+  "nf-111-accra-health-v2": {
+   "videoId": "0a2555cacb",
+   "key": "key#4",
+   "replica": "r340d93adc9b",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-111-accra-health-v2.mp4",
+   "seconds": 32
+  },
+  "nf-113-umoja-insure-v2": {
+   "videoId": "7ca30af409",
+   "key": "key#4",
+   "replica": "r5fb46c843a8",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-113-umoja-insure-v2.mp4",
+   "seconds": 28.5
+  },
+  "nf-119-brixton-build-v2": {
+   "videoId": "b921c21b41",
+   "key": "key#4",
+   "replica": "r90a0339d496",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-119-brixton-build-v2.mp4",
+   "seconds": 31.1
+  },
+  "nf-121-toronto-credit-v2": {
+   "videoId": "602168f09b",
+   "key": "key#4",
+   "replica": "r1d7cf9edbb4",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-121-toronto-credit-v2.mp4",
+   "seconds": 31.7
+  },
+  "fw-brightkloof-energy-v2": {
+   "videoId": "1586bab73c",
+   "key": "key#4",
+   "replica": "rf1bd7e252de",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-brightkloof-energy-v2.mp4",
+   "seconds": 32.3
+  },
+  "nf-101-kilnworks-v2": {
+   "videoId": "73e4cd1d85",
+   "key": "key#4",
+   "replica": "r9fa0878977a",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-101-kilnworks-v2.mp4",
+   "seconds": 37.1
+  },
+  "nf-106-mavuno-cold-v2": {
+   "videoId": "c5410e4260",
+   "key": "key#4",
+   "replica": "rf4e9d9790f0",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-106-mavuno-cold-v2.mp4",
+   "seconds": 31
+  },
+  "nf-114-lagos-legal-v2": {
+   "videoId": "2f952e950b",
+   "key": "key#4",
+   "replica": "r213e42b45b3",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-114-lagos-legal-v2.mp4",
+   "seconds": 32.1
+  },
+  "nf-118-hairline-v2": {
+   "videoId": "cc9f16d00f",
+   "key": "key#4",
+   "replica": "rd9b169b334e",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-118-hairline-v2.mp4",
+   "seconds": 31
+  },
+  "nf-107-ledgerkid-v2": {
+   "videoId": "10df0b6b6c",
+   "key": "key#4",
+   "replica": "r9ed2c6769d0",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-107-ledgerkid-v2.mp4",
+   "seconds": 30.6
+  },
+  "nf-112-sahel-solar-v2": {
+   "videoId": "b19df10360",
+   "key": "key#4",
+   "replica": "rc0d9e7a3385",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-112-sahel-solar-v2.mp4",
+   "seconds": 32.3
+  },
+  "nf-115-kivu-coffee-v2": {
+   "videoId": "6f93713272",
+   "key": "key#4",
+   "replica": "r5ad3b1690f0",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-115-kivu-coffee-v2.mp4",
+   "seconds": 33.4
+  },
+  "nf-117-addis-pharma-v2": {
+   "videoId": "ded3a35c92",
+   "key": "key#4",
+   "replica": "rc6fedbe63ea",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-117-addis-pharma-v2.mp4",
+   "seconds": 39.5
+  },
+  "nf-120-paris-care-v2": {
+   "videoId": "2fe6611e32",
+   "key": "key#4",
+   "replica": "r99d2b9af9a0",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-120-paris-care-v2.mp4",
+   "seconds": 31.2
+  },
+  "nf-104-shamba-sense-v2": {
+   "videoId": "a147b167b2",
+   "key": "key#4",
+   "replica": "r042bf0ddb46",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-104-shamba-sense-v2.mp4",
+   "seconds": 37.8
+  },
+  "nf-110-naija-reels-v2": {
+   "videoId": "ee07c0af92",
+   "key": "key#4",
+   "replica": "r862e3a3c5e0",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-110-naija-reels-v2.mp4",
+   "seconds": 32.7
   }
  },
  "excluded": [],

@@ -1,0 +1,186 @@
+[
+ {
+  "company": "Tarmacly",
+  "founder": "Musa Garba-Lawal",
+  "script": "This is an AI-presented summary of Tarmacly's pitch. On the Kano to Lagos corridor, most trucks are still booked by phone, and carriers wait weeks to be paid. Musa Garba-Lawal built Tarmacly to fix both. Shippers post loads. Tarmacly matches them with vetted truck owners, tracks every trip, and pays carriers within forty-eight hours through a partner bank. The company reports 180 contracted shippers, 2,300 trucks, and about $1.1 million in monthly freight value in early 2026. The ask is an $8 million Series A, to open the Abuja to Onitsha corridor.",
+  "slug": "fw-tarmacly-v2",
+  "replica_id": "rfb0463909e3",
+  "was": "r4ba1277e4fb"
+ },
+ {
+  "company": "Yamfield Agro",
+  "founder": "Terna Iorliam",
+  "script": "In Benue State, a yam harvest can lose much of its value before it reaches a buyer. Yamfield Agro, founded by Terna Iorliam, puts solar cold rooms at rural markets. Farmers pay per crate, per day, with mobile money. Yamfield also buys part of the stored produce at an agreed floor price. It is early. Two pilot rooms have run since August 2025, and 310 farmers have used them. Yamfield is raising $400,000 on a SAFE, to build eight more rooms and prove the economics site by site. I'm an AI presenter, and these are the company's reported figures.",
+  "slug": "fw-yamfield-agro-v2",
+  "replica_id": "rbf278df2604",
+  "was": "rccbeedfc684"
+ },
+ {
+  "company": "Tallyloom",
+  "founder": "Babajide Coker",
+  "script": "An AI presenter here, with Tallyloom's pitch. Payroll in Nigeria and Ghana means tax, pension and statutory filings, every single month. Babajide Coker's company, Tallyloom, computes and files them, pays staff through bank integrations, and keeps an audit trail ready for inspection. It serves 1,250 employers and 186,000 employee seats. Annual recurring revenue was $6.4 million at December 2025, according to its audited accounts. Tallyloom is raising a $22 million Series B, to enter Kenya and add salary advances with a bank partner.",
+  "slug": "fw-tallyloom-v2",
+  "replica_id": "r2a31940a5f0",
+  "was": "r4ba1277e4fb"
+ },
+ {
+  "company": "Nsuo Labs",
+  "founder": "Kwabena Asante-Mensah",
+  "script": "A fish trader at a Ghanaian landing beach has hours, not days, before the catch spoils. Kwabena Asante-Mensah started Nsuo Labs in Tema to buy back those hours, with a solar ice plant on the beach and insulated crates rented by the day. One pilot site has run since November 2025, with 140 regular traders. In a small survey, traders reported spoilage falling from about a quarter of the catch to under a tenth. That is self-reported, and early. Nsuo Labs is raising $600,000 on a SAFE. I'm an AI presenter, sharing the company's pitch.",
+  "slug": "fw-nsuo-labs-v2",
+  "replica_id": "r2d564127497",
+  "was": "rccbeedfc684"
+ },
+ {
+  "company": "Kazikit",
+  "founder": "Brian Mwangi",
+  "script": "I'm an AI presenter, here with Kazikit's pitch. In Kenya, informal building contractors, the fundis, quote from memory and chase payment by phone. Brian Mwangi built Kazikit for them: a light Android app for quoting with local material prices, tracking spend per job, and sending M-Pesa payment requests. Since September 2025, 1,900 contractors have signed up, and around 600 use it weekly. There is no revenue yet. Kazikit is raising $350,000 on a SAFE, to launch a paid tier and a materials marketplace.",
+  "slug": "fw-kazikit-v2",
+  "replica_id": "r2a1cea82862",
+  "was": "r4ba1277e4fb"
+ },
+ {
+  "company": "Xam Xam Learn",
+  "founder": "Mamadou Diallo",
+  "script": "I'm an AI presenter, and this is Xam Xam Learn's pitch. Mamadou Diallo taught mathematics in Dakar for years, and saw students fail exams for want of a good lesson, not ability. Xam Xam Learn sends short audio lessons and quizzes over WhatsApp, written by Senegalese teachers for the national exams. 14,800 families now pay for it, and 46 schools have signed on. The company is raising 1.2 million euros on a SAFE, to launch in Côte d'Ivoire. 35 percent of the new money goes to curriculum content.",
+  "slug": "nf-105-dakar-learn-v2",
+  "replica_id": "rbb3ca3630f7",
+  "was": "rccbeedfc684"
+ },
+ {
+  "company": "Karoo Gridworks",
+  "founder": "Sipho Dlamini",
+  "script": "A South African factory can install batteries and still pay peak tariffs, because nobody decides when to use them. Sipho Dlamini spent nine years in grid planning before co-founding Karoo Gridworks. Its software forecasts each site's load and tariffs, and dispatches batteries and solar on its own. It manages 141 sites and 67 megawatts of storage. Karoo Gridworks is raising 110 million rand in Series A equity. 40 percent of the new money goes to engineering and forecasting. I'm an AI presenter, summarising the company's pitch.",
+  "slug": "nf-108-karoo-grid-v2",
+  "replica_id": "r1a4e22fa0d9",
+  "was": "rccbeedfc684"
+ },
+ {
+  "company": "Kliniqa",
+  "founder": "Kwame Adjei-Larbi",
+  "script": "I'm an AI presenter, sharing Kliniqa's pitch. In Accra, a patient referred from one clinic to another often repeats the same tests, because the records don't travel. Dr. Kwame Adjei-Larbi led health informatics at a teaching hospital, and built Kliniqa so they can. Clinics keep records and send referrals in one system, shared only with the patient's consent. Twenty-four clinics use it today, and most are not paying yet. Kliniqa is raising 500,000 dollars on a SAFE. 45 percent of the new money goes to product and security.",
+  "slug": "nf-111-accra-health-v2",
+  "replica_id": "r340d93adc9b",
+  "was": "r4ba1277e4fb"
+ },
+ {
+  "company": "Umoja Cover",
+  "founder": "Brian Otieno",
+  "script": "For a boda-boda rider in Nairobi, one accident can cost a year of savings. Brian Otieno, an actuary, built Umoja Cover so it doesn't. Riders buy health cover by the week, paid from their earnings inside the ride apps they already use. A licensed insurer underwrites it, and claims are paid by M-Pesa, in about three days. 41,000 riders are covered. Umoja Cover is raising 2.2 million dollars on a SAFE. 35 percent of the new money goes to distribution partnerships. I'm an AI presenter, sharing the company's pitch.",
+  "slug": "nf-113-umoja-insure-v2",
+  "replica_id": "r5fb46c843a8",
+  "was": "rccbeedfc684"
+ },
+ {
+  "company": "Plumbline Assure",
+  "founder": "Kwesi Mensah",
+  "script": "I'm an AI presenter, with Plumbline Assure's pitch. A UK housing association has to prove that fire-safety work was done properly, building by building. Kwesi Mensah led compliance at a London housing association, and too often that proof was in a contractor's inbox. With Plumbline Assure, contractors capture evidence on site, and it becomes an audit-ready record. It covers 210,000 homes, and annual recurring revenue is 3.1 million pounds. Plumbline Assure is raising an 8 million pound Series A. 35 percent of the new money goes to engineering.",
+  "slug": "nf-119-brixton-build-v2",
+  "replica_id": "r90a0339d496",
+  "was": "rccbeedfc684"
+ },
+ {
+  "company": "Landfall Credit",
+  "founder": "Chidi Anyanwu",
+  "script": "Chidi Anyanwu moved from Lagos to Toronto with a strong credit history. In Canada, it counted for nothing. Now a credit-risk modeller, he founded Landfall Credit for newcomers like him. With their consent, members bring their overseas banking history, open a credit-builder account, and borrow from a partner lender at fair rates. 36,000 members use it, and annual losses are about three percent. Landfall is raising 6 million Canadian dollars. 30 percent of the new money goes to lending partnerships. I'm an AI presenter, sharing this pitch.",
+  "slug": "nf-121-toronto-credit-v2",
+  "replica_id": "r1d7cf9edbb4",
+  "was": "r4ba1277e4fb"
+ },
+ {
+  "company": "Brightkloof Energy",
+  "founder": "Thandiwe Mokoena",
+  "script": "An AI presenter, sharing Brightkloof Energy's pitch. Thandiwe Mokoena's company gives South African small businesses rooftop solar and batteries, with no upfront cost. Brightkloof designs, installs, monitors and maintains each system, for a fixed monthly fee over ten years. It reports 2,900 contracted sites and 38 megawatts installed. The company is also clear that growth slowed as load-shedding eased in 2025. Brightkloof is raising 280 million rand in Series B equity, to expand into KwaZulu-Natal and the Western Cape.",
+  "slug": "fw-brightkloof-energy-v2",
+  "replica_id": "rf1bd7e252de",
+  "was": "r1a0108fbd75"
+ },
+ {
+  "company": "Laterra Bricks",
+  "founder": "Akosua Mensah-Boateng",
+  "script": "A two-bedroom home in Kumasi can spend a large share of its budget on blocks. Laterra Bricks makes them differently. Its mobile presses turn local soil into stabilised earth bricks, right on the building site. Akosua Mensah-Boateng, a civil engineer, started the company in 2022. Laterra Bricks has delivered 4.6 million bricks, and 112 contractors now buy from it. It is raising 1.5 million dollars in priced equity, for six more presses and a certified lab. 45 percent of the new money goes to six more mobile presses. I'm an AI presenter, sharing Laterra's pitch.",
+  "slug": "nf-101-kilnworks-v2",
+  "replica_id": "r9fa0878977a",
+  "was": "r4f5b5ef55c8"
+ },
+ {
+  "company": "Mavuno Cold",
+  "founder": "Neema Mollel",
+  "script": "Tomatoes at Kariakoo market have about two days before they spoil. Neema Mollel, a supply-chain analyst, founded Mavuno Cold to give traders more time. Its solar cold rooms sit inside the market, and traders pay per crate, per day, by mobile money. Nineteen rooms are live, storing about 31,000 crates a month. Mavuno Cold is raising 2 million dollars in equity, for twenty more rooms in Dar es Salaam, Arusha and Mwanza. 50 percent of the new money goes to twenty new rooms. This pitch is presented by an AI presenter.",
+  "slug": "nf-106-mavuno-cold-v2",
+  "replica_id": "rf4e9d9790f0",
+  "was": "r1a0108fbd75"
+ },
+ {
+  "company": "Clausekind",
+  "founder": "Ngozi Okafor-Bello",
+  "script": "I'm an AI presenter, with Clausekind's pitch. Most small businesses in Lagos sign tenancy and supplier contracts without a lawyer, because one costs too much. Ngozi Okafor-Bello practised commercial law for seven years, and founded Clausekind to change the price. It drafts and reviews contracts in plain language, and a licensed Nigerian lawyer signs off every document. 310 businesses have paid for a document, and it completes about 940 a month. Clausekind is raising 350,000 dollars on a SAFE. 45 percent of the new money goes to product.",
+  "slug": "nf-114-lagos-legal-v2",
+  "replica_id": "r213e42b45b3",
+  "was": "r4f5b5ef55c8"
+ },
+ {
+  "company": "Kinkora",
+  "founder": "Simone Okonkwo-Harris",
+  "script": "Ask anyone with coily hair how many products are under their sink. Simone Okonkwo-Harris spent eight years in brand management, and founded Kinkora to stop the guessing. Customers build a hair profile that a licensed stylist reviews, then get a routine and monthly refills. 19,000 people subscribe, and 63 percent are still subscribed six months later. Kinkora is raising 4 million dollars in priced equity. 35 percent of the new money goes to growth marketing. Marcus Bell is COO. I'm an AI presenter, sharing the company's pitch.",
+  "slug": "nf-118-hairline-v2",
+  "replica_id": "rd9b169b334e",
+  "was": "r1a0108fbd75"
+ },
+ {
+  "company": "Bursary Bridge",
+  "founder": "Hadiza Abubakar",
+  "script": "Every September, some Nigerian children miss school while their parents find a whole term's fees at once. Hadiza Abubakar saw it as a school bursar. Bursary Bridge lets parents pay in instalments, and pays the school in full on day one, through a lending partner. Thirty-one schools and 1,350 families are on its pilot. Repayment data covers only two terms so far. Bursary Bridge is raising 600,000 dollars on a SAFE. 35 percent of the new money goes to lending partnerships. I'm an AI presenter, sharing the company's pitch.",
+  "slug": "nf-107-ledgerkid-v2",
+  "replica_id": "r9ed2c6769d0",
+  "was": "red9211eea81"
+ },
+ {
+  "company": "Sahel Pumps",
+  "founder": "Fatoumata Traoré",
+  "script": "Along the Niger River, many market gardeners grow one season a year, because diesel is too expensive for more. Fatoumata Traoré ran rural-energy programmes for eight years, then founded Sahel Pumps. Gardeners get a solar irrigation pump and pay for it over 24 months by mobile money. 3,100 pumps are in service, and about nine in ten instalments arrive on time. Sahel Pumps is raising 2.5 million euros, to launch in Burkina Faso. 45 percent of the new money goes to pump inventory financing. This pitch is presented by an AI presenter.",
+  "slug": "nf-112-sahel-solar-v2",
+  "replica_id": "rc0d9e7a3385",
+  "was": "radb9683b0eb"
+ },
+ {
+  "company": "Kivu Traceworks",
+  "founder": "Esther Kavira",
+  "script": "Coffee from the hills above Lake Kivu can win specialty prices. Most of it is still sold anonymously, at commodity rates. Esther Kavira, a quality grader, founded Kivu Traceworks to connect those growers to roasters. Each lot is tracked from washing station to port, and roasters buy it directly. Kivu Traceworks exported 240 tonnes in the last twelve months, from 6,400 registered growers. It is raising 1.6 million dollars in equity. 40 percent of the new money goes to pre-harvest finance for growers. I'm an AI presenter, sharing this pitch.",
+  "slug": "nf-115-kivu-coffee-v2",
+  "replica_id": "r5ad3b1690f0",
+  "was": "rcd970fadf46"
+ },
+ {
+  "company": "Kefet Rx",
+  "founder": "Selam Tesfaye",
+  "script": "I'm an AI presenter, and this is Kefet Rx. When a pharmacy in Addis Ababa runs short of an essential medicine, it starts phoning importers, one by one. Selam Tesfaye managed hospital procurement, and built Kefet Rx to replace those calls with one ordering app, showing stock across licensed importers. 260 pharmacies place about 2,400 orders a month through it. Importer commissions have only just started. Kefet Rx is raising 400,000 dollars on a SAFE. 40 percent of the new money goes to importer integrations. Dawit Alemu is CTO.",
+  "slug": "nf-117-addis-pharma-v2",
+  "replica_id": "rc6fedbe63ea",
+  "was": "red9211eea81"
+ },
+ {
+  "company": "Aïna Care",
+  "founder": "Aïssatou Ba",
+  "script": "A home carer in France can spend more time on the road and on paperwork than with the people she cares for. Aïssatou Ba ran a home-care agency for six years, and built Aïna Care for agencies like hers. It plans visits around real travel times, gives carers an app for visit notes, and prepares billing for local authorities. 128 agencies and 4,700 carers use it. Aïna Care is raising 3 million euros. 35 percent of the new money goes to product. I'm an AI presenter, sharing this pitch.",
+  "slug": "nf-120-paris-care-v2",
+  "replica_id": "r99d2b9af9a0",
+  "was": "radb9683b0eb"
+ },
+ {
+  "company": "Shambasense",
+  "founder": "Aline Uwimana",
+  "script": "When should a Rwandan smallholder add fertiliser? Usually, it's a guess. Aline Uwimana, an agronomist, started Shambasense to replace that guess. A shared solar soil probe measures moisture and nutrients, and farmers get plain advice by SMS, in Kinyarwanda. Seventeen cooperatives, about 3,200 farmers, now use it in pilots. It is early, and the yield data is still coming in. Shambasense is raising 450,000 dollars on a SAFE. 40 percent of the new money goes to probe manufacturing. I'm an AI presenter, sharing the company's pitch.",
+  "slug": "nf-104-shamba-sense-v2",
+  "replica_id": "r042bf0ddb46",
+  "was": "r38a383b0173"
+ },
+ {
+  "company": "Studio Ekun",
+  "founder": "Folasade Adeyemi",
+  "script": "A Nollywood producer can sell one film to five platforms, and still not know what it has earned. Folasade Adeyemi negotiated those deals as a lawyer, then founded Studio Ekun. It keeps every right, territory and licence window in one catalogue, and reconciles royalty statements platform by platform. 240 producers pay for it, covering 4,300 titles. Studio Ekun is raising 1.4 million dollars on a SAFE. 40 percent of the new money goes to product. Kunle Bakare is CTO. I'm an AI presenter, and this is the company's pitch.",
+  "slug": "nf-110-naija-reels-v2",
+  "replica_id": "r862e3a3c5e0",
+  "was": "r38a383b0173"
+ }
+]

@@ -22,7 +22,31 @@ fs.mkdirSync(OUT, { recursive: true });
 const ledger = fs.existsSync(LEDGER)
   ? JSON.parse(fs.readFileSync(LEDGER, "utf8"))
   : { activeKey: 0, keys: {}, videos: {} };
-const save = () => fs.writeFileSync(LEDGER, JSON.stringify(ledger, null, 1));
+// Another run may have written the ledger meanwhile: merge per video, then
+// recompute each key's totals from the videos themselves.
+const save = () => {
+  const disk = fs.existsSync(LEDGER)
+    ? JSON.parse(fs.readFileSync(LEDGER, "utf8"))
+    : { keys: {}, videos: {} };
+  for (const [slug, v] of Object.entries(disk.videos ?? {})) {
+    const mine = ledger.videos[slug];
+    if (!mine || Object.keys(v).length > Object.keys(mine).length)
+      ledger.videos[slug] = v;
+  }
+  ledger.activeKey = Math.max(ledger.activeKey, disk.activeKey ?? 0);
+  for (const [k, d] of Object.entries(disk.keys ?? {}))
+    (ledger.keys[k] ??= { videos: 0, seconds: 0, refusal: null }).refusal ??=
+      d.refusal;
+  for (const k of Object.values(ledger.keys))
+    Object.assign(k, { videos: 0, seconds: 0 });
+  for (const v of Object.values(ledger.videos)) {
+    if (!v.key || !v.seconds) continue;
+    const k = (ledger.keys[v.key] ??= { videos: 0, seconds: 0, refusal: null });
+    k.videos += 1;
+    k.seconds = Math.round((k.seconds + v.seconds) * 10) / 10;
+  }
+  fs.writeFileSync(LEDGER, JSON.stringify(ledger, null, 1));
+};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const jobs = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 
@@ -112,9 +136,6 @@ for (let round = 0; round < 180; round++) {
         ]).toString(),
       );
       Object.assign(v, { file, seconds: Math.round(secs * 10) / 10 });
-      const k = ledger.keys[v.key];
-      k.videos += 1;
-      k.seconds = Math.round((k.seconds + secs) * 10) / 10;
       save();
       console.log(j.slug, "ready", v.seconds, "s", v.key);
     } else if (/error|fail|deleted/i.test(st ?? "")) {
@@ -125,4 +146,5 @@ for (let round = 0; round < 180; round++) {
   }
   await sleep(20000);
 }
+save();
 console.log(JSON.stringify(ledger.keys));

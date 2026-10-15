@@ -146,7 +146,7 @@ def record(i, c):
                           "gender": gender, "nationality": nat,
                           "headline": f"{role}, {c['company']}",
                           "professionalSummary": bio, "backgroundSummary": f"Based in {c['city']}. {bio}"},
-        "team": team, "inviteTeam": True,
+        "team": team, "inviteTeam": False,
         "metrics": {"kpis": kpis, "points": points},
         "capital": {"targetRaise": {"amount": amt, "currency": ccy}, "instrument": instrument,
                     **({"valuationCap": {"amount": cap, "currency": ccy}} if cap else {}),
@@ -246,7 +246,7 @@ def main():
                      "founder": r["founderPerson"]["name"], "replica_id": c["replica"], "script": script})
         recs.append(r)
     json.dump(keep + recs, open(out_json, "w"), ensure_ascii=False, indent=2)
-    json.dump(jobs, open(os.path.join(HERE, "..", "jobs-nf.json"), "w"), ensure_ascii=False, indent=1)
+    json.dump(jobs, open(os.path.join(HERE, "..", "jobs-nf.built.json"), "w"), ensure_ascii=False, indent=1)
     json.dump(render, open(f"{WORK}/jobs.json", "w"), indent=1)
     print("records", len(recs), "jobs", len(jobs), "pdfs", len(render))
     print("words", sorted(len(j["script"].split()) for j in jobs))

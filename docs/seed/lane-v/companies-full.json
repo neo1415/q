@@ -64,7 +64,7 @@
       "useOfFunds": []
     },
     "roundName": "Capital Q raise",
-    "deckViaQ": true,
+    "deckViaQ": false,
     "dataRoom": [
       {
         "title": "Capital Q Product Specification",
@@ -99,7 +99,9 @@
     ],
     "qPersonality": "FORMAL",
     "pitchTitle": "Capital Q: pitch (AI presenter, AI-generated)",
-    "pitchVideo": "00-capital-q-9x16.mp4"
+    "pitchVideo": "00-capital-q-9x16.mp4",
+    "deckTitle": "Capital Q investor deck (drafted with Q, Oct 2026)",
+    "deckSource": "Q \"Make my pitch deck\" on /capital, downloaded as PDF and uploaded by the founder"
   },
   {
     "n": 101,
@@ -151,7 +153,7 @@
         "email": "efua.kilnworks@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -450,7 +452,7 @@
         "email": "faith.pesaflow@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -749,7 +751,7 @@
         "email": "ifeanyi.tunde-cargo@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -1047,7 +1049,7 @@
         "email": "claudine.shamba-sense@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -1350,7 +1352,7 @@
         "email": "ousmane.dakar-learn@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -1653,7 +1655,7 @@
         "email": "rehema.mavuno-cold@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -1951,7 +1953,7 @@
         "email": "zainab.ledgerkid@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -2254,7 +2256,7 @@
         "email": "pieter.karoo-grid@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -2553,7 +2555,7 @@
         "email": "patience.afya-scan@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -2855,7 +2857,7 @@
         "email": "ama.naija-reels@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -3157,7 +3159,7 @@
         "email": "nana.accra-health@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -3460,7 +3462,7 @@
         "email": "aminata.sahel-solar@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -3758,7 +3760,7 @@
         "email": "daniel.umoja-insure@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -4060,7 +4062,7 @@
         "email": "ireti.lagos-legal@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -4363,7 +4365,7 @@
         "email": "sophie.kivu-coffee@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -4661,7 +4663,7 @@
         "email": "ravi.joburg-fleet@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -4959,7 +4961,7 @@
         "email": "hanna.addis-pharma@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -5262,7 +5264,7 @@
         "email": "kezia.hairline@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -5560,7 +5562,7 @@
         "email": "tom.brixton-build@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -5860,7 +5862,7 @@
         "email": "fanta.paris-care@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -6158,7 +6160,7 @@
         "email": "aarav.toronto-credit@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -6456,7 +6458,7 @@
         "email": "sunil.kisan-ledger@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -6755,7 +6757,7 @@
         "email": "arjun.pune-robotics@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -7053,7 +7055,7 @@
         "email": "pooja.ashaa-care@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -7356,7 +7358,7 @@
         "email": "hendra.jakarta-stock@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -7655,7 +7657,7 @@
         "email": "joy.manila-nurse@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -7953,7 +7955,7 @@
         "email": "le.hanoi-ev@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -8251,7 +8253,7 @@
         "email": "andres.bogota-shop@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -8550,7 +8552,7 @@
         "email": "rafael.sao-paulo-freight@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -8848,7 +8850,7 @@
         "email": "rosa.lima-water@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -9151,7 +9153,7 @@
         "email": "daniela.cdmx-health@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -9449,7 +9451,7 @@
         "email": "karim.riyadh-site@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -9748,7 +9750,7 @@
         "email": "mona.cairo-tutor@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -10050,7 +10052,7 @@
         "email": "murat.berlin-heat@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -10348,7 +10350,7 @@
         "email": "luis.austin-ag@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {
@@ -10646,7 +10648,7 @@
         "email": "rui.lisbon-tourism@fictional.capitalq.local"
       }
     ],
-    "inviteTeam": true,
+    "inviteTeam": false,
     "metrics": {
       "kpis": [
         {

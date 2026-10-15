@@ -1,0 +1,42 @@
+{
+  "companies": {
+    "102": {
+      "company": "Dawaledger",
+      "founderUserId": "a1500533-4dc0-49d8-86ac-8860e9d7a0d8"
+    },
+    "103": {
+      "company": "Harbourline Cargo",
+      "founderUserId": "e4876c13-0d52-4d03-9df0-2fecffc12b74",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "ceb6ec2d-4a4a-41a2-9b71-377d72c26407",
+      "organisationId": "e9cabc71-4287-4ba9-8a6b-03e3a6ddef27",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "pitch": true,
+        "photos": true,
+        "visible": true,
+        "team": true
+      },
+      "team": [
+        {
+          "name": "Chiamaka Eze",
+          "userId": "c54b69d0-886e-4e73-ab20-af6cabe4d436",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Ifeanyi Okoro",
+          "userId": "77127913-90bc-4717-9830-e18759d6f8a6",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "1218b83c-2cbe-4943-a2bc-3b54f61c20d9",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    }
+  }
+}

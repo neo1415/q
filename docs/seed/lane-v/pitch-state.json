@@ -46,6 +46,12 @@
   },
   "fw-brightkloof-energy": {
     "companyId": "37b0c9a0-c160-406e-9b83-04496665965d",
-    "mediaId": "520ef763-f165-4b3a-bd2d-7091cce694a2"
+    "mediaId": "520ef763-f165-4b3a-bd2d-7091cce694a2",
+    "published": true
+  },
+  "fw-kazikit": {
+    "companyId": "8e2c40e7-d1e2-4063-a179-abdea4f0cd83",
+    "mediaId": "cd27062e-9f4e-44c4-b60e-536bf19c31f9",
+    "published": true
   }
 }

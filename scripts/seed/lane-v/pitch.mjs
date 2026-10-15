@@ -46,6 +46,12 @@ const summary = [];
 for (const job of jobs) {
   if (only && !only.includes(job.slug)) continue;
   const s = (state[job.slug] ??= { companyId: job.companyId });
+  if (job.replaces && s.replaces !== job.replaces) {
+    // A replacement upload for this slug: keep the old record, start over.
+    state[`${job.slug}@${s.mediaId ?? "none"}`] = { ...s };
+    for (const k of Object.keys(s)) delete s[k];
+    Object.assign(s, { companyId: job.companyId, replaces: job.replaces });
+  }
   if (s.published) continue;
   const ctx = await browser.newContext({
     ignoreHTTPSErrors: true,
@@ -56,14 +62,19 @@ for (const job of jobs) {
   try {
     if (!s.mediaId) {
       const before = new Set((await assets(job.companyId)).map((a) => a.id));
-      await login(page, job.email, "/pitch/new");
-      await page.goto(`${lib.WEB}/pitch/new`, {
-        waitUntil: "domcontentloaded",
-      });
+      // `replaces`: the founder's own "Replace video" on the published pitch,
+      // so the new asset supersedes it instead of standing beside it.
+      const path = job.replaces ? `/pitch/${job.replaces}` : "/pitch/new";
+      await login(page, job.email, path);
+      await page.goto(`${lib.WEB}${path}`, { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(7000);
       const [fc] = await Promise.all([
         page.waitForEvent("filechooser", { timeout: 15000 }),
-        page.getByRole("button", { name: "Choose a video" }).click(),
+        page
+          .getByRole("button", {
+            name: job.replaces ? "Replace video" : "Choose a video",
+          })
+          .click(),
       ]);
       await fc.setFiles(job.file);
       for (let i = 0; i < 60 && !s.mediaId; i += 1) {

@@ -2,7 +2,23 @@
   "companies": {
     "00": {
       "company": "Capital Q",
-      "founderUserId": "dab9acc9-a99b-4dc8-9901-5b2e5054f82d"
+      "founderUserId": "dab9acc9-a99b-4dc8-9901-5b2e5054f82d",
+      "founderCount": 1,
+      "companyId": "ee75a7d8-d457-4b59-9ad8-0d64b3026a3d",
+      "organisationId": "f95c3469-ef29-4574-a508-c1ba1131d842",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true,
+        "capital": true,
+        "documents": true
+      },
+      "pitchId": "cdaadc96-d97b-4552-8cbf-c982bdddd73e",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
     }
   }
 }
