@@ -119,6 +119,16 @@ export type PresenceTriggerDependencies = {
   readonly profiles?: ProfileShortDescriptionLookup | undefined;
   /** Told what was found about the person, so Q can check it is them. */
   readonly onPersonFound?: ((found: PresenceFound) => void) | undefined;
+  /**
+   * True when the acting person is a fictional synthetic demo account (auth
+   * app_metadata `synthetic` and `fictional_demo`), the same rule as the
+   * workers' typed-onboarding guard. An invented subject has no public
+   * presence: the open web can only return real namesakes, and every search
+   * is a paid provider call. Absent: every subject is researched, as before.
+   * A failed read keeps the old behaviour.
+   */
+  readonly isFictionalAccount?:
+    ((userId: string) => Promise<boolean>) | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -140,7 +150,8 @@ export type PresenceTrigger = {
 export function createPresenceTrigger(
   dependencies: PresenceTriggerDependencies,
 ): PresenceTrigger {
-  const { presence, people, onPersonFound, logger } = dependencies;
+  const { presence, people, onPersonFound, isFictionalAccount, logger } =
+    dependencies;
 
   /** One build, detached, never able to delay or fail a turn. */
   const start = (
@@ -157,6 +168,16 @@ export function createPresenceTrigger(
   ): void => {
     void (async () => {
       try {
+        if (
+          isFictionalAccount !== undefined &&
+          (await isFictionalAccount(actor.userId).catch(() => false))
+        ) {
+          logger?.info(
+            { subjectType },
+            "presence research skipped: fictional synthetic account",
+          );
+          return;
+        }
         const outcome = await presence.build({
           actor,
           subject: { subjectType, subjectId },
