@@ -73,6 +73,8 @@ export const STAGE_LABEL = {
   pre_seed: "Pre-seed",
   seed: "Seed",
   series_a: "Series A",
+  series_b: "Series B",
+  unsure: "Not sure yet",
 };
 export const COUNTRY_LABEL = {
   NG: "Nigeria",
@@ -86,6 +88,10 @@ export const COUNTRY_LABEL = {
   FR: "France",
   IN: "India",
   BR: "Brazil",
+  NL: "Netherlands",
+  AE: "United Arab Emirates",
+  SG: "Singapore",
+  CA: "Canada",
 };
 export const PERSONALITY_LABEL = {
   WARM: "Warm",
@@ -141,7 +147,7 @@ export function useOfFundsBoxes(c) {
 }
 
 /** Onboarding "Target close" radio from the close date, relative to today. */
-export function closeWindow(dateText, today = new Date("2026-10-06")) {
+export function closeWindow(dateText, today = new Date()) {
   const months = (new Date(dateText) - today) / (30.4 * 86400000);
   if (months <= 3) return "Within 3 months";
   if (months <= 6) return "3–6 months";

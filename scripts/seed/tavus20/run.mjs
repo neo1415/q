@@ -60,7 +60,7 @@ for (const c of lib.companies()) {
       console.log(`[${c.n} ${c.company}] ${step.name} FAILED: ${msg}`);
       await page
         .screenshot({
-          path: `/tmp/claude-0/-home-user-q/5e7a5c77-f947-52b0-88c5-5afccae36a31/scratchpad/shots/fail-${c.n}-${step.name}.png`,
+          path: `${process.env.CQ_SEED_SHOTS ?? "/tmp"}/fail-${c.n}-${step.name}.png`,
         })
         .catch(() => {});
       failed.push(step.name);

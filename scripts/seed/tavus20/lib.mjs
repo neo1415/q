@@ -24,13 +24,20 @@ export const ASSETS =
 export const VIDEOS =
   process.env.CQ_SEED_VIDEOS ??
   "/tmp/claude-0/-home-user-q/5e7a5c77-f947-52b0-88c5-5afccae36a31/scratchpad/tavus/videos";
-export const STATE_FILE = join(ROOT, "docs/seed/tavus-20/seed-state.json");
-export const FINDINGS_FILE = join(ROOT, "docs/seed/tavus-20/SEED-FINDINGS.md");
+// Another dataset in the same shape (e.g. docs/seed/lane-v) reuses every
+// step; it may carry explicit fictional logins per person (`email`).
+export const DATASET = process.env.CQ_SEED_DATASET
+  ? join(ROOT, process.env.CQ_SEED_DATASET)
+  : join(ROOT, "docs/seed/tavus-20");
+export const SEED_PREFIX = process.env.CQ_SEED_PREFIX ?? "tavus20";
+export const STATE_FILE = join(DATASET, "seed-state.json");
+export const FINDINGS_FILE = join(DATASET, "SEED-FINDINGS.md");
 
+let cached = null;
 export const companies = () =>
-  JSON.parse(
-    readFileSync(join(ROOT, "docs/seed/tavus-20/companies-full.json"), "utf8"),
-  );
+  (cached ??= JSON.parse(
+    readFileSync(join(DATASET, "companies-full.json"), "utf8"),
+  ));
 
 let keys = null;
 /** Supabase keys, in memory only. */
@@ -109,7 +116,17 @@ export const slugOf = (s) =>
 export const firstNameOf = (name) =>
   slugOf(name.replace(/^(Dr|Prof)\.?\s+/i, "").split(/\s+/)[0]);
 export const emailFor = (personName, companyName) =>
+  explicitEmail(personName, companyName) ??
   `adedaniel502+cq-${firstNameOf(personName)}-${slugOf(companyName).replace(/-/g, "")}@gmail.com`;
+
+function explicitEmail(personName, companyName) {
+  const c = companies().find((x) => x.company === companyName);
+  if (!c) return undefined;
+  const p = [c.founderPerson, ...(c.team ?? [])].find(
+    (x) => x.name === personName,
+  );
+  return p?.email;
+}
 
 /** Find an auth user by email (read-only SQL; the admin API has no lookup). */
 export async function findUser(email) {

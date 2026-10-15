@@ -24,6 +24,7 @@ const TAXONOMY = JSON.parse(
   ),
 );
 const STAGE_DIR =
+  process.env.CQ_SEED_STAGE_DIR ??
   "/tmp/claude-0/-home-user-q/5e7a5c77-f947-52b0-88c5-5afccae36a31/scratchpad/stage";
 const SIGNAL = {
   5: "Signed partnerships or distribution deals",
@@ -197,7 +198,7 @@ async function onboardingForm(page, c) {
           ? "COO"
           : "CEO";
       await page.getByRole("radio", { name: role, exact: true }).check();
-      const founders = plan.founderCount(c);
+      const founders = c.onboardingFounders ?? plan.founderCount(c);
       await page
         .getByRole("textbox", { name: "How many founders?" })
         .fill(String(founders));
@@ -206,7 +207,7 @@ async function onboardingForm(page, c) {
         .check();
       await page
         .getByRole("textbox", { name: /How many people/ })
-        .fill(String(c.headcount));
+        .fill(String(c.headcount ?? c.onboardingHeadcount ?? 1));
       for (const n of plan.strengthsOf(c)) {
         await page
           .getByRole("checkbox", { name: n, exact: true })
@@ -234,7 +235,9 @@ async function onboardingForm(page, c) {
         await page.getByRole("radio", { name: growthBand(c) }).check();
       } else {
         await page
-          .getByRole("radio", { name: SIGNAL[c.n] ?? "Paying customers" })
+          .getByRole("radio", {
+            name: c.signal ?? SIGNAL[c.n] ?? "Paying customers",
+          })
           .check();
       }
       await page.waitForTimeout(800);
@@ -250,16 +253,23 @@ async function onboardingForm(page, c) {
       await page
         .getByRole("textbox", { name: "Target amount" })
         .fill(String(c.capital.targetRaise.amount));
+      // Unknown instrument or close date stays "Not sure yet".
       await page
         .getByRole("radio", {
-          name: plan.instrumentOf(c.capital.instrument).onboarding,
+          name: c.capital.instrument
+            ? plan.instrumentOf(c.capital.instrument).onboarding
+            : "Not sure yet",
           exact: true,
         })
+        .first()
         .check();
       await page
         .getByRole("radio", {
-          name: plan.closeWindow(c.capital.targetCloseDate),
+          name: c.capital.targetCloseDate
+            ? plan.closeWindow(c.capital.targetCloseDate)
+            : "Not sure yet",
         })
+        .last()
         .check();
       for (const n of plan.useOfFundsBoxes(c))
         await page.getByRole("checkbox", { name: n }).check();
@@ -351,7 +361,7 @@ export async function stepOnboarding(page, c) {
   const acct = await lib.ensureAccount({
     email,
     displayName: c.founderPerson.name,
-    seedKey: `tavus20:${nn(c)}:founder`,
+    seedKey: `${lib.SEED_PREFIX}:${nn(c)}:founder`,
   });
   mark(c, { founderUserId: acct.id });
   if (isDone(c, "onboarding")) return;
@@ -505,17 +515,22 @@ export async function stepProfile(page, c) {
     `${base}/founder-profile/me`,
     {
       ...(fp.status === 200 ? { expectedVersion: fp.body.version } : {}),
-      professionalSummary: c.founderPerson.professionalSummary.slice(0, 2000),
-      backgroundSummary: c.founderPerson.backgroundSummary.slice(0, 2000),
+      professionalSummary:
+        c.founderPerson.professionalSummary?.slice(0, 2000) ?? null,
+      backgroundSummary:
+        c.founderPerson.backgroundSummary?.slice(0, 2000) ?? null,
     },
   );
   const tf = await lib.call(lib.API, token, "GET", `${base}/team-facts`);
+  // `teamFacts` (nulls allowed) records unknown where onboarding forced a number.
   const founders = plan.founderCount(c);
   const r3 = await lib.call(lib.API, token, "PATCH", `${base}/team-facts`, {
     ...(tf.status === 200 ? { expectedVersion: tf.body.version } : {}),
-    founderCount: founders,
-    fullTimeFounderCount: founders,
-    teamSize: c.headcount,
+    ...(c.teamFacts ?? {
+      founderCount: founders,
+      fullTimeFounderCount: founders,
+      teamSize: c.headcount,
+    }),
   });
   log(
     c,
@@ -541,7 +556,7 @@ export async function stepCapital(page, c) {
     const f = page.getByRole("form", { name: "Open a round" });
     await f
       .getByRole("textbox", { name: "Name" })
-      .fill(plan.STAGE_LABEL[c.currentStageCode]);
+      .fill(c.roundName ?? plan.STAGE_LABEL[c.currentStageCode]);
     await f
       .getByRole("combobox", { name: "Currency" })
       .selectOption({ label: c.capital.targetRaise.currency })
@@ -549,12 +564,13 @@ export async function stepCapital(page, c) {
     await f
       .getByRole("textbox", { name: "Target" })
       .fill(String(c.capital.targetRaise.amount));
-    await f
-      .getByRole("radio", {
-        name: plan.instrumentOf(c.capital.instrument).round,
-        exact: true,
-      })
-      .check();
+    if (c.capital.instrument)
+      await f
+        .getByRole("radio", {
+          name: plan.instrumentOf(c.capital.instrument).round,
+          exact: true,
+        })
+        .check();
     await f.getByRole("button", { name: "Open now" }).click();
     await page.waitForTimeout(5000);
   }
@@ -566,7 +582,7 @@ export async function stepCapital(page, c) {
     "GET",
     `/v1/companies/${s.companyId}/capital-objectives/current`,
   );
-  if (cur.status === 200) {
+  if (cur.status === 200 && c.capital.useOfFunds?.length) {
     const fmt = (n) => Number(n).toLocaleString("en-US");
     const uof = c.capital.useOfFunds
       .map((u) => `${u.line}: ${u.percent}% (${u.currency} ${fmt(u.amount)})`)
@@ -609,7 +625,7 @@ export async function stepDocuments(page, c) {
   await page.goto(`${lib.WEB}/documents`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(7000);
   // Deck, when onboarding did not take it.
-  const deckTitle = `${c.company} ${plan.STAGE_LABEL[c.currentStageCode].toLowerCase()} deck (Oct 2026)`;
+  const deckTitle = `${c.company} ${(plan.STAGE_LABEL[c.currentStageCode] ?? "Funding").toLowerCase()} deck (Oct 2026)`;
   const deckDoc = (dr0.documents ?? []).find(
     (d) => d.kind && /deck/i.test(d.title),
   );
@@ -822,7 +838,9 @@ export async function stepPitch(page, c) {
   });
   await page.waitForTimeout(7000);
   const R = page.getByRole("region", { name: "Who sees it" });
-  const title = `${c.company}: ${plan.STAGE_LABEL[c.currentStageCode].toLowerCase()} pitch with ${c.founderPerson.name}`;
+  const title =
+    c.pitchTitle ??
+    `${c.company}: ${(plan.STAGE_LABEL[c.currentStageCode] ?? "Funding").toLowerCase()} pitch with ${c.founderPerson.name}`;
   if (pitch.title !== title || pitch.audience !== "NETWORK") {
     await R.getByRole("textbox", { name: "Title" }).fill(title);
     // Everyone on Capital Q (NETWORK): Explore lists only network pitches.
@@ -915,6 +933,68 @@ async function quietEmails(page) {
 
 // ------------------------------------------------------------------- team
 
+/**
+ * The product's own invitation path: the owner invites from Team, the link
+ * (shown when the email cannot go, as for these .local addresses) is opened
+ * by each member under their own login, who accepts on the join card.
+ */
+async function inviteAndAccept(page, c, members) {
+  const owner = lib.emailFor(c.founderPerson.name, c.company);
+  await login(page, owner, "/settings/team");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: lib.WEB,
+  });
+  const links = new Map();
+  for (const role of ["ADMIN", "MEMBER"]) {
+    const batch = members.filter((m) => m.appRole === role);
+    if (!batch.length) continue;
+    await page.goto(`${lib.WEB}/settings/team`, {
+      waitUntil: "domcontentloaded",
+    });
+    await page.waitForTimeout(7000);
+    await page
+      .getByRole("button", { name: /^Invite (people|someone)$/ })
+      .first()
+      .click();
+    await page.waitForTimeout(1500);
+    const sheet = page.locator("form[data-team-sheet=invite]");
+    await sheet
+      .locator("#team-emails")
+      .fill(batch.map((m) => m.email).join(", "));
+    await sheet
+      .getByRole("radio", { name: role === "ADMIN" ? "Admin" : "Member" })
+      .click();
+    await sheet.getByRole("button", { name: /^Send/ }).click();
+    await page.waitForTimeout(6000);
+    const unsent = page.locator("[data-team-unsent] li");
+    for (const li of await unsent.all()) {
+      const text = await li.innerText();
+      const m = batch.find((x) => text.includes(x.email));
+      if (!m) continue;
+      await li.locator("[data-team-copy-link]").click();
+      await page.waitForTimeout(500);
+      links.set(
+        m.email,
+        await page.evaluate(() => navigator.clipboard.readText()),
+      );
+    }
+    log(c, `invited ${batch.length} as ${role}; links shown ${links.size}`);
+  }
+  for (const m of members) {
+    const link = links.get(m.email);
+    if (!link) throw new Error(`no invite link for ${m.email} (emailed?)`);
+    await login(page, m.email, "/home");
+    await page.goto(link, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(6000);
+    await page
+      .getByRole("button", { name: /^Join / })
+      .first()
+      .click();
+    await page.waitForURL(/settings\/team/, { timeout: 30000 }).catch(() => {});
+    log(c, `accepted ${m.name}: ${page.url().replace(lib.WEB, "")}`);
+  }
+}
+
 export async function stepTeam(page, c) {
   if (isDone(c, "team")) return;
   const { s } = stateOf(c);
@@ -924,7 +1004,7 @@ export async function stepTeam(page, c) {
     const acct = await lib.ensureAccount({
       email,
       displayName: p.name,
-      seedKey: `tavus20:${nn(c)}:team:${i}`,
+      seedKey: `${lib.SEED_PREFIX}:${nn(c)}:team:${i}`,
     });
     members.push({ ...p, email, userId: acct.id });
   }
@@ -942,56 +1022,65 @@ export async function stepTeam(page, c) {
       )
     ).map((r) => r.email.toLowerCase()),
   );
-  // F8: each member signs in on the web, then asks to join (API).
-  for (const m of members) {
-    if (inOrg.has(m.email.toLowerCase())) continue;
-    await login(page, m.email, "/profile");
-    const t = await lib.accessToken(m.email);
-    const r = await lib.call(lib.API, t, "POST", "/v1/join-requests", {
-      organisationId: s.organisationId,
-      message: `${m.name}, ${m.title}.`,
+  if (c.inviteTeam) {
+    await inviteAndAccept(
+      page,
+      c,
+      members.filter((m) => !inOrg.has(m.email.toLowerCase())),
+    );
+  } else {
+    // F8: each member signs in on the web, then asks to join (API).
+    for (const m of members) {
+      if (inOrg.has(m.email.toLowerCase())) continue;
+      await login(page, m.email, "/profile");
+      const t = await lib.accessToken(m.email);
+      const r = await lib.call(lib.API, t, "POST", "/v1/join-requests", {
+        organisationId: s.organisationId,
+        message: `${m.name}, ${m.title}.`,
+      });
+      log(c, `join request ${m.name}: ${r.status}`);
+    }
+    // The owner lets them in and sets roles on the Team page.
+    await login(
+      page,
+      lib.emailFor(c.founderPerson.name, c.company),
+      "/settings/team",
+    );
+    await page.goto(`${lib.WEB}/settings/team`, {
+      waitUntil: "domcontentloaded",
     });
-    log(c, `join request ${m.name}: ${r.status}`);
-  }
-  // The owner lets them in and sets roles on the Team page.
-  await login(
-    page,
-    lib.emailFor(c.founderPerson.name, c.company),
-    "/settings/team",
-  );
-  await page.goto(`${lib.WEB}/settings/team`, {
-    waitUntil: "domcontentloaded",
-  });
-  await page.waitForTimeout(7000);
-  for (let i = 0; i < members.length; i += 1) {
-    const b = page.getByRole("button", { name: "Let in" }).first();
-    if (!(await b.isVisible().catch(() => false))) break;
-    await b.click();
-    await page.waitForTimeout(4000);
-  }
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(6000);
-  for (const m of members.filter((x) => x.appRole === "ADMIN")) {
-    const btn = page.getByRole("button", {
-      name: new RegExp(`^Role for .*: Member\\. Change$`),
-    });
-    const mine = page
-      .getByRole("listitem")
-      .filter({ hasText: m.email })
-      .getByRole("button", { name: /^Role for/ });
-    const target = (await mine.count()) ? mine.first() : btn.first();
-    if (
-      !/Member/.test(
-        (await target.getAttribute("aria-label")) ?? (await target.innerText()),
+    await page.waitForTimeout(7000);
+    for (let i = 0; i < members.length; i += 1) {
+      const b = page.getByRole("button", { name: "Let in" }).first();
+      if (!(await b.isVisible().catch(() => false))) break;
+      await b.click();
+      await page.waitForTimeout(4000);
+    }
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(6000);
+    for (const m of members.filter((x) => x.appRole === "ADMIN")) {
+      const btn = page.getByRole("button", {
+        name: new RegExp(`^Role for .*: Member\\. Change$`),
+      });
+      const mine = page
+        .getByRole("listitem")
+        .filter({ hasText: m.email })
+        .getByRole("button", { name: /^Role for/ });
+      const target = (await mine.count()) ? mine.first() : btn.first();
+      if (
+        !/Member/.test(
+          (await target.getAttribute("aria-label")) ??
+            (await target.innerText()),
+        )
       )
-    )
-      continue;
-    await target.click();
-    await page.waitForTimeout(1200);
-    const d = page.getByRole("dialog");
-    await d.getByRole("radio", { name: /^Admin/ }).check();
-    await d.getByRole("button", { name: "Save" }).click();
-    await page.waitForTimeout(4000);
+        continue;
+      await target.click();
+      await page.waitForTimeout(1200);
+      const d = page.getByRole("dialog");
+      await d.getByRole("radio", { name: /^Admin/ }).check();
+      await d.getByRole("button", { name: "Save" }).click();
+      await page.waitForTimeout(4000);
+    }
   }
   // Each member: activate the company (F11, API), then name, headline, photo (UI), title (API).
   for (const m of members) {
