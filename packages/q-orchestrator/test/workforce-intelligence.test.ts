@@ -4,6 +4,7 @@ import type { RelationshipBrief } from "@capital-q/contracts";
 
 import {
   boundPlan,
+  executorRosterText,
   groundReasoning,
   needsApproval,
   nextSteps,
@@ -565,5 +566,31 @@ describe("a fallback never goes round the person or a contradiction", () => {
       expect(one?.status).toBe("HELD");
       expect(one?.summary).toMatch(/contradiction/iu);
     }
+  });
+});
+
+describe("a step must carry the tool its role acts through (production 2026-10-15)", () => {
+  it("refuses a CONVERSATION step with only list_messages before approval, and says what each role must include", () => {
+    const executors = registeredExecutors({ research: true });
+    const permitted = new Set(["list_messages", "chat.message.send"]);
+    const bound = boundPlan(
+      [
+        {
+          key: "intro",
+          role: "CONVERSATION",
+          agentName: null,
+          goal: "Prepare an intro; do not send it",
+          tools: ["list_messages"],
+          dependsOn: [],
+        },
+      ],
+      { permitted, budgetUsd: 1, executors },
+    );
+    expect(bound.refused).toEqual([
+      { key: "intro", reason: "MISSING_REQUIRED_TOOL" },
+    ]);
+    expect(executorRosterText(executors, permitted)).toContain(
+      "A CONVERSATION step must include chat.message.send.",
+    );
   });
 });
