@@ -369,3 +369,10 @@ export {
   relationshipPipelineScopeBinding,
   relationshipPipelineExportRows,
 } from "./application/relationship-pipeline.js";
+
+// CRM saved views (2026-10-15).
+export { RelationshipViewLimitError } from "./domain/errors.js";
+export {
+  createRelationshipViewService,
+  type RelationshipViewService,
+} from "./application/relationship-views.js";

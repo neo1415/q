@@ -1,5 +1,10 @@
 import type { ActorContext } from "@capital-q/security";
 
+import {
+  createRelationshipViewService,
+  type RelationshipViewService,
+} from "./relationship-views.js";
+
 import type { Interest } from "../contracts/index.js";
 import {
   createRelationshipEventRegistry,
@@ -137,6 +142,8 @@ export function createNetworkService(
 
 /** Express Interest and the investor's own status read (CQ-NET-010). */
 export type InterestService = {
+  /** CRM saved views over the same party-scoped pipeline (2026-10-15). */
+  readonly relationshipViews?: RelationshipViewService | undefined;
   readonly expressInterest: (
     command: ExpressInterestCommand,
   ) => Promise<ExpressInterestResult>;
@@ -243,6 +250,7 @@ export function createInterestService(
 ): InterestService {
   const dependencies = interestDependencies(options);
   return {
+    relationshipViews: createRelationshipViewService(dependencies),
     expressInterest: createExpressInterest(dependencies),
     getOwnInterest: createGetOwnInterest(dependencies),
     mayExpressInterest: createMayExpressInterest(dependencies),
