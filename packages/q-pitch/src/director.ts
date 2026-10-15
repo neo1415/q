@@ -494,6 +494,33 @@ export function transition(
       if (target === null) return reject(state, event, "NO_VALID_SCENE");
       return moveTo(state, target);
     }
+    case "SKIP": {
+      if (!HALTABLE.has(state.phase))
+        return reject(state, event, "NOT_IN_THIS_STATE");
+      const next = state.sceneIndex + 1;
+      if (next >= state.scenes.length) {
+        return {
+          state: enter({ ...state, capsule: null, pending: null }, "COMPLETE"),
+          effects: [...halt(state), { type: "COMPLETED" }],
+        };
+      }
+      return moveTo(state, next);
+    }
+    case "REPEAT": {
+      if (!HALTABLE.has(state.phase))
+        return reject(state, event, "NOT_IN_THIS_STATE");
+      // "That" is what the person just saw: this scene once it has begun
+      // (or completed), otherwise the last scene that reached its checkpoint.
+      const begun =
+        state.validScenes.includes(state.sceneIndex) ||
+        state.actionIndex > 0 ||
+        state.pending !== null ||
+        state.phase === "SPEAK_AND_ACT" ||
+        state.phase === "ACKNOWLEDGE";
+      const target = begun ? state.sceneIndex : lastValidBefore(state);
+      if (target === null) return reject(state, event, "NO_VALID_SCENE");
+      return moveTo(state, target);
+    }
     case "JUMP_TO_CHAPTER": {
       const chapter = state.chapters.find(
         (c) => c.chapterId === event.chapterId,

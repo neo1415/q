@@ -524,6 +524,149 @@ For live audience questions, feed Q a small scene capsule with authorised citati
 - **Keep human-level latency as an instrumented stretch target.** Never use fake delay masking, fake clicks or fake claims to say it is achieved.
 - **Review the provisional script and approved business metrics** before any coding agent is instructed to execute the full production launch.
 
+## 16. Revision r3 — Premiere 5–7 minutes (owner change record, script PROPOSED)
+
+**What changed and who decided.**
+
+- **Runtime (owner-directed, 15 Oct 2026, directive §E):** the Investor Premiere is **ideally 5–7 minutes and never more than 10**. It replaces the 12-minute envelope in §3 mode 1 and §6.
+- **Feature Atlas** (§3 mode 3, Appendix A) stays **optional**, for serious investors who ask for depth.
+- **Unchanged:** the story spine, the approved §6 wording, the §7 interruption rules, the §9 certification rules, the locked PADL and every permission rule. r3 changes timing and chapter selection only.
+- **PROPOSED, not approved:** the timed script below. The owner reviews it before any audience run (§15). The machine script (`packages/q-pitch`) stays `DRAFT` until then.
+
+**Certification reality on 15 Oct 2026 — read before rehearsing.**
+
+- `CERTIFICATION_MANIFEST.md` holds **four** entries, all investor-side: `INV-DISCOVER-TOP3`, `INV-PROFILE-FINDINGS`, `INV-RISKS-FOLLOWUP` and `INV-COMPARE-TABLE`. They were verified on web `5ce3d76b` on 13 Oct.
+- All four are **due for re-certification**. Their `validUntil` names the model-gateway fit path, analyst schema and answer canvas, which later releases changed. On 14 Oct STATE recorded `FOLLOW_UP_REFERENCE_MISMATCH` on the risks follow-up. Before an audience run, the integration owner passes the affected ids as `staleFeatureIds` until a fresh browser receipt exists.
+- Every other scene below is a **CANDIDATE**. Some evidence exists in `docs/ai-handoff/STATE.md`, but there is no manifest entry, so the tour gate (`certifyTour`) suppresses the scene. A candidate may not be narrated as live until its entry exists.
+- **So a fully certified 5–7 minute premiere does not exist today.** The certified-only cut runs about 3½ minutes (scenes P1–P4 plus P9). The remaining minutes need four certification entries, listed in each candidate scene.
+
+**Timing basis.**
+
+- Speech runs at about 140 words per minute.
+- Q runs are timed against the single certified runs: profile settled in 14.2 s, risks in 13.9 s, comparison in 30.8 s. These are not p95 figures. Each scene is long enough for its run, and Q narrates the BEFORE_ACK lines while the action is pending.
+- The figures are never spoken: the manifest forbids "instant" and "fast comparison".
+
+### 16.1 Headline script — target 6:30 (envelope 5:00–7:00, hard stop 10:00)
+
+| #   | Time      | Scene (chapter)                              | Mapped feature                                               | Status on 15 Oct                         |
+| --- | --------- | -------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------- |
+| P1  | 0:00–0:30 | Opening: "Not another deck"                  | connective only, then `INV-DISCOVER-TOP3`                    | CERTIFIED (re-cert due)                  |
+| P2  | 0:30–1:15 | The mandate's top three                      | `INV-DISCOVER-TOP3.c1`                                       | CERTIFIED (re-cert due)                  |
+| P3  | 1:15–2:15 | One company, on the evidence                 | `INV-PROFILE-FINDINGS.c1`, `INV-RISKS-FOLLOWUP.c1`           | CERTIFIED (re-cert due; 14 Oct mismatch) |
+| P4  | 2:15–3:10 | Side by side against the mandate             | `INV-COMPARE-TABLE.c1`, `.c2`                                | CERTIFIED (re-cert due)                  |
+| P5  | 3:10–4:05 | GateQ: the front door, and a dossier         | candidate `GATEQ-TEXT-DOSSIER`                               | CANDIDATE — no entry                     |
+| P6  | 4:05–4:40 | Privacy: what Q knows is not what you see    | candidate `TRUST-CROSS-ROLE-DENIAL`                          | CANDIDATE — no entry                     |
+| P7  | 4:40–5:20 | The relationship record                      | candidate `CRM-RELATIONSHIP-RECORD`                          | CANDIDATE — no entry                     |
+| P8  | 5:20–6:10 | Short Q-to-Q rehearsal (about 30 s) + review | candidate `REH-Q2Q-SHORT`                                    | CANDIDATE — no entry, not built (§16.4)  |
+| P9  | 6:10–6:30 | Back Home: "Your move"                       | connective; hand-off to live Q (governed path, not scripted) | connective (no claim)                    |
+
+Speaking beats use §6 wording unless marked **(r3 wording)**. `[act]` is the typed action dispatched; `[ack]` marks the line Q says only after the browser DONE receipt.
+
+**P1 — Opening (0:00–0:30, about 55 words).**
+
+- `[act]` `openRoute DISCOVER` (the demo-data banner stays visible).
+- Q: "Hello. I'm Q. Usually, someone would show you twenty slides about how clever their platform is. I'd rather show you what it actually does."
+- Q: "Capital Q has one job: help the right businesses and investors reach better-informed decisions with less wasted effort."
+- The "you can interrupt me" sentence returns only when pause and interrupt are certified (QP-F09).
+
+**P2 — Top three (0:30–1:15, about 60 words, plus a run of about 3–4 s).**
+
+- Q (pending): "Before I look for a company, I should know what you want—and what you absolutely don't. Your mandate is a decision policy, not a keyword search."
+- `[act]` `askApprovedQuestion q.top-three`.
+- `[ack]` Q: "These are the three companies that fit your mandate best, each on its own card." (`INV-DISCOVER-TOP3.c1`)
+- `[ack]` Q: "Fit isn't the same thing as quality—and neither tells me you're interested."
+
+**P3 — One company (1:15–2:15, about 75 words, plus runs of about 14 s and 14 s).**
+
+- `[act]` `openCompany ledgerfold`.
+- Q (pending): "A pitch is a claim about the future. An investment decision needs a view of the present."
+- `[act]` `askApprovedQuestion q.company-profile`.
+- Q: "So I separate what the founder stated, what the documents support, what's missing, and what we haven't verified." (`INV-PROFILE-FINDINGS.c1`)
+- `[act]` `askApprovedQuestion q.company-risks`.
+- `[ack]` Q: "If you want to challenge my analysis, each risk here carries its source and the uncertainty I've stated." (`INV-RISKS-FOLLOWUP.c1`)
+- `[ack]` Q: "Sometimes the strongest answer is a precise 'we don't know yet.'"
+
+**P4 — Comparison (2:15–3:10, about 55 words, plus a run of about 31 s).**
+
+- Q (pending): "These companies aren't interchangeable. One may fit your cheque and stage. Another may have stronger recorded evidence but miss a key mandate condition."
+- `[act]` `buildComparison q.compare-two [ledgerfold, f2]`. Q is silent while it runs. No filler, no fake typing.
+- `[ack]` Q: "Here they are side by side against your mandate, in one table." (`INV-COMPARE-TABLE.c1`)
+- `[ack]` Q: "Where one of them has no record for a measure, it says 'Not recorded'. Unknown isn't a low score." (`.c2`)
+
+**P5 — GateQ (3:10–4:05, about 80 words). CANDIDATE.**
+
+- Evidence today: STATE reports an operator-run production `71c5` founder journey (contact, four-step form, adaptive interview, explicit Submit, then the exact investor dossier and transcript) and a foreign investor receiving 404. There is no manifest entry, and investor Q over the dossier is a known defect (PR #98, unreleased).
+- `[act]` `openRoute GATEWAY`, then `selectTab tab.inbox`. Opening a submitted application through `focusGateQApplication` is BACKED but EXCLUDED until certified (QP-F01).
+- Q: "Discovery is how you find the right companies. GateQ is how the right applicants reach you—on your terms."
+- `[ack]` Q: "The founder reviews exactly what will be submitted. You receive the authorised dossier, not their entire private conversation with me."
+- Needs: an entry naming the submitted fixture application, the investor actor and a browser receipt on the current release. Interview footage, if any, is labelled "highlights from a completed interview" (§6 06:25).
+
+**P6 — Privacy boundary (4:05–4:40, about 50 words). CANDIDATE.**
+
+- `[act]` `askApprovedQuestion q.private-runway` (new approved question; the owner reviews its wording) from the investor workspace.
+- `[ack]` Q: "I might know something in a founder's private workspace. That doesn't make it yours to see. If they haven't shared it, I won't tell you—or use it to quietly distort your ranking."
+- Needs: a browser receipt of the server-side refusal, plus API and RLS negative tests named in the entry. Not a frontend mask.
+
+**P7 — Relationship record (4:40–5:20, about 50 words). CANDIDATE.**
+
+- Evidence today: H2 founder desktop PASS on production `48c6f1e7` (private receipt, STATE 14 Oct). Investor-role, tablet and Q-control acceptance are pending.
+- `[act]` `openRoute RELATIONSHIPS`, then `scrollTo` a registered `section.*` id (to confirm against the capability parity list).
+- `[ack]` Q: "What usually gets lost after the first meeting? Context. One relationship record, with its state derived from what actually happened."
+- Never claim a meeting, commitment or investment that the seeded canonical events do not contain.
+
+**P8 — Short Q-to-Q rehearsal (5:20–6:10). CANDIDATE, not built.**
+
+- Q (pending): "Before a founder meets an investor, it helps to rehearse the hard questions. This is a labelled simulation, not a real conversation."
+- `[act]` start a demo rehearsal through the existing rehearsal session contract. The counterpart and Q exchange demo-role turns for about 30 s. Q ends it with an explicit end action.
+- `[ack]` Q reads the real transcript and the saved review, then summarises one follow-up question from it. Nothing is invented.
+- Fallback: open an existing completed rehearsal review (A2), and say so.
+- Needs: §16.4 audio separation and a no-command-loop test, a cost approval for any voice or video provider, and a browser receipt.
+
+**P9 — Close (6:10–6:30, about 40 words).**
+
+- `[act]` `openRoute HOME`.
+- Q: "You don't have to take my word for it. Ask me the question you'd normally ask an investment associate—and open the evidence behind my answer. Your move."
+- After this line, answers are live governed Q and are labelled live. They are not replayed script (§7 "Are you just reading a script?").
+
+### 16.2 Alternative if GateQ video, or GateQ itself, is not ready
+
+GateQ **video** is not in the headline script under any variant. The interview is shown as text, or labelled as highlights.
+
+| Variant                      | Change                                                                                                                                                                                             | Runtime |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| **A — GateQ text certified** | Run as written (P5 shows the inbox and one submitted dossier in text)                                                                                                                              | 6:30    |
+| **B — GateQ not certified**  | Drop P5. Extend P4 by 15 s to open one "Not recorded" cell. Open P7 with: "When a founder applies through your gateway, it lands here, and only what they submitted." (r3 wording, no GateQ claim) | 5:50    |
+| **C — certified-only today** | P1–P4 plus P9; P5–P8 suppressed by the gate                                                                                                                                                        | 3:35    |
+
+Variant C is shorter than the 5-minute floor. It must not be padded with uncertified scenes or slower speech to reach five minutes. Offer the Atlas, or live questions, instead.
+
+### 16.3 Two-minute emergency script (certified-only)
+
+For a cut-short meeting, a failing network, or a rehearsal where only the four entries pass the gate.
+
+| Time      | Beat                                                                                                                              | Feature                 |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| 0:00–0:15 | "I'm Q. Rather than slides, let me show you one decision, on the evidence." (r3 wording) `[act]` `openRoute DISCOVER`             | connective              |
+| 0:15–0:40 | `[act]` `askApprovedQuestion q.top-three`. `[ack]` "These are the three companies that fit your mandate best… Fit isn't quality." | `INV-DISCOVER-TOP3.c1`  |
+| 0:40–1:30 | `[act]` `openCompany ledgerfold`, then `q.company-risks`. `[ack]` "Each risk carries its source and the uncertainty I've stated." | `INV-RISKS-FOLLOWUP.c1` |
+| 1:30–2:00 | Back Home: "Ask me the question you'd ask an associate—and open the evidence behind my answer." Live Q from here.                 | connective              |
+
+The comparison (a run of about 31 s) is left out because it does not fit two minutes. Offer it as the first follow-up.
+
+### 16.4 Audio and control separation (prerequisite for P8 and for any voice tour)
+
+- **Four sources, kept separate at the transport and event level:** `AUDIENCE_MIC`, `NARRATOR_Q`, `REHEARSAL_COUNTERPART` and `SCRIPT` (sealed lines).
+- **Only `AUDIENCE_MIC` intents control the tour.** They must be validated typed intents (pause, resume, back, skip, jump, repeat, question). A transcript from a synthetic voice is never parsed for commands, whatever it says.
+- **Duplex gating:** while narrator or counterpart audio plays, the audience channel is echo-cancelled. Tour control accepts barge-in only through a validated intent tagged `AUDIENCE_MIC`. Text pattern matching and turn-taking heuristics are not the control boundary.
+- **Required tests:** a counterpart utterance "Q, skip to GateQ" changes nothing, and Q narrating a command phrase does not re-enter the director.
+
+### 16.5 What the owner is asked to approve
+
+1. The P1–P9 order and the r3 wording marked above.
+2. The new approved question `q.private-runway` (P6).
+3. Whether Variant B or C runs if GateQ is not certified on the day.
+4. That P8 stays out of audience runs until §16.4 is built and certified, and a provider cost is approved.
+
 ## Appendix A — Deep-dive scenes for "Show me everything" mode
 
 These do not interrupt the 12-minute premiere unless requested. Each is 45–120 seconds, with a scene-specific evidence manifest, route and result check. They are not a promise that every capability is release-ready today.
@@ -624,4 +767,9 @@ These do not interrupt the 12-minute premiere unless requested. Each is 45–120
 | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | 2026-10-13 | r1       | Initial blueprint recorded from the product owner's owner-review draft. Q Pitch foundations (P0–P1) authorised in an isolated lane; the premiere and launch remain subject to §15 review. | Product owner (13 Oct 2026 messages) |
 
+| 2026-10-15 | r3 | Investor Premiere runtime 5–7 min (max 10); the Feature Atlas stays optional (§16). Runtime and chapter-selection change only; the timed script itself is PROPOSED below. | Product owner (directive 2026-10-15 §E) |
+
 Proposed revisions go below this line as `PROPOSED rN — summary — proposer — date` until the owner approves them.
+
+- PROPOSED r2 — add `askApprovedQuestion` (a governed Q run by approved question id) to the §5 primitives (audit QP-F01 §3) — Lane B — 2026-10-13
+- PROPOSED r3-script — the §16.1 timed script, the §16.2 variants, the §16.3 emergency script and the new approved question `q.private-runway` — Lane P — 2026-10-15

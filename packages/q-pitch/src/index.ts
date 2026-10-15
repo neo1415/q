@@ -2,6 +2,17 @@ export * from "./tour-action.js";
 export * from "./scene-evidence.js";
 export * from "./script.js";
 export * from "./guide.js";
+export * from "./control-channel.js";
+export {
+  routeMatchesPattern,
+  TourRunner,
+  type ActionOutcome,
+  type PrepareOutcome,
+  type TourNotice,
+  type TourPorts,
+  type TourRunnerOptions,
+  type TourSnapshot,
+} from "./tour-runner.js";
 export {
   cursorOf,
   startTour,
@@ -26,3 +37,21 @@ export {
   PILOT_CERTIFICATION_LEDGER,
   PILOT_SCRIPT,
 } from "./pilot.js";
+export {
+  runShortRehearsal,
+  SHORT_REHEARSAL_MAX_MS,
+  SHORT_REHEARSAL_MIN_MS,
+  type RehearsalPorts,
+  type RehearsalRead,
+  type RehearsalTurn,
+  type ShortRehearsalOutcome,
+  type ShortRehearsalPlan,
+} from "./q2q-rehearsal.js";
+export {
+  CAPITAL_Q_KNOWLEDGE_PACK,
+  KnowledgePackSchema,
+  PackEntrySchema,
+  packEntriesFor,
+  type KnowledgePack,
+  type PackEntry,
+} from "./knowledge-pack.js";
