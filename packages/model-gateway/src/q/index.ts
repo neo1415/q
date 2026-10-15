@@ -226,7 +226,11 @@ import type { QTurnSkimmer } from "./turn-skim.js";
 export { arrivalSnapshotFact };
 import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
-import { manifestFacts, manifestReads } from "./manifest-fact.js";
+import {
+  manifestFacts,
+  manifestReads,
+  selectedDossierRead,
+} from "./manifest-fact.js";
 import { onScreenDailyFact } from "./daily-fact.js";
 import { ownDayFact, type OwnRehearsal } from "./own-day.js";
 import {
@@ -2157,7 +2161,16 @@ export function createModelGatewayQAnswer(
       await arrivalRead();
       const snapshot = arrivalData;
       if (snapshot === null) return null;
-      if (quick) return arrivalFollowUpAnswer(latest.content, snapshot);
+      if (quick) {
+        return arrivalFollowUpAnswer(
+          latest.content,
+          snapshot,
+          earlier
+            .filter((message) => message.role === "USER")
+            .slice(-2)
+            .map((message) => message.content),
+        );
+      }
       const named = snapshot.items.filter((item) => item.counterpart !== null);
       if (named.length === 0 || dependencies.arrivalSkim === undefined) {
         return null;
@@ -2194,6 +2207,131 @@ export function createModelGatewayQAnswer(
       return null;
     };
     const arrivalDecision = decideArrival().catch(() => null);
+    const offerRead = timed(
+      "offer",
+      phased("offer", () => tools.offer(toolContext)),
+    );
+    // The facts read for every turn are read by code, so a turn's focus
+    // (which narrows only what the model is offered) never removes them.
+    const availableRead =
+      tools.available === undefined
+        ? Promise.resolve(null)
+        : timed(
+            "available",
+            phased(
+              "available",
+              () => tools.available?.(toolContext) ?? Promise.resolve(null),
+            ),
+          );
+    /**
+     * The tools the prefetch may run: only tools the run may use (the
+     * research filter decided later never touches them), and none for an
+     * arrival follow-up the snapshot answers.
+     *
+     * S6 (lane S, live 2026-10-15 run ddf0738b, a GateQ dossier review,
+     * 6.9 s to first text): the screen's own reads -- the selected
+     * dossier's summarise, the page's records, the open document -- waited
+     * for context assembly and memory (~0.8 s that day) though they need
+     * only this set, known in ~10 ms. They now start from it, with the
+     * same tools, plan and tool context, as the asker.
+     */
+    const prefetchToolsRead = (async (): Promise<{
+      readonly names: ReadonlySet<string>;
+      readonly arrivalAnswer: ArrivalReply | null;
+    }> => {
+      const [offered, available] = await Promise.all([
+        offerRead,
+        availableRead,
+      ]);
+      const arrivalAnswer = arrivalByCode ? await arrivalDecision : null;
+      return {
+        arrivalAnswer,
+        names: new Set(
+          arrivalAnswer !== null
+            ? []
+            : (available ?? offered).map((tool) => tool.definition.name),
+        ),
+      };
+    })();
+    // A failed offer fails the turn where it is awaited below, never here.
+    prefetchToolsRead.catch(() => undefined);
+    /**
+     * The document Q made for them that is open on their screen, read for
+     * them (voiceq-63, founder live 2026-10-04: Q opened the prep PDF and
+     * could not read what it showed). Through read_my_document under the
+     * plan, as the asker; its words are their document's, data to read
+     * out or summarise, never instructions.
+     */
+    let onScreenDocument: AuthorisedFact | null = null;
+    let onScreenDocumentCall: QToolCallObservation | null = null;
+    const documentRead = (async (): Promise<void> => {
+      const artifactId = plan.screen?.artifactId;
+      if (artifactId === undefined) return;
+      const { names } = await prefetchToolsRead;
+      if (!names.has("read_my_document")) return;
+      const call = {
+        callId: "q-on-screen-document",
+        name: "read_my_document",
+        arguments: { artifactId },
+      };
+      const outcome = await tools.execute(call, toolContext);
+      onScreenDocumentCall = {
+        toolName: outcome.toolName,
+        providerName: call.name,
+        status: outcome.status,
+        failureCode: outcome.failureCode,
+        latencyMs: outcome.latencyMs,
+      };
+      if (outcome.result.ok) {
+        onScreenDocument = onScreenDocumentFact(outcome.result.data);
+      }
+    })();
+    // Awaited with the other reads below; a failure there is as before.
+    documentRead.catch(() => undefined);
+    /**
+     * Q room R1: the whole page on their screen (sections, tab, filters,
+     * open windows), sent as ids only and read back here through the read
+     * tools the model could call, under the same plan, as the asker. A ref
+     * whose read is refused is dropped unread; nothing the browser wrote
+     * reaches the model.
+     */
+    let onScreenPage: readonly AuthorisedFact[] = [];
+    /** The selected GateQ application's submitted dossier was read for them. */
+    let onScreenDossier = false;
+    const onScreenPageCalls: QToolCallObservation[] = [];
+    const pageRead = (async (): Promise<void> => {
+      const manifest = plan.screen?.manifest;
+      if (manifest === undefined) return;
+      const { names } = await prefetchToolsRead;
+      const reads = manifestReads(manifest, names);
+      const results = new Map<string, unknown>();
+      await Promise.all(
+        reads.map(async (read, index) => {
+          const outcome = await tools
+            .execute(
+              {
+                callId: `q-on-screen-page-${String(index)}`,
+                name: read.name,
+                arguments: { ...read.arguments },
+              },
+              toolContext,
+            )
+            .catch(() => null);
+          if (outcome === null) return;
+          onScreenPageCalls.push({
+            toolName: outcome.toolName,
+            providerName: read.name,
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          });
+          if (outcome.result.ok) results.set(read.key, outcome.result.data);
+        }),
+      );
+      onScreenPage = manifestFacts(manifest, results);
+      onScreenDossier = selectedDossierRead(manifest, results);
+    })();
+    pageRead.catch(() => undefined);
     const [assembled, profile, offeredForRun, availableForRun, memory] =
       await Promise.all([
         timed(
@@ -2204,22 +2342,8 @@ export function createModelGatewayQAnswer(
           "profile",
           phased("profile", () => communication.profileFor(request)),
         ),
-        timed(
-          "offer",
-          phased("offer", () => tools.offer(toolContext)),
-        ),
-        // The facts read for every turn are read by code, so a turn's
-        // focus (which narrows only what the model is offered) never
-        // removes them.
-        tools.available === undefined
-          ? Promise.resolve(null)
-          : timed(
-              "available",
-              phased(
-                "available",
-                () => tools.available?.(toolContext) ?? Promise.resolve(null),
-              ),
-            ),
+        offerRead,
+        availableRead,
         timed(
           "memory",
           phased("memory", () =>
@@ -2227,18 +2351,7 @@ export function createModelGatewayQAnswer(
           ),
         ),
       ]);
-    // The prefetch below reads only tools the run may use; the research
-    // filter decided later never touches them.
-    const arrivalAnswer = arrivalByCode ? await arrivalDecision : null;
-    // An arrival follow-up the snapshot answers reads nothing else: no
-    // prefetch tool is run for it.
-    const prefetchTools = new Set(
-      arrivalAnswer !== null
-        ? []
-        : (availableForRun ?? offeredForRun).map(
-            (tool) => tool.definition.name,
-          ),
-    );
+    const { arrivalAnswer, names: prefetchTools } = await prefetchToolsRead;
 
     /**
      * Their own declared profile, read for them (CQ-QX-007; directive
@@ -2641,76 +2754,6 @@ export function createModelGatewayQAnswer(
       }
     })();
     /**
-     * The document Q made for them that is open on their screen, read for
-     * them (voiceq-63, founder live 2026-10-04: Q opened the prep PDF and
-     * could not read what it showed). Through read_my_document under the
-     * plan, as the asker; its words are their document's, data to read
-     * out or summarise, never instructions.
-     */
-    let onScreenDocument: AuthorisedFact | null = null;
-    let onScreenDocumentCall: QToolCallObservation | null = null;
-    const documentRead = (async (): Promise<void> => {
-      const artifactId = plan.screen?.artifactId;
-      if (artifactId === undefined || !prefetchTools.has("read_my_document")) {
-        return;
-      }
-      const call = {
-        callId: "q-on-screen-document",
-        name: "read_my_document",
-        arguments: { artifactId },
-      };
-      const outcome = await tools.execute(call, toolContext);
-      onScreenDocumentCall = {
-        toolName: outcome.toolName,
-        providerName: call.name,
-        status: outcome.status,
-        failureCode: outcome.failureCode,
-        latencyMs: outcome.latencyMs,
-      };
-      if (outcome.result.ok) {
-        onScreenDocument = onScreenDocumentFact(outcome.result.data);
-      }
-    })();
-    /**
-     * Q room R1: the whole page on their screen (sections, tab, filters,
-     * open windows), sent as ids only and read back here through the read
-     * tools the model could call, under the same plan, as the asker. A ref
-     * whose read is refused is dropped unread; nothing the browser wrote
-     * reaches the model.
-     */
-    let onScreenPage: readonly AuthorisedFact[] = [];
-    const onScreenPageCalls: QToolCallObservation[] = [];
-    const pageRead = (async (): Promise<void> => {
-      const manifest = plan.screen?.manifest;
-      if (manifest === undefined) return;
-      const reads = manifestReads(manifest, prefetchTools);
-      const results = new Map<string, unknown>();
-      await Promise.all(
-        reads.map(async (read, index) => {
-          const outcome = await tools
-            .execute(
-              {
-                callId: `q-on-screen-page-${String(index)}`,
-                name: read.name,
-                arguments: { ...read.arguments },
-              },
-              toolContext,
-            )
-            .catch(() => null);
-          if (outcome === null) return;
-          onScreenPageCalls.push({
-            toolName: outcome.toolName,
-            providerName: read.name,
-            status: outcome.status,
-            failureCode: outcome.failureCode,
-            latencyMs: outcome.latencyMs,
-          });
-          if (outcome.result.ok) results.set(read.key, outcome.result.data);
-        }),
-      );
-      onScreenPage = manifestFacts(manifest, results);
-    })();
-    /**
      * Their day: now in their zone, calls and reminders for 7 days, what
      * waits for their approval, Q's work for them, their last rehearsals
      * (founder demo 2026-10-02). Own records only, through the tools the
@@ -2970,6 +3013,7 @@ export function createModelGatewayQAnswer(
       onScreenDocument,
       onScreenDocumentCall,
       onScreenPage,
+      onScreenDossier,
       onScreenPageCalls,
       arrival,
       arrivalAnswer,
@@ -3099,6 +3143,7 @@ export function createModelGatewayQAnswer(
         onScreenDocument,
         onScreenDocumentCall,
         onScreenPage,
+        onScreenDossier,
         onScreenPageCalls,
         pitchMoment,
         fitSweep,
@@ -3222,6 +3267,7 @@ export function createModelGatewayQAnswer(
         prepared: {
           mandate: ownProfile !== null,
           onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
+          focusDossier: onScreenDossier,
           qWork: true,
           ownCompany: ownCompany !== null,
         },
@@ -3264,6 +3310,7 @@ export function createModelGatewayQAnswer(
         prepared: {
           mandate: ownProfile !== null,
           onScreenRecord: onScreenCompany !== null || onScreenDocument !== null,
+          focusDossier: onScreenDossier,
           qWork: wideReads.ownDay !== null,
           ownCompany: ownCompany !== null,
         },

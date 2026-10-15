@@ -13,6 +13,7 @@ import {
   MANIFEST_COMPANY_READS_MAX,
   manifestFacts,
   manifestReads,
+  selectedDossierRead,
 } from "../src/q/manifest-fact.js";
 
 /**
@@ -124,7 +125,26 @@ describe("the selected GateQ dossier", () => {
           .map((f) => f.statement)
           .join("\n"),
       ).not.toContain("Foreign secret");
+      // S6: nor does such a read count as the dossier being read (routing).
+      expect(selectedDossierRead(manifest, new Map([[key, result]]))).toBe(
+        false,
+      );
     }
+  });
+  it("S6: counts the dossier as read only for the focused application's own DONE reading", () => {
+    const done = new Map([
+      [
+        `gateq_inbox_summarise:${id(7)}`,
+        { status: "DONE", says: "Read", reading: sourceReading("Facts") },
+      ],
+    ]);
+    expect(selectedDossierRead(manifest, done)).toBe(true);
+    expect(selectedDossierRead(manifest, new Map())).toBe(false);
+    const company = QPageManifestSchema.parse({
+      ...manifest,
+      focus: { kind: "COMPANY", id: id(7) },
+    });
+    expect(selectedDossierRead(company, done)).toBe(false);
   });
   it("follows a changed focus and never reuses the previous application's reading", () => {
     const results = new Map<string, unknown>([
