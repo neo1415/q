@@ -1396,23 +1396,17 @@ describe("sourced public research follow-up continuity", () => {
     ).toBe(false);
   });
 
-  it.each([
-    ["new named target", true, false],
-    ["changed selected company", false, true],
-  ])(
-    "does not carry stale research into %s",
-    (_label, aboutNamedOther, selectedCompany) => {
-      const { asked, answer } = priorResearch();
-      expect(
-        publicResearchFollowUp({
-          history: [asked, answer],
-          question: "Compare their competitors",
-          aboutNamedOther,
-          selectedCompany,
-        }),
-      ).toBeNull();
-    },
-  );
+  it("does not carry stale research into a turn the reader read as naming someone new", () => {
+    const { asked, answer } = priorResearch();
+    expect(
+      publicResearchFollowUp({
+        history: [asked, answer],
+        question: "Compare their competitors",
+        aboutNamedOther: true,
+        selected: null,
+      }),
+    ).toBeNull();
+  });
 
   it("never promotes a source title that the person did not name", () => {
     const { asked, answer } = priorResearch(["Unrelated Business"]);
@@ -1421,7 +1415,7 @@ describe("sourced public research follow-up continuity", () => {
         history: [asked, answer],
         question: "What are they doing?",
         aboutNamedOther: false,
-        selectedCompany: false,
+        selected: null,
       }),
     ).toBeNull();
   });
@@ -1434,7 +1428,7 @@ describe("sourced public research follow-up continuity", () => {
     const input = {
       question: "What are they doing?",
       aboutNamedOther: false,
-      selectedCompany: false,
+      selected: null,
     };
     expect(
       publicResearchFollowUp({
@@ -1469,7 +1463,7 @@ describe("sourced public research follow-up continuity", () => {
     const input = {
       question: "What are they doing?",
       aboutNamedOther: false,
-      selectedCompany: false,
+      selected: null,
     };
     expect(
       publicResearchFollowUp({
@@ -1484,6 +1478,153 @@ describe("sourced public research follow-up continuity", () => {
           { ...asked, runId: RUN as QConversationMessage["runId"] },
           answer,
         ],
+      }),
+    ).toBeNull();
+  });
+});
+
+/**
+ * Who "they" is in a research follow-up (lead decision 2026-10-15): the
+ * different company the last turn named; otherwise the selected company;
+ * never their own company unless the last turn was about it.
+ */
+describe("research follow-up pronouns", () => {
+  const SELECTED = "5e1ec7ed-0000-4000-8000-000000000001";
+  const OWN = "0a0a0a0a-0000-4000-8000-000000000002";
+  const at = (n: number) => `2026-10-15T07:0${String(n)}:00.000Z`;
+  const base = {
+    id: randomUUID() as QConversationMessage["id"],
+    tenantId: randomUUID() as QConversationMessage["tenantId"],
+    conversationId: randomUUID() as QConversationMessage["conversationId"],
+    contentType: "TEXT" as const,
+  };
+  const exchange = (
+    asked: string,
+    blocks: NonNullable<QConversationMessage["blocks"]>,
+  ): QConversationMessage[] => {
+    const runId = randomUUID() as QConversationMessage["runId"];
+    return [
+      { ...base, runId, role: "USER", content: asked, createdAt: at(1) },
+      {
+        ...base,
+        id: randomUUID() as QConversationMessage["id"],
+        runId,
+        role: "Q",
+        content: "Public sources say...",
+        createdAt: at(2),
+        blocks,
+      },
+    ];
+  };
+  const source = (title: string) => ({
+    kind: "PUBLIC_SOURCE" as const,
+    title,
+    url: "https://example.org/a",
+    domain: "example.org",
+    publishedOn: null,
+    retrievedOn: "2026-10-15T07:00:00.000Z",
+  });
+  const northstar = exchange(
+    "Search online for Northstar Aviation's competitors in Nigeria.",
+    [source("Northstar Aviation | About")],
+  );
+
+  it("a different company named by the last turn is 'they', even with another selected", () => {
+    expect(
+      publicResearchFollowUp({
+        history: northstar,
+        question: "What is their pricing?",
+        aboutNamedOther: false,
+        selected: { companyId: SELECTED, name: "Maji Loop", own: false },
+      }),
+    ).toEqual({
+      target: "GENERAL",
+      entityName: "Northstar Aviation",
+      query: "Northstar Aviation competitors What is their pricing?",
+    });
+  });
+
+  it("the selected company is 'they' when the last turn named no other", () => {
+    const aboutSelected = exchange("Research Maji Loop's competitors online", [
+      source("Water kiosks in Nairobi"),
+      { kind: "COMPANY_REFERENCE", companyId: SELECTED },
+    ]);
+    for (const history of [[], aboutSelected]) {
+      expect(
+        publicResearchFollowUp({
+          history,
+          question: "What is their pricing?",
+          aboutNamedOther: false,
+          selected: { companyId: SELECTED, name: "Maji Loop", own: false },
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("a last turn that named the selected company itself keeps the selected company", () => {
+    const named = exchange("Search online for Maji Loop Kenya pricing", [
+      source("Maji Loop Kenya | Home"),
+    ]);
+    expect(
+      publicResearchFollowUp({
+        history: named,
+        question: "Who are their rivals?",
+        aboutNamedOther: false,
+        selected: { companyId: SELECTED, name: "Maji Loop Kenya", own: false },
+      }),
+    ).toBeNull();
+  });
+
+  it("never their own company unless the last turn was about it", () => {
+    const own = { companyId: OWN, name: "Maji Loop", own: true };
+    // No last turn, or one about something else: research attaches to no one.
+    for (const history of [
+      [],
+      exchange("What's the weather in Nairobi?", []),
+    ]) {
+      expect(
+        publicResearchFollowUp({
+          history,
+          question: "What are they charging?",
+          aboutNamedOther: false,
+          selected: own,
+        }),
+      ).toEqual({ target: "GENERAL", query: "What are they charging?" });
+    }
+    // The last turn was about their own company: it stays the subject.
+    for (const history of [
+      exchange("How is my raise going?", [
+        { kind: "COMPANY_REFERENCE", companyId: OWN },
+      ]),
+      exchange("Search online for what people say about Maji Loop", []),
+    ]) {
+      expect(
+        publicResearchFollowUp({
+          history,
+          question: "What are they charging?",
+          aboutNamedOther: false,
+          selected: own,
+        }),
+      ).toBeNull();
+    }
+    // A different company named by the last turn still wins.
+    expect(
+      publicResearchFollowUp({
+        history: northstar,
+        question: "What are they charging?",
+        aboutNamedOther: false,
+        selected: own,
+      })?.entityName,
+    ).toBe("Northstar Aviation");
+  });
+
+  it("words with no pronoun are the ordinary path's", () => {
+    expect(
+      publicResearchFollowUp({
+        history: northstar,
+        question: "Research the Nigerian aviation market",
+        aboutNamedOther: false,
+        selected: { companyId: SELECTED, name: "Maji Loop", own: false },
       }),
     ).toBeNull();
   });

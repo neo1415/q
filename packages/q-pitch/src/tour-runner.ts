@@ -1,4 +1,5 @@
 import {
+  classifyAudienceSpeech,
   TourControlGate,
   type ControlDecision,
   type DuplexState,
@@ -216,6 +217,34 @@ export class TourRunner {
   /** Transcript from any channel: recorded, never interpreted as control. */
   noteTranscript(raw: unknown): void {
     this.#gate.noteSegment(raw);
+  }
+
+  /**
+   * A final segment from the audience mic: recorded, classified by the
+   * tour's closed phrase set, and offered to the gate as a VOICE intent.
+   * A segment from any other source is only recorded. While the tour is
+   * halted, a question is not an interruption (nothing is running).
+   */
+  hearAudience(raw: unknown, duplex: DuplexState): ControlDecision | null {
+    const segment = this.#gate.noteSegment(raw);
+    if (segment === null) return null;
+    const kind = classifyAudienceSpeech(segment);
+    if (kind === null) return null;
+    const halted =
+      this.#state.phase === "PAUSED" ||
+      this.#state.phase === "INTERRUPTED" ||
+      this.#state.phase === "COMPLETE";
+    if (kind === "INTERRUPT" && halted) return null;
+    return this.control(
+      {
+        intentId: `voice-${segment.segmentId}`.slice(0, 128),
+        source: segment.source,
+        modality: "VOICE",
+        kind,
+        segmentId: segment.segmentId,
+      },
+      duplex,
+    );
   }
 
   /** A server-confirmed workspace switch (QP-F10); never a UI toggle. */

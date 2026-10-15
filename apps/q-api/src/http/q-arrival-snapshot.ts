@@ -27,6 +27,12 @@ export type ArrivalSnapshotRoutesDependencies = ActorContextDependencies & {
   readonly snapshots: {
     readonly forActor: (actor: ActorContext) => Promise<ArrivalSnapshot | null>;
     readonly invalidateActor: (userId: string) => number;
+    /**
+     * S5: after a write of theirs, end trust and rebuild in the
+     * background for this (live, just-authenticated) actor, so their next
+     * Q turn is warm. Absent: trust only ends.
+     */
+    readonly refreshAfterWrite?: ((actor: ActorContext) => void) | undefined;
   };
 };
 
@@ -64,13 +70,18 @@ export function registerArrivalSnapshotInvalidation(
   app: FastifyInstance,
   snapshots: Pick<
     ArrivalSnapshotRoutesDependencies["snapshots"],
-    "invalidateActor"
+    "invalidateActor" | "refreshAfterWrite"
   >,
 ): void {
   app.addHook("onResponse", (request, _reply, done) => {
     if (touchesSnapshotSources(request.method, request.url)) {
       try {
-        snapshots.invalidateActor(getActorContext(request).userId);
+        const actor = getActorContext(request);
+        if (snapshots.refreshAfterWrite === undefined) {
+          snapshots.invalidateActor(actor.userId);
+        } else {
+          snapshots.refreshAfterWrite(actor);
+        }
       } catch {
         // Not an authenticated request: nothing of theirs to end.
       }

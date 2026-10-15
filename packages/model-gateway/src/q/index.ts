@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import { publicResearchFollowUp } from "./research-follow-up.js";
+import {
+  publicResearchFollowUp,
+  type SelectedCompany,
+} from "./research-follow-up.js";
 
 import { z } from "zod";
 
@@ -34,7 +37,11 @@ import {
   type CompanyEditableField,
   type CorrelationId,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
+import {
+  withRoundTripPhase,
+  type DatabaseExecutor,
+  type TransactionManager,
+} from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 import {
@@ -125,6 +132,7 @@ import {
 import {
   companyFactAskOf,
   companyNameCandidates,
+  namesOnlyCompany,
   readNamedVisibleCompany,
   runNamedCompanyFact,
   type CompanyFactAnswer,
@@ -1818,6 +1826,11 @@ async function recordUserStatements(
   return recorded;
 }
 
+/** S3: a read's round trips counted under `answer.<label>` (diagnosis only). */
+function phased<T>(label: string, work: () => Promise<T>): Promise<T> {
+  return withRoundTripPhase(`answer.${label}`, work);
+}
+
 export function createModelGatewayQAnswer(
   dependencies: ModelGatewayQAnswerDependencies,
 ): ModelGatewayQAnswer {
@@ -1872,7 +1885,12 @@ export function createModelGatewayQAnswer(
         toolContext.runId,
         proposal,
         readOnlyByRun.get(toolContext.runId)?.has(proposal.name) === true,
-        () => baseTools.execute(proposal, toolContext),
+        // S3: each tool's round trips under its own phase, so the run's
+        // dbRoundTripsByPhase says which reads the answer spends them on.
+        () =>
+          withRoundTripPhase(`tool.${proposal.name}`, () =>
+            baseTools.execute(proposal, toolContext),
+          ),
       );
       runCompanies.note(toolContext.runId, outcome);
       runFits.note(toolContext.runId, outcome);
@@ -2168,16 +2186,36 @@ export function createModelGatewayQAnswer(
     const arrivalDecision = decideArrival().catch(() => null);
     const [assembled, profile, offeredForRun, availableForRun, memory] =
       await Promise.all([
-        timed("assemble", context.assemble(request)),
-        timed("profile", communication.profileFor(request)),
-        timed("offer", tools.offer(toolContext)),
+        timed(
+          "assemble",
+          phased("assemble", () => context.assemble(request)),
+        ),
+        timed(
+          "profile",
+          phased("profile", () => communication.profileFor(request)),
+        ),
+        timed(
+          "offer",
+          phased("offer", () => tools.offer(toolContext)),
+        ),
         // The facts read for every turn are read by code, so a turn's
         // focus (which narrows only what the model is offered) never
         // removes them.
         tools.available === undefined
           ? Promise.resolve(null)
-          : timed("available", tools.available(toolContext)),
-        timed("memory", recallMemory(request, conversationId, latest.content)),
+          : timed(
+              "available",
+              phased(
+                "available",
+                () => tools.available?.(toolContext) ?? Promise.resolve(null),
+              ),
+            ),
+        timed(
+          "memory",
+          phased("memory", () =>
+            recallMemory(request, conversationId, latest.content),
+          ),
+        ),
       ]);
     // The prefetch below reads only tools the run may use; the research
     // filter decided later never touches them.
@@ -2350,6 +2388,8 @@ export function createModelGatewayQAnswer(
     // K Part 4: a founder's own company from their Tier A snapshot, as a
     // fact, only where this run's plan holds that company's profile.
     let ownCompany: AuthorisedFact | null = null;
+    /** Their own company's id (a founder), whatever the plan admits. */
+    let ownCompanyId: string | null = null;
     const ownCompanyRead = (async (): Promise<void> => {
       if (ownInvestor !== null || dependencies.ownCompanySnapshot === undefined)
         return;
@@ -2357,6 +2397,7 @@ export function createModelGatewayQAnswer(
         .ownCompanySnapshot(request.actor)
         .catch(() => null);
       if (own === null) return;
+      ownCompanyId = own.companyId;
       ownCompany = ownCompanySnapshotFact(own, plan);
     })();
     const mandateRead = (async (): Promise<void> => {
@@ -2434,6 +2475,8 @@ export function createModelGatewayQAnswer(
      */
     let onScreenCompany: AuthorisedFact | null = null;
     let onScreenCompanyCall: QToolCallObservation | null = null;
+    /** Its canonical name, for who "they" is in a research follow-up. */
+    let onScreenCompanyName: string | null = null;
     const companyRead = (async (): Promise<void> => {
       if (
         counterparty?.kind !== "COMPANY" ||
@@ -2456,6 +2499,12 @@ export function createModelGatewayQAnswer(
       };
       if (outcome.result.ok) {
         onScreenCompany = onScreenCompanyFact(outcome.result.data);
+        const read: unknown = outcome.result.data;
+        const name =
+          typeof read === "object" && read !== null
+            ? (read as { readonly canonicalName?: unknown }).canonicalName
+            : undefined;
+        onScreenCompanyName = typeof name === "string" ? name : null;
       }
     })();
     /**
@@ -2858,13 +2907,13 @@ export function createModelGatewayQAnswer(
         const wideStarted = Date.now();
         const ownNamed = namedRead();
         await Promise.all([
-          timed("standing", standingDone()),
-          timed("index", indexDone()),
-          timed("onboarding", onboardingRead()),
+          timed("standing", phased("standing", standingDone)),
+          timed("index", phased("index", indexDone)),
+          timed("onboarding", phased("onboarding", onboardingRead)),
           timed("named", ownNamed),
           timed("named-visible", visibleNamedRead(ownNamed)),
-          timed("day", dayRead()),
-          timed("arrival", arrivalRead()),
+          timed("day", phased("day", dayRead)),
+          timed("arrival", phased("arrival", arrivalRead)),
         ]);
         prepareMs["wide"] = Date.now() - wideStarted;
         return {
@@ -2899,11 +2948,13 @@ export function createModelGatewayQAnswer(
       ownProfileCall,
       ownMandateData: (): unknown => ownMandateData,
       ownCompany,
+      ownCompanyId,
       ownInvestor,
       relationship,
       relationshipCall,
       onScreenCompany,
       onScreenCompanyCall,
+      onScreenCompanyName,
       onScreenDaily,
       onScreenDailyCall,
       onScreenDocument,
@@ -3019,6 +3070,8 @@ export function createModelGatewayQAnswer(
         relationshipCall,
         onScreenCompany,
         onScreenCompanyCall,
+        onScreenCompanyName,
+        ownCompanyId,
         onScreenDaily,
         onScreenDailyCall,
         onScreenDocument,
@@ -3036,6 +3089,22 @@ export function createModelGatewayQAnswer(
         attention,
         counterparty,
       } = prepared;
+      /** The selected company, for who "they" is in a research follow-up. */
+      const selectedForResearch = (): SelectedCompany | null => {
+        const subject = request.subjects.find(
+          (candidate) => candidate.kind === "COMPANY",
+        );
+        if (subject?.kind !== "COMPANY") return null;
+        return {
+          companyId: subject.companyId,
+          name:
+            counterparty?.kind === "COMPANY" &&
+            counterparty.companyId === subject.companyId
+              ? onScreenCompanyName
+              : null,
+          own: ownCompanyId !== null && subject.companyId === ownCompanyId,
+        };
+      };
       // S2b: one declared profile fact about a company named outright.
       const companyFactAsk =
         request.writingDocument !== true &&
@@ -3371,6 +3440,36 @@ export function createModelGatewayQAnswer(
           ...(personality === null ? {} : { personality }),
           ...(asker === null ? {} : { asker }),
         });
+        // S3a (live 2026-10-15, #107): the named company read ahead of the
+        // model was looked up again (company.search, company.get: two
+        // NORMAL rounds, ~3.5 s) because the turn note told it to resolve
+        // the name. A named company whose complete authorised profile this
+        // run already holds is said to be among the facts, with its id.
+        const screenFocus =
+          plan.screen?.route === "COMPANY" || plan.screen?.route === "DISCOVER"
+            ? (plan.screen.companyId ?? null)
+            : null;
+        const namedAlreadyRead = [
+          ...runCompanies.read(request.runId).profiles,
+        ].filter(
+          ([companyId, name]) =>
+            companyId !== screenFocus &&
+            containsCompanyName(latest.content, name),
+        );
+        const alreadyReadNote =
+          namedAlreadyRead.length === 0
+            ? null
+            : `Already read for this turn through get_company, with complete authorized profiles among the facts: ${namedAlreadyRead
+                .map(([companyId, name]) => `${name} (company id ${companyId})`)
+                .join(
+                  "; ",
+                )}. Use those facts and ids without calling search_companies or get_company for them again. Resolve through search_companies and get_company only a named company not listed here.`;
+        if (request.aboutNamedOther !== true && alreadyReadNote !== null) {
+          noteParts = {
+            ...noteParts,
+            turn: [alreadyReadNote, noteParts.turn].join(" "),
+          };
+        }
         if (request.aboutNamedOther === true) {
           // A reader may call an investor's selected company "other" even
           // for "the risks for this company". Its complete profile was
@@ -3395,7 +3494,11 @@ export function createModelGatewayQAnswer(
                 subject.kind === "COMPANY" &&
                 subject.companyId === screenCompanyId,
             ) &&
-            isSingleCompanyQuestion(latest.content) &&
+            (isSingleCompanyQuestion(latest.content) ||
+              namesOnlyCompany(
+                latest.content,
+                read.profiles.get(screenCompanyId) ?? null,
+              )) &&
             !/\b(?:compar(?:e|ed|ing|ison)|versus|vs|against|alongside|relative to)\b/iu.test(
               latest.content,
             );
@@ -3404,7 +3507,9 @@ export function createModelGatewayQAnswer(
             turn: [
               selectedTarget
                 ? "The current single-company question refers to the selected company whose complete, freshly read authorized profile is already among the facts. Use those facts without searching for its identity or reading the same profile again. If the question instead names a different target, resolve it through search_companies and get_company; never substitute the selected company's facts. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately."
-                : "Resolve the company named in the current question through search_companies and get_company before answering from its records. The company visible on screen is navigation context; do not substitute its facts for the named target. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately.",
+                : alreadyReadNote !== null
+                  ? `${alreadyReadNote} The company visible on screen is navigation context; do not substitute its facts for the named target. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately.`
+                  : "Resolve the company named in the current question through search_companies and get_company before answering from its records. The company visible on screen is navigation context; do not substitute its facts for the named target. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately.",
               noteParts.turn,
             ].join(" "),
           };
@@ -5009,9 +5114,7 @@ export function createModelGatewayQAnswer(
             history: earlier,
             question: latest.content,
             aboutNamedOther: request.aboutNamedOther === true,
-            selectedCompany: request.subjects.some(
-              (subject) => subject.kind === "COMPANY",
-            ),
+            selected: selectedForResearch(),
           });
           const call = {
             callId: "q-research",
@@ -5499,7 +5602,12 @@ export function createModelGatewayQAnswer(
             : null;
         const selectedCompanySubjects =
           !mentionsReadName &&
-          isSingleCompanyQuestion(latest.content) &&
+          (isSingleCompanyQuestion(latest.content) ||
+            (screenCompanyId !== null &&
+              namesOnlyCompany(
+                latest.content,
+                companiesRead.profiles.get(screenCompanyId) ?? null,
+              ))) &&
           !/\b(?:compar(?:e|ed|ing|ison)|versus|vs|against|alongside|relative to)\b/iu.test(
             latest.content,
           ) &&

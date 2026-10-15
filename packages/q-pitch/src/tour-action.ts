@@ -122,6 +122,23 @@ export const AskApprovedQuestionActionSchema = z
   })
   .strict();
 
+/**
+ * PROPOSED r3 (blueprint §16.1 P8): a short Q-to-Q rehearsal through the
+ * existing rehearsal session contracts. The narrator's side speaks only
+ * approved lines (by id), the counterpart is the actor's own rehearsal
+ * partner named by fixture key, and the session is bounded and always
+ * ended explicitly (`q2q-rehearsal.ts`).
+ */
+export const RunShortRehearsalActionSchema = z
+  .object({
+    ...base,
+    kind: z.literal("runShortRehearsal"),
+    counterpart: FixtureKeySchema,
+    lines: z.array(ApprovedQuestionIdSchema).min(1).max(4),
+    maxMs: z.number().int().min(15_000).max(45_000),
+  })
+  .strict();
+
 export const TourActionSchema = z.discriminatedUnion("kind", [
   OpenRouteActionSchema,
   OpenCompanyActionSchema,
@@ -131,6 +148,7 @@ export const TourActionSchema = z.discriminatedUnion("kind", [
   ShowQJobActionSchema,
   BuildComparisonActionSchema,
   AskApprovedQuestionActionSchema,
+  RunShortRehearsalActionSchema,
 ]);
 export type TourAction = z.infer<typeof TourActionSchema>;
 export type TourActionKind = TourAction["kind"];
@@ -144,6 +162,7 @@ export const TOUR_ACTION_KINDS = [
   "showQJob",
   "buildComparison",
   "askApprovedQuestion",
+  "runShortRehearsal",
 ] as const satisfies readonly TourActionKind[];
 export const TourActionKindSchema = z.enum(TOUR_ACTION_KINDS);
 

@@ -162,6 +162,10 @@ export {
   gateqInboxAuthority,
   ownGatewayIdFrom,
 } from "./inbox/compose.js";
+export {
+  createRelationshipGateqApplications,
+  type RelationshipGateqApplication,
+} from "./inbox/relationship-applications.js";
 export { createStartupAlerts, type StartupAlerts } from "./find/alerts.js";
 export {
   createPostgresApplicationFounders,

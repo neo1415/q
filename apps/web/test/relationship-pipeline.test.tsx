@@ -314,6 +314,12 @@ describe("real pipeline controls", () => {
     ).toBeNull();
     expect(mock.remove).not.toHaveBeenCalled();
   });
+  it("says an upper-bound total as one", () => {
+    render(
+      <RelationshipPipeline {...props} data={{ ...data, totalExact: false }} />,
+    );
+    expect(screen.getByText(/up to 2 matching relationships/)).toBeDefined();
+  });
   it("isolates another user's preferences and persists columns", () => {
     const page = render(<RelationshipPipeline {...props} />);
     const cols = screen.getByText("Columns").parentElement;
