@@ -124,12 +124,18 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
           "Next change to gateq-intake inbox/dossier or GateQ authority",
       },
     }),
-    codeEntry({
+    {
+      // Promoted 15 Oct (lead decision): browser step + API negative passed.
       featureId: "TRUST-CROSS-ROLE-DENIAL",
+      status: "PRODUCTION_LIVE_VERIFIED",
+      actorContext: PILOT_ACTOR,
       fixture:
-        "test fixtures only (q-firewall policy, q-tools discovery slate/visibility)",
+        "?qpitch=premiere privacy scene on card-1 (Duplo) from the scene-1 receipt; API negative on the fictional Ledgerfold test document 'Private runway note (test)' (data-room level PRIVATE, organisation_private)",
+      appCommit: "web/api production 41b3b4ee",
+      verifiedAt: "2026-10-15 08:21 / 08:30 UTC",
+      verifierType: "BROWSER",
       receipt:
-        "packages/q-firewall/test/policy.test.ts (22); packages/q-tools/test/discovery-slate-network.test.ts (3); packages/q-tools/test/visibility-tools.test.ts (4): 29 PASS",
+        "scratchpad qpitch-review/41b3b4ee/run-942f77cc.sse.txt + premiere-cert2-41b3b4ee.webm (answer: nothing shared, every evidenceRefs empty); privacy-negative.json (founder open 200, investor open 404, investor access 404, not listed). Code: q-firewall policy (22), q-tools slate/visibility (7) PASS",
       claimsAllowed: [
         {
           claimId: "TRUST-CROSS-ROLE-DENIAL.c1",
@@ -137,14 +143,14 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
         },
       ],
       claimsForbidden: [
-        "That Q's on-screen answer was a refusal, until a browser receipt shows it",
         "That nothing can ever leak",
+        "That Q quoted or summarised the private document",
       ],
       validUntil: {
         invalidatedBy:
-          "Next change to q-firewall scope policy or discovery slate tools",
+          "Next change to q-firewall scope policy, discovery slate tools or data-room read authorization",
       },
-    }),
+    },
     codeEntry({
       featureId: "CRM-RELATIONSHIP-RECORD",
       fixture: "test fixtures only (network state projector v1/v2)",

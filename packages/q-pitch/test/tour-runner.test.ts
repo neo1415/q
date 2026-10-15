@@ -205,7 +205,7 @@ describe("TourRunner — act, receipt, then describe", () => {
     const h = harness();
     h.runner.start();
     await flush();
-    const deadline = h.timers.find((t) => t.ms === 20_000);
+    const deadline = h.timers.find((t) => t.ms === 30_000);
     expect(deadline).toBeDefined();
     deadline?.run();
     await flush();
