@@ -30,10 +30,23 @@ begin
 exception when invalid_text_representation or numeric_value_out_of_range then return false;
 end; $$;
 revoke all on function gateq.check_disclosure_lineage(jsonb,uuid,uuid,integer) from public,anon,authenticated;
-alter table gateq.application_facts add constraint application_facts_disclosure_lineage_valid
-  check(gateq.check_disclosure_lineage(disclosure_lineage,application_id,tenant_id,null));
-alter table gateq.application_turns add constraint application_turns_disclosure_lineage_valid
-  check(gateq.check_disclosure_lineage(disclosure_lineage,application_id,tenant_id,seq));
+-- Enforced by trigger, not CHECK: a CHECK that reads other tables is not
+-- re-validated when they change, and pg_dump restores it inline with the
+-- table, before evidence/turn rows exist, so a logical restore would fail.
+create function gateq.enforce_disclosure_lineage() returns trigger language plpgsql security invoker set search_path='' as $$
+begin
+  if not gateq.check_disclosure_lineage(new.disclosure_lineage,new.application_id,new.tenant_id,
+    -- Only turns carry seq; facts read it as null without naming a missing field.
+    (to_jsonb(new)->>'seq')::integer) then
+    raise exception 'disclosure lineage is invalid' using errcode='check_violation';
+  end if;
+  return new;
+end; $$;
+revoke all on function gateq.enforce_disclosure_lineage() from public,anon,authenticated;
+create trigger application_facts_disclosure_lineage_valid before insert or update of disclosure_lineage on gateq.application_facts
+  for each row execute function gateq.enforce_disclosure_lineage();
+create trigger application_turns_disclosure_lineage_valid before insert or update of disclosure_lineage on gateq.application_turns
+  for each row execute function gateq.enforce_disclosure_lineage();
 
 create function gateq.protect_disclosure_lineage() returns trigger language plpgsql security invoker set search_path='' as $$
 begin
