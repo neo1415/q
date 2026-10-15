@@ -897,7 +897,7 @@ const SummaryIn = z
 const STAND_WORDS = {
   MEETS: "meets",
   DOES_NOT_MEET: "doesn't meet",
-  NOT_ANSWERED: "not answered",
+  NOT_ANSWERED: "needs clarification",
 } as const;
 const SUMMARISE = defineAppAction<
   z.infer<typeof SummaryIn>,
