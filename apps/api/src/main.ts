@@ -45,6 +45,7 @@ import {
 } from "@capital-q/database";
 import {
   GATEQ_VIDEO_BRIDGE_PATH,
+  GATEQ_VIDEO_EVENTS_PATH,
   CorrelationIdSchema,
   type AdminUsageDto,
   NO_RAISE_VIEW,
@@ -800,6 +801,7 @@ function composeGateqVideo(apply: {
     intake: apply.intake,
     conversation: apply.conversation,
     bridgePath: GATEQ_VIDEO_BRIDGE_PATH,
+    eventsPath: GATEQ_VIDEO_EVENTS_PATH,
   });
   // Rooms past their deadline are ended even after a restart; the
   // provider's own max_call_duration is the backstop behind this.

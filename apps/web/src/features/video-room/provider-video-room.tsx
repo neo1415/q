@@ -50,6 +50,11 @@ export type ProviderVideoRoomProps = {
   readonly tileLabel: string;
   readonly endsAt: string;
   readonly maxSeconds: number;
+  /**
+   * False while the interviewer is still joining: the full time is shown
+   * and held, and `endsAt` is only the hard stop. Defaults to true.
+   */
+  readonly clockStarted?: boolean | undefined;
   /** The primary way out, e.g. "End and see my review". */
   readonly endLabel: string;
   /** The typed or voice fallback, e.g. "Carry on by voice instead". */
@@ -73,9 +78,14 @@ export type ProviderVideoRoomProps = {
 
 export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
   const endsAt = Date.parse(props.endsAt);
-  const [left, setLeft] = useState(() =>
-    Math.max(0, Math.ceil((endsAt - Date.now()) / 1_000)),
-  );
+  const held = props.clockStarted === false;
+  const { maxSeconds } = props;
+  // Held, the time shown is the full allowance (bounded by the hard stop).
+  const remaining = () => {
+    const toStop = Math.max(0, Math.ceil((endsAt - Date.now()) / 1_000));
+    return held ? Math.min(maxSeconds, toStop) : toStop;
+  };
+  const [left, setLeft] = useState(remaining);
   const [message, setMessage] = useState<string | null>(null);
   const [joining, setJoining] = useState(true);
   const [ending, setEnding] = useState(false);
@@ -112,7 +122,7 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      const seconds = Math.max(0, Math.ceil((endsAt - Date.now()) / 1_000));
+      const seconds = remaining();
       setLeft(seconds);
       if (seconds === 0) {
         window.clearInterval(timer);
@@ -120,8 +130,9 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
       }
     }, 1_000);
     return () => window.clearInterval(timer);
-    // `end` guards itself with a ref and reads the latest callback.
-  }, [endsAt]);
+    // `end` guards itself with a ref and reads the latest callback;
+    // `remaining` reads only these three.
+  }, [endsAt, held, maxSeconds]);
 
   const minutes = Math.floor(left / 60);
   const seconds = String(left % 60).padStart(2, "0");

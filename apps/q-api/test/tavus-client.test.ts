@@ -155,6 +155,38 @@ describe("the Tavus adapter", () => {
     },
   );
 
+  it("adds at most a 30 s join grace to the provider's own cap", async () => {
+    const fetch = fakeFetch(200, {
+      conversation_id: "c1",
+      conversation_url: "https://tavus.daily.co/c1",
+      status: "active",
+    });
+    const client = createTavusClient({ apiKey: "k", fetch });
+    const base = {
+      palId: "p1",
+      faceId: "r1",
+      name: "GateQ",
+      callbackUrl: null,
+      greeting: null,
+      context: null,
+      maxCallSeconds: 180,
+      testMode: true,
+    };
+    await client
+      .createConversation({ ...base, joinGraceSeconds: 30 })
+      .catch(() => undefined);
+    const [, init] = fetch.mock.calls[0] ?? [];
+    const body = JSON.parse(String(init?.body)) as {
+      properties: { max_call_duration: number };
+    };
+    expect(body.properties.max_call_duration).toBe(210);
+    for (const joinGraceSeconds of [31, -1, 1.5])
+      await expect(
+        client.createConversation({ ...base, joinGraceSeconds }),
+      ).rejects.toMatchObject({ status: 400 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("fails with the status only, never the provider's body", async () => {
     const fetch = fakeFetch(429, { message: "secret details k-secret" });
     const failed = await createTavusClient({ apiKey: "k-secret", fetch })

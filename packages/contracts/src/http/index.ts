@@ -991,6 +991,8 @@ export {
   GATEQ_APPLY_VIDEO_PATH,
   GATEQ_APPLY_VIDEO_END_PATH,
   GATEQ_VIDEO_BRIDGE_PATH,
+  GATEQ_VIDEO_EVENTS_PATH,
+  GateqVideoProviderEventSchema,
   GATEQ_VIDEO_REFUSALS,
   GateqVideoSessionDtoSchema,
   GateqVideoStateDtoSchema,

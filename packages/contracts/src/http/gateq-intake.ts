@@ -328,6 +328,18 @@ export const GATEQ_APPLY_VIDEO_PATH = "/v1/gateq/apply/video" as const;
 export const GATEQ_APPLY_VIDEO_END_PATH = "/v1/gateq/apply/video/end" as const;
 export const GATEQ_VIDEO_BRIDGE_PATH =
   "/v1/gateq/video/bridge/chat/completions" as const;
+/**
+ * The provider's room events (its callback). The last segment is the
+ * per-session secret; only "the replica joined" is acted on.
+ */
+export const GATEQ_VIDEO_EVENTS_PATH = "/v1/gateq/video/events" as const;
+/** What the provider's callback sends; beyond these, ignored. */
+export const GateqVideoProviderEventSchema = z
+  .object({
+    event_type: z.string().max(80),
+    conversation_id: z.string().max(128).optional(),
+  })
+  .passthrough();
 export const GATEQ_VIDEO_REFUSALS = [
   "DISABLED",
   "ALLOWANCE_EXHAUSTED",
@@ -340,7 +352,16 @@ export const GateqVideoSessionDtoSchema = z
     status: z.enum(["STARTING", "LIVE", "ENDED"]),
     /** The provider's private room link, only while live. */
     joinUrl: z.string().url().max(2048).nullable(),
+    /**
+     * While `liveAt` is null this is the hard stop (ready + join grace +
+     * cap); once Q is in the room it is liveAt + maxSeconds.
+     */
     endsAt: z.string().datetime(),
+    /**
+     * When Q joined the room and the applicant's time began; null while Q
+     * is still joining. Optional so a web release can accept it first.
+     */
+    liveAt: z.string().datetime().nullable().optional(),
     maxSeconds: z.number().int().min(1).max(3600),
     endedReason: z
       .enum([
