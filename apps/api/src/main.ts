@@ -90,6 +90,7 @@ import {
   createPostgresCompanySectorsPort,
   createMaterialChanges,
   createSlateReadPipeline,
+  playablePitchPortFrom,
   createExploreService,
 } from "@capital-q/discovery";
 import {
@@ -301,6 +302,7 @@ import {
   createPostgresDiscoverablePitchQueryPort,
   createPostgresNetworkPitchQueryPort,
   createUnconfiguredVideoProvider,
+  DISCOVERABLE_PITCH_BATCH_MAX,
   MediaAssetIdSchema,
 } from "@capital-q/media";
 import {
@@ -1272,6 +1274,13 @@ const gateqInboxService = createGateqInbox({
 const slates = createSlateReadPipeline({
   sql: database.sql,
   disclosure,
+  // discover-feed-eligibility.v1, re-checked at read: a pitch that stopped
+  // being playable after the slate was built leaves a gap.
+  playablePitches: playablePitchPortFrom({
+    findDiscoverablePitches: (ids) =>
+      discoverablePitches.findDiscoverablePitches(ids),
+    batchMax: DISCOVERABLE_PITCH_BATCH_MAX,
+  }),
   // A passed company with a pitch that became playable after the pass is
   // offered again, labelled (doc 19 §67). Read per request.
   pitchTimes: {

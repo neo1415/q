@@ -418,6 +418,19 @@ export {
   type RankingReasonCode,
 } from "./ranking/config.js";
 export {
+  admitToFeed,
+  applyFeedEligibility,
+  DISCOVER_FEED_ELIGIBILITY_CURRENT,
+  DISCOVER_FEED_ELIGIBILITY_V1,
+  DISCOVER_FEED_ELIGIBILITY_VERSIONS,
+  DiscoverFeedEligibilitySchema,
+  FEED_WITHHELD_NO_PLAYABLE_PITCH,
+  playablePitchPortFrom,
+  type DiscoverFeedEligibility,
+  type FeedAdmission,
+  type PlayablePitchPort,
+} from "./ranking/feed-eligibility.js";
+export {
   FACTOR_OUTCOMES,
   FactorOutcomeSchema,
   FactorResultSchema,
