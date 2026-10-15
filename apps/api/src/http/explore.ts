@@ -1,3 +1,4 @@
+import type { ActorContext } from "@capital-q/security";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
@@ -49,6 +50,19 @@ export type ExploreRow = Parameters<typeof pitchSummary>[0] & {
 
 export type ExploreRoutesDependencies = ActorContextDependencies & {
   readonly explore: ExploreService<ExploreRow>;
+  /**
+   * Companies matched by name or description whether or not they have a
+   * pitch (owner direction 2026-10-15: a company without a video is not in
+   * the Discover video feed, but stays findable in Search and Explore).
+   * Composed with the same network-visibility rule as the pitch pool.
+   * Absent: only companies with a network pitch are found, as before.
+   */
+  readonly searchCompanies?:
+    | ((
+        actor: ActorContext,
+        text: string,
+      ) => Promise<readonly ExploreCompanyResultDto[]>)
+    | undefined;
 };
 
 function tile(
@@ -196,6 +210,14 @@ export function registerExploreRoutes(
           headquartersCountry: p.company.headquartersCountry,
           currentStageCode: p.company.currentStageCode,
         });
+      }
+      if (text.length > 0 && dependencies.searchCompanies !== undefined) {
+        const named = await dependencies
+          .searchCompanies(getActorContext(request), text)
+          .catch(() => [] as readonly ExploreCompanyResultDto[]);
+        for (const c of named) {
+          if (!companies.has(c.companyId)) companies.set(c.companyId, c);
+        }
       }
       return ExploreSearchDtoSchema.parse({
         query: text,
