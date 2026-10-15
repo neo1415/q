@@ -116,4 +116,13 @@ The four original investor entries remain due for re-certification on the deploy
 
 **Default-gate cut now:** pilot P1–P4 (3:10) + GateQ (0:55) + relationship (0:40) = **4:45**. With the Home close certified after deploy, about 5:05. With privacy and Q-to-Q (paid, after 09:00), about 6:30.
 
+## Browser receipts — production `242460c1`, 15 Oct 2026 06:11–06:15 UTC (Lane P)
+
+- **`QP-HOME-HANDOFF`: PRODUCTION_LIVE_VERIFIED.** `?qpitch=premiere`, jump to "Your move": `openRoute HOME` produced a navigation DONE receipt at `/home`, the closing lines played after it, and the scene reached its checkpoint. Every non-GET request was aborted. Receipt: `qpitch-review/242460c1/premiere-log.json` + video.
+- **CORRECTION to the 04a322ae entry above.** The guard there aborted server actions only, but Q questions use `POST /api/q-ask`. So both pilot runs (05:25 and 06:11 UTC) made **one real top-three Q run each**. The scene-1 DONE was a real run, **not** a stale-receipt defect. The `20abe295` change is kept as hardening (it binds the receipt to the exact run). Since 06:13 the guard aborts every non-GET request, and no Q run was made after that.
+- **Fixture drift:** the actor's top three are now Duplo, Bumpa and MedTrail (all level at 8.8, cheque compatibility unknown). Ledgerfold and F2 are not among them, so `s.pilot.company` / `s.pilot.compare` correctly fall back with `FIXTURE_UNRESOLVED`. **These three are not fictional-world companies.** `INV-DISCOVER-TOP3` must not be narrated for an audience until the fixture companies are confirmed fictional, and its re-certification names them.
+- **UX defect (host):** the tour opens the Q side sheet for its question, and the sheet is modal, so the tour controls are inert until it closes (Escape works). To fix in the host.
+
+**Default-gate cut on 242460c1:** pilot P1–P4 + GateQ + relationship + Home = **about 5:05**. The pilot scenes are blocked by the fixture drift above. Privacy and Q-to-Q are pending the paid run (after 08:00 UTC).
+
 Every other atlas feature currently has no certification entry and must not be presented as live.

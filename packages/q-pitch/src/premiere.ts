@@ -185,10 +185,16 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
           "Next change to rehearsal session actions or q2q-rehearsal.ts",
       },
     }),
-    codeEntry({
+    {
       featureId: "QP-HOME-HANDOFF",
-      fixture: "q-pitch runner tests (fake ports)",
-      receipt: "packages/q-pitch/test/tour-runner.test.ts: PASS",
+      status: "PRODUCTION_LIVE_VERIFIED",
+      actorContext: PILOT_ACTOR,
+      fixture: "?qpitch=premiere, chapter jump to 'Your move' (no Q run)",
+      appCommit: "web production 242460c1",
+      verifiedAt: "2026-10-15 06:15 UTC",
+      verifierType: "BROWSER",
+      receipt:
+        "scratchpad qpitch-review/242460c1/premiere-log.json + video (Playwright; every non-GET aborted)",
       claimsAllowed: [
         {
           claimId: "QP-HOME-HANDOFF.c1",
@@ -197,7 +203,7 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
       ],
       claimsForbidden: ["That later answers are scripted"],
       validUntil: { invalidatedBy: "Next change to the tour host" },
-    }),
+    },
   ]);
 
 const FALLBACK: SceneLine = {
