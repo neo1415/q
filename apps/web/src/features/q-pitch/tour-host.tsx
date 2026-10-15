@@ -370,11 +370,14 @@ function TourOverlay({
     panel === null
       ? null
       : createPortal(
+          // In flow, not absolute: the panel is a flex column, so `order-first`
+          // makes this its own strip above the header instead of covering the
+          // panel's subtitle (browser receipt 41b3b4ee, 15 Oct).
           <div
             role="toolbar"
             aria-label="Tour controls"
             data-q-pitch-panel-controls
-            className="absolute top-3 right-14 z-(--cq-z-popover) flex items-center gap-1 rounded-md border border-(--cq-border) bg-(--cq-surface-raised) p-1 shadow-(--cq-shadow-overlay)"
+            className="order-first flex shrink-0 items-center justify-end gap-1 border-b border-(--cq-border) px-4 py-2"
           >
             <TourButton label="Back" onPress={() => send("BACK")} />
             {halted ? (
