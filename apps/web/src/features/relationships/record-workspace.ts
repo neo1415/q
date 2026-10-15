@@ -2,6 +2,7 @@ import type {
   FitProfileDto,
   InterestDto,
   QWorkDto,
+  RelationshipGateqApplicationsDto,
 } from "@capital-q/contracts";
 
 import {
@@ -98,4 +99,47 @@ export function fitState(
 ): "UNAVAILABLE" | "NOT_SET_UP" | "PROFILE" {
   if (fit.kind === "UNAVAILABLE") return "UNAVAILABLE";
   return fit.value === null ? "NOT_SET_UP" : "PROFILE";
+}
+
+export type RecordGateqRow = {
+  readonly key: string;
+  readonly title: string;
+  readonly status: string;
+  readonly href: string;
+  readonly action: string;
+};
+
+/**
+ * The GateQ applications on this relationship, as the API authorised them
+ * for this side (linked by relationship id, never by name). An investor
+ * opens the exact application in their inbox; a founder opens their own
+ * applications, where drafts are resumed and submissions read.
+ */
+export function recordGateq(
+  dto: RelationshipGateqApplicationsDto,
+  day: (iso: string) => string,
+): readonly RecordGateqRow[] {
+  return dto.items.map((item) => ({
+    key: item.applicationId,
+    title:
+      item.gatewayName === null
+        ? `Application ${item.reference}`
+        : `${item.gatewayName} · ${item.reference}`,
+    status:
+      item.status === "SUBMITTED"
+        ? `Submitted${item.submittedAt === null ? "" : ` ${day(item.submittedAt)}`}`
+        : item.status === "READY_TO_SUBMIT"
+          ? `Ready to submit · started ${day(item.startedAt)}`
+          : `In progress · started ${day(item.startedAt)}`,
+    href:
+      dto.side === "INVESTOR"
+        ? `/gateq?${new URLSearchParams({ tab: "inbox", item: item.applicationId }).toString()}`
+        : "/gateq?tab=applications",
+    action:
+      dto.side === "INVESTOR"
+        ? "Open the dossier"
+        : item.status === "SUBMITTED"
+          ? "See it in your applications"
+          : "Continue it in your applications",
+  }));
 }

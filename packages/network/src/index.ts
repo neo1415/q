@@ -376,3 +376,11 @@ export {
   createRelationshipViewService,
   type RelationshipViewService,
 } from "./application/relationship-views.js";
+// CRM pipeline read model (slice 3b, 2026-10-15).
+export {
+  createRelationshipPipelineQuery,
+  PIPELINE_EXPORT_LIMIT,
+  PIPELINE_REPAIR_LIMIT,
+  type PipelinePage,
+  type RelationshipPipelineQueryService,
+} from "./application/relationship-pipeline-query.js";

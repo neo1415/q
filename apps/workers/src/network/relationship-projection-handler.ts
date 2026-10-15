@@ -56,9 +56,13 @@ export function withRelationshipProjection(
       relationshipId: relationshipId.data,
     };
     try {
-      const { projection, changed } = await projector.project(
+      const { projection, changed, readModel } = await projector.project(
         relationshipId.data,
       );
+      // The CRM pipeline read model is repaired on read; a failure here is
+      // a signal (e.g. its migration not applied), never a retry.
+      if (readModel === "FAILED")
+        logger.warn(fields, "pipeline read model write failed");
       logger.info(
         {
           ...fields,
