@@ -148,7 +148,8 @@ export function createPostgresGateqVideoSessions(deps: {
     end: async (input) => {
       const rows = await sql`
         update gateq.application_video_sessions
-           set status = 'ENDED', ended_reason = ${input.reason}, ended_at = now()
+           set status = 'ENDED', ended_reason = ${input.reason}, ended_at = now(),
+               provider_conversation_id = coalesce(provider_conversation_id, ${input.providerConversationId ?? null})
          where id = ${input.id} and status <> 'ENDED'
          returning *`;
       if (rows[0] !== undefined) return toRow(rows[0]);

@@ -33,7 +33,8 @@
 --
 -- A reservation is released (not counted) only when no provider room can
 -- exist: GateQ ended PROVIDER_FAILED with no conversation id, or a
--- rehearsal that never reached the provider. Anything else counts.
+-- rehearsal that never reached the provider. Anything else counts; a GateQ
+-- room the provider made but that failed to go live counts the full 180 s.
 --
 -- Server-only like the rest of billing: RLS on, no policy, no browser
 -- grant. Functions are SECURITY INVOKER with an empty search_path; the
@@ -273,9 +274,12 @@ create trigger application_video_session_reserve
 create function gateq.video_session_settle()
 returns trigger language plpgsql security invoker set search_path = '' as $$
 begin
+  -- A failed start with a provider room (made, then not saved as live)
+  -- may run until the provider's own cap: count it in full, never less.
   perform billing.settle_video_session(
     new.id,
-    least(new.max_seconds, ceil(extract(epoch from (new.ended_at - new.created_at)))::integer),
+    case when new.ended_reason = 'PROVIDER_FAILED' then least(new.max_seconds, 180)
+         else least(new.max_seconds, ceil(extract(epoch from (new.ended_at - new.created_at)))::integer) end,
     new.ended_reason = 'PROVIDER_FAILED' and new.provider_conversation_id is null);
   return null;
 end;

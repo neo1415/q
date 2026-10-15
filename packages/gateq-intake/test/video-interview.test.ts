@@ -90,7 +90,13 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
       const row = rows[i];
       if (row === undefined) return Promise.resolve(null);
       if (row.status !== "ENDED")
-        rows[i] = { ...row, status: "ENDED", endedReason: input.reason };
+        rows[i] = {
+          ...row,
+          status: "ENDED",
+          endedReason: input.reason,
+          providerConversationId:
+            row.providerConversationId ?? input.providerConversationId ?? null,
+        };
       return Promise.resolve(rows[i] ?? null);
     },
     openForApplication: (applicationId) =>
@@ -317,6 +323,32 @@ describe("the GateQ video interview session", () => {
       status: "ENDED",
       endedReason: "PROVIDER_FAILED",
     });
+  });
+
+  it("a room made but never saved as live is ended and recorded, so the ledger counts it in full", async () => {
+    const w = world();
+    vi.spyOn(w.store, "markLive").mockRejectedValueOnce(new Error("db blip"));
+    await expect(
+      w.video.start({ token: TOKEN, correlationId: "c" }),
+    ).rejects.toMatchObject({ reason: "PROVIDER_UNAVAILABLE" });
+    expect(w.provider.endRoom).toHaveBeenCalledWith("c1");
+    // The closed row names the room: the settle trigger then counts 180 s
+    // instead of releasing it (migration 20261226150000).
+    expect(w.store.rows[0]).toMatchObject({
+      status: "ENDED",
+      endedReason: "PROVIDER_FAILED",
+      providerConversationId: "c1",
+    });
+  });
+
+  it("a provider that made no room leaves nothing to end or count", async () => {
+    const w = world();
+    w.provider.createRoom.mockRejectedValueOnce(new Error("refused"));
+    await expect(
+      w.video.start({ token: TOKEN, correlationId: "c" }),
+    ).rejects.toMatchObject({ reason: "PROVIDER_UNAVAILABLE" });
+    expect(w.provider.endRoom).not.toHaveBeenCalled();
+    expect(w.store.rows[0]?.providerConversationId).toBeNull();
   });
 
   it("ends the provider room before recording the end, and typing continues the same interview", async () => {

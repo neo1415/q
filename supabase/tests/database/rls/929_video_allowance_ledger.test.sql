@@ -4,7 +4,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
-select plan(20);
+select plan(22);
 
 -- Isolate from any other reservations this month; the cap is tested below.
 update billing.video_allowance_config set monthly_cap_seconds = 1000000;
@@ -56,6 +56,35 @@ select lives_ok($$select billing.reserve_video_session('00000000-0000-4000-8000-
   'a second reservation');
 select lives_ok($$select billing.settle_video_session('00000000-0000-4000-8000-0000000929a2', 0, true)$$, 'it is released');
 select is((select used from billing.video_allowance_status('email:' || repeat('c', 64))), 1, 'a released session gives the allowance back');
+
+-- GateQ: a room the provider made that never went live counts in full.
+insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values
+  ('00000000-0000-4000-8000-0000000929f1', pg_temp.rls_id('tenant_b'), pg_temp.rls_id('org_b'), 'VC', 'Ledger Capital');
+insert into gateq.gateways (id, tenant_id, investor_organisation_id, organisation_id, public_id, name, created_by_user_id) values
+  ('00000000-0000-4000-8000-0000000929f2', pg_temp.rls_id('tenant_b'), '00000000-0000-4000-8000-0000000929f1', pg_temp.rls_id('org_b'),
+   'gq_23456789abcdefghjkmnpq9290', 'Ledger programme', pg_temp.rls_id('user_b'));
+insert into gateq.gateway_versions
+  (id, gateway_id, tenant_id, version_number, status, inbound_mode, public_title, qualification_policy_version,
+   created_by_user_id, published_by_user_id, published_at)
+values
+  ('00000000-0000-4000-8000-0000000929f3', '00000000-0000-4000-8000-0000000929f2', pg_temp.rls_id('tenant_b'), 1,
+   'PUBLISHED', 'QUALIFIED', 'Ledger seed', 'gateq-qualification.v1',
+   pg_temp.rls_id('user_b'), pg_temp.rls_id('user_b'), now());
+insert into gateq.applications (id, tenant_id, gateway_id, gateway_version_id, public_reference) values
+  ('00000000-0000-4000-8000-0000000929f4', pg_temp.rls_id('tenant_b'), '00000000-0000-4000-8000-0000000929f2',
+   '00000000-0000-4000-8000-0000000929f3', 'ga_23456789abcdefghjkmnpq9290');
+insert into gateq.application_video_sessions
+  (id, tenant_id, application_id, bridge_token_hash, guest_credential_sealed, max_seconds, ends_at)
+values ('00000000-0000-4000-8000-0000000929f5', pg_temp.rls_id('tenant_b'), '00000000-0000-4000-8000-0000000929f4',
+        repeat('9', 64), 'sealed:v1:opaque', 180, now() + interval '180 seconds');
+update gateq.application_video_sessions
+   set status = 'ENDED', ended_reason = 'PROVIDER_FAILED', provider_conversation_id = 'c929made', ended_at = now()
+ where id = '00000000-0000-4000-8000-0000000929f5';
+select is((select status from billing.video_session_reservations where session_id = '00000000-0000-4000-8000-0000000929f5'),
+  'SETTLED', 'a GateQ room made but never live is never released');
+select is((select billed_minutes from billing.video_usage_ledger
+            where session_id = '00000000-0000-4000-8000-0000000929f5' and event = 'SETTLED'),
+  3, 'it is counted as the full 180 seconds, never under-counted');
 
 -- Append-only and forward-only.
 select throws_ok($$update billing.video_usage_ledger set seconds = 0$$, '23514', null, 'the ledger is never rewritten');
