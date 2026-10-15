@@ -152,8 +152,8 @@ async function usageSince(userId, since) {
   return sql(
     `select task_class, model_id, cost_usd::text as usd, success
        from ai_ops.model_usage
-      where user_id = ${quote(userId)} and created_at >= ${quote(since)}
-      order by created_at`,
+      where user_id = ${quote(userId)} and occurred_at >= ${quote(since)}
+      order by occurred_at`,
   );
 }
 

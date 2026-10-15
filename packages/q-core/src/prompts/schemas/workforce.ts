@@ -519,6 +519,42 @@ export const JobPlanResultV5Schema = JobPlanResultV4Schema.extend({
 }).strict();
 export type JobPlanResultV5 = z.infer<typeof JobPlanResultV5Schema>;
 
+/**
+ * v6 (live 2026-10-15): the deployed v5 planner wrote every evidence
+ * reference in a shape the strict pattern refused (eight
+ * `steps.N.evidence.M:invalid_format`), so the whole plan was lost and Q
+ * said planning failed. A reference is now any short string; code reads
+ * the F number out of it and grounds it against the situation, so a loose
+ * shape costs that reference at most, never the plan.
+ */
+export const JOB_PLAN_V6_SCHEMA_VERSION = 6;
+const LooseRef = z.string().trim().max(120);
+const looseEvidence = z.array(LooseRef).max(12);
+export const JobPlanResultV6Schema = JobPlanResultV5Schema.extend({
+  prerequisites: z
+    .array(
+      JobPlanResultV5Schema.shape.prerequisites.element
+        .extend({ evidence: looseEvidence })
+        .strict(),
+    )
+    .max(8),
+  steps: z
+    .array(
+      JobPlanResultV5Schema.shape.steps.element
+        .extend({ evidence: looseEvidence })
+        .strict(),
+    )
+    .max(12),
+  nextActions: z
+    .array(
+      JobPlanResultV5Schema.shape.nextActions.element
+        .extend({ evidence: looseEvidence })
+        .strict(),
+    )
+    .max(6),
+}).strict();
+export type JobPlanResultV6 = z.infer<typeof JobPlanResultV6Schema>;
+
 // SUBSTANCE_CRITIQUE (2026-10-12): a second specialist's critique of a
 // prepared document, against the evidence it was built from.
 export const SUBSTANCE_CRITIQUE_SCHEMA_NAME = "SubstanceCritiqueResult";
