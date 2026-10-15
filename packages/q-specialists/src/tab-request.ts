@@ -171,6 +171,13 @@ function fromObject(rawObject: string): TabAsk | null {
     if (tab === null || name === undefined) return null;
     return { tab, subTab: null, name, viewer: tab === "deck" };
   }
+  // Lane S 2026-10-15 (audit: "show me their documents" was read as a
+  // record named "their documents"): with a pronoun, a company's documents
+  // are its data room, the record on screen. "my documents" is their own
+  // Documents page and "the documents" says whose for neither.
+  if (/^(?:their|its)\s+(?:documents?|docs|files)$/iu.test(object)) {
+    return { tab: "dataroom", subTab: null, name: null, viewer: false };
+  }
   // "the team tab", "diligence", "the deck for Nixo", "the data room of Nixo".
   const plain = new RegExp(
     `^(?:(?:the|their|its|his|her)\\s+)?(${ANY_TAB})${SUFFIX}(?:\\s+(?:for|of|at|with|from)\\s+(.+))?$`,
