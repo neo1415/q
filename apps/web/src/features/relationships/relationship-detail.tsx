@@ -49,6 +49,7 @@ import {
   type RelationshipSide,
   STATE_WORDS,
 } from "./relationship-words";
+import { QControl } from "@/features/q/control/q-control";
 import { QSection } from "@/features/q/q-section";
 
 /** States whose next step is the outcome itself, shown above More. */
@@ -266,24 +267,27 @@ export function RelationshipDetail({
 
           {relationship === null ||
           relationship.milestones.length === 0 ? null : (
-            <Card
-              title="What happened"
-              id="history"
-              collapsible
-              count={relationship.milestones.length}
-            >
-              <StageDurations
-                milestones={relationship.milestones}
-                now={readAt}
-              />
-              <RelationshipTimeline
-                milestones={relationship.milestones}
-                meetings={meetings}
-                now={readAt}
-                side={side}
-                counterpart={counterpart}
-              />
-            </Card>
+            // Q's SCROLL_TO (premiere v5): the dated history, on screen.
+            <QControl id="section.relationship-history" kind="SECTION">
+              <Card
+                title="What happened"
+                id="history"
+                collapsible
+                count={relationship.milestones.length}
+              >
+                <StageDurations
+                  milestones={relationship.milestones}
+                  now={readAt}
+                />
+                <RelationshipTimeline
+                  milestones={relationship.milestones}
+                  meetings={meetings}
+                  now={readAt}
+                  side={side}
+                  counterpart={counterpart}
+                />
+              </Card>
+            </QControl>
           )}
 
           {gateq === null || gateq === undefined ? null : (
@@ -329,104 +333,114 @@ export function RelationshipDetail({
           aria-label="Next"
         >
           <Card title="Next" id="next" className="max-lg:order-first">
-            {standing.length === 0 ? null : (
-              <ul
-                className="cq-body-sm mb-3 flex flex-col gap-1 text-(--cq-text-secondary)"
-                aria-label="Where this stands"
-                data-relationship-brief
-              >
-                {standing.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            )}
-            <DockAvoidZone className="flex flex-col items-stretch gap-2">
-              {actions}
-              {connected && relationship !== null ? (
-                <ScheduleDialog
-                  kind="call"
-                  primary={
-                    actions === null && !WAY_BACK.has(relationship.state)
-                  }
+            {/*
+              The whole next-step block, its brief included, is kept clear
+              of the Q dock (16 Oct run: "Voice paused" sat over the brief
+              just above Book a call).
+            */}
+            <DockAvoidZone>
+              {standing.length === 0 ? null : (
+                <ul
+                  className="cq-body-sm mb-3 flex flex-col gap-1 text-(--cq-text-secondary)"
+                  aria-label="Where this stands"
+                  data-relationship-brief
                 >
-                  <RelationshipSchedule
-                    relationshipId={relationship.relationshipId}
-                    counterpart={counterpart}
-                    connected={connected}
-                    focus="call"
-                  />
-                </ScheduleDialog>
-              ) : null}
-              {connected ? (
-                <Link
-                  href={`${basePath}/messages`}
-                  className={buttonClassName("secondary")}
-                >
-                  <MessageSquare size={ICON_SIZE.regular} aria-hidden="true" />
-                  Send a message
-                </Link>
-              ) : null}
-              {relationship !== null &&
-              nothingLeads(
-                actions !== null && actions !== undefined,
-                connected,
-                relationship.state,
-                call !== null,
-              ) ? (
-                <p className="cq-body-sm text-(--cq-text-secondary)">
-                  Nothing needs you right now.
-                </p>
-              ) : null}
-              {relationship === null ? null : (
-                <>
-                  {/*
+                  {standing.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex flex-col items-stretch gap-2">
+                {actions}
+                {connected && relationship !== null ? (
+                  <ScheduleDialog
+                    kind="call"
+                    primary={
+                      actions === null && !WAY_BACK.has(relationship.state)
+                    }
+                  >
+                    <RelationshipSchedule
+                      relationshipId={relationship.relationshipId}
+                      counterpart={counterpart}
+                      connected={connected}
+                      focus="call"
+                    />
+                  </ScheduleDialog>
+                ) : null}
+                {connected ? (
+                  <Link
+                    href={`${basePath}/messages`}
+                    className={buttonClassName("secondary")}
+                  >
+                    <MessageSquare
+                      size={ICON_SIZE.regular}
+                      aria-hidden="true"
+                    />
+                    Send a message
+                  </Link>
+                ) : null}
+                {relationship !== null &&
+                nothingLeads(
+                  actions !== null && actions !== undefined,
+                  connected,
+                  relationship.state,
+                  call !== null,
+                ) ? (
+                  <p className="cq-body-sm text-(--cq-text-secondary)">
+                    Nothing needs you right now.
+                  </p>
+                ) : null}
+                {relationship === null ? null : (
+                  <>
+                    {/*
                     One primary step above; everything else one tap away
                     (demo audit 2026-10-03: six equal actions under Next).
                   */}
-                  <details className="group" data-next-more>
-                    <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-(--cq-radius-md) text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
-                      More
-                      <ChevronDown
-                        size={ICON_SIZE.compact}
-                        aria-hidden="true"
-                        className="transition-transform duration-(--cq-motion-fast) group-open:rotate-180 motion-reduce:transition-none"
-                      />
-                    </summary>
-                    <div className="flex flex-col items-stretch gap-2 pt-2">
-                      <RelationshipErrands
-                        relationshipId={relationship.relationshipId}
-                        counterpart={counterpart}
-                        connected={connected}
-                      />
-                      {connected ? (
-                        <ScheduleDialog kind="join">
-                          <JoinCallForm
-                            relationshipId={relationship.relationshipId}
-                            counterpart={counterpart}
-                          />
-                        </ScheduleDialog>
-                      ) : null}
-                      <ScheduleDialog kind="reminder">
-                        <RelationshipSchedule
+                    <details className="group" data-next-more>
+                      <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-(--cq-radius-md) text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
+                        More
+                        <ChevronDown
+                          size={ICON_SIZE.compact}
+                          aria-hidden="true"
+                          className="transition-transform duration-(--cq-motion-fast) group-open:rotate-180 motion-reduce:transition-none"
+                        />
+                      </summary>
+                      <div className="flex flex-col items-stretch gap-2 pt-2">
+                        <RelationshipErrands
                           relationshipId={relationship.relationshipId}
                           counterpart={counterpart}
                           connected={connected}
-                          focus="reminder"
                         />
-                      </ScheduleDialog>
-                      {OUTCOME_FIRST.has(relationship.state) ||
-                      call !== null ? null : (
-                        <RelationshipOutcome
-                          relationshipId={relationship.relationshipId}
-                          state={relationship.state}
-                          side={side}
-                          counterpart={counterpart}
-                        />
-                      )}
-                    </div>
-                  </details>
-                </>
-              )}
+                        {connected ? (
+                          <ScheduleDialog kind="join">
+                            <JoinCallForm
+                              relationshipId={relationship.relationshipId}
+                              counterpart={counterpart}
+                            />
+                          </ScheduleDialog>
+                        ) : null}
+                        <ScheduleDialog kind="reminder">
+                          <RelationshipSchedule
+                            relationshipId={relationship.relationshipId}
+                            counterpart={counterpart}
+                            connected={connected}
+                            focus="reminder"
+                          />
+                        </ScheduleDialog>
+                        {OUTCOME_FIRST.has(relationship.state) ||
+                        call !== null ? null : (
+                          <RelationshipOutcome
+                            relationshipId={relationship.relationshipId}
+                            state={relationship.state}
+                            side={side}
+                            counterpart={counterpart}
+                          />
+                        )}
+                      </div>
+                    </details>
+                  </>
+                )}
+              </div>
             </DockAvoidZone>
           </Card>
 

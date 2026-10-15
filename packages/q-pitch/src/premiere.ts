@@ -1311,6 +1311,20 @@ const gateqAppV5: SceneScript = {
       record: "GATEQ_APPLICATION",
       key: "maji-loop-application",
     },
+    // The transcript is folded below the brief: brought on screen and
+    // opened, so what the dossier line says is what the screen shows.
+    {
+      actionId: "ta_scroll-transcript",
+      kind: "uiAct",
+      act: "SCROLL_TO",
+      target: "disclosure.gateq-transcript",
+    },
+    {
+      actionId: "ta_open-transcript",
+      kind: "uiAct",
+      act: "EXPAND",
+      target: "disclosure.gateq-transcript",
+    },
   ],
   lines: [
     line(
@@ -1359,6 +1373,13 @@ const crmRecordV5: SceneScript = {
       kind: "openRecord",
       record: "RELATIONSHIP",
       key: "clinicrest",
+    },
+    // The dated history sits below the deal: brought on screen.
+    {
+      actionId: "ta_show-history",
+      kind: "uiAct",
+      act: "SCROLL_TO",
+      target: "section.relationship-history",
     },
   ],
   lines: [

@@ -69,6 +69,8 @@ export function QSheetConversation({
     endRef,
     `${String(turns.length)}:${String(spokenOnly.length)}:${q.state.partial?.text ?? ""}`,
     turns.at(-1)?.kind === "PERSON",
+    // The Board sits below the exchange: follow the exchange, not the end.
+    "element",
   );
 
   const label = presence.label ?? "Ready";
