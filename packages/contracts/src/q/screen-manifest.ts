@@ -132,6 +132,10 @@ export const Q_MANIFEST_SECTIONS_MAX = 12;
 export const Q_MANIFEST_SECTION_REFS_MAX = 12;
 export const Q_MANIFEST_DIALOGS_MAX = 3;
 export const Q_MANIFEST_DIALOG_REFS_MAX = 4;
+/** Lane W: the records of one section actually visible now, at most. */
+export const Q_MANIFEST_VISIBLE_REFS_MAX = 6;
+/** Lane W: error, empty, loading and toast notices on the page, at most. */
+export const Q_MANIFEST_NOTICES_MAX = 6;
 
 export const QManifestSectionSchema = z
   .object({
@@ -140,6 +144,16 @@ export const QManifestSectionSchema = z
     refs: z.array(QManifestRefSchema).max(Q_MANIFEST_SECTION_REFS_MAX),
     /** How many items the section holds in all (refs may be the first few). */
     total: z.number().int().min(0).max(10_000),
+    /**
+     * Lane W (2026-10-15): the records of this section visible in the
+     * viewport now, in screen order (a shared IntersectionObserver, read
+     * when a turn is sent). Optional: an older web omits it. Each is read
+     * back as the person like any ref; naming one grants nothing.
+     */
+    visible: z
+      .array(QManifestRefSchema)
+      .max(Q_MANIFEST_VISIBLE_REFS_MAX)
+      .optional(),
   })
   .strict();
 export type QManifestSection = z.infer<typeof QManifestSectionSchema>;
@@ -187,6 +201,93 @@ export const QManifestDrawnSchema = z
   .strict();
 export type QManifestDrawn = z.infer<typeof QManifestDrawnSchema>;
 
+/**
+ * Lane W: what a page shows instead of (or over) its records: an error, an
+ * empty list, a loading frame, a toast. Closed kinds and codes; the
+ * message text never travels.
+ */
+export const Q_MANIFEST_NOTICE_KINDS = [
+  "ERROR",
+  "EMPTY",
+  "LOADING",
+  "TOAST",
+] as const;
+export const QManifestNoticeKindSchema = z.enum(Q_MANIFEST_NOTICE_KINDS);
+export type QManifestNoticeKind = z.infer<typeof QManifestNoticeKindSchema>;
+
+export const Q_MANIFEST_NOTICE_CODES = [
+  /** The whole page failed to render (the error boundary). */
+  "PAGE_FAILED",
+  /** The page or record is not there, or not theirs to see. */
+  "NOT_FOUND",
+  "OFFLINE",
+  "PLAYBACK_FAILED",
+  /** A toast saying something they did worked. */
+  "DONE",
+  /** A toast saying something they did failed. */
+  "FAILED",
+] as const;
+export const QManifestNoticeCodeSchema = z.enum(Q_MANIFEST_NOTICE_CODES);
+export type QManifestNoticeCode = z.infer<typeof QManifestNoticeCodeSchema>;
+
+export const QManifestNoticeSchema = z
+  .object({
+    kind: QManifestNoticeKindSchema,
+    code: QManifestNoticeCodeSchema.optional(),
+    /** The section it shows in, when it is inside one. */
+    section: SlugSchema.optional(),
+  })
+  .strict();
+export type QManifestNotice = z.infer<typeof QManifestNoticeSchema>;
+
+/** Lane W: the one pitch video on screen, as ids and closed states. */
+export const Q_MANIFEST_MEDIA_STATES = [
+  "PLAYING",
+  "PAUSED",
+  "BUFFERING",
+  "ENDED",
+  "FAILED",
+] as const;
+export const QManifestMediaStateSchema = z.enum(Q_MANIFEST_MEDIA_STATES);
+export type QManifestMediaState = z.infer<typeof QManifestMediaStateSchema>;
+
+/** Coarse position: never a timestamp the page could be fingerprinted by. */
+export const Q_MANIFEST_MEDIA_POSITIONS = [
+  "START",
+  "EARLY",
+  "MIDDLE",
+  "LATE",
+  "END",
+] as const;
+export const QManifestMediaPositionSchema = z.enum(Q_MANIFEST_MEDIA_POSITIONS);
+export type QManifestMediaPosition = z.infer<
+  typeof QManifestMediaPositionSchema
+>;
+
+export const QManifestMediaSchema = z
+  .object({
+    kind: z.literal("PITCH"),
+    /** The company whose pitch it is; read back with get_company. */
+    companyId: UuidSchema.optional(),
+    /** The media asset; read back with read_my only for their own pitch. */
+    mediaAssetId: UuidSchema.optional(),
+    state: QManifestMediaStateSchema,
+    position: QManifestMediaPositionSchema.optional(),
+    muted: z.boolean().optional(),
+  })
+  .strict();
+export type QManifestMedia = z.infer<typeof QManifestMediaSchema>;
+
+/**
+ * The page manifest (q.screen.v2). New fields are optional, so an older
+ * web keeps working against a newer Q API and the reverse; `v` moves only
+ * on a breaking change.
+ *
+ * Privacy line (lane W, deliberate): unsaved input -- what a person is
+ * typing in a field and has not saved or sent -- is never part of the
+ * manifest, not even as a "has typed" flag. Q answers "I can't see what
+ * you're typing until you save or send it". No screenshots, no DOM text.
+ */
 export const QPageManifestSchema = z
   .object({
     v: z.literal(2),
@@ -216,11 +317,21 @@ export const QPageManifestSchema = z
       .optional(),
     /** Lane A: the Q object drawn on this tab now, if any. */
     drawn: QManifestDrawnSchema.optional(),
+    /** Lane W: errors, empty lists, loading frames and toasts showing. */
+    notices: z
+      .array(QManifestNoticeSchema)
+      .max(Q_MANIFEST_NOTICES_MAX)
+      .optional(),
+    /** Lane W: the pitch video on screen, if any. */
+    media: QManifestMediaSchema.optional(),
   })
   .strict();
 export type QPageManifest = z.infer<typeof QPageManifestSchema>;
 
-/** Every distinct ref a manifest names, focus and top dialog first. */
+/**
+ * Every distinct ref a manifest names: focus, top dialog, the playing
+ * pitch's company, then visible records, then the rest.
+ */
 export function manifestRefs(manifest: QPageManifest): readonly QManifestRef[] {
   const seen = new Set<string>();
   const out: QManifestRef[] = [];
@@ -231,6 +342,12 @@ export function manifestRefs(manifest: QPageManifest): readonly QManifestRef[] {
     out.push({ kind: ref.kind, id: ref.id.toLowerCase() });
   };
   if (manifest.focus !== undefined) add(manifest.focus);
+  if (manifest.media?.companyId !== undefined) {
+    add({ kind: "COMPANY", id: manifest.media.companyId });
+  }
+  if (manifest.media?.mediaAssetId !== undefined) {
+    add({ kind: "MEDIA", id: manifest.media.mediaAssetId });
+  }
   for (const dialog of [...manifest.dialogs].reverse()) {
     for (const ref of dialog.refs) add(ref);
   }
@@ -239,6 +356,9 @@ export function manifestRefs(manifest: QPageManifest): readonly QManifestRef[] {
     ...manifest.sections.filter((section) => inView.has(section.id)),
     ...manifest.sections.filter((section) => !inView.has(section.id)),
   ];
+  // Lane W: what is visible right now before the rest of its section.
+  for (const section of ordered)
+    for (const ref of section.visible ?? []) add(ref);
   for (const section of ordered) for (const ref of section.refs) add(ref);
   return out;
 }
