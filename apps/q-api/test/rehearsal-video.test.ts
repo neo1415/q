@@ -178,7 +178,7 @@ function fakeRehearsals() {
 }
 
 /** The session table, faked with the same rules as the migration. */
-function memoryStore(): RehearsalVideoStore & {
+function memoryStore(now: () => Date): RehearsalVideoStore & {
   rows: Map<string, VideoSessionRow & { tokenHash: string }>;
   /** The database's shared weekly allowance and monthly safeguard. */
   limits: { remaining: number; platformFull: boolean };
@@ -266,7 +266,13 @@ function memoryStore(): RehearsalVideoStore & {
     markLive: (row, input) => {
       const held = rows.get(row.id);
       if (held?.status !== "STARTING") return Promise.resolve(null);
-      const next = { ...held, ...input, status: "LIVE" as const };
+      // As the database: the founder's clock starts when the room is ready.
+      const next = {
+        ...held,
+        ...input,
+        status: "LIVE" as const,
+        endsAt: new Date(now().getTime() + 180_000),
+      };
       rows.set(row.id, next);
       return Promise.resolve(next);
     },
@@ -371,7 +377,7 @@ function setup(
   let clock = T0.getTime();
   const timers: { run: () => void; at: number; cancelled: boolean }[] = [];
   const rehearsals = fakeRehearsals();
-  const store = memoryStore();
+  const store = memoryStore(() => new Date(clock));
   const tavus = fakeTavus(options.keys ?? 2, options.failConversation);
   const stillAllowed = vi.fn((_actor: ActorContext) => Promise.resolve(true));
   const service = createRehearsalVideoService({
@@ -447,6 +453,34 @@ async function startVideo(harness: ReturnType<typeof setup>) {
 }
 
 describe("starting a video rehearsal", () => {
+  it("names the interviewer's tile for the founder and starts their three minutes when the room is ready", async () => {
+    const harness = setup();
+    const client = harness.tavus.pool.clientAt(0);
+    if (client === null) throw new Error("missing fake client");
+    const create = client.createConversation.bind(client);
+    // The provider takes 88 s to make the room (production, 2026-10-15).
+    vi.spyOn(client, "createConversation").mockImplementationOnce(
+      async (input) => {
+        await harness.advance(88_000);
+        return create(input);
+      },
+    );
+    const session = await startVideo(harness);
+    expect(session.endsAt).toBe(
+      new Date(T0.getTime() + 88_000 + 180_000).toISOString(),
+    );
+    expect(harness.tavus.calls.conversations[0]?.input.maxCallSeconds).toBe(
+      180,
+    );
+    expect(harness.tavus.calls.pals[0]?.input.name).toMatch(/^Steve, \S/u);
+    expect(harness.tavus.calls.pals[0]?.input.name).not.toMatch(
+      /cq-|[0-9a-f]{8}-/u,
+    );
+    expect(harness.tavus.calls.conversations[0]?.input.name).toBe(
+      `cq-rehearsal-${session.id}`,
+    );
+  });
+
   it("opens a private, three-minute room whose brain is Q's bridge", async () => {
     const harness = setup();
     const session = await startVideo(harness);

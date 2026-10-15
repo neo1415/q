@@ -76,14 +76,18 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
     markLive: (input) => {
       const i = rows.findIndex((r) => r.id === input.id);
       const row = rows[i];
-      if (row !== undefined && row.status === "STARTING")
-        rows[i] = {
-          ...row,
-          status: "LIVE",
-          providerConversationId: input.providerConversationId,
-          joinUrlSealed: input.joinUrlSealed,
-        };
-      return Promise.resolve();
+      if (row === undefined || row.status !== "STARTING")
+        return Promise.resolve(null);
+      // As the database: the clock starts when the room is ready.
+      const live: GateqVideoSessionRow = {
+        ...row,
+        status: "LIVE",
+        providerConversationId: input.providerConversationId,
+        joinUrlSealed: input.joinUrlSealed,
+        endsAt: new Date(clock() + row.maxSeconds * 1000).toISOString(),
+      };
+      rows[i] = live;
+      return Promise.resolve(live);
     },
     end: (input) => {
       const i = rows.findIndex((r) => r.id === input.id);
@@ -249,6 +253,22 @@ describe("the GateQ video interview session", () => {
     const row = w.store.rows[0];
     expect(row?.guestCredentialSealed).toBe(`sealed:${TOKEN}`);
     expect(JSON.stringify(w.store.rows)).not.toContain(w.bearers[0] ?? "x");
+  });
+
+  it("starts the applicant's clock when the room is ready, not when it was requested", async () => {
+    const w = world();
+    const slow = w.provider.createRoom.getMockImplementation();
+    // The provider takes 88 s to make the room (production, 2026-10-15).
+    w.provider.createRoom.mockImplementationOnce(async (input) => {
+      w.advance(88_000);
+      if (slow === undefined) throw new Error("no default room");
+      return slow(input);
+    });
+    const requestedAt = Date.parse("2026-10-15T09:00:00Z");
+    const session = await w.video.start({ token: TOKEN, correlationId: "c" });
+    expect(Date.parse(session.endsAt)).toBe(
+      requestedAt + 88_000 + session.maxSeconds * 1000,
+    );
   });
 
   it("a retry or reconnect returns the same session and clock, never a second room", async () => {

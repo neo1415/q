@@ -981,6 +981,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "/company/visibility": cap("navigate.COMPANY_VISIBILITY"),
   "/company/interest": cap("navigate.COMPANY_INTEREST"),
+  // Founder docs (2026-10-15): "open my data room / deck" lands here.
+  "/company/data-room": cap("navigate.OWN_DATA_ROOM"),
   "/relationships": cap("navigate.RELATIONSHIPS"),
   // CRM (2026-10-15): the alias of the Hub; it only redirects there.
   "/crm": cap("navigate.RELATIONSHIPS"),

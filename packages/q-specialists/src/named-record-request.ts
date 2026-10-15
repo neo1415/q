@@ -39,12 +39,28 @@ export type NamedRecordRequest = {
   readonly explicit: boolean;
 };
 
-type FacetWords = { readonly facet: NamedRecordFacet; readonly words: string };
+type FacetWords = {
+  readonly facet: NamedRecordFacet;
+  readonly words: string;
+  /** Only with a proper name: "documents for my seed round" is not a record. */
+  readonly properOnly?: true;
+};
 
 const FACETS: readonly FacetWords[] = [
   { facet: "DATA_ROOM", words: "data\\s*room|dataroom|diligence\\s+room" },
+  // Owner 2026-10-15: "open Tensorgate's documents" opened the profile. A
+  // company's documents are its data room (Q's own documents, "my
+  // documents", stay the Documents page: they name no company).
+  {
+    facet: "DATA_ROOM",
+    words: "documents?|docs|files|document\\s+room",
+    properOnly: true,
+  },
   { facet: "DECK", words: "(?:pitch\\s+)?deck" },
   { facet: "ELEVATOR", words: "elevator(?:\\s+pitch)?" },
+  // "Tensorgate's pitch" is its pitch video, the Elevator tab ("pitch
+  // deck" is read first, as DECK).
+  { facet: "ELEVATOR", words: "pitch(?:\\s+video)?", properOnly: true },
   { facet: "TEAM", words: "team" },
   { facet: "CHAT", words: "chat|messages|conversation\\s+thread" },
   { facet: "RELATIONSHIP", words: "relationship|deal|pipeline\\s+entry" },
@@ -85,7 +101,7 @@ function asName(raw: string): string | null {
 /** One sentence's object, read for a name and a part. */
 function fromObject(object: string): NamedRecordRequest | null {
   const said = clean(object);
-  for (const { facet, words } of FACETS) {
+  for (const { facet, words, properOnly } of FACETS) {
     // "the data room for Shiftwell", "my relationship with Shiftwell",
     // "the chat with Shiftwell".
     const after = new RegExp(
@@ -101,6 +117,7 @@ function fromObject(object: string): NamedRecordRequest | null {
     if (raw === undefined) continue;
     const name = asName(raw);
     if (name === null) continue;
+    if (properOnly === true && !/\p{Lu}/u.test(name)) continue;
     return { name, facet, explicit: true };
   }
   const name = asName(said);

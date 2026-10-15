@@ -5,6 +5,7 @@ import {
   FileText,
   Compass,
   DoorOpen,
+  FolderLock,
   Gauge,
   Handshake,
   LayoutDashboard,
@@ -40,6 +41,7 @@ export type NavigationItem = {
     | "/relationships"
     | "/profile"
     | "/pitch"
+    | "/company/data-room"
     | "/investors"
     | "/search"
     | "/rehearsals"
@@ -105,6 +107,17 @@ export const FOUNDER_MEDIA_NAVIGATION: NavigationItem = {
   href: "/pitch",
   label: "Pitch & media",
   icon: Play,
+};
+
+/**
+ * The founder's own data room and deck (owner 2026-10-15: they were only
+ * reachable from the company page's tabs). One stable link the server
+ * resolves to their own company's Data room tab, where they edit.
+ */
+export const FOUNDER_DATA_ROOM_NAVIGATION: NavigationItem = {
+  href: "/company/data-room",
+  label: "Data room & deck",
+  icon: FolderLock,
 };
 
 /**
@@ -258,7 +271,9 @@ export function navigationGroupsFor(
       items: [
         ...(founder || investor ? [GATEQ_NAVIGATION] : []),
         WORK_NAVIGATION,
-        ...(founder ? [FOUNDER_MEDIA_NAVIGATION] : []),
+        ...(founder
+          ? [FOUNDER_MEDIA_NAVIGATION, FOUNDER_DATA_ROOM_NAVIGATION]
+          : []),
         ...(investor ? [COMPANY_REQUESTS_NAVIGATION] : []),
         DOCUMENTS_NAVIGATION,
         ...(founder || investor ? [REHEARSALS_NAVIGATION] : []),
