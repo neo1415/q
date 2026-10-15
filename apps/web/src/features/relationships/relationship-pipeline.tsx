@@ -221,6 +221,20 @@ export function RelationshipPipeline({
         : preferences.columns.filter((entry) => entry !== column),
     });
   }
+  // What the folded panel says it holds, so a phone shows the view in use.
+  const optionsSummary = [
+    query.state === undefined ? null : STATE_WORDS[query.state],
+    query.sort === "name"
+      ? "Name A–Z"
+      : query.sort === "name-desc"
+        ? "Name Z–A"
+        : query.sort === "oldest"
+          ? "Earliest first"
+          : null,
+    layout === "board" ? "Board" : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
   const exports = new URLSearchParams({ scope: data.scope });
   for (const [key, value] of Object.entries(query))
     if (key !== "cursor" && key !== "pageSize" && value !== undefined)
@@ -265,108 +279,141 @@ export function RelationshipPipeline({
         >
           Search
         </button>
-        <select
-          ref={stateRef}
-          aria-label="Relationship state"
-          className={inputClass}
-          value={query.state ?? "ALL"}
-          onChange={(event) =>
-            move({
-              ...query,
-              state:
-                event.target.value === "ALL"
-                  ? undefined
-                  : (event.target
-                      .value as (typeof RELATIONSHIP_STATES_V2)[number]),
-              cursor: undefined,
-            })
-          }
-        >
-          <option value="ALL">All states</option>
-          {RELATIONSHIP_STATES_V2.map((state) => (
-            <option key={state} value={state}>
-              {STATE_WORDS[state]}
-            </option>
-          ))}
-        </select>
-        <select
-          ref={sortRef}
-          aria-label="Sort relationships"
-          className={inputClass}
-          value={query.sort ?? "recent"}
-          onChange={(event) =>
-            move({
-              ...query,
-              sort: event.target.value as RelationshipPipelineQuery["sort"],
-              cursor: undefined,
-            })
-          }
-        >
-          <option value="recent">Latest state change</option>
-          <option value="oldest">Earliest state change</option>
-          <option value="name">Name A–Z</option>
-          <option value="name-desc">Name Z–A</option>
-        </select>
-        <a
-          className={buttonClassName("quiet")}
-          href={`/relationships/export?${exports.toString()}`}
-        >
-          {selected.length === 0
-            ? "Export filtered CSV"
-            : `Export ${String(selected.length)} selected`}
-        </a>
       </form>
-      <PipelineSavedViews
-        initial={views}
-        device={preferences.views}
-        onDeviceChange={(next) => persist({ ...preferences, views: [...next] })}
-        current={{
-          query: RelationshipPipelineQuerySchema.omit({ cursor: true }).parse(
-            Object.fromEntries(
-              Object.entries(query).filter(([key]) => key !== "cursor"),
-            ),
-          ),
-          layout,
-          columns: preferences.columns,
-        }}
-        onApply={applyView}
-        onNotice={setNotice}
-      />
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href={pipelineHref(query, "table")}
-          data-pipeline-layout="table"
-          aria-current={layout === "table" ? "page" : undefined}
-          className={buttonClassName("quiet")}
-        >
-          Table
-        </Link>
-        <Link
-          href={pipelineHref(query, "board")}
-          data-pipeline-layout="board"
-          aria-current={layout === "board" ? "page" : undefined}
-          className={buttonClassName("quiet")}
-        >
-          Board
-        </Link>
-        <details className="cq-body-sm">
-          <summary className="cursor-pointer py-3">Columns</summary>
-          {(["state", "since", "next"] as const).map((column) => (
-            <label key={column} className="flex min-h-11 items-center gap-2">
-              <input
-                type="checkbox"
-                checked={preferences.columns.includes(column)}
-                onChange={(event) => setColumn(column, event.target.checked)}
-              />
-              {column === "state"
-                ? "State"
-                : column === "since"
-                  ? "State changed"
-                  : "Next step"}
-            </label>
-          ))}
-        </details>
-      </div>
+      {/*
+        One "View options" panel on a phone (production review 2026-10-15:
+        the controls filled the first screen); from tablet width up the
+        panel is always open and its summary hidden. Search stays outside.
+      */}
+      <details
+        className="group md:[&::details-content]:[content-visibility:visible]"
+        data-pipeline-options
+      >
+        <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) md:hidden [&::-webkit-details-marker]:hidden">
+          <span className="font-medium">View options</span>
+          <span className="truncate text-(--cq-text-secondary)">
+            {optionsSummary === "" ? "All · latest first" : optionsSummary}
+          </span>
+        </summary>
+        <div className="flex flex-col gap-3 pt-3 md:pt-0">
+          <div
+            className="flex flex-wrap gap-2"
+            aria-label="Filter and sort"
+            role="group"
+          >
+            <select
+              ref={stateRef}
+              aria-label="Relationship state"
+              className={inputClass}
+              value={query.state ?? "ALL"}
+              onChange={(event) =>
+                move({
+                  ...query,
+                  state:
+                    event.target.value === "ALL"
+                      ? undefined
+                      : (event.target
+                          .value as (typeof RELATIONSHIP_STATES_V2)[number]),
+                  cursor: undefined,
+                })
+              }
+            >
+              <option value="ALL">All states</option>
+              {RELATIONSHIP_STATES_V2.map((state) => (
+                <option key={state} value={state}>
+                  {STATE_WORDS[state]}
+                </option>
+              ))}
+            </select>
+            <select
+              ref={sortRef}
+              aria-label="Sort relationships"
+              className={inputClass}
+              value={query.sort ?? "recent"}
+              onChange={(event) =>
+                move({
+                  ...query,
+                  sort: event.target.value as RelationshipPipelineQuery["sort"],
+                  cursor: undefined,
+                })
+              }
+            >
+              <option value="recent">Latest state change</option>
+              <option value="oldest">Earliest state change</option>
+              <option value="name">Name A–Z</option>
+              <option value="name-desc">Name Z–A</option>
+            </select>
+            <a
+              className={buttonClassName("quiet")}
+              href={`/relationships/export?${exports.toString()}`}
+            >
+              {selected.length === 0
+                ? "Export filtered CSV"
+                : `Export ${String(selected.length)} selected`}
+            </a>
+          </div>
+          <PipelineSavedViews
+            initial={views}
+            device={preferences.views}
+            onDeviceChange={(next) =>
+              persist({ ...preferences, views: [...next] })
+            }
+            current={{
+              query: RelationshipPipelineQuerySchema.omit({
+                cursor: true,
+              }).parse(
+                Object.fromEntries(
+                  Object.entries(query).filter(([key]) => key !== "cursor"),
+                ),
+              ),
+              layout,
+              columns: preferences.columns,
+            }}
+            onApply={applyView}
+            onNotice={setNotice}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={pipelineHref(query, "table")}
+              data-pipeline-layout="table"
+              aria-current={layout === "table" ? "page" : undefined}
+              className={buttonClassName("quiet")}
+            >
+              Table
+            </Link>
+            <Link
+              href={pipelineHref(query, "board")}
+              data-pipeline-layout="board"
+              aria-current={layout === "board" ? "page" : undefined}
+              className={buttonClassName("quiet")}
+            >
+              Board
+            </Link>
+            <details className="cq-body-sm">
+              <summary className="cursor-pointer py-3">Columns</summary>
+              {(["state", "since", "next"] as const).map((column) => (
+                <label
+                  key={column}
+                  className="flex min-h-11 items-center gap-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={preferences.columns.includes(column)}
+                    onChange={(event) =>
+                      setColumn(column, event.target.checked)
+                    }
+                  />
+                  {column === "state"
+                    ? "State"
+                    : column === "since"
+                      ? "State changed"
+                      : "Next step"}
+                </label>
+              ))}
+            </details>
+          </div>
+        </div>
+      </details>
       {notice === null ? null : (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
           {notice}

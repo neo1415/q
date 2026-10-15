@@ -314,6 +314,35 @@ describe("real pipeline controls", () => {
     ).toBeNull();
     expect(mock.remove).not.toHaveBeenCalled();
   });
+  it("folds the controls behind a View options summary of the view in use", () => {
+    const { container } = render(
+      <RelationshipPipeline
+        {...props}
+        layout="board"
+        query={{ state: "CONNECTED", sort: "name" }}
+      />,
+    );
+    const panel = container.querySelector("[data-pipeline-options]");
+    expect(panel?.tagName).toBe("DETAILS");
+    expect(panel?.querySelector("summary")?.textContent).toBe(
+      "View optionsConnected · Name A–Z · Board",
+    );
+    // Search stays outside the panel; filters, views and layout are inside.
+    expect(
+      panel?.contains(
+        screen.getByRole("textbox", { name: "Search companies" }),
+      ),
+    ).toBe(false);
+    for (const name of [
+      "Relationship state",
+      "Sort relationships",
+      "Saved view",
+    ]) {
+      expect(panel?.contains(screen.getByRole("combobox", { name }))).toBe(
+        true,
+      );
+    }
+  });
   it("says an upper-bound total as one", () => {
     render(
       <RelationshipPipeline {...props} data={{ ...data, totalExact: false }} />,
