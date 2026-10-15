@@ -15,7 +15,7 @@ import { abortableWait } from "./narrator";
  * is used as it is.
  */
 export const TOUR_GREETING =
-  "This person has just started a guided tour of Capital Q. In one short sentence, tell them you will walk them through it now. Nothing more: the tour's own words follow.";
+  "A guided tour of Capital Q is about to begin, and its first lines introduce you. Say only a short hello, in a few words. Nothing more.";
 
 export const TOUR_BRIEF =
   "For the rest of this call you are presenting a guided Q Pitch tour of Capital Q. The app moves the screen and hands you each line to say; say those lines exactly as given. Do not describe the screen on your own, and do not start any analysis or open anything yourself. When the person says pause, resume, continue, skip, next, go back, stop, or asks to see a part of the product, reply with at most three words, such as 'Of course.', and nothing else: the app does it. If they ask a real question, answer it briefly and honestly.";

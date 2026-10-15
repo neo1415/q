@@ -77,6 +77,29 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
       validUntil: { invalidatedBy: "Next GateQ inbox/dossier release" },
     },
     {
+      featureId: "INV-MANDATE-VIEW",
+      status: "PRODUCTION_LIVE_VERIFIED",
+      actorContext: PILOT_ACTOR,
+      fixture:
+        "Savanna Seed Partners' own declared mandate on /capital (fictional demo investor)",
+      appCommit: "web production d6ae5e69",
+      verifiedAt: "2026-10-15 12:00 UTC",
+      verifierType: "BROWSER",
+      receipt:
+        "scratchpad qpitch-review/mandate/capital-mandate-savanna.png + capital-read.txt (Playwright, GET only)",
+      claimsAllowed: [
+        {
+          claimId: "INV-MANDATE-VIEW.c1",
+          text: "The investor's Capital page shows their declared mandate: stage, cheque range, sectors, geography, and business models and customers",
+        },
+      ],
+      claimsForbidden: [
+        "That Q set or changed the mandate",
+        "Any figure on screen as a Capital Q result",
+      ],
+      validUntil: { invalidatedBy: "Next change to the investor Capital page" },
+    },
+    {
       featureId: "CRM-RELATIONSHIP-VIEW",
       status: "PRODUCTION_LIVE_VERIFIED",
       actorContext: PILOT_ACTOR,
@@ -235,6 +258,135 @@ const line = (
   timing,
   source,
 });
+
+/**
+ * r4 (owner feedback 15 Oct, "less disjointed"): Q introduces itself on
+ * Home, opens the investor's real mandate, and each scene starts with a
+ * spoken transition, so the tour reads as one Q-led walk-through. The
+ * pilot script itself is unchanged; the premiere uses copies of its scenes
+ * with premiere wording (same scene ids, same actions, same claims).
+ */
+const intro: SceneScript = {
+  sceneId: "s.premiere.intro",
+  chapterId: "ch.premiere.intro",
+  title: "Hello, I'm Q",
+  featureIds: ["QP-HOME-HANDOFF"],
+  approvedClaimIds: [],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/home",
+  actions: [
+    { actionId: "ta_intro-home", kind: "openRoute", destination: "HOME" },
+  ],
+  lines: [
+    line(
+      "l.intro.hello",
+      "Hello, I'm Q, the investment analyst inside Capital Q.",
+      "AFTER_ACK",
+      "r4 intro (owner 15 Oct)",
+    ),
+    line(
+      "l.intro.what",
+      "Capital Q is an investment intelligence system for private capital. It helps investors and founders reach better-informed decisions: evidence first, opinion second.",
+      "AFTER_ACK",
+      "r4 intro; CLAUDE.md product identity",
+    ),
+    line(
+      "l.intro.plan",
+      "In the next few minutes I'll show you how an investor's mandate shapes what they see, how I read a company on the evidence, how founders reach investors through GateQ, how each relationship stays in one record, and how you can rehearse a meeting before it happens.",
+      "AFTER_ACK",
+      "r4 intro: the premiere's chapters",
+    ),
+    line(
+      "l.intro.real",
+      "Everything you'll see is the real product, on a demonstration account with fictional data.",
+      "AFTER_ACK",
+      "r4 intro; demo-identity rule",
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 20_000,
+};
+
+const mandate: SceneScript = {
+  sceneId: "s.premiere.mandate",
+  chapterId: "ch.premiere.mandate",
+  title: "Your mandate",
+  featureIds: ["INV-MANDATE-VIEW"],
+  approvedClaimIds: ["INV-MANDATE-VIEW.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/capital",
+  actions: [
+    { actionId: "ta_open-mandate", kind: "openRoute", destination: "CAPITAL" },
+  ],
+  lines: [
+    line(
+      "l.mandate.start",
+      "Everything starts with the investor's mandate. Let me open yours.",
+      "BEFORE_ACK",
+      "r4 transition",
+    ),
+    line(
+      "l.mandate.criteria",
+      "This is your mandate, as you declared it: the stage you invest at, your cheque range, your sectors, your geography, and the business models you back.",
+      "AFTER_ACK",
+      "CERTIFICATION INV-MANDATE-VIEW (r4 wording)",
+      ["INV-MANDATE-VIEW.c1"],
+    ),
+    line(
+      "l.mandate.yours",
+      "It's yours to set, and you can change it at any time.",
+      "AFTER_ACK",
+      "r4; declared mandate is the investor's",
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 20_000,
+};
+
+/** A pilot scene with premiere wording (same actions and claims). */
+function withLines(
+  id: string,
+  lines: (scene: SceneScript) => SceneLine[],
+): SceneScript {
+  const scene = PILOT_SCRIPT.scenes.find((s) => s.sceneId === id);
+  if (scene === undefined) throw new Error(`missing pilot scene ${id}`);
+  return {
+    ...scene,
+    // "Spoken start" belonged to the pilot; the premiere starts at the intro.
+    title:
+      id === "s.pilot.opening" ? "The best fits for your mandate" : scene.title,
+    lines: lines(scene),
+  };
+}
+
+const lineOf = (scene: SceneScript, id: string): SceneLine => {
+  const found = scene.lines.find((l) => l.lineId === id);
+  if (found === undefined) throw new Error(`missing line ${id}`);
+  return found;
+};
+
+const premiereTopThree = withLines("s.pilot.opening", (scene) => [
+  line(
+    "l.top3.find",
+    "Now let me find the companies that fit that mandate best.",
+    "BEFORE_ACK",
+    "r4 transition",
+  ),
+  lineOf(scene, "l.top3.cards"),
+  lineOf(scene, "l.top3.fit"),
+]);
+
+const premiereCompany = withLines("s.pilot.company", (scene) => [
+  line(
+    "l.company.open",
+    "Let's open the first one, and look at it the way an analyst would.",
+    "BEFORE_ACK",
+    "r4 transition",
+  ),
+  ...scene.lines,
+]);
 
 const candidates: SceneScript[] = [
   {
@@ -411,13 +563,31 @@ const candidates: SceneScript[] = [
   },
 ];
 
+function pilotSceneOf(id: string): SceneScript {
+  const scene = PILOT_SCRIPT.scenes.find((s) => s.sceneId === id);
+  if (scene === undefined) throw new Error(`missing pilot scene ${id}`);
+  return scene;
+}
+
 export const PREMIERE_SCRIPT: TourScript = TourScriptSchema.parse({
   scriptId: "tour.investor-premiere",
-  scriptVersion: "0.2.0-draft",
+  scriptVersion: "0.3.0-draft",
   status: "DRAFT",
   reviewNote:
-    "DRAFT r3 (blueprint §16), pending owner review. Scenes 1-3 are the pilot's certified scenes (re-certification due). GateQ, privacy, relationship, rehearsal and close are CODE_VERIFIED only; an audience gate suppresses them until browser receipts promote them. q.private-runway and the q.reh-* lines are new approved-question proposals.",
+    "DRAFT r4 (owner feedback 15 Oct), pending owner review: a spoken introduction on Home, the investor's real mandate, then the pilot's scenes with spoken transitions, privacy, GateQ, relationship, rehearsal and close. Scenes without a browser receipt stay CODE_VERIFIED and an audience gate suppresses them.",
   chapters: [
+    {
+      chapterId: intro.chapterId,
+      title: intro.title,
+      atlasTab: "INVESTOR",
+      sceneIds: [intro.sceneId],
+    },
+    {
+      chapterId: mandate.chapterId,
+      title: mandate.title,
+      atlasTab: "INVESTOR",
+      sceneIds: [mandate.sceneId],
+    },
     ...PILOT_SCRIPT.chapters,
     ...candidates.map((scene) => ({
       chapterId: scene.chapterId,
@@ -452,7 +622,14 @@ export const PREMIERE_SCRIPT: TourScript = TourScriptSchema.parse({
       text: "What would you need from us to make a decision quickly?",
     },
   ],
-  scenes: [...PILOT_SCRIPT.scenes, ...candidates],
+  scenes: [
+    intro,
+    mandate,
+    premiereTopThree,
+    premiereCompany,
+    pilotSceneOf("s.pilot.compare"),
+    ...candidates,
+  ],
 });
 
 const pilotScene = (id: string): SceneScript => {

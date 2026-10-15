@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PILOT_SCRIPT,
   PREMIERE_CERTIFICATION_LEDGER,
   PREMIERE_SCRIPT,
   TourControlGate,
@@ -19,6 +20,8 @@ describe("r3 premiere and the certification gate", () => {
       audience: "INTERNAL_REHEARSAL",
     });
     expect(gate.scenes.map((s) => s.sceneId)).toEqual([
+      "s.premiere.intro",
+      "s.premiere.mandate",
       "s.pilot.opening",
       "s.pilot.company",
       "s.pilot.compare",
@@ -39,7 +42,7 @@ describe("r3 premiere and the certification gate", () => {
       audience: "INTERNAL_REHEARSAL",
       acceptedStatuses: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
     });
-    expect(gate.scenes).toHaveLength(8);
+    expect(gate.scenes).toHaveLength(10);
     expect(gate.rejectedLines).toEqual([]);
   });
 
@@ -131,5 +134,36 @@ describe("two-minute cut", () => {
       "s.short.risks",
       "s.premiere.close",
     ]);
+  });
+
+  it("r4: Q introduces itself first, then the real mandate, and every scene opens with a spoken line", () => {
+    const ids = PREMIERE_SCRIPT.scenes.map((s) => s.sceneId);
+    expect(ids.slice(0, 3)).toEqual([
+      "s.premiere.intro",
+      "s.premiere.mandate",
+      "s.pilot.opening",
+    ]);
+    const intro = PREMIERE_SCRIPT.scenes[0];
+    expect(intro?.lines.map((l) => l.kind)).toEqual([
+      "CONNECTIVE",
+      "CONNECTIVE",
+      "CONNECTIVE",
+      "CONNECTIVE",
+    ]);
+    expect(intro?.lines[0]?.text).toMatch(/^Hello, I'm Q/u);
+    // A transition before anything happens on screen, in every scene but
+    // the intro (which speaks once Home is open) and the close.
+    for (const scene of PREMIERE_SCRIPT.scenes.slice(1, -1)) {
+      expect(scene.lines[0]?.timing, scene.sceneId).toBe("BEFORE_ACK");
+    }
+    // Premiere copies keep the pilot's actions and claims.
+    const top = PREMIERE_SCRIPT.scenes.find(
+      (s) => s.sceneId === "s.pilot.opening",
+    );
+    const pilotTop = PILOT_SCRIPT.scenes.find(
+      (s) => s.sceneId === "s.pilot.opening",
+    );
+    expect(top?.actions).toEqual(pilotTop?.actions);
+    expect(top?.approvedClaimIds).toEqual(pilotTop?.approvedClaimIds);
   });
 });
