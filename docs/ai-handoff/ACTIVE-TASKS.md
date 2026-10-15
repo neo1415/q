@@ -1,5 +1,9 @@
 # Active tasks — authoritative cross-model board
 
+## Mandatory current milestone: H2 production acceptance
+
+PR99 is protectedgreen38617987342 and normally merged48c6f1e7. Founderdesktop realH2 checks PASS including selectedCSV/savedreload/security negatives. Complete investor/founder desktop/mobile and Q controls; verify q-api fourthservice (last BUILDING). Preserve98/97 and originalWIPs; do not mergefailing siblings. Media randomrequestId CI flake repaired with39testsPASS, PR101. STATE top is current authority; olderentries historical.
+
 ## Latest continuation priorities
 
 Description90 is deployed72d across four SUCCESS services; fresh description browser proof remains pending. Claim capture PR92/08cacfd4:53 builds, root/API/package types,149 suite tests and40 focused tests PASS; exact CI38601112916 quality still running, database/build/types PASS. No live adherence proof or release. Next primary implementation: exact selected-dossier manifest hydration and full authorized source payload beside the600-character receipt; no investor-Q repair exists yet. Canonical H2 pipeline2d9dfa1e and guest expiry553316c5 follow; cloud-view and product-inventory WIPs are preserved, not release-ready. STATE top supersedes historical task entries below.

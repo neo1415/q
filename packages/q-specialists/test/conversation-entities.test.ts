@@ -597,3 +597,127 @@ describe("the catalog's cards (K1: 'show me three fintech companies')", () => {
     });
   });
 });
+
+describe("pipeline commands use the registered controls without a model", () => {
+  const page: QPageManifest = {
+    ...CAPITAL_PAGE,
+    controls: [
+      { id: "filter.pipeline-sort", kind: "FILTER" },
+      { id: "filter.pipeline-search", kind: "FILTER" },
+      { id: "filter.pipeline-state", kind: "FILTER" },
+    ],
+  };
+  it.each([
+    ["Sort this pipeline by name A–Z.", "filter.pipeline-sort", "name"],
+    ["Sort the pipeline by name Z-A", "filter.pipeline-sort", "name-desc"],
+    [
+      "Sort the pipeline by latest state change",
+      "filter.pipeline-sort",
+      "recent",
+    ],
+    [
+      'Search this pipeline for "Maji Loop"',
+      "filter.pipeline-search",
+      "Maji Loop",
+    ],
+    ["Clear the pipeline search", "filter.pipeline-search", ""],
+    ["Filter this pipeline to connected", "filter.pipeline-state", "CONNECTED"],
+  ])("%s", async (text, target, value) => {
+    const run = seam();
+    const answer = await run.say(text, page);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(answer?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: expect.objectContaining({
+          kind: "UI_ACT",
+          act: "FILTER",
+          target,
+          value,
+        }) as unknown,
+      },
+    ]);
+  });
+  it.each([
+    "Should we sort this pipeline by name A-Z?",
+    "Sort this pipeline by revenue",
+    "Filter this pipeline to approved",
+    `Search this pipeline for ${"x".repeat(121)}`,
+  ])("does not invent an operation for %s", async (text) => {
+    const run = seam();
+    const answer = await run.say(text, page);
+    expect(
+      (answer?.blocks ?? []).some(
+        (b) => b.kind === "UI_INTENT" && b.intent.kind === "UI_ACT",
+      ),
+    ).toBe(false);
+  });
+  it("does not operate a stale or absent pipeline control", async () => {
+    const run = seam();
+    const answer = await run.say(
+      "Sort this pipeline by name A–Z.",
+      CAPITAL_PAGE,
+    );
+    expect(
+      (answer?.blocks ?? []).some(
+        (b) => b.kind === "UI_INTENT" && b.intent.kind === "UI_ACT",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("opening an exact pipeline relationship uses its native link", () => {
+  it.each(["COMPANY", "INVESTOR_ORGANISATION"] as const)(
+    "uses the visible %s pipeline rather than page aliases or old cards",
+    async (kind) => {
+      const page: QPageManifest = {
+        ...CAPITAL_PAGE,
+        sections: [
+          {
+            id: "pipeline",
+            kind: "RELATIONSHIP_LIST",
+            refs: [
+              { kind, id: AJOPOT },
+              { kind, id: KORA },
+            ],
+            total: 2,
+          },
+        ],
+        controls: [{ id: "list.pipeline", kind: "LIST", count: 2 }],
+      };
+      const run = seam([message("Q", "Older companies", [companyCards])]);
+      const answer = await run.say(
+        "Open the first relationship in this pipeline.",
+        page,
+      );
+      expect(run.delegatedWith).toHaveLength(0);
+      expect(answer?.blocks).toEqual([
+        {
+          kind: "UI_INTENT",
+          intent: expect.objectContaining({
+            kind: "UI_ACT",
+            act: "SELECT_ITEM",
+            target: "list.pipeline",
+            index: 1,
+          }) as unknown,
+        },
+      ]);
+    },
+  );
+  it("does not treat a question about the first relationship as navigation", async () => {
+    const page: QPageManifest = {
+      ...CAPITAL_PAGE,
+      controls: [{ id: "list.pipeline", kind: "LIST", count: 2 }],
+    };
+    const run = seam();
+    const answer = await run.say(
+      "Explain the first relationship in this pipeline",
+      page,
+    );
+    expect(
+      (answer?.blocks ?? []).some(
+        (b) => b.kind === "UI_INTENT" && b.intent.kind === "UI_ACT",
+      ),
+    ).toBe(false);
+  });
+});

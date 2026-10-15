@@ -1,0 +1,602 @@
+# CAPITAL Q — VERIFIED ENGINEERING TAKEOVER
+## GateQ Completion + Full Functional Relationship Hub
+### 14 October 2026 — Post-usage-limit continuation
+
+Repository: https://github.com/neo1415/q
+
+You are taking over an actively developed Capital Q product after the previous Codex account exhausted its usage limit.
+
+**This is not a new implementation. It is a continuation of substantial, existing, partly released work.**
+
+Your primary mission is to finish GateQ and the complete functional Relationship Hub/CRM, in parallel, while preserving everything that already works.
+
+Do not restart investigations that have already reached verified conclusions. Do not rebuild Q, GateQ, the CRM, Evidence, Q Work, or the agent runtime.
+
+You have broad engineering autonomy to investigate, repair, integrate, test and release capabilities within the approved product architecture.
+
+## 1. READ THE LATEST SOURCE OF TRUTH
+
+Before editing, read:
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `docs/ai-handoff/START-HERE.md`
+- Latest sections of `docs/ai-handoff/STATE.md`
+- `docs/ai-handoff/ACTIVE-TASKS.md`
+- `docs/ai-handoff/HANDOFF-LOG.md`
+- `docs/ai-handoff/session-directives/2026-10-14-post1755-gateq-crm-continuation.txt`
+- Current GateQ capability reconciliation
+- The consolidated Relationship Hub/CRM product-owner handoff
+- Relevant module contracts, migration inventory and ADRs
+
+Architecture precedence remains:
+
+1. Locked PADL.
+2. Real Capital Q Product Specification.
+3. Final System Review.
+4. Supplementary GateQ Feature Specification.
+
+Refresh live GitHub, protected CI, production deployment and worktree state before acting. The checkpoints below are starting references; newer verified work takes precedence.
+
+## 2. EXACT VERIFIED RELEASE BASELINE
+
+Production branch:
+
+`recovery/2026-09-12`
+
+Last confirmed production SHA:
+
+`72d626cdebbb2a177734db0a4125bd7b81cd4e9b`
+
+The outgoing account verified all four Railway services successfully running this release.
+
+Protected production CI `38599936086` passed.
+
+This includes:
+
+- GateQ structured qualification preservation.
+- Transactional fact correction and durable interview recovery.
+- Functional text-based founder GateQ application and interview.
+- Review and explicit submission.
+- Investor inbox and frozen submitted dossier.
+- Applicant-description preservation.
+- Role-aware investor/founder Hub H1.
+- Existing authorized Q navigation.
+
+### Actually browser-verified
+
+A fictional founder completed a genuine application, including the adaptive interview and explicit submission.
+
+The owning investor opened the exact frozen dossier and transcript.
+
+A different investor was denied access with HTTP 404.
+
+Both investor and founder Hub H1 passed desktop/mobile navigation acceptance.
+
+**Preserve these paths. Never rebuild already-working functionality without a demonstrated need.**
+
+### Latest integration state
+
+PR #92 (GateQ expanded claim capture) and PR #93 (continuation handoff) were merged into `build/int-rc`.
+
+PR #94 is the production release candidate for expanded claim capture. Its exact candidate SHA is:
+
+`98bd8cb7e71b4f1c540c81d7bb915660c61d957e`
+
+Its protected CI has passed. Confirm the final PR state and promote through the established release workflow. Do not confuse passing CI with deployed acceptance.
+
+## 3. THE NEWEST HIGH-PRIORITY DISCOVERY: INVESTOR Q DOSSIER FAILURE
+
+The previous session has already reproduced the failure in the live app.
+
+### Actual observed result
+
+An authorized investor opened a frozen, submitted GateQ application.
+
+The browser displayed the dossier and interview transcript.
+
+Q was asked about the selected application.
+
+Q named the application but responded that the dossier contents were unavailable, omitting supplied business information.
+
+Observed answer duration: **17.723 seconds**.
+
+This is a real product failure, not merely an unverified hypothesis.
+
+The same dossier passed an authorization test:
+
+- Owning investor: access permitted.
+- Different investor: HTTP 404.
+
+### Reusable reproduction is already pushed
+
+PR #95:
+
+https://github.com/neo1415/q/pull/95
+
+Branch:
+
+`codex/gateq-hub-continuation-post1755`
+
+HEAD:
+
+`48724480c5f573537a5c9df745be468cff12abe8`
+
+Reproduction driver:
+
+`scripts/handoff/live/gateq-dossier-q-acceptance.mjs`
+
+The driver defaults to read-only preflight.
+
+Its `--ask` option performs one internal Q turn using authorized private test fixtures.
+
+The strengthened assertions require a substantive source-supported answer. Merely naming the company or explaining that evidence might be missing is not a pass.
+
+The driver preserves private receipts outside Git.
+
+Inspect the script's actual arguments and security assumptions before running it.
+
+### Two identified code problems
+
+**Problem A — incorrect selected-screen hydration**
+
+Inspect:
+
+`packages/model-gateway/src/q/manifest-fact.ts`
+
+`GATEQ_APPLICATION` currently resolves using a general `read_my(kind=gateq)` inbox read instead of the selected frozen dossier's full authorized contents.
+
+The UI already publishes application focus. Do not rebuild the frontend context emitter without demonstrating a defect.
+
+Extend the existing governed Q retrieval path so an authorized investor can read the exact selected submitted application.
+
+Bind:
+
+- Investor authorization context.
+- Gateway identity.
+- Application identity.
+- Frozen submission/version.
+- Dossier dimensions and claims.
+- Evidence/source references.
+- Current UI focus and selection.
+
+**Problem B — oversized dossier findings in short action output**
+
+Inspect:
+
+`packages/app-actions/src/actions/gateq-inbox.ts`
+
+`packages/app-actions/src/actions/gateq-submitted-reading.ts`
+
+Existing action/tool output schemas.
+
+The submitted dossier reader may assemble findings with a substantial source-text budget, but a short tool-output field has a roughly 600-character contract.
+
+Do not solve this by globally expanding every action acknowledgement.
+
+Separate:
+
+1. Short action receipts meant for UI status and completion.
+2. Authorized, typed, bounded source-reading payloads meant for Q's substantive analysis.
+
+Keep contracts versioned and source-linked.
+
+No independent Q runtime or arbitrary database read.
+
+### Required regression coverage
+
+Prove correct behavior for:
+
+- One selected submitted application.
+- Multiple applications from one gateway.
+- Multiple companies in an inbox.
+- Long business descriptions and findings.
+- Selected application changed mid-conversation.
+- Missing or stale focus.
+- Draft and unsubmitted applications.
+- Wrong investor, wrong tenant and revoked membership.
+- Returning to a previous application.
+- Applicant claims versus verified evidence.
+- Missing evidence and contradictions.
+- Source ID and transcript attribution.
+
+The Context Firewall remains mandatory.
+
+A valid investor request may use authorized private application data. Q must not infer that its own knowledge authorizes disclosure to another user.
+
+### Acceptance
+
+Run the actual deployed investor browser journey.
+
+Q must answer substantive questions such as:
+
+"What does this founder do?"
+
+"What traction have they demonstrated?"
+
+"What are they raising and what will they use it for?"
+
+"What claims lack evidence?"
+
+"How does this application align with our declared mandate?"
+
+"What are the next diligence actions?"
+
+Answers must be based on the actual frozen dossier and correctly identify what is claimed, evidenced, unknown or unverified.
+
+The investor must be able to inspect the supporting source or interview passage.
+
+**Do not declare this repaired from test output alone. Obtain substantive live browser acceptance.**
+
+## 4. COMPLETE THE GATEQ CLAIM-CAPTURE RELEASE
+
+PR #92:
+
+https://github.com/neo1415/q/pull/92
+
+Source HEAD:
+
+`08cacfd4861e8212b7a06f2f12e66c08cec4a76f`
+
+Merged into integration.
+
+PR #94:
+
+https://github.com/neo1415/q/pull/94
+
+Production candidate HEAD:
+
+`98bd8cb7e71b4f1c540c81d7bb915660c61d957e`
+
+This fix allows valid company information volunteered by the applicant to be recorded, even when it is not one of the next six interview questions.
+
+It introduces immutable interviewer prompt v3 while preserving previous prompt versions and typed server validation.
+
+The protected source and candidate checks are green. Confirm the release gates and deploy appropriately.
+
+Then verify real founder answers concerning traction, revenue, business model, use of funds and other permitted fields.
+
+The resulting frozen investor dossier must accurately reflect the captured statements, with provenance.
+
+Do not infer fields or invent unavailable information.
+
+Do not rewrite historic submitted applications or change locked qualification rules.
+
+## 5. CRM H2 — RECOVER THE LATEST WORK, INCLUDING THE NEW EXPORT DEFECT
+
+H1 is deployed and verified.
+
+The full CRM is not complete.
+
+### Canonical H2 foundation
+
+Branch:
+
+`codex/hub-h2-pipeline`
+
+HEAD:
+
+`2d9dfa1ef8687bc4827a70a8070c30f35a1bb97e`
+
+This already contains substantial real implementation across Network, API, contracts, Results and the web application:
+
+- Relationship pipeline queries.
+- Server-authorized filtering.
+- Sorting.
+- Cursor pagination.
+- Table/board presentation.
+- Record preview/details.
+- Q controls.
+- Personal saved views.
+- CSV export.
+- Tests.
+
+Do not recreate these components.
+
+### Newest worktree to attempt recovery
+
+The previous session documented:
+
+`codex/hub-h2-canonical-repair-oct14`
+
+Workspace:
+
+`/workspace/cq-hub-h2-canonical`
+
+It reported two defects being repaired.
+
+**Defect A — export organization scope propagation**
+
+The export proxy at:
+
+`apps/web/app/(app)/relationships/export/route.ts`
+
+builds its upstream request without forwarding the optional active-organisation header.
+
+The previous agent correctly noted that the current `apiSession()` does not always populate that header, so a live cross-organization exposure has NOT been proven.
+
+Nevertheless, the session/context propagation must be audited and made correct for multi-organization users.
+
+Never take a tenant or organization ID directly from an untrusted query parameter.
+
+Bind the selected workspace to an authorized, server-resolved context and forward the relevant typed session header when required.
+
+Test users belonging to multiple organizations, role changes, denied workspaces and export requests following account switching.
+
+**Defect B — selections lost across pagination**
+
+The H2 pipeline was discarding selected relationship IDs across paginated views.
+
+Repair selection ownership and scope validation so filtering, page changes, exports and Q-driven operations remain consistent.
+
+Do not allow stale selections to export inaccessible records.
+
+### Important recovery instruction
+
+The newest H2 canonical repair worktree was reported locally, but its updated fixes were not verified as pushed to GitHub.
+
+Inspect available worktrees first.
+
+If source changes exist, preserve them in a clearly labelled branch and push before merging.
+
+If the previous workspace is unavailable, recover from the canonical pushed H2 branch and reproduce the two defects there.
+
+Never claim that unpushed work was recovered.
+
+### Additional saved-view work
+
+Branch:
+
+`codex/hub-h2-scoped-views`
+
+HEAD:
+
+`b4a2a68e553b11f8c366aa5d45289f2e542817b2`
+
+This has a proposed server-backed personal/team view extension.
+
+It is UNVERIFIED.
+
+Previous results included two failing tests and root type errors, and its proposed migration has not been approved or deployed.
+
+Review its design and integrate only compatible, corrected elements into canonical H2.
+
+Do not wholesale merge both branches or apply historical migrations blindly.
+
+## 6. GATEQ GUEST EVIDENCE — CONTINUE IN PARALLEL
+
+Recover:
+
+`codex/gateq-guest-upload-expiry`
+
+HEAD:
+
+`553316c5136a8e6e624b33a4a9af42dffe9f7762`
+
+Earlier recovery foundation:
+
+`codex/gateq-guest-evidence-recovery`
+
+HEAD:
+
+`b35813def71c4bf5293580e4243d64c989c11dca`
+
+These contain application evidence custody, disclosure foundations, upload expiration, cleanup and relevant database tests.
+
+Finish:
+
+Guest authorization → secure upload → actual byte accounting → storage validation → safe extraction → permission-filtered document retrieval → document-grounded interview → founder disclosure review → frozen submitted evidence versions → investor access.
+
+The Evidence owner must continue owning canonical documents and provenance.
+
+No founder-private material becomes investor-visible just because Q has processed it.
+
+Submission must establish what was actually disclosed.
+
+Test cross-application and cross-organization boundaries, expiry, abandoned uploads, unsafe files, retries, idempotency, migrations and RLS.
+
+Use existing document ingestion, storage, scanning and retrieval architecture.
+
+Do not create a separate GateQ document warehouse.
+
+## 7. COMPLETE THE FULL FUNCTIONAL RELATIONSHIP HUB
+
+The owner approved the **functionality-first strategy**.
+
+Full visual redesign is explicitly deferred.
+
+The old Relationship Hub prototype PR #75 is NOT approved production styling.
+
+Reuse Capital Q's existing colors, typography, tokens, themes, spacing, controls, Q presence and responsive layout conventions.
+
+### Investor Investment Hub
+
+Deliver complete authorized integration across:
+
+- Opportunities and canonical relationships.
+- GateQ applications, dossiers and submitted evidence.
+- Pipeline and private team workflows.
+- Mandate-fit intelligence.
+- Meetings, transcripts and follow-ups.
+- Documents and diligence requests.
+- Messages, notes and assignments.
+- Q Work execution and approvals.
+- Investment decisions and outcomes.
+- Portfolio context where genuinely supported.
+- Reporting, exports and activity history.
+
+### Founder Fundraising Hub
+
+Deliver:
+
+- Investor relationship pipeline.
+- Outreach, interest and follow-ups.
+- Fundraising goals, commitments and round context.
+- GateQ applications.
+- Meetings and investor requests.
+- Shared documents and updates.
+- Founder-private notes.
+- Q Work outputs and approvals.
+- Fundraising progress and reporting.
+
+### Q integration is mandatory throughout
+
+Q must genuinely operate the existing Hub:
+
+- Enter the correct role view.
+- Switch areas and tabs.
+- Search/filter/sort.
+- Select saved views.
+- Open specific relationships.
+- Scroll and expand sections.
+- Open authorized documents and evidence passages.
+- Navigate meeting transcripts/timestamps.
+- Open relevant Q Work jobs/reports.
+- Summarize current activity.
+- Restore navigation context.
+
+Reuse Q's existing fast deterministic navigation, semantic controls, permission-filtered manifest and action receipts.
+
+Never create another Q navigation engine or simulate completed UI actions.
+
+### Data architecture
+
+Keep one canonical company, one investor organization and one canonical relationship.
+
+Relationship states derive from events.
+
+Do not duplicate CRM tables for canonical entities.
+
+CRM private workflow stages must not silently rewrite the relationship's canonical state.
+
+Keep Readiness, Quality, Fit, Interest, Relationship State and Outcome distinct.
+
+Expose structured data through typed/versioned bounded-context contracts.
+
+### UI states
+
+Handle loading, empty, stale, partial, failed, retrying, pending approval, processing, completed and unavailable states correctly.
+
+Use appropriate lightweight motion and focus transitions, including reduced-motion support.
+
+Do not begin a large cosmetic redesign.
+
+The eventual premium redesign must be able to replace presentation without rewriting domain functionality.
+
+## 8. PARALLEL EXECUTION IS AUTHORIZED AND EXPECTED
+
+Do not serialize all development behind one long GateQ investigation.
+
+Run the following independent lanes with clear file ownership:
+
+**Lane A — GateQ intelligence and release**
+
+Owner: integration lead or dedicated Q/GateQ worker.
+
+Tasks: PR #94 production release, exact investor dossier Q repair, claim-capture acceptance and complete investor use of submitted information.
+
+**Lane B — CRM H2–H4**
+
+Owner: independent Hub worker.
+
+Tasks: recover the canonical H2 repair, fix export/session scope and paginated selection, complete server-owned views and reporting, then relationship-level GateQ/meetings/documents/Q Work integration.
+
+**Lane C — Guest Evidence**
+
+Owner: independent Evidence worker.
+
+Tasks: recover the existing guest-upload implementation, reconcile security and migrations, deliver end-to-end source-linked guest documents.
+
+Use one integration owner for shared contracts, permissions, Q runtime and migrations.
+
+Workers must not overwrite each other's source.
+
+Do not start three huge builds concurrently. The previous environment encountered ENOSPC.
+
+Use affected-package tests first, reuse build outputs safely and cap heavy concurrent processes.
+
+Preserve source, credentials and private test receipts while reclaiming generated caches.
+
+## 9. RELEASE AND ACCEPTANCE RULES
+
+For each slice:
+
+1. Read the relevant module architecture and ADR.
+2. Inspect current implementation and existing tests.
+3. Identify auth, data, migration and contract impacts.
+4. Implement in bounded changes.
+5. Run formatting, lint, strict types, targeted tests and relevant security/database tests.
+6. Push the branch.
+7. Run protected CI.
+8. Integrate and deploy through established workflows.
+9. Verify actual user-visible behavior.
+10. Record exact evidence and unfinished work.
+
+Do not make production-complete claims for local unit tests or green CI alone.
+
+For every live test, distinguish source code, integration, production deployment and actual browser acceptance.
+
+Avoid introducing paid services silently.
+
+Do not commit tokens, sessions, customer records or private screenshots.
+
+Before the next usage limit, preserve all working trees and upload any important handoff that cannot be inferred from GitHub.
+
+## 10. SECONDARY AND DEFERRED WORK
+
+The online competitor-research continuity patch remains in PRs #86/#88.
+
+It is a legitimate separate improvement but NOT today's GateQ/CRM critical path.
+
+The public-safe Capital Q product-capability inventory WIP must not be presented as a current verified feature register until reviewed and tested.
+
+Do not spend the primary execution budget on competitor research, Q Pitch changes or speculative product redesign.
+
+### Future GateQ voice/video experience
+
+Preserve this explicit product-owner requirement for the next phase after the functional milestones.
+
+Tavus must not appear as a generic iframe popup.
+
+The eventual experience should use Capital Q's existing native rehearsal/meeting room design and controls, with Tavus behind the existing or properly adapted provider interface.
+
+The room must support:
+
+- Configurable Q personality and voice.
+- Preferred name/form of address.
+- Reuse of already supplied founder/application information.
+- Natural live interruption and conversational flow.
+- Native microphone/camera/participant controls.
+- Captions and transcript.
+- Pause/resume and failure recovery.
+- Evidence-aware Q questions.
+- Recording consent and secure retention.
+- Integration into the same GateQ application and relationship history.
+- Approved usage budgets.
+
+Do not consume paid Tavus minutes or start a duplicate voice platform during the current work.
+
+Q Pitch, broader latency optimization and precision improvements follow once GateQ and the CRM are functionally dependable.
+
+## 11. FIRST ACTIONS IN THIS NEW SESSION
+
+Begin with a short verified state report, then execute.
+
+1. Refresh production revision, PR #94, PR #95, current integration and release CI.
+2. Inspect all accessible worktrees for the interrupted investor-Q and H2 repair changes. Push recoverable code immediately.
+3. Assign independent Hub and Evidence work without file conflicts.
+4. Finish the GateQ claim-capture release.
+5. Repair investor Q's actual selected-dossier reading and rerun the strict PR #95 browser test.
+6. Continue Hub H2, including export scope and selection preservation.
+7. Finish guest Evidence and subsequent H3/H4 integrations.
+8. Complete real founder/investor acceptance and record source-linked results.
+
+Do not ask me to repeat previous requirements that are already in the repository.
+
+Do not repeat completed investigations merely to produce another report.
+
+Do not silently mark incomplete features as done.
+
+**The end goal is a complete, trustworthy GateQ investment-intake experience and a fully functional, Q-native Investment/Fundraising Hub. Build toward that through actual integrated and deployed vertical slices.**
+
+START IMPLEMENTATION.

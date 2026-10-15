@@ -20,6 +20,7 @@ export {
   money,
   reasonWords,
   resultsCsv,
+  reportCsvRows,
   resultsDocument,
   resultsPdf,
   stateWords,
