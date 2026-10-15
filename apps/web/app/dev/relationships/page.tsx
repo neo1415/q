@@ -208,7 +208,7 @@ export default async function RelationshipsReviewPage({
     if (view === "overview") {
       if (state === "loading") return <RelationshipsLoading />;
       return (
-        <PageContainer className="flex flex-col gap-4">
+        <PageContainer className="flex flex-col gap-8">
           <HubHeader side={side} view="overview" />
           <NeedsYouQueue
             cards={state === "empty" ? [] : cards}
@@ -232,7 +232,8 @@ export default async function RelationshipsReviewPage({
             />
           ) : (
             <ResultsDashboard
-              heading={null}
+              heading="This period"
+              headingLevel={2}
               basePath="/dev/relationships?view=overview"
               range="30d"
               stage={null}

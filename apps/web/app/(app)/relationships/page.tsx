@@ -125,7 +125,9 @@ export default async function RelationshipsPage({
           ? context.investorOrganisationId
           : null;
     return (
-      <PageContainer className="flex flex-col gap-4">
+      // The Overview's blocks are separate questions (what needs me, what
+      // I hold, how the period went): more air between them than within.
+      <PageContainer className="flex flex-col gap-8">
         <HubHeader side={side} view={view} />
         {data === null ||
         user === null ||
@@ -238,7 +240,9 @@ export default async function RelationshipsPage({
       context.kind === "NONE" &&
       context.unavailable !== true;
     return (
-      <PageContainer className="flex flex-col gap-4">
+      // The Overview's blocks are separate questions (what needs me, what
+      // I hold, how the period went): more air between them than within.
+      <PageContainer className="flex flex-col gap-8">
         <HubHeader side={side} view={view} />
         {unset ? (
           <EmptyState
@@ -291,7 +295,8 @@ export default async function RelationshipsPage({
           >
             <QControl id="section.hub-overview" kind="SECTION">
               <ResultsDashboard
-                heading={null}
+                heading="This period"
+                headingLevel={2}
                 basePath="/relationships?view=overview"
                 range={range}
                 stage={stage}
