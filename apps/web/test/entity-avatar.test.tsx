@@ -114,6 +114,14 @@ describe("EntityAvatar visibility", () => {
     expect(container.innerHTML).not.toContain("/api/");
   });
 
+  it("a company the server said has no photo (null) makes no request at all", () => {
+    // 15 Oct: the relationships lists turned the API's null into undefined
+    // and asked the photo route for every row (19 x 404 in one tour).
+    expect(
+      entityImageSource({ kind: "company", companyId: COMPANY_ID, src: null }),
+    ).toBeNull();
+  });
+
   it("an unknown company picture asks the gated company photo route only", () => {
     expect(entityImageSource({ kind: "company", companyId: COMPANY_ID })).toBe(
       `/api/company-photo/${COMPANY_ID}`,

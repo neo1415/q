@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
+import type { QSubjectRef } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, ICON_STROKE, Pin, PinOff, X } from "@capital-q/ui/icons";
@@ -12,11 +13,17 @@ import { ViewTransition } from "@/components/view-transition";
 import { artifactTypeLabel } from "./artifact-type";
 import { ArtifactCard } from "./artifact-card";
 import { slideSource } from "./slide-source";
-import { arrangeBoard, boardObjects, type BoardObject } from "./board";
+import {
+  arrangeBoard,
+  boardObjects,
+  referenceRowLabel,
+  type BoardObject,
+} from "./board";
 import type { QTurn } from "./conversation";
 import { plainFromMarkdown } from "./markdown";
 import { QEvidence } from "./q-evidence";
 import { QResultBlocks } from "./q-result-blocks";
+import { useSubjectNames } from "./blocks/use-subject-names";
 
 /**
  * The Board (ADR 0017 F3; spec §7.1): what Q produced, as objects to open,
@@ -155,6 +162,84 @@ function SlidePreview({
   );
 }
 
+function ReferenceRows({
+  kind,
+  blocks,
+  onAsk,
+}: {
+  readonly kind: "COMPANIES" | "INVESTORS";
+  readonly blocks: BoardObject["blocks"];
+  readonly onAsk: (question: string) => void;
+}) {
+  const subjects: QSubjectRef[] = blocks.flatMap((block): QSubjectRef[] =>
+    block.kind === "COMPANY_REFERENCE"
+      ? [{ kind: "COMPANY" as const, companyId: block.companyId }]
+      : block.kind === "INVESTOR_REFERENCE"
+        ? [
+            {
+              kind: "INVESTOR_ORGANISATION" as const,
+              investorOrganisationId: block.investorOrganisationId,
+            },
+          ]
+        : [],
+  );
+  const nameOf = useSubjectNames(subjects);
+  return (
+    <ul className="flex flex-col" data-q-board-rows>
+      {blocks.map((block, index) => {
+        const subject: QSubjectRef | null =
+          block.kind === "COMPANY_REFERENCE"
+            ? { kind: "COMPANY", companyId: block.companyId }
+            : block.kind === "INVESTOR_REFERENCE"
+              ? {
+                  kind: "INVESTOR_ORGANISATION",
+                  investorOrganisationId: block.investorOrganisationId,
+                }
+              : null;
+        const name = subject === null ? null : nameOf(subject);
+        const label = referenceRowLabel(kind, index, name);
+        return (
+          <li
+            key={
+              block.kind === "COMPANY_REFERENCE"
+                ? block.companyId
+                : String(index)
+            }
+            className="flex min-h-11 items-center justify-between gap-2 border-t border-(--cq-border-subtle) first:border-t-0"
+          >
+            <span className="cq-body-sm text-(--cq-text-secondary)">
+              {label}
+            </span>
+            <span className="flex items-center gap-1">
+              {block.kind === "COMPANY_REFERENCE" ? (
+                <Link
+                  href={`/company/${encodeURIComponent(block.companyId)}`}
+                  className={buttonClassName("quiet", "compact")}
+                >
+                  Open
+                </Link>
+              ) : null}
+              <button
+                type="button"
+                className={buttonClassName("quiet", "compact")}
+                onClick={() => {
+                  onAsk(
+                    name === null
+                      ? `Why is ${kind === "COMPANIES" ? "company" : "investor"} ${String(index + 1)} here?`
+                      : `Why is ${name} here?`,
+                  );
+                }}
+              >
+                Why?
+              </button>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function ObjectBody({
   object,
   onAsk,
@@ -175,44 +260,11 @@ function ObjectBody({
     case "COMPANIES":
     case "INVESTORS":
       return (
-        <ul className="flex flex-col" data-q-board-rows>
-          {object.blocks.map((block, index) => (
-            <li
-              key={
-                block.kind === "COMPANY_REFERENCE"
-                  ? block.companyId
-                  : String(index)
-              }
-              className="flex min-h-11 items-center justify-between gap-2 border-t border-(--cq-border-subtle) first:border-t-0"
-            >
-              <span className="cq-body-sm text-(--cq-text-secondary)">
-                {object.kind === "COMPANIES" ? "Company" : "Investor"}{" "}
-                {index + 1}
-              </span>
-              <span className="flex items-center gap-1">
-                {block.kind === "COMPANY_REFERENCE" ? (
-                  <Link
-                    href={`/company/${encodeURIComponent(block.companyId)}`}
-                    className={buttonClassName("quiet", "compact")}
-                  >
-                    Open
-                  </Link>
-                ) : null}
-                <button
-                  type="button"
-                  className={buttonClassName("quiet", "compact")}
-                  onClick={() => {
-                    onAsk(
-                      `Why is ${object.kind === "COMPANIES" ? "company" : "investor"} ${String(index + 1)} here?`,
-                    );
-                  }}
-                >
-                  Why?
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
+        <ReferenceRows
+          kind={object.kind}
+          blocks={object.blocks}
+          onAsk={onAsk}
+        />
       );
     case "ARTIFACT": {
       const block = object.blocks[0];

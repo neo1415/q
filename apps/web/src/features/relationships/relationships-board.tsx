@@ -449,7 +449,7 @@ function RelationshipRow({
           kind="company"
           name={name}
           companyId={item.counterpart.id}
-          src={photoUrl ?? undefined}
+          src={photoUrl}
           size={40}
           decorative
         />
@@ -458,7 +458,7 @@ function RelationshipRow({
           kind="investor"
           name={name}
           investorOrganisationId={item.counterpart.id}
-          src={photoUrl ?? undefined}
+          src={photoUrl}
           size={40}
           decorative
         />
@@ -549,7 +549,7 @@ export function CounterpartAvatar({
       kind="company"
       name={name}
       companyId={item.counterpart.id}
-      src={item.counterpart.photoUrl ?? undefined}
+      src={item.counterpart.photoUrl}
       size={size}
       decorative
     />
@@ -558,7 +558,7 @@ export function CounterpartAvatar({
       kind="investor"
       name={name}
       investorOrganisationId={item.counterpart.id}
-      src={item.counterpart.photoUrl ?? undefined}
+      src={item.counterpart.photoUrl}
       size={size}
       decorative
     />
