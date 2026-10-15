@@ -22,15 +22,14 @@ describe("r3 premiere and the certification gate", () => {
       "s.pilot.opening",
       "s.pilot.company",
       "s.pilot.compare",
+      "s.premiere.privacy",
       "s.premiere.gateq",
       "s.premiere.relationship",
       "s.premiere.close",
     ]);
+    // Q-to-Q stays CODE_VERIFIED until the microphone "skip" test runs.
     const suppressed = gate.decisions.filter((d) => d.verdict === "SUPPRESSED");
-    expect(suppressed.map((d) => d.sceneId)).toEqual([
-      "s.premiere.privacy",
-      "s.premiere.rehearsal",
-    ]);
+    expect(suppressed.map((d) => d.sceneId)).toEqual(["s.premiere.rehearsal"]);
   });
 
   it("a rehearsal that opts into CODE_VERIFIED runs the full cut", () => {
