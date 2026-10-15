@@ -1,7 +1,34 @@
-import {
-  RELATIONSHIP_STATES_V2,
-  type RelationshipSummaryDto,
+import type {
+  RelationshipStateV2,
+  RelationshipSummaryDto,
 } from "@capital-q/contracts";
+
+type PipelineState = RelationshipStateV2;
+
+/**
+ * The Board's columns, left to right: the deal's forward path first, then
+ * the states where it stopped (paused, not proceeding, not taken forward),
+ * so a closed relationship never sits between two live stages. Every
+ * relationship state appears exactly once (asserted in the pipeline tests).
+ */
+export const BOARD_STATES: readonly PipelineState[] = [
+  "DISCOVERED",
+  "INTEREST_EXPRESSED",
+  "CONNECTED",
+  "MEETING_HELD",
+  "IN_DILIGENCE",
+  "INVESTED",
+  "PAUSED",
+  "PASSED",
+  "DECLINED",
+];
+
+/** Where the forward path ends on the Board: these columns read as closed. */
+export const BOARD_STOPPED: ReadonlySet<PipelineState> = new Set([
+  "PAUSED",
+  "PASSED",
+  "DECLINED",
+]);
 
 /** Board grouping changes presentation order, never canonical relationship state. */
 export function pipelinePresentedRows(
@@ -10,7 +37,7 @@ export function pipelinePresentedRows(
 ): readonly RelationshipSummaryDto[] {
   return layout === "table"
     ? items
-    : RELATIONSHIP_STATES_V2.flatMap((state) =>
+    : BOARD_STATES.flatMap((state) =>
         items.filter((row) => row.state === state),
       );
 }

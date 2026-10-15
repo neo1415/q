@@ -8,6 +8,7 @@ import type {
 } from "@capital-q/contracts";
 import { RELATIONSHIP_NOTE_MAX_LENGTH } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
+import { ICON_SIZE, Lock } from "@capital-q/ui/icons";
 
 import { addRelationshipNoteAction } from "./relationship-notes-actions";
 import type { Read } from "./record-workspace";
@@ -82,7 +83,12 @@ export function RelationshipNotes({
 
   return (
     <div className="flex flex-col gap-3" data-relationship-notes>
-      <p className="cq-caption text-(--cq-text-tertiary)">
+      <p className="cq-caption flex items-start gap-1.5 text-(--cq-text-secondary)">
+        <Lock
+          size={ICON_SIZE.compact}
+          aria-hidden="true"
+          className="mt-px flex-none"
+        />
         Only {who} sees these. Never shared with them, never used by Q.
       </p>
       <form

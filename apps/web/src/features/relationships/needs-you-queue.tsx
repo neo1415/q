@@ -101,26 +101,36 @@ export function NeedsYouQueue({
           {shown.map((card, index) => (
             <li
               key={card.key}
-              className="flex min-w-0 items-center gap-3 py-2.5"
+              className="flex min-w-0 items-center gap-3 py-3"
               data-needs-you-card
             >
               {card.relationship === null ? null : (
                 <CounterpartAvatar item={card.relationship} size={32} />
               )}
-              <div className="flex min-w-0 flex-1 flex-col">
-                <p className="cq-body-sm truncate text-(--cq-text-primary)">
-                  {card.relationship === null ? null : (
-                    <span className="font-semibold">
-                      {card.relationship.counterpart.name}
-                      {" · "}
-                    </span>
-                  )}
-                  {card.title}
-                </p>
-                <p className="cq-caption cq-numeric text-(--cq-text-tertiary)">
-                  {card.count > 1
-                    ? `${String(card.count)} updates · ${since(card.latestAt, now)}`
-                    : since(card.latestAt, now)}
+              {/* Who, then what and when: two short lines that wrap on a
+                  phone instead of one line cut mid-word. */}
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                {card.relationship === null ? null : (
+                  <p className="cq-body-sm truncate font-semibold text-(--cq-text-primary)">
+                    {card.relationship.counterpart.name}
+                  </p>
+                )}
+                <p className="cq-body-sm line-clamp-2 text-(--cq-text-secondary)">
+                  <span
+                    className={
+                      card.relationship === null
+                        ? "text-(--cq-text-primary)"
+                        : undefined
+                    }
+                  >
+                    {card.title}
+                  </span>
+                  <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
+                    {" · "}
+                    {card.count > 1
+                      ? `${String(card.count)} updates · ${since(card.latestAt, now)}`
+                      : since(card.latestAt, now)}
+                  </span>
                 </p>
               </div>
               {card.action.href === null ? (
