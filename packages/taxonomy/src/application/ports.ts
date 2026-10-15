@@ -122,6 +122,19 @@ export type TaxonomyAssignmentRepository = {
     subject: Pick<TaxonomySubjectDescriptor, "subjectType" | "subjectId">,
     vocabularyCode?: TaxonomyVocabularyCode,
   ) => Promise<readonly TaxonomyEntityAssignment[]>;
+  /**
+   * S2: `listCurrent` for many subjects of one type in one statement. Each
+   * subject is still read under its own tenant (the pair must match, never
+   * a tenant set crossed with an id set). Same rows, same order per subject.
+   */
+  readonly listCurrentForSubjects: (
+    executor: DatabaseExecutor,
+    subjectType: TaxonomySubjectType,
+    subjects: readonly {
+      readonly tenantId: TenantId;
+      readonly subjectId: string;
+    }[],
+  ) => Promise<readonly TaxonomyEntityAssignment[]>;
   readonly listHistory: (
     executor: DatabaseExecutor,
     tenantId: TenantId,

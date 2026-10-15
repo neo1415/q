@@ -22,6 +22,10 @@ import {
   NETWORK_INVESTOR_RELATIONSHIP_PATH,
   NETWORK_INVESTOR_RELATIONSHIPS_PATH,
   NETWORK_COMPANY_RELATIONSHIPS_PATH,
+  NETWORK_RELATIONSHIP_BRIEF_PATH,
+  NETWORK_RELATIONSHIP_BRIEFS_PATH,
+  RelationshipBriefListSchema,
+  RelationshipBriefSchema,
   RelationshipListDtoSchema,
   RelationshipStatusResponseDtoSchema,
   type ExpressInterestRequest,
@@ -124,6 +128,53 @@ export function getRelationshipWithCompany(
     "GET",
     companyPath(NETWORK_COMPANY_RELATIONSHIP_PATH, companyId),
     RelationshipStatusResponseDtoSchema,
+  );
+}
+
+/**
+ * `GET /v1/network/relationships/:relationshipId/brief` (R1): the asking
+ * side's standing in one read, each source OK or UNAVAILABLE.
+ */
+export function getRelationshipBrief(
+  session: ApiSession,
+  relationshipId: string,
+) {
+  return call(
+    session,
+    "GET",
+    NETWORK_RELATIONSHIP_BRIEF_PATH.replace(
+      ":relationshipId",
+      encodeURIComponent(relationshipId),
+    ),
+    RelationshipBriefSchema,
+  );
+}
+
+/**
+ * `GET /v1/network/relationship-briefs` (R1 batching): the briefs of one
+ * page of the viewer's own relationships in one call. `companyId` for a
+ * founder's own company; absent, the actor's investor organisation.
+ */
+export function listRelationshipBriefs(
+  session: ApiSession,
+  query: {
+    readonly companyId?: string | undefined;
+    readonly relationshipIds?: readonly string[] | undefined;
+  } = {},
+) {
+  const params = new URLSearchParams();
+  if (query.companyId !== undefined) params.set("companyId", query.companyId);
+  if (query.relationshipIds !== undefined) {
+    params.set("ids", query.relationshipIds.join(","));
+  }
+  const search = params.toString();
+  return call(
+    session,
+    "GET",
+    search.length === 0
+      ? NETWORK_RELATIONSHIP_BRIEFS_PATH
+      : `${NETWORK_RELATIONSHIP_BRIEFS_PATH}?${search}`,
+    RelationshipBriefListSchema,
   );
 }
 

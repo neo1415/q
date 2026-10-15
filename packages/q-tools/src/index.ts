@@ -51,6 +51,8 @@ export {
 export type {
   InvestorFeedCompany,
   InvestorFeedDecision,
+  CompanyCatalogCandidate,
+  CompanyCatalogPort,
   InvestorFeedPort,
   ConversationProposal,
   PendingProposalContext,
@@ -356,6 +358,13 @@ export {
   type ReadAttentionInput,
 } from "./tools/attention.js";
 
+export {
+  createDiscoverCompaniesTool,
+  DISCOVER_COMPANIES,
+  DiscoverCompaniesInputSchema,
+  DiscoverCompaniesOutputSchema,
+  type DiscoverCompaniesOutput,
+} from "./tools/discover-companies.js";
 export {
   createDiscoverySlateTool,
   DISCOVERY_SLATE,
@@ -706,3 +715,27 @@ export {
   Q_CONTROL_CATALOG,
   type QControlCatalogEntry,
 } from "./tools/control-catalog.js";
+export {
+  createDiscoverCounterpartsTool,
+  DISCOVER_COUNTERPARTS,
+  DiscoverCounterpartsInputSchema,
+  DiscoverCounterpartsOutputSchema,
+  type DiscoverCounterpartsInput,
+  type DiscoverCounterpartsOutput,
+} from "./tools/discover-counterparts.js";
+export {
+  createFindPublicEntityTool,
+  FIND_PUBLIC_ENTITY,
+  FindPublicEntityInputSchema,
+  FindPublicEntityOutputSchema,
+  type FindPublicEntityInput,
+  type FindPublicEntityOutput,
+} from "./tools/find-public-entity.js";
+export {
+  BRIEF_PUBLIC_ENTITY,
+  BriefPublicEntityInputSchema,
+  BriefPublicEntityOutputSchema,
+  createBriefPublicEntityTool,
+  type BriefPublicEntityInput,
+  type BriefPublicEntityOutput,
+} from "./tools/brief-public-entity.js";

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { QAnswerCardsBlock, QResultBlock } from "@capital-q/contracts";
 import type { QConversationMessage, QToolPort } from "@capital-q/q-runtime";
@@ -6,6 +6,7 @@ import type { QConversationMessage, QToolPort } from "@capital-q/q-runtime";
 import { fitSweepCardsBlock, fitSweepSummary } from "../src/q/fit-cards.js";
 import {
   mandateFitProvenance,
+  namedCardCompanyIds,
   previousCardCompanyIds,
   tieLine,
   withFitIntegrity,
@@ -114,8 +115,12 @@ function fitTools(top: number) {
 const AVAILABLE = new Set(["fit_profile", "fit_top_candidates"]);
 const CONTEXT = {} as Parameters<typeof runFitSweep>[0]["context"];
 
-async function sweep(said: string, previous: readonly string[] = []) {
-  const ask = fitSweepAsk(said, previous);
+async function sweep(
+  said: string,
+  previous: readonly string[] = [],
+  named: readonly string[] = [],
+) {
+  const ask = fitSweepAsk(said, previous, named);
   if (ask === null) throw new Error("not a fit question");
   const tools = fitTools(10);
   const result = await runFitSweep({
@@ -225,6 +230,78 @@ describe("'rank them' keeps the set just shown (INC-1)", () => {
   });
 });
 
+describe("bounded candidate sweep", () => {
+  it("returns the requested three when a ten-company tool result is too large", async () => {
+    const execute = vi.fn<QToolPort["execute"]>((proposal) => {
+      if (proposal.name === "fit_top_candidates") {
+        const limit = (proposal.arguments as { limit: number }).limit;
+        // Live response with ten profiles plus disclosed raise views exceeded
+        // the existing 32,000-character tool bound. Keep that bound intact.
+        if (limit > 3)
+          return Promise.resolve({
+            callId: proposal.callId,
+            toolName: "fit.top_candidates",
+            toolVersion: 1,
+            classification: "READ_ONLY",
+            status: "FAILED",
+            failureCode: "RESULT_TOO_LARGE",
+            sensitivity: null,
+            result: {
+              ok: false,
+              error: {
+                code: "RESULT_TOO_LARGE",
+                safeMessage: "Narrow the request.",
+              },
+            },
+            latencyMs: 1,
+          });
+        const entries = Array.from({ length: limit }, (_, i) => {
+          const fit = incidentFit(i + 1).result.data as {
+            name: string;
+            profile: unknown;
+          };
+          return { name: fit.name, profile: fit.profile };
+        });
+        return Promise.resolve({
+          callId: proposal.callId,
+          toolName: "fit.top_candidates",
+          toolVersion: 1,
+          classification: "READ_ONLY",
+          status: "SUCCEEDED",
+          failureCode: null,
+          sensitivity: "CONFIDENTIAL",
+          result: { ok: true, data: { status: "OK", comparison: { entries } } },
+          latencyMs: 1,
+        });
+      }
+      return Promise.reject(new Error("No other read needed"));
+    });
+    const result = await runFitSweep({
+      ask: { scope: "CANDIDATES", place: null, fitAsked: true, count: 3 },
+      tools: { execute },
+      context: CONTEXT,
+      available: new Set(["fit_profile", "fit_top_candidates"]),
+      own: Promise.resolve(null),
+    });
+    expect(result?.fits).toHaveLength(3);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0]?.[0].arguments).toEqual({ limit: 3 });
+  });
+
+  it("retains the wider candidate window before applying a place filter", async () => {
+    const tools = fitTools(10);
+    const execute = vi.fn(tools.port.execute);
+    await runFitSweep({
+      ask: { scope: "CANDIDATES", place: "Kenya", fitAsked: true, count: 3 },
+      tools: { execute },
+      context: CONTEXT,
+      available: new Set(["fit_profile", "fit_top_candidates"]),
+      own: Promise.resolve(null),
+    });
+    expect(execute.mock.calls[0]?.[0].arguments).toEqual({ limit: 10 });
+  });
+});
+
 describe("score integrity (INC-1)", () => {
   it("labels every score mandate fit, with how it was made", async () => {
     const said = "top three companies for my mandate";
@@ -256,5 +333,54 @@ describe("score integrity (INC-1)", () => {
     expect(
       mandateFitProvenance({ name: "Kora", fit: null, sourceCount: 0 }),
     ).toBeNull();
+  });
+});
+
+describe("explicit names after an evidence follow-up", () => {
+  it("reads exactly the two named prior cards and never expands to candidates", async () => {
+    const first = await sweep("Show my top three companies against my mandate");
+    const prose = {
+      ...shownAnswer(first.block),
+      blocks: [],
+      content: "The company has no verified traction on record.",
+    };
+    const history = [shownAnswer(first.block), prose];
+    expect(previousCardCompanyIds(history)).toEqual([]);
+    const text =
+      "Compare Halyard and Savanna against my mandate using authorized company records.";
+    const named = namedCardCompanyIds(history, text);
+    expect(named).toEqual([ID(1), ID(2)]);
+    const comparison = await sweep(
+      text,
+      previousCardCompanyIds(history),
+      named,
+    );
+    expect(comparison.ask.scope).toBe("PREVIOUS");
+    expect(comparison.asked).not.toContain("fit_top_candidates");
+    expect(ids([comparison.block]).sort()).toEqual([ID(1), ID(2)].sort());
+    expect(comparison.block.cards.every((c) => c.fit?.score === 8.8)).toBe(
+      true,
+    );
+  });
+  it("ignores unresolved names, partial names and ambiguous canonical identities", async () => {
+    const first = await sweep("Show my top three companies against my mandate");
+    const altered: QAnswerCardsBlock = {
+      ...first.block,
+      cards: first.block.cards.map((c, index) =>
+        index === 1 ? { ...c, name: "Halyard" } : c,
+      ),
+    };
+    expect(
+      namedCardCompanyIds(
+        [shownAnswer(altered)],
+        "Compare Halyard and Clearwater",
+      ),
+    ).toEqual([ID(3)]);
+    expect(
+      namedCardCompanyIds(
+        [shownAnswer(first.block)],
+        "Compare Superhalyard and an unknown company",
+      ),
+    ).toEqual([]);
   });
 });

@@ -64,6 +64,11 @@ export const LiveOpenResultSchema = z
     maxSessionMs: z.number().int().positive(),
     /** No speech either way for this long: the client closes the line. */
     idleMs: z.number().int().positive(),
+    /**
+     * Part 6: the call's background note (approved facts, built by code),
+     * sent to the voice as quiet context at the start of each session.
+     */
+    context: z.string().max(2_000).nullable().optional(),
   })
   .strict();
 export type LiveOpenResult = z.infer<typeof LiveOpenResultSchema>;
@@ -85,6 +90,11 @@ export const LiveDelegationRequestSchema = z
       )
       .max(12)
       .optional(),
+    /**
+     * The client can say the first verified words before the run ends and
+     * asks again (same id) for the rest. Absent: one answer, at the end.
+     */
+    early: z.boolean().optional(),
   })
   .strict();
 export type LiveDelegationRequest = z.infer<typeof LiveDelegationRequestSchema>;
@@ -114,8 +124,15 @@ export const LiveDelegationResultSchema = z
     failed: z.boolean(),
     /** The call is past its length: the client closes it. */
     ended: z.boolean().optional(),
+    /** Nothing usable was heard: no Q run; the voice checks with them. */
+    unheard: z.boolean().optional(),
     /** The run moved the screen: follow it, and await its receipt, first. */
     move: LiveMoveSchema.optional(),
+    /**
+     * Only the start of the answer: say it now, then ask again with the
+     * same delegation id for the rest.
+     */
+    partial: z.boolean().optional(),
   })
   .strict();
 export type LiveDelegationResult = z.infer<typeof LiveDelegationResultSchema>;
@@ -153,6 +170,21 @@ export const LiveTranscriptReportSchema = z
       )
       .min(1)
       .max(12),
+    /**
+     * Numbers the browser measured on the line, for latency reporting
+     * (a rehearsal with a researched external person): first audio of the
+     * played person, and the gap from the founder's last word to the reply.
+     */
+    timings: z
+      .object({
+        firstAudioMs: z.number().int().min(0).max(120_000).optional(),
+        turnLatencyMs: z
+          .array(z.number().int().min(0).max(120_000))
+          .max(24)
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type LiveTranscriptReport = z.infer<typeof LiveTranscriptReportSchema>;

@@ -45,18 +45,46 @@ export const QAppRouteSchema = z
  * whether it landed -- DONE with the route the router settled on, or
  * FAILED when it never did -- so a move is never claimed without one.
  */
+/**
+ * R3: why a move did not happen (the browser's one navigation lifecycle).
+ * Closed values only; Q says them in plain words, never guesses one.
+ */
+export const QNavigationFailureSchema = z.enum([
+  "NOT_FOUND",
+  "UNAUTHORIZED",
+  "NO_ROUTER",
+  "NOT_LANDED",
+  "CONTROL_MISSING",
+  "SUPERSEDED",
+]);
+export type QNavigationFailure = z.infer<typeof QNavigationFailureSchema>;
+
+/** The move's idempotency key: one execution, one receipt. */
+export const QNavigationIntentIdSchema = z
+  .string()
+  .min(1)
+  .max(120)
+  .regex(/^[A-Za-z0-9:_.-]+$/);
+
+/**
+ * DONE is the lifecycle's VERIFIED: the browser confirmed the destination
+ * (its route, a declared redirect's target, the named control on it).
+ */
 export const QNavigationReceiptSchema = z.discriminatedUnion("status", [
   z
     .object({
       status: z.literal("DONE"),
       expected: QAppRouteSchema.nullable(),
       route: QAppRouteSchema,
+      intentId: QNavigationIntentIdSchema.optional(),
     })
     .strict(),
   z
     .object({
       status: z.literal("FAILED"),
       expected: QAppRouteSchema.nullable(),
+      intentId: QNavigationIntentIdSchema.optional(),
+      reason: QNavigationFailureSchema.optional(),
     })
     .strict(),
 ]);

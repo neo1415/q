@@ -282,6 +282,8 @@ function harness(options: {
       context,
     );
   return {
+    specialist,
+    context,
     investigate,
     investigatePublic,
     requests,
@@ -679,5 +681,65 @@ describe("the specialist reads the answer with the active prompt's own result", 
       proposalStatus: false,
     });
     expect(h.executeOptions[0]?.schema?.safeParse(full).success).toBe(true);
+  });
+});
+
+describe("authorized evidence-only document preparation", () => {
+  it("copies canonical facts without research, retrieval, models or statement writes", async () => {
+    let writes = 0;
+    const world = harness({
+      statements: {
+        record: () => {
+          writes += 1;
+          return Promise.resolve(null);
+        },
+      } as unknown as QUserStatementRecorder,
+    });
+    const result = await world.specialist.investigate(
+      {
+        company: { kind: "COMPANY", companyId: COMPANY },
+        question: "Prepare our one-pager",
+        preparationMode: "EVIDENCE_ONLY",
+        publicResearch: true,
+      },
+      world.context,
+    );
+    expect(result.blocked).toBeNull();
+    expect(
+      result.findings
+        .filter((f) => f.type === "OBSERVATION")
+        .map((f) => f.statement),
+    ).toContain("Digital logistics platform for freight in Nigeria and Ghana.");
+    expect(
+      result.findings
+        .filter((f) => f.type === "OBSERVATION")
+        .every(
+          (f) =>
+            f.truthClass === "USER_CLAIM" &&
+            f.evidenceStatus === "SELF_REPORTED",
+        ),
+    ).toBe(true);
+    expect(world.requests).toHaveLength(0);
+    expect(world.researchCalls).toHaveLength(0);
+    expect(world.reads).toEqual({ canonical: 1, knowledge: 1, evidence: 0 });
+    expect(writes).toBe(0);
+    expect(result.artifactRequest).toBeNull();
+    expect(result.telemetry.modelCalls).toBe(0);
+    expect(result.telemetry.costUsd).toBe(0);
+  });
+  it("honors cancellation before any evidence reads", async () => {
+    const world = harness({});
+    const signal = AbortSignal.abort();
+    const result = await world.specialist.investigate(
+      {
+        company: { kind: "COMPANY", companyId: COMPANY },
+        question: "Prepare our one-pager",
+        preparationMode: "EVIDENCE_ONLY",
+      },
+      { ...world.context, signal },
+    );
+    expect(result.blocked).toBe("CANCELLED");
+    expect(world.reads.canonical).toBe(0);
+    expect(world.requests).toHaveLength(0);
   });
 });

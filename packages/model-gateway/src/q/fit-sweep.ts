@@ -108,6 +108,18 @@ const NOT_PLACES = new Set([
   "Them",
 ]);
 
+/** A profile explanation is not a request for a candidate list. */
+export function isSingleCompanyQuestion(text: string): boolean {
+  return (
+    /\b(?:this|that|the selected|the current|the on-screen)\s+(?:company|startup|business)\b/iu.test(
+      text,
+    ) &&
+    !/\b(?:companies|startups|businesses|founders|deals|them|those|these|others|another)\b/iu.test(
+      text,
+    )
+  );
+}
+
 /**
  * What set and place a fit question is about; null when it is not one.
  * `previous`: the companies the last answer showed, so "rank them" is
@@ -116,9 +128,20 @@ const NOT_PLACES = new Set([
 export function fitSweepAsk(
   text: string,
   previous: readonly string[] = [],
+  named: readonly string[] = [],
 ): FitSweepAsk | null {
   const words = text.trim();
   if (words.length === 0 || words.length > 400) return null;
+  if (named.length >= 2) {
+    return {
+      scope: "PREVIOUS",
+      place: null,
+      fitAsked: true,
+      count: Math.min(askedCount(words) ?? named.length, named.length),
+      within: [...named],
+    };
+  }
+  if (isSingleCompanyQuestion(words)) return null;
   if (previous.length > 0 && refersToShown(words) && FIT_CUE.test(words)) {
     const asked = askedCount(words);
     return {
@@ -160,15 +183,32 @@ function placeOf(words: string): string | null {
  * the reader's; the place and "those" are read from the words as above.
  */
 export function fitSweepAskOfReading(
-  question: { readonly text: string; readonly count: number | null },
+  question: {
+    readonly text: string;
+    readonly count: number | null;
+    readonly previous?: boolean | undefined;
+  },
   previous: readonly string[] = [],
+  named: readonly string[] = [],
 ): FitSweepAsk {
   const words = question.text.trim().slice(0, 400);
+  if (named.length >= 2) {
+    return {
+      scope: "PREVIOUS",
+      place: null,
+      fitAsked: true,
+      count: Math.min(question.count ?? named.length, named.length),
+      within: [...named],
+    };
+  }
   const count =
     question.count === null
       ? null
       : Math.min(Math.max(question.count, 1), FIT_SWEEP_CARDS_MAX);
-  if (previous.length > 0 && refersToShown(words)) {
+  if (
+    previous.length > 0 &&
+    (question.previous === true || refersToShown(words))
+  ) {
     return {
       scope: "PREVIOUS",
       place: null,
@@ -292,7 +332,14 @@ export async function runFitSweep(input: {
   const ids = [...wanted.keys()].slice(0, FIT_SWEEP_MAX);
   const [top, each] = await Promise.all([
     ask.scope === "CANDIDATES" && available.has("fit_top_candidates")
-      ? call("fit_top_candidates", { limit: 10 }, "q-fit-sweep-top")
+      ? call(
+          "fit_top_candidates",
+          // The domain ranks all eligible candidates before taking this
+          // window. Fetch only the requested count when no place filter
+          // needs a wider set; ten rich profiles can exceed the tool bound.
+          { limit: ask.place === null ? (ask.count ?? 10) : 10 },
+          "q-fit-sweep-top",
+        )
       : Promise.resolve([] as RunFit[]),
     Promise.all(
       ids.map((companyId, index) =>

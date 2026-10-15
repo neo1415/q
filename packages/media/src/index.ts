@@ -126,6 +126,7 @@ export {
 } from "./application/transcript-use-cases.js";
 export {
   extractPitchClaims,
+  firstPitchRaise,
   moneyIn,
   pitchMomentLabel,
   PITCH_CLAIMS_READER_VERSION,

@@ -1,4 +1,3 @@
-/* global process, console, fetch, AbortController, setTimeout */
 // Voice over HTTP, without the browser's WebSocket leg (the sandbox proxy
 // cannot upgrade): opens a real voice session on the q-api, then plays the
 // speech provider's part -- transcript text to the think endpoint, Q's

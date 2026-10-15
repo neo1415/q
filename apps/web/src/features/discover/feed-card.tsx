@@ -24,6 +24,8 @@ import {
 
 import { CompanyAvatar, CompanyAvatarLink } from "../company/company-avatar";
 import { moneyText } from "../company/money-text";
+import { RaiseFact } from "../company/raise-fact";
+import { raiseWords } from "../company/raise-words";
 import { countryLabel, stageLabel } from "../company/declared-labels";
 import { ExpressInterest } from "../network/express-interest";
 import { useDockAvoid } from "../q-dock/dock-avoid";
@@ -144,6 +146,8 @@ function Reasons({
   );
 }
 
+const subscribeNothing = () => () => undefined;
+
 const DESKTOP = "(min-width: 1024px)";
 function subscribeDesktop(onChange: () => void): () => void {
   if (typeof window.matchMedia !== "function") return () => undefined;
@@ -208,7 +212,10 @@ function CardFacts({
       )}
       <dt>Raising</dt>
       <dd className="cq-numeric">
-        {summary.raise === null ? (
+        {summary.raiseView !== undefined ? (
+          // R2: the server's one raise read, in the profile's own words.
+          <RaiseFact words={raiseWords(summary.raiseView, false)} />
+        ) : summary.raise === null ? (
           <span className="cq-feed-fact-unknown">Not shared with you</span>
         ) : (
           <>
@@ -292,6 +299,13 @@ export function FeedCard({
   // The caption's "more": in place, over its own darker scrim (Discover v2).
   const [captionOpen, setCaptionOpen] = useState(false);
   const wide = useDesktopPanel();
+  // The server-rendered control cannot open Q until its handler is attached.
+  // Keep it disabled through hydration so an early press is never discarded.
+  const interactive = useSyncExternalStore(
+    subscribeNothing,
+    () => true,
+    () => false,
+  );
   const [confirming, setConfirming] = useState(false);
   const openDetails = (confirm: boolean) => {
     setConfirming(confirm);
@@ -649,6 +663,7 @@ export function FeedCard({
         </Button>
         <Button
           variant="quiet"
+          disabled={!interactive}
           onClick={onAskQ}
           className="cq-feed-rail-button"
           data-feed-ask-q

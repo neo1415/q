@@ -1,4 +1,3 @@
-/* global console */
 // Read-only: one line per seeded company with what production holds now.
 import * as lib from "./lib.mjs";
 

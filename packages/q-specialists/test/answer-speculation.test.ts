@@ -81,6 +81,8 @@ const QUESTION: TurnReaderV8Result = {
     text: "What can you do for me?",
     about: [],
     count: null,
+    discover: null,
+    subject: null,
   },
   aboutNamedOther: false,
   tool: null,
@@ -111,6 +113,8 @@ const RESEARCH: TurnReaderV8Result = {
     text: "What did Paystack raise last?",
     about: [],
     count: null,
+    discover: null,
+    subject: null,
   },
   aboutNamedOther: true,
   tool: null,
@@ -219,6 +223,20 @@ afterEach(() => {
 });
 
 describe("a spoken question answered speculatively (latency2)", () => {
+  it("discards the assumed-subject answer when the reader names someone else", async () => {
+    const run = seam({
+      said: "What does Portside do?",
+      reading: { ...QUESTION, aboutNamedOther: true },
+    });
+    await run.answer.answer(request());
+    expect(run.calls).toHaveLength(2);
+    expect(run.calls[0]?.speculation).toBeDefined();
+    expect(run.calls[1]?.aboutNamedOther).toBe(true);
+    expect(run.calls[1]?.speculation).toBeUndefined();
+    expect(run.events.some((event) => event.outcome === "CANCELLED")).toBe(
+      true,
+    );
+  });
   it("adopts the speculation when the reading is a plain question: one answer, said once", async () => {
     const run = seam({ said: "What can you do for me?", reading: QUESTION });
     const outcome = await run.answer.answer(request());
@@ -244,9 +262,7 @@ describe("a spoken question answered speculatively (latency2)", () => {
     ]);
     expect(run.heard).toEqual([]);
     expect(run.stored).toHaveLength(1);
-    expect(run.stored[0]).toMatch(
-      /^(?:Here's Discover|Discover is up|Over to Discover)\.$/u,
-    );
+    expect(run.stored[0]).toMatch("Opening Discover…");
   });
 
   it("cancels it for a research request and answers on the normal path, said once", async () => {

@@ -9,6 +9,12 @@ import {
 } from "./app-action-turn.js";
 import { namesWebAddress, RESEARCH_TOOLS, toolFocusOf } from "./tool-focus.js";
 import {
+  TEAM_JOB_KINDS,
+  teamJobLine,
+  workKindsAsked,
+  type QTeamJobPort,
+} from "./team-job.js";
+import {
   readingMisfit,
   SPECULATIVE_READING,
   speculationMisfit,
@@ -50,6 +56,7 @@ import {
   type QPageManifest,
   type QResponseMessage,
   type QResultBlock,
+  type QUiIntent,
   type QVisibleStage,
 } from "@capital-q/contracts";
 import {
@@ -83,7 +90,20 @@ import {
   toolAreaOf,
   zoneFromWords,
 } from "@capital-q/q-tools";
-import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
+import {
+  asksForOwnMandate,
+  ownInvestorOrganisationIn,
+} from "@capital-q/model-gateway/q";
+import {
+  cardsLaneOf,
+  fastLaneOf,
+  knownEntityLaneOf,
+  lastShownEntityId,
+  type PreparedFollowUpPort,
+  investorDiscoveryLaneOf,
+  dailyLaneOf,
+  type KnownEntityMatcher,
+} from "./fast-lane.js";
 
 import {
   ANSWER_DOCUMENT_ARTIFACT_TYPE,
@@ -129,9 +149,13 @@ import {
 import type { QProfileGapsPort } from "./profile-gaps.js";
 import {
   openingLine,
+  asksToReviseDocument,
   openTarget,
+  spokenRecordName,
   referenceNote,
   repeatedAction,
+  rehearsalNameOf,
+  rehearseWithPersonCard,
   shownItems,
   type LastAction,
   type QOpenRecordPort,
@@ -258,8 +282,22 @@ import {
   pageRequestOf,
   wordsNamePage,
 } from "./page-request.js";
-import { resolveNamedRecord } from "./fast-navigation.js";
-import type { TurnReference } from "@capital-q/q-core";
+import {
+  resolveNamedRecord,
+  withTabs,
+  type OpenRecordIntent,
+} from "./fast-navigation.js";
+import { deckSectionSpeech, deckSpeech } from "./deck-speech.js";
+import {
+  screenTabTarget,
+  lastOpenedScreen,
+  tabAskOf,
+  tabPlace,
+  type TabAsk,
+} from "./tab-request.js";
+import { movePhaseLine } from "@capital-q/q-core/speech";
+import { namedRecordRequestOf } from "./named-record-request.js";
+import type { TurnReference, TurnSkimResult } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
   startPendingDecision,
@@ -292,6 +330,7 @@ import {
   askedSubjects,
   provenanceLine,
   type QTurnReader,
+  type QTurnSkimmer,
 } from "@capital-q/model-gateway/q";
 
 /**
@@ -452,6 +491,23 @@ export type SpecialistQAnswerDependencies = {
    */
   readonly turns?: QTurnReader | undefined;
   /**
+   * K fast lane: a short first read beside the turn reader; a HIGH
+   * confidence "companies of a kind" or "fit" is answered by the read-only
+   * app query before the full reading lands. Absent: no fast lane.
+   */
+  readonly turnSkim?: QTurnSkimmer | undefined;
+  /**
+   * The warm prepared-entity index, as a pure in-memory matcher. A plain
+   * "who is / tell me about / find <prepared entity>" is answered by code
+   * with no model call at all. Absent: the normal path.
+   */
+  readonly knownEntities?: KnownEntityMatcher | undefined;
+  /**
+   * Follow-ups about a prepared entity, answered by code from its stored
+   * brief: no web search, no model call. Absent: the normal path.
+   */
+  readonly preparedFollowUp?: PreparedFollowUpPort | undefined;
+  /**
    * A typed yes or no to a change waiting in this conversation, read and
    * acted on by code through the Approval Engine (pending-decision.ts).
    * Absent: approval by conversation is left to the answer's tools.
@@ -491,6 +547,8 @@ export type SpecialistQAnswerDependencies = {
    * instruction. Absent: such a turn is answered as before.
    */
   readonly delegation?: QDelegationPort | undefined;
+  /** Several kinds of work at once: the lead Q plans a team job. */
+  readonly teamJob?: QTeamJobPort | undefined;
   /**
    * Their own readiness gaps as the opening lines of "what should I do
    * next?", or null when there are none (or no company of theirs).
@@ -562,6 +620,25 @@ export type SpecialistQAnswerDependencies = {
    * open_page's authorize step. Absent: such a turn is answered as before.
    */
   readonly openRecord?: QOpenRecordPort | undefined;
+  /**
+   * W4: a researched person, organisation or agency the asker can already
+   * reach by name -- a prepared public seed or one of their own researched
+   * records -- with its identity card ready to show. No web search: the
+   * fallback when a name is none of their relationships.
+   */
+  readonly externalEntities?:
+    | {
+        readonly find: (
+          request: QAnswerRequest,
+          name: string,
+        ) => Promise<{
+          readonly externalPersonId: string;
+          readonly displayName: string;
+          readonly said: string;
+          readonly blocks: readonly QResultBlock[];
+        } | null>;
+      }
+    | undefined;
   /** Whether public research exists in this composition at all. */
   readonly researchAvailable?: boolean | undefined;
   /**
@@ -1845,6 +1922,107 @@ export function createSpecialistQAnswer(
    * Null: not such a request, or a plain-words name nothing of theirs
    * matches (the normal path answers it).
    */
+  /**
+   * W4 ("take me to Shadi Qishta", "rehearse with Shadi Qishta"): a name
+   * that is none of their relationships but is a researched entity they
+   * can reach (prepared seed or their own research). Opens its identity
+   * card in focus, or the rehearsal lobby when "rehearse" is said (through
+   * open_page's authorize step). Null: not such a request or no such entity.
+   */
+  const externalEntityAnswer = async (
+    request: QAnswerRequest,
+    text: string,
+    mode: "REHEARSE" | "OPEN",
+  ): Promise<{
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+  } | null> => {
+    const finder = dependencies.externalEntities;
+    if (finder === undefined) return null;
+    const name =
+      mode === "REHEARSE"
+        ? rehearsalNameOf(text)
+        : (namedRecordRequestOf(text)?.name ?? null);
+    if (name === null) return null;
+    // Their own counterparts keep their own, richer paths.
+    const own = await (
+      dependencies.counterpartNames?.(request) ?? Promise.resolve([])
+    ).catch(() => [] as readonly string[]);
+    if (own.some((one) => one.toLowerCase() === name.toLowerCase())) {
+      return null;
+    }
+    const hit = await finder.find(request, name).catch(() => null);
+    if (hit === null) return null;
+    if (mode === "REHEARSE") {
+      const port = dependencies.openRecord;
+      if (port === undefined) return null;
+      const intent = await port
+        .open(request, {
+          page: "EXTERNAL_REHEARSAL",
+          id: hit.externalPersonId,
+          name: hit.displayName,
+        })
+        .catch(() => null);
+      if (intent === null) return null;
+      return {
+        said: `Opening a rehearsal with ${hit.displayName}. It is an AI rehearsal informed by public sources, not the real person.`,
+        blocks: [{ kind: "UI_INTENT", intent }],
+      };
+    }
+    return { said: hit.said, blocks: hit.blocks };
+  };
+
+  /**
+   * N2: the pitch deck was asked for (or one of its sections): it opens in
+   * its viewer and Q speaks what the deck says, composed by code from the
+   * sections the person may read (read_company_deck's own authorize step,
+   * the Context Firewall's plan). A deck they may not see is a plain
+   * refusal: no intent, no summary, nothing of its content.
+   */
+  const withDeckSpoken = async (
+    request: QAnswerRequest,
+    intent: OpenRecordIntent,
+    name: string | null,
+    said: string,
+  ): Promise<{
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+    readonly refused: boolean;
+  }> => {
+    const onDeck = intent.tab === "deck" || intent.page === "COMPANY_DECK";
+    const reader = dependencies.openRecord?.deck;
+    if (
+      !onDeck ||
+      (intent.viewer !== "OPEN" && intent.subTab === undefined) ||
+      reader === undefined
+    ) {
+      return {
+        said,
+        blocks: [{ kind: "UI_INTENT", intent }],
+        refused: false,
+      };
+    }
+    const view = await reader(request, intent.id).catch(() => null);
+    if (view === null) {
+      return {
+        said:
+          name === null
+            ? "There is no pitch deck I can open for you here."
+            : `There is no pitch deck of ${name}'s that I can open for you.`,
+        blocks: [],
+        refused: true,
+      };
+    }
+    return {
+      said:
+        intent.subTab === undefined
+          ? deckSpeech(name, view)
+          : deckSectionSpeech(name, intent.subTab, view),
+      blocks: [{ kind: "UI_INTENT", intent }],
+      refused: false,
+    };
+  };
+
   const namedRecordAnswer = async (
     request: QAnswerRequest,
     text: string,
@@ -1869,13 +2047,59 @@ export function createSpecialistQAnswer(
       open: (page, name) => port.open(request, { page, name }),
     });
     if (resolved === null) return null;
-    return resolved.kind === "OPEN"
-      ? {
-          said: resolved.said,
-          blocks: [{ kind: "UI_INTENT", intent: resolved.intent }],
-          log: `${resolved.own ? "OWN" : "REACHABLE"}_${resolved.page}`,
-        }
-      : { said: resolved.said, blocks: [], log: resolved.log };
+    if (resolved.kind !== "OPEN") {
+      return { said: resolved.said, blocks: [], log: resolved.log };
+    }
+    const spoken = await withDeckSpoken(
+      request,
+      resolved.intent,
+      resolved.name,
+      resolved.said,
+    );
+    return {
+      ...spoken,
+      log: spoken.refused
+        ? "DECK_NOT_SHARED"
+        : `${resolved.own ? "OWN" : "REACHABLE"}_${resolved.page}`,
+    };
+  };
+
+  /**
+   * N2: a tab, sub-tab or the deck asked for without a name ("open their
+   * team tab", "go to diligence", "show the deck"): the company or
+   * investor on the screen is the one meant. Read by code, opened through
+   * open_page's own authorize step; with nothing relevant on screen it is
+   * null and the other readers take the words.
+   */
+  const screenTabAnswer = async (
+    request: QAnswerRequest,
+    text: string,
+    history: readonly QConversationMessage[],
+  ): Promise<{
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+    readonly log: string;
+  } | null> => {
+    const port = dependencies.openRecord;
+    const ask = tabAskOf(text);
+    if (port === undefined || ask === null || ask.name !== null) return null;
+    const target =
+      screenTabTarget(request.plan.screen, ask) ??
+      screenTabTarget(lastOpenedScreen(history), ask);
+    if (target === null) return null;
+    const opened = await port
+      .open(request, { page: target.page, id: target.id })
+      .catch(() => null);
+    if (opened === null) return null;
+    const intent = withTabs(opened, ask);
+    if (intent.tab === undefined) return null;
+    const said = movePhaseLine("PENDING", tabPlace(ask));
+    const spoken = await withDeckSpoken(request, intent, null, said);
+    return {
+      said: spoken.said,
+      blocks: spoken.blocks,
+      log: spoken.refused ? "DECK_NOT_SHARED" : `SCREEN_${ask.tab}`,
+    };
   };
 
   /** B6: the reference each run's words were bound to, for its answer. */
@@ -2027,6 +2251,41 @@ export function createSpecialistQAnswer(
     readonly reading: Promise<Awaited<ReturnType<QTurnReader["read"]>> | null>;
   };
   const prereads = new Map<string, Promise<EarlyReading | null>>();
+  /** K fast lane: the short first read, begun beside the firewall. */
+  const preskims = new Map<
+    string,
+    {
+      readonly messageId: string;
+      readonly skim: Promise<TurnSkimResult | null>;
+    }
+  >();
+  const skimInput = (
+    who: {
+      readonly runId: string;
+      readonly tenantId: string;
+      readonly correlationId: string;
+      readonly actor: { readonly userId: string };
+      readonly signal?: AbortSignal | undefined;
+    },
+    history: readonly QConversationMessage[],
+    latest: QConversationMessage,
+  ) => ({
+    utterance: latest.content,
+    recentTurns: history
+      .filter((message) => message.id !== latest.id)
+      .slice(-2)
+      .map((message) => ({
+        role: message.role === "USER" ? ("USER" as const) : ("Q" as const),
+        text: message.content,
+      })),
+    attribution: {
+      tenantId: who.tenantId,
+      userId: who.actor.userId,
+      qRunId: who.runId,
+      correlationId: who.correlationId,
+    },
+    signal: who.signal,
+  });
   const PREREADS_MAX = 64;
 
   /**
@@ -2084,6 +2343,26 @@ export function createSpecialistQAnswer(
     };
   };
 
+  const instantLaneOf = (
+    utterance: string,
+    history: readonly QConversationMessage[] = [],
+  ) =>
+    (dependencies.knownEntities === undefined
+      ? null
+      : knownEntityLaneOf(utterance, dependencies.knownEntities)) ??
+    investorDiscoveryLaneOf(utterance) ??
+    dailyLaneOf(utterance, lastAnswerShowedCards(history));
+
+  /** A follow-up about a prepared entity, composed by code; null if none. */
+  const preparedFollowUpOf = (
+    utterance: string,
+    history: Parameters<typeof lastShownEntityId>[0],
+  ): string | null =>
+    dependencies.preparedFollowUp?.({
+      utterance,
+      lastShownEntityId: lastShownEntityId(history),
+    }) ?? null;
+
   const preread = (input: QPrereadInput): void => {
     if (turns === undefined || prereads.has(input.runId)) return;
     const started = (async (): Promise<EarlyReading | null> => {
@@ -2101,6 +2380,26 @@ export function createSpecialistQAnswer(
       if (conversationId === undefined || latest === undefined) return null;
       // B5: a pleasantry is answered by code; its reading would be waste.
       if (pleasantryOf(latest.content) !== null) return null;
+      // A plain mandate recall is routed after the firewall supplies its
+      // own mandate scope; starting classifiers here would still waste calls.
+      if (asksForOwnMandate(latest.content)) return null;
+      // An instant known-entity lookup is answered by code: no reading.
+      if (instantLaneOf(latest.content, history) !== null) return null;
+      if (preparedFollowUpOf(latest.content, history) !== null) return null;
+      // K fast lane: the short first read starts as early as the reading.
+      if (dependencies.turnSkim !== undefined && !preskims.has(input.runId)) {
+        preskims.set(input.runId, {
+          messageId: latest.id,
+          skim: dependencies.turnSkim
+            .skim(skimInput(input, history, latest))
+            .catch(() => null),
+        });
+        while (preskims.size > PREREADS_MAX) {
+          const oldest = preskims.keys().next().value;
+          if (oldest === undefined) break;
+          preskims.delete(oldest);
+        }
+      }
       const key = lastActions.get(conversationId);
       // A conversation's first turn has no known actions: read later.
       if (key === undefined) return null;
@@ -2166,6 +2465,64 @@ export function createSpecialistQAnswer(
     }
   };
 
+  /** Asks that make a deck rather than open one. */
+  const MAKES_A_DECK =
+    /\b(?:draft|make|create|build|write|prepare|generate|improve|rewrite|edit|redo|fix|polish|design|update)\b/iu;
+  const DECK_WORD = /\b(?:pitch\s+)?deck\b/iu;
+
+  const openDeckAsked = async (
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    history: readonly QConversationMessage[],
+    target: {
+      readonly id?: string | undefined;
+      readonly name?: string | undefined;
+    },
+  ): Promise<QAnswerOutcome | null> => {
+    const port = dependencies.openRecord;
+    const said = [...history].reverse().find((m) => m.role === "USER")?.content;
+    if (port === undefined || said === undefined) return null;
+    if (MAKES_A_DECK.test(said) || !DECK_WORD.test(said)) return null;
+    const ask = tabAskOf(said);
+    const name = ask?.name ?? target.name ?? null;
+    const screenAsk: TabAsk = ask ?? {
+      tab: "deck",
+      subTab: null,
+      name: null,
+      viewer: true,
+    };
+    if (screenAsk.tab !== "deck") return null;
+    const opened =
+      target.id !== undefined || name !== null
+        ? await port
+            .open(request, {
+              page: "COMPANY_DECK",
+              ...(target.id === undefined
+                ? { name: name ?? "" }
+                : { id: target.id }),
+            })
+            .catch(() => null)
+        : await (async () => {
+            const onScreen = screenTabTarget(request.plan.screen, screenAsk);
+            return onScreen === null
+              ? null
+              : port.open(request, onScreen).catch(() => null);
+          })();
+    if (opened === null) return null;
+    const intent = withTabs(opened, screenAsk);
+    const spoken = await withDeckSpoken(
+      request,
+      intent,
+      name === null ? null : spokenRecordName(name),
+      movePhaseLine("PENDING", tabPlace(screenAsk)),
+    );
+    logger?.info(
+      { qRunId: request.runId, refused: spoken.refused },
+      "q opened a company's pitch deck the turn pointed at",
+    );
+    return recordAnswer(request, conversationId, spoken.said, spoken.blocks);
+  };
+
   /**
    * Open the one record the turn names or points at (follow-55), through
    * open_page's authorize step: their own documents, relationships and
@@ -2190,6 +2547,18 @@ export function createSpecialistQAnswer(
         .open(request, { page, id: target.id, name: target.name })
         .catch(() => null);
       if (intent === null) continue;
+      // Live 2026-10-11 (investor rehearsal): on Ledgerfold's own page,
+      // "What does this company actually do and why does it fit my
+      // mandate?" was read as "open it", and Q answered by re-opening the
+      // page they were on, with no evidence. Opening the page already on
+      // screen never answers a question: the answer path does.
+      if (alreadyOnScreen(request, intent) && asksAQuestion(askedIn(history))) {
+        logger?.info(
+          { qRunId: request.runId, page },
+          "the record the turn pointed at is already on screen; answered instead",
+        );
+        return null;
+      }
       logger?.info(
         { qRunId: request.runId, page, byName: target.id === undefined },
         "q opened the record the turn pointed at",
@@ -2217,6 +2586,12 @@ export function createSpecialistQAnswer(
         { kind: "UI_INTENT", intent },
       ]);
     }
+    // N2 (live 2026-10-10: "open <company>'s pitch deck" read as a
+    // DOCUMENT, which covers only what Q prepared for them): a company's
+    // deck is opened as that company's Pitch deck tab, under its own
+    // authorize step, and spoken from what the deck says.
+    const deck = await openDeckAsked(request, conversationId, history, target);
+    if (deck !== null) return deck;
     logger?.info(
       { qRunId: request.runId, open: reference.open },
       "the record the turn pointed at is not one of theirs; answered instead",
@@ -2313,6 +2688,106 @@ export function createSpecialistQAnswer(
           conversationId,
           pleasantryReply(pleasantry, request.runId, lastQ?.content ?? null),
         );
+      }
+    }
+    // The existing delegate reads and composes their declared mandate under
+    // this same plan. Only skip classifiers for an unambiguous recall with
+    // an authorised own mandate; this routing decision grants no access.
+    if (
+      conversationId !== undefined &&
+      latest !== undefined &&
+      request.speculation === undefined &&
+      request.plan.screen?.route !== "ONBOARDING" &&
+      request.writingDocument !== true &&
+      request.askedAction === undefined &&
+      (request.turnKind === undefined ||
+        request.turnKind === "QUESTION_TO_Q") &&
+      request.actor.organisationId !== undefined &&
+      asksForOwnMandate(latest.content) &&
+      request.plan.actor.organisationId === request.actor.organisationId &&
+      request.plan.actor.userId === request.actor.userId &&
+      request.plan.tenantId === request.tenantId &&
+      request.plan.runId === request.runId &&
+      request.plan.scopes.some(
+        (scope) =>
+          scope.kind === "INVESTOR_MANDATE" &&
+          scope.subject?.kind === "INVESTOR_ORGANISATION" &&
+          scope.subject.investorOrganisationId ===
+            scope.filter.investorOrganisationId &&
+          scope.filter.tenantId === request.tenantId,
+      )
+    ) {
+      // A sequence may have begun on another instance. Load the existing
+      // durable core before deciding this recall can skip its turn reader.
+      await hydrate({ tenantId: request.tenantId, conversationId });
+      if (!sequences.has(conversationId)) {
+        const capabilities = await capabilitiesOf(request);
+        logger?.info(
+          { qRunId: request.runId, lane: "OWN_MANDATE" },
+          "q fast lane",
+        );
+        return delegate.answer({
+          ...request,
+          research: Promise.resolve(NO_RESEARCH),
+          capabilities: manifestOf(capabilities),
+          turnKind: "QUESTION_TO_Q",
+          questionKind: "THEIR_OWN_RECORDS",
+          preparedSubject: "MANDATE",
+          ...(latest.utteranceRef !== undefined ? { spoken: true } : {}),
+        });
+      }
+    }
+    // Known-entity instant lane: a plain lookup of a prepared entity is
+    // answered from the warm index with zero model calls (live 2026-10-10:
+    // three classification calls ran before a code-built card).
+    if (
+      conversationId !== undefined &&
+      latest !== undefined &&
+      request.speculation === undefined &&
+      request.plan.screen?.route !== "ONBOARDING" &&
+      !sequences.has(conversationId)
+    ) {
+      const instant = instantLaneOf(latest.content, history);
+      if (instant !== null) {
+        const capabilities = await capabilitiesOf(request);
+        logger?.info(
+          {
+            qRunId: request.runId,
+            lane:
+              instant.questionKind === "DISCOVER_INVESTORS"
+                ? "INVESTOR_DISCOVERY"
+                : "KNOWN_ENTITY",
+          },
+          "q fast lane",
+        );
+        return delegate.answer({
+          ...request,
+          research: Promise.resolve(NO_RESEARCH),
+          capabilities: manifestOf(capabilities),
+          turnKind: "QUESTION_TO_Q",
+          ...(latest.utteranceRef !== undefined ? { spoken: true } : {}),
+          ...instant,
+        });
+      }
+    }
+    // A follow-up about a prepared entity ("tell me more about him", "what
+    // has Muhannad said about founders") is composed by code from its
+    // stored brief: zero web search, zero analyst call (live 2026-10-11:
+    // "tell me more about this person" took long and found little).
+    if (
+      conversationId !== undefined &&
+      latest !== undefined &&
+      request.speculation === undefined &&
+      request.plan.screen?.route !== "ONBOARDING" &&
+      !sequences.has(conversationId)
+    ) {
+      const followUp = preparedFollowUpOf(latest.content, history);
+      if (followUp !== null) {
+        logger?.info(
+          { qRunId: request.runId, lane: "PREPARED_FOLLOW_UP", modelCalls: 0 },
+          "q answered a prepared-entity follow-up by code",
+        );
+        return recordAnswer(request, conversationId, followUp);
       }
     }
     delegate.warm?.(request);
@@ -2415,6 +2890,7 @@ export function createSpecialistQAnswer(
       capabilitiesRead,
       speculative,
       decideAfterReading,
+      () => pending?.waiting() ?? Promise.resolve(false),
     ).finally(() => {
       // A path that never asked: the reading in flight is not wanted.
       if (!concluded) pending?.cancel();
@@ -2463,6 +2939,8 @@ export function createSpecialistQAnswer(
     speculative: { current: Speculation | null },
     /** A waiting change, decided from this turn's reading; a line ends the turn. */
     decide?: (turn: PendingTurnReading | null) => Promise<string | null>,
+    /** K fast lane: whether a change waits on their word; true when unknown. */
+    waitingOnThem: () => Promise<boolean> = () => Promise.resolve(false),
   ): Promise<QAnswerOutcome> => {
     if (turns === undefined) return answerOnce(request);
     const state =
@@ -2529,6 +3007,45 @@ export function createSpecialistQAnswer(
     // Spoken turns carry the recogniser's utterance; typed ones never do.
     // The reader needs to know which: only speech can be overheard.
     const spoken = latest.utteranceRef !== undefined;
+    // W4: "I want to rehearse with him" right after one person card: the
+    // pronoun is that card; the rehearsal opens through open_page's own
+    // authorize step (their own researched record or a prepared seed).
+    const cardRehearsal = rehearseWithPersonCard(latest.content, history);
+    if (cardRehearsal !== null && dependencies.openRecord !== undefined) {
+      const intent = await dependencies.openRecord
+        .open(request, {
+          page: "EXTERNAL_REHEARSAL",
+          id: cardRehearsal.externalPersonId,
+          name: cardRehearsal.name,
+        })
+        .catch(() => null);
+      if (intent !== null) {
+        logger?.info(
+          { qRunId: request.runId },
+          "q opened a rehearsal with the person card just shown",
+        );
+        return recordAnswer(
+          request,
+          conversationId,
+          `Opening a rehearsal with ${cardRehearsal.name}. It is an AI rehearsal informed by public sources, not the real person.`,
+          [{ kind: "UI_INTENT", intent }],
+        );
+      }
+    }
+    // W4: "rehearse with Shadi Qishta" for a researched entity by name.
+    const namedRehearsal = await externalEntityAnswer(
+      request,
+      latest.content,
+      "REHEARSE",
+    );
+    if (namedRehearsal !== null) {
+      return recordAnswer(
+        request,
+        conversationId,
+        namedRehearsal.said,
+        namedRehearsal.blocks,
+      );
+    }
     // What Q showed and last did, for "that one" and "try again".
     const shown = shownItems(history);
     const lastAction = lastActed.get(conversationId) ?? null;
@@ -2598,6 +3115,18 @@ export function createSpecialistQAnswer(
         [controlActBlock(pointed.control)],
       );
     }
+    // Founder P5: "clear all cards", "show me the cards again": a change to
+    // what is shown on this device, done in code. Presentation only.
+    const cardsLane = cardsLaneOf(latest.content);
+    if (cardsLane !== null) {
+      logger?.info(
+        { qRunId: request.runId, act: cardsLane.intent.action },
+        "q is clearing or restoring cards",
+      );
+      return recordAnswer(request, conversationId, cardsLane.said, [
+        { kind: "UI_INTENT", intent: cardsLane.intent },
+      ]);
+    }
     // A bare screen command ("scroll down", "go back") is done at once in
     // code, like the wake words: it needs no reading, no model and no view
     // of the screen (founder 2026-10-06: Q said it could not scroll
@@ -2624,7 +3153,41 @@ export function createSpecialistQAnswer(
     // "open Shiftwell", "the data room for Shiftwell": the one record the
     // name means, among their own relationships first, opened by code --
     // or one short line naming who it could be. Never "Understood.".
+    const onScreenTab = await screenTabAnswer(request, latest.content, history);
+    if (onScreenTab !== null) {
+      logger?.info(
+        { qRunId: request.runId, outcome: onScreenTab.log },
+        "q opened a tab by its name",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        onScreenTab.said,
+        onScreenTab.blocks,
+      );
+    }
     const byName = await namedRecordAnswer(request, latest.content);
+    // W4: none of their relationships, but a researched entity they can
+    // reach by name: its identity card in focus.
+    if (byName === null || byName.log === "NOT_FOUND") {
+      const external = await externalEntityAnswer(
+        request,
+        latest.content,
+        "OPEN",
+      );
+      if (external !== null) {
+        logger?.info(
+          { qRunId: request.runId },
+          "q showed a researched entity by its name",
+        );
+        return recordAnswer(
+          request,
+          conversationId,
+          external.said,
+          external.blocks,
+        );
+      }
+    }
     if (byName !== null) {
       logger?.info(
         { qRunId: request.runId, outcome: byName.log },
@@ -2696,6 +3259,13 @@ export function createSpecialistQAnswer(
         },
       });
     }
+    // K6: the full reading is dropped (its provider call aborted) when the
+    // fast lane's skim answers the turn first; the run's own abort still
+    // reaches it.
+    const readerAbort = new AbortController();
+    request.signal?.addEventListener("abort", () => readerAbort.abort(), {
+      once: true,
+    });
     const readTurn = () =>
       turns.read(
         turnReaderInput(
@@ -2706,7 +3276,7 @@ export function createSpecialistQAnswer(
             tenantId: request.tenantId,
             userId: request.actor.userId,
             correlationId: request.correlationId,
-            signal: request.signal,
+            signal: readerAbort.signal,
           },
           withResolution(referenceNote(shown, lastAction), pointed),
         ),
@@ -2722,18 +3292,66 @@ export function createSpecialistQAnswer(
       const oldest = lastActions.keys().next().value;
       if (oldest !== undefined) lastActions.delete(oldest);
     }
-    const ready = early === undefined ? null : await early;
-    const earlyRead =
-      ready !== null &&
-      ready.messageId === latest.id &&
-      ready.actionsKey === actionsKey(actions)
-        ? await ready.reading
-        : null;
+    const readingFirst = (async () => {
+      const ready = early === undefined ? null : await early;
+      const earlyRead =
+        ready !== null &&
+        ready.messageId === latest.id &&
+        ready.actionsKey === actionsKey(actions)
+          ? await ready.reading
+          : null;
+      return earlyRead ?? (await readTurn().catch(() => null));
+    })();
+    // K fast lane: the short first read, begun beside the firewall when it
+    // could be, races the full reading. A HIGH confidence "companies of a
+    // kind" or "fit" is answered by the read-only app query at once; any
+    // other skim, or the full reading arriving first, takes the path below.
+    const preskim = preskims.get(request.runId);
+    preskims.delete(request.runId);
+    const skimmer = dependencies.turnSkim;
+    const skimming =
+      skimmer === undefined ||
+      request.speculation !== undefined ||
+      request.plan.screen?.route === "ONBOARDING" ||
+      sequences.has(conversationId)
+        ? null
+        : preskim !== undefined && preskim.messageId === latest.id
+          ? preskim.skim
+          : skimmer.skim(skimInput(request, history, latest));
+    if (skimming !== null) {
+      const skimStarted = Date.now();
+      const skimmed = await Promise.race([
+        readingFirst.then(() => null),
+        skimming.catch(() => null),
+      ]);
+      const lane = fastLaneOf(skimmed, latest.content);
+      // Never past a change waiting on their word: a yes is not a list.
+      if (lane !== null && !(await waitingOnThem())) {
+        speculative.current?.cancel("KIND");
+        readerAbort.abort();
+        logger?.info(
+          {
+            qRunId: request.runId,
+            lane: lane.questionKind,
+            waitedMs: Date.now() - skimStarted,
+          },
+          "q fast lane",
+        );
+        return delegate.answer({
+          ...request,
+          research: Promise.resolve(NO_RESEARCH),
+          capabilities: manifestOf(capabilities),
+          turnKind: "QUESTION_TO_Q",
+          ...(spoken ? { spoken: true } : {}),
+          ...lane,
+        });
+      }
+    }
     // A reading that failed is tried once more: the gateway has parked the
     // provider that failed, so the second try goes to the fallback model.
     // A request to make something must never be dropped because one model
     // was down (B1, 2026-09-25).
-    let read = earlyRead ?? (await readTurn().catch(() => null));
+    let read = await readingFirst;
     let turnUnread = false;
     if (read === null && request.signal?.aborted !== true) {
       read = await readTurn().catch(() => null);
@@ -2926,6 +3544,35 @@ export function createSpecialistQAnswer(
         return recordAnswer(request, conversationId, said);
       }
     }
+    // An explicit edit of a file already on screen/in this conversation must
+    // reach its canonical revision tool, even if the reader mistakes the
+    // document reference for an instruction to open it. This chooses a path;
+    // the tool still resolves owner, firewall scope and the real READY version.
+    if (
+      request.capability === "ANSWER" &&
+      !sequences.has(conversationId) &&
+      read?.sequence == null &&
+      asksToReviseDocument(latest.content) &&
+      (request.plan.screen?.artifactId !== undefined ||
+        latestArtifactCardIn(history) !== null)
+    ) {
+      speculative.current?.cancel("FOCUS");
+      return delegate.answer({
+        ...request,
+        research: Promise.resolve(NO_RESEARCH),
+        capabilities: manifestOf(capabilities),
+        turnKind: "TOOL_REQUEST",
+        toolFocus: {
+          areas: ["Documents"],
+          tools: [
+            "revise_my_document",
+            "read_my_document",
+            "list_my_documents",
+          ],
+        },
+        ...(spoken ? { spoken: true } : {}),
+      });
+    }
     // What the turn points back at (TURN_READER v40, follow-55): one record
     // to open, or Q's last action again. Bound here by code to a record of
     // theirs or to that action, before any screen is opened for the turn
@@ -2959,6 +3606,36 @@ export function createSpecialistQAnswer(
         reference.sameFor,
       );
       if (again !== null) return again;
+    }
+    // Work handed to Q's team -- read from meaning (TURN_READER v49
+    // teamJob), or a sentence naming three kinds of work as a fast path --
+    // is planned by the lead and approved as one card: never one in-run
+    // brief, never a hand-over (live 2026-10-12). A plan that could not be
+    // made is said plainly; it is not covered by an ordinary answer.
+    const teamJobBy =
+      read === null || read.confidence === "LOW" || read.addressedToQ === false
+        ? null
+        : read.teamJob === true
+          ? "READING"
+          : workKindsAsked(latest.content) >= TEAM_JOB_KINDS
+            ? "WORDS"
+            : null;
+    if (dependencies.teamJob !== undefined && teamJobBy !== null) {
+      const startedAt = Date.now();
+      const planned = await dependencies.teamJob.propose(
+        request,
+        latest.content,
+      );
+      logger?.info(
+        {
+          qRunId: request.runId,
+          by: teamJobBy,
+          outcome: planned.status,
+          planMs: Date.now() - startedAt,
+        },
+        "q work handed to the team: planned",
+      );
+      return recordAnswer(request, conversationId, teamJobLine(planned));
     }
     // A LOW reading is a guess, and a guess never moves anybody's screen or
     // prepares a change: it is answered like any other turn. A document
@@ -3323,6 +4000,19 @@ export function createSpecialistQAnswer(
     // "handle this for me", in any language. Code prepares Q's errand for
     // the subject they are looking at, for their approval, instead of the
     // answer asking who (founder live 2026-10-01).
+    // Live 2026-10-12 (fictional investor): "Research Ledgerfold, assess
+    // the opportunity, prepare an investment memo, have it critiqued...
+    // and prepare founder diligence questions" was read as a hand-over of
+    // Ledgerfold, and a waiting connection request was turned into an
+    // "accept and send a message" card. Asking for work products is never
+    // a hand-over of a relationship: the answer path plans that work.
+    const askedForWork = asksForWorkProducts(latest.content);
+    if (askedForWork && read?.handOver != null) {
+      logger?.info(
+        { qRunId: request.runId },
+        "a request for work products is not a hand-over; answered instead",
+      );
+    }
     if (
       dependencies.handOver !== undefined &&
       read !== null &&
@@ -3330,12 +4020,17 @@ export function createSpecialistQAnswer(
       read.handOver !== undefined &&
       read.handOver !== null &&
       tool === null &&
-      !writingDocument
+      !writingDocument &&
+      !askedForWork
     ) {
       const handed = await actOnHandOver(
         dependencies.handOver,
         request,
-        { ...read.handOver, pointed: handOverSubjectPointed(pointed) },
+        {
+          ...read.handOver,
+          pointed: handOverSubjectPointed(pointed),
+          utterance: latest.content,
+        },
         read.timeWindow ?? null,
       ).catch((error: unknown) => {
         logger?.warn(
@@ -3456,15 +4151,42 @@ export function createSpecialistQAnswer(
       ...(turnUnread ? { turnUnread: true } : {}),
       // Said aloud: the answer is shaped for the ear (2026-10-07).
       ...(spoken ? { spoken: true } : {}),
-      ...(read === null ? {} : { turnKind: read.kind }),
+      ...(read === null
+        ? {}
+        : { turnKind: read.kind, aboutNamedOther: read.aboutNamedOther }),
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),
+      // K8: a question about a prepared subject.
+      ...(read?.kind === "QUESTION_TO_Q" &&
+      read.question?.subject !== undefined &&
+      read.question.subject !== null
+        ? { preparedSubject: read.question.subject }
+        : {}),
+      // K1: companies of a kind, with the reader's structure.
+      ...(read?.kind === "QUESTION_TO_Q" &&
+      read.question?.kind === "DISCOVER_COMPANIES"
+        ? {
+            discoverCompanies: {
+              text: read.question.text,
+              sectors: read.question.discover?.sectors ?? [],
+              countries: (read.question.discover?.countries ?? []).map((code) =>
+                code.toUpperCase(),
+              ),
+              stages: read.question.discover?.stages ?? [],
+              count: read.question.count ?? null,
+              ranking: read.question.discover?.ranking ?? "NONE",
+              mandateRelevant: read.question.discover?.mandateRelevant ?? false,
+              previous: read.question.discover?.previous ?? false,
+            },
+          }
+        : {}),
       ...(read?.kind === "QUESTION_TO_Q" && read.question?.kind === "FIT"
         ? {
             fitQuestion: {
               text: read.question.text,
               count: read.question.count ?? null,
+              previous: read.question.discover?.previous ?? false,
             },
           }
         : {}),
@@ -3859,4 +4581,62 @@ export function screenActOf(text: string): {
     return { act: "GO_BACK", said: "Going back." };
   }
   return null;
+}
+
+/** Whether Q's last answer put cards on screen ("the first one" means a card then). */
+function lastAnswerShowedCards(
+  history: readonly QConversationMessage[],
+): boolean {
+  const lastQ = [...history].reverse().find((m) => m.role === "Q");
+  return (lastQ?.blocks ?? []).some(
+    (block) =>
+      block.kind === "ANSWER_CARDS" ||
+      block.kind === "COMPANY_REFERENCE" ||
+      block.kind === "INVESTOR_REFERENCE" ||
+      block.kind === "COMPARISON_CARDS",
+  );
+}
+
+/** The record page this intent opens is the one the person is looking at. */
+function alreadyOnScreen(
+  request: QAnswerRequest,
+  intent: Extract<QUiIntent, { kind: "OPEN_RECORD_PAGE" }>,
+): boolean {
+  const screen = request.plan.screen;
+  if (screen === undefined || intent.tab !== undefined) return false;
+  return (
+    intent.page === "COMPANY" &&
+    (screen.route === "COMPANY" || screen.route === "PITCH") &&
+    screen.companyId === intent.id
+  );
+}
+
+/** A question, not a command to go somewhere. */
+function asksAQuestion(text: string): boolean {
+  const said = text.trim().toLowerCase();
+  return (
+    said.includes("?") ||
+    /^(what|why|how|who|which|when|where|does|do|is|are|can|could|should|would|tell me|explain|describe|walk me|give me|summari[sz]e)\b/u.test(
+      said,
+    )
+  );
+}
+
+/**
+ * The words ask Q to produce analysis or documents (research, an
+ * assessment, a memo or brief, a critique or revision, diligence
+ * questions): two or more distinct kinds of work. Handing a relationship
+ * over ("handle Kestrel for me") names none of them.
+ */
+export function asksForWorkProducts(text: string): boolean {
+  const said = text.toLowerCase();
+  const kinds = [
+    /\bresearch/u,
+    /\b(assess|assessment|evaluat|analy[sz])/u,
+    /\b(memo|brief|report|one-pager|write-?up)\b/u,
+    /\b(critique|second opinion|review it|revise|revision)/u,
+    /\b(diligence questions|due diligence|questions for the founder|founder questions|diligence)/u,
+    /\b(risks?|missing information|red flags)\b/u,
+  ];
+  return kinds.filter((kind) => kind.test(said)).length >= 2;
 }

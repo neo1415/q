@@ -9,6 +9,7 @@ import { parseContract } from "@capital-q/contracts";
 
 import { getActorContext } from "../../security/actor-context.js";
 import type { VoiceSessionBinding } from "../bindings.js";
+import { createAvailabilityCache } from "./availability-cache.js";
 import type { LiveBroker } from "./broker.js";
 import {
   LiveDelegationRequestSchema,
@@ -256,18 +257,20 @@ export function registerLiveVoiceRoutes(
   // Whether this person's voice starts on GPT-Live: the web asks before it
   // opens any voice line (founder 2026-10-09: GPT-Live is the voice of the
   // app for the people it is switched on for).
+  // Answered from memory for a token seen in the last few minutes (no
+  // Auth server call, no database read): availability-cache.ts.
+  const availability = createAvailabilityCache();
   app.get(
     Q_VOICE_LIVE_AVAILABLE_PATH,
-    { onRequest: withContext },
-    (request, reply) =>
-      reply
+    { onRequest: availability.hook(withContext) },
+    (request, reply) => {
+      const available = broker.enabled && allowed(request);
+      availability.remember(request, available);
+      return reply
         .code(200)
         .header("Cache-Control", "no-store")
-        .send(
-          LiveAvailabilitySchema.parse({
-            available: broker.enabled && allowed(request),
-          }),
-        ),
+        .send(LiveAvailabilitySchema.parse({ available }));
+    },
   );
 
   // Developer-only: which voice lines this local deployment can compare.

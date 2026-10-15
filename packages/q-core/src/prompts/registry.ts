@@ -105,6 +105,10 @@ import { TURN_READER_V42 } from "./tasks/turn-reader.v42.js";
 import { TURN_READER_V43 } from "./tasks/turn-reader.v43.js";
 import { TURN_READER_V44 } from "./tasks/turn-reader.v44.js";
 import { TURN_READER_V45 } from "./tasks/turn-reader.v45.js";
+import { TURN_READER_V46 } from "./tasks/turn-reader.v46.js";
+import { TURN_READER_V47 } from "./tasks/turn-reader.v47.js";
+import { TURN_READER_V48 } from "./tasks/turn-reader.v48.js";
+import { TURN_READER_V49 } from "./tasks/turn-reader.v49.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEMORY_EXTRACTOR_V2 } from "./tasks/memory-extractor.v2.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
@@ -120,12 +124,21 @@ import {
   DRAFT_REVIEW_V3,
   JOB_PLAN_V1,
   JOB_PLAN_V2,
+  JOB_PLAN_V3,
+  JOB_PLAN_V4,
+  SUBSTANCE_CRITIQUE_V1,
+  DILIGENCE_QUESTIONS_V1,
   REPLY_READER_V1,
 } from "./tasks/workforce.v1.js";
 import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
 import { DECK_EXTRACTION_V1 } from "./tasks/deck-extraction.v1.js";
 import { SPOKEN_REPLY_V1 } from "./tasks/spoken-reply.v1.js";
 import { SMALL_TALK_V1 } from "./tasks/small-talk.v1.js";
+import { TURN_SKIM_V1 } from "./tasks/turn-skim.v1.js";
+import { TURN_SKIM_V2 } from "./tasks/turn-skim.v2.js";
+import { TURN_SKIM_V3 } from "./tasks/turn-skim.v3.js";
+import { TURN_SKIM_V4 } from "./tasks/turn-skim.v4.js";
+import { PERSON_BRIEF_READER_V1 } from "./tasks/person-brief-reader.v1.js";
 import { BRIEFING_COMMAND_V1 } from "./tasks/briefing-command.v1.js";
 // AUTO block (ADR 0030)
 import {
@@ -159,6 +172,8 @@ import { INVESTOR_TWIN_TURN_V10 } from "./tasks/investor-twin-turn.v10.js";
 import { MEETING_HOST_TURN_V1 } from "./tasks/meeting-host-turn.v1.js";
 import { MEETING_HOST_TURN_V2 } from "./tasks/meeting-host-turn.v2.js";
 import { MEETING_HOST_TURN_V3 } from "./tasks/meeting-host-turn.v3.js";
+import { MEETING_HOST_TURN_V4 } from "./tasks/meeting-host-turn.v4.js";
+import { MEETING_HOST_TURN_V5 } from "./tasks/meeting-host-turn.v5.js";
 import { MEETING_SCREEN_NOTE_V1 } from "./tasks/meeting-screen-note.v1.js";
 import { MEETING_CAMERA_NOTE_V1 } from "./tasks/meeting-camera-note.v1.js";
 import { REHEARSAL_SCORE_V3 } from "./tasks/rehearsal-score.v3.js";
@@ -174,6 +189,8 @@ import { DOCUMENT_POLISH_V2 } from "./tasks/document-polish.v2.js";
 import { DOCUMENT_CRITIQUE_V1 } from "./tasks/document-critique.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
 import { FIT_Q_VIEW_V1 } from "./tasks/fit-q-view.v1.js";
+import { FIT_Q_VIEW_V2 } from "./tasks/fit-q-view.v2.js";
+import { FIT_Q_VIEW_V3 } from "./tasks/fit-q-view.v3.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-extraction.v2.js";
 import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
@@ -404,6 +421,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     ARTIFACT_REVISION_V3,
     FIT_EXPLANATION_V1,
     FIT_Q_VIEW_V1,
+    FIT_Q_VIEW_V2,
+    FIT_Q_VIEW_V3,
     PRESENCE_READER_V1,
     INVESTOR_RESEARCH_READER_V1,
     DECISION_READER_V1,
@@ -453,6 +472,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_READER_V43,
     TURN_READER_V44,
     TURN_READER_V45,
+    TURN_READER_V46,
+    TURN_READER_V47,
+    TURN_READER_V48,
+    TURN_READER_V49,
     MEMORY_EXTRACTOR_V1,
     MEMORY_EXTRACTOR_V2,
     MEETING_NOTES_V1,
@@ -468,6 +491,10 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     REPLY_READER_V1,
     JOB_PLAN_V1,
     JOB_PLAN_V2,
+    JOB_PLAN_V3,
+    JOB_PLAN_V4,
+    SUBSTANCE_CRITIQUE_V1,
+    DILIGENCE_QUESTIONS_V1,
     ONBOARDING_MOVE_READER_V1,
     PREFERENCE_POLARITY_V1,
     MEETING_OUTCOME_READER_V1,
@@ -493,6 +520,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     MEETING_HOST_TURN_V1,
     MEETING_HOST_TURN_V2,
     MEETING_HOST_TURN_V3,
+    MEETING_HOST_TURN_V4,
+    MEETING_HOST_TURN_V5,
     MEETING_SCREEN_NOTE_V1,
     MEETING_CAMERA_NOTE_V1,
     REHEARSAL_SCORE_V3,
@@ -536,6 +565,11 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DECK_EXTRACTION_V1,
     SPOKEN_REPLY_V1,
     SMALL_TALK_V1,
+    TURN_SKIM_V1,
+    TURN_SKIM_V2,
+    TURN_SKIM_V3,
+    TURN_SKIM_V4,
+    PERSON_BRIEF_READER_V1,
     BRIEFING_COMMAND_V1,
   ];
 

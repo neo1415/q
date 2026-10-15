@@ -79,6 +79,7 @@ import { useQControl } from "@/features/q/control/q-control";
 
 import { loadArrival } from "./arrival-browser";
 import { setRoomFilled, useRoomSlots } from "./arrival-room";
+import { DailyPrefetch } from "./daily-prefetch";
 
 /**
  * Q on arrival (Zino, 2026-10-08; designs docs/design/2026-10-08/briefing
@@ -1056,7 +1057,8 @@ export function Sequence({
   );
 }
 
-const WIDE_QUERY = "(min-width: 1024px)";
+// xl, as the room grid: at 1024px the side columns were ~95px wide.
+const WIDE_QUERY = "(min-width: 1280px)";
 function subscribeWide(onChange: () => void): () => void {
   if (typeof window.matchMedia !== "function") return () => undefined;
   const query = window.matchMedia(WIDE_QUERY);
@@ -1172,7 +1174,6 @@ export function ArrivalBriefing({
       setArrivalSpoken(words.spoken);
     }
   }, [words, ready]);
-
   if (ready === null || words === null) return <>{fallback}</>;
   const compact = variant === "dock";
   // E1: on the Q page the cards are the stage's (arrival-stage.tsx), which
@@ -1194,6 +1195,9 @@ export function ArrivalBriefing({
       data-arrival={variant}
       data-arrival-quiet={words.quiet ? "" : undefined}
     >
+      {words.dailyPaths.length === 0 || ready.quietHead ? null : (
+        <DailyPrefetch paths={words.dailyPaths} />
+      )}
       {ready.quietHead ? (
         variant === "page" ? (
           fallback

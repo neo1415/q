@@ -19,7 +19,11 @@ import {
   UtcTimestampSchema,
   parseQResultBlocks,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
+import {
+  cachedInRun,
+  type DatabaseExecutor,
+  type TransactionContext,
+} from "@capital-q/database";
 import {
   OrganisationIdSchema,
   TenantIdSchema,
@@ -287,7 +291,27 @@ function selectEvent(executor: DatabaseExecutor) {
 const EVENTS_PAGE_DEFAULT = 200;
 const EVENTS_PAGE_MAX = 1000;
 
-export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
+/**
+ * R5: the conversation history a run reads, fetched once per run at the
+ * largest window any reader takes; each reader gets its own newest slice.
+ */
+const RECENT_OF_RUN_WINDOW = 64;
+const RECENT_OF_RUN_TABLES = [
+  "q_runtime.conversation_messages",
+  "q_runtime.conversation_message_marks",
+  // Superseded runs' lines are left out of the history read.
+  "q_runtime.runs",
+] as const;
+
+export function createPostgresQRuntimeRepositories(
+  options: {
+    /**
+     * R5: reads made on exactly this executor (the request client, never a
+     * transaction) may be served from the run read cache.
+     */
+    readonly runCacheRoot?: DatabaseExecutor | undefined;
+  } = {},
+): QRuntimeRepositories {
   const findRunForActor: QRuntimeRepositories["runs"]["findForActor"] = async (
     executor,
     tenantId,
@@ -461,9 +485,22 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
         // A run's last sign of life is its newest durable event, else its
         // start, else its creation. A paused run waits on a person and no
         // engine; an in-flight one is held by whichever process runs it.
+        // G-D24: a run whose engine heartbeats is judged by the heartbeat
+        // alone, over the short engine window: a live engine touches it
+        // every few seconds however quiet the run is, so a heartbeat that
+        // stopped means the process is gone. A run no heartbeating engine
+        // ever held keeps the event-silence rule below.
+        const engineSilentSince =
+          input.engineSilentSince ?? input.inFlightSilentSince;
         const rows = await executor`
           ${selectRun(executor)}
            where r.status not in ('COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED')
+             and (
+               (r.engine_heartbeat_at is not null
+                and r.status not in ('AWAITING_INPUT', 'AWAITING_APPROVAL')
+                and r.engine_heartbeat_at < ${engineSilentSince}::timestamptz)
+               or
+             ((r.engine_heartbeat_at is null or r.status in ('AWAITING_INPUT', 'AWAITING_APPROVAL'))
              and coalesce(
                    (select max(e.occurred_at)
                       from q_runtime.run_events e
@@ -475,7 +512,7 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
                        when r.status in ('AWAITING_INPUT', 'AWAITING_APPROVAL')
                          then ${input.pausedSilentSince}::timestamptz
                        else ${input.inFlightSilentSince}::timestamptz
-                     end
+                     end))
            order by r.created_at
            limit ${input.limit}`;
         return rows.map(toRun);
@@ -503,19 +540,80 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
            where r.id = ${input.runId}
              and r.tenant_id = ${input.tenantId}
              and r.version = ${input.expectedVersion}
-          returning r.actor_user_id`;
-        if (rows.length === 0) {
-          return null;
-        }
-        const { actor_user_id } = z
-          .object({ actor_user_id: UserIdSchema })
-          .parse(rows[0]);
-        return findRunForActor(
-          tx.sql,
-          input.tenantId,
-          actor_user_id,
-          input.runId,
-        );
+          returning r.id, r.tenant_id, r.actor_user_id, r.actor_organisation_id,
+                    r.conversation_id, r.objective, r.capability, r.consequence_class,
+                    r.status, r.subject_refs, r.viewing, r.screen, r.orchestration_version,
+                    r.prompt_bundle_version, r.model_policy_version, r.correlation_id,
+                    r.created_at, r.started_at, r.completed_at, r.failure_code,
+                    r.version, r.last_event_sequence`;
+        // SUB-SECOND: the moved row comes back from the UPDATE itself (the
+        // same columns selectRun reads), not from a second SELECT.
+        return rows.length === 0 ? null : toRun(rows[0]);
+      },
+      moveChain: async (executor, input) => {
+        // S2: the whole lifecycle move and its event in ONE statement (it
+        // was BEGIN, lock, update, latest-stage read, event insert, COMMIT).
+        // The UPDATE takes the row lock and its predicate (actor, tenant,
+        // status in the legal-from set) is re-checked under that lock, so a
+        // concurrent mover or a replay makes it match nothing. The event
+        // takes the next sequence from the same UPDATE, exactly as
+        // appendNext does, and is notified the same way. An event meant
+        // only when the stage changes compares against the latest visible
+        // stage as of this statement, which the lock makes the latest.
+        const event = input.event;
+        const stage = event?.visibleStage ?? null;
+        const rows = await executor`
+          with wants as (
+            select (${event !== undefined}::boolean
+                    and (not ${event?.onlyIfStageDiffers ?? false}::boolean
+                         or (select e.visible_stage
+                               from q_runtime.run_events e
+                              where e.run_id = ${input.runId}
+                                and e.tenant_id = ${input.tenantId}
+                                and e.visible_stage is not null
+                              order by e.sequence desc
+                              limit 1) is distinct from ${stage}::text)
+                   ) as appended
+          ),
+          moved as (
+            update q_runtime.runs r
+               set status = ${input.status},
+                   started_at = coalesce(${input.startedAt ?? null}::timestamptz, r.started_at),
+                   completed_at = ${input.completedAt ?? null}::timestamptz,
+                   failure_code = ${input.failureCode ?? null},
+                   orchestration_version = coalesce(${input.orchestrationVersion ?? null}, r.orchestration_version),
+                   model_policy_version = coalesce(${input.modelPolicyVersion ?? null}, r.model_policy_version),
+                   prompt_bundle_version = coalesce(${input.promptBundleVersion ?? null}, r.prompt_bundle_version),
+                   version = r.version + ${input.steps},
+                   last_event_sequence = r.last_event_sequence
+                     + case when (select appended from wants) then 1 else 0 end
+             where r.id = ${input.runId}
+               and r.tenant_id = ${input.tenantId}
+               and r.actor_user_id = ${input.actorUserId}
+               and r.status = any(${[...input.allowedFrom]}::text[])
+            returning r.id, r.tenant_id, r.actor_user_id, r.actor_organisation_id,
+                      r.conversation_id, r.objective, r.capability, r.consequence_class,
+                      r.status, r.subject_refs, r.viewing, r.screen, r.orchestration_version,
+                      r.prompt_bundle_version, r.model_policy_version, r.correlation_id,
+                      r.created_at, r.started_at, r.completed_at, r.failure_code,
+                      r.version, r.last_event_sequence
+          ),
+          inserted as (
+            insert into q_runtime.run_events
+              (tenant_id, run_id, sequence, event_type, visible_stage, payload)
+            select m.tenant_id, m.id, m.last_event_sequence,
+                   ${event?.eventType ?? null}, ${stage},
+                   ${JSON.stringify(event?.payload ?? null)}::text::jsonb
+              from moved m
+             where (select appended from wants)
+            returning run_id, sequence
+          )
+          select m.*,
+                 (select count(pg_notify(${Q_RUN_EVENTS_CHANNEL},
+                           json_build_object('runId', i.run_id, 'sequence', i.sequence)::text))
+                    from inserted i) as notified
+            from moved m`;
+        return rows.length === 0 ? null : toRun(rows[0]);
       },
       allocateEventSequence: async (tx, tenantId, runId) => {
         // The UPDATE takes the row lock; a second allocator for the same run
@@ -556,31 +654,37 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
                 const valid = parseQResultBlocks(input.blocks).blocks;
                 return valid.length === 0 ? null : valid;
               })();
+        // S2: the insert, the row as stored and the conversation's own
+        // clock in ONE statement (they were an insert, a re-select and an
+        // update). The conversation clock moves to the stored row's time,
+        // exactly as before.
         const rows = await tx.sql`
-          insert into q_runtime.conversation_messages
-            (id, tenant_id, conversation_id, run_id, role, content, result_blocks,
-             provider_message_ref)
-          values (coalesce(${input.id ?? null}::uuid, gen_random_uuid()),
-                  ${input.tenantId}, ${input.conversationId}, ${input.runId},
-                  ${input.role}, ${input.content},
-                  ${blocks === null ? null : JSON.stringify(blocks)}::text::jsonb,
-                  ${utteranceRef})
-          returning id`;
-        const { id } = IdRow.parse(rows[0]);
-        const created = await findMessageById(
-          tx.sql,
-          input.tenantId,
-          QMessageIdSchema.parse(id),
-        );
-        if (created === null) {
+          with inserted as (
+            insert into q_runtime.conversation_messages
+              (id, tenant_id, conversation_id, run_id, role, content, result_blocks,
+               provider_message_ref)
+            values (coalesce(${input.id ?? null}::uuid, gen_random_uuid()),
+                    ${input.tenantId}, ${input.conversationId}, ${input.runId},
+                    ${input.role}, ${input.content},
+                    ${blocks === null ? null : JSON.stringify(blocks)}::text::jsonb,
+                    ${utteranceRef})
+            returning id, tenant_id, conversation_id, run_id, role, content,
+                      content_type, result_blocks, provider_message_ref, created_at
+          ),
+          clocked as (
+            update q_runtime.conversations c
+               set last_message_at = greatest(coalesce(c.last_message_at, c.created_at),
+                                              (select i.created_at from inserted i))
+             where c.id = ${input.conversationId} and c.tenant_id = ${input.tenantId}
+            returning c.id
+          )
+          select i.*, (select count(*) from clocked) as clocked
+            from inserted i`;
+        const first = rows[0];
+        if (first === undefined) {
           throw new Error("q message insert did not return a row");
         }
-        // The conversation's own clock, for listing it by activity.
-        await tx.sql`
-          update q_runtime.conversations
-             set last_message_at = greatest(coalesce(last_message_at, created_at), ${created.createdAt}::timestamptz)
-           where id = ${input.conversationId} and tenant_id = ${input.tenantId}`;
-        return created;
+        return toMessage(first);
       },
       findById: findMessageById,
       mark: async (tx, input) => {
@@ -632,7 +736,10 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
         // The newest `limit` of the conversation, then put back in the
         // order they were said. Taking the OLDEST would hand a long
         // conversation its opening and hide the part being talked about.
-        const rows = await executor`
+        const newestFirst = async (
+          window: number,
+        ): Promise<readonly unknown[]> =>
+          await executor`
           ${selectMessage(executor)}
            where m.tenant_id = ${tenantId}
              and m.conversation_id = (
@@ -648,28 +755,84 @@ export function createPostgresQRuntimeRepositories(): QRuntimeRepositories {
                 where k.message_id = m.id and k.tenant_id = m.tenant_id)
              and ${notSupersededRun(executor)}
            order by m.created_at desc, m.id desc
-           limit ${limit}`;
+           limit ${window}`;
+        // R5: one read per run at the widest window; a narrower reader
+        // takes the newest `limit` of it, the same rows its own query
+        // would have returned (same order, same predicates).
+        const rows =
+          options.runCacheRoot !== undefined &&
+          executor === options.runCacheRoot &&
+          limit <= RECENT_OF_RUN_WINDOW
+            ? (
+                await cachedInRun(
+                  {
+                    aggregate: "conversation-recent-of-run",
+                    tables: RECENT_OF_RUN_TABLES,
+                    actor: tenantId,
+                    fingerprint: runId,
+                  },
+                  () => newestFirst(RECENT_OF_RUN_WINDOW),
+                )
+              ).slice(0, limit)
+            : await newestFirst(limit);
         return withoutSupersededUtterances(rows.map(toMessage).reverse());
       },
     },
 
     runEvents: {
       append: async (tx, input) => {
+        // Wake live readers (CQ-Q-009) in the same statement as the insert
+        // (SUB-SECOND: one round trip, not two). Postgres delivers the
+        // notice on commit, so a rolled-back event is never announced.
+        // Identifiers only: the reader re-reads the row it is told about.
+        // pg_notify sits in the select list over the inserted row, so it
+        // runs exactly once, for exactly that row.
         const rows = await tx.sql`
-          insert into q_runtime.run_events
-            (tenant_id, run_id, sequence, event_type, visible_stage, payload)
-          values (${input.tenantId}, ${input.runId}, ${input.sequence},
-                  ${input.eventType}, ${input.visibleStage},
-                  ${JSON.stringify(input.payload)}::text::jsonb)
-          returning id, tenant_id, run_id, sequence, event_type, visible_stage,
-                    payload, occurred_at`;
-        // Wake live readers (CQ-Q-009). Postgres delivers the notice on
-        // commit, so a rolled-back event is never announced. Identifiers
-        // only: the reader re-reads the row it is told about.
-        await tx.sql`select pg_notify(${Q_RUN_EVENTS_CHANNEL}, ${JSON.stringify(
-          { runId: input.runId, sequence: input.sequence },
-        )})`;
+          with inserted as (
+            insert into q_runtime.run_events
+              (tenant_id, run_id, sequence, event_type, visible_stage, payload)
+            values (${input.tenantId}, ${input.runId}, ${input.sequence},
+                    ${input.eventType}, ${input.visibleStage},
+                    ${JSON.stringify(input.payload)}::text::jsonb)
+            returning id, tenant_id, run_id, sequence, event_type, visible_stage,
+                      payload, occurred_at
+          )
+          select i.*,
+                 pg_notify(${Q_RUN_EVENTS_CHANNEL},
+                           json_build_object('runId', i.run_id, 'sequence', i.sequence)::text)
+                   as notified
+            from inserted i`;
         return toEvent(rows[0]);
+      },
+      appendNext: async (tx, input) => {
+        // R5: allocate and append in one statement. The UPDATE takes the
+        // run's row lock first, so a concurrent appender waits and then
+        // gets the next number: consecutive, as allocateEventSequence +
+        // append were, and the unique (run_id, sequence) constraint still
+        // arbitrates. No run, no row: nothing is inserted.
+        const rows = await tx.sql`
+          with allocated as (
+            update q_runtime.runs r
+               set last_event_sequence = r.last_event_sequence + 1
+             where r.id = ${input.runId} and r.tenant_id = ${input.tenantId}
+            returning r.last_event_sequence
+          ),
+          inserted as (
+            insert into q_runtime.run_events
+              (tenant_id, run_id, sequence, event_type, visible_stage, payload)
+            select ${input.tenantId}, ${input.runId}, a.last_event_sequence,
+                   ${input.eventType}, ${input.visibleStage},
+                   ${JSON.stringify(input.payload)}::text::jsonb
+              from allocated a
+            returning id, tenant_id, run_id, sequence, event_type, visible_stage,
+                      payload, occurred_at
+          )
+          select i.*,
+                 pg_notify(${Q_RUN_EVENTS_CHANNEL},
+                           json_build_object('runId', i.run_id, 'sequence', i.sequence)::text)
+                   as notified
+            from inserted i`;
+        return rows.length === 0 ? null : toEvent(rows[0]);
       },
       listForRun: async (executor, tenantId, runId, page = {}) => {
         const after = page.afterSequence ?? 0;

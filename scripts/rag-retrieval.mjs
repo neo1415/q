@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Authorised retrieval developer commands (CQ-RAG-004 §120).
  *

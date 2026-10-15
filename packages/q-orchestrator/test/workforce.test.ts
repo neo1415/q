@@ -292,6 +292,79 @@ describe("boundPlan", () => {
   });
 });
 
+describe("boundPlan: investor documents (2026-10-12)", () => {
+  const executors = registeredExecutors({ research: true, documents: true });
+  const permitted = new Set(["documents.own.prepare", "public_web.search"]);
+  const company = "8a6f2a3e-3c4b-4d5e-9f60-7a8b9c0d1e2f";
+  const memo = {
+    key: "memo",
+    role: "DOCUMENTS",
+    agentName: null,
+    goal: "Investment memo",
+    tools: ["documents.own.prepare"],
+    dependsOn: [],
+    document: { operation: "PREPARE", kind: "MEMO", scope: "NAMED_COMPANY" },
+  };
+  const critique = {
+    key: "critique",
+    role: "DOCUMENTS",
+    agentName: null,
+    goal: "Critique and revise the memo",
+    tools: ["documents.own.prepare"],
+    dependsOn: ["memo"],
+    document: { operation: "CRITIQUE_AND_REVISE", sourceStep: "memo" },
+  };
+
+  it("binds the memo to the company the goal named, never one a model wrote", () => {
+    const bound = boundPlan([memo, critique], {
+      permitted,
+      budgetUsd: 1,
+      executors,
+      namedCompanyId: company,
+    });
+    expect(bound.refused).toEqual([]);
+    expect(bound.steps[0]?.document).toEqual({
+      operation: "PREPARE",
+      kind: "MEMO",
+      scope: "NAMED_COMPANY",
+      companyId: company,
+    });
+    expect(bound.steps[1]).toMatchObject({
+      agentName: "Reviewer",
+      document: { operation: "CRITIQUE_AND_REVISE", sourceStep: "memo" },
+    });
+  });
+
+  it("refuses a named-company memo when the goal names no company on record", () => {
+    const bound = boundPlan([memo], { permitted, budgetUsd: 1, executors });
+    expect(bound.refused).toEqual([
+      { key: "memo", reason: "NO_NAMED_COMPANY" },
+    ]);
+  });
+
+  it("refuses a model-written company id outright", () => {
+    const bound = boundPlan(
+      [{ ...memo, document: { ...memo.document, companyId: "elsewhere" } }],
+      { permitted, budgetUsd: 1, executors, namedCompanyId: company },
+    );
+    expect(bound.refused).toEqual([
+      { key: "memo", reason: "INVALID_DOCUMENT_REQUEST" },
+    ]);
+  });
+
+  it("refuses a critique that does not wait on an earlier preparation", () => {
+    const bound = boundPlan([memo, { ...critique, dependsOn: [] }], {
+      permitted,
+      budgetUsd: 1,
+      executors,
+      namedCompanyId: company,
+    });
+    expect(bound.refused).toEqual([
+      { key: "critique", reason: "INVALID_CRITIQUE_SOURCE" },
+    ]);
+  });
+});
+
 describe("gradeOf", () => {
   it("weights the rubric to 100 and never averages away an integrity failure", () => {
     expect(gradeOf(review(5), 75)).toMatchObject({ score: 100, passed: true });
@@ -547,6 +620,150 @@ describe("runJob", () => {
     ]);
     // Lead plus the one re-run step: no second run for the finished step.
     expect(runs).toHaveLength(2);
+  });
+
+  it("runs independent steps side by side and outward steps one at a time, in plan order", async () => {
+    const { port } = recorder();
+    const log: string[] = [];
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const result = await runJob({
+      jobId: "job-1",
+      goal: "g",
+      steps: [
+        {
+          key: "research",
+          role: "RESEARCH",
+          executor: "RESEARCH",
+          agentName: "research",
+          goal: "g",
+          tools: [],
+          dependsOn: [],
+          budgetUsd: 0.1,
+          outward: false,
+          spawned: false,
+        },
+        {
+          key: "shortlist",
+          role: "MANDATE_WATCHER",
+          executor: "DISCOVERY",
+          agentName: "shortlist",
+          goal: "g",
+          tools: [],
+          dependsOn: [],
+          budgetUsd: 0.1,
+          outward: false,
+          spawned: false,
+        },
+        {
+          key: "first",
+          role: "CONVERSATION",
+          executor: "CONVERSATION",
+          agentName: "first",
+          goal: "g",
+          tools: [],
+          dependsOn: [],
+          budgetUsd: 0.1,
+          outward: true,
+          spawned: false,
+        },
+        {
+          key: "second",
+          role: "OUTREACH",
+          executor: "OUTREACH",
+          agentName: "second",
+          goal: "g",
+          tools: [],
+          dependsOn: [],
+          budgetUsd: 0.1,
+          outward: true,
+          spawned: false,
+        },
+      ],
+      recorder: port,
+      executors: {
+        RESEARCH: async () => {
+          log.push("research:start");
+          // Shortlist must start while research is still working.
+          await gate;
+          log.push("research:end");
+          return { status: "DONE", summary: "noted" };
+        },
+        DISCOVERY: () => {
+          log.push("shortlist:start");
+          release();
+          return Promise.resolve({ status: "DONE", summary: "3 found" });
+        },
+        CONVERSATION: async () => {
+          log.push("first:start");
+          await Promise.resolve();
+          log.push("first:end");
+          return { status: "DONE", summary: "replied" };
+        },
+        OUTREACH: () => {
+          log.push("second:start");
+          return Promise.resolve({ status: "DONE", summary: "sent" });
+        },
+      },
+    });
+    expect(log.indexOf("shortlist:start")).toBeLessThan(
+      log.indexOf("research:end"),
+    );
+    expect(log.indexOf("first:end")).toBeLessThan(log.indexOf("second:start"));
+    // The result keeps plan order whatever finished first.
+    expect(result.steps.map((one) => one.key)).toEqual([
+      "research",
+      "shortlist",
+      "first",
+      "second",
+    ]);
+  });
+
+  it("reports a thrown executor to the operator and never ends the lead DONE on a failed step", async () => {
+    const { runs, port } = recorder();
+    const errors: unknown[] = [];
+    const result = await runJob({
+      jobId: "job-1",
+      goal: "g",
+      steps: [
+        {
+          key: "ok",
+          role: "MANDATE_WATCHER",
+          executor: "DISCOVERY",
+          agentName: "ok",
+          goal: "g",
+          tools: [],
+          dependsOn: [],
+          budgetUsd: 0.1,
+          outward: false,
+          spawned: false,
+        },
+        {
+          key: "boom",
+          role: "RESEARCH",
+          executor: "RESEARCH",
+          agentName: "boom",
+          goal: "g",
+          tools: [],
+          dependsOn: [],
+          budgetUsd: 0.1,
+          outward: false,
+          spawned: false,
+        },
+      ],
+      recorder: port,
+      onStepError: ({ error }) => errors.push(error),
+      executors: {
+        DISCOVERY: () => Promise.resolve({ status: "DONE", summary: "fine" }),
+        RESEARCH: () => Promise.reject(new Error("provider timeout")),
+      },
+    });
+    expect(result.steps.map((one) => one.status)).toEqual(["DONE", "FAILED"]);
+    expect(errors).toHaveLength(1);
+    expect(String(errors[0])).toContain("provider timeout");
+    expect(runs[0]).toMatchObject({ role: "LEAD", status: "HELD" });
   });
 
   it("holds a step whose executor is missing, with the reason, instead of faking it", async () => {

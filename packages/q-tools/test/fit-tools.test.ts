@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { fitScoreOutOf10 } from "@capital-q/contracts";
+import {
+  MODEL_TOOL_RESULT_MAX_CHARS,
+  fitScoreOutOf10,
+} from "@capital-q/contracts";
 import {
   createFitService,
+  fitComparisonText,
   type FitCandidate,
   type FitCompanyInputs,
   type RecommendationFeatureSnapshot,
@@ -10,6 +14,7 @@ import {
 
 import {
   createDefaultQTools,
+  createFitTopCandidatesTool,
   createQToolExecutor,
   createQToolRegistry,
   FitTopCandidatesOutputSchema,
@@ -176,6 +181,8 @@ describe("fit tools", () => {
     }
     expect(data.guidance).toContain("score out of 10");
     expect(data.guidance).toContain("never a score of your own");
+    if (data.comparison === null) throw new Error("expected comparison");
+    expect(data.text).toBe(fitComparisonText(data.comparison));
   });
 
   it("a founder, or anyone without an investor side, gets nothing", async () => {
@@ -194,6 +201,136 @@ describe("fit tools", () => {
       "NOT_INVESTOR",
     );
     expect(read).toEqual([]);
+  });
+
+  it("returns all ten rich profiles without duplicating their reasons past the tool bound", async () => {
+    const baseline = await tools({
+      candidates: [{ companyId: COMPANY_A, source: "FEED" }],
+    }).port.execute(
+      call("fit_top_candidates", { limit: 1 }),
+      contextFor(actorB, investorPlan),
+    );
+    if (!baseline.result.ok) throw new Error("expected canonical comparison");
+    const comparison = FitTopCandidatesOutputSchema.parse(
+      baseline.result.data,
+    ).comparison;
+    if (comparison === null || comparison.entries[0] === undefined)
+      throw new Error("expected a candidate");
+    const first = comparison.entries[0];
+    const rich = {
+      ...comparison,
+      considered: 10,
+      entries: Array.from({ length: 10 }, (_, index) => {
+        const companyId = `c0000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
+        return {
+          ...first,
+          companyId,
+          name: `Company ${String(index + 1)}`,
+          position: index + 1,
+          profile: {
+            ...first.profile,
+            companyId,
+            parameters: first.profile.parameters.map((p) => ({
+              ...p,
+              reason: "Declared evidence remains qualified. ".repeat(3).trim(),
+            })),
+          },
+        };
+      }),
+    };
+    expect(
+      JSON.stringify({ comparison: rich, text: fitComparisonText(rich) })
+        .length,
+    ).toBeGreaterThan(MODEL_TOOL_RESULT_MAX_CHARS);
+    expect(
+      JSON.stringify({
+        comparison: rich,
+        text: fitComparisonText(rich, { summaryOnly: true }),
+      }).length,
+    ).toBeLessThan(MODEL_TOOL_RESULT_MAX_CHARS - 1_000);
+    const ports = fakePorts({
+      fit: {
+        profiles: () => Promise.resolve({ kind: "NO_MANDATE" }),
+        compare: () => Promise.resolve({ kind: "NO_MANDATE" }),
+        top: () => Promise.resolve({ kind: "OK", comparison: rich }),
+      },
+    });
+    const definition = createFitTopCandidatesTool(ports);
+    const oldPort = createQToolExecutor({
+      registry: createQToolRegistry([
+        {
+          ...definition,
+          execute: async (input, context, authorization) => ({
+            ...FitTopCandidatesOutputSchema.parse(
+              await definition.execute(input, context, authorization),
+            ),
+            text: fitComparisonText(rich),
+          }),
+        },
+      ]),
+    });
+    const old = await oldPort.execute(
+      call("fit_top_candidates", { limit: 10 }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(old.result.ok).toBe(false);
+    expect(old.failureCode).toBe("RESULT_TOO_LARGE");
+    const port = createQToolExecutor({
+      registry: createQToolRegistry([definition]),
+    });
+    const outcome = await port.execute(
+      call("fit_top_candidates", { limit: 10 }),
+      contextFor(actorB, investorPlan),
+    );
+    if (!outcome.result.ok)
+      expect(outcome.failureCode).toBe("RESULT_TOO_LARGE");
+    expect(outcome.result.ok).toBe(true);
+    if (!outcome.result.ok)
+      throw new Error(outcome.failureCode ?? "expected comparison");
+    const data = FitTopCandidatesOutputSchema.parse(outcome.result.data);
+    expect(data.comparison).toEqual(rich);
+    expect(JSON.stringify(data).length).toBeLessThanOrEqual(
+      MODEL_TOOL_RESULT_MAX_CHARS,
+    );
+    for (const entry of rich.entries) {
+      const score = fitScoreOutOf10(entry.profile);
+      expect(data.text).toContain(
+        score === null ? `${entry.name}: ` : `${entry.name}: ${score}/10`,
+      );
+    }
+    expect(data.text).toContain("Unknown never counts against a company");
+    const oversized = {
+      ...rich,
+      entries: rich.entries.map((entry) => ({
+        ...entry,
+        profile: {
+          ...entry.profile,
+          parameters: entry.profile.parameters.map((p) => ({
+            ...p,
+            reason: "Declared evidence remains qualified. ".repeat(5).trim(),
+          })),
+        },
+      })),
+    };
+    const oversizedPort = createQToolExecutor({
+      registry: createQToolRegistry([
+        createFitTopCandidatesTool(
+          fakePorts({
+            fit: {
+              profiles: () => Promise.resolve({ kind: "NO_MANDATE" }),
+              compare: () => Promise.resolve({ kind: "NO_MANDATE" }),
+              top: () => Promise.resolve({ kind: "OK", comparison: oversized }),
+            },
+          }),
+        ),
+      ]),
+    });
+    const refused = await oversizedPort.execute(
+      call("fit_top_candidates", { limit: 10 }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(refused.result.ok).toBe(false);
+    expect(refused.failureCode).toBe("RESULT_TOO_LARGE");
   });
 
   it("one company's fit, and a company the reader may not see is not found", async () => {

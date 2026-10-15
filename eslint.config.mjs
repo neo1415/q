@@ -442,6 +442,68 @@ export default tseslint.config(
       },
     },
   },
+  // Plain-JavaScript tooling outside the TypeScript projects: repository
+  // scripts and design/seed harnesses are Node programs, and Playwright
+  // harnesses also touch browser globals inside page.evaluate() callbacks.
+  // Globals are declared explicitly (the list is the whole surface in use)
+  // rather than turning no-undef off.
+  {
+    files: ["scripts/**/*.mjs", "docs/design/**/*.mjs", "docs/seed/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        ...Object.fromEntries(
+          [
+            "AbortController",
+            "AbortSignal",
+            "Blob",
+            "Buffer",
+            "FormData",
+            "Request",
+            "TextDecoder",
+            "TextEncoder",
+            "URL",
+            "URLSearchParams",
+            "clearTimeout",
+            "clearInterval",
+            "console",
+            "crypto",
+            "fetch",
+            "performance",
+            "process",
+            "setInterval",
+            "setTimeout",
+          ].map((name) => [name, "readonly"]),
+        ),
+        ...Object.fromEntries(
+          [
+            "Element",
+            "document",
+            "requestAnimationFrame",
+            "sessionStorage",
+            "window",
+          ].map((name) => [name, "readonly"]),
+        ),
+      },
+    },
+    rules: { "no-console": "off" },
+  },
+  // The GateQ page script: plain browser JavaScript served from /public.
+  {
+    files: ["apps/web/public/gateq.js"],
+    languageOptions: {
+      sourceType: "script",
+      globals: Object.fromEntries(
+        [
+          "Element",
+          "URL",
+          "document",
+          "window",
+          "sessionStorage",
+          "requestAnimationFrame",
+        ].map((name) => [name, "readonly"]),
+      ),
+    },
+  },
   {
     files: ["apps/web/scripts/**/*.mjs"],
     languageOptions: {

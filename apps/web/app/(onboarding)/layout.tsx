@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { redirect } from "next/navigation";
 
 import { requireSessionUser } from "@/auth/session";
 import { resolveQStanding } from "@/features/q/context";
+import { PublicBrandStyle } from "@/features/brand-theme/public-brand-style";
 import { FictionalNames } from "@/components/app-shell/fictional-names";
+import { QControlRuntime } from "@/features/q/control/q-control-runtime";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -30,8 +32,14 @@ export default async function OnboardingLayout({
   // Outside the app shell: the same "fictional" names rule as inside it.
   return (
     <div data-fictional-scope>
+      <PublicBrandStyle />
       {children}
       <FictionalNames />
+      {/* R3: Q's moves from onboarding go through the client router and
+          are verified like everywhere else. */}
+      <Suspense fallback={null}>
+        <QControlRuntime />
+      </Suspense>
     </div>
   );
 }

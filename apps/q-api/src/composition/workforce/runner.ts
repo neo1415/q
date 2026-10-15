@@ -160,6 +160,23 @@ export function createAgentWorkRunner(dependencies: {
         {
           // Metered once, when first claimed: a resumed job is not a new one.
           gated: row.attempts > 1,
+          ...(row.trace.runId === undefined ||
+          row.trace.organisationId === undefined
+            ? {}
+            : {
+                documentContext: {
+                  qRunId: row.trace.runId,
+                  organisationId: row.trace.organisationId,
+                  canContinue: async () => {
+                    if (lost) return false;
+                    const kept = await queue
+                      .heartbeat(row.job_id, workerId, leaseMs)
+                      .catch(() => false);
+                    if (!kept) lost = true;
+                    return kept;
+                  },
+                },
+              }),
           durable: {
             prior: async (key) => {
               if (lost || !(await queue.live(row.job_id))) {
@@ -228,7 +245,18 @@ export function createAgentWorkRunner(dependencies: {
         .catch(() => undefined);
     }
     const claimed = await queue.claim(workerId, leaseMs, CLAIM_PER_PASS);
-    for (const row of claimed) await runOne(row);
+    // Every claimed row already holds a lease. Start its run and heartbeat
+    // without waiting behind another job; the claim count bounds concurrency.
+    // Wait for all rows even if a queue operation escapes runOne's recovery,
+    // so another pass cannot begin while this batch still has live work.
+    const settled = await Promise.allSettled(claimed.map(runOne));
+    const errors: unknown[] = [];
+    for (const result of settled) {
+      if (result.status === "rejected") errors.push(result.reason);
+    }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, "A claimed workforce job failed.");
+    }
     return claimed.length;
   };
 

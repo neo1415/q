@@ -545,3 +545,73 @@ describe("fit: an investor's own declared mandate is read, and only theirs", () 
     expect(mandateStatement({ mandates: [] })).toBeNull();
   });
 });
+
+describe("R2: Q says the raise the Discover card and the profile say", () => {
+  function capitalPort(raise: unknown): QToolPort {
+    return {
+      offer: () =>
+        Promise.resolve(
+          ["get_capital_objective"].map((name) => ({ definition: { name } })),
+        ),
+      execute: () =>
+        Promise.resolve({
+          result: {
+            ok: true,
+            data: {
+              companyId: COMPANY,
+              availability: "NOT_SHARED_WITH_YOU",
+              objective: null,
+              raise,
+            },
+          },
+        }),
+    } as unknown as QToolPort;
+  }
+  async function capitalFacts(raise: unknown) {
+    const runId = randomUUID();
+    const read = await createToolCanonicalPort(capitalPort(raise)).read(
+      {
+        actor,
+        runId: runId as never,
+        correlationId: "cor_test",
+        capability: "ANSWER",
+        plan: plan(runId, { subjects: [company] }),
+      } as never,
+      COMPANY,
+    );
+    return read.facts.filter((fact) => fact.scope === "CAPITAL_OBJECTIVE");
+  }
+
+  it("a pitch claim is said as their pitch, a claim, never as a disclosed or verified raise", async () => {
+    const [fact] = await capitalFacts({
+      source: "PITCH_CLAIM",
+      money: { amount: "4000000", currency: "USD" },
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "SELF_REPORTED",
+      visibility: "network_visible",
+      asOf: null,
+      pitch: { pitchId: randomUUID(), atSeconds: 74 },
+    });
+    expect(fact?.statement).toContain("In their pitch video");
+    expect(fact?.statement).toContain("4000000 USD (at 1:14)");
+    expect(fact?.statement).toContain("not a disclosed or verified figure");
+    expect(fact?.truthClass).toBe("USER_CLAIM");
+    expect(fact?.evidenceStatus).toBe("SELF_REPORTED");
+  });
+
+  it("nothing disclosed and nothing said: not shared, with no figure", async () => {
+    const facts = await capitalFacts({
+      source: "NONE",
+      money: null,
+      truthClass: "UNKNOWN",
+      evidenceStatus: "NO_EVIDENCE",
+      visibility: "founder_private",
+      asOf: null,
+      pitch: null,
+    });
+    expect(facts.map((f) => f.statement).join(" ")).toContain(
+      "has not shared its raise",
+    );
+    expect(facts.map((f) => f.statement).join(" ")).not.toMatch(/\d{4,}/);
+  });
+});

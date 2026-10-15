@@ -1,4 +1,7 @@
+> **Historical (superseded 2026-10-11).** Current state, tasks and instructions: [`docs/ai-handoff/START-HERE.md`](../ai-handoff/START-HERE.md). Kept for history; verify any operational instruction here against `docs/ai-handoff/LEGACY-RECONCILIATION.md`.
+
 ---
+
 title: Capital Q cloud start (single entry point for the cloud lead)
 project: capital-q
 date: 2026-09-26

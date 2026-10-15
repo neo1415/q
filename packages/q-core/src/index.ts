@@ -293,6 +293,23 @@ export {
   V45_STILL_WAITING,
 } from "./prompts/tasks/turn-reader.v45.js";
 export {
+  TURN_READER_V46,
+  V46_DISCOVER,
+  V46_DISCOVER_FIELDS,
+} from "./prompts/tasks/turn-reader.v46.js";
+export {
+  TURN_READER_V47,
+  V47_SUBJECT,
+} from "./prompts/tasks/turn-reader.v47.js";
+export {
+  TURN_READER_V48,
+  V48_SUBJECT,
+} from "./prompts/tasks/turn-reader.v48.js";
+export {
+  TURN_READER_V49,
+  V49_TEAM_JOB,
+} from "./prompts/tasks/turn-reader.v49.js";
+export {
   TURN_READER_SCHEMA_NAME,
   TURN_READER_SCHEMA_VERSION,
   TURN_READER_UNTRUSTED,
@@ -355,6 +372,18 @@ export {
   TURN_READER_V45_SCHEMA_VERSION,
   TurnReaderV45ResultSchema,
   type TurnReaderV45Result,
+  TURN_READER_V46_SCHEMA_VERSION,
+  TurnReaderV46ResultSchema,
+  type TurnReaderV46Result,
+  TURN_READER_V47_SCHEMA_VERSION,
+  TurnReaderV47ResultSchema,
+  type TurnReaderV47Result,
+  TURN_READER_V48_SCHEMA_VERSION,
+  TurnReaderV48ResultSchema,
+  type TurnReaderV48Result,
+  TURN_READER_V49_SCHEMA_VERSION,
+  TurnReaderV49ResultSchema,
+  type TurnReaderV49Result,
   type TurnReference,
   type TurnReferenceOpenKind,
   TurnReaderV30ResultSchema,
@@ -450,6 +479,8 @@ export { MEETING_HOST_TURN_V1 } from "./prompts/tasks/meeting-host-turn.v1.js";
 export { MEETING_HOST_TURN_V2 } from "./prompts/tasks/meeting-host-turn.v2.js";
 export { MEETING_SCREEN_NOTE_V1 } from "./prompts/tasks/meeting-screen-note.v1.js";
 export { MEETING_HOST_TURN_V3 } from "./prompts/tasks/meeting-host-turn.v3.js";
+export { MEETING_HOST_TURN_V4 } from "./prompts/tasks/meeting-host-turn.v4.js";
+export { MEETING_HOST_TURN_V5 } from "./prompts/tasks/meeting-host-turn.v5.js";
 export { MEETING_CAMERA_NOTE_V1 } from "./prompts/tasks/meeting-camera-note.v1.js";
 export {
   MEETING_SCREEN_NOTE_SCHEMA_NAME,
@@ -474,6 +505,12 @@ export {
   MEETING_HOST_UNTRUSTED_V3,
   MeetingHostVariablesV3Schema,
   type MeetingHostVariablesV3,
+  MEETING_HOST_KINDS_V3,
+  MEETING_HOST_UNTRUSTED_V4,
+  MeetingHostResultV3Schema,
+  type MeetingHostResultV3,
+  MeetingHostVariablesV4Schema,
+  type MeetingHostVariablesV4,
 } from "./prompts/schemas/meeting-host.js";
 // end MEET-HOST block
 export { REHEARSAL_SCORE_V3 } from "./prompts/tasks/rehearsal-score.v3.js";
@@ -779,14 +816,18 @@ export { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./prompts/tasks/investor-mandate-
 export { INVESTOR_MANDATE_SYNTHESIS_V3 } from "./prompts/tasks/investor-mandate-synthesis.v3.js";
 export { FIT_EXPLANATION_V1 } from "./prompts/tasks/fit-explanation.v1.js";
 export { FIT_Q_VIEW_V1 } from "./prompts/tasks/fit-q-view.v1.js";
+export { FIT_Q_VIEW_V2 } from "./prompts/tasks/fit-q-view.v2.js";
+export { FIT_Q_VIEW_V3 } from "./prompts/tasks/fit-q-view.v3.js";
 export {
   FIT_Q_VIEW_SCHEMA_NAME,
   FIT_Q_VIEW_SCHEMA_VERSION,
   FIT_Q_VIEW_VERDICTS,
   FitQViewResultSchema,
   FitQViewVariablesSchema,
+  FitQViewV3VariablesSchema,
   type FitQViewResult,
   type FitQViewVariables,
+  type FitQViewV3Variables,
 } from "./prompts/schemas/fit-q-view.js";
 
 export {
@@ -1272,6 +1313,7 @@ export {
   DRAFT_REVIEW_V3,
   JOB_PLAN_V1,
   JOB_PLAN_V2,
+  JOB_PLAN_V3,
   REPLY_READER_V1,
 } from "./prompts/tasks/workforce.v1.js";
 export {
@@ -1285,6 +1327,25 @@ export {
   DraftReviewResultV2Schema,
   JobPlanResultSchema,
   JobPlanResultV2Schema,
+  JobPlanResultV3Schema,
+  JOB_PLAN_V3_SCHEMA_VERSION,
+  JobPlanResultV4Schema,
+  JOB_PLAN_V4_SCHEMA_VERSION,
+  PlannedNamedCompanyDocumentSchema,
+  SUBSTANCE_CRITIQUE_SCHEMA_NAME,
+  SUBSTANCE_CRITIQUE_SCHEMA_VERSION,
+  SUBSTANCE_CRITIQUE_ISSUE_KINDS,
+  SubstanceCritiqueResultSchema,
+  SubstanceCritiqueVariablesSchema,
+  type SubstanceCritiqueResult,
+  type SubstanceCritiqueVariables,
+  type JobPlanResultV4,
+  DILIGENCE_QUESTIONS_SCHEMA_NAME,
+  DILIGENCE_QUESTIONS_SCHEMA_VERSION,
+  DiligenceQuestionsResultSchema,
+  DiligenceQuestionsVariablesSchema,
+  type DiligenceQuestionsResult,
+  type DiligenceQuestionsVariables,
   JOB_PLAN_V2_SCHEMA_VERSION,
   PLAN_AGENT_ROLES,
   PLAN_AGENT_ROLES_V2,
@@ -1306,6 +1367,7 @@ export {
   type DraftStage,
   type JobPlanResult,
   type JobPlanResultV2,
+  type JobPlanResultV3,
   type JobPlanVariables,
   type ReplyReaderResult,
   type ReplyReaderVariables,
@@ -1320,6 +1382,39 @@ export {
 } from "./prompts/tasks/spoken-reply.v1.js";
 export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
 export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
+export { TURN_SKIM_V1 } from "./prompts/tasks/turn-skim.v1.js";
+export { TURN_SKIM_V2 } from "./prompts/tasks/turn-skim.v2.js";
+export { TURN_SKIM_V3 } from "./prompts/tasks/turn-skim.v3.js";
+export { TURN_SKIM_V4 } from "./prompts/tasks/turn-skim.v4.js";
+export { PERSON_BRIEF_READER_V1 } from "./prompts/tasks/person-brief-reader.v1.js";
+export {
+  PERSON_BRIEF_READER_SCHEMA_NAME,
+  PERSON_BRIEF_READER_SCHEMA_VERSION,
+  PERSON_BRIEF_READER_TOPICS,
+  PERSON_BRIEF_READER_UNTRUSTED,
+  PersonBriefReaderResultSchema,
+  PersonBriefReaderVariablesSchema,
+  type PersonBriefReaderResult,
+  type PersonBriefReaderVariables,
+} from "./prompts/schemas/person-brief-reader.js";
+export {
+  TURN_SKIM_KINDS,
+  TURN_SKIM_SCHEMA_NAME,
+  TURN_SKIM_SCHEMA_VERSION,
+  TURN_SKIM_V2_KINDS,
+  TURN_SKIM_V2_SCHEMA_VERSION,
+  SkimPersonSchema,
+  SkimInvestorsSchema,
+  type SkimPerson,
+  type SkimInvestors,
+  TurnSkimResultSchema,
+  TurnSkimVariablesSchema,
+  TurnSkimV3VariablesSchema,
+  ARRIVAL_ASPECTS,
+  type TurnSkimResult,
+  type TurnSkimVariables,
+  type TurnSkimV3Variables,
+} from "./prompts/schemas/turn-skim.js";
 export {
   SMALL_TALK_SCHEMA_NAME,
   SMALL_TALK_SCHEMA_VERSION,
@@ -1369,6 +1464,11 @@ export {
   type SpokenItem,
 } from "./speech/spoken-facts.js";
 export {
+  movePhaseLine,
+  pendingPlaceOf,
+  type MovePhase,
+} from "./speech/move-line.js";
+export {
   arrivalGreeting,
   arrivalSeed,
   cardFactsForVoice,
@@ -1417,3 +1517,17 @@ export {
   type DeckExtractionResult,
   type DeckExtractionVariables,
 } from "./prompts/schemas/deck-extraction.js";
+
+export {
+  WELCOME_STORIES_MAX,
+  dailyFollowUpKind,
+  dailyGistWords,
+  dailyMoreWords,
+  editionDay,
+  quietDayNewsWords,
+  spokenHeadline,
+  storyOrdinal,
+  welcomeStories,
+  type DailyFollowUpKind,
+  type DailyNewsStory,
+} from "./speech/daily-news.js";

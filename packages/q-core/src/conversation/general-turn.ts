@@ -81,7 +81,11 @@ export function researchDirectiveFor(
   // their mandate from Capital Q's own companies; the public web never
   // answers it (live 2026-10-09: read as ADVICE and researched, 23-30 s
   // for what the computed fit answers in under one).
-  if (reading.kind === "QUESTION_TO_Q" && reading.question?.kind === "FIT") {
+  if (
+    reading.kind === "QUESTION_TO_Q" &&
+    (reading.question?.kind === "FIT" ||
+      reading.question?.kind === "DISCOVER_COMPANIES")
+  ) {
     return NO_RESEARCH;
   }
   // Asking about somebody else by name is a question for Capital Q's own

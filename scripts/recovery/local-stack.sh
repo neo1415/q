@@ -122,6 +122,7 @@ launch() {
     local live_key="${CQ_LIVE_OPENAI_API_KEY:-}" live_dg="${CQ_LIVE_DEEPGRAM_API_KEY:-}"
     local live_proxy="${CQ_LIVE_PROXY_HOST:-}" ca="${NODE_EXTRA_CA_CERTS:-}"
     local live_gl="${CQ_LIVE_GPT_LIVE_KEY:-}" fake_gl="${CQ_RECOVERY_GPT_LIVE:-}"
+    local fake_search="${CQ_RECOVERY_SEARCH:-}"
     for var in $(compgen -e); do unset "$var" 2>/dev/null || true; done
     export PATH="$keep_path" HOME="$keep_home"
     CQ_LIVE_OPENAI_API_KEY="$live_key"; CQ_LIVE_DEEPGRAM_API_KEY="$live_dg"
@@ -151,6 +152,10 @@ launch() {
       # its session creation answered by the fake vendor (no key, no audio).
       # The fake sessions still land on the local ledger: a high local cap.
       [[ "$fake_gl" == 1 ]] && export CQ_VOICE_LIVE=on CQ_VOICE_PREVIEW=on CQ_VOICE_LIVE_DAILY_CAP_USD=20
+      # V2, opt-in (CQ_RECOVERY_SEARCH=1): q-api builds its public people-search
+      # adapter on a DISABLED key; vendor-redirect.mjs sends its calls to the
+      # fake, which scripts and logs them. No real search provider is reachable.
+      [[ "$fake_search" == 1 && "$name" == q-api ]] && export SERPER_API_KEY="$DISABLED"
       # V (GPT-Live developer preview), opt-in: CQ_LIVE_GPT_LIVE_KEY in the
       # operator's shell. The model stays the fake; only q-api gets the key,
       # and only for the GPT-Live session call (CQ_VOICE_LIVE_OPENAI_API_KEY,
@@ -193,6 +198,8 @@ start_one() {
       for c in supabase_storage_capital-q supabase_realtime_capital-q; do
         docker start "$c" >/dev/null 2>&1 || true
       done
+      # G2 K2: local FAST_CLASSIFICATION routes to the fake vendor's model, not Gemini.
+      docker exec -i supabase_db_capital-q psql -U postgres -v ON_ERROR_STOP=1 -q <"$HARNESS/scripts/recovery/local-routing.sql"
       write_env ;;
     fake)
       [[ -f "$ENV_FILE" ]] || write_env
@@ -229,11 +236,21 @@ cmd="${1:-status}"; shift || true
 services=("$@"); [[ ${#services[@]} -eq 0 ]] && services=("${ALL[@]}")
 
 case "$cmd" in
-  start) echo "$MODE" >"$RUN/mode"; log "mode: $MODE"; for s in "${services[@]}"; do start_one "$s"; done ;;
+  start)
+    echo "$MODE" >"$RUN/mode"; log "mode: $MODE"
+    # V (G-D26): whether q-api's GPT-Live line is on, for the specs that
+    # need it (gpt-live.spec fails fast and says so when it is off).
+    for s in "${services[@]}"; do
+      [[ "$s" == q-api ]] && echo "${CQ_RECOVERY_GPT_LIVE:-0}" >"$RUN/gpt-live"
+      [[ "$s" == q-api ]] && echo "${CQ_RECOVERY_SEARCH:-0}" >"$RUN/search"
+    done
+    log "gpt-live: $(cat "$RUN/gpt-live" 2>/dev/null || echo unknown)"
+    for s in "${services[@]}"; do start_one "$s"; done ;;
   stop)
     for (( i=${#services[@]}-1; i>=0; i-- )); do stop_one "${services[$i]}"; done ;;
   status)
     log "mode: $(cat "$RUN/mode" 2>/dev/null || echo unknown)"
+    log "gpt-live: $(cat "$RUN/gpt-live" 2>/dev/null || echo unknown)"
     docker info >/dev/null 2>&1 && log "docker: up" || log "docker: down"
     for s in fake api q-api workers web; do
       if running "$s"; then log "$s: running (pid $(cat "$(pidfile "$s")"))"; else log "$s: stopped"; fi
@@ -243,7 +260,20 @@ case "$cmd" in
   seed)
     set -a; source "$ENV_FILE"; set +a
     unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy
-    cd "$ROOT" && CQ_SEED_API_URL="http://127.0.0.1:$API_PORT" node scripts/seed-fictional-world.mjs --local-stack --out "$RUN/fictional-world" ;;
+    cd "$ROOT" && CQ_SEED_API_URL="http://127.0.0.1:$API_PORT" node scripts/seed-fictional-world.mjs --local-stack --out "$RUN/fictional-world"
+    # G2-SEED: one playable pitch whose transcript says a raise (no video provider locally).
+    docker exec -i supabase_db_capital-q psql -U postgres -v ON_ERROR_STOP=1 -q <"$HARNESS/scripts/recovery/seed-pitch-raise.sql" ;;
+  reset-allowance)
+    # V2: the LOCAL org's monthly rehearsal allowance (q.rehearsals) runs out
+    # after 30 Joins, and every later Join is a 402 that looks like a broken call.
+    docker exec -i supabase_db_capital-q psql -U postgres -v ON_ERROR_STOP=1 -q -c "update billing.usage_events set voided_at = now(), void_reason = 'local test reset' where feature_key = 'q.rehearsals' and voided_at is null" ;;
+  seed-research)
+    # V2/W5: the Qatar Five prepared entities, loaded into the LOCAL database
+    # (no web fetch, no provider call), with logos pointing at this web origin.
+    set -a; source "$ENV_FILE"; set +a
+    unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy
+    cd "$ROOT" && node --import ./scripts/dev-env.mjs apps/q-api/src/dev/load-research-seed.ts --web-origin "http://127.0.0.1:$WEB_PORT"
+    bash "$0" reset-allowance ;;
   env) echo "$ENV_FILE" ;;
   *) log "usage: $0 start|stop|status|seed|env [service...]"; exit 2 ;;
 esac

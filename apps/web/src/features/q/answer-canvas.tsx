@@ -30,7 +30,16 @@ import {
   LEVEL_WORD,
 } from "./answer-canvas-logic";
 import { MapBody } from "./blocks/data-blocks";
-import { openSubjectPage, subjectPagePath } from "./client-actions";
+import { useVisibleCards } from "./cards/card-visibility";
+import {
+  cardPagePath,
+  openCardPage,
+  openExternalRehearsal,
+  rehearseOffered,
+  openSubjectPage,
+  subjectPagePath,
+} from "./client-actions";
+import { currentNavigationViewer } from "./control/app-routes";
 
 /**
  * Q's answer as cards on the Q page (C1-C3; mockup answer-canvas.html).
@@ -65,7 +74,7 @@ function useWideCanvas(): boolean {
   );
 }
 
-/** A measure's level as a shape: full, half, ring, dashed ring. */
+/** A measure's level as a shape, including a cross for a known mismatch. */
 export function LevelShape({ level }: { readonly level: QAnswerCardLevel }) {
   return (
     <span className="cq-ac-lvl-ink" data-level={level}>
@@ -92,6 +101,13 @@ export function LevelShape({ level }: { readonly level: QAnswerCardLevel }) {
             fill="none"
             stroke="currentColor"
             strokeWidth="1.2"
+          />
+        ) : level === "MISMATCH" ? (
+          <path
+            d="M2 2l8 8M10 2l-8 8"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
           />
         ) : (
           <circle
@@ -121,7 +137,81 @@ export type AnswerCardActions = {
   readonly onAsk?: ((question: string) => void) | undefined;
   readonly onPin?: ((card: QAnswerCard) => void) | undefined;
   readonly onOpenProfile?: ((card: QAnswerCard) => void) | undefined;
+  /** W4: rehearse with the researched person on an identity card. */
+  readonly onRehearse?: ((card: QAnswerCard) => void) | undefined;
 };
+
+/**
+ * W4: the sources an identity card rests on, as links: the top three open
+ * in a new tab (title or host, noopener); the rest sit behind a disclosure.
+ */
+/** Honest per-source wording: a link is not a reading. */
+function sourceStatusWord(status: string): string {
+  switch (status) {
+    case "VERIFIED_AGAINST_SOURCE":
+      return "read, checked";
+    case "FACT_EXTRACTED":
+    case "CONTENT_READ":
+      return "read";
+    case "BLOCKED_OR_UNAVAILABLE":
+      return "could not open";
+    case "NEEDS_REFRESH":
+      return "needs refresh";
+    default:
+      return "link only";
+  }
+}
+
+function SourceLinks({
+  sources,
+}: {
+  readonly sources: readonly {
+    readonly label: string;
+    readonly url: string;
+    readonly status?: string | undefined;
+  }[];
+}) {
+  const link = (source: {
+    readonly label: string;
+    readonly url: string;
+    readonly status?: string | undefined;
+  }) => (
+    <li key={source.url}>
+      <a
+        className="underline"
+        href={source.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-ac-source-link
+      >
+        {source.label}
+      </a>
+      {source.status === undefined ? null : (
+        <span
+          data-ac-source-status
+        >{` (${sourceStatusWord(source.status)})`}</span>
+      )}
+    </li>
+  );
+  const rest = sources.slice(3);
+  return (
+    <div className="flex w-full flex-col gap-1" data-ac-source-links>
+      <ul className="cq-body-sm m-0 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-(--cq-text-secondary)">
+        {sources.slice(0, 3).map(link)}
+      </ul>
+      {rest.length === 0 ? null : (
+        <details className="cq-body-sm text-(--cq-text-secondary)">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center">
+            More sources
+          </summary>
+          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+            {rest.map(link)}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
 
 function AnswerCard({
   card,
@@ -145,6 +235,9 @@ function AnswerCard({
   const number = fitNumber(card);
   const words = fitWords(card);
   const provenance = fitProvenance(card);
+  // K5: a card with a record behind it has an explicit Open control; a
+  // tap on the card itself keeps the spotlight (founder-requested).
+  const opens = cardPagePath(card.subject) !== null;
   return (
     <m.article
       layout={reduced ? false : "position"}
@@ -221,6 +314,23 @@ function AnswerCard({
             </span>
           </div>
         )}
+        {opens ? (
+          <button
+            type="button"
+            className="cq-ac-open"
+            aria-label={`Open ${card.name}`}
+            onClick={() => {
+              if (actions.onOpenProfile !== undefined) {
+                actions.onOpenProfile(card);
+              } else {
+                openCardPage(card.subject);
+              }
+            }}
+            data-ac-open={card.key}
+          >
+            Open
+          </button>
+        ) : null}
         <button
           type="button"
           className="cq-ac-x"
@@ -266,7 +376,7 @@ function AnswerCard({
             {card.fit === null && card.sourceCount > 0 ? (
               <span className="cq-ac-btn cq-ac-sources" data-ac-sources>
                 <Icon of={ChevronRight} />
-                {`From ${String(card.sourceCount)} ${card.sourceCount === 1 ? "source" : "sources"}`}
+                {`From ${String(card.sourceCount)} ${card.sourceCount === 1 ? "source" : "sources"}${card.sourcesRead === undefined ? "" : `, ${String(card.sourcesRead)} read`}`}
               </span>
             ) : null}
             {card.fitBasis === undefined ||
@@ -317,6 +427,45 @@ function AnswerCard({
                     : "Open profile"}
                 </button>
               ) : null}
+              {card.external?.sources === undefined ||
+              card.external.sources.length === 0 ? null : (
+                <SourceLinks sources={card.external.sources} />
+              )}
+              {card.external?.profileUrl == null ? null : (
+                <a
+                  className="cq-ac-btn"
+                  data-ac-external
+                  data-ac-external-profile
+                  href={card.external.profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open profile
+                </a>
+              )}
+              {!rehearseOffered(
+                currentNavigationViewer()?.kind,
+                card.external,
+              ) ? null : (
+                <button
+                  type="button"
+                  className="cq-ac-btn"
+                  data-ac-external
+                  data-ac-rehearse={card.key}
+                  onClick={() => {
+                    if (actions.onRehearse !== undefined) {
+                      actions.onRehearse(card);
+                    } else if (card.external?.externalPersonId != null) {
+                      openExternalRehearsal(
+                        card.external.externalPersonId,
+                        card.external.investorOrganisationId,
+                      );
+                    }
+                  }}
+                >
+                  {`Rehearse with ${card.name.split(/\s+/u)[0] ?? card.name}`}
+                </button>
+              )}
               {actions.onAsk === undefined ? null : (
                 <button
                   type="button"
@@ -590,13 +739,22 @@ export function AnswerCanvas({
 }: AnswerCanvasProps) {
   const wide = useWideCanvas();
   const reduced = useReducedMotion() === true;
-  const shown = block.cards.filter((card) => dismissed?.has(card.key) !== true);
+  // Founder P5: cards the person cleared, by voice or click, are not drawn
+  // and take no space (presentation only; the answer itself is untouched).
+  const unhidden = useVisibleCards(block.cards, (card) => ({
+    category: "ANSWER",
+    key: `answer:${block.title}:${card.key}`,
+    names: [card.name],
+  }));
+  const shown = unhidden.filter((card) => dismissed?.has(card.key) !== true);
   const { layout, tiles } = canvasLayout(shown.length, wide);
   const table = comparesAsTable(block) && shown.length === block.cards.length;
   const spotKey = spotlight === null ? undefined : block.cards[spotlight]?.key;
   const spotCard = shown.find((card) => card.key === spotKey);
   const spot = !table && spotCard !== undefined && shown.length >= 2;
   const focusKey = spot ? spotKey : block.cards[focus]?.key;
+
+  if (block.cards.length > 0 && unhidden.length === 0) return null;
 
   return (
     <LazyMotion features={loadFeatures} strict>

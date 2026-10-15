@@ -23,6 +23,56 @@ describe("parseWebServerConfig", () => {
     expect(config.secrets).toEqual({});
   });
 
+  describe("internal (private network) base URLs", () => {
+    const DEPLOYED = {
+      NODE_ENV: "production",
+      CAPITAL_Q_ENV: "production",
+      CQ_WEB_ORIGIN: "https://app.capitalq.test",
+      CQ_API_URL: "https://api.capitalq.test",
+      CQ_Q_API_URL: "https://q.capitalq.test",
+      ...SUPABASE_ENV,
+    } as const;
+
+    it("is unchanged when no internal URL is set", () => {
+      const config = parseWebServerConfig(DEPLOYED);
+      expect(config.apiBaseUrl).toBe("https://api.capitalq.test");
+      expect(config.qApiBaseUrl).toBe("https://q.capitalq.test");
+    });
+
+    it("prefers the internal URL for server-side calls when set", () => {
+      const config = parseWebServerConfig({
+        ...DEPLOYED,
+        CQ_API_INTERNAL_URL: "http://capital-q-api.railway.internal:3001/",
+        CQ_Q_API_INTERNAL_URL: "http://capital-q-q-api.railway.internal:3002",
+      });
+      expect(config.apiBaseUrl).toBe(
+        "http://capital-q-api.railway.internal:3001",
+      );
+      expect(config.qApiBaseUrl).toBe(
+        "http://capital-q-q-api.railway.internal:3002",
+      );
+    });
+
+    it("refuses plain http to a public host", () => {
+      expect(() =>
+        parseWebServerConfig({
+          ...DEPLOYED,
+          CQ_API_INTERNAL_URL: "http://api.capitalq.test",
+        }),
+      ).toThrow(ConfigurationError);
+    });
+
+    it("refuses an internal URL for a service that is not configured", () => {
+      const { CQ_Q_API_URL: _omitted, ...withoutQ } = DEPLOYED;
+      expect(() =>
+        parseWebServerConfig({
+          ...withoutQ,
+          CQ_Q_API_INTERNAL_URL: "http://capital-q-q-api.railway.internal:3002",
+        }),
+      ).toThrow(/CQ_Q_API_INTERNAL_URL/);
+    });
+  });
+
   it("defaults to the api adapter whenever CQ_API_URL is configured, and requires it for api", () => {
     const local = parseWebServerConfig({
       NODE_ENV: "test",

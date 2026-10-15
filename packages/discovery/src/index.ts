@@ -772,6 +772,12 @@ export {
   type FitServiceDependencies,
   type FitTopResult,
 } from "./fit/service.js";
+export {
+  FIT_EVIDENCE_LINES_MAX,
+  statedEvidenceFrom,
+  type FitEvidenceLine,
+  type FitStatedEvidence,
+} from "./fit/stated.js";
 // Q.02 (2026-10-07): how Q reads an investor's thesis; suggestions apply
 // only on approval, through the ordinary mandate update.
 export {
@@ -838,3 +844,39 @@ export {
   type ExplorePorts,
   type ExploreService,
 } from "./explore/service.js";
+// RECOVERY K (Tier B): prepared business knowledge, through its port only.
+export {
+  KNOWLEDGE_DISCOVER_LIMIT_MAX,
+  createKnowledgeReconciler,
+  createPostgresCompanyKnowledge,
+  type CompanyKnowledge,
+  type CompanyKnowledgePort,
+  type DiscoverCompaniesQuery,
+  type FitSummary,
+  type KnowledgeVersionKind,
+  type MandateSummary,
+} from "./knowledge/company-knowledge.js";
+
+// The one company read for the raise (R2): every surface renders this.
+export {
+  presentCompanyRaise,
+  type CompanyRaisePolicyInput,
+  type PitchRaiseClaimFact,
+  type RaiseObjectiveFact,
+  type RaiseSharing,
+  type RaiseViewerKind,
+} from "./company-raise/policy.js";
+export {
+  RAISE_BATCH_MAX,
+  RAISE_PITCHES_MAX,
+  createCompanyRaiseReader,
+  sharingFromPolicies,
+  type CompanyRaiseReader,
+  type CompanyRaiseReaderPorts,
+  type RaisePitchCandidate,
+  type RaisePolicyRow,
+} from "./company-raise/reader.js";
+export {
+  composeCompanyRaiseReader,
+  type CompanyRaiseContextPorts,
+} from "./company-raise/compose.js";

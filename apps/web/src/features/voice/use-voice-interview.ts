@@ -563,6 +563,9 @@ export function useVoiceInterview(
     };
   }, [reset, closeTransport]);
 
+  // The line this surface is opening right now (the server's answer and
+  // the transport coming up), until it is up or has failed.
+  const connecting = useRef<{ readonly promise: Promise<void> } | null>(null);
   const talk = useCallback<VoiceInterview["talk"]>(
     async ({
       thread,
@@ -575,6 +578,15 @@ export function useVoiceInterview(
     }) => {
       // G-D21: a line reopens by itself only for the person's own line.
       if (automatic && !personAsked.current) return;
+      // A press while this surface's line is still connecting (Q opening
+      // by itself on arrival, or a second tap) joins that line: one line,
+      // one bill, one voice. A live line keeps today's behaviour (a fresh
+      // start), and so does a change of voice.
+      const joining = connecting.current;
+      if (!automatic && requested === undefined && joining !== null) {
+        await joining.promise;
+        return;
+      }
       // The session a reopen replaces (G-D21), read before anything resets.
       const reopensId = lineSessionId.current;
       if (!automatic) {
@@ -591,7 +603,7 @@ export function useVoiceInterview(
       const chosen = requested ?? voice;
       // The previous line -- this surface's own or another's -- is ended
       // and awaited before the server is asked for the next one.
-      await openVoiceLine(holder, async () => {
+      const lineOpening = openVoiceLine(holder, async () => {
         if (!mounted.current || generation.current !== mine) return;
         setNotice(null);
         lastStart.current = { thread, firstMessage };
@@ -663,6 +675,13 @@ export function useVoiceInterview(
           firstMessage: opening,
         });
       });
+      const attempt = { promise: lineOpening };
+      connecting.current = attempt;
+      try {
+        await lineOpening;
+      } finally {
+        if (connecting.current === attempt) connecting.current = null;
+      }
     },
     [holder, voice],
   );
@@ -685,6 +704,9 @@ export function useVoiceInterview(
   }, [holder]);
 
   const end = useCallback(async () => {
+    // Ended while connecting: the next press opens a new line, never joins
+    // the one that was ended.
+    connecting.current = null;
     reset();
     // After any open still in progress, so an End pressed while connecting
     // is never followed by the line coming up.

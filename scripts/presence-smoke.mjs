@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Public presence smoke (CQ-Q-PRESENCE-001): one real build through the
  * whole packet against the local database — the public web in parallel,

@@ -792,6 +792,58 @@ describe("GET /v1/companies/:id/profile — what the pitch says", () => {
     expect(body.overview?.pitchRaiseNotice).toBeNull();
   });
 
+  it("R2: with the one raise read wired, it decides the headline on the profile", async () => {
+    const said = {
+      source: "PITCH_CLAIM" as const,
+      money: { amount: "4000000", currency: "USD" },
+      truthClass: "USER_CLAIM" as const,
+      evidenceStatus: "SELF_REPORTED" as const,
+      visibility: "network_visible" as const,
+      asOf: null,
+      pitch: { pitchId: INVESTORS_VIDEO, atSeconds: 43 },
+    };
+    const declared = {
+      ...said,
+      source: "DISCLOSED_OBJECTIVE" as const,
+      money: { amount: "5000000", currency: "USD" },
+      visibility: "relationship_shared" as const,
+      asOf: "2026-09-01T00:00:00.000Z",
+      pitch: null,
+    };
+    const none = {
+      source: "NONE" as const,
+      money: null,
+      truthClass: "UNKNOWN" as const,
+      evidenceStatus: "NO_EVIDENCE" as const,
+      visibility: null,
+      asOf: null,
+      pitch: null,
+    };
+    for (const [view, raise, fromPitch] of [
+      [said, null, "4000000"],
+      [declared, { amount: "5000000", currency: "USD" }, null],
+      [none, null, null],
+    ] as const) {
+      const { profile } = pitchPorts({
+        investor: true,
+        // The legacy derivation would say otherwise: the view must win.
+        declared: view.source !== "DISCLOSED_OBJECTIVE",
+        sharing: "PRIVATE",
+      });
+      const body = (await pitchBody({
+        ...profile,
+        raiseView: () => Promise.resolve(view),
+      })) as PitchBody & {
+        overview: { raiseView?: { source: string } } | null;
+      };
+      expect(body.overview?.raise).toEqual(raise);
+      expect(body.overview?.raiseFromPitch?.money?.amount ?? null).toBe(
+        fromPitch,
+      );
+      expect(body.overview?.raiseView?.source).toBe(view.source);
+    }
+  });
+
   it("reads no transcript of a video the reader may not play", async () => {
     const { profile, read } = pitchPorts({
       investor: true,

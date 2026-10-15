@@ -4,7 +4,9 @@ import type { QAnswerCard, QResultBlock } from "@capital-q/contracts";
 
 import {
   BANNED_SPOKEN_PHRASES,
+  movePhaseLine,
   naturalPlaceLine,
+  pendingPlaceOf,
   spokenFactsOf,
   spokenFidelityIssues,
 } from "../src/index.js";
@@ -98,7 +100,7 @@ describe("typed: ties are said as ties", () => {
 });
 
 describe("typed: page moves", () => {
-  it("never says 'Taking you to', and varies with what was asked", () => {
+  it("never says 'Taking you to', and never claims arrival before the browser verifies (R3)", () => {
     const said = new Set(
       [
         "take me to the explore page",
@@ -109,14 +111,10 @@ describe("typed: page moves", () => {
         "can we look at discover",
       ].map((asked) => naturalPlaceLine("Taking you to Discover.", asked)),
     );
-    for (const line of said) {
-      expect(line).toMatch(
-        /^(?:Here's Discover|Discover is up|Over to Discover)\.$/u,
-      );
-    }
-    expect(said.size).toBeGreaterThan(1);
-    expect(naturalPlaceLine("Taking you home now.", "home")).toMatch(
-      /^(?:Back home|Here's home)\.$/u,
+    // One pending line: "opened" is the VERIFIED receipt's to say.
+    expect([...said]).toEqual(["Opening Discover…"]);
+    expect(naturalPlaceLine("Taking you home now.", "home")).toBe(
+      "Heading home…",
     );
     expect(naturalPlaceLine("Opening your profile.", "my profile")).toMatch(
       /your profile|Your profile/u,
@@ -140,5 +138,36 @@ describe("typed: page moves", () => {
     });
     expect(facts?.kind).toBe("NAVIGATE");
     expect(facts?.mustSay).toEqual(["Discover"]);
+  });
+});
+
+describe("R3: one source for what Q says about a move, by lifecycle phase", () => {
+  it("pending, then confirmed only on VERIFIED, plainly on FAILED", () => {
+    expect(movePhaseLine("PENDING", "Capital")).toBe("Opening Capital…");
+    expect(movePhaseLine("VERIFIED", "Capital")).toBe("Opened Capital.");
+    expect(movePhaseLine("FAILED", "your relationships")).toBe(
+      "Your relationships didn't open.",
+    );
+    expect(movePhaseLine("PENDING", "home")).toBe("Heading home…");
+    expect(movePhaseLine("VERIFIED", "home")).toBe("You're home.");
+    expect(movePhaseLine("ASKED", "Capital")).toBe("Asked to open Capital.");
+  });
+
+  it("reads the place back from a pending line, and nothing else", () => {
+    expect(
+      pendingPlaceOf("Opening Tensorgate… Want me to run through them?"),
+    ).toBe("Tensorgate");
+    expect(pendingPlaceOf("Heading home…")).toBe("home");
+    expect(pendingPlaceOf("Here's Capital.")).toBeNull();
+    expect(pendingPlaceOf('Opening "Tensorgate".')).toBeNull();
+  });
+
+  it("no record or page line Q composes claims arrival", () => {
+    for (const asked of ["open tensorgate", "take me to capital", "x", "y"]) {
+      const line = naturalPlaceLine("Taking you to Capital.", asked);
+      expect(line).not.toMatch(
+        /\b(?:Here's|Up now|Over to|is up|opened|pulled them up)\b/iu,
+      );
+    }
   });
 });

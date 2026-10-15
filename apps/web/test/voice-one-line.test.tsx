@@ -322,3 +322,81 @@ describe("one voice line per tab", () => {
     expect(mostLive).toBe(1);
   });
 });
+
+describe("a press while the line is still connecting joins it (lead, 2026-10-09)", () => {
+  it("Q opening by itself on arrival, then 'Talk with Q' mid-connect: one session, one line", async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    startVoiceSessionAction.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const surface = renderHook(() => useVoiceInterview());
+    let arrival: Promise<void> = Promise.resolve();
+    let press: Promise<void> = Promise.resolve();
+    await act(async () => {
+      // Arrival: the line opens by itself and waits on the server.
+      arrival = surface.result.current.talk({
+        thread: {},
+        resume: true,
+        firstMessage: "Welcome back.",
+      });
+      await settle();
+      // The person presses Talk while it is still connecting.
+      press = surface.result.current.talk({ thread: {} });
+      await settle();
+      answer(issue(IDS.welcome));
+      await arrival;
+      await press;
+      await settle();
+    });
+    // One session POST and one transport (one peer, one bill, one voice).
+    expect(startVoiceSessionAction).toHaveBeenCalledTimes(1);
+    expect(starts).toHaveLength(1);
+    expect([...live]).toEqual([IDS.welcome]);
+    expect(mostLive).toBe(1);
+    expect(surface.result.current.active).toBe(true);
+  });
+
+  it("a press on a line that is already live keeps today's behaviour: a fresh line", async () => {
+    startVoiceSessionAction
+      .mockResolvedValueOnce(issue(IDS.welcome))
+      .mockResolvedValueOnce(issue(IDS.again));
+    const surface = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      await surface.result.current.talk({ thread: {} });
+    });
+    await act(async () => {
+      await surface.result.current.talk({ thread: {} });
+      await settle();
+    });
+    expect(startVoiceSessionAction).toHaveBeenCalledTimes(2);
+    expect([...live]).toEqual([IDS.again]);
+    expect(mostLive).toBe(1);
+  });
+
+  it("after End mid-connect, the next press opens a new line, never the ended one", async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    startVoiceSessionAction
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(issue(IDS.again));
+    const surface = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      const first = surface.result.current.talk({ thread: {} });
+      await settle();
+      const ending = surface.result.current.end();
+      const second = surface.result.current.talk({ thread: {} });
+      answer(issue(IDS.welcome));
+      await first;
+      await ending;
+      await second;
+      await settle();
+    });
+    expect(startVoiceSessionAction).toHaveBeenCalledTimes(2);
+    expect([...live]).toEqual([IDS.again]);
+  });
+});

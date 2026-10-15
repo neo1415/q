@@ -1,4 +1,3 @@
-/* global process, console, fetch, setTimeout */
 // Re-run one standing instruction now, as its owner, through the app's own
 // Work endpoints (there is no separate run-now route): Pause, then Resume.
 // Resume makes the instruction due at once; the q-api sweep (every minute)

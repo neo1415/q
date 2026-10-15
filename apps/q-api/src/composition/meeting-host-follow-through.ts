@@ -1,24 +1,20 @@
 import type { DatabaseExecutor } from "@capital-q/database";
-import {
-  AuthUserIdSchema,
-  resolveHumanActorContext,
-  type ActorContext,
-  type ActorContextResolver,
-} from "@capital-q/security";
+import type { ActorContextResolver } from "@capital-q/security";
 
 import type { MeetingHostFollowThrough } from "./meeting-host-runtime.js";
 
 /**
  * After a call Q hosted did not take place, or with actions asked for in
  * it (MEET-HOST, founder direction 2026-10-01). Everything here goes
- * through paths the organiser already owns: the meeting is cancelled by the
- * existing cancel path (the calendar event deleted with sendUpdates=all,
- * attendees told), the relationship's history gets `meeting_no_show`, and
- * people are told by a notice and an email. Rebooking is never done here:
- * the notice takes them to the relationship, where asking Q to find a new
- * time goes through the approval-gated booking path. A Google Meet link
- * itself cannot be revoked by Capital Q; cancelling the event withdraws
- * the invite so the link is no longer promoted.
+ * through paths the organiser already owns: the relationship's history
+ * gets `meeting_no_show`, and people are told by a notice and an email.
+ *
+ * 2026-10-09 (live bug): Q NEVER cancels or reschedules a booked meeting
+ * because someone was absent. It used to withdraw the calendar invite on a
+ * no-show and promise to "reach out"; both are gone. The booking stays as
+ * it is; a new time is only ever proposed through the meeting proposal
+ * state machine and takes effect when the investor (or an authorised
+ * party) explicitly accepts it.
  */
 
 type Sql = DatabaseExecutor;
@@ -47,8 +43,6 @@ type Meeting = {
 export type MeetingHostFollowThroughDependencies = {
   readonly sql: Sql;
   readonly resolver: ActorContextResolver;
-  /** The existing cancel path, as the organiser. */
-  readonly cancel: (actor: ActorContext, meetingId: string) => Promise<boolean>;
   /** `meeting_no_show` on the relationship, through Network's appender. */
   readonly markNoShow: (input: {
     readonly relationshipId: string;
@@ -142,26 +136,7 @@ export function createMeetingHostFollowThrough(
     }
   }
 
-  async function organiserActor(userId: string): Promise<ActorContext | null> {
-    const rows = await sql<{ auth_user_id: string | null }[]>`
-      select auth_user_id from identity.user_profiles where id = ${userId} limit 1`;
-    const auth = AuthUserIdSchema.safeParse(rows[0]?.auth_user_id);
-    if (!auth.success) return null;
-    const resolution = await resolveHumanActorContext(dependencies.resolver, {
-      principal: { authUserId: auth.data },
-      selection: {},
-    });
-    return resolution.status === "RESOLVED" &&
-      resolution.context.userId === userId
-      ? resolution.context
-      : null;
-  }
-
-  async function markAndCancel(
-    meetingId: string,
-    meeting: Meeting,
-    cancel: boolean,
-  ): Promise<void> {
+  async function mark(meetingId: string, meeting: Meeting): Promise<void> {
     await dependencies
       .markNoShow({
         relationshipId: meeting.relationship_id,
@@ -171,17 +146,6 @@ export function createMeetingHostFollowThrough(
       .catch((error: unknown) => {
         logger?.warn({ err: error, meetingId }, "no-show not recorded");
       });
-    if (!cancel) return;
-    const actor = await organiserActor(meeting.organiser_user_id).catch(
-      () => null,
-    );
-    const cancelled =
-      actor === null
-        ? false
-        : await dependencies.cancel(actor, meetingId).catch(() => false);
-    if (!cancelled) {
-      logger?.warn({ meetingId }, "no-show meeting not cancelled");
-    }
   }
 
   return {
@@ -189,14 +153,14 @@ export function createMeetingHostFollowThrough(
       const found = await meetingOf(meetingId);
       if (found === null) return;
       const { meeting, people } = found;
-      await markAndCancel(meetingId, meeting, true);
+      await mark(meetingId, meeting);
       for (const person of people) {
         await tell(
           meetingId,
           meeting,
           person,
-          `Nobody made it to ${meeting.purpose}. Want me to find a new time?`,
-          "Q waited in the call and nobody joined, so the invite has been withdrawn. Open the relationship and ask Q to find a new time; nothing is booked until you approve it.",
+          `Nobody joined ${meeting.purpose} before Q's wait ended`,
+          "Q waited in the call as long as it is allowed to, then left. Your meeting is exactly as it was: nothing was cancelled or moved. If you want another time, open the relationship and ask Q to propose one; it only changes once the other person accepts.",
           "no-show",
         );
       }
@@ -206,31 +170,19 @@ export function createMeetingHostFollowThrough(
       const found = await meetingOf(meetingId);
       if (found === null) return;
       const { meeting, people } = found;
-      await markAndCancel(meetingId, meeting, false);
+      // The absent side is not marked: not joining is not evidence (a link
+      // that failed, a late train). Only a call nobody joined is a no-show.
       const present = people.filter((p) => p.side === outcome.presentSide);
       const absent = people.filter((p) => p.side === outcome.absentSide);
       const presentNames =
         present.map((p) => p.display_name).join(" and ") || "The other side";
-      if (!outcome.reschedule) {
-        for (const person of present) {
-          await tell(
-            meetingId,
-            meeting,
-            person,
-            `Noted: Q won't look for a new time for ${meeting.purpose}`,
-            "You told Q not to reschedule. If you change your mind, ask Q from the relationship.",
-            "one-sided-never-mind",
-          );
-        }
-        return;
-      }
       for (const person of absent) {
         await tell(
           meetingId,
           meeting,
           person,
-          `We missed you at ${meeting.purpose}. Want to find a new time?`,
-          `${presentNames} waited in the call. Open the relationship and ask Q to find a new time; nothing is booked until it is approved.`,
+          `We missed you at ${meeting.purpose}`,
+          `${presentNames} waited in the call. Your meeting is unchanged. If you would like another time, open the relationship; nothing is booked or moved until you accept a proposed time.`,
           "one-sided-missed",
         );
       }
@@ -239,9 +191,11 @@ export function createMeetingHostFollowThrough(
           meetingId,
           meeting,
           person,
-          `Q has reached out to find a new time for ${meeting.purpose}`,
-          "You'll get the invite as soon as a new time is agreed.",
-          "one-sided-reaching-out",
+          `Q left the call for ${meeting.purpose}`,
+          outcome.rescheduleRequested
+            ? "You asked for a new time. Open the relationship and propose one or more options; the other person decides, and nothing changes until they accept."
+            : "The other participant did not join before Q's wait ended. Your meeting is unchanged; nothing was cancelled or rescheduled.",
+          "one-sided-left",
         );
       }
     },

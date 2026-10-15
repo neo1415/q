@@ -30,7 +30,7 @@ import {
   recordTermsAction,
   tickChecklistAction,
 } from "./deal-actions";
-import { DealStageStrip, dealDay } from "./deal-stage-strip";
+import { DealGuide, DealStageStrip, dealDay } from "./deal-stage-strip";
 import type { RelationshipSide } from "./relationship-words";
 
 /**
@@ -75,9 +75,13 @@ const REPORT_WORDS: Readonly<Record<RelationshipReportKind, string>> = {
 
 const STEP_WORDS: Readonly<Record<string, string>> = {
   START_DILIGENCE: "Start diligence from “How did it go?” above.",
-  SOFT_COMMIT: "Record a soft commit on the Commitment card.",
-  SEND_FUNDS: "Mark the money sent on the Commitment card.",
-  CONFIRM_FUNDS: "Confirm the money arrived on the Commitment card.",
+  SOFT_COMMIT:
+    "The investor states an amount on the Commitment card; the company confirms it.",
+  SEND_FUNDS:
+    "When you have sent the money, mark it sent on the Commitment card. The company then confirms it arrived.",
+  CONFIRM_FUNDS:
+    "When the money is in your account, confirm it on the Commitment card. Only you can confirm receipt.",
+  PASS: "If you decide not to go ahead, use “Not proceeding for now” on this relationship. It is archived, never deleted, and you can reconsider later.",
 };
 
 const newKey = (what: string) => `web-deal-${what}-${crypto.randomUUID()}`;
@@ -425,9 +429,13 @@ export function RelationshipDeal({
   useEffect(() => {
     if (initial !== null) return;
     let live = true;
-    void readDealAction(relationshipId).then((result) => {
-      if (live && result.ok) setView(result.value);
-    });
+    // A failed read leaves the panel unrendered, as a refused one does;
+    // never an unhandled rejection.
+    void readDealAction(relationshipId)
+      .then((result) => {
+        if (live && result.ok) setView(result.value);
+      })
+      .catch(() => undefined);
     return () => {
       live = false;
     };
@@ -480,6 +488,7 @@ export function RelationshipDeal({
       data-deal={view.end?.kind ?? view.current ?? "NONE"}
     >
       <DealStageStrip view={view} />
+      <DealGuide view={view} />
 
       {view.end?.kind === "CLOSED" ? (
         <section

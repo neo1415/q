@@ -7,6 +7,7 @@ import {
   resolveNamedRecord,
   type OpenRecordIntent,
 } from "../src/fast-navigation.js";
+import { misheardOwnCounterpart } from "../src/named-record-request.js";
 import { asksToGo, wordsNamePage } from "../src/page-request.js";
 
 /**
@@ -104,7 +105,8 @@ describe("resolveFastNavigation", () => {
 
   it.each([
     "open discover no wait",
-    "open discover... actually, open settings",
+    "Open Discover, no, actually never mind",
+    "Open Discover... sorry, wait",
     "don't open discover",
     "never mind, open relationships",
     "Open Shiftwell -- hold on",
@@ -114,6 +116,51 @@ describe("resolveFastNavigation", () => {
       kind: "LEAVE_TO_Q",
     });
     expect(opened).toEqual([]);
+  });
+
+  it.each([
+    "Open Discover, no, actually Rehearsals",
+    "Open Discover... sorry, Rehearsals",
+    "Not Discover, Rehearsals",
+    "Okay, take me to Discover. No, actually, rehearsals.",
+    "open discover, i mean rehearsals",
+  ])(
+    "a self-correction moves only to the LAST page named: %s",
+    async (text) => {
+      const { input, opened } = reader(["Shiftwell"]);
+      expect(await resolveFastNavigation(input(text))).toEqual({
+        kind: "NAVIGATE",
+        intent: { kind: "NAVIGATE", destination: "REHEARSALS" },
+      });
+      expect(opened).toEqual([]);
+    },
+  );
+
+  it("a self-correction to a record opens that record, never the page first named", async () => {
+    const { input, opened } = reader(["Shiftwell"]);
+    const decided = await resolveFastNavigation(
+      input("Open Discover, no, actually Shiftwell relationship"),
+    );
+    expect(decided).toEqual({
+      kind: "NAVIGATE",
+      intent: {
+        kind: "OPEN_RECORD_PAGE",
+        page: "RELATIONSHIP_COMPANY",
+        id: SHIFTWELL,
+      },
+    });
+    expect(opened.map((o) => o.name)).toEqual(["Shiftwell"]);
+  });
+
+  it("open discover... actually, open settings: Settings", async () => {
+    const { input } = reader([]);
+    const decided = await resolveFastNavigation(
+      input("open discover... actually, open privacy settings"),
+    );
+    expect(decided).toEqual({
+      kind: "NAVIGATE",
+      intent: { kind: "OPEN_SETTINGS", section: "privacy" },
+    });
   });
 
   it("leaves a question that is not a move to Q", async () => {
@@ -247,5 +294,87 @@ describe("wordsNamePage", () => {
     expect(asksToGo("Okay, open Tensor Gate.")).toBe(true);
     expect(asksToGo("I can't really see anything, so you're not")).toBe(false);
     expect(asksToGo("So no, no, you're alright.")).toBe(false);
+  });
+});
+
+describe("W3: romanised and Arabic-world names within their own set", () => {
+  const OWN = [
+    "Shadi Qishta",
+    "Muhannad Taslaq",
+    "QInvest LLC",
+    "AlRayan Investment",
+    "Al Rayan Bank",
+  ];
+
+  it("alternate romanisations reach the one own record", () => {
+    expect(misheardOwnCounterpart("Shady Kishta", OWN)).toBe("Shadi Qishta");
+    expect(misheardOwnCounterpart("Mohannad Taslak", OWN)).toBe(
+      "Muhannad Taslaq",
+    );
+    expect(misheardOwnCounterpart("Al Rayan Investments", OWN)).toBe(
+      "AlRayan Investment",
+    );
+  });
+
+  it("a bank is not the investment arm, and a bare first name guesses nothing", () => {
+    expect(misheardOwnCounterpart("Al Rayan Bank", OWN)).not.toBe(
+      "AlRayan Investment",
+    );
+    expect(misheardOwnCounterpart("Shadi", OWN)).toBeNull();
+    expect(misheardOwnCounterpart("Shadi Karam", OWN)).toBeNull();
+  });
+});
+
+describe("R3: a misheard name, matched only within their own set", () => {
+  const OWN = ["Tensorgate", "Shiftwell", "Clearwater Assurance", "Ledgerfold"];
+
+  it("TensorFlow -> their Tensorgate (hosted 2026-10-09), moved at once", async () => {
+    const { input, opened } = reader(OWN);
+    const decided = await resolveFastNavigation(input("Open TensorFlow"));
+    expect(decided).toMatchObject({
+      kind: "NAVIGATE",
+      intent: { kind: "OPEN_RECORD_PAGE" },
+    });
+    // Opened by their own name, never by what was heard.
+    expect(opened.map((one) => one.name)).toEqual(["Tensorgate"]);
+  });
+
+  it("caught by stem when the name scorer finds nothing (a long list of theirs)", () => {
+    expect(misheardOwnCounterpart("TensorFlow", OWN)).toBe("Tensorgate");
+  });
+
+  it("the same sounds spelt differently", () => {
+    expect(misheardOwnCounterpart("Shyftwel", OWN)).toBe("Shiftwell");
+  });
+
+  it("never outside their set: a name none of theirs resembles stays unknown", async () => {
+    expect(misheardOwnCounterpart("Halcyon Robotics", OWN)).toBeNull();
+    const { input, opened } = reader(OWN);
+    const decided = await resolveFastNavigation(input("Open TensorFlow"));
+    expect(decided.kind).toBe("NAVIGATE");
+    // Without Tensorgate among theirs, nothing is matched or guessed.
+    const other = reader(["Shiftwell", "Ledgerfold"]);
+    expect(await resolveFastNavigation(other.input("Open TensorFlow"))).toEqual(
+      { kind: "LEAVE_TO_Q" },
+    );
+    expect(other.opened.map((one) => one.name)).not.toContain("Tensorgate");
+    expect(opened).toHaveLength(1);
+  });
+
+  it("two of theirs it could mean: no guess (Q's answer asks)", async () => {
+    const both = ["Tensorgate", "Tensorline"];
+    expect(misheardOwnCounterpart("TensorFlow", both)).toBeNull();
+    const { input } = reader(both);
+    expect(await resolveFastNavigation(input("Open TensorFlow"))).toEqual({
+      kind: "LEAVE_TO_Q",
+    });
+  });
+
+  it("a short or weak stem is not enough", () => {
+    expect(misheardOwnCounterpart("Tens", OWN)).toBeNull();
+    // "Ledger" is 6 letters but under half of "Ledgerfold Partners Group".
+    expect(
+      misheardOwnCounterpart("Ledgerline", ["Ledgerfold Partners Group"]),
+    ).toBeNull();
   });
 });

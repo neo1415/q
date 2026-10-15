@@ -283,8 +283,11 @@ describe("Q answers within about two seconds of a question to it", () => {
     await t.play(
       [
         ...JOINS,
-        [40, recall("transcript.data", OYENIYI, 39, "Q, can you hear me?")],
-        [41, recall("transcript.data", OYENIYI, 40, "Q, are you there?")],
+        [40, recall("transcript.data", OYENIYI, 39, "Q, what is the cost?")],
+        [
+          41,
+          recall("transcript.data", OYENIYI, 40, "Q, what is the timeline?"),
+        ],
         [
           42,
           recall("transcript.data", OYENIYI, 41, "Q, would you introduce us?"),
@@ -293,11 +296,11 @@ describe("Q answers within about two seconds of a question to it", () => {
       43,
     );
     // The model is slow: one question in flight, the latest waiting.
-    expect(t.asked).toEqual(["Q, can you hear me?"]);
+    expect(t.asked).toEqual(["Q, what is the cost?"]);
     t.held.shift()?.();
     await t.play([], 44);
     expect(t.asked).toEqual([
-      "Q, can you hear me?",
+      "Q, what is the cost?",
       "Q, would you introduce us?",
     ]);
     t.held.shift()?.();

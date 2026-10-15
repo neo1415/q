@@ -6,6 +6,7 @@ import { createPostgresSecurityEventWriter } from "@capital-q/audit";
 import { createPostgresCompanyQueryPort } from "@capital-q/companies";
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import {
+  QRunIdSchema,
   QRunSummarySchema,
   QStreamEventSchema,
   type CorrelationId,
@@ -13,6 +14,8 @@ import {
 } from "@capital-q/contracts";
 import {
   createRequestDatabaseClient,
+  createRoundTripCounter,
+  withRoundTripCounter,
   type RequestDatabase,
   type TransactionContext,
   type TransactionManager,
@@ -28,6 +31,7 @@ import {
   appendRunEvent,
   createCompanyQSubjectResolver,
   createPostgresQRuntimeRepositories,
+  createQOrchestrationRuntime,
   createQRuntimeService,
   createQSubjectResolverRegistry,
   QConversationNotFoundError,
@@ -503,6 +507,35 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
         64,
       );
       expect(history.filter((m) => m.role === "USER")).toHaveLength(2);
+      // R5: with the run read cache, every window is a slice of ONE read at
+      // the widest window, and each equals what its own query returns.
+      const cached = createPostgresQRuntimeRepositories({
+        runCacheRoot: tx.sql,
+      });
+      const counter = createRoundTripCounter(last.run.id);
+      const windows = [2, 8, 64, 3] as const;
+      const fromCache = await withRoundTripCounter(counter, () =>
+        Promise.all(
+          windows.map((limit) =>
+            cached.messages.listRecentForConversationOfRun(
+              tx.sql,
+              TenantIdSchema.parse(tenantA),
+              last.run.id,
+              limit,
+            ),
+          ),
+        ),
+      );
+      expect(counter.count).toBe(1);
+      for (const [index, limit] of windows.entries()) {
+        const own = await repositories.messages.listRecentForConversationOfRun(
+          tx.sql,
+          TenantIdSchema.parse(tenantA),
+          last.run.id,
+          limit,
+        );
+        expect(fromCache[index]).toEqual(own);
+      }
       // Every fragment is still stored: history is never rewritten.
       const stored = await tx.sql<{ n: number }[]>`
         select count(*)::int as n from q_runtime.conversation_messages
@@ -1388,6 +1421,88 @@ describe("@capital-q/q-runtime concurrency against local PostgreSQL", () => {
     }
   });
 
+  it("R5: one-statement appends under contention: no gaps, no duplicates, in commit order, mixed with the two-statement path", async () => {
+    const world = await commitWorld();
+    try {
+      const created = await service().createRun({
+        actor: world.actor,
+        input: request(),
+        idempotencyKey: `conc-append-next-${randomUUID()}`,
+        correlationId: CORRELATION(),
+      });
+      const repositories = createPostgresQRuntimeRepositories();
+      expect(repositories.runEvents.appendNext).toBeDefined();
+      // The store without appendNext: allocate, then append.
+      const { appendNext: _omitted, ...legacyEvents } = repositories.runEvents;
+      const legacy = { ...repositories, runEvents: legacyEvents };
+      const stages = [
+        "UNDERSTANDING_REQUEST",
+        "REVIEWING_COMPANY",
+        "CHECKING_EVIDENCE",
+        "PREPARING_ANALYSIS",
+      ] as const;
+      const appended = await Promise.all(
+        Array.from({ length: 24 }, (_, i) =>
+          db.transactions.run((tx) =>
+            appendRunEvent(
+              i % 3 === 0 ? legacy : repositories,
+              tx,
+              created.run,
+              {
+                type: "q.stage.changed",
+                data: {
+                  stage: stages[i % stages.length] ?? "UNDERSTANDING_REQUEST",
+                },
+              },
+            ),
+          ),
+        ),
+      );
+      const sequences = appended.map((e) => e.sequence).sort((a, b) => a - b);
+      expect(sequences).toEqual(Array.from({ length: 24 }, (_, i) => i + 2));
+      const stored = await repositories.runEvents.listForRun(
+        db.sql,
+        world.actor.tenantId,
+        created.run.id,
+      );
+      expect(stored.map((e) => e.sequence)).toEqual(
+        Array.from({ length: 25 }, (_, i) => i + 1),
+      );
+      // A run that does not exist (or another tenant's) gets nothing.
+      const appendNext = repositories.runEvents.appendNext;
+      if (appendNext === undefined) throw new Error("no appendNext");
+      const missing = await db.transactions.run((tx) =>
+        appendNext(tx, {
+          tenantId: world.actor.tenantId,
+          runId: QRunIdSchema.parse(randomUUID()),
+          eventType: "q.stage.changed",
+          visibleStage: "UNDERSTANDING_REQUEST",
+          payload: { stage: "UNDERSTANDING_REQUEST" },
+        }),
+      );
+      expect(missing).toBeNull();
+      // A rolled-back append leaves no gap: the sequence rolls back with it.
+      await expect(
+        db.transactions.run(async (tx) => {
+          await appendRunEvent(repositories, tx, created.run, {
+            type: "q.stage.changed",
+            data: { stage: "PREPARING_ANALYSIS" },
+          });
+          throw new Error("abort");
+        }),
+      ).rejects.toThrow("abort");
+      const next = await db.transactions.run((tx) =>
+        appendRunEvent(repositories, tx, created.run, {
+          type: "q.stage.changed",
+          data: { stage: "PREPARING_ANALYSIS" },
+        }),
+      );
+      expect(next.sequence).toBe(26);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
   it("resolves two concurrent cancels to one cancellation and one terminal event", async () => {
     const world = await commitWorld();
     try {
@@ -1454,6 +1569,126 @@ describe("@capital-q/q-runtime concurrency against local PostgreSQL", () => {
         { n: number }[]
       >`select count(*)::int as n from q_runtime.runs where tenant_id = ${world.tenantId}`;
       expect(runs[0]?.n).toBe(1);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("S2: a lifecycle chain is one statement and leaves exactly what the step-by-step path leaves; a replay or a pending cancel falls back", async () => {
+    const world = await commitWorld();
+    try {
+      const repositories = createPostgresQRuntimeRepositories();
+      const withoutChain = {
+        ...repositories,
+        runs: { ...repositories.runs, moveChain: undefined },
+      };
+      const make = (repos: typeof repositories) =>
+        createQOrchestrationRuntime({
+          sql: db.sql,
+          transactions: db.transactions,
+          subjects: createQSubjectResolverRegistry([]),
+          securityEvents: createPostgresSecurityEventWriter({ sql: db.sql }),
+          repositories: repos,
+        });
+      const fast = make(repositories);
+      const slow = make(withoutChain);
+      const newRun = async () => {
+        const created = await service().createRun({
+          actor: world.actor,
+          input: request(),
+          idempotencyKey: `chain-${randomUUID()}`,
+          correlationId: CORRELATION(),
+        });
+        return {
+          runId: created.run.id,
+          tenantId: world.actor.tenantId,
+          actorUserId: world.actor.userId,
+        };
+      };
+      const drive = async (
+        runtime: typeof fast,
+        ref: Awaited<ReturnType<typeof newRun>>,
+      ) => {
+        const trips: number[] = [];
+        const counted = async <T>(work: () => Promise<T>): Promise<T> => {
+          const counter = createRoundTripCounter(ref.runId);
+          const value = await withRoundTripCounter(counter, work);
+          trips.push(counter.count);
+          return value;
+        };
+        await counted(() => runtime.begin(ref, "test-v1"));
+        await counted(() =>
+          runtime.advanceThrough(ref, ["CONTEXT_RESOLUTION", "POLICY_CHECK"]),
+        );
+        await counted(() => runtime.advance(ref, "PLANNING"));
+        // A replay of a move already made: unchanged, nothing appended.
+        const replay = await counted(() => runtime.advance(ref, "PLANNING"));
+        expect(replay.kind).toBe("UNCHANGED");
+        await counted(() => runtime.advanceThrough(ref, ["RETRIEVAL"]));
+        await counted(() =>
+          runtime.advance(ref, "SYNTHESIS", "PREPARING_ANALYSIS"),
+        );
+        // The stage is already showing: the move happens, the event does not.
+        await counted(() =>
+          runtime.advanceThrough(
+            ref,
+            ["VERIFICATION", "SYNTHESIS"],
+            "PREPARING_ANALYSIS",
+          ),
+        );
+        const done = await counted(() =>
+          runtime.complete(ref, { modelPolicyVersion: "p1" }),
+        );
+        expect(done.kind).toBe("ADVANCED");
+        const after = await counted(() => runtime.advance(ref, "SYNTHESIS"));
+        expect(after.kind).toBe("TERMINAL");
+        const run = await runtime.readRun(ref);
+        const events = await db.sql<
+          {
+            sequence: number;
+            event_type: string;
+            visible_stage: string | null;
+          }[]
+        >`select sequence, event_type, visible_stage from q_runtime.run_events
+           where run_id = ${ref.runId} order by sequence`;
+        return { trips, run, events };
+      };
+      const a = await drive(fast, await newRun());
+      const b = await drive(slow, await newRun());
+      expect(a.run?.status).toBe("COMPLETED");
+      expect(a.run?.version).toBe(b.run?.version);
+      expect(a.run?.lastEventSequence).toBe(b.run?.lastEventSequence);
+      expect(a.run?.modelPolicyVersion).toBe(b.run?.modelPolicyVersion);
+      expect(
+        a.events.map((e) => [e.sequence, e.event_type, e.visible_stage]),
+      ).toEqual(
+        b.events.map((e) => [e.sequence, e.event_type, e.visible_stage]),
+      );
+      // begin, the two chains, the stage move, complete: one statement each.
+      expect(a.trips[0]).toBe(1);
+      expect(a.trips[1]).toBe(1);
+      expect(a.trips[2]).toBe(1);
+      expect(a.trips[4]).toBe(1);
+      expect(a.trips[5]).toBe(1);
+      expect(a.trips[7]).toBe(1);
+      expect(Math.max(...b.trips)).toBeGreaterThan(1);
+
+      // A pending cancellation is only completed, never worked past.
+      const ref = await newRun();
+      await fast.begin(ref, "test-v1");
+      await service().cancelRun({
+        actor: world.actor,
+        runId: ref.runId,
+        correlationId: CORRELATION(),
+      });
+      const blocked = await fast.advance(ref, "CONTEXT_RESOLUTION");
+      expect(["CANCEL_REQUESTED", "TERMINAL"]).toContain(blocked.kind);
+      // Another person's reference moves nothing.
+      const stranger = {
+        ...(await newRun()),
+        actorUserId: randomUUID() as never,
+      };
+      await expect(fast.begin(stranger, "test-v1")).rejects.toThrow();
     } finally {
       await cleanup(world);
     }

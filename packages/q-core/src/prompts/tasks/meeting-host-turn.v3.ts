@@ -43,7 +43,7 @@ export const MEETING_HOST_TURN_V3: PromptDefinition<
 > = {
   ...MEETING_HOST_TURN_V2,
   version: 3,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder 2026-10-08: answer at once in a short spoken style (direct first sentence under 15 words); answers may use what is shown in the call (shared screens, cameras when on), never appearance or identity.",
   effectiveFrom: "2026-10-08",

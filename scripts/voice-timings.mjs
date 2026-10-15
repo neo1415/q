@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console */
 /**
  * Where spoken turns spend their time, read from q-api's own log
  * (CQ-VOICE-010).

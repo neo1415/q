@@ -1,4 +1,3 @@
-/* global process, console, fetch */
 // Sets every tavus-20 fictional account's password to CQ_SEED_ACCOUNT_PASSWORD
 // (env only; never printed or written) so the founder can sign in as them,
 // and writes docs/seed/tavus-20/LOGINS.md (emails only, no passwords).

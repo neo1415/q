@@ -22,6 +22,7 @@ import {
   visibleToParty,
   type RelationshipNextStep,
   type RelationshipParty,
+  type ProjectableEvent,
   type RelationshipProjection,
 } from "../domain/state-projector.js";
 import {
@@ -51,6 +52,11 @@ export type RelationshipStatus = {
   readonly relationship: Relationship;
   readonly projection: RelationshipProjection;
   readonly nextStep: RelationshipNextStep;
+  /**
+   * The history this side may see, as folded (R1): the brief reads its
+   * counts from it instead of reading the history again. Never on the wire.
+   */
+  readonly visibleHistory?: readonly ProjectableEvent[] | undefined;
 };
 
 /** The wire shape: where are we, what happened, what is next. No payloads, no anomalies. */
@@ -84,6 +90,7 @@ function viewOf(
     : {
         relationship,
         projection,
+        visibleHistory: visible,
         nextStep: nextStepFor(
           projection.state,
           party,

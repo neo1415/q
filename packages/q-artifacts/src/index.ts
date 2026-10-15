@@ -27,6 +27,7 @@ export {
 export type {
   ArtifactRepository,
   ComposedArtifact,
+  WorkforceDocumentBinding,
 } from "./application/ports.js";
 
 export {

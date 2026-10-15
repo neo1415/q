@@ -1,3 +1,5 @@
+> **Historical (superseded 2026-10-11).** Current state, tasks and instructions: [`docs/ai-handoff/START-HERE.md`](../ai-handoff/START-HERE.md). Kept for history; verify any operational instruction here against `docs/ai-handoff/LEGACY-RECONCILIATION.md`.
+
 > **2026-10-01 evening (lead):** deploy branch `recovery/2026-09-12` at 6d9a7500+ (hosted migrations 110/110). Read `docs/handoff/research/ledger.md` (latest entries), `docs/handoff/research/product-verification-2026-10-01.md` (capability verdicts) and `docs/specs/2026-10/` (MASTER-PLAN, WORKER-RULES, billing, readiness-blueprint, admin-escalation-kyb, presence). A real Zino↔Nixo intro call is booked for Fri 2 Oct 12:30 UTC (Meet link in communication.meetings). Founder decisions are pending on prices/limits, the facilitation fee (needs a PADL amendment + legal), Stripe keys, ADR 0036 (Blueprint), and hiding the overheard lines / retiring the "Neo" memory.
 
 ---

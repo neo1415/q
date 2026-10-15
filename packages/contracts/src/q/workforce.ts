@@ -398,6 +398,52 @@ export type WorkforceOverviewDto = z.infer<typeof WorkforceOverviewDtoSchema>;
  */
 export const Q_WORKFORCE_JOB_START = "q.workforce.job.start" as const;
 
+/** An approved request for the existing own-company document pipeline. */
+export const WorkforceOwnDocumentRequestSchema = z
+  .object({
+    operation: z.literal("PREPARE"),
+    kind: z.enum(["PITCH_DECK", "ONE_PAGER", "MEMO"]),
+    scope: z.literal("OWN_COMPANY"),
+  })
+  .strict();
+
+/**
+ * A memo or brief about the ONE company the job names (an investor's
+ * prospect, say). The company is bound by code from the records the goal
+ * names under the person's own reach -- never an id a model wrote -- and
+ * every read is authorised again by the Context Firewall as the person.
+ */
+export const WorkforceNamedCompanyDocumentRequestSchema = z
+  .object({
+    operation: z.literal("PREPARE"),
+    kind: z.enum(["MEMO", "ONE_PAGER", "INVESTMENT_BRIEF"]),
+    scope: z.literal("NAMED_COMPANY"),
+    companyId: UuidSchema,
+  })
+  .strict();
+
+/**
+ * A second specialist reads the document an earlier step prepared, checks
+ * it against the evidence it was built from, and revises it (a new
+ * version) only when the critique finds a material problem.
+ */
+export const WorkforceDocumentCritiqueRequestSchema = z
+  .object({
+    operation: z.literal("CRITIQUE_AND_REVISE"),
+    /** The earlier DOCUMENTS step whose document this reviews. */
+    sourceStep: z.string().trim().min(1).max(40),
+  })
+  .strict();
+
+export const WorkforceDocumentRequestSchema = z.union([
+  WorkforceOwnDocumentRequestSchema,
+  WorkforceNamedCompanyDocumentRequestSchema,
+  WorkforceDocumentCritiqueRequestSchema,
+]);
+export type WorkforceDocumentRequest = z.infer<
+  typeof WorkforceDocumentRequestSchema
+>;
+
 export const WorkforcePlannedStepSchema = z
   .object({
     key: z.string().trim().min(1).max(40),
@@ -410,6 +456,7 @@ export const WorkforcePlannedStepSchema = z
     budgetUsd: UsdSchema,
     /** A helper the lead Q spawned for this step, with only these tools. */
     spawned: z.boolean(),
+    document: WorkforceDocumentRequestSchema.optional(),
   })
   .strict();
 export type WorkforcePlannedStep = z.infer<typeof WorkforcePlannedStepSchema>;

@@ -76,11 +76,14 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     authorization: port(),
     disclosure: port(),
     investorFeed: port(),
+    companyCatalog: port(),
     discovery: port(),
     recommendationExplanations: port(),
     // MATCH block (ADR 0052): fit with the investor's own mandate.
     fit: port(),
     research: port(),
+    people: port(),
+    counterparts: port(),
     profiles: port(),
     relationships: port(),
     email: port(),
@@ -234,6 +237,8 @@ function sample(schema: unknown): unknown {
  */
 const RELATIONSHIP = { relationshipId: UUID };
 const SCRIPTED_INPUTS: Readonly<Record<string, unknown>> = {
+  // K1: a sector and an ISO country (a pattern, not free text).
+  discover_companies: { sectors: ["fintech"], countries: ["NG"], limit: 3 },
   // "A company id or name is required" (Explore, ADR 0055).
   explore_pitches_like: { companyName: "Kora Health" },
   // Deal close: a checklist item code (a pattern, not free text).

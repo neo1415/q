@@ -61,7 +61,7 @@ const VARIANTS: Readonly<Record<SwarmVariant, Variant>> = {
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 /* One hue family, light only on Q. Canvas paint, so literal channels. */
-const BANDS = ["255,248,232", "190,212,255", "120,160,255"] as const;
+const BANDS = ["255,248,232", "240,214,150", "226,184,88"] as const;
 const ALPHA_STEPS = 12;
 /** The brightest the glow gets (rest, attention, voice and ring at once). */
 const MAX_GLOW = 0.75 + 0.3 + 0.5 + 0.2;

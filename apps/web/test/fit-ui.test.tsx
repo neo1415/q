@@ -224,8 +224,105 @@ describe("the fit panel (profile)", () => {
       />,
     );
     expect(screen.getByText("Fit with your mandate")).toBeTruthy();
-    expect(screen.getByText("Q's view, not a verified fact")).toBeTruthy();
-    expect(container.querySelectorAll("[data-fit-glyph]")).toHaveLength(9);
+    expect(screen.getByText("Q's view · not verified")).toBeTruthy();
+    // Only the parameters the mandate declares; the rest are in "See why".
+    expect(container.querySelectorAll("[data-fit-glyph]")).toHaveLength(
+      KORA.fit.profile.parameters.filter((p) => p.applicable).length,
+    );
+  });
+});
+
+describe("Q's compact view on the profile", () => {
+  it("shows the qualification, the open questions and deeper asks bound to the company", () => {
+    const view = KORA.view;
+    if (view.status !== "READY") throw new Error("fixture");
+    const { container } = render(
+      <FitPanel
+        companyId={KORA.fit.companyId}
+        name="Kora Health"
+        fit={{ status: "READY", fit: KORA.fit }}
+        qView={{
+          ...view,
+          mainRisk: "Ticket size is only a partial match.",
+          unknowns: ["Is the round priced or a SAFE?"],
+        }}
+      />,
+    );
+    expect(
+      container.querySelector('[data-q-view-part="RISK"]')?.textContent,
+    ).toContain("Ticket size is only a partial match.");
+    expect(
+      container.querySelector('[data-q-view-part="UNKNOWNS"]')?.textContent,
+    ).toContain("Is the round priced or a SAFE?");
+    const deeper = container.querySelector('[data-q-view-part="DEEPER"]');
+    expect(deeper).not.toBeNull();
+    expect(
+      within(deeper as HTMLElement).getByRole("button", {
+        name: "Full assessment",
+      }),
+    ).toBeTruthy();
+    // Each open question is itself a question to Q (depth on demand).
+    expect(
+      within(
+        container.querySelector('[data-q-view-part="UNKNOWNS"]') as HTMLElement,
+      ).getByRole("button", { name: "Is the round priced or a SAFE?" }),
+    ).toBeTruthy();
+  });
+
+  it("names a stated, unshared figure as Stated, never as Unknown (Tensorgate, 2026-10-12)", () => {
+    const profile = {
+      ...KORA.fit.profile,
+      parameters: KORA.fit.profile.parameters.map((p) =>
+        p.parameter === "CHEQUE_SIZE"
+          ? {
+              ...p,
+              outcome: "UNKNOWN" as const,
+              applicable: true,
+              evidenceStatus: null,
+              stated: true as const,
+              context: {
+                items: [
+                  {
+                    label: "Raise",
+                    value: "$4M",
+                    source: "PITCH_AND_DECK" as const,
+                  },
+                  {
+                    label: "Your cheque",
+                    value: "$250k",
+                    source: "YOUR_MANDATE" as const,
+                  },
+                ],
+                open: "Ticket fit: not scored until the round is formally shared",
+              },
+              reason:
+                "Raising $4M, said in their pitch and deck, minimum cheque $100k; not formally shared, so not scored.",
+            }
+          : p,
+      ),
+    };
+    const { container } = render(
+      <FitPanel
+        companyId={KORA.fit.companyId}
+        name="Kora Health"
+        fit={{ status: "READY", fit: { ...KORA.fit, profile } }}
+        qView={null}
+      />,
+    );
+    const glyph = container.querySelector('[data-fit-glyph="STATED"]');
+    expect(glyph).not.toBeNull();
+    const row = container.querySelector('[data-fit-row="CHEQUE_SIZE"]');
+    expect(row?.textContent).toContain("Cheque compatibility");
+    expect(row?.textContent).toContain("Stated");
+    expect(row?.textContent).not.toContain("Unknown");
+    // The values themselves, each with its source, and what is still open.
+    expect(row?.textContent).toContain("$4M");
+    expect(row?.textContent).toContain("Raise · From pitch and deck");
+    expect(row?.textContent).toContain("$250k");
+    expect(row?.textContent).toContain("Your cheque · Your mandate");
+    expect(row?.querySelector("[data-fit-context-open]")?.textContent).toBe(
+      "Ticket fit: not scored until the round is formally shared",
+    );
   });
 });
 
@@ -288,7 +385,7 @@ describe("relationship fit chips", () => {
       <RelationshipFitChips profile={KORA.fit.profile} />,
     );
     expect(container.textContent).toContain("Good fit · medium confidence");
-    expect(container.textContent).toContain("Round unknown");
+    expect(container.textContent).toContain("Round terms unknown");
     expect(
       container.querySelectorAll('[data-fit-glyph="STRONG"]'),
     ).toHaveLength(3);

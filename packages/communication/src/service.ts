@@ -94,6 +94,27 @@ const DEFAULT_PAGE = 50;
 const Q_READ_MAX = 30;
 const Q_BODY_MAX = 600;
 
+/** One message as a list card or the brief shows it. */
+export type BriefLatestMessage = {
+  readonly from: "YOU" | "YOUR_SIDE" | "OTHER_SIDE";
+  readonly senderName: string;
+  readonly kind: ChatMessageDto["kind"];
+  readonly viaQ: boolean;
+  readonly sentAt: string;
+  readonly preview: string;
+};
+
+const PREVIEW_MAX = 240;
+
+function previewOf(message: Folded): string {
+  if (message.original.kind === "VOICE_NOTE") return "Voice note";
+  if (message.original.kind === "ATTACHMENT") {
+    const title = message.original.attachment?.title;
+    return title === undefined ? "Shared a document" : `Shared ${title}`;
+  }
+  return (message.body ?? "").slice(0, PREVIEW_MAX);
+}
+
 type Folded = {
   readonly original: ChatMessageRow;
   readonly body: string | null;
@@ -459,6 +480,69 @@ export function createChatService(dependencies: ChatServiceDependencies) {
         actor.userId,
       );
       return { items: items.filter((item) => item.unread > 0) };
+    },
+
+    /**
+     * R1 batching: each listed thread's newest message and the other
+     * side's newest, as they stand now, for a page of the person's own
+     * relationships in one read. Scoped in SQL to threads where the
+     * person's organisation is a party; a party relationship with no
+     * thread is answered with none, one where they are not a party is
+     * absent (the brief then reads it UNAVAILABLE).
+     */
+    latestForRelationships: async (
+      actor: ActorContext,
+      relationshipIds: readonly string[],
+    ): Promise<
+      ReadonlyMap<
+        string,
+        {
+          readonly latest: BriefLatestMessage | null;
+          readonly fromThem: BriefLatestMessage | null;
+        }
+      >
+    > => {
+      const ids = relationshipIds.filter((id) => UUID.test(id)).slice(0, 50);
+      if (actor.organisationId === undefined || ids.length === 0) {
+        return new Map();
+      }
+      if (store.recentForRelationships === undefined) {
+        throw new Error("batched thread read not composed");
+      }
+      const threads = await store.recentForRelationships(
+        actor.organisationId,
+        ids,
+      );
+      const out = new Map<
+        string,
+        {
+          readonly latest: BriefLatestMessage | null;
+          readonly fromThem: BriefLatestMessage | null;
+        }
+      >();
+      for (const thread of threads) {
+        const folded = foldChatRows(thread.rows).filter((m) => !m.unsent);
+        const shaped = folded.map((message): BriefLatestMessage => ({
+          from:
+            message.original.senderUserId === actor.userId
+              ? "YOU"
+              : message.original.senderSide === thread.side
+                ? "YOUR_SIDE"
+                : "OTHER_SIDE",
+          senderName: message.original.senderName,
+          kind: toDto(message, actor.userId).kind,
+          viaQ:
+            message.original.qActionId !== null ||
+            (message.original.qDelegationId ?? null) !== null,
+          sentAt: message.original.createdAt.toISOString(),
+          preview: previewOf(message),
+        }));
+        out.set(thread.relationshipId, {
+          latest: shaped.at(-1) ?? null,
+          fromThem: shaped.findLast((m) => m.from === "OTHER_SIDE") ?? null,
+        });
+      }
+      return out;
     },
 
     /**

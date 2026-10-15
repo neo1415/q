@@ -16,7 +16,12 @@ import {
   type ActorContext,
 } from "@capital-q/security";
 
-import { createPostgresArtifactRepository } from "../src/index.js";
+import {
+  createArtifactService,
+  createPostgresArtifactRepository,
+  createPostgresDocumentJobRepository,
+} from "../src/index.js";
+import type { PermittedContextPlan } from "@capital-q/contracts";
 
 /**
  * The artifact tables against real PostgreSQL (`pnpm db:start`), run with
@@ -119,6 +124,106 @@ describe("@capital-q/q-artifacts against local Supabase Postgres", () => {
     }
     expect(completed).toBe(true);
   }
+
+  it("two independent transactions claim one artifact and enqueue one worker job", async () => {
+    const jobId = randomUUID();
+    const runId = randomUUID();
+    const party = await db.transactions.run(async (tx) => {
+      const mine = await createParty(
+        tx,
+        `workforce-race-${randomUUID().slice(0, 8)}`,
+      );
+      await tx.sql`insert into q_runtime.workforce_jobs
+        (id, tenant_id, user_id, source_kind, goal, rubric_version)
+        values (${jobId}, ${mine.tenantId}, ${mine.userId}, 'JOB', 'Prepare a memo', 'workforce-rubric/v1')`;
+      return mine;
+    });
+    try {
+      const repository = createPostgresArtifactRepository({ sql: db.sql });
+      const jobs = createPostgresDocumentJobRepository({ sql: db.sql });
+      let entered = 0;
+      let release: () => void = () => undefined;
+      const bothEntered = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const service = createArtifactService({
+        repository: {
+          ...repository,
+          createForWorkforce: (tx, artifact, binding) => {
+            if (++entered === 2) release();
+            if (repository.createForWorkforce === undefined)
+              throw new Error("Missing replay adapter");
+            return repository.createForWorkforce(tx, artifact, binding);
+          },
+        },
+        transactions: db.transactions,
+        jobs: {
+          ...jobs,
+          enqueue: async (tx, job) => {
+            // Hold the winning transaction until the competing request
+            // actually enters the repository, rather than sequentially
+            // calling the service and labelling that a race.
+            await bothEntered;
+            await jobs.enqueue(tx, job);
+          },
+        },
+      });
+      const input = {
+        actorContext: party.actor,
+        qRunId: runId,
+        permittedContextPlan: {
+          runId,
+          tenantId: party.tenantId,
+          actor: { userId: party.userId, organisationId: party.organisationId },
+          subjects: [],
+          revalidateAfter: "2099-01-01T00:00:00.000Z",
+        } as unknown as PermittedContextPlan,
+        artifactType: "MEMO",
+        kind: "MEMO" as const,
+        content: {
+          title: "Memo",
+          summary: "From the record.",
+          content: CONTENT,
+        },
+        job: {
+          grounding: [],
+          sectorCodes: [],
+          directionChosen: false,
+          brand: null,
+          sensitivity: "INTERNAL" as const,
+        },
+        workforce: { jobId, stepKey: "memo", intentSha256: "a".repeat(64) },
+      };
+      const [first, second] = await Promise.all([
+        service.requestDocument(input),
+        service.requestDocument(input),
+      ]);
+      expect(first.artifact.artifactId).toBe(second.artifact.artifactId);
+      const artifacts =
+        await db.sql`select id from artifacts.artifacts where workforce_job_id = ${jobId}`;
+      expect(artifacts).toHaveLength(1);
+      const enqueued =
+        await db.sql`select id from artifacts.document_jobs where artifact_id = ${first.artifact.artifactId}`;
+      expect(enqueued).toHaveLength(1);
+      // A crash after this transaction but before recording the workforce
+      // result must recover this identity, not create a second document.
+      expect((await service.requestDocument(input)).artifact.artifactId).toBe(
+        first.artifact.artifactId,
+      );
+    } finally {
+      await db.transactions.run(async (tx) => {
+        await tx.sql`delete from artifacts.document_jobs where artifact_id in
+          (select id from artifacts.artifacts where workforce_job_id = ${jobId})`;
+        await tx.sql`delete from artifacts.artifacts where workforce_job_id = ${jobId}`;
+        await tx.sql`delete from q_runtime.workforce_jobs where id = ${jobId}`;
+        await tx.sql`delete from identity.organisation_memberships where organisation_id = ${party.organisationId}`;
+        await tx.sql`delete from identity.organisations where id = ${party.organisationId}`;
+        await tx.sql`delete from identity.tenants where id = ${party.tenantId}`;
+        await tx.sql`delete from auth.users where id =
+          (select auth_user_id from identity.user_profiles where id = ${party.userId})`;
+      });
+    }
+  });
 
   it("never selects an artifact belonging to another tenant or organisation", async () => {
     await rolledBack(async (tx) => {

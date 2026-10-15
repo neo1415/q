@@ -12,6 +12,10 @@
     "./speech": {
       "types": "./dist/speech/public.d.ts",
       "default": "./dist/speech/public.js"
+    },
+    "./names": {
+      "types": "./dist/names/public.d.ts",
+      "default": "./dist/names/public.js"
     }
   },
   "main": "./dist/index.js",

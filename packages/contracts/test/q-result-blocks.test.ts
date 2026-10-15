@@ -353,6 +353,7 @@ describe("QUiIntent", () => {
       ],
     },
     DOCUMENT_ACT: { kind: "DOCUMENT_ACT", act: "GO_TO_PAGE", page: 3 },
+    CARDS: { kind: "CARDS", action: "HIDE_CATEGORY", category: "CONNECTION" },
   };
 
   it("parses every supported intent", () => {
@@ -362,6 +363,19 @@ describe("QUiIntent", () => {
     for (const [kind, fixture] of Object.entries(INTENT_FIXTURES)) {
       expect(QUiIntentSchema.safeParse(fixture).success, kind).toBe(true);
     }
+  });
+
+  it("a cards intent names what it needs, and nothing else", () => {
+    const parse = (intent: unknown) =>
+      QUiIntentSchema.safeParse(intent).success;
+    expect(parse({ kind: "CARDS", action: "HIDE_ALL" })).toBe(true);
+    expect(
+      parse({ kind: "CARDS", action: "RESTORE_ONE", name: "TensorGate" }),
+    ).toBe(true);
+    expect(parse({ kind: "CARDS", action: "HIDE_CATEGORY" })).toBe(false);
+    expect(parse({ kind: "CARDS", action: "HIDE_ONE" })).toBe(false);
+    expect(parse({ kind: "CARDS", action: "DELETE_ALL" })).toBe(false);
+    expect(parse({ kind: "CARDS", action: "HIDE_ALL", id: "x" })).toBe(false);
   });
 
   it("a document act to a page names the page", () => {

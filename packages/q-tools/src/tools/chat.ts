@@ -367,7 +367,19 @@ function createListMessagesTool(
       Promise.resolve({
         open: grant.thread.connected && grant.thread.blocked !== true,
         counterpartName: grant.thread.counterpartName,
-        messages: grant.thread.messages.map((message) => ({ ...message })),
+        // Pick the contract's fields: the port's rows carry more (id, viaQ,
+        // envelope since the Q room build), and spreading them failed the
+        // strict output on every non-empty thread -- hosted run 77dbcc69
+        // (2026-10-09 23:09:41, INVALID_TOOL_OUTPUT), which Q then told
+        // the person as "no message has been sent" (TensorGate).
+        messages: grant.thread.messages.map((message) => ({
+          from: message.from,
+          senderName: message.senderName,
+          kind: message.kind,
+          text: message.text,
+          attachmentTitle: message.attachmentTitle,
+          sentAt: message.sentAt,
+        })),
       }),
   });
 }

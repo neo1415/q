@@ -1,4 +1,3 @@
-/* global process, console, URL */
 /**
  * Overdeliver design-review screenshots (docs/design/2026-10-07/overdeliver):
  * every screen at phone and desktop, light and dark, from the static file.

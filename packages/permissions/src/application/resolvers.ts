@@ -6,6 +6,7 @@ import {
   CompanyIdSchema,
   FounderProfileIdSchema,
   type CompanyQueryPort,
+  type CompanyVisibilityFacts,
 } from "@capital-q/companies";
 import {
   InvestorMandateIdSchema,
@@ -54,8 +55,25 @@ function ref(type: DisclosureResourceType, id: string) {
 export function createCompanyDisclosureResolver(
   companies: CompanyQueryPort,
 ): DisclosureResourceResolver {
+  const describe = (
+    company: CompanyVisibilityFacts,
+  ): DisclosureResourceDescriptor => ({
+    resource: ref("company", company.id),
+    tenantId: company.tenantId,
+    ownerOrganisationId: company.organisationId,
+    intrinsicScope: company.marketplaceVisibility,
+  });
   return {
     resourceType: "company",
+    resolveMany: async (resourceIds) => {
+      const ids = resourceIds.flatMap((raw) => {
+        const parsed = CompanyIdSchema.safeParse(raw);
+        return parsed.success ? [parsed.data] : [];
+      });
+      return (await companies.findCanonicalCompanyVisibilities(ids)).map(
+        describe,
+      );
+    },
     resolve: async (resourceId) => {
       const id = CompanyIdSchema.safeParse(resourceId);
       if (!id.success) {

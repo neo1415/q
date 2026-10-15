@@ -1,5 +1,9 @@
 import type { DatabaseHealth } from "@capital-q/database";
 import type { DealCloseService } from "@capital-q/network";
+import {
+  createRelationshipBriefBatchSources,
+  createRelationshipBriefSources,
+} from "@capital-q/network";
 import type { CapitalRoundService } from "@capital-q/capital";
 import type {
   CompanyDeckService,
@@ -63,6 +67,7 @@ import type {
   CompanyClaims,
   PlatformCompanyPublishing,
 } from "@capital-q/companies";
+import type { MeetingProposalPort } from "@capital-q/communication";
 import type { StartupAlerts } from "@capital-q/gateq-intake";
 import type {
   AppActionPorts,
@@ -156,6 +161,7 @@ import {
   type OrganisationRoutesDependencies,
 } from "./http/organisations.js";
 import { registerProblemHandling } from "./http/problem-handler.js";
+import { registerRequestTiming } from "./http/request-timing.js";
 // P5 block: brand theming
 import type { BrandThemeStore } from "@capital-q/platform-admin";
 
@@ -377,6 +383,8 @@ export type ApiModules = {
   readonly chatSafety?: ChatRoutesDependencies["safety"] | undefined;
   /** BIZ-008: meetings, reminders, notifications. Absent: none register. */
   readonly schedule?: ScheduleRoutesDependencies["schedule"] | undefined;
+  /** D: meeting time proposals (the app actions' port). */
+  readonly proposals?: MeetingProposalPort | undefined;
   /** AUTO: Web Push subscriptions and notification settings. */
   readonly push?:
     Pick<PushRoutesDependencies, "subscriptions" | "publicKey"> | undefined;
@@ -443,6 +451,7 @@ export function createApp(
   });
 
   registerProblemHandling(app, logger);
+  registerRequestTiming(app);
 
   // Liveness and readiness are split per doc 21 (74-77): liveness proves the
   // process is alive and performs no dependency checks. Readiness asks the
@@ -655,6 +664,9 @@ export function createApp(
         : { companyDeck: modules.companyDeck }),
       ...(modules.chat === undefined ? {} : { chat: modules.chat }),
       ...(modules.schedule === undefined ? {} : { schedule: modules.schedule }),
+      ...(modules.proposals === undefined
+        ? {}
+        : { proposals: modules.proposals }),
       ...(modules.media === undefined ? {} : { pitchUploads: modules.media }),
       ...(modules.profileImages === undefined
         ? {}
@@ -860,6 +872,24 @@ export function createApp(
       outcomes: modules.outcomes,
       diligence: modules.diligence,
       namedPhotos: modules.namedPhotos,
+      // R1: the Relationship Brief over the same services as the screens.
+      // Without chat or schedule composed, those sources read UNAVAILABLE.
+      briefSources:
+        modules.chat !== undefined && modules.schedule !== undefined
+          ? createRelationshipBriefSources({
+              chat: modules.chat,
+              schedule: modules.schedule,
+              diligence: modules.diligence,
+            })
+          : undefined,
+      briefBatchSources:
+        modules.chat !== undefined && modules.schedule !== undefined
+          ? createRelationshipBriefBatchSources({
+              chat: modules.chat,
+              schedule: modules.schedule,
+              diligence: modules.diligence,
+            })
+          : undefined,
     });
   }
 

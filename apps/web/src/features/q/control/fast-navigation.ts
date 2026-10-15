@@ -5,6 +5,11 @@ import {
   takenBack,
 } from "@capital-q/q-specialists/page-request";
 
+import {
+  cardsIntentOf,
+  cardsRequestOf,
+} from "@capital-q/q-specialists/cards-request";
+
 import { destinationPath } from "@/features/voice/destinations";
 
 import {
@@ -12,9 +17,10 @@ import {
   movedEarlyRecently,
   moveEarly,
   prefetchPath,
-  recordPagePath,
+  recordIntentPath,
   settingsPath,
 } from "../client-actions";
+import { applyCardsIntent } from "../cards/card-visibility-store";
 import { navigationInFlight } from "../ui-act-controller";
 
 /**
@@ -76,7 +82,7 @@ export function pathOfIntent(
       // A data-room document opens in the viewer, never as a move.
       return intent.page === "DATA_ROOM_DOCUMENT"
         ? null
-        : recordPagePath(intent.page, intent.id);
+        : recordIntentPath(intent);
   }
 }
 
@@ -160,6 +166,14 @@ export async function navigationHeard(
   if (keyOf(text).length === 0) return null;
   // Every finished sentence (typed, any voice line) passes here first.
   noteAsked();
+  // Founder P5: "Q, clear all cards" acts in this same task, by code, with
+  // no server round trip. Presentation only; Q's answer says it too, and
+  // the controller acts once for the same words.
+  const cards = cardsRequestOf(text);
+  if (cards !== null) {
+    applyCardsIntent(cardsIntentOf(cards));
+    return null;
+  }
   const started = performance.now();
   // A page read here moves in this same task: no await, so nothing the
   // send queued (a React render, the run's request) goes first.
@@ -211,6 +225,32 @@ export function navigationHearing(key: string, text: string): void {
       });
     }, INTERIM_DEBOUNCE_MS),
   );
+}
+
+/**
+ * Latency (typed send->VERIFIED): the words in the typed composer, as they
+ * change. A record by its name is resolved (the server's prepared reading
+ * context warmed: ~2 s cold when hosted) and its page prefetched while
+ * they type, so Send moves at once. Never moves; only a request to go
+ * somewhere is read at all.
+ */
+export function navigationTyping(text: string): void {
+  navigationHearing(TYPED_KEY, text);
+}
+const TYPED_KEY = "typed-composer";
+
+/** A composer's `input` event (bubbled to its wrapper): its words, read. */
+export function readTypedDraft(event: {
+  readonly target: EventTarget | null;
+}): void {
+  const field = event.target;
+  if (
+    typeof HTMLTextAreaElement !== "undefined" &&
+    field instanceof HTMLTextAreaElement &&
+    field.hasAttribute("data-q-composer-input")
+  ) {
+    navigationTyping(field.value);
+  }
 }
 
 /** Partial words so far, per utterance (a line that streams deltas). */

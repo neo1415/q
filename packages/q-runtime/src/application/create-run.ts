@@ -442,8 +442,17 @@ function screenWithManifest(
 ): NonNullable<CreateQRunRequest["screen"]> {
   const has = (ref: QSubjectRef) =>
     refs.some((known) => JSON.stringify(known) === JSON.stringify(ref));
-  const { companyId, investorOrganisationId, documentId, timeZone, manifest } =
-    screen;
+  const {
+    companyId,
+    investorOrganisationId,
+    documentId,
+    documentPage,
+    artifactId,
+    artifactSlide,
+    artifactVersion,
+    timeZone,
+    manifest,
+  } = screen;
   return {
     route: screen.route,
     // The person's own clock: not an entity, nothing to resolve.
@@ -452,6 +461,16 @@ function screenWithManifest(
     // asked; every ref is read back as the asker before the model sees
     // anything, and one that does not resolve is dropped there.
     ...(manifest === undefined ? {} : { manifest }),
+    // An artifact is a viewer reference, not a document/entity subject.
+    // Its content and any edit still require the owning service's actor read.
+    // Keep it even when no conversation card exists (workforce documents).
+    ...(artifactId === undefined
+      ? {}
+      : {
+          artifactId,
+          ...(artifactSlide === undefined ? {} : { artifactSlide }),
+          ...(artifactVersion === undefined ? {} : { artifactVersion }),
+        }),
     ...(companyId !== undefined && has({ kind: "COMPANY", companyId })
       ? { companyId }
       : {}),
@@ -460,7 +479,10 @@ function screenWithManifest(
       ? { investorOrganisationId }
       : {}),
     ...(documentId !== undefined && has({ kind: "DOCUMENT", documentId })
-      ? { documentId }
+      ? {
+          documentId,
+          ...(documentPage === undefined ? {} : { documentPage }),
+        }
       : {}),
   };
 }

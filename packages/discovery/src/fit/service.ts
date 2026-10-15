@@ -18,6 +18,7 @@ import type { ActorContext } from "@capital-q/security";
 
 import type { EligibilityReasonCode } from "../eligibility/contracts.js";
 import type { EligibilityService } from "../eligibility/service.js";
+import type { FitEvidenceLine } from "./stated.js";
 import type { RecommendationFeatureSnapshot } from "../features/contracts.js";
 
 import { FIT_CONFIG_CURRENT, type FitConfig } from "./config.js";
@@ -61,6 +62,10 @@ export type FitCompanyInputs = {
   /** The current raise, only where disclosure lets this reader see it. */
   readonly raise?:
     { readonly amount: string; readonly currency: string } | null | undefined;
+  /** What the company stated where this reader may see it; never scored. */
+  readonly evidence?: readonly FitEvidenceLine[] | undefined;
+  /** That evidence came through a grant: models read it only as CONFIDENTIAL. */
+  readonly evidenceConfidential?: boolean | undefined;
 };
 
 export type FitInputSource = {
@@ -114,6 +119,9 @@ export type FitProfileItem = {
   readonly about?: string | null | undefined;
   readonly raise?:
     { readonly amount: string; readonly currency: string } | null | undefined;
+  /** For Q's view: what the company stated where this reader may see it. */
+  readonly evidence?: readonly FitEvidenceLine[] | undefined;
+  readonly evidenceConfidential?: boolean | undefined;
 };
 
 export type FitProfilesResult =
@@ -256,6 +264,8 @@ export function createFitService(
           : input.line,
         about: input.about ?? null,
         raise: input.raise ?? null,
+        evidence: input.evidence ?? [],
+        evidenceConfidential: input.evidenceConfidential ?? false,
       });
     }
     // Request order, as eligibility returned it.
@@ -407,11 +417,16 @@ export function buildFitComparison(input: {
 }
 
 /** One profile, as plain text (Q's fallback where cards are not rendered). */
-export function fitProfileText(name: string, profile: FitProfileDto): string {
+export function fitProfileText(
+  name: string,
+  profile: FitProfileDto,
+  options: { readonly summaryOnly?: boolean } = {},
+): string {
   // ADR 0059: the score out of 10 beside the words, computed here from the
   // rows below (never by a model); none when too little is known.
   const score = fitScoreOutOf10(profile);
   const head = `${name}: ${score === null ? "" : `${score}/10 · `}${FIT_BAND_LABELS[profile.band]}, ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}.`;
+  if (options.summaryOnly === true) return head;
   const rows = profile.parameters.map(
     (p) =>
       `- ${FIT_PARAMETER_LABELS[p.parameter]}: ${p.applicable ? FIT_OUTCOME_LABELS[p.outcome] : "No preference"}. ${p.reason}`,
@@ -420,12 +435,28 @@ export function fitProfileText(name: string, profile: FitProfileDto): string {
 }
 
 /** The comparison as plain text, best first. */
-export function fitComparisonText(comparison: FitComparisonDto): string {
+export function fitComparisonText(
+  comparison: FitComparisonDto,
+  options: { readonly summaryOnly?: boolean } = {},
+): string {
   if (comparison.entries.length === 0) {
     return `None of the ${comparison.considered} companies you can compare has enough known to rank yet.`;
   }
+  // The compact tool fallback accompanies complete typed profiles. Repeat
+  // only their code-derived scores here, not each band/confidence/reason.
+  // Unknown scores remain words; full prose and every profile stay intact.
+  if (options.summaryOnly === true) {
+    const scores = comparison.entries.map((entry) => {
+      const score = fitScoreOutOf10(entry.profile);
+      return `${entry.position}. ${entry.name}: ${score === null ? FIT_BAND_LABELS[entry.profile.band] : `${score}/10`}`;
+    });
+    return [
+      ...scores,
+      `Mandate fit, rules ${comparison.configLabel}. Unknown never counts against a company.`,
+    ].join("\n");
+  }
   const parts = comparison.entries.map(
-    (e) => `${e.position}. ${fitProfileText(e.name, e.profile)}`,
+    (e) => `${e.position}. ${fitProfileText(e.name, e.profile, options)}`,
   );
   return [
     ...parts,

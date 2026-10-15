@@ -154,6 +154,14 @@ export type QActionDefinition<P, R> = {
    */
   readonly supersedes?: boolean | undefined;
   /**
+   * A setter's resource, from its payload (G-D23 follow-up): two waiting
+   * cards replace each other only when this is equal. Required in effect
+   * for a setter that declares no targets -- its default target is the
+   * proposer, which would match every card of theirs; without a key such
+   * a setter never replaces anything.
+   */
+  readonly supersedeKey?: ((payload: P) => string) | undefined;
+  /**
    * Whether two proposals for the same targets would do the same thing in
    * the world although their values differ in detail (voiceq-63, live
    * 2026-10-04: "book a call with Nixo in the next five minutes", said and

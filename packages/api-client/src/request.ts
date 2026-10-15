@@ -17,6 +17,8 @@ export type ApiSession = {
   readonly accessToken: string;
   readonly organisationId?: string | undefined;
   readonly fetch?: typeof fetch | undefined;
+  /** Latency attribution only; sent as x-cq-trace-id, logged untrusted. */
+  readonly traceId?: string | undefined;
 };
 
 /**
@@ -45,6 +47,11 @@ export async function call<TSchema extends z.ZodType>(
     ...(session.organisationId === undefined
       ? {}
       : { "x-organisation-id": session.organisationId }),
+    ...(session.traceId === undefined
+      ? {}
+      : // CQ_TRACE_HEADER in @capital-q/contracts; inlined so this module
+        // stays free of the contracts (Zod) bundle on the client.
+        { "x-cq-trace-id": session.traceId }),
     ...options.headers,
   };
   if (options.body !== undefined) {

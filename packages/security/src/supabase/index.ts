@@ -13,3 +13,10 @@ export {
   type AccessTokenAuthenticator,
   type SupabaseAccessTokenAuthenticatorOptions,
 } from "./access-token-authenticator.js";
+
+export {
+  createLocalJwtAccessTokenAuthenticator,
+  type FreshnessAwareAuthenticator,
+  type LocalJwtAuthenticatorOptions,
+  type SessionLiveness,
+} from "./local-jwt-authenticator.js";

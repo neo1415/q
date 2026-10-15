@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Developer Q smoke (CQ-Q-006 §66-§67): real synthetic conversations through
  * the actual Q runtime — Context Firewall → Prompt Registry → Model Gateway

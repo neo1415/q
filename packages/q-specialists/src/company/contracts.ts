@@ -44,6 +44,8 @@ export type PublicCompanySubject = {
 };
 
 export type CompanyIntelligenceRequest = {
+  /** Trusted preparation reads only canonical records and governed knowledge; no paid calls or writes. */
+  readonly preparationMode?: "EVIDENCE_ONLY" | undefined;
   readonly company:
     Extract<QSubjectRef, { kind: "COMPANY" }> | PublicCompanySubject;
   /** The person's message, verbatim. DATA, never an instruction. */

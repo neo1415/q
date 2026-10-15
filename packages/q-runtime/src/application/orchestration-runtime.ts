@@ -1,5 +1,9 @@
+import { randomUUID } from "node:crypto";
+
 import {
   isTerminalQRunStatus,
+  Q_RUN_STATUSES,
+  QStreamEventSchema,
   toPublicQFailure,
   type CorrelationId,
   type QFailureDiagnosticCode,
@@ -141,7 +145,9 @@ type Move = {
   readonly modelPolicyVersion?: string | undefined;
   readonly promptBundleVersion?: string | undefined;
   readonly failureCode?: QFailureDiagnosticCode | undefined;
-  readonly event?: ((run: QRunRecord) => QRunEventInput) | undefined;
+  readonly event?:
+    | ((run: Pick<QRunRecord, "id" | "completedAt">) => QRunEventInput)
+    | undefined;
 };
 
 export function createQOrchestrationRuntime(
@@ -172,6 +178,8 @@ export function createQOrchestrationRuntime(
     ref: QRunRef,
     requests: readonly Move[],
   ): Promise<QLifecycleOutcome> {
+    const chained = await moveChain(ref, requests);
+    if (chained !== null) return chained;
     return transactions.run(async (tx: TransactionContext) => {
       const locked = await repositories.runs.lockForActor(
         tx,
@@ -191,6 +199,115 @@ export function createQOrchestrationRuntime(
       }
       return outcome;
     });
+  }
+
+  /**
+   * S2: the ordinary case - a legal chain from a run that has not moved
+   * yet - as one statement (see QRunMoveChain). Null whenever anything is
+   * unusual (a replay, a terminal or cancel-requested run, an unlisted
+   * chain, a move with both a stage and an event, no store support): the
+   * locked step-by-step path then decides, with its outcomes unchanged.
+   */
+  async function moveChain(
+    ref: QRunRef,
+    requests: readonly Move[],
+  ): Promise<QLifecycleOutcome | null> {
+    const chain = repositories.runs.moveChain;
+    const first = requests[0];
+    const last = requests[requests.length - 1];
+    if (chain === undefined || first === undefined || last === undefined) {
+      return null;
+    }
+    for (let at = 1; at < requests.length; at += 1) {
+      const from = requests[at - 1]?.to;
+      const to = requests[at]?.to;
+      if (from === undefined || to === undefined || !canTransition(from, to)) {
+        return null;
+      }
+    }
+    // Only the last move may carry a stage or an event, and not both.
+    for (const request of requests.slice(0, -1)) {
+      if (request.stage !== undefined || request.event !== undefined) {
+        return null;
+      }
+    }
+    if (last.stage !== undefined && last.event !== undefined) return null;
+    // The same rules `step` applies one run at a time: already there is a
+    // replay, a terminal run is left alone, and a pending cancellation is
+    // only ever completed, never worked past.
+    const allowedFrom = Q_RUN_STATUSES.filter(
+      (status) =>
+        status !== first.to &&
+        !isTerminalQRunStatus(status) &&
+        (status !== "CANCEL_REQUESTED" || first.to === "CANCELLED") &&
+        canTransition(status, first.to),
+    );
+    if (allowedFrom.length === 0) return null;
+
+    const completedAt = isTerminalQRunStatus(last.to)
+      ? new Date().toISOString()
+      : undefined;
+    // The event is parsed against the stream contract before it is
+    // written, as appendRunEvent does; the sequence is a stand-in.
+    const input =
+      last.stage !== undefined
+        ? ({
+            type: "q.stage.changed",
+            data: { stage: last.stage },
+          } as const)
+        : last.event?.({ id: ref.runId, completedAt: completedAt ?? null });
+    const event =
+      input === undefined
+        ? undefined
+        : QStreamEventSchema.parse({
+            contractVersion: 1,
+            eventId: randomUUID(),
+            runId: ref.runId,
+            sequence: 1,
+            occurredAt: new Date().toISOString(),
+            type: input.type,
+            data: input.data,
+          });
+    const moved = await chain(sql, {
+      tenantId: ref.tenantId,
+      actorUserId: ref.actorUserId,
+      runId: ref.runId,
+      allowedFrom,
+      steps: requests.length,
+      status: last.to,
+      startedAt: requests.find((r) => r.startedAt !== undefined)?.startedAt,
+      completedAt,
+      failureCode: last.failureCode,
+      orchestrationVersion: requests.find(
+        (r) => r.orchestrationVersion !== undefined,
+      )?.orchestrationVersion,
+      modelPolicyVersion: last.modelPolicyVersion,
+      promptBundleVersion: last.promptBundleVersion,
+      ...(event === undefined
+        ? {}
+        : {
+            event: {
+              eventType: event.type,
+              visibleStage:
+                event.type === "q.stage.changed" ? event.data.stage : null,
+              payload: event.data,
+              onlyIfStageDiffers: last.stage !== undefined,
+            },
+          }),
+    });
+    if (moved === null) return null;
+    for (const request of requests) {
+      dependencies.logger?.info(
+        {
+          qRunId: moved.id,
+          status: request.to,
+          ...(request.stage === undefined ? {} : { stage: request.stage }),
+          correlationId: moved.correlationId,
+        },
+        "q run advanced",
+      );
+    }
+    return { kind: "ADVANCED", run: moved };
   }
 
   async function step(

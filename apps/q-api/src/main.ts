@@ -15,8 +15,24 @@
  * a credential, a connection or a table.
  */
 
+import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
+import { createWorkforceDocuments } from "./composition/workforce/documents.js";
+import { createDemoRehearsalAccess } from "./composition/demo-rehearsal-access.js";
+import { createInvestorLink } from "./composition/investor-link.js";
 import { createFitComposition } from "./composition/fit.js";
+import {
+  createPreparedEntities,
+  preparedEntityMatcher,
+  preparedFollowUpPort,
+  createPreparedVersionReader,
+  preparedEntityPrewarmLines,
+  watchPreparedEntities,
+} from "./composition/prepared-entities.js";
 import { createAttentionSources } from "./composition/attention-sources.js";
+import {
+  createArrivalSnapshots,
+  createPostgresArrivalProbe,
+} from "./composition/arrival-snapshot.js";
 import { createQApiGateQCompanyProjectionPort } from "./composition/gateq-projection.js";
 import {
   createPostgresTaxonomyAssignmentRepository,
@@ -72,6 +88,7 @@ import {
   cuesAround,
   extractPitchClaims,
   MediaAssetIdSchema,
+  firstPitchRaise,
 } from "@capital-q/media";
 import { MEDIA_EVENTS } from "@capital-q/media/events";
 import { COMPANY_EVENTS } from "@capital-q/companies/events";
@@ -109,6 +126,10 @@ import {
   createOpenAISidebandConnector,
 } from "@capital-q/model-gateway/realtime/openai";
 import { createDuplexBroker } from "./voice/duplex/broker.js";
+import { createExternalRehearsalLatency } from "./composition/external-rehearsal-latency.js";
+import { createExternalEntityFinder } from "./composition/external-entity-finder.js";
+import { createExternalSubjectResolver } from "./composition/external-resolve.js";
+import { createPostgresExternalSubjectStore } from "./composition/external-subjects.js";
 import { createLiveBroker } from "./voice/live/broker.js";
 import { createPostgresLiveSpend } from "./voice/live/spend.js";
 import { liveConfigFrom } from "./voice/live/config.js";
@@ -118,6 +139,7 @@ import { createDuplexSideband } from "./voice/duplex/sideband.js";
 import { createMemoryListeningStore } from "./voice/duplex/listening.js";
 import { createPostgresDuplexSpend } from "./voice/duplex/spend.js";
 import { createPostgresDuplexTranscriptStore } from "./voice/duplex/transcript.js";
+import { createPostgresPronunciationStore } from "./voice/live/pronunciations.js";
 import { ownCompanyAskerNote } from "./composition/own-company-asker.js";
 import {
   createDocumentStudioPort,
@@ -253,6 +275,9 @@ import {
   type Sourced,
 } from "./composition/rehearsals.js";
 import { createMeetingNotesComposer } from "./composition/meeting-notes.js";
+import { createPostgresMeetingEventStore } from "./composition/meeting-events.js";
+import { createMeetingSnapshotBuilder } from "./composition/meeting-snapshot.js";
+import { createWorkingSnapshots } from "./composition/working-snapshot.js";
 import {
   createProfileAnswerAction,
   type ProfileAnswersPort,
@@ -266,9 +291,14 @@ import {
   type QViewingMoment,
 } from "@capital-q/contracts";
 import {
+  cachedInRun,
   checkDatabaseReadiness,
   createRequestDatabaseClient,
 } from "@capital-q/database";
+import {
+  withRunCachedRelationshipLists,
+  withRunReadCache,
+} from "./composition/run-read-cache.js";
 import { createOutboxWriter } from "@capital-q/eventing";
 import {
   createOnboardingNudges,
@@ -276,10 +306,12 @@ import {
   createOnboardingService,
   OnboardingSessionIdSchema,
   createOwnOnboardingSummaryReader,
+  type OwnOnboardingSummaryReader,
 } from "@capital-q/onboarding";
 import {
   composeChat,
   composeSchedule,
+  createMeetingProposalPort,
   createPushSubscriptionStore,
   // AUTO block (2026-10-02)
   createCounterpartNotices,
@@ -287,6 +319,7 @@ import {
   createMeetingAssistantService,
   meetingRecapEmail,
   createNetworkMeetingActivityWriter,
+  waitMaxMsFromEnv,
 } from "@capital-q/communication";
 import {
   createPostgresDocumentQueryPort,
@@ -304,6 +337,8 @@ import {
 } from "@capital-q/investors";
 import { INVESTOR_EVENTS } from "@capital-q/investors/events";
 import {
+  createRelationshipBriefBatchSources,
+  createRelationshipBriefSources,
   createCommitmentService,
   createDealCloseService,
   createRelationshipOutcomeService,
@@ -426,6 +461,7 @@ import {
   createInvestorOrganisationQSubjectResolver,
   createOrganisationQSubjectResolver,
   createOrphanedRunSweep,
+  createRunEngineHeartbeat,
   createPostgresQRunEventNotifier,
   createPostgresQRuntimeRepositories,
   createQOrchestrationRuntime,
@@ -454,9 +490,14 @@ import {
   createPostgresActorContextResolver,
   createPostgresApplicationIdentityLookup,
   createPostgresAuthorizationPolicySource,
+  createPostgresContextEpochReader,
   createPostgresPersonProfileStore,
+  createPostgresSessionLiveness,
 } from "@capital-q/security/postgres";
-import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
+import {
+  createLocalJwtAccessTokenAuthenticator,
+  createSupabaseAccessTokenAuthenticator,
+} from "@capital-q/security/supabase";
 
 import { createApp, SERVICE_NAME } from "./app.js";
 import {
@@ -475,6 +516,7 @@ import { createConnectionRequestAnswerAction } from "./composition/connection-re
 import { createConnectionRequestSendAction } from "./composition/connection-request-send-action.js";
 import {
   chainProposers,
+  createOwnBriefsReader,
   createRelationshipActionBoard,
   createRelationshipIntelligencePort,
 } from "./composition/relationship-intelligence.js";
@@ -502,18 +544,22 @@ import {
   createRecordChangeActions,
   createRecordChangeBoard,
 } from "./composition/record-change-actions.js";
+import { createPostgresCompanyCatalog } from "./composition/company-catalog.js";
 import { createExploreToolPort } from "./composition/explore.js";
 import {
   createDiscoveryService,
+  createKnowledgeReconciler,
   createInteractionSignalService,
   createPostgresCompanyCardPort,
   createPostgresInteractionRepository,
   createCurrentSlateExplanationService,
+  createPostgresCompanyKnowledge,
   createPostgresDiscoveryRepository,
   createPostgresInvestorDecisionReader,
   createRecommendationExplanationService,
   createMaterialChanges,
   createSlateReadPipeline,
+  composeCompanyRaiseReader,
   readFeatureSnapshotById,
 } from "@capital-q/discovery";
 
@@ -761,6 +807,12 @@ const relationships: RelationshipQueryPort = {
       companyId,
       investorOrganisationId,
     ),
+  findManyByInvestor: (investorOrganisationId, companyIds) =>
+    relationshipRepository.findByInvestorAndCompanies(
+      database.sql,
+      investorOrganisationId,
+      companyIds,
+    ),
   listEvents: (relationshipId, page = {}) =>
     relationshipEventRepository.listByRelationship(
       database.sql,
@@ -858,7 +910,11 @@ const firewall = recordingFirewall(baseFirewall, {
 });
 // end ADMIN block
 
-const repositories = createPostgresQRuntimeRepositories();
+// R5: the run's own conversation reads, once per run (read-your-writes).
+const repositories = withRunReadCache(
+  createPostgresQRuntimeRepositories({ runCacheRoot: database.sql }),
+  database.sql,
+);
 const ownInvestorOrganisations = createPostgresInvestorOrganisationRepository();
 const runtimeDependencies = {
   sql: database.sql,
@@ -883,23 +939,44 @@ const runtimeDependencies = {
         : Promise.resolve(false);
     },
   },
+  // R5: both are read once per run (a run asked up to seven times); a
+  // write by the run to the table drops the entry.
   ownInvestorOrganisation: async (actor: ActorContext) => {
-    if (actor.organisationId === undefined) return null;
-    const found = await ownInvestorOrganisations.findByOrganisation(
-      database.sql,
-      actor.tenantId,
-      actor.organisationId,
+    const organisationId = actor.organisationId;
+    if (organisationId === undefined) return null;
+    const found = await cachedInRun(
+      {
+        aggregate: "own-investor-organisation",
+        tables: ["core.investor_organisations"],
+        actor: `${actor.tenantId}/${organisationId}`,
+        fingerprint: "",
+      },
+      () =>
+        ownInvestorOrganisations.findByOrganisation(
+          database.sql,
+          actor.tenantId,
+          organisationId,
+        ),
     );
     return found === null ? null : found.id;
   },
   // A founder's own company, the default "my company" (CQ-QX-008).
   ownCompany: async (actor: ActorContext) => {
-    if (actor.organisationId === undefined) return null;
-    const found =
-      (await companies.findOrganisationCompany?.(
-        actor.tenantId,
-        actor.organisationId,
-      )) ?? null;
+    const organisationId = actor.organisationId;
+    if (organisationId === undefined) return null;
+    const found = await cachedInRun(
+      {
+        aggregate: "own-company",
+        tables: ["core.companies"],
+        actor: `${actor.tenantId}/${organisationId}`,
+        fingerprint: "",
+      },
+      async () =>
+        (await companies.findOrganisationCompany?.(
+          actor.tenantId,
+          organisationId,
+        )) ?? null,
+    );
     return found === null ? null : found.id;
   },
 };
@@ -1086,7 +1163,35 @@ const researchComposition = composeResearch({
   authorization,
   investorQueries: investors,
   secrets: config.secrets.researchProviders,
+  gateway: modelGateway,
+  dataPosture: demoDataPosture,
   logger,
+});
+// Rehearsing with a researched external entity (W4): the asker's own
+// researched record and newest brief, or a prepared public seed.
+const externalSubjectResolver = createExternalSubjectResolver({
+  researched: researchComposition.researched,
+  known: researchComposition.knownEntities.store,
+});
+
+// Prepared public research entities (W5), held hot on W2's shared index:
+// a known name costs no web call and no database trip; a change in the
+// store reloads it. A failed load costs the demo pack its instant lookup,
+// never the service; the check retries and a normal search still works.
+const preparedEntities = createPreparedEntities({
+  ...researchComposition.knownEntities,
+  version: createPreparedVersionReader(database.sql),
+});
+await preparedEntities
+  .start()
+  .then((count) => {
+    logger.info({ count }, "prepared research entities loaded");
+  })
+  .catch((error: unknown) => {
+    logger.warn({ err: error }, "prepared research entities not loaded");
+  });
+watchPreparedEntities(preparedEntities, (error) => {
+  logger.warn({ err: error }, "prepared research entities check failed");
 });
 
 // Public presence (CQ-Q-PRESENCE-001): what the web already says about a
@@ -1226,6 +1331,39 @@ const pitchMedia = createMediaService({
     },
   },
 });
+// R2: the one company read for the raise, composed exactly as the API's
+// Discover card and profile compose it, so Q says what those screens say.
+const raisePitches = createPostgresDiscoverablePitchQueryPort({
+  sql: database.sql,
+});
+const companyRaise = composeCompanyRaiseReader({
+  sql: database.sql,
+  companies,
+  capital,
+  disclosure,
+  policies: createPostgresDisclosurePolicyRepository(),
+  isInvestor: async (actor) =>
+    (await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+      actor,
+    )) !== null,
+  pitches: () => raisePitches,
+  mayPlay: async (actor, companyId, mediaAssetId) => {
+    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+    return parsed.success
+      ? pitchMedia.mayPlayPitch({ actor, companyId, mediaAssetId: parsed.data })
+      : false;
+  },
+  pitchRaise: async (actor, companyId, mediaAssetId) => {
+    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+    if (!parsed.success) return null;
+    const view = await pitchMedia.getPitchTranscript({
+      actor,
+      companyId,
+      mediaAssetId: parsed.data,
+    });
+    return view.status === "AVAILABLE" ? firstPitchRaise(view.cues) : null;
+  },
+});
 const recommendationExplanations = createRecommendationExplanationService({
   ports: slateRead.eligibilityPorts,
   slates: slateRead.slates,
@@ -1288,7 +1426,9 @@ const interestServiceOptions: InterestServiceOptions = {
     },
   },
 };
-const interestService = createInterestService(interestServiceOptions);
+const interestService = withRunCachedRelationshipLists(
+  createInterestService(interestServiceOptions),
+);
 /**
  * Post-meeting outcomes (2026-10-02): Q's generated pass, pause, resume
  * and meeting-outcome tools run through the same Network service as the
@@ -1531,6 +1671,17 @@ const workforcePortsFor = createWorkforcePorts(
         correlationId: CorrelationIdSchema.parse(`cor_${randomUUID()}`),
       });
       return booked.outcome === "OK" ? booked.meeting.id : null;
+    },
+    get documents() {
+      return qArtifacts.preparation.pipeline?.mode === "JOB"
+        ? workforceDocuments
+        : undefined;
+    },
+    // Questions need a document to draw on: composed with the documents.
+    get diligence() {
+      return qArtifacts.preparation.pipeline?.mode === "JOB"
+        ? workforceDiligence
+        : undefined;
     },
     nameOf: workforceDisplayName,
   },
@@ -1878,6 +2029,18 @@ const diligenceService = createDiligenceService({
     }),
   newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
 });
+
+/**
+ * R1 batching: the brief's batch readers over the chat and schedule
+ * services, each scoped in SQL to the actor's own organisation. Replaces
+ * the raw latest-message query, which also returned unsent messages.
+ */
+const relationshipBriefBatchSources = createRelationshipBriefBatchSources({
+  chat,
+  schedule,
+  diligence: diligenceService,
+});
+
 const visibilityCentre = createVisibilityCentre({
   access: permissionsService.access,
   inspect: permissionsService.inspectResourceDisclosure,
@@ -1922,7 +2085,28 @@ const profileFindingsReader = createProfileFindingsReader({
 // Setup reminders (founder directive 2026-09-27): the versioned policy
 // over the person's own setup, keyed by the actor's own user id. Q says it
 // at a natural pause; "later", "stop" and "let's finish it" are tools.
-const onboardingNudges = createOnboardingNudges({ sql: database.sql });
+// Their own onboarding, as Q and the reminders read it: once per run (R5;
+// it was read four times), dropped by any onboarding or mandate write the
+// run makes.
+const ownOnboardingSummaryReads = createOwnOnboardingSummaryReader({
+  sql: database.sql,
+});
+const ownOnboardingSummaries: OwnOnboardingSummaryReader = {
+  read: (userId) =>
+    cachedInRun(
+      {
+        aggregate: "onboarding-summary",
+        tables: ["onboarding.", "core.investor_mandate"],
+        actor: userId,
+        fingerprint: "",
+      },
+      () => ownOnboardingSummaryReads.read(userId),
+    ),
+};
+const onboardingNudges = createOnboardingNudges({
+  sql: database.sql,
+  summaries: ownOnboardingSummaries,
+});
 
 // AUTO block (ADR 0030): "Q, handle it". The store, the approval board
 // its tools prepare on, and the port every Q surface reads it through.
@@ -2042,9 +2226,8 @@ const ownResults = createResultsReader({
 // end ADMIN block
 // DAILY block: The Q Daily, read and set by the person (routes and Q's
 // tools); editions are prepared by the worker only.
-const dailyReader = createDailyReaderService({
-  store: createPostgresDailyReaderStore(database.sql),
-});
+const dailyStore = createPostgresDailyReaderStore(database.sql);
+const dailyReader = createDailyReaderService({ store: dailyStore });
 const ownDaily = (actor: {
   readonly userId: string;
   readonly tenantId: string;
@@ -2099,6 +2282,9 @@ const fitComposition = createFitComposition({
       .filter((item) => item.interest.response == null)
       .map((item) => item.interest.companyId),
   feed: investorFeed,
+  raiseReader: companyRaise,
+  deckView: (actor, companyId) =>
+    profileMaterial.companyDeck.view(actor, companyId),
   viewer: createFitQViewer({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
@@ -2279,6 +2465,12 @@ const investorGatesPort: InvestorGatesPort = {
   },
 };
 const appActionPorts: OwnReadPorts = {
+  // D (2026-10-11): meeting time proposals, booked through the schedule
+  // service as the accepting person once an acceptance is recorded.
+  proposals: createMeetingProposalPort({
+    transactions: database.transactions,
+    schedule,
+  }),
   // Recovery D6: "Stop this job", shared by Q and the Work screen.
   workforceJobs: workforceJobStopPort(agentWorkQueue, workforceStore),
   readiness: readinessService,
@@ -2572,6 +2764,7 @@ const qTools = createQTools({
     },
     companies,
     capital,
+    companyRaise,
     mandates,
     investors,
     authorization,
@@ -2601,13 +2794,28 @@ const qTools = createQTools({
     ...(researchComposition.profiles === undefined
       ? {}
       : { profiles: researchComposition.profiles }),
+    // W2: find / brief a named person or organisation.
+    people: researchComposition.people,
+    counterparts: researchComposition.counterparts,
+    externalRehearsal: {
+      canRehearse: async (actor, externalPersonId) =>
+        (await externalSubjectResolver(actor, externalPersonId)) !== null,
+    },
     relationships: {
       ...createRelationshipIntelligencePort({
         interests: interestService,
         board: relationshipBoard,
         ownCompany: runtimeDependencies.ownCompany,
         connections: connectionService,
-        latestMessages: latestRelationshipMessages,
+        // R1: the latest message per relationship from the chat's own
+        // batched read (unsends folded), and the Relationship Brief.
+        briefBatchSources: relationshipBriefBatchSources,
+        // R1: the Relationship Brief, over the same services as the screens.
+        briefSources: createRelationshipBriefSources({
+          chat,
+          schedule,
+          diligence: diligenceService,
+        }),
       }),
       // Diligence (2026-10-02): get_relationship names the area's requests
       // and shares, read through the diligence service as the person.
@@ -2636,6 +2844,12 @@ const qTools = createQTools({
       sql: database.sql,
       companies,
       disclosure,
+    }),
+    // K1: "three fintech companies" by declared taxonomy; the tool decides
+    // every candidate through disclosure.
+    companyCatalog: createPostgresCompanyCatalog({
+      sql: database.sql,
+      knowledge: createPostgresCompanyKnowledge({ sql: database.sql }),
     }),
     // R18: what is said in the pitch around a moment, under the playback rule.
     pitchMoments: {
@@ -2718,12 +2932,20 @@ const qTools = createQTools({
         null,
     }),
     // BIZ-008: calls and reminders, prepared on the chat board.
-    schedule: createScheduleIntelligencePort(schedule, async (actor) =>
-      actor.actorType === "HUMAN"
-        ? ((await people.read(actor.userId).catch(() => null))?.timeZone ??
-          null)
-        : null,
-    ),
+    schedule: {
+      ...createScheduleIntelligencePort(schedule, async (actor) =>
+        actor.actorType === "HUMAN"
+          ? ((await people.read(actor.userId).catch(() => null))?.timeZone ??
+            null)
+          : null,
+      ),
+      // R1: list_schedule's per-relationship calls, from the briefs.
+      relationshipBriefs: createOwnBriefsReader({
+        interests: interestService,
+        ownCompany: runtimeDependencies.ownCompany,
+        sources: relationshipBriefBatchSources,
+      }),
+    },
     // BIZ-002: every profile field the page edits, Q can prepare.
     profileChanges: profileChangeBoard,
     profileGaps: profileGapsBoard,
@@ -3060,56 +3282,11 @@ const ownRecords = createOwnRecordsPort({
 const qActionRepositories = createPostgresQActionRepositories();
 // Errands (founder direction 2026-09-29): one approval, an exact plan Q
 // carries forward as the relationship moves.
-/**
- * The latest chat message of each relationship, by side (R35, live
- * 2026-10-08). Called only with relationships the actor's own list
- * already returned; text messages only, newest per relationship.
- */
-async function latestRelationshipMessages(
-  relationshipIds: readonly string[],
-): Promise<
-  ReadonlyMap<
-    string,
-    {
-      readonly side: "INVESTOR" | "COMPANY";
-      readonly at: string;
-      readonly body: string;
-    }
-  >
-> {
-  if (relationshipIds.length === 0) return new Map();
-  const rows = await database.sql<
-    {
-      relationship_id: string;
-      sender_side: "INVESTOR" | "COMPANY";
-      created_at: Date;
-      body: string | null;
-    }[]
-  >`
-    select distinct on (c.relationship_id)
-           c.relationship_id, m.sender_side, m.created_at, m.body
-      from communication.conversations c
-      join communication.messages m on m.conversation_id = c.id
-     where c.relationship_id = any(${[...relationshipIds].slice(0, 200)}::uuid[])
-       and m.kind = 'TEXT'
-     order by c.relationship_id, m.created_at desc`;
-  return new Map(
-    rows.map((row) => [
-      row.relationship_id,
-      {
-        side: row.sender_side,
-        at: new Date(row.created_at).toISOString(),
-        body: row.body ?? "",
-      },
-    ]),
-  );
-}
-
 const errandRelationships = createRelationshipIntelligencePort({
   interests: interestService,
   board: relationshipBoard,
   ownCompany: runtimeDependencies.ownCompany,
-  latestMessages: latestRelationshipMessages,
+  briefBatchSources: relationshipBriefBatchSources,
 });
 // ADMIN block: a suspended account resolves to no actor (ADR 0033).
 const actorContextResolver = withSuspension(
@@ -3403,9 +3580,6 @@ void embeddings
 // after every run to propose memories and keep the conversation summary
 // current. Recall is composed into the prompts below; learning is hung on
 // the orchestrator further down.
-const ownOnboardingSummaries = createOwnOnboardingSummaryReader({
-  sql: database.sql,
-});
 const displayNameFor = async (actor: ActorContext): Promise<string | null> => {
   // A profile belongs to a person, not to a tenant: the predicate is the
   // acting user's own id, so this can only ever read the caller's name.
@@ -3613,7 +3787,22 @@ const qReceipts: QReceiptPort = {
       : { status, progress: errandProgress(errand) };
   },
 };
+// W1: what Q told them on arrival, built once per actor from the same
+// attention report and relationship briefs their pages read, and handed to
+// the welcome, Q's turns, the live voice session and the Work list alike.
+const arrivalSnapshots = createArrivalSnapshots({
+  attention: (actor, options) => qTools.attention(actor, options),
+  briefs: createOwnBriefsReader({
+    interests: interestService,
+    ownCompany: runtimeDependencies.ownCompany,
+    sources: relationshipBriefBatchSources,
+  }),
+  probe: createPostgresArrivalProbe({ sql: database.sql }),
+  // P4: their own latest Q Daily edition, for the quiet-day welcome.
+  daily: (actor) => dailyStore.latest(actor.userId, actor.tenantId),
+});
 const qIntelligence = composeQIntelligence({
+  arrivalSnapshot: (actor) => arrivalSnapshots.forActor(actor),
   // RECOVERY (C's request): what came of Q's recent screen acts, from the
   // receipts ledger (composed further down; read only once turns run).
   uiActReceipts: (actor) => [
@@ -3637,6 +3826,14 @@ const qIntelligence = composeQIntelligence({
   counterpartNames: createCounterpartNames({
     ownRelationships: errandRelationships.ownRelationships,
     logger,
+  }),
+  // W4: a researched entity reachable by name (prepared seed or their own
+  // research): "take me to Shadi Qishta" shows its identity card.
+  knownEntities: preparedEntityMatcher(preparedEntities),
+  preparedFollowUp: preparedFollowUpPort(preparedEntities),
+  externalEntities: createExternalEntityFinder({
+    known: researchComposition.knownEntities.index,
+    researched: researchComposition.researched,
   }),
   // A typed yes or no to a waiting change, read and acted on by code
   // through the Approval Engine (founder fixture #1).
@@ -3859,10 +4056,19 @@ const checkpoints = createPostgresQCheckpointStore({
   connectTimeoutSeconds: checkpointDatabase.connectTimeoutSeconds,
   idleTimeoutSeconds: checkpointDatabase.idleTimeoutSeconds,
 });
-const orchestrationRuntime = createQOrchestrationRuntime({
-  ...runtimeDependencies,
-  repositories,
+// G-D24: the runs this process orchestrates heartbeat, so one caught by a
+// restart or deploy is closed within about a minute and a half (engine
+// window 60 s, sweep every 30 s) instead of hanging in SYNTHESIS.
+const runEngineHeartbeat = createRunEngineHeartbeat({
+  sql: database.sql,
+  runtime: createQOrchestrationRuntime({
+    ...runtimeDependencies,
+    repositories,
+  }),
+  logger,
 });
+runEngineHeartbeat.start();
+const orchestrationRuntime = runEngineHeartbeat.runtime;
 const orchestrator = withLearning(
   createLangGraphQOrchestrator({
     runtime: orchestrationRuntime,
@@ -3929,6 +4135,73 @@ const orphanSweep = createOrphanedRunSweep({
 });
 await orphanSweep.sweep();
 
+// Recovery K: Tier B knowledge is kept current by same-transaction triggers;
+// this reconciles anything missed (a failed refresh, a projection rule that
+// changed), every ten minutes.
+const knowledgeReconciler = createKnowledgeReconciler({ sql: database.sql });
+setInterval(
+  () => {
+    knowledgeReconciler
+      .reconcile()
+      .then((touched) => {
+        if (touched > 0)
+          logger.info({ touched }, "knowledge projections reconciled");
+      })
+      .catch((error: unknown) => {
+        logger.warn({ err: error }, "knowledge reconciliation failed");
+      });
+  },
+  10 * 60 * 1000,
+).unref();
+
+const workforceDocuments = createWorkforceDocuments({
+  freshActor: (actor) =>
+    createOwnerActor({
+      resolver: actorContextResolver,
+      authUserOf: async (userId) =>
+        (
+          await database.sql<{ auth_user_id: string | null }[]>`
+      select auth_user_id from identity.user_profiles where id = ${userId}`
+        )[0]?.auth_user_id ?? null,
+    })(actor.userId, actor.organisationId ?? null),
+  ownCompany: (actor) => ownCompanyOf(database.sql, actor),
+  firewall,
+  investigate: qIntelligence.companyIntelligence.investigate,
+  artifacts: qArtifacts.service,
+  preparation: qArtifacts.preparation,
+  critic: workforceModels.critique,
+  logger,
+});
+const workforceDiligence = createWorkforceDiligence({
+  freshActor: (actor) =>
+    createOwnerActor({
+      resolver: actorContextResolver,
+      authUserOf: async (userId) =>
+        (
+          await database.sql<{ auth_user_id: string | null }[]>`
+      select auth_user_id from identity.user_profiles where id = ${userId}`
+        )[0]?.auth_user_id ?? null,
+    })(actor.userId, actor.organisationId ?? null),
+  firewall,
+  currentVersion: qArtifacts.preparation.port.currentVersion,
+  questions: workforceModels.diligenceQuestions,
+  relationshipWith: async (actor, companyId) => {
+    const relationship = await errandRelationships.withCompany?.(
+      actor,
+      companyId,
+    );
+    return relationship == null
+      ? null
+      : {
+          relationshipId: relationship.relationshipId,
+          state: relationship.state,
+        };
+  },
+  runtime: qRuntime,
+  orchestration: orchestrationRuntime,
+  actions: qActions,
+});
+
 // Recovery D3: the durable workforce runner. It claims approved jobs under a
 // lease, renews it while a job runs and resumes any job a restart left
 // behind once its lease lapses. Jobs finish without anyone connected.
@@ -3958,7 +4231,9 @@ setInterval(
       logger.warn({ err: error }, "orphaned q run sweep failed");
     });
   },
-  5 * 60 * 1000,
+  // G-D24: often enough that an orphan is closed within its engine window
+  // plus this interval; the query is bounded and indexed by status.
+  30 * 1000,
 ).unref();
 
 // Q in a meeting (founder direction 2026-09-29): the organiser brings Q to
@@ -4028,7 +4303,40 @@ const meetingHost = createMeetingHostRuntime({
     config.secrets.speechProviders.elevenLabs !== undefined,
   publicBase: process.env.Q_API_PUBLIC_URL,
   secret: recallKey,
+  // MEETING_WAIT_MAX_MINUTES (default 20): the longest Q waits for a side
+  // that has not joined, however often it is asked to keep waiting. Bounded
+  // by boundedPolicy and never past the provider-minute hard cap.
+  policy: {
+    waitMaxAfterStartMs: waitMaxMsFromEnv(process.env.MEETING_WAIT_MAX_MINUTES),
+  },
   store: createPostgresMeetingHostStore(database.sql),
+  // P3: the append-only meeting record, and the context snapshot prepared
+  // before Q joins -- every read through a service that already applies the
+  // Context Firewall for its viewer, each side's private layer read as that
+  // side's own actor.
+  events: createPostgresMeetingEventStore(database.sql),
+  snapshots: createMeetingSnapshotBuilder({
+    ownerActor: (userId, organisationId) =>
+      createOwnerActor({
+        resolver: actorContextResolver,
+        authUserOf: async (id) =>
+          (
+            await database.sql<{ auth_user_id: string | null }[]>`
+              select auth_user_id from identity.user_profiles where id = ${id}`
+          )[0]?.auth_user_id ?? null,
+      })(userId, organisationId),
+    knowledge: createPostgresCompanyKnowledge({ sql: database.sql }),
+    workingSnapshots: createWorkingSnapshots({
+      sql: database.sql,
+      knowledge: createPostgresCompanyKnowledge({ sql: database.sql }),
+      epochs: createPostgresContextEpochReader({ sql: database.sql }),
+    }),
+    labels: MANDATE_LABELS,
+    dataRoom: (actor, companyId) =>
+      profileMaterial.dataRoom.view(actor, companyId),
+    deck: (actor, companyId) =>
+      profileMaterial.companyDeck.view(actor, companyId),
+  }),
   voice: {
     // meet2-64: in a call, the fast engine (turbo) speaks each sentence as
     // soon as it is ready; the expressive v3 voice stays for Q in the app.
@@ -4066,14 +4374,6 @@ const meetingHost = createMeetingHostRuntime({
   followThrough: createMeetingHostFollowThrough({
     sql: database.sql,
     resolver: actorContextResolver,
-    cancel: async (actor, meetingId) => {
-      const cancelled = await schedule.cancel({
-        actor,
-        meetingId,
-        correlationId: `cor_${randomUUID()}`,
-      });
-      return cancelled.outcome === "OK";
-    },
     markNoShow: async (input) => {
       const writer = createNetworkMeetingActivityWriter();
       await database.transactions.run((tx) =>
@@ -4498,6 +4798,53 @@ const qSendGuard = createSendGuard({
   readThread: async ({ actor, relationshipId }) =>
     (await chat.readForQ({ actor, relationshipId, limit: 50 })).messages,
 });
+// The sender's approved facts (also the GPT-Live call's background, V part 6).
+const instructionMaterial = createInstructionMaterialReader({
+  ownInvestor: (actor) =>
+    slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
+  ownMandate: async (actor) => {
+    const own =
+      await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+        actor,
+      );
+    if (own === null) return null;
+    const tenantId = TenantIdSchema.parse(actor.tenantId);
+    const organisationId = InvestorOrganisationIdSchema.parse(
+      own.investorOrganisationId,
+    );
+    const first = (
+      await mandates.listActiveMandates(tenantId, organisationId)
+    )[0];
+    return first === undefined
+      ? null
+      : mandates.getMandate(tenantId, organisationId, first.id);
+  },
+  ownCompanyCard: async (actor) => {
+    const companyId = await workOwnCompany(actor);
+    if (companyId === null) return null;
+    return (
+      (await instructionCards.cardsByIds([companyId])).get(companyId) ?? null
+    );
+  },
+  companyCards: async (actor, companyIds) => {
+    const [permitted, cards] = await Promise.all([
+      slateRead.eligibilityPorts.discoverability.permittedToView(
+        { kind: "ACTOR", actor },
+        companyIds,
+      ),
+      instructionCards.cardsByIds(companyIds),
+    ]);
+    return new Map(
+      [...cards].filter(([companyId]) => permitted.get(companyId) === true),
+    );
+  },
+  investorProfile: (actor, investorOrganisationId) =>
+    instructionDiscovery.discoverableInvestor(actor, investorOrganisationId),
+  labels: {
+    code: (code, vocabularyCode) => MANDATE_LABELS.code(code, vocabularyCode),
+    investorType: (code) => MANDATE_LABELS.investorType(code),
+  },
+});
 instructionEngine.current = createInstructionEngine({
   sendGuard: qSendGuard,
   review: outwardReview,
@@ -4538,52 +4885,7 @@ instructionEngine.current = createInstructionEngine({
   // counterpart's network-visible material -- the feed's own cards behind
   // its discoverability check, or an investor's network-visible profile.
   // Never founder-private data.
-  material: createInstructionMaterialReader({
-    ownInvestor: (actor) =>
-      slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
-    ownMandate: async (actor) => {
-      const own =
-        await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
-          actor,
-        );
-      if (own === null) return null;
-      const tenantId = TenantIdSchema.parse(actor.tenantId);
-      const organisationId = InvestorOrganisationIdSchema.parse(
-        own.investorOrganisationId,
-      );
-      const first = (
-        await mandates.listActiveMandates(tenantId, organisationId)
-      )[0];
-      return first === undefined
-        ? null
-        : mandates.getMandate(tenantId, organisationId, first.id);
-    },
-    ownCompanyCard: async (actor) => {
-      const companyId = await workOwnCompany(actor);
-      if (companyId === null) return null;
-      return (
-        (await instructionCards.cardsByIds([companyId])).get(companyId) ?? null
-      );
-    },
-    companyCards: async (actor, companyIds) => {
-      const [permitted, cards] = await Promise.all([
-        slateRead.eligibilityPorts.discoverability.permittedToView(
-          { kind: "ACTOR", actor },
-          companyIds,
-        ),
-        instructionCards.cardsByIds(companyIds),
-      ]);
-      return new Map(
-        [...cards].filter(([companyId]) => permitted.get(companyId) === true),
-      );
-    },
-    investorProfile: (actor, investorOrganisationId) =>
-      instructionDiscovery.discoverableInvestor(actor, investorOrganisationId),
-    labels: {
-      code: (code, vocabularyCode) => MANDATE_LABELS.code(code, vocabularyCode),
-      investorType: (code) => MANDATE_LABELS.investorType(code),
-    },
-  }),
+  material: instructionMaterial,
   plan: createInstructionPlanner({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
@@ -4802,7 +5104,27 @@ const contentWords = (value: unknown, out: string[] = []): string[] => {
   }
   return out;
 };
+// Rehearsing with a researched external person: the sourced public brief per
+// viewer (written by the people research), and the latency board the live
+// line and the persona preparation report to.
+const externalSubjects = createPostgresExternalSubjectStore(database.sql);
+const externalRehearsalLatency = createExternalRehearsalLatency(
+  (metric, ms) => {
+    logger.info({ metric, ms }, "external rehearsal latency");
+  },
+);
 const rehearsals = createRehearsalService({
+  external: {
+    subjects: externalSubjects,
+    latency: externalRehearsalLatency,
+    // The identity card's "Rehearse with them": the researched record and
+    // its newest brief (or a prepared seed), frozen per brief version.
+    resolve: externalSubjectResolver,
+    // R5: QInvest, AlRayan Investment and Alchemist Doha are canonical,
+    // unclaimed investor organisations rehearsed as labelled simulations.
+    investorLink: createInvestorLink(database.sql),
+    demoAccess: createDemoRehearsalAccess(database.sql),
+  },
   store: createPostgresRehearsalStore(database.sql),
   material: {
     viewer: async (actor) => {
@@ -5644,6 +5966,49 @@ const liveBroker =
         // The turn board the voice surface polls: a delegation that moved
         // the screen says so, so the move is followed before it is spoken.
         board: voiceTurnBoard,
+        // W5: names of the prepared public entities, so the voice
+        // recognises them at once (a list, never biographies).
+        preparedEntityLines: () =>
+          preparedEntityPrewarmLines(preparedEntities.all()),
+        // Part 6: the call's background, from approved facts only (their
+        // declared mandate or their company's card, as Q's messages may
+        // state them) and their own organisation's name.
+        arrivalFor: (actor) => arrivalSnapshots.forActor(actor),
+        // W3: verified and corrected name pronunciations, as hints.
+        pronunciations: createPostgresPronunciationStore({
+          sql: database.sql,
+        }),
+        contextFor: async (actor) => {
+          const organisationId = actor.organisationId;
+          const [material, company, firm] = await Promise.all([
+            instructionMaterial(actor, []),
+            organisationId === undefined ||
+            companies.findOrganisationCompany === undefined
+              ? Promise.resolve(null)
+              : companies
+                  .findOrganisationCompany(actor.tenantId, organisationId)
+                  .catch(() => null),
+            organisationId === undefined
+              ? Promise.resolve(null)
+              : ownInvestorOrganisations
+                  .findByOrganisation(
+                    database.sql,
+                    actor.tenantId,
+                    organisationId,
+                  )
+                  .catch(() => null),
+          ]);
+          return {
+            side: material.sender.side,
+            organisation:
+              material.sender.side === "INVESTOR"
+                ? (firm?.displayName ?? null)
+                : (company?.canonicalName ?? null),
+            facts: material.sender.facts.map(
+              (fact) => `${fact.label}: ${fact.text}`,
+            ),
+          };
+        },
         // Both sides of the line, into voice_line_turns (routed 'live').
         transcripts: createPostgresDuplexTranscriptStore({
           sql: database.sql,
@@ -5654,6 +6019,20 @@ const liveBroker =
         providerCeiling: "PUBLIC",
         syntheticDemo: syntheticDemo?.permitted === true,
         logger,
+        // A rehearsal with a researched external person speaks on GPT-Live
+        // from its prepared persona; every other rehearsal is refused here.
+        rehearsalLine: {
+          prepare: async (actor, rehearsalId, hints) => {
+            const line = await rehearsals.externalLine(
+              actor,
+              rehearsalId,
+              hints,
+            );
+            return line === null ? null : { instructions: line.instructions };
+          },
+          record: rehearsals.recordLive,
+          latency: externalRehearsalLatency,
+        },
       })
     : undefined;
 logger.info(
@@ -5687,12 +6066,23 @@ logger.info(
   "voice channel composed",
 );
 
+// SUB-SECOND Phase 4: access tokens are verified here against the
+// project's published ES256 key, and the session is checked in the
+// database (fresh for writes, at most 15 s old for reads), instead of
+// asking the Auth server on every request (~208 ms median, 2-6 s tail).
+// CQ_AUTH_LOCAL_JWT=off restores the Auth-server check.
+const accessTokens =
+  process.env["CQ_AUTH_LOCAL_JWT"]?.trim().toLowerCase() === "off"
+    ? createSupabaseAccessTokenAuthenticator(supabaseAuth)
+    : createLocalJwtAccessTokenAuthenticator({
+        url: supabaseAuth.url,
+        sessions: createPostgresSessionLiveness({ sql: database.sql }),
+        fallback: createSupabaseAccessTokenAuthenticator(supabaseAuth),
+      });
 const { app, logger: appLogger } = createApp(
   config,
   {
-    authenticator: createSupabaseRequestAuthenticator(
-      createSupabaseAccessTokenAuthenticator(supabaseAuth),
-    ),
+    authenticator: createSupabaseRequestAuthenticator(accessTokens),
     resolver: actorContextResolver,
     identity,
   },
@@ -5818,6 +6208,7 @@ const { app, logger: appLogger } = createApp(
     standing: standingStore,
     // RECOVERY B1: the reader Q's what_needs_me tool uses, for the pages.
     attention: qTools.attention,
+    arrivalSnapshots,
     // DAILY block
     daily: dailyReader,
     orchestration: { orchestrator, autostart: Q_ORCHESTRATION_AUTOSTART },

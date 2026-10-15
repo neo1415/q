@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console */
 /**
  * Recovery G: plays the founder's recorded clips into Capital Q's voice line
  * as the microphone, and writes what the app heard next to what was said.

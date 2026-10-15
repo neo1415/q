@@ -1,6 +1,7 @@
 import {
   FIT_NOT_APPLICABLE_LABEL,
   FIT_OUTCOME_LABELS,
+  FIT_STATED_LABEL,
   type FitOutcome,
   type FitParameterResultDto,
 } from "@capital-q/contracts";
@@ -10,21 +11,27 @@ import { cx } from "@capital-q/ui";
  * One parameter's outcome as a glyph (ADR 0052). Each outcome has its own
  * SHAPE, so meaning never rests on colour: a filled check (strong), a half
  * disc (partial), a minus (mismatch), a dotted circle with a question mark
- * (unknown), a dash (no preference). Mismatch is neutral, never red;
+ * (unknown), a ring with a centre dot (stated by the company where you may
+ * see it, not scored), a dash (no preference). Mismatch is neutral, never red;
  * unknown is quiet, never an alarm. Always paired with a word somewhere
  * the reader can see or hear it.
  */
 
-export type FitGlyphKind = FitOutcome | "NOT_APPLICABLE";
+export type FitGlyphKind = FitOutcome | "NOT_APPLICABLE" | "STATED";
 
 export function glyphKindOf(result: FitParameterResultDto): FitGlyphKind {
-  return result.applicable ? result.outcome : "NOT_APPLICABLE";
+  if (!result.applicable) return "NOT_APPLICABLE";
+  // Not formally shared is not "not known at all" (2026-10-12).
+  if (result.outcome === "UNKNOWN" && result.stated === true) return "STATED";
+  return result.outcome;
 }
 
 export function outcomeWord(kind: FitGlyphKind): string {
   return kind === "NOT_APPLICABLE"
     ? FIT_NOT_APPLICABLE_LABEL
-    : FIT_OUTCOME_LABELS[kind];
+    : kind === "STATED"
+      ? FIT_STATED_LABEL
+      : FIT_OUTCOME_LABELS[kind];
 }
 
 const TONE: Readonly<Record<FitGlyphKind, string>> = {
@@ -32,6 +39,7 @@ const TONE: Readonly<Record<FitGlyphKind, string>> = {
   PARTIAL: "text-(--cq-warning)",
   MISMATCH: "text-(--cq-text-secondary)",
   UNKNOWN: "text-(--cq-text-tertiary)",
+  STATED: "text-(--cq-text-secondary)",
   NOT_APPLICABLE: "text-(--cq-text-tertiary)",
 };
 
@@ -93,6 +101,18 @@ export function FitGlyph({
             strokeWidth="1.7"
             strokeLinecap="round"
           />
+        </>
+      ) : kind === "STATED" ? (
+        <>
+          <circle
+            cx="8"
+            cy="8"
+            r="6.2"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <circle cx="8" cy="8" r="2" fill="currentColor" />
         </>
       ) : kind === "UNKNOWN" ? (
         <>

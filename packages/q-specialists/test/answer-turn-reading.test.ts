@@ -1,10 +1,12 @@
 import type { DelegationContext, QDelegationPort } from "../src/delegation.js";
+import { asksToReviseDocument } from "../src/references.js";
 import { randomUUID } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
 import {
   PermittedContextPlanSchema,
+  QArtifactIdSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
 } from "@capital-q/contracts";
 import {
@@ -39,10 +41,12 @@ import type { Logger } from "@capital-q/observability";
 import { ActorContextSchema } from "@capital-q/security";
 
 import {
+  asksForWorkProducts,
   createSpecialistQAnswer,
   namedInWords,
   unknownScreenLine,
 } from "../src/answer.js";
+import { workKindsAsked, type QTeamJobPort } from "../src/team-job.js";
 import {
   createToolProfileGapsPort,
   type QProfileGapsPort,
@@ -108,6 +112,7 @@ function seam(options: {
     noteVisibility: (entry: Record<string, unknown>) => void;
   };
   readonly offeredTools?: readonly string[];
+  readonly openRecord?: import("../src/references.js").QOpenRecordPort;
   /** A spoken turn: stored with the recogniser's utterance. */
   readonly spoken?: boolean;
   /** The company analysis takes the question (default: it never does). */
@@ -124,6 +129,8 @@ function seam(options: {
   readonly handOver?: QHandOverPort;
   /** Work handed over in general (QA 2026-10-03). */
   readonly delegation?: QDelegationPort;
+  /** Several kinds of work at once: a team job (live 2026-10-12). */
+  readonly teamJob?: QTeamJobPort;
   /** Readiness lead lines for "what should I do next?" (lead 2026-10-03). */
   readonly readinessLead?: (request: QAnswerRequest) => Promise<string | null>;
   /** Their profile's gaps filled by code (TURN_READER v27). */
@@ -186,6 +193,7 @@ function seam(options: {
   const declaredActions: string[][] = [];
   const askedActions: (string | undefined)[] = [];
   const focuses: unknown[] = [];
+  const namedOthers: (boolean | undefined)[] = [];
   const outcomes = [...options.outcomes];
   const modalities: string[] = [];
   const turns: QTurnReader = {
@@ -242,6 +250,7 @@ function seam(options: {
         askedActions.push(req.askedAction);
         leads.push(req.leadLines);
         focuses.push(req.toolFocus);
+        namedOthers.push(req.aboutNamedOther);
         capabilities.push(req.capabilities);
         directives.push(
           req.research === undefined ? undefined : await req.research,
@@ -289,6 +298,9 @@ function seam(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
+    ...(options.openRecord === undefined
+      ? {}
+      : { openRecord: options.openRecord }),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
     ...(options.waitingLines === undefined
       ? {}
@@ -300,6 +312,7 @@ function seam(options: {
     ...(options.delegation === undefined
       ? {}
       : { delegation: options.delegation }),
+    ...(options.teamJob === undefined ? {} : { teamJob: options.teamJob }),
     ...(options.readinessLead === undefined
       ? {}
       : { readinessLead: options.readinessLead }),
@@ -346,6 +359,7 @@ function seam(options: {
     askedActions,
     modalities,
     focuses,
+    namedOthers,
   };
 }
 
@@ -394,9 +408,7 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(run.delegated()).toBe(0);
     expect(run.stored).toHaveLength(1);
     // Said as a person says it, never "Taking you to…" (round 3).
-    expect(run.stored[0]?.content).toMatch(
-      /^(?:Here's Discover|Discover is up|Over to Discover)\.$/u,
-    );
+    expect(run.stored[0]?.content).toMatch("Opening Discover…");
     expect(run.stored[0]?.blocks).toEqual([
       {
         kind: "UI_INTENT",
@@ -422,9 +434,7 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     await run.answer.answer(request());
     expect(run.reads()).toBe(0);
     expect(run.delegated()).toBe(0);
-    expect(run.stored[0]?.content).toMatch(
-      /^(?:Here's Explore|Explore is up|Over to Explore)\.$/u,
-    );
+    expect(run.stored[0]?.content).toMatch("Opening Explore…");
     expect(run.stored[0]?.blocks).toEqual([
       {
         kind: "UI_INTENT",
@@ -636,6 +646,8 @@ const advice: TurnReaderResult = {
     text: "what else should I look for?",
     about: [],
     count: null,
+    discover: null,
+    subject: null,
   },
   aboutNamedOther: false,
   tool: null,
@@ -664,6 +676,8 @@ describe("a general turn is read before it is answered", () => {
           text: "a real investor",
           about: [],
           count: null,
+          discover: null,
+          subject: null,
         },
       },
       outcomes: [],
@@ -1137,6 +1151,8 @@ describe("a question about their own record takes the fast path (lead 2026-10-01
       text: "what do you have on record about my company?",
       about: [],
       count: null,
+      discover: null,
+      subject: null,
     },
   };
 
@@ -1443,9 +1459,7 @@ describe("the turn read early, beside the firewall (ADR 0035)", () => {
     const outcome = await run.answer.answer(next);
     expect(outcome.kind).toBe("ANSWERED");
     expect(run.reads()).toBe(2);
-    expect(run.stored.at(-1)?.content).toMatch(
-      /^(?:Here's Discover|Discover is up|Over to Discover)\.$/u,
-    );
+    expect(run.stored.at(-1)?.content).toMatch("Opening Discover…");
   });
 
   it("is dropped unused when the run is refused: the answer reads the turn itself", async () => {
@@ -1687,6 +1701,169 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     );
     return { line: stored.at(-1)?.content, delegated: delegated() };
   };
+
+  it("a request for research, a memo and diligence questions is never answered by accepting a waiting request (live 2026-10-12)", async () => {
+    const { value, asked, errands } = port(() => ({
+      status: "PREPARED",
+      awaitingApprovalOf:
+        "Accept Ledgerfold's connection request and send them your message",
+    }));
+    const { answer, delegated } = seam({
+      said: "Research Ledgerfold and how it fits Savanna Seed Partners, assess the opportunity, identify the important risks and missing information, prepare an investment memo, get a second specialist to critique it, revise the memo, and prepare appropriate founder diligence questions. Show me the results and anything requiring my approval.",
+      reading: reading("Ledgerfold"),
+      outcomes: [],
+      handOver: value,
+    });
+    await answer.answer(request());
+    expect(asked).toEqual([]);
+    expect(errands).toEqual([]);
+    expect(delegated()).toBe(1);
+  });
+
+  it("the same request, with Q's team composed, is planned as one team job and the plan is said back (live 2026-10-12)", async () => {
+    const { value, asked, errands } = port(() => null);
+    const goals: string[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, goal) => {
+        goals.push(goal);
+        return Promise.resolve({
+          status: "PREPARED",
+          plan: {
+            summary:
+              "Research Ledgerfold, write and critique a memo, draft diligence questions.",
+            steps: [
+              { who: "Research", does: "Reads Ledgerfold's public record." },
+              { who: "Documents", does: "Writes the investment memo." },
+              { who: "Reviewer", does: "Critiques it and revises it once." },
+              { who: "Diligence", does: "Drafts the founder questions." },
+            ],
+            needsYou: ["Sending the questions needs your approval."],
+            cannot: [],
+          },
+        });
+      },
+    };
+    const said =
+      "Research Ledgerfold and how it fits Savanna Seed Partners, assess the opportunity, identify the important risks and missing information, prepare an investment memo, get a second specialist to critique it, revise the memo, and prepare appropriate founder diligence questions. Show me the results and anything requiring my approval.";
+    const { answer, delegated, stored } = seam({
+      said,
+      reading: reading("Ledgerfold"),
+      outcomes: [],
+      handOver: value,
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(goals).toEqual([said]);
+    expect(asked).toEqual([]);
+    expect(errands).toEqual([]);
+    expect(delegated()).toBe(0);
+    expect(stored.at(-1)?.content).toBe(
+      "I've planned this as a job for my team: 4 steps, Research → Documents → Reviewer → Diligence. Sending the questions needs your approval.",
+    );
+  });
+
+  it("a team job that could not be planned is said plainly, never covered by an answer (lead review 2026-10-12)", async () => {
+    const teamJob: QTeamJobPort = {
+      propose: () => Promise.resolve({ status: "NOT_PLANNED" }),
+    };
+    const { answer, delegated, stored } = seam({
+      said: "Research Ledgerfold, write a memo and have it critiqued",
+      reading: reading(null),
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(delegated()).toBe(0);
+    expect(stored.at(-1)?.content).toMatch(
+      /^I couldn't turn that into a plan my team can carry out, so nothing has started\./u,
+    );
+  });
+
+  it("work handed to the team in words naming no list of tasks is read by the reader and planned (lead review 2026-10-12)", async () => {
+    const goals: string[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, goal) => {
+        goals.push(goal);
+        return Promise.resolve({ status: "UNAVAILABLE" });
+      },
+    };
+    const said =
+      "Get your team to investigate Ledgerfold and prepare me for a meeting";
+    const { answer, delegated, stored } = seam({
+      said,
+      reading: {
+        ...reading("Ledgerfold"),
+        handOver: null,
+        teamJob: true,
+      } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(goals).toEqual([said]);
+    expect(delegated()).toBe(0);
+    expect(stored.at(-1)?.content).toMatch(
+      /^Handing work to my team isn't available on your account here, so nothing has started\./u,
+    );
+  });
+
+  it("the same words without the reading's teamJob are answered as before (no magic word)", async () => {
+    let proposed = 0;
+    const teamJob: QTeamJobPort = {
+      propose: () => {
+        proposed += 1;
+        return Promise.resolve({ status: "FAILED" });
+      },
+    };
+    const { answer, delegated } = seam({
+      said: "Get your team to investigate Ledgerfold and prepare me for a meeting",
+      reading: { ...reading(null), handOver: null } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(proposed).toBe(0);
+    expect(delegated()).toBe(1);
+  });
+
+  it("a question with two kinds of work is not a team job", async () => {
+    let proposed = 0;
+    const teamJob: QTeamJobPort = {
+      propose: () => {
+        proposed += 1;
+        return Promise.resolve({ status: "FAILED" });
+      },
+    };
+    const { answer, delegated } = seam({
+      said: "What are the main risks? Give me a brief assessment.",
+      reading: reading(null),
+      outcomes: [],
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(proposed).toBe(0);
+    expect(delegated()).toBe(1);
+  });
+
+  it("counts the kinds of work: assessing and naming risks are one kind", () => {
+    expect(
+      workKindsAsked("What are the main risks? Give me a brief assessment."),
+    ).toBe(2);
+    expect(
+      workKindsAsked(
+        "Research them, prepare an investment memo, get it critiqued, revise it and draft founder diligence questions",
+      ),
+    ).toBe(5);
+    expect(workKindsAsked("handle it")).toBe(0);
+  });
+
+  it("names the work kinds: two or more is a work request, a hand-over names none", () => {
+    expect(asksForWorkProducts("handle Kestrel for me")).toBe(false);
+    expect(asksForWorkProducts("get me a meeting with Priya")).toBe(false);
+    expect(
+      asksForWorkProducts("research them and write me a memo on the risks"),
+    ).toBe(true);
+  });
 
   it("one request waiting, asked for by name: prepared as one approval with the message", async () => {
     const { value, asked, errands } = port(() => ({
@@ -2268,9 +2445,7 @@ describe("speech that was not for Q is kept out of what Q reads back (founder li
     );
     expect(run.marked).not.toContain(run.message.id);
     // The request itself is still acted on.
-    expect(run.stored.at(-1)?.content).toMatch(
-      /^(?:Here's Discover|Discover is up|Over to Discover)\.$/u,
-    );
+    expect(run.stored.at(-1)?.content).toMatch("Opening Discover…");
   });
 
   it("marks Q's reply to the line too, when Q had answered it", async () => {
@@ -2576,9 +2751,7 @@ describe("PASSED and the asked action (ADR 0040 parity)", () => {
       outcomes: [],
     });
     await run.answer.answer(request());
-    expect(run.stored[0]?.content).toMatch(
-      /^(?:Here's Passed|Passed is up|Over to Passed)\.$/u,
-    );
+    expect(run.stored[0]?.content).toMatch("Opening Passed…");
     expect(run.stored[0]?.blocks).toEqual([
       {
         kind: "UI_INTENT",
@@ -3442,6 +3615,8 @@ describe("a stated decision about a relationship is prepared, an opinion is not"
           text: "I'm not sure about Ledgerfold.",
           about: [],
           count: null,
+          discover: null,
+          subject: null,
         },
         aboutNamedOther: false,
         tool: null,
@@ -4040,6 +4215,7 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
     });
     await other.answer.answer(request());
     expect(other.leads).toEqual([undefined]);
+    expect(other.namedOthers).toEqual([true]);
     const ready = seam({
       said: "what should I do next",
       reading: advice(),
@@ -4095,5 +4271,92 @@ describe("a reader's move the words do not ask for is not made (live 2026-10-09)
         intent: { kind: "NAVIGATE", destination: "REHEARSALS" },
       },
     ]);
+  });
+});
+
+describe("explicit document revision cannot become opening the document", () => {
+  it.each([
+    ["Revise the report you just prepared.", true],
+    ["Please shorten this deck.", true],
+    ["Open the revised report.", false],
+    ["Do not revise my report.", false],
+    ["Update my company profile.", false],
+    ["Revise my report using new market research.", false],
+    ["Revise this document and email it to the investor.", false],
+    ["Edit my memo and prepare a new pitch deck.", false],
+  ])("keeps the full meaning of %s", (text, expected) => {
+    expect(asksToReviseDocument(text)).toBe(expected);
+  });
+  const artifactId = QArtifactIdSchema.parse(randomUUID());
+  function revisionTurn(said: string) {
+    let opened = 0;
+    const reading = {
+      kind: "TOOL_REQUEST",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: null,
+      tool: null,
+      aboutNamedOther: false,
+      reference: {
+        open: "DOCUMENT",
+        name: "Test report",
+        shown: 1,
+        retryLast: false,
+        sameFor: null,
+      },
+    } as TurnReaderResult;
+    const run = seam({
+      said,
+      reading,
+      outcomes: [],
+      specialistSupports: true,
+      offeredTools: ["revise_my_document", "read_my_document", "open_page"],
+      earlier: [
+        {
+          role: "Q",
+          content: "Your document is ready.",
+          blocks: [
+            {
+              kind: "ARTIFACT_REFERENCE",
+              artifactId,
+              type: "Q_REPORT",
+              status: "READY",
+              title: "Test report",
+            },
+          ],
+        },
+      ],
+      openRecord: {
+        open: () => {
+          opened += 1;
+          return Promise.resolve({
+            kind: "OPEN_RECORD_PAGE",
+            page: "DOCUMENT",
+            id: artifactId,
+          });
+        },
+      },
+    });
+    return { run, opened: () => opened };
+  }
+  it("routes the actual edit request to the existing revision tool when the reader says open", async () => {
+    const { run, opened } = revisionTurn(
+      "Revise the document you just prepared. Make the opening concise, and add a clearly labeled Evidence gaps section. Keep all existing evidence qualifications and do not invent facts.",
+    );
+    await run.answer.answer(request());
+    expect(opened()).toBe(0);
+    expect(run.delegated()).toBe(1);
+    expect(run.investigated()).toBe(0);
+    const focus = run.focuses[0] as QAnswerRequest["toolFocus"];
+    expect(focus?.tools).toContain("revise_my_document");
+    expect(run.stored).toEqual([]);
+  });
+  it("preserves a genuine request to open the document", async () => {
+    const { run, opened } = revisionTurn(
+      "Open the document you just prepared.",
+    );
+    await run.answer.answer(request());
+    expect(opened()).toBe(1);
+    expect(run.delegated()).toBe(0);
   });
 });

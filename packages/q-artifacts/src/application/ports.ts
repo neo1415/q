@@ -8,6 +8,21 @@ import type {
   StoredArtifactVersion,
 } from "../domain/artifact.js";
 
+/** Server-derived identity of one immutable, approved workforce step. */
+export type WorkforceDocumentBinding = {
+  readonly jobId: string;
+  readonly stepKey: string;
+  /** SHA-256 of the approved intent, never of a freshly generated draft. */
+  readonly intentSha256: string;
+  /** Cost belongs to this workforce run; qRunId keeps the original Q provenance. */
+  readonly execution?:
+    | {
+        readonly runId: string;
+        readonly budgetUsd: number;
+      }
+    | undefined;
+};
+
 /**
  * What this context stores, and what it borrows (QX-003C, ADR 0013).
  *
@@ -25,6 +40,29 @@ import type {
  */
 
 export type ArtifactRepository = {
+  /** Actor-scoped resume lookup; matching approved intent only. */
+  readonly findForWorkforce?: (
+    actor: ActorContext,
+    input: WorkforceDocumentBinding & {
+      readonly type: string;
+      readonly companyId: string | null;
+      readonly investorOrganisationId: string | null;
+    },
+  ) => Promise<StoredArtifact | null>;
+  /**
+   * Atomically claim the existing artifact row for a workforce step. A
+   * restart reuses it, even before the runner recorded its result. The
+   * binding is stored on artifacts, with no second document registry.
+   * Optional only for adapters without workforce preparation support.
+   */
+  readonly createForWorkforce?: (
+    tx: TransactionContext,
+    artifact: Parameters<ArtifactRepository["create"]>[1],
+    binding: WorkforceDocumentBinding,
+  ) => Promise<{
+    readonly artifact: StoredArtifact;
+    readonly created: boolean;
+  } | null>;
   /**
    * Start one. The artifact exists before its first version does, so a
    * person who closes the tab has something to come back to.

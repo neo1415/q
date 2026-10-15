@@ -45,12 +45,12 @@ import { Q_CONVERSATION_PARAM } from "./chats-list";
 import { turnsFrom, workingLabel, type QTurn } from "./conversation";
 import {
   askedSince,
-  movedEarlyTo,
+  answerMove,
   performClientAction,
   registerClientRouter,
 } from "./client-actions";
 import { navigationInFlight } from "./ui-act-controller";
-import { followOfTurns } from "./follow-navigation";
+import { followOfThread, seenAtOpen } from "./follow-navigation";
 import { QMaterialViewer } from "./material-viewer";
 import { useQSubject, type QSubject } from "./q-subject";
 import { resumableConversation } from "./resume-conversation";
@@ -491,12 +491,9 @@ export function QSessionProvider({
     if (followed.clientAction !== undefined && followed.clientAction !== null) {
       performClientAction(followed.clientAction);
     }
-    const path = destinationPath(followed.navigate);
-    // RECOVERY-2026-10 (C): the fast path already went there: one move.
-    if (path !== null && !movedEarlyTo(path)) {
-      act();
-      router.push(path);
-    }
+    // R3: the board's move was made by the chain itself (requestMove: one
+    // lifecycle, deduplicated with the fast path's move to the same page).
+    if (destinationPath(followed.navigate) !== null) act();
   });
 
   /**
@@ -520,32 +517,25 @@ export function QSessionProvider({
       // not "already there", even when the conversation reloaded as it
       // landed (the URL naming a new conversation): its move is made.
       const since = askedSince();
-      followedTurns.current = new Set(
-        turns
-          .filter(
-            (turn) =>
-              turn.kind === "Q" &&
-              (since === null ||
-                (turn.at !== undefined && Date.parse(turn.at) < since - 3_000)),
-          )
-          .map((turn) => turn.id),
-      );
+      followedTurns.current = seenAtOpen(turns, since);
       if (since === null) return;
     }
     if (wire === null) return;
-    const followed = followOfTurns(turns, followedTurns.current);
     // While the line is open, a spoken answer's moves are the voice
     // board's to make, after Q has said them; making them here too would
-    // cut the sentence short and open a website twice.
-    if (voiceActive) return;
+    // cut the sentence short and open a website twice. A typed question's
+    // answer is still this surface's (followOfThread).
+    const followed = followOfThread(turns, followedTurns.current, {
+      active: voiceActive,
+    });
+    // R3: the move is asked for first (the one lifecycle executes and
+    // verifies it), so the answer's UI acts wait for the page it opens.
+    // The fast path already went there for this sentence: one move.
+    const path = destinationPath(followed.navigate);
+    if (path !== null && answerMove(path)) act();
     // R20/R33: the app's own actions the answer carries, done once.
     for (const action of followed.actions) performClientAction(action);
-    const path = destinationPath(followed.navigate);
-    if (path !== null && !movedEarlyTo(path)) {
-      act();
-      router.push(path);
-    }
-  }, [turns, q.loading, act, router, voiceActive, wire]);
+  }, [turns, q.loading, act, voiceActive, wire]);
 
   const [artifactId, setArtifactId] = useState<string | null>(null);
   // R21: the document open in the viewer is part of what is on screen,

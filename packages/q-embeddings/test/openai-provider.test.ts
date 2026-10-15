@@ -23,7 +23,7 @@ function fakeFetch(
   const calls: { url: string; body: Record<string, unknown>; auth: string }[] =
     [];
   const fetch = ((url: string, init: RequestInit) => {
-    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
     calls.push({
       url,
       body,

@@ -1,0 +1,125 @@
+# CAPITAL Q: URGENT INVESTOR DEMO PRIORITY OVERRIDE
+
+We have an investor demonstration tomorrow, Monday, October 12, 2026.
+
+Capital Q already has substantial working functionality. I do not want a new application, a sweeping redesign, or an extended effort building additional infrastructure.
+
+**Your immediate mission is to make the EXISTING Capital Q exceptionally fast, reliable, intelligent and impressive in a real investor demonstration.**
+
+You retain the full engineering autonomy and standing approvals previously granted.
+
+## Immediate priority shift
+
+The document workforce connection has achieved an important milestone. A real autonomous document job reached READY, persisted content, rendered and exported successfully.
+
+Preserve that work.
+
+However, STOP expanding the document subsystem as the primary focus. Only address document regressions that threaten the existing product or investor demonstration.
+
+The priority now is the investor experience and Q itself.
+
+## Mission 1: Optimize Q's actual response speed
+
+Investigate the existing end-to-end response pipeline.
+
+Identify and eliminate avoidable latency in:
+
+- Intent routing and classification.
+- Named-company subject resolution.
+- Authorized evidence retrieval.
+- Context assembly.
+- Model selection and routing.
+- Agent orchestration and tool execution.
+- Streaming and time to first useful response.
+- Repeated or duplicated model calls.
+- Unnecessary sequential operations.
+
+The existing named-company analysis has been observed taking approximately 24 seconds. Investigate and improve that path without sacrificing answer quality, evidence grounding, authorization or conversational intelligence.
+
+Favor existing reusable, authorized evidence and prepared intelligence where appropriate.
+
+Measure actual before-and-after performance.
+
+## Mission 2: Make Q's investor intelligence reliable
+
+An investor must be able to discover a company, open its profile, ask Q about that company, receive the correct authorized evidence, ask follow-up questions, and request analysis.
+
+Q must consistently understand which company is being discussed.
+
+Do not mistake navigation requests for analysis requests or vice versa.
+
+Do not return information belonging to another company.
+
+Preserve conversation context, source provenance and permission boundaries.
+
+Make the experience feel like talking to a highly capable investment analyst, not interacting with a collection of disconnected APIs.
+
+## Mission 3: Fix the investor presentation defects
+
+Complete and deploy the already implemented corrections for:
+
+- Fit-card evidence and coverage.
+- Top-ten result-size handling.
+- Named-company subject propagation.
+- Relevant Q presentation and conversational context defects.
+
+Make sure Q presents the most useful existing formats for each answer, including company cards, comparisons, charts, findings and evidence.
+
+Do not invent metrics, company facts or proprietary InvestIQ methodology parameters.
+
+## Mission 4: Establish a repeatable live investor demo
+
+Use the existing deployed product and authorized demo accounts.
+
+Verify this experience end to end:
+
+1. Investor opens Capital Q and sees real company opportunities.
+2. Investor requests the top three relevant companies.
+3. Q returns three appropriate cards with accurate explanations.
+4. Investor selects a company.
+5. Investor asks Q what the company does and why it fits the mandate.
+6. Investor asks follow-up questions about traction, risks, evidence and missing information.
+7. Q answers using the correct company's authorized records, quickly and coherently.
+8. Investor requests a comparison or additional analysis.
+9. Q delivers the correct response in a clear and useful format.
+
+Use legitimate test data and real application functionality. Do not hardcode answers specifically for the demo or bypass authorization.
+
+Fix any failure discovered during the rehearsal.
+
+If there is a reliable opportunity to demonstrate an existing document or agent capability, use it as an optional enhancement, not as the core dependency.
+
+## Mission 5: Voice if it can be verified
+
+Preserve the existing GPT-Live integration.
+
+Investigate the outstanding real-audio failure only as far as it can be productively addressed without delaying the core investor journey.
+
+Do not claim voice is working based only on session creation or unit tests.
+
+If real speech cannot be verified, keep the text-based demo reliable and ready.
+
+## Execution rules
+
+- Do not start a new architecture or duplicate existing systems.
+- Do not spend the remaining time primarily producing documentation.
+- Do not expand scope into unrelated features.
+- Do not repeatedly ask me for approval.
+- Continue independently through implementation, testing and deployment where authorized.
+- Prefer high-impact fixes that can be verified in the live product.
+- Avoid destabilizing already working features.
+- Use the existing CI and deployment gates.
+- Preserve a verified rollback point.
+- Distinguish deployed and tested improvements from unverified changes.
+
+Work in short execution and verification cycles.
+
+If one task is blocked, immediately continue another high-value task.
+
+**The acceptance criterion is not the number of commits or passing unit tests. It is a genuinely impressive, accurate, fast and reliable investor experience in the actual deployed Capital Q application.**
+
+First identify the weakest links in this exact investor journey, then fix them and verify the complete flow.
+
+Prioritize the demo until it is demonstrably ready. Afterward, resume the broader autonomous workforce and architectural improvement roadmap.
+
+Proceed autonomously.

@@ -17,6 +17,7 @@ import {
 
 import {
   ArtifactAuthorityError,
+  ArtifactCompositionFailedError,
   ArtifactNotFoundError,
   ArtifactNotRevisableError,
   createArtifactService,
@@ -60,6 +61,10 @@ function composed(body: string): ComposedArtifact {
 
 function memory() {
   const artifacts = new Map<string, StoredArtifact>();
+  const bindings = new Map<
+    string,
+    { readonly id: string; readonly digest: string }
+  >();
   const versions: StoredArtifactVersion[] = [];
   const own = (actor: ActorContext, a: StoredArtifact | undefined) =>
     a !== undefined &&
@@ -68,6 +73,43 @@ function memory() {
       ? a
       : null;
   const repository: ArtifactRepository = {
+    findForWorkforce: (actor, input) => {
+      const prior = bindings.get(`${input.jobId}:${input.stepKey}`);
+      const artifact =
+        prior === undefined ? undefined : artifacts.get(prior.id);
+      return Promise.resolve(
+        prior?.digest === input.intentSha256 &&
+          artifact !== undefined &&
+          artifact.tenantId === actor.tenantId &&
+          artifact.organisationId === actor.organisationId &&
+          artifact.createdByUserId === actor.userId &&
+          artifact.type === input.type &&
+          artifact.companyId === input.companyId &&
+          artifact.archivedAt === null
+          ? artifact
+          : null,
+      );
+    },
+    createForWorkforce: async (tx, input, binding) => {
+      const key = `${binding.jobId}:${binding.stepKey}`;
+      const prior = bindings.get(key);
+      if (prior !== undefined) {
+        const artifact = artifacts.get(prior.id);
+        return prior.digest === binding.intentSha256 &&
+          artifact !== undefined &&
+          artifact.tenantId === input.tenantId &&
+          artifact.organisationId === input.organisationId &&
+          artifact.createdByUserId === input.createdByUserId &&
+          artifact.type === input.type &&
+          artifact.companyId === input.companyId &&
+          artifact.archivedAt === null
+          ? { artifact, created: false }
+          : null;
+      }
+      const artifact = await repository.create(tx, input);
+      bindings.set(key, { id: artifact.id, digest: binding.intentSha256 });
+      return { artifact, created: true };
+    },
     create: (_tx, input) => {
       const artifact: StoredArtifact = {
         id: `a${String(artifacts.size + 1)}000000-0000-4000-8000-000000000001`,
@@ -210,6 +252,202 @@ function request(overrides: Record<string, unknown> = {}) {
 }
 
 describe("documents made by a job", () => {
+  const workforce = {
+    jobId: "f0000000-0000-4000-8000-0000000000b1",
+    stepKey: "prepare-own-deck",
+    intentSha256: "a".repeat(64),
+  };
+
+  it("a restart after enqueue reuses the artifact without enqueueing another worker job", async () => {
+    const { repository, artifacts } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    const first = await svc.requestDocument({ ...request(), workforce });
+    const replay = await svc.requestDocument({
+      ...request(),
+      workforce,
+      content: composed("A regenerated draft is not a new approved intent."),
+    });
+    expect(replay.artifact.artifactId).toBe(first.artifact.artifactId);
+    expect(artifacts.size).toBe(1);
+    expect(jobs.queued).toHaveLength(1);
+    expect(jobs.queued[0]?.input.content.sections[0]?.body).toBe(
+      "First composition.",
+    );
+  });
+
+  it("an authorized resume finds the existing identity before recomposition and hides strangers", async () => {
+    const { repository } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    const input = { ...request(), workforce };
+    expect(await svc.findWorkforceDocument(input)).toBeNull();
+    const first = await svc.requestDocument(input);
+    expect((await svc.findWorkforceDocument(input))?.artifactId).toBe(
+      first.artifact.artifactId,
+    );
+    expect(
+      await svc.findWorkforceDocument({
+        ...input,
+        workforce: { ...workforce, intentSha256: "b".repeat(64) },
+      }),
+    ).toBeNull();
+    await expect(
+      svc.findWorkforceDocument({
+        ...input,
+        permittedContextPlan: plan({ subjects: [] }),
+      }),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    const stranger = { ...ACTOR, userId: UserIdSchema.parse(COMPANY) };
+    expect(
+      await svc.findWorkforceDocument({
+        ...input,
+        actorContext: stranger,
+        permittedContextPlan: plan({
+          actor: {
+            userId: stranger.userId,
+            organisationId: ACTOR.organisationId,
+          },
+        }),
+      }),
+    ).toBeNull();
+    expect(jobs.queued).toHaveLength(1);
+  });
+
+  it("a READY pointer cannot stand in for a real immutable version", async () => {
+    const { repository, artifacts } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    const input = { ...request(), workforce };
+    const prepared = await svc.requestDocument(input);
+    const id = prepared.artifact.artifactId;
+    const stored = artifacts.get(id);
+    if (stored === undefined) throw new Error("Expected the prepared artifact");
+    artifacts.set(id, { ...stored, status: "READY", currentVersion: 1 });
+    await expect(svc.findWorkforceDocument(input)).rejects.toBeInstanceOf(
+      ArtifactCompositionFailedError,
+    );
+    await expect(svc.requestDocument(input)).rejects.toBeInstanceOf(
+      ArtifactCompositionFailedError,
+    );
+    expect(jobs.queued).toHaveLength(1);
+
+    artifacts.set(id, stored);
+    const filed = await svc.completeDocumentJob(
+      {
+        id: workforce.jobId,
+        tenantId: ACTOR.tenantId,
+        organisationId: ACTOR.organisationId ?? "",
+        artifactId: id,
+        userId: ACTOR.userId,
+        runId: RUN,
+        kind: "PITCH_DECK",
+        attempts: 1,
+        input: { ...EXTRA, ...composed("First composition.") },
+      },
+      composed("Designed."),
+    );
+    expect(filed.current?.version).toBe(1);
+    expect((await svc.findWorkforceDocument(input))?.status).toBe("READY");
+  });
+
+  it("a changed approved intent or subject fails closed on the existing binding", async () => {
+    const { repository, artifacts } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    await svc.requestDocument({ ...request(), workforce });
+    await expect(
+      svc.requestDocument({
+        ...request(),
+        workforce: { ...workforce, intentSha256: "b".repeat(64) },
+      }),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    await expect(
+      svc.requestDocument({ ...request(), workforce, artifactType: "MEMO" }),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    expect(artifacts.size).toBe(1);
+    expect(jobs.queued).toHaveLength(1);
+  });
+
+  it("replay still requires a fresh actor-bound firewall plan", async () => {
+    const { repository } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    await svc.requestDocument({ ...request(), workforce });
+    for (const override of [
+      { revalidateAfter: "2000-01-01T00:00:00.000Z" },
+      { tenantId: COMPANY },
+      { actor: { userId: COMPANY, organisationId: ACTOR.organisationId } },
+      { subjects: [] },
+    ]) {
+      await expect(
+        svc.requestDocument({
+          ...request(),
+          workforce,
+          permittedContextPlan: plan(override),
+        }),
+      ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    }
+    expect(jobs.queued).toHaveLength(1);
+  });
+
+  it("never falls back to a non-idempotent repository for a workforce request", async () => {
+    const { repository, artifacts } = memory();
+    const { createForWorkforce: _unsupported, ...ordinaryRepository } =
+      repository;
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository: ordinaryRepository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    await expect(
+      svc.requestDocument({ ...request(), workforce }),
+    ).rejects.toBeInstanceOf(ArtifactAuthorityError);
+    expect(artifacts.size).toBe(0);
+    expect(jobs.queued).toHaveLength(0);
+  });
+
+  it("keeps the real Q run while deriving worker cost provenance from the trusted binding", async () => {
+    const { repository } = memory();
+    const jobs = queue();
+    const svc = createArtifactService({
+      repository,
+      transactions,
+      jobs: jobs.repository,
+    });
+    const runId = "f0000000-0000-4000-8000-0000000000b2";
+    await svc.requestDocument({
+      ...request(),
+      workforce: { ...workforce, execution: { runId, budgetUsd: 0.08 } },
+    });
+    expect(jobs.queued[0]?.runId).toBe(RUN);
+    expect(jobs.queued[0]?.input.workforce).toEqual({
+      jobId: workforce.jobId,
+      runId,
+      budgetUsd: 0.08,
+    });
+  });
   it("a request is PREPARING with no version, and its job is queued with the draft", async () => {
     const { repository } = memory();
     const jobs = queue();

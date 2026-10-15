@@ -6,8 +6,12 @@ import type { QVoiceTurnState } from "@capital-q/contracts";
 
 import { performClientAction } from "../q/client-actions";
 import {
-  expectNavigation,
+  navigationFailureMessage,
+  type NavigationFailure,
+} from "../q/control/navigation-lifecycle";
+import {
   onNavigationOutcome,
+  requestMove,
   type NavigationOutcome,
 } from "../q/ui-act-controller";
 import { noteToLine } from "./line-cards";
@@ -33,13 +37,21 @@ export const MOVE_FAILED_LINE =
  * line is told at once when it FAILED, so Q never lets "it's open" stand
  * for a page that did not open.
  */
+export function spokenMoveFailedNote(reason: NavigationFailure): string {
+  return `Screen note (data, not the person's words): the page you just moved them to did NOT open on their screen (FAILED: ${reason}). Tell them briefly, in your own words: "${navigationFailureMessage(reason)}" Never say it is open.`;
+}
+
 export function watchSpokenMove(
   path: string,
-  onFailed: () => void = () => {
+  onFailed: (reason: NavigationFailure) => void = (reason) => {
+    // A move Q replaced with a newer one is not news to the person.
+    if (reason === "SUPERSEDED") return;
     noteToLine(
-      "Screen note (data, not the person's words): the page you just moved them to did NOT open on their screen (FAILED). Tell them briefly that it didn't open and offer to try again; do not say it is open.",
+      spokenMoveFailedNote(reason),
       true,
-      MOVE_FAILED_LINE,
+      reason === "NOT_LANDED"
+        ? MOVE_FAILED_LINE
+        : navigationFailureMessage(reason),
     );
   },
   subscribe: (
@@ -49,14 +61,25 @@ export function watchSpokenMove(
   const stop = subscribe((outcome) => {
     if (outcome.expected !== path) return;
     stop();
-    if (outcome.status === "FAILED") onFailed();
+    if (outcome.status === "FAILED") onFailed(outcome.reason);
   });
 }
 
+/** The board's move, made through the one navigation lifecycle. */
+export function moveForTurn(path: string): void {
+  requestMove({ path });
+}
+
+/**
+ * R3: the follower that reads the board makes its move (`move`), before
+ * the chain, so the chain's UI acts wait for the page it moves to. A
+ * surface that must do something first (end the line, then move) passes
+ * null and makes the move itself with `requestMove`.
+ */
 export function performTurnChain(
   turn: QVoiceTurnState,
   perform: (action: unknown) => boolean = performClientAction,
-  expect: (path?: string) => void = expectNavigation,
+  move: ((path: string) => void) | null = moveForTurn,
   watch: (path: string) => void = watchSpokenMove,
 ): QVoiceTurnState {
   const chain =
@@ -66,11 +89,11 @@ export function performTurnChain(
         ? []
         : [turn.clientAction];
   const path = destinationPath(turn.navigate);
-  // Every move gets its receipt, even to where they already are (DONE at
-  // once): the GPT-Live voice waits for it before it speaks.
+  // Every move gets its receipt, even to where they already are (VERIFIED
+  // at once): the GPT-Live voice waits for it before it speaks.
   if (path !== null && typeof window !== "undefined") {
     watch(path);
-    expect(path);
+    move?.(path);
   }
   for (const action of chain) perform(action);
   return { ...turn, clientAction: null, clientActions: [] };
@@ -98,7 +121,17 @@ export function useFollowTurn(
   turn: QVoiceTurnState | null,
   client: Pick<VoiceSessionClient, "state">,
   follow: (turn: QVoiceTurnState) => void,
+  /**
+   * Who makes the board's move: the chain (default; the follow callback
+   * must not push it again), or the caller's own callback (a surface that
+   * ends its line before it moves).
+   */
+  moves: "CHAIN" | "CALLER" = "CHAIN",
 ): void {
+  const movesRef = useRef(moves);
+  useEffect(() => {
+    movesRef.current = moves;
+  }, [moves]);
   const followed = useRef(0);
   const timer = useRef<number | null>(null);
   const followRef = useRef(follow);
@@ -132,8 +165,14 @@ export function useFollowTurn(
     // Founder direction 2026-09-30: moving is instant. The voice line lives
     // above every page, so Q keeps talking while the screen changes under
     // it; only handing back to typing waits for Q to finish the sentence.
+    const chain = (followedTurn: QVoiceTurnState) =>
+      performTurnChain(
+        followedTurn,
+        performClientAction,
+        movesRef.current === "CHAIN" ? moveForTurn : null,
+      );
     if (turn.handoff === null) {
-      followRef.current(performTurnChain(turn));
+      followRef.current(chain(turn));
       return;
     }
     const at = Date.now();
@@ -149,7 +188,7 @@ export function useFollowTurn(
         state === "Q_SPEAKING" ? SPEAKING_CEILING_MS : SPEECH_CEILING_MS;
       if ((quiet && elapsed >= SPEECH_FLOOR_MS) || elapsed >= ceiling) {
         timer.current = null;
-        followRef.current(performTurnChain(turn));
+        followRef.current(chain(turn));
         return;
       }
       timer.current = window.setTimeout(check, CHECK_MS);

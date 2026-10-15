@@ -87,7 +87,10 @@ export type WebServerConfig = {
   readonly runtime: RuntimeConfig;
   readonly founderOnboardingAdapter: FounderOnboardingAdapter;
   readonly auth: WebAuthConfig;
-  /** Base URL of the Capital Q API for server-side calls. Absent locally by default. */
+  /**
+   * Base URL of the Capital Q API for server-side calls: CQ_API_INTERNAL_URL
+   * when set (private network), else CQ_API_URL. Absent locally by default.
+   */
   readonly apiBaseUrl: string | undefined;
   /**
    * Base URL of the Q API, which is a separate deployable from the
@@ -95,6 +98,7 @@ export type WebServerConfig = {
    * build: the composer says so plainly and sends nothing, which is what it
    * did before this variable existed. It is never a default — a URL that
    * guessed at a Q service would be a worse failure than an honest one.
+   * CQ_Q_API_INTERNAL_URL, when set, replaces it for server-side calls.
    */
   readonly qApiBaseUrl: string | undefined;
   readonly public: WebPublicConfig;
@@ -120,12 +124,38 @@ const originSchema = z
     }
   }, "expected an origin with no path, query or fragment");
 
+/**
+ * A private-network base URL for server-to-server calls (R4: Railway private
+ * domain, `http://<service>.railway.internal:<port>`). Plain http is accepted
+ * only for a private or loopback host, because the bearer token travels on
+ * it; anything else must be https.
+ */
+const internalUrlSchema = z
+  .string()
+  .url("expected an absolute http(s) URL")
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      if (url.protocol === "https:") return true;
+      return (
+        url.protocol === "http:" &&
+        (url.hostname.endsWith(".railway.internal") ||
+          url.hostname === "localhost" ||
+          url.hostname === "127.0.0.1")
+      );
+    } catch {
+      return false;
+    }
+  }, "expected https, or http to a *.railway.internal or loopback host");
+
 const webServerEnvSchema = z.object({
   ...runtimeEnvShape,
   CQ_FOUNDER_ONBOARDING_ADAPTER: z.enum(FOUNDER_ONBOARDING_ADAPTERS).optional(),
   CQ_WEB_ORIGIN: originSchema.optional(),
   CQ_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
   CQ_Q_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
+  CQ_API_INTERNAL_URL: internalUrlSchema.optional(),
+  CQ_Q_API_INTERNAL_URL: internalUrlSchema.optional(),
 });
 
 /** Server-only. Never pass the result to a Client Component. */
@@ -162,6 +192,26 @@ export function parseWebServerConfig(env: EnvironmentInput): WebServerConfig {
     ]);
   }
 
+  // An internal URL is a faster route to a service that is already
+  // configured, never a way to turn one on: the public variable still decides
+  // whether api / Q is connected at all.
+  for (const [internal, publicVariable] of [
+    ["CQ_API_INTERNAL_URL", "CQ_API_URL"],
+    ["CQ_Q_API_INTERNAL_URL", "CQ_Q_API_URL"],
+  ] as const) {
+    if (
+      parsed[internal] !== undefined &&
+      parsed[publicVariable] === undefined
+    ) {
+      throw new ConfigurationError("web", [
+        {
+          variable: internal,
+          reason: `set only together with ${publicVariable}`,
+        },
+      ]);
+    }
+  }
+
   const supabase = parseSupabaseAuthConfig("web", {
     url: env["NEXT_PUBLIC_SUPABASE_URL"],
     publishableKey: env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"],
@@ -189,8 +239,14 @@ export function parseWebServerConfig(env: EnvironmentInput): WebServerConfig {
       appOrigin: appOrigin.replace(/\/$/, ""),
       secureCookies: !isLocal,
     },
-    apiBaseUrl: parsed.CQ_API_URL?.replace(/\/$/, ""),
-    qApiBaseUrl: parsed.CQ_Q_API_URL?.replace(/\/$/, ""),
+    apiBaseUrl: (parsed.CQ_API_INTERNAL_URL ?? parsed.CQ_API_URL)?.replace(
+      /\/$/,
+      "",
+    ),
+    qApiBaseUrl: (parsed.CQ_Q_API_INTERNAL_URL ?? parsed.CQ_Q_API_URL)?.replace(
+      /\/$/,
+      "",
+    ),
     public: {
       supabaseUrl: supabase.url,
       supabasePublishableKey: supabase.publishableKey,

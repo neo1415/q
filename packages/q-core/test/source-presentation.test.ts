@@ -121,3 +121,30 @@ describe("withoutPublicSourceLabels (R23, R38)", () => {
     });
   });
 });
+
+describe("provider dates that are not ISO (live 2026-10-10)", () => {
+  const BLOCK_DAY = /^\d{4}-\d{2}-\d{2}$/;
+  for (const publishedAt of [
+    "Oct 3, 2026",
+    "3 Oct 2026",
+    "2 days ago",
+    "yesterday",
+    "2026-10-03T08:00:00+03:00",
+    "",
+  ]) {
+    it(`"${publishedAt}" gives a contract-valid day or none`, () => {
+      const fields = publicSourceBlockFields({ ...WIKI, publishedAt });
+      if (fields.publishedOn !== null) {
+        expect(fields.publishedOn).toMatch(BLOCK_DAY);
+      }
+      expect(fields.retrievedOn).toMatch(BLOCK_DAY);
+    });
+  }
+
+  it("keeps a real date", () => {
+    expect(
+      publicSourceBlockFields({ ...WIKI, publishedAt: "Oct 3, 2026" })
+        .publishedOn,
+    ).toMatch(/^2026-10-0[23]$/);
+  });
+});

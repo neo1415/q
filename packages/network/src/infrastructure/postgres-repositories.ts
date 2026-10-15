@@ -90,6 +90,18 @@ export function createPostgresRelationshipRepository(): RelationshipRepository {
            and r.investor_organisation_id = ${investorOrganisationId}`;
       return rows.length === 0 ? null : toRelationship(rows[0]);
     },
+    findByInvestorAndCompanies: async (
+      executor,
+      investorOrganisationId,
+      companyIds,
+    ) => {
+      if (companyIds.length === 0) return [];
+      const rows = await executor`
+        ${relationshipSelect(executor)}
+         where r.investor_organisation_id = ${investorOrganisationId}
+           and r.company_id = any(${[...companyIds]}::uuid[])`;
+      return rows.map(toRelationship);
+    },
     lockPair: async (tx, companyId, investorOrganisationId) => {
       await tx.sql`
         select pg_advisory_xact_lock(

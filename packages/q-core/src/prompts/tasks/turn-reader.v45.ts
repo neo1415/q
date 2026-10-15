@@ -39,7 +39,7 @@ export const TURN_READER_V45: PromptDefinition<
 > = {
   ...TURN_READER_V44,
   version: 45,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Zino live 2026-10-09: which companies they could invest in is the FIT question kind in any words, with its count, answered from the computed fit and never researched; a turn that only presses on an unanswered ask is read as that ask.",
   effectiveFrom: "2026-10-09",

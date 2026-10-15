@@ -175,6 +175,48 @@ describe("opening a record's page", () => {
     ).toEqual({ kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: COMPANY_A });
   });
 
+  it("carries a tab, a deck section and the viewer on a page they may open (N2)", async () => {
+    const outcome = await executor.execute(
+      call("open_page", {
+        page: "COMPANY",
+        id: COMPANY_A,
+        tab: "deck",
+        subTab: "TRACTION",
+        viewer: "OPEN",
+      }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+    ).toEqual({
+      kind: "OPEN_RECORD_PAGE",
+      page: "COMPANY",
+      id: COMPANY_A,
+      tab: "deck",
+      subTab: "TRACTION",
+      viewer: "OPEN",
+    });
+  });
+
+  it("drops a tab the page does not have, and opens nothing the page would not (N2)", async () => {
+    const wrongTab = await executor.execute(
+      call("open_page", { page: "COMPANY", id: COMPANY_A, tab: "calls" }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(wrongTab)).clientAction,
+    ).toEqual({ kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: COMPANY_A });
+    const notTheirs = await executor.execute(
+      call("open_page", {
+        page: "COMPANY_DECK",
+        id: COMPANY_B_PRIVATE,
+        viewer: "OPEN",
+      }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(notTheirs.result.ok).toBe(false);
+  });
+
   it("opens a network-visible company in another tenant, by id or by name (R0, Zino live 2026-10-06)", async () => {
     for (const args of [
       { page: "COMPANY", id: COMPANY_B_NETWORK },
@@ -566,5 +608,58 @@ describe("approving and declining an inbox item (lead decision 2026-09-27)", () 
     );
     expect(both.status).not.toBe("SUCCEEDED");
     expect(decided).toEqual([]);
+  });
+});
+
+describe("rehearsing with a researched external person (W4)", () => {
+  const OWN = "00000000-0000-4000-8000-0000000e0001";
+  const executor = createQToolExecutor({
+    registry: createQToolRegistry([
+      createOpenPageTool({
+        ...fakePorts(),
+        externalRehearsal: {
+          canRehearse: (_actor, id) => Promise.resolve(id === OWN),
+        },
+      }),
+    ]),
+  });
+
+  it("opens the rehearsal for an entity the asker may rehearse with", async () => {
+    const outcome = await executor.execute(
+      call("open_page", { page: "EXTERNAL_REHEARSAL", id: OWN }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(
+      QClientActionToolResultSchema.parse(dataOf(outcome)).clientAction,
+    ).toEqual({
+      kind: "OPEN_RECORD_PAGE",
+      page: "EXTERNAL_REHEARSAL",
+      id: OWN,
+    });
+  });
+
+  it("never opens one by a name, a stranger's id, or when the port is absent", async () => {
+    for (const args of [
+      { page: "EXTERNAL_REHEARSAL", name: "Shadi Qishta" },
+      {
+        page: "EXTERNAL_REHEARSAL",
+        id: "00000000-0000-4000-8000-0000000e0999",
+      },
+      { page: "EXTERNAL_REHEARSAL", id: "not-an-id" },
+    ]) {
+      const outcome = await executor.execute(
+        call("open_page", args),
+        contextFor(actorA, ownPlan()),
+      );
+      expect(outcome.status).not.toBe("SUCCEEDED");
+    }
+    const bare = createQToolExecutor({
+      registry: createQToolRegistry([createOpenPageTool(fakePorts())]),
+    });
+    const outcome = await bare.execute(
+      call("open_page", { page: "EXTERNAL_REHEARSAL", id: OWN }),
+      contextFor(actorA, ownPlan()),
+    );
+    expect(outcome.status).not.toBe("SUCCEEDED");
   });
 });

@@ -224,6 +224,12 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
    */
   readonly supersedes?: boolean | undefined;
   /**
+   * What a setter sets, when its targets do not say it (a folder of a
+   * company): supersede compares this, so a newer card replaces only the
+   * card for the same resource (G-D23 follow-up).
+   */
+  readonly supersedeKey?: ((input: In) => string) | undefined;
+  /**
    * ADR 0043: terms, money or a commitment. Never taken by Q on its own
    * under a standing instruction, whatever the grant says: always an
    * explicit yes on its card.
@@ -297,6 +303,32 @@ export function isRefusal(value: unknown): value is AppActionRefusal {
     typeof value.refused === "string" &&
     Object.keys(value).length === 1
   );
+}
+
+/**
+ * An authorize step that checks the resource before Q shows its card (lead
+ * 2026-10-09: never a card the person cannot act on -- not theirs, or no
+ * longer open). On the screen the service's own check decides, as before:
+ * a screen retry of an answer already given must reach the service's
+ * idempotent replay, not a 404 from "no longer open".
+ */
+export function cardOnlyIf<In>(
+  check: (
+    ports: AppActionPorts,
+    context: AppActionContext,
+    input: In,
+  ) => Promise<boolean>,
+  reason: string,
+): (
+  ports: AppActionPorts,
+  context: AppActionContext,
+  input: In,
+) => Promise<AppActionVerdict> {
+  return async (ports, context, input) => {
+    if (context.surface !== "Q") return { ok: true };
+    const allowed = await check(ports, context, input).catch(() => false);
+    return allowed ? { ok: true } : { ok: false, reason };
+  };
 }
 
 /** Erased for the registry; per-action types stay with the action (as q-tools does). */

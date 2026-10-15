@@ -421,6 +421,9 @@ export {
   QFindingTypeSchema,
   QInternalFindingSchema,
   QPublicFindingSchema,
+  QArtifactFindingSchema,
+  Q_ARTIFACT_FINDING_STATEMENT_MAX_LENGTH,
+  type QArtifactFinding,
   type QFindingType,
   type QInternalFinding,
   type QPublicFinding,
@@ -542,6 +545,15 @@ export {
   QShowCalendarConnectIntentSchema,
   type QShowCalendarConnectIntent,
   Q_DOCUMENT_ACTS,
+  Q_CARD_ACTIONS,
+  Q_CARD_CATEGORIES,
+  Q_CARD_NAME_MAX,
+  QCardActionSchema,
+  QCardCategorySchema,
+  QCardsIntentSchema,
+  type QCardAction,
+  type QCardCategory,
+  type QCardsIntent,
   Q_DOCUMENT_PAGE_MAX,
   QDocumentActSchema,
   QDocumentActIntentSchema,
@@ -564,6 +576,12 @@ export {
   QSetDiscoverFiltersIntentSchema,
   type QSetDiscoverFiltersIntent,
   type QRecordPage,
+  type QRecordTab,
+  Q_COMPANY_PROFILE_TABS,
+  Q_RELATIONSHIP_TABS,
+  Q_RECORD_TABS,
+  QRecordTabSchema,
+  recordPageHasTab,
   type QMotionChoice,
   QClientActionIntentSchema,
   Q_CLIENT_ACTION_TOOLS,
@@ -1109,6 +1127,11 @@ export {
   Q_WORKFORCE_JOB_START,
   WorkforceJobStartPayloadSchema,
   WorkforcePlannedStepSchema,
+  WorkforceDocumentCritiqueRequestSchema,
+  WorkforceDocumentRequestSchema,
+  WorkforceNamedCompanyDocumentRequestSchema,
+  WorkforceOwnDocumentRequestSchema,
+  type WorkforceDocumentRequest,
   type WorkforceJobStartPayload,
   type WorkforcePlannedStep,
   WORKFORCE_AGENT_ROLES,
@@ -1171,3 +1194,7 @@ export * from "./agent-capability.js";
 export * from "./ui-act-receipts.js";
 // RECOVERY-2026-10 workstream C: navigation at the end of the utterance.
 export * from "./fast-navigation.js";
+export * from "./arrival-snapshot.js";
+
+// W2 (2026-10-10): external person identity card, subject and evidence-classed brief.
+export * from "./external-person.js";

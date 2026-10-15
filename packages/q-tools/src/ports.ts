@@ -14,6 +14,7 @@ import type { ExploreToolPort } from "./tools/explore.js";
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import type { CompanyQueryPort } from "@capital-q/companies";
 import type {
+  CompanyRaiseReader,
   CurrentSlateExplanationService,
   DiscoveryService,
   FitService,
@@ -25,6 +26,7 @@ import type {
 import type {
   IncomingInterestDto,
   PermittedContextPlan,
+  RelationshipBrief,
   RelationshipStatusDto,
   RelationshipSummaryDto,
   VisibilityStateDto,
@@ -34,6 +36,8 @@ import type { DisclosureAccessService } from "@capital-q/permissions";
 import type {
   PublicProfileLookupProvider,
   PublicWebResearchService,
+  PersonLookup,
+  CounterpartDiscoverer,
 } from "@capital-q/q-research";
 import type { ActorContext, AuthorizationService } from "@capital-q/security";
 
@@ -81,6 +85,46 @@ export type InvestorFeedDecision = {
   readonly decision: "SAVED" | "PASSED";
 };
 
+/**
+ * K1 (founder brief 2026-10-09): the companies on the network in a sector,
+ * country or stage, by declared taxonomy (confirmed assignments only, a
+ * sector's sub-sectors included). Candidates only: the tool decides each
+ * one through disclosure before anything is returned.
+ */
+export type CompanyCatalogCandidate = {
+  readonly companyId: string;
+  readonly name: string;
+  readonly stageCode: string | null;
+  readonly headquartersCountry: string | null;
+  readonly shortDescription: string | null;
+  /** The declared sectors that matched the ask, by display name. */
+  readonly sectors: readonly string[];
+};
+
+export type CompanyCatalogPort = {
+  readonly find: (
+    actor: ActorContext,
+    query: {
+      /** Taxonomy codes or their aliases, as the reader gave them. */
+      readonly sectors: readonly string[];
+      /** ISO 3166-1 alpha-2, upper case. */
+      readonly countries: readonly string[];
+      readonly stages: readonly string[];
+      readonly limit: number;
+    },
+  ) => Promise<{
+    /** In name order, never the actor's own organisation's (disclosure would let a network-visible one through). */
+    readonly candidates: readonly CompanyCatalogCandidate[];
+    /** The sectors asked for that the taxonomy knows, by display name. */
+    readonly sectors: readonly {
+      readonly code: string;
+      readonly name: string;
+    }[];
+    /** Sectors asked for that the taxonomy does not know. */
+    readonly unknownSectors: readonly string[];
+  }>;
+};
+
 export type InvestorFeedPort = {
   /** The first page of the actor's own feed; null when they are not an investor. */
   readonly page: (
@@ -107,8 +151,10 @@ export type OwnRelationship = RelationshipSummaryDto & {
    * The latest chat message in the relationship, by side: THEM means the
    * other side wrote last and is waiting for a reply (live 2026-10-08:
    * Q said nothing needed Marcus while Zino Aviation's message waited).
-   * Absent or null: no messages, or not read.
+   * Null with `lastMessageRead` OK: no messages. Absent or UNAVAILABLE
+   * read: not known -- never "no messages" (TensorGate, 2026-10-09).
    */
+  readonly lastMessageRead?: "OK" | "UNAVAILABLE" | undefined;
   readonly lastMessage?:
     | {
         readonly from: "THEM" | "YOU";
@@ -165,6 +211,17 @@ export type RelationshipIntelligencePort = {
         readonly answeredRequests: readonly string[];
         readonly sharedDocuments: readonly string[];
       } | null>)
+    | undefined;
+  /**
+   * The Relationship Brief (R1) of one relationship the actor is a party
+   * to, assembled by the Network context as the actor. Null: not a party
+   * or nothing this side may see. Absent: not composed.
+   */
+  readonly brief?:
+    | ((
+        actor: ActorContext,
+        relationshipId: string,
+      ) => Promise<RelationshipBrief | null>)
     | undefined;
   readonly byRelationship: (
     actor: ActorContext,
@@ -399,6 +456,12 @@ export type QToolPorts = {
   // end ADMIN-3 block
   readonly companies: CompanyQueryPort;
   readonly capital: CapitalObjectiveQueryPort;
+  /**
+   * R2: the one company read for the raise (`raiseFor`), the same the
+   * Discover card and the profile render. Absent: Q says only what the
+   * disclosed objective says, as before.
+   */
+  readonly companyRaise?: CompanyRaiseReader | undefined;
   readonly mandates: InvestorMandateQueryPort;
   readonly investors: InvestorOrganisationQueryPort;
   readonly authorization: AuthorizationService;
@@ -412,6 +475,8 @@ export type QToolPorts = {
    * bypasses them. Absent: the older network discovery answers.
    */
   readonly investorFeed?: InvestorFeedPort | undefined;
+  /** K1: companies by sector, country and stage. Absent: the tool is not offered. */
+  readonly companyCatalog?: CompanyCatalogPort | undefined;
   /** Discovery (doc 19). Absent means the slate tool reports it is unavailable. */
   readonly discovery?: DiscoveryService | undefined;
   /**
@@ -434,6 +499,23 @@ export type QToolPorts = {
    */
   readonly investorGates?: InvestorGatesPort | undefined;
   readonly research?: PublicWebResearchService | undefined;
+  /** W2: fast identity lookup of a named person or organisation; absent means no such tool. */
+  readonly people?: PersonLookup | undefined;
+  /** D1: investors by meaning (known entities, then a bounded web search); absent means no such tool. */
+  readonly counterparts?: CounterpartDiscoverer | undefined;
+  /**
+   * W4: whether the asker may rehearse with this researched entity (their
+   * own researched record, or a prepared public seed). Absent means the
+   * EXTERNAL_REHEARSAL page is never opened by Q.
+   */
+  readonly externalRehearsal?:
+    | {
+        readonly canRehearse: (
+          actor: ActorContext,
+          externalPersonId: string,
+        ) => Promise<boolean>;
+      }
+    | undefined;
   /** Public LinkedIn pages by URL; absent means the lookup tool does not exist. */
   readonly profiles?: PublicProfileLookupProvider | undefined;
   /** Relationships (CQ-Q-030); absent means no relationship tool exists. */

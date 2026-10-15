@@ -316,32 +316,30 @@ describe("what an earlier utterance stated stays theirs (live 2026-09-30)", () =
 
   it("an answer no earlier reading stated stays refused", async () => {
     const world = investorSession({ currentStepKey: "I0.investor_type" });
-    const { gateway } = {
-      gateway: {
-        execute: () =>
-          Promise.resolve({
-            output: {
-              kind: "TOOL_CALLS",
-              text: "",
-              calls: [
-                {
-                  callId: "c1",
-                  name: "record_answers",
-                  arguments: {
-                    answers: [
-                      {
-                        stepKey: "I0.investor_type",
-                        value: "vc",
-                        quote: "a venture capital fund",
-                      },
-                    ],
-                  },
+    const gateway = {
+      execute: () =>
+        Promise.resolve({
+          output: {
+            kind: "TOOL_CALLS",
+            text: "",
+            calls: [
+              {
+                callId: "c1",
+                name: "record_answers",
+                arguments: {
+                  answers: [
+                    {
+                      stepKey: "I0.investor_type",
+                      value: "vc",
+                      quote: "a venture capital fund",
+                    },
+                  ],
                 },
-              ],
-            },
-          }),
-      } as unknown as ModelGateway,
-    };
+              },
+            ],
+          },
+        }),
+    } as unknown as ModelGateway;
     await createInterviewAgent({
       gateway,
       firewall: firewall(),

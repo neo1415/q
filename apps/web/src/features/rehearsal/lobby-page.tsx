@@ -26,7 +26,8 @@ export async function RehearsalLobbyPage({
   readonly meeting: string | undefined;
 }) {
   const context = await resolveOwnContext();
-  const needs = kind === "INVESTOR_ORGANISATION" ? "FOUNDER" : "INVESTOR";
+  // A researched external person is rehearsed by a founder, who pitches.
+  const needs = kind === "COMPANY" ? "INVESTOR" : "FOUNDER";
   const id = z.string().uuid().safeParse(counterpartId);
   const meetingId = z.string().uuid().safeParse(meeting);
   if (context.kind !== needs || !id.success) {

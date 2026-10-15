@@ -12,7 +12,6 @@ import type { QMessage, QViewingMoment } from "@capital-q/contracts";
 
 import {
   approveQApprovalAction,
-  askQAction,
   cancelQRunAction,
   continueQRunAction,
   pendingQApprovalsAction,
@@ -24,6 +23,8 @@ import {
 import { carriedApproval, type CarriedApproval } from "./carried-approval";
 import type { PendingTurn } from "./conversation";
 import { navigationHeard } from "./control/fast-navigation";
+import { askQ } from "./ask-route";
+import { noteLiveRun, noteTypedRun } from "./follow-navigation";
 import { currentScreen, currentViewing } from "./screen";
 import {
   forgetPendingAsk,
@@ -212,6 +213,8 @@ export function useQConversation(
   );
 
   const follow = useCallback((run: string) => {
+    // Seen live by this page: its answer may move them (follow-navigation).
+    noteLiveRun(run);
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
@@ -380,6 +383,8 @@ export function useQConversation(
       setConversationIdState(named);
       openRun.current = started.runId;
       setRunId(started.runId);
+      // Started from a typed question (ask, or its resume after a reload).
+      noteTypedRun(started.runId);
       if (isNew && named !== null) {
         // The caller writes it to the URL; that change is ours, not a
         // request to reopen.
@@ -469,7 +474,7 @@ export function useQConversation(
               : { relationshipId: options.relationshipId }),
           });
         }
-        const started = await askQAction(
+        const started = await askQ(
           text,
           conversationId.current ?? undefined,
           subjectInputOf({
@@ -535,7 +540,7 @@ export function useQConversation(
       };
       setPending((current) => [...current, placeholder]);
       setSubmitting(true);
-      void askQAction(
+      void askQ(
         remembered.text,
         undefined,
         subjectInputOf(remembered),

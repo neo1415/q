@@ -39,9 +39,9 @@ select ok((select supports_zero_retention from ai_ops.providers where code = 'gr
 select results_eq(
   $$ select model_code from ai_ops.models order by model_code $$,
   $$ values ('gemini-2.5-flash-image'), ('gemini-3.1-flash-lite-image'), ('gemini-3.5-flash'), ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'),
-            ('gpt-5.6-luna'), ('gpt-image-1'), ('gpt-realtime-mini'),
+            ('gpt-5.6-luna'), ('gpt-image-1'), ('gpt-live-1'), ('gpt-realtime-mini'),
             ('openai/gpt-oss-120b'), ('openai/gpt-oss-20b'), ('qwen/qwen3.8-27b') $$,
-  'the eleven model ids are seeded, exactly (gemini-3.1-flash-lite-image under its own id in 20261220192000, gpt-realtime-mini for full-duplex voice in 20261203090000, image models gemini-2.5-flash-image and gpt-image-1 in 20261113010000, qwen/qwen3.8-27b joined Groq in 20260918, gpt-5.6-luna in 20261006090000, gemini-3.5-flash in 20261008120000)');
+  'the twelve model ids are seeded, exactly (gpt-live-1 for the GPT-Live voice line in 20261221090000, priced per second in its metadata so it has no model_prices row; gemini-3.1-flash-lite-image under its own id in 20261220192000, gpt-realtime-mini for full-duplex voice in 20261203090000, image models gemini-2.5-flash-image and gpt-image-1 in 20261113010000, qwen/qwen3.8-27b joined Groq in 20260918, gpt-5.6-luna in 20261006090000, gemini-3.5-flash in 20261008120000)');
 select is((select count(*)::int from ai_ops.models where sensitivity_ceiling in ('HIGHLY_CONFIDENTIAL', 'RESTRICTED')), 0,
   'no model is cleared above CONFIDENTIAL: the strongest material never leaves through a vendor');
 select is(

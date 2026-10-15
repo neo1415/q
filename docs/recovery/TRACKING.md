@@ -1,3 +1,5 @@
+> **Historical (superseded 2026-10-11).** Current state, tasks and instructions: [`docs/ai-handoff/START-HERE.md`](../ai-handoff/START-HERE.md). Kept for history; verify any operational instruction here against `docs/ai-handoff/LEGACY-RECONCILIATION.md`.
+
 # Recovery tracking (RECOVERY-2026-10)
 
 The lead updates this at each merge. Implementation, integration, local testing and live verification are tracked separately.

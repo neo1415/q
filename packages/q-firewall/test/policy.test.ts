@@ -24,6 +24,7 @@ import {
   sensitivityCeiling,
   type SubjectRelation,
 } from "../src/index.js";
+import { screenWithin } from "../src/firewall.js";
 
 /**
  * The pure policies, exhaustively. No database, no ports: these are the
@@ -33,6 +34,50 @@ import {
 
 const COMPANY = "11111111-1111-4111-8111-111111111111";
 const TENANT = "22222222-2222-4222-8222-222222222222";
+
+describe("viewer references within the permitted screen", () => {
+  it("retains artifact positions without adding any scope", () => {
+    const screen = {
+      route: "DOCUMENTS" as const,
+      artifactId: COMPANY,
+      artifactSlide: 2,
+      artifactVersion: 1,
+    };
+    expect(screenWithin(screen, [])).toEqual(screen);
+  });
+
+  it("drops positions without their parent reference", () => {
+    expect(
+      screenWithin(
+        {
+          route: "DOCUMENTS",
+          artifactSlide: 2,
+          artifactVersion: 1,
+          documentPage: 3,
+        },
+        [],
+      ),
+    ).toEqual({ route: "DOCUMENTS" });
+  });
+
+  it("retains an uploaded document page only under its own permitted subject", () => {
+    const screen = {
+      route: "DOCUMENTS" as const,
+      documentId: COMPANY,
+      documentPage: 3,
+    };
+    expect(screenWithin(screen, [scope("COMPANY_PROFILE")])).toEqual({
+      route: "DOCUMENTS",
+    });
+    expect(
+      screenWithin(screen, [
+        scope("EVIDENCE_DOCUMENTS", {
+          subject: { kind: "DOCUMENT", documentId: COMPANY },
+        }),
+      ]),
+    ).toEqual(screen);
+  });
+});
 
 function scope(
   kind: QAuthorisedKnowledgeScope["kind"],

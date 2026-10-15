@@ -16,7 +16,10 @@ import type {
 } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
+import { pendingPlaceOf } from "@capital-q/q-core/speech";
+
 import { createSpecialistQAnswer } from "../src/answer.js";
+import { openingLine } from "../src/references.js";
 import {
   matchOwnCounterpart,
   namedRecordRequestOf,
@@ -122,6 +125,17 @@ function openRecordPort(opened: { page: QRecordPage; name?: string }[]) {
         page: target.page,
         ...(target.name === undefined ? {} : { name: target.name }),
       });
+      if (target.page === "EXTERNAL_REHEARSAL") {
+        return Promise.resolve(
+          target.id === SHADI_ID
+            ? {
+                kind: "OPEN_RECORD_PAGE" as const,
+                page: target.page,
+                id: SHADI_ID,
+              }
+            : null,
+        );
+      }
       const companyPage =
         target.page === "COMPANY" ||
         target.page === "COMPANY_DATA_ROOM" ||
@@ -136,7 +150,50 @@ function openRecordPort(opened: { page: QRecordPage; name?: string }[]) {
   return port;
 }
 
-function conversation(counterparts: readonly string[], investor = true) {
+const SHADI_ID = "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d";
+
+/** A researched entity the asker can reach by name (a prepared seed). */
+const EXTERNAL = {
+  find: (_request: QAnswerRequest, name: string) =>
+    Promise.resolve(
+      name.toLowerCase() === "shadi qishta"
+        ? {
+            externalPersonId: SHADI_ID,
+            displayName: "Shadi Qishta",
+            said: "Here's Shadi Qishta, from public sources.",
+            blocks: [
+              {
+                kind: "ANSWER_CARDS",
+                shape: "RESEARCH",
+                title: "Who I found",
+                cards: [
+                  {
+                    key: SHADI_ID,
+                    name: "Shadi Qishta",
+                    line: null,
+                    hue: 1,
+                    fit: null,
+                    reasons: ["Strong match on public sources"],
+                    measures: [],
+                    view: null,
+                    said: null,
+                    sourceCount: 1,
+                    subject: null,
+                  },
+                ],
+                followUps: [],
+              },
+            ] as unknown as QResultBlock[],
+          }
+        : null,
+    ),
+};
+
+function conversation(
+  counterparts: readonly string[],
+  investor = true,
+  withExternal = false,
+) {
   const conversationId = randomUUID();
   const lines: QConversationMessage[] = [];
   const opened: { page: QRecordPage; name?: string }[] = [];
@@ -185,6 +242,7 @@ function conversation(counterparts: readonly string[], investor = true) {
     offeredTools: () => Promise.resolve(["open_page"]),
     openRecord: openRecordPort(opened),
     counterpartNames: () => Promise.resolve(counterparts),
+    ...(withExternal ? { externalEntities: EXTERNAL } : {}),
   });
   const say = async (said: string) => {
     lines.push({
@@ -276,7 +334,10 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
     expect(intentOf(answer.blocks)).toEqual([
       { kind: "OPEN_RECORD_PAGE", page: "RELATIONSHIP_COMPANY", id: SHIFTWELL },
     ]);
-    expect(answer.content).toBe('Opening "Shiftwell Health".');
+    // G2-D3: the one pending wording (move-line.ts), so the thread's row
+    // flips to "Opened Shiftwell Health." on the browser's VERIFIED receipt.
+    expect(answer.content).toBe("Opening Shiftwell Health…");
+    expect(pendingPlaceOf(answer.content)).toBe("Shiftwell Health");
     expect(q.delegated()).toBe(0);
   });
 
@@ -293,9 +354,14 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
     const q = conversation(own);
     const answer = await q.say("Show me the data room for Shiftwell.");
     expect(intentOf(answer.blocks)).toEqual([
-      { kind: "OPEN_RECORD_PAGE", page: "COMPANY_DATA_ROOM", id: SHIFTWELL },
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY_DATA_ROOM",
+        id: SHIFTWELL,
+        tab: "dataroom",
+      },
     ]);
-    expect(answer.content).toBe('Opening "Shiftwell Health"\'s data room.');
+    expect(answer.content).toBe("Opening Shiftwell Health's data room…");
   });
 
   it('"You open documents. I want to see the data room for Shiftwell." acts, never asks about documents', async () => {
@@ -304,7 +370,12 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
       "You open documents. I want to see the data room for Shiftwell.",
     );
     expect(intentOf(answer.blocks)).toEqual([
-      { kind: "OPEN_RECORD_PAGE", page: "COMPANY_DATA_ROOM", id: SHIFTWELL },
+      {
+        kind: "OPEN_RECORD_PAGE",
+        page: "COMPANY_DATA_ROOM",
+        id: SHIFTWELL,
+        tab: "dataroom",
+      },
     ]);
     expect(answer.content).not.toMatch(/document/iu);
   });
@@ -325,5 +396,58 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
     expect(intentOf(answer.blocks)).toEqual([]);
     expect(answer.content).toMatch(/^I can't find "Brightmoor" data room/u);
     expect(answer.content).not.toBe("Understood.");
+  });
+});
+
+describe("G2-D3: a record move's line is the one pending wording", () => {
+  it("names the record as people read it, so the row can flip to Opened", () => {
+    const line = openingLine("INVESTOR", "Savanna Seed Partners (fictional)");
+    expect(line).toBe("Opening Savanna Seed Partners…");
+    expect(pendingPlaceOf(line)).toBe("Savanna Seed Partners");
+    expect(pendingPlaceOf(openingLine("COMPANY_DECK", "Tallyloom"))).toBe(
+      "Tallyloom's pitch deck",
+    );
+    expect(pendingPlaceOf(openingLine("DOCUMENT", undefined))).toBe(
+      "the document",
+    );
+  });
+});
+
+describe("W4: a researched entity by name, when it is none of their relationships", () => {
+  const own = ["Shiftwell Health", "Ledgerline"];
+
+  it('"Take me to Shadi Qishta" / "open Shadi Qishta" show the identity card, not "can\'t find"', async () => {
+    for (const said of ["Take me to Shadi Qishta.", "Open Shadi Qishta."]) {
+      const q = conversation(own, false, true);
+      const answer = await q.say(said);
+      expect(answer.content).toBe("Here's Shadi Qishta, from public sources.");
+      expect(answer.blocks.map((b) => b.kind)).toEqual(["ANSWER_CARDS"]);
+      expect(q.delegated()).toBe(0);
+    }
+  });
+
+  it('"I want to rehearse with Shadi Qishta" opens /rehearsals/person through open_page', async () => {
+    const q = conversation(own, false, true);
+    const answer = await q.say("I want to rehearse with Shadi Qishta.");
+    expect(intentOf(answer.blocks)).toEqual([
+      { kind: "OPEN_RECORD_PAGE", page: "EXTERNAL_REHEARSAL", id: SHADI_ID },
+    ]);
+    expect(answer.content).toMatch(/AI rehearsal informed by public sources/u);
+  });
+
+  it("their own relationship of the same name keeps its own path; an unknown name still says it cannot find it", async () => {
+    const q = conversation(["Shadi Qishta"], false, true);
+    await q.say("Open Shadi Qishta.");
+    expect(q.opened.length).toBeGreaterThan(0);
+    const none = conversation(own, false, true);
+    const unknown = await none.say("Show me the data room for Brightmoor.");
+    expect(unknown.content).toMatch(/can't find/u);
+    expect(unknown.blocks.map((b) => b.kind)).not.toContain("ANSWER_CARDS");
+  });
+
+  it("without the entity port, nothing changes (still not found)", async () => {
+    const q = conversation(own, false, false);
+    const answer = await q.say("Take me to Shadi Qishta.");
+    expect(answer.blocks.map((b) => b.kind)).not.toContain("ANSWER_CARDS");
   });
 });

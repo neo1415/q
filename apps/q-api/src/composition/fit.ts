@@ -2,17 +2,20 @@ import { createHash } from "node:crypto";
 
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import { CompanyIdSchema, type CompanyQueryPort } from "@capital-q/companies";
-import type { QViewDto } from "@capital-q/contracts";
+import type { CompanyDeckView, QViewDto } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import {
   createFitInputSource,
   createFitService,
+  statedEvidenceFrom,
+  type CompanyRaiseReader,
   type EligibilityPorts,
   type EligibilityService,
   type FilterMoney,
   type FitCandidate,
   type FitProfileItem,
   type FitService,
+  type FitStatedEvidence,
 } from "@capital-q/discovery";
 import type { Logger } from "@capital-q/observability";
 import {
@@ -53,6 +56,18 @@ export type FitCompositionDependencies = {
   readonly relationships: (actor: ActorContext) => Promise<readonly string[]>;
   readonly requests: (actor: ActorContext) => Promise<readonly string[]>;
   readonly feed: Pick<InvestorFeedPort, "page">;
+  /**
+   * The one raise reader (Discover, profile and Q read the raise from it):
+   * a raise said in a pitch this reader may play arrives as PITCH_CLAIM.
+   */
+  readonly raiseReader?: Pick<CompanyRaiseReader, "raisesFor"> | undefined;
+  /** The deck as this reader may see it (investors: confirmed sections only). */
+  readonly deckView?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<CompanyDeckView | null>)
+    | undefined;
   readonly viewer: FitQViewer;
   readonly logger?: Logger | undefined;
 };
@@ -71,6 +86,40 @@ export function createFitComposition(
     return id.success
       ? dependencies.companies.findCanonicalCompany(id.data)
       : null;
+  };
+
+  // What each company STATED where this reader may see it: context beside
+  // the fit and evidence for Q's view, never a scored input (fit/stated.ts).
+  // Both reads are the reader's own; a failed read is simply no statement.
+  const stated = async (
+    actor: ActorContext,
+    companyIds: readonly string[],
+  ): Promise<ReadonlyMap<string, FitStatedEvidence>> => {
+    const [raises, decks] = await Promise.all([
+      dependencies.raiseReader === undefined
+        ? Promise.resolve(null)
+        : dependencies.raiseReader
+            .raisesFor(actor, companyIds)
+            .catch(() => null),
+      Promise.all(
+        companyIds.map((companyId) =>
+          dependencies.deckView === undefined
+            ? Promise.resolve(null)
+            : dependencies.deckView(actor, companyId).catch(() => null),
+        ),
+      ),
+    ]);
+    const out = new Map<string, FitStatedEvidence>();
+    companyIds.forEach((companyId, index) => {
+      const said = statedEvidenceFrom({
+        raise: raises?.get(companyId) ?? null,
+        deck: decks[index] ?? null,
+      });
+      if (said.statedRound !== null || said.evidence.length > 0) {
+        out.set(companyId, said);
+      }
+    });
+    return out;
   };
 
   const inputs = createFitInputSource({
@@ -145,6 +194,7 @@ export function createFitComposition(
       });
       return out;
     },
+    stated,
   });
 
   const quiet = <T>(label: string, work: Promise<readonly T[]>) =>
@@ -216,6 +266,7 @@ export function createFitComposition(
             item.name,
             item.line,
             { ...profile, computedAt: "" },
+            item.evidence ?? [],
           ]),
         )
         .digest("hex");
@@ -228,6 +279,10 @@ export function createFitComposition(
         companyName: item.name,
         companyLine: item.line,
         profile,
+        evidence: item.evidence ?? [],
+        ...(item.evidenceConfidential === true
+          ? { sensitivity: "CONFIDENTIAL" as const }
+          : {}),
       });
       // An unavailable view is not cached: the next open may succeed.
       if (view.status === "READY") {

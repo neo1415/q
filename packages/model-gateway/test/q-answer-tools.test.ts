@@ -35,6 +35,7 @@ import {
   Q_TOOL_LOOP_MAX_ROUNDS,
 } from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
+import { fitFixture } from "./fit-fixture.js";
 
 /**
  * The bounded tool loop in the answer seam (CQ-Q-007 §63-§66, §102) over
@@ -276,6 +277,274 @@ const SET_THEME_OFFERED: QOfferedTool = {
   },
   visibleStage: null,
 };
+
+describe("named-company evidence binding", () => {
+  it.each([false, true])(
+    "binds findings to the explicitly named authorised profile, including warmed reads (%s)",
+    async (warm) => {
+      const screen = randomUUID();
+      const target = randomUUID();
+      const profile = (companyId: string, canonicalName: string) => ({
+        companyId,
+        canonicalName,
+        legalName: null,
+        websiteUrl: null,
+        foundedDate: null,
+        headquartersCountry: null,
+        headquartersCity: null,
+        currentStageCode: "seed",
+        shortDescription: "Declared company profile",
+        primaryDescription: null,
+        companyStatus: "active",
+        relationToYou: "SHARED",
+        truthClass: "USER_CLAIM",
+      });
+      const tools = toolPort([GET_COMPANY], (p) =>
+        succeeded(
+          p,
+          profile(
+            p.callId === "named-profile" ? target : screen,
+            p.callId === "named-profile"
+              ? "Named Founder"
+              : "Incidental Screen Company",
+          ),
+        ),
+      );
+      const { seam, request, messages, completed, alpha } = build({
+        tools,
+        script: [
+          call("named-profile", { companyId: target }),
+          {
+            kind: "TEXT",
+            text: JSON.stringify({
+              ...analystResult(
+                "Named Founder's declared profile is seed stage.",
+              ),
+              findings: [
+                {
+                  statement: "Declared seed stage.",
+                  type: "FACT",
+                  confidence: "MODERATE",
+                  truthClass: "USER_CLAIM",
+                  evidenceStatus: "SELF_REPORTED",
+                },
+              ],
+            }),
+          },
+        ],
+      });
+      if (messages[0])
+        messages.splice(0, 1, {
+          ...messages[0],
+          content: "What does Named Founder do?",
+        });
+      const bound = {
+        ...request,
+        subjects: [{ kind: "COMPANY" as const, companyId: screen }],
+        plan: {
+          ...request.plan,
+          screen: { route: "COMPANY" as const, companyId: screen },
+        },
+      };
+      if (warm) {
+        const warmAnswer = seam.warm;
+        if (warmAnswer === undefined) throw new Error("Warm reads unavailable");
+        warmAnswer(bound);
+      }
+      await seam.answer({ ...bound, aboutNamedOther: true });
+      const payload = completed.at(-1) as {
+        message: {
+          blocks: Array<{
+            kind: string;
+            finding?: { subjects: unknown[] };
+            companyId?: string;
+          }>;
+        };
+      };
+      expect(
+        payload.message.blocks.find((b) => b.kind === "FINDING")?.finding
+          ?.subjects,
+      ).toEqual([{ kind: "COMPANY", companyId: target }]);
+      expect(
+        payload.message.blocks
+          .filter((b) => b.kind === "COMPANY_REFERENCE")
+          .map((b) => b.companyId),
+      ).toEqual([target]);
+      expect(JSON.stringify(alpha.calls[0]?.request)).toContain(
+        "Resolve the company named in the current question",
+      );
+    },
+  );
+});
+
+describe("selected-company analysis stays out of the candidate sweep", () => {
+  it.each([
+    [false, false],
+    [true, false],
+    [false, true],
+    [true, true],
+  ])(
+    "answers the profile question with a late FIT reading, warm=%s, other=%s",
+    async (warm, aboutNamedOther) => {
+      const companyId = randomUUID();
+      const investorOrganisationId = randomUUID();
+      const topOffer = {
+        ...GET_COMPANY,
+        toolName: "fit.top_candidates",
+        definition: { ...GET_COMPANY.definition, name: "fit_top_candidates" },
+      };
+      const tools = toolPort(
+        [
+          GET_COMPANY,
+          topOffer,
+          {
+            ...topOffer,
+            toolName: "fit.profile",
+            definition: { ...topOffer.definition, name: "fit_profile" },
+          },
+        ],
+        (p) => {
+          if (p.name === "fit_top_candidates") {
+            const fit = fitFixture(
+              companyId,
+              "Selected Company",
+              { STAGE: "STRONG" },
+              "STRONG_FIT",
+            );
+            const data = fit.result.data as { name: string; profile: unknown };
+            return {
+              ...succeeded(p, {
+                status: "OK",
+                comparison: {
+                  entries: [
+                    { name: data.name, line: null, profile: data.profile },
+                  ],
+                },
+              }),
+              toolName: "fit.top_candidates",
+            };
+          }
+          if (p.name === "fit_profile")
+            return {
+              ...succeeded(
+                p,
+                fitFixture(
+                  companyId,
+                  "Selected Company",
+                  { STAGE: "STRONG" },
+                  "STRONG_FIT",
+                ).result.data,
+              ),
+              toolName: "fit.profile",
+            };
+          return succeeded(p, {
+            companyId,
+            canonicalName: "Selected Company",
+            legalName: null,
+            websiteUrl: null,
+            foundedDate: null,
+            headquartersCountry: null,
+            headquartersCity: null,
+            currentStageCode: "seed",
+            shortDescription: "Declared company profile",
+            primaryDescription: null,
+            companyStatus: "active",
+            relationToYou: "SHARED",
+            truthClass: "USER_CLAIM",
+          });
+        },
+      );
+      const text =
+        "What does this company actually do and why does it fit my mandate? Use its Capital Q records.";
+      const answer =
+        "Selected Company's declared profile is seed stage; missing fit evidence remains unknown.";
+      const { seam, request, messages, completed, alpha } = build({
+        tools,
+        script: [
+          {
+            kind: "TEXT",
+            text: JSON.stringify({
+              ...analystResult(answer),
+              findings: [
+                {
+                  statement: "Declared seed stage.",
+                  type: "FACT",
+                  confidence: "MODERATE",
+                  truthClass: "USER_CLAIM",
+                  evidenceStatus: "SELF_REPORTED",
+                },
+              ],
+            }),
+          },
+        ],
+      });
+      if (messages[0]) messages[0] = { ...messages[0], content: text };
+      const bound = {
+        ...request,
+        subjects: [{ kind: "COMPANY" as const, companyId }],
+        plan: PermittedContextPlanSchema.parse({
+          ...request.plan,
+          screen: { route: "COMPANY" as const, companyId },
+          scopes: [
+            {
+              kind: "INVESTOR_MANDATE" as const,
+              contextLabel: "investor_private",
+              sensitivity: "CONFIDENTIAL",
+              layer: "STRUCTURED_STATE",
+              factCategories: ["INVESTOR_THESIS"],
+              projection: "FULL",
+              rights: {
+                canUseForReasoning: true,
+                canDiscloseExistence: true,
+                canQuote: true,
+                canProvideLink: false,
+              },
+              filter: { tenantId: TENANT, investorOrganisationId },
+              isEvidence: true,
+              subject: {
+                kind: "INVESTOR_ORGANISATION" as const,
+                investorOrganisationId,
+              },
+            },
+          ],
+        }),
+      };
+      if (warm) {
+        if (!seam.warm) throw new Error("Warm seam missing");
+        seam.warm(bound);
+      }
+      await seam.answer({
+        ...bound,
+        aboutNamedOther,
+        fitQuestion: { text, count: null },
+      });
+      expect(
+        tools.executed.filter((p) => p.name === "fit_top_candidates"),
+      ).toHaveLength(0);
+      expect(tools.executed.some((p) => p.name === "get_company")).toBe(true);
+      expect(alpha.calls).toHaveLength(1);
+      expect(JSON.stringify(completed)).toContain(answer);
+      const payload = completed.at(-1) as {
+        message: {
+          blocks: Array<{
+            kind: string;
+            companyId?: string;
+            finding?: { subjects: unknown[] };
+          }>;
+        };
+      };
+      expect(
+        payload.message.blocks
+          .filter((b) => b.kind === "COMPANY_REFERENCE")
+          .map((b) => b.companyId),
+      ).toEqual([companyId]);
+      expect(
+        payload.message.blocks.find((b) => b.kind === "FINDING")?.finding
+          ?.subjects,
+      ).toEqual([{ kind: "COMPANY", companyId }]);
+    },
+  );
+});
 
 describe("client actions and the screen reach the answer (R20/R21/R33)", () => {
   it("a client-action tool's authorised result rides on the answer as a UI_INTENT block", async () => {
@@ -700,14 +969,15 @@ describe("answer seam tool loop", () => {
 
   it("bounds rounds and calls, then finishes with one structured call without tools", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
-    // Each round proposes as many calls as a reply may carry; together
+    // Each round proposes as many distinct calls as a reply may carry; together
     // they propose more than the turn's budget.
     const many = (round: string): FakeBehaviour => ({
       kind: "TOOL_CALLS",
       calls: Array.from({ length: MODEL_TOOL_CALLS_MAX }, (_v, i) => ({
         callId: `${round}${String(i)}`,
         name: "get_company",
-        arguments: {},
+        // Distinct reads: identical concurrent ones share a call (K4).
+        arguments: { companyId: `${round}-${String(i)}` },
       })),
     });
     expect(MODEL_TOOL_CALLS_MAX * Q_TOOL_LOOP_MAX_ROUNDS).toBeGreaterThan(
@@ -902,14 +1172,15 @@ describe("use_capability: a tool outside the turn's focus, loaded and called in 
     });
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
+    // Sent in one stable name order (K7: the cached prefix holds).
     expect(alpha.calls[0]?.request.tools.map((t) => t.name)).toEqual([
-      "use_capability",
       "get_company",
+      "use_capability",
     ]);
     expect(alpha.calls[1]?.request.tools.map((t) => t.name)).toEqual([
-      "use_capability",
       "get_company",
       "propose_meeting",
+      "use_capability",
     ]);
     expect(executed.map((e) => e.name)).toEqual([
       "use_capability",

@@ -498,6 +498,14 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // Post-meeting outcomes (2026-10-02): the Pass dialog's reason list is
   // reference data; the current pass is read on the relationship page.
   "api/http/network-interests.ts GET NETWORK_PASS_REASONS_PATH": REFERENCE,
+  // R1: the Relationship Brief Q reads through get_relationship, and the
+  // list's briefs are the relationships screen's cards.
+  "api/http/network-interests.ts GET NETWORK_RELATIONSHIP_BRIEF_PATH": cap(
+    "tool.get_relationship",
+  ),
+  "api/http/network-interests.ts GET NETWORK_RELATIONSHIP_BRIEFS_PATH": cap(
+    "navigate.RELATIONSHIPS",
+  ),
   // Diligence (2026-10-02): the area Q acts in through diligence_documents;
   // a download is the person's own browser fetching a signed URL.
   "api/http/network-interests.ts GET NETWORK_RELATIONSHIP_DILIGENCE_PATH": cap(
@@ -653,6 +661,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   // RECOVERY B1: the same reader as Q's what_needs_me.
   "q-api/http/q-attention.ts GET Q_ATTENTION_PATH": cap("tool.what_needs_me"),
+  "q-api/http/q-arrival-snapshot.ts GET Q_ARRIVAL_SNAPSHOT_PATH":
+    cap("tool.what_needs_me"),
   // BILLING-2 block (ADR 0036)
   "q-api/http/readiness-blueprint.ts POST Q_READINESS_BLUEPRINTS_PATH": exempt(
     "the plan-gated Readiness Blueprint (Pro), built by code from the free diagnosis Q already reads with read_my plan; the sequencing is the page's, the steps are Q's read",
@@ -966,6 +976,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/rehearsals": cap("navigate.REHEARSALS"),
   "/rehearsals/investor/[investorOrganisationId]": cap("tool.open_page"),
   "/rehearsals/company/[companyId]": cap("tool.open_page"),
+  "/rehearsals/person/[externalPersonId]": cap("tool.open_page"),
   "/rehearsals/meeting/[meetingId]": exempt(
     "the rehearsal suggested when a call was booked; it resolves to the lobby Q opens with open_page",
   ),

@@ -122,7 +122,7 @@ export default async function SavedComparePage({
                         href={`/company/${encodeURIComponent(entry.companyId)}#assumptions`}
                         className="underline underline-offset-4"
                       >
-                        Assumptions to test
+                        Questions to investigate
                       </Link>
                     </dd>
                   </div>

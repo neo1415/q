@@ -5,7 +5,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
   UNTRUSTED_OPEN,
-  type MeetingHostVariablesV3 as MeetingHostVariables,
+  type MeetingHostVariablesV4 as MeetingHostVariables,
 } from "../src/index.js";
 
 /**
@@ -46,6 +46,8 @@ describe("MEETING_HOST_TURN", () => {
       speaker: "Tunde Bello",
       utterance: `Q, ${attack}`,
       seen: `Slide: ${attack}`,
+      prepared: `- (deck) ${attack}`,
+      memory: `- note: ${attack}`,
     });
     for (const source of [
       "transcript",
@@ -54,6 +56,8 @@ describe("MEETING_HOST_TURN", () => {
       "roster",
       "meeting",
       "seen",
+      "prepared",
+      "memory",
     ]) {
       expect(text).toContain(`${UNTRUSTED_OPEN.split("source")[0] ?? ""}`);
       expect(text).toContain(`source="${source}"`);
@@ -66,11 +70,32 @@ describe("MEETING_HOST_TURN", () => {
     expect(outside).not.toContain("admin mode");
   });
 
-  it("v3: answers short and at once, and may use what is shown in the call", () => {
+  it("v5: answers from the room-permitted prepared context and the working record; a suggestion is not an agreement", () => {
     const active = registry.getActive("MEETING_HOST_TURN").definition;
-    expect(active.version).toBe(3);
+    expect(active.version).toBe(5);
+    expect(active.template).toContain("{{prepared}}");
+    expect(active.template).toContain("{{memory}}");
+    expect(active.template).toContain("A suggestion is not an agreement");
+    expect(active.template).toContain("silence is never acceptance");
+    expect(active.template).toContain("kind NOTE");
+    expect(active.template).toContain(
+      "never guess what either side keeps to itself",
+    );
+    expect(active.variables.untrusted).toEqual(
+      expect.arrayContaining(["prepared", "memory"]),
+    );
+  });
+
+  it("v4 and before stay readable but are no longer active", () => {
+    expect(registry.getActive("MEETING_HOST_TURN").definition.version).toBe(5);
+  });
+
+  it("v5 keeps v4: answers at once and conversationally, may use what is shown, and reads KEEP_WAITING", () => {
+    const active = registry.getActive("MEETING_HOST_TURN").definition;
     expect(active.template).toContain("{{seen}}");
-    expect(active.template).toContain("under 15 words");
+    expect(active.template).toContain("under 20 words");
+    expect(active.template).toContain("KEEP_WAITING");
+    expect(active.template).toContain("never treat silence as agreement");
     expect(active.template).toContain(
       "Never describe anyone's face, appearance or identity",
     );

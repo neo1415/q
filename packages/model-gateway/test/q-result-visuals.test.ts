@@ -353,3 +353,77 @@ describe("E4: timeline and chart refuse what must not be drawn", () => {
     expect(QResultBlockSchema.safeParse(place("London")).success).toBe(false);
   });
 });
+
+describe("authorized relationship timeline projection", () => {
+  const data = {
+    yourSide: "INVESTOR",
+    counterpart: { kind: "COMPANY", id: COMPANY, name: "Acme" },
+    relationship: {
+      state: "CONNECTED",
+      stateSince: "2026-10-02T00:00:00.000Z",
+      nextStep: "SCHEDULE_MEETING",
+      milestones: [
+        { state: "CONNECTED", at: "2026-10-02T00:00:00.000Z" },
+        { state: "INTEREST_EXPRESSED", at: "2026-10-01T00:00:00.000Z" },
+        { state: "CONNECTED", at: "2026-10-02T00:00:00.000Z" },
+      ],
+    },
+    truthClass: "VERIFIED",
+    source: "Capital Q relationship history",
+  };
+  const read = (
+    metadata: Partial<
+      Pick<QToolCallOutcome, "toolName" | "status" | "classification">
+    > = {},
+    value: unknown = data,
+  ) => {
+    const runs = createRunCompanies();
+    runs.note("timeline", {
+      ...outcome(value),
+      toolName: "relationship.get",
+      status: "SUCCEEDED",
+      classification: "READ_ONLY",
+      ...metadata,
+    });
+    return runs;
+  };
+  const blocks = (runs: ReturnType<typeof read>) =>
+    analystResultBlocks({
+      result: { visual: "TIMELINE" },
+      subjects: [],
+      read: runs.take("timeline"),
+    });
+  it("uses validated milestones, sorts and deduplicates them, and consumes the run", () => {
+    const runs = read();
+    const timeline = blocks(runs)?.find((block) => block.kind === "TIMELINE");
+    expect(
+      timeline?.kind === "TIMELINE" &&
+        timeline.events.map((event) => event.label),
+    ).toEqual(["interest expressed", "connected"]);
+    expect(
+      timeline?.kind === "TIMELINE" && timeline.events[0]?.subject,
+    ).toEqual({ kind: "COMPANY", companyId: COMPANY });
+    expect(timeline?.kind === "TIMELINE" && timeline.events[0]?.note).toBe(
+      data.source,
+    );
+    expect(blocks(runs)).toBeUndefined();
+  });
+  it("refuses denied reads, lookalike web results, invalid output and absent history", () => {
+    expect(blocks(read({ status: "DENIED" }))).toBeUndefined();
+    expect(blocks(read({ toolName: null }))).toBeUndefined();
+    expect(
+      blocks(read({}, { ...data, truthClass: "USER_CLAIM" })),
+    ).toBeUndefined();
+    expect(blocks(read({}, { ...data, relationship: null }))).toBeUndefined();
+  });
+  it("does not choose an arbitrary counterpart when multiple histories were read", () => {
+    const runs = read();
+    runs.note("timeline", {
+      ...outcome({ ...data, counterpart: { ...data.counterpart, id: APEX } }),
+      toolName: "relationship.get",
+      status: "SUCCEEDED",
+      classification: "READ_ONLY",
+    });
+    expect(blocks(runs)).toBeUndefined();
+  });
+});

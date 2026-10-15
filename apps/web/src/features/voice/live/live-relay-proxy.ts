@@ -53,6 +53,7 @@ const OpenResult = z.object({
   model: z.string().nullable(),
   maxSessionMs: z.number().int().positive(),
   idleMs: z.number().int().positive(),
+  context: z.string().max(2_000).nullable().optional(),
 });
 const DelegateBody = z
   .object({
@@ -66,6 +67,7 @@ const DelegateBody = z
       )
       .max(12)
       .optional(),
+    early: z.boolean().optional(),
   })
   .strict();
 const DelegateResult = z.object({
@@ -75,6 +77,8 @@ const DelegateResult = z.object({
   approvalPending: z.boolean(),
   failed: z.boolean(),
   ended: z.boolean().optional(),
+  unheard: z.boolean().optional(),
+  partial: z.boolean().optional(),
   move: z
     .object({
       navigate: QVoiceDestinationSchema.nullable(),

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console */
 /**
  * Recovery G: latency from the logs the services already write. No
  * invented numbers: every figure is a nearest-rank percentile of observed

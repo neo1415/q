@@ -1,11 +1,14 @@
 import { z } from "zod";
 
 import {
+  CompanyRaiseViewSchema,
   FIT_COMPARISON_MAX,
   FitComparisonDtoSchema,
   FitProfileDtoSchema,
   MoneySchema,
+  MODEL_TOOL_RESULT_MAX_CHARS,
   UuidSchema,
+  type CompanyRaiseView,
 } from "@capital-q/contracts";
 import { fitComparisonText, fitProfileText } from "@capital-q/discovery";
 
@@ -50,7 +53,7 @@ export const FIT_TOP_CANDIDATES = "fit.top_candidates" as const;
 // code from the rows (`text` carries it as "7.5/10 · Good fit"); the model
 // repeats it, never makes one.
 const GUIDANCE =
-  "Say each company's fit as the score out of 10 given in text beside its band in words (\"7.5/10 · Good fit\"), exactly as given; where no score is given, the band in words alone. Never a percentage, never a score of your own, never a different number. Then the parameter rows that matter, with their reasons. Unknown means not known yet, never bad. Q's view, if you give one, is labelled as your view and does not change the fit. Do not make a document or PDF unless the person asked for a file.";
+  "Say each company's fit as the score out of 10 given in text beside its profile's band in words (\"7.5/10 · Good fit\"), exactly as given; where no score is given, the band in words alone. Never a percentage, never a score of your own, never a different number. Then the parameter rows that matter, with their reasons. Unknown means not known yet, never bad. Q's view, if you give one, is labelled as your view and does not change the fit. Do not make a document or PDF unless the person asked for a file.";
 
 const STATUSES = [
   "OK",
@@ -81,6 +84,8 @@ export const FitProfileOutputSchema = z
     about: z.string().max(400).nullable().optional(),
     /** The current raise, only where disclosure lets this reader see it. */
     raise: MoneySchema.nullable().optional(),
+    /** R2: the raise as the Discover card and the profile say it, for display. */
+    raiseView: CompanyRaiseViewSchema.optional(),
     profile: FitProfileDtoSchema.nullable(),
     /** The same profile as plain text. */
     text: z.string(),
@@ -107,7 +112,7 @@ export const FitTopCandidatesOutputSchema = z
     status: z.enum(STATUSES),
     /** The typed comparison the answer canvas renders. */
     comparison: FitComparisonDtoSchema.nullable(),
-    /** The same comparison as plain text, for any surface without cards. */
+    /** Canonical comparison text; large results keep the reasons in the typed profiles once. */
     text: z.string(),
     guidance: z.string(),
   })
@@ -124,6 +129,24 @@ const TEXT: Readonly<Record<(typeof STATUSES)[number], string>> = {
   NOT_FOUND: "That company is not one you can see a fit for.",
   NOT_AVAILABLE: "Fit is not available right now.",
 };
+
+/**
+ * R2: the raise each card shows, from the one company read the Discover
+ * card and the profile use. A failed or absent read adds nothing: the card
+ * falls back to the disclosed raise, never to a guess.
+ */
+async function raiseViewsFor(
+  ports: QToolPorts,
+  actor: QToolExecutionContext["actor"],
+  companyIds: readonly string[],
+): Promise<ReadonlyMap<string, CompanyRaiseView>> {
+  if (ports.companyRaise === undefined || companyIds.length === 0) {
+    return new Map();
+  }
+  return ports.companyRaise
+    .raisesFor(actor, companyIds)
+    .catch(() => new Map<string, CompanyRaiseView>());
+}
 
 const authorize = (
   _input: unknown,
@@ -181,11 +204,16 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
       if (result.kind !== "OK") return none(result.kind);
       const item = result.items[0];
       if (item === undefined) return none("NOT_FOUND");
+      const views = await raiseViewsFor(ports, context.actor, [
+        input.companyId,
+      ]);
+      const raiseView = views.get(input.companyId);
       return {
         status: "OK",
         name: item.name,
         about: item.about ?? null,
         raise: item.raise ?? null,
+        ...(raiseView === undefined ? {} : { raiseView }),
         profile: item.assessment.profile,
         text: fitProfileText(item.name, item.assessment.profile),
         guidance: GUIDANCE,
@@ -219,12 +247,33 @@ export function createFitTopCandidatesTool(
       if (fit === undefined) return none("NOT_AVAILABLE");
       const result = await fit.top(context.actor, input.limit ?? 3);
       if (result.kind !== "OK") return none(result.kind);
-      return {
+      const views = await raiseViewsFor(
+        ports,
+        context.actor,
+        result.comparison.entries.map((entry) => entry.companyId),
+      );
+      const output: FitTopCandidatesOutput = {
         status: "OK",
-        comparison: result.comparison,
+        comparison: {
+          ...result.comparison,
+          entries: result.comparison.entries.map((entry) => {
+            const raiseView = views.get(entry.companyId);
+            return raiseView === undefined ? entry : { ...entry, raiseView };
+          }),
+        },
         text: fitComparisonText(result.comparison),
         guidance: GUIDANCE,
       };
+      // Ten rich profiles can exceed the tool bound when all their reasons
+      // are repeated in prose. Keep every authorized row, order and raise;
+      // only shorten the redundant text to canonical scores/bands. The
+      // executor still enforces the same bound on the complete result.
+      if (JSON.stringify(output).length > MODEL_TOOL_RESULT_MAX_CHARS) {
+        output.text = fitComparisonText(result.comparison, {
+          summaryOnly: true,
+        });
+      }
+      return output;
     },
   });
 }

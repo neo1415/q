@@ -5,6 +5,8 @@ import type {
   QResultBlock,
 } from "@capital-q/contracts";
 
+import { movePhaseLine } from "./move-line.js";
+
 /**
  * Facts to speak, not words to read (research 2026-10-07 §4, founder live
  * 2026-10-08, conversation c10b845f).
@@ -313,8 +315,13 @@ function recordFallback(
 ): string {
   const item = facts.items[0];
   const name = item?.name ?? facts.place ?? "That one";
+  // R3: said before the browser has moved -- pending, never arrival.
   const shown = pick(
-    ["I've pulled them up.", "Their page is up.", "I've opened their page."],
+    [
+      "I'm bringing up their page.",
+      "Their page is opening.",
+      "I'm opening their page.",
+    ],
     seed,
     3,
   );
@@ -325,7 +332,7 @@ function recordFallback(
   ) {
     return facts.talkAbout
       ? `${name}: ${shown} I haven't gone through them with you yet. Want me to?`
-      : `${pick(["Here's", "Up now:"], seed)} ${name}. ${facts.next === null ? "" : "Want me to run through them?"}`.trim();
+      : `${movePhaseLine("PENDING", name)} ${facts.next === null ? "" : "Want me to run through them?"}`.trim();
   }
   const ack = pick(["sure", "right", "good pick"], seed);
   const sentences: string[] = [`${name}, ${ack}.`];
@@ -368,26 +375,23 @@ function recordFallback(
   return sentences.join(" ");
 }
 
-function navigateFallback(place: string, seed: number): string {
-  if (/^home$/iu.test(place)) return pick(["Back home.", "Here's home."], seed);
-  // Never "<place> is up": places are often plural ("your relationships",
-  // "your documents"), and live Q said "Your relationships is up" (INC-1).
-  return pick([`Here's ${place}.`, `Over to ${place}.`], seed);
+function navigateFallback(place: string): string {
+  // R3: composed before the browser moves, so pending ("Opening Capital…");
+  // "opened" is the browser's VERIFIED receipt's to say (move-line.ts).
+  return movePhaseLine("PENDING", place);
 }
 
 /**
- * A page move said as a person says it, varied by what was asked
- * ("Here's Discover.", "Over to Discover."): never "Taking you to…".
- * `line` is the code's own destination line ("Taking you to Discover.",
- * "Opening your profile."); anything else comes back unchanged.
+ * A page move as Q says it while the browser is still moving ("Opening
+ * Discover…", R3): never "Taking you to…", never arrival. `line` is the
+ * code's own destination line ("Taking you to Discover.", "Opening your
+ * profile."); anything else comes back unchanged. `_asked` is kept for
+ * callers; the pending line no longer varies by it.
  */
-export function naturalPlaceLine(line: string, asked: string): string {
+export function naturalPlaceLine(line: string, _asked?: string): string {
   const place = navigatedPlace(line);
   if (place === null) return line;
-  return navigateFallback(
-    place.replace(/^home now$/iu, "home"),
-    seedOf(`${asked}\u0000${line}`),
-  );
+  return navigateFallback(place.replace(/^home now$/iu, "home"));
 }
 
 const TALK =
@@ -398,7 +402,7 @@ function openedName(text: string): string | null {
   const quoted = /["“]([^"”\n]{1,80})["”]/u.exec(text)?.[1];
   if (quoted !== undefined) return quoted.trim();
   const bare =
-    /^Opening\s+(.{1,80}?)(?:'s\s+[a-z ]+|\s+in\s+Your companies)?\.$/u.exec(
+    /^Opening\s+(.{1,80}?)(?:'s\s+[a-z ]+|\s+in\s+Your companies)?(?:\.|…)$/u.exec(
       text.trim(),
     )?.[1];
   return bare === undefined ? null : bare.trim();
@@ -407,9 +411,10 @@ function openedName(text: string): string | null {
 /** The place in a code-made navigation line ("Taking you to Discover."). */
 function navigatedPlace(text: string): string | null {
   const trimmed = text.trim();
-  if (/^(?:Back home|Here's home)\.$/u.test(trimmed)) return "home";
+  if (/^(?:Back home|Here's home)\.$|^Heading home…$/u.test(trimmed))
+    return "home";
   const match =
-    /^(?:Taking you(?:\s+to)?|Opening|Here's|Over to)\s+(.{1,60}?)(?:\s+now)?\.$/u.exec(
+    /^(?:Taking you(?:\s+to)?|Opening|Here's|Over to)\s+(.{1,60}?)(?:\s+now)?(?:\.|…)$/u.exec(
       trimmed,
     ) ?? /^(.{1,60}?)\s+is up\.$/u.exec(trimmed);
   if (match?.[1] === undefined) return null;
@@ -552,7 +557,7 @@ export function spokenFactsOf(input: {
         place,
         talkAbout: false,
       };
-      return { ...facts, fallback: navigateFallback(place, seed) };
+      return { ...facts, fallback: navigateFallback(place) };
     }
   }
   return null;

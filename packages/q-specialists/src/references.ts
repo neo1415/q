@@ -4,6 +4,7 @@ import type {
   QResultBlock,
 } from "@capital-q/contracts";
 import type { TurnReference } from "@capital-q/q-core";
+import { movePhaseLine } from "@capital-q/q-core/speech";
 import type {
   QAnswerRequest,
   QConversationMessage,
@@ -12,6 +13,7 @@ import type {
 import type { Logger } from "@capital-q/observability";
 
 import type { TurnAppAction } from "./app-action-turn.js";
+import type { DeckSpeech } from "./deck-speech.js";
 
 /**
  * The conversation reference resolver (follow-55, Zino live 2026-10-04).
@@ -26,6 +28,24 @@ import type { TurnAppAction } from "./app-action-turn.js";
  * own records only), and an action re-runs through its own authorize step
  * and approval card.
  */
+
+/** An explicit edit of an existing file, rather than a request to open it. */
+export function asksToReviseDocument(text: string): boolean {
+  const words = text.trim();
+  return (
+    words.length <= 3_000 &&
+    /^(?:(?:please|q)[,\s]+)*(?:revise|rewrite|edit|update|shorten|restyle)\b/iu.test(
+      words,
+    ) &&
+    /\b(?:document|report|deck|memo|brief|one[- ]pager)\b/iu.test(words) &&
+    // Adding newly researched evidence needs the full research path.
+    !/\b(?:research|search|look up|find new|new evidence)\b/iu.test(words) &&
+    // Multi-action/outward turns keep the existing approval-aware path.
+    !/\b(?:send|share|publish|email|book|schedule|invite|approve|create|prepare)\b/iu.test(
+      words.replace(/\b(?:you just|you already) prepared\b/giu, ""),
+    )
+  );
+}
 
 /** One thing Q showed or named, newest first. */
 export type ShownItem = {
@@ -282,6 +302,18 @@ export type QOpenRecordPort = {
     QClientActionIntent,
     { kind: "OPEN_RECORD_PAGE" }
   > | null>;
+  /**
+   * N2: a company's pitch deck as this person may read it, through the
+   * read_company_deck tool's own authorize step (the same view their Pitch
+   * deck tab shows). Null: no deck they may see -- the caller refuses
+   * plainly and says nothing about it.
+   */
+  readonly deck?:
+    | ((
+        request: QAnswerRequest,
+        companyId: string,
+      ) => Promise<DeckSpeech | null>)
+    | undefined;
 };
 
 export function createToolOpenRecordPort(dependencies: {
@@ -289,6 +321,48 @@ export function createToolOpenRecordPort(dependencies: {
   readonly logger?: Logger | undefined;
 }): QOpenRecordPort {
   return {
+    deck: async (request, companyId) => {
+      try {
+        const outcome = await dependencies.tools.execute(
+          {
+            callId: "q-open-record-deck-read",
+            name: "read_company_deck",
+            arguments: { companyId },
+          },
+          {
+            actor: request.actor,
+            runId: request.runId,
+            correlationId: request.correlationId,
+            capability: request.capability,
+            plan: request.plan,
+            focus: { areas: [], tools: ["read_company_deck"] },
+            ...(request.signal === undefined ? {} : { signal: request.signal }),
+          },
+        );
+        if (!outcome.result.ok) return null;
+        const data = outcome.result.data as Partial<DeckSpeech> | null;
+        if (
+          data === null ||
+          typeof data !== "object" ||
+          !Array.isArray(data.sections) ||
+          (data.viewer !== "INVESTOR" && data.viewer !== "OWNER")
+        ) {
+          return null;
+        }
+        return {
+          viewer: data.viewer,
+          sections: data.sections,
+          confirmedByFounder: data.confirmedByFounder === true,
+        };
+      } catch (error: unknown) {
+        if (request.signal?.aborted === true) throw error;
+        dependencies.logger?.warn(
+          { err: error, qRunId: request.runId },
+          "a company's deck was not read for the person",
+        );
+        return null;
+      }
+    },
     open: async (request, target) => {
       try {
         const outcome = await dependencies.tools.execute(
@@ -332,48 +406,148 @@ export function createToolOpenRecordPort(dependencies: {
   };
 }
 
-/** What Q says as it opens a record (the screen follows the intent). */
+/**
+ * A record's name as Q says it: a trailing parenthetical the records carry
+ * ("Savanna Seed Partners (fictional)") and quotes are not spoken. Bounded
+ * so the pending line stays one the thread can read back (pendingPlaceOf).
+ */
+function spokenName(name: string): string {
+  const bare = name
+    .replace(/\s*\([^)]*\)\s*$/u, "")
+    .replace(/["“”]/gu, "")
+    .trim();
+  return (bare.length === 0 ? name.trim() : bare).slice(0, 60).trim();
+}
+
+/**
+ * What Q says as it opens a record (the screen follows the intent).
+ *
+ * G2-D3 (gate on build/int-rc): this said `Opening "Savanna Seed Partners
+ * (fictional)".` -- a full stop and the quoted raw name -- so the thread
+ * never recognised it as a pending move and never flipped it to "Opened".
+ * Every move line is now the one pending wording (q-core move-line.ts).
+ */
 export function openingLine(
   page: QRecordPage,
   name: string | undefined,
 ): string {
-  const what = name === undefined ? null : `"${name.slice(0, 80)}"`;
+  const what =
+    name === undefined || name.trim().length === 0 ? null : spokenName(name);
+  return movePhaseLine("PENDING", recordPlace(page, what));
+}
+
+/** The place a record move names ("Tallyloom's pitch deck", "the chat"). */
+function recordPlace(page: QRecordPage, what: string | null): string {
   switch (page) {
     case "DOCUMENT":
     case "DATA_ROOM_DOCUMENT":
-      return what === null ? "Opening the document." : `Opening ${what}.`;
+      return what ?? "the document";
     case "RELATIONSHIP_COMPANY_MESSAGES":
     case "RELATIONSHIP_INVESTOR_MESSAGES":
-      return what === null
-        ? "Opening the chat."
-        : `Opening your chat with ${what}.`;
+      return what === null ? "the chat" : `your chat with ${what}`;
     case "COMPANY_PITCH":
-      return what === null
-        ? "Opening the pitch in Your companies."
-        : `Opening ${what} in Your companies.`;
+      return `${what ?? "the pitch"} in Your companies`;
     case "COMPANY":
     case "INVESTOR":
     case "RELATIONSHIP_COMPANY":
     case "RELATIONSHIP_INVESTOR":
     case "INVESTOR_REHEARSAL":
     case "COMPANY_REHEARSAL":
+    case "EXTERNAL_REHEARSAL":
     case "WORK_ITEM":
     case "CAPITAL_ROUND":
     case "GATEQ_APPLICATION":
-      return what === null ? "Opening it." : `Opening ${what}.`;
+      return what ?? "the page";
+    case "DAILY_EDITION":
+      return what ?? "the Daily";
     case "COMPANY_ELEVATOR":
-      return what === null
-        ? "Opening the elevator pitch."
-        : `Opening ${what}'s elevator pitch.`;
+      return what === null ? "the elevator pitch" : `${what}'s elevator pitch`;
     case "COMPANY_DATA_ROOM":
-      return what === null
-        ? "Opening the data room."
-        : `Opening ${what}'s data room.`;
+      return what === null ? "the data room" : `${what}'s data room`;
     case "COMPANY_DECK":
-      return what === null
-        ? "Opening the pitch deck."
-        : `Opening ${what}'s pitch deck.`;
+      return what === null ? "the pitch deck" : `${what}'s pitch deck`;
     case "COMPANY_TEAM":
-      return what === null ? "Opening the team." : `Opening ${what}'s team.`;
+      return what === null ? "the team" : `${what}'s team`;
   }
+}
+
+/**
+ * W4: "I want to rehearse (an investment pitch) with him/her/them" typed or
+ * spoken right after Q showed one identity card of a researched person.
+ * The pronoun is bound to that card (the newest Q answer's only external
+ * card), by code; nothing earlier in the conversation is a referent, and a
+ * name said instead must be that card's. Authority still comes from
+ * open_page's authorize step, not from this reading.
+ */
+const REHEARSE_WITH =
+  /\b(?:rehears\w*|practi[sc]\w*)\b[^.?!]*?\b(?:with|against|on|for)\s+(him|her|them|this\s+(?:person|one|guy|man|woman)|that\s+(?:person|one|guy|man|woman)|the\s+same\s+(?:person|one)|[\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,2})\s*[.!?]*\s*$/iu;
+const NOT_WANTED =
+  /\b(?:don'?t|do not|never|no longer|not)\b[^.?!]*\b(?:rehears|practi[sc])/iu;
+
+export type PersonCardRehearsal = {
+  readonly externalPersonId: string;
+  readonly name: string;
+};
+
+export function rehearseWithPersonCard(
+  text: string,
+  history: readonly QConversationMessage[],
+): PersonCardRehearsal | null {
+  const said = text.replace(/\s+/gu, " ").trim();
+  if (said.length === 0 || said.length > 240 || NOT_WANTED.test(said)) {
+    return null;
+  }
+  const match = REHEARSE_WITH.exec(said);
+  const who = match?.[1];
+  if (who === undefined) return null;
+  // Right after a person card: the newest Q answer decides, nothing older.
+  const latest = [...history].reverse().find((m) => m.role === "Q");
+  if (latest === undefined) return null;
+  const externals = (latest.blocks ?? []).flatMap((block) =>
+    block.kind === "ANSWER_CARDS"
+      ? block.cards.flatMap((card) =>
+          card.external?.rehearse === true &&
+          card.external.externalPersonId !== null
+            ? [{ id: card.external.externalPersonId, name: card.name }]
+            : [],
+        )
+      : [],
+  );
+  if (externals.length !== 1) return null;
+  const only = externals[0];
+  if (only === undefined) return null;
+  const pronoun = /^(?:him|her|them|this |that |the same )/iu.test(who);
+  if (!pronoun) {
+    // A name: the card's own (full, or any one word of it), nobody else's.
+    const spoken = who
+      .toLowerCase()
+      .replace(/[.!?,;:]+$/u, "")
+      .replace(/[’']s$/u, "");
+    const parts = only.name.toLowerCase().split(/\s+/u);
+    const ok =
+      spoken === only.name.toLowerCase() ||
+      (parts.includes(spoken) && spoken.length >= 3);
+    if (!ok) return null;
+  }
+  return { externalPersonId: only.id, name: only.name };
+}
+
+/**
+ * W4: the name said in "rehearse with <name>" (not a pronoun), or null.
+ * A name only: whether it is a researched entity is decided by the
+ * lookup, and whether they may rehearse with it by open_page.
+ */
+export function rehearsalNameOf(text: string): string | null {
+  const said = text.replace(/\s+/gu, " ").trim();
+  if (said.length === 0 || said.length > 240 || NOT_WANTED.test(said)) {
+    return null;
+  }
+  const who = REHEARSE_WITH.exec(said)?.[1];
+  if (who === undefined) return null;
+  if (/^(?:him|her|them|this |that |the same )/iu.test(who)) return null;
+  const name = who
+    .replace(/[.!?,;:]+$/u, "")
+    .replace(/[’']s$/u, "")
+    .trim();
+  return name.length >= 3 ? name : null;
 }

@@ -4,7 +4,13 @@ import { manifestVersion } from "./manifest";
 import { performOnControl } from "./control/perform";
 import { controlOf, kindOfId, registerControl } from "./control/registry";
 import {
-  currentRoute,
+  activeNavigation,
+  navigationNoteRoute,
+  requestNavigation,
+  resetNavigationLifecycle,
+  type NavigationRequest,
+} from "./control/navigation-lifecycle";
+import {
   noteRoute as noteSettledRoute,
   resetRouteState,
   routeEpoch,
@@ -29,10 +35,7 @@ export type UiActHandler = (
   intent: QUiActIntent,
 ) => Promise<QUiActReceipt["status"]> | QUiActReceipt["status"];
 
-/** The new page's route reported (or this long passed) after a move. */
-export const NAVIGATION_WAIT_MS = 20_000;
-/** A move reported FAILED is still listened for this long, to correct it. */
-export const LATE_LANDING_MS = 60_000;
+export { NAVIGATION_WAIT_MS } from "./control/navigation-lifecycle";
 /** A step after a move or another act may wait this long for its control. */
 export const REGISTRATION_WAIT_MS = 4_000;
 /** Otherwise, a moment's grace for a control that is mounting. */
@@ -48,7 +51,7 @@ const LEDGER_MAX = 16;
 
 /** G-R1: the page's receipts as window events, for tests to record. */
 export const UI_ACT_RECEIPT_EVENT = "cq:ui-act-receipt";
-export const NAVIGATION_RECEIPT_EVENT = "cq:navigation-receipt";
+export { NAVIGATION_RECEIPT_EVENT } from "./control/navigation-lifecycle";
 
 function dispatch(name: string, detail: unknown): void {
   if (typeof window === "undefined") return;
@@ -110,211 +113,45 @@ export function recentUiActReports(): readonly UiActReport[] {
 }
 
 // ---------------------------------------------------------------------------
-// Route trail: where this tab has been, in order (BACK, "the page I was on").
+// Moves: one lifecycle (control/navigation-lifecycle.ts) owns them; the act
+// queue only waits for the one on its way.
 // ---------------------------------------------------------------------------
 
-/** What the act queue waits for: the next settled route after a move. */
-let navigationPending: {
-  readonly from: number;
-  readonly at: number;
-  readonly expected: string | null;
-} | null = null;
 let lastActivity = 0;
 
-/** How a move Q made ended: the route the router settled on, or none. */
-export type NavigationOutcome =
-  | {
-      readonly status: "DONE";
-      readonly expected: string | null;
-      readonly route: string;
-    }
-  | { readonly status: "FAILED"; readonly expected: string | null };
-
-const navigationListeners = new Set<(outcome: NavigationOutcome) => void>();
-
-/** Heard per move Q made: settled, or not within the bound. */
-export function onNavigationOutcome(
-  listener: (outcome: NavigationOutcome) => void,
-): () => void {
-  navigationListeners.add(listener);
-  return () => navigationListeners.delete(listener);
-}
-
-/**
- * The move whose outcome is not yet known (or was reported FAILED and may
- * still land late). One at a time: a newer move replaces it.
- */
-let move: {
-  readonly expected: string | null;
-  failed: boolean;
-  timer: ReturnType<typeof setTimeout> | null;
-} | null = null;
-
-/**
- * Whether the route the router settled on is the one asked for: the same
- * path, with every query value the move named (a page may add its own,
- * like the conversation it names). Never "any route change": a URL the
- * page rewrites for itself is not the move landing (G-D14).
- */
-export function routesMatch(expected: string, actual: string): boolean {
-  const base = "http://route.local";
-  let want: URL;
-  let got: URL;
-  try {
-    want = new URL(expected, base);
-    got = new URL(actual, base);
-  } catch {
-    return false;
-  }
-  const path = (url: URL) => url.pathname.replace(/\/+$/u, "") || "/";
-  if (path(want) !== path(got)) return false;
-  for (const [key, value] of want.searchParams) {
-    if (got.searchParams.get(key) !== value) return false;
-  }
-  return true;
-}
-
-/**
- * Pages that send the person on to another page (`/investors` -> Discover
- * for a founder): a move to one has arrived when it lands on where that
- * page sent it. Declared by the redirecting page itself, so a move there
- * is never reported FAILED -- and "that page didn't open" never said --
- * for a page that did its job (live 2026-10-09).
- */
-const redirects = new Map<
-  string,
-  { readonly to: string; readonly at: number }
->();
-const REDIRECT_FRESH_MS = 60_000;
-
-export function noteRedirect(from: string, to: string): void {
-  redirects.set(pathOf(from), { to, at: Date.now() });
-}
-
-function pathOf(route: string): string {
-  try {
-    return (
-      new URL(route, "http://route.local").pathname.replace(/\/+$/u, "") || "/"
-    );
-  } catch {
-    return route;
-  }
-}
-
-/** The move to `expected` has arrived at `actual` (itself, or where it sent them). */
-export function arrivedAt(expected: string, actual: string): boolean {
-  if (routesMatch(expected, actual)) return true;
-  const sent = redirects.get(pathOf(expected));
-  return (
-    sent !== undefined &&
-    Date.now() - sent.at <= REDIRECT_FRESH_MS &&
-    routesMatch(sent.to, actual)
-  );
-}
-
-/** Where this tab is now, by the router's settled route, else its URL. */
-function landedOn(expected: string | null): string | null {
-  const candidates = [
-    currentRoute(),
-    typeof window === "undefined"
-      ? null
-      : `${window.location.pathname}${window.location.search}`,
-  ];
-  for (const candidate of candidates) {
-    if (candidate === null) continue;
-    if (expected === null || arrivedAt(expected, candidate)) return candidate;
-  }
-  return null;
-}
-
-function emit(outcome: NavigationOutcome): void {
-  for (const listener of navigationListeners) listener(outcome);
-  dispatch(NAVIGATION_RECEIPT_EVENT, outcome);
-}
-
-function landed(route: string): void {
-  const current = move;
-  if (current === null) return;
-  if (current.timer !== null) clearTimeout(current.timer);
-  move = null;
-  // A move reported FAILED that lands late is reported again, DONE: the
-  // newest receipt is the truth, so Q never confesses a page that opened.
-  emit({ status: "DONE", expected: current.expected, route });
-}
+export {
+  arrivedAt,
+  navigationInFlight,
+  onNavigationOutcome,
+  routesMatch,
+  type NavigationOutcome,
+} from "./control/navigation-lifecycle";
+export { noteRedirect } from "./control/app-routes";
 
 /**
  * The shell reports each route the router settled on (QControlRuntime);
- * a move Q was waiting for has arrived when it is that route.
+ * the move on its way is verified there.
  */
 export function noteRoute(path: string): void {
   const from = routeEpoch();
   noteSettledRoute(path);
   if (routeEpoch() === from) return;
   lastActivity = Date.now();
-  const expected = navigationPending?.expected ?? null;
-  if (
-    navigationPending !== null &&
-    (expected === null || arrivedAt(expected, path))
-  ) {
-    navigationPending = null;
-  }
-  if (
-    move !== null &&
-    (move.expected === null || arrivedAt(move.expected, path))
-  ) {
-    landed(path);
-  }
+  navigationNoteRoute(path);
 }
 
 export { routeTrail };
 
-/** A move of Q's is on its way and has not landed yet. */
-export function navigationInFlight(): boolean {
-  return move !== null && !move.failed;
-}
-
 /**
- * A move is on its way (Q's own navigation, to `path` when known): the
- * next step waits for the new route, so it never runs on the page being
- * left, and the move itself is DONE only once the router settles on that
- * route. At the deadline it is checked once more against where the tab
- * actually is; only a move that is not there is FAILED, and a late landing
- * is still reported DONE.
+ * Q's move to `path`: validated, executed through the client router and
+ * verified (navigation-lifecycle.ts). A UI act queued after it waits for
+ * the new page instead of acting on the one being left.
  */
-export function expectNavigation(path?: string): void {
-  const expected = path ?? null;
+export function requestMove(
+  request: NavigationRequest,
+): ReturnType<typeof requestNavigation> {
   lastActivity = Date.now();
-  // The same move asked twice (the typed and the room follow) is one move.
-  if (move !== null && move.expected === expected && !move.failed) return;
-  navigationPending = { from: routeEpoch(), at: Date.now(), expected };
-  if (move?.timer != null) clearTimeout(move.timer);
-  if (expected !== null && landedOn(expected) !== null) {
-    move = null;
-    navigationPending = null;
-    emit({ status: "DONE", expected, route: landedOn(expected) ?? expected });
-    return;
-  }
-  const current: NonNullable<typeof move> = {
-    expected,
-    failed: false,
-    timer: null,
-  };
-  move = current;
-  current.timer = setTimeout(() => {
-    current.timer = null;
-    if (move !== current) return;
-    const there = expected === null ? null : landedOn(expected);
-    if (there !== null) {
-      landed(there);
-      return;
-    }
-    current.failed = true;
-    emit({ status: "FAILED", expected });
-    // Still listened for a while: a slow page that lands corrects it.
-    current.timer = setTimeout(() => {
-      if (move === current) move = null;
-    }, LATE_LANDING_MS);
-  }, NAVIGATION_WAIT_MS);
+  return requestNavigation(request);
 }
 
 function wait(ms: number): Promise<void> {
@@ -331,16 +168,9 @@ async function until(test: () => boolean, limitMs: number): Promise<boolean> {
 }
 
 async function settleNavigation(): Promise<void> {
-  const pending = navigationPending;
-  if (pending === null) return;
-  await until(
-    () =>
-      navigationPending !== pending ||
-      (routeEpoch() !== pending.from &&
-        (pending.expected === null || landedOn(pending.expected) !== null)),
-    Math.max(0, pending.at + NAVIGATION_WAIT_MS - Date.now()),
-  );
-  if (navigationPending === pending) navigationPending = null;
+  const moving = activeNavigation();
+  if (moving === null) return;
+  await moving.settled;
 }
 
 // ---------------------------------------------------------------------------
@@ -501,9 +331,7 @@ export function performUiAct(intent: QUiActIntent): Promise<QUiActReceipt> {
 /** Clears the trail and the ledger (tests). */
 export function resetUiActController(): void {
   resetRouteState();
-  if (move?.timer != null) clearTimeout(move.timer);
-  move = null;
-  navigationPending = null;
+  resetNavigationLifecycle();
   lastActivity = 0;
   ledger.length = 0;
   queue = Promise.resolve();

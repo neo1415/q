@@ -220,7 +220,7 @@ describe("BIZ-001 · a brief is a document you can download", () => {
     // Truth class and evidence status, apart and visible.
     expect(text).toContain("user claim · self reported");
     // Unknown stays unknown, in the file too.
-    expect(text).toContain("What isn't on record yet");
+    expect(text).toContain("Evidence gaps");
     expect(text).toContain("Unit economics");
     expect(text).toContain("Version 2 · 25 September 2026");
     // Every page says it is a private draft, because a page can travel alone.

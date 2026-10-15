@@ -245,7 +245,11 @@ function preview(payload: WorkforceJobStartPayload): string {
  * else goes to the person with the reason; it is never widened.
  */
 export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
-  const executors = registeredExecutors({ research: true });
+  const executors = registeredExecutors({
+    research: true,
+    documents: true,
+    diligence: true,
+  });
   const folded = new Map<string, readonly string[]>();
   for (const step of payload.steps) {
     if (step.role === "WRITER" || step.role === "REVIEWER") {
@@ -286,6 +290,7 @@ export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
           ["chat.message.send", "email.send"].includes(tool),
         ),
         spawned: step.spawned,
+        ...(step.document === undefined ? {} : { document: step.document }),
       },
     ];
   });
@@ -324,7 +329,7 @@ export function createWorkforceJobActions(dependencies: {
         { kind: "USER", userId: payload.ownerUserId },
       ],
       describe: (payload) => ({
-        summary: `Q's team: ${payload.summary}`.slice(0, 200),
+        summary: cardSummary(`Q's team: ${payload.summary}`),
         preview: preview(payload),
       }),
       confirm: () =>
@@ -440,18 +445,30 @@ export function createWorkforceJobBoard(dependencies: {
           }
         }
         const owner = { tenantId: actor.tenantId, userId: actor.userId };
-        if (
-          dependencies.withinLimit !== undefined &&
-          !(await dependencies.withinLimit(owner).catch(() => true))
-        ) {
-          return { status: "LIMIT_REACHED" };
+        if (dependencies.withinLimit !== undefined) {
+          const room = await dependencies.withinLimit(owner).catch(() => null);
+          if (room === null) return { status: "NOT_PLANNED" };
+          if (!room) return { status: "LIMIT_REACHED" };
         }
         const jobs = dependencies.jobsFor(actor);
+        // The one company the goal names, resolved as the person by
+        // goalSubjects; several or none: no NAMED_COMPANY document.
+        const companies = (options?.subjects ?? []).flatMap((subject) =>
+          subject.kind === "COMPANY" ? [subject.companyId] : [],
+        );
         const planned = await jobs
           .plan(owner, {
             goal,
-            permitted: executableJobTools(jobs.research),
+            permitted: executableJobTools(
+              jobs.research,
+              jobs.documents,
+              jobs.diligence,
+            ),
             budgetUsd: budget,
+            namedCompany:
+              companies.length === 1 && companies[0] !== undefined
+                ? { companyId: companies[0], name: "" }
+                : null,
           })
           .catch(() => null);
         // D1: a plan with any step no registered executor can run is not
@@ -472,6 +489,7 @@ export function createWorkforceJobBoard(dependencies: {
           dependsOn: [...step.dependsOn].slice(0, 8),
           budgetUsd: usd(step.budgetUsd),
           spawned: step.spawned,
+          ...(step.document === undefined ? {} : { document: step.document }),
         }));
         const parsed = WorkforceJobStartPayloadSchema.safeParse({
           ownerUserId: actor.userId,
@@ -520,4 +538,19 @@ export function createWorkforceJobBoard(dependencies: {
       },
     },
   };
+}
+
+/**
+ * The card's one line, at most 200 characters, ending on a sentence or a
+ * word, never mid-word (live 2026-10-12: "... for your approval. The res").
+ * The full plan is the card's preview.
+ */
+export function cardSummary(text: string, max = 200): string {
+  const clean = text.replace(/\s+/gu, " ").trim();
+  if (clean.length <= max) return clean;
+  const head = clean.slice(0, max);
+  const sentenceEnd = head.lastIndexOf(". ");
+  if (sentenceEnd >= max / 2) return head.slice(0, sentenceEnd + 1);
+  const space = head.lastIndexOf(" ", max - 1);
+  return `${head.slice(0, space > 0 ? space : max - 1).replace(/[,;:]$/u, "")}…`;
 }

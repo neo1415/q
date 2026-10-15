@@ -2,11 +2,14 @@ import type { EtiquetteGuides } from "@capital-q/q-core";
 import { APP_ACTIONS, appActionToolNames } from "@capital-q/app-actions";
 import { loadEmbeddingConfig } from "@capital-q/config/embeddings";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
+import { createPostgresCompanyKnowledge } from "@capital-q/discovery";
+import { createPostgresContextEpochReader } from "@capital-q/security/postgres";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import {
   createModelGatewayQAnswer,
   createQTurnReader,
   createSmallTalkReply,
+  createTurnSkimmer,
   type QArtifactReviser,
   type QReceiptPort,
   type ClearCheck,
@@ -17,7 +20,7 @@ import {
   type QOwnOnboardingPort,
   type ModelGatewayQAnswerDependencies,
 } from "@capital-q/model-gateway/q";
-import type { ModelDataPosture } from "@capital-q/contracts";
+import type { ArrivalSnapshot, ModelDataPosture } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
   createEmbeddingService,
@@ -52,6 +55,7 @@ import {
   createToolCanonicalPort,
   createToolHandOverPort,
   createToolDelegationPort,
+  createToolTeamJobPort,
   createToolReadinessLead,
   createToolAppActionPort,
   createToolOpenRecordPort,
@@ -61,10 +65,15 @@ import {
   type ArtifactPreparation,
   type PendingDecisionPort,
   type QVisibilityNotebook,
+  type SpecialistQAnswerDependencies,
 } from "@capital-q/q-specialists";
 import { createAppActionArgumentReader } from "./app-action-arguments.js";
 import { createPostgresAwaitingActions } from "./awaiting-actions.js";
 import { createPostgresConversationCore } from "./conversation-core-state.js";
+import {
+  createOwnMandateReads,
+  createWorkingSnapshots,
+} from "./working-snapshot.js";
 import { createAppActionRouter } from "./app-action-router.js";
 import { createProfileGapReader } from "./profile-gap-reader.js";
 
@@ -103,6 +112,10 @@ import { MANDATE_LABELS } from "./mandate-labels.js";
 
 export type QIntelligenceDependencies = {
   readonly sql: DatabaseExecutor;
+  /** W1: what Q told them on arrival, prepared for every turn of theirs. */
+  readonly arrivalSnapshot?:
+    | ((actor: QAnswerRequest["actor"]) => Promise<ArrivalSnapshot | null>)
+    | undefined;
   /** RECOVERY (C's request): receipt facts of the person's recent UI acts. */
   readonly uiActReceipts?:
     ((actor: QAnswerRequest["actor"]) => readonly string[]) | undefined;
@@ -175,6 +188,12 @@ export type QIntelligenceDependencies = {
   readonly counterpartNames: (
     request: QAnswerRequest,
   ) => Promise<readonly string[]>;
+  /** W4: a researched entity reachable by name (seed or own research). */
+  readonly externalEntities?: SpecialistQAnswerDependencies["externalEntities"];
+  /** Instant known-entity lookups: the warm prepared index, in memory. */
+  readonly knownEntities?: SpecialistQAnswerDependencies["knownEntities"];
+  /** Follow-ups about a prepared entity, composed by code (no web, no model). */
+  readonly preparedFollowUp?: SpecialistQAnswerDependencies["preparedFollowUp"];
   /** What Capital Q remembers about the person, for the prompts (ADR 0012). */
   readonly memory?: QMemoryRecall | undefined;
   /** The person's own onboarding, for Home Q (CQ-QX-007). Absent: not read. */
@@ -243,6 +262,9 @@ export type QIntelligenceCapabilities = {
 };
 
 export type QIntelligenceComposition = {
+  readonly companyIntelligence: ReturnType<
+    typeof createCompanyIntelligenceSpecialist
+  >;
   readonly retrieval: QRetrievalPort;
   readonly answer: QAnswerPort;
   readonly capabilities: QIntelligenceCapabilities;
@@ -328,9 +350,38 @@ export function composeQIntelligence(
     sql,
     transactions,
     tools,
+    // K Part 4: their own mandate read, kept per actor (Tier A) while D's
+    // version for it is current; F's scope key, epoch read per request.
+    ownMandateReads: createOwnMandateReads({
+      knowledge: createPostgresCompanyKnowledge({ sql }),
+      epochs: createPostgresContextEpochReader({ sql }),
+    }),
+    // A founder's own company, from their working snapshot (Tier A).
+    ownCompanySnapshot: (() => {
+      const snapshots = createWorkingSnapshots({
+        sql,
+        knowledge: createPostgresCompanyKnowledge({ sql }),
+        epochs: createPostgresContextEpochReader({ sql }),
+      });
+      return async (actor) =>
+        (await snapshots.forActor(actor))?.company ?? null;
+    })(),
     ...(dependencies.uiActReceipts === undefined
       ? {}
       : { uiActReceipts: dependencies.uiActReceipts }),
+    ...(dependencies.arrivalSnapshot === undefined
+      ? {}
+      : {
+          arrivalSnapshot: dependencies.arrivalSnapshot,
+          // W1: the semantic fallback for unusual phrasings.
+          arrivalSkim: createTurnSkimmer({
+            gateway,
+            logger,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
+          }),
+        }),
     context: evidence.context,
     ...(statements === undefined ? {} : { statements }),
     ...(dependencies.profileUpdates === undefined
@@ -425,6 +476,15 @@ export function composeQIntelligence(
       ? {}
       : { pendingDecisions: dependencies.pendingDecisions }),
     counterpartNames: dependencies.counterpartNames,
+    ...(dependencies.knownEntities === undefined
+      ? {}
+      : { knownEntities: dependencies.knownEntities }),
+    ...(dependencies.preparedFollowUp === undefined
+      ? {}
+      : { preparedFollowUp: dependencies.preparedFollowUp }),
+    ...(dependencies.externalEntities === undefined
+      ? {}
+      : { externalEntities: dependencies.externalEntities }),
     ...(dependencies.waitingLines === undefined
       ? {}
       : { waitingLines: dependencies.waitingLines }),
@@ -500,6 +560,10 @@ export function composeQIntelligence(
       tools,
       ...(logger === undefined ? {} : { logger }),
     }),
+    teamJob: createToolTeamJobPort({
+      tools,
+      ...(logger === undefined ? {} : { logger }),
+    }),
     handOver: createToolHandOverPort({
       tools,
       ...(dependencies.firewall === undefined
@@ -560,10 +624,20 @@ export function composeQIntelligence(
               ? {}
               : { dataPosture: dependencies.dataPosture }),
           }),
+          // K fast lane: a short first read races the full one; only a
+          // read-only app query ever acts on it.
+          turnSkim: createTurnSkimmer({
+            gateway,
+            logger,
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
+          }),
         }),
   });
 
   return {
+    companyIntelligence: specialist,
     retrieval: evidence.port,
     answer,
     capabilities: {

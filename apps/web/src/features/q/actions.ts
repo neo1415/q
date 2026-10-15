@@ -39,6 +39,8 @@ import {
 
 import { getSessionAccessToken } from "@/auth/session";
 
+import { forwardedTraceId } from "./request-trace";
+
 /**
  * The only place the browser reaches the Q API (CQ-C5-R1 §13, §19).
  *
@@ -77,7 +79,12 @@ async function qSession(): Promise<ApiSession | QActionResult<never>> {
   if (accessToken === null) {
     return failure("Your session ended. Sign in again to continue.");
   }
-  return { baseUrl: qApiBaseUrl, accessToken };
+  const traceId = await forwardedTraceId();
+  return {
+    baseUrl: qApiBaseUrl,
+    accessToken,
+    ...(traceId === undefined ? {} : { traceId }),
+  };
 }
 
 function isSession(

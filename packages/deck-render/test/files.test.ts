@@ -69,6 +69,11 @@ const deck: QDeck = {
   markIsDraft: false,
 };
 
+function urlOf(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
 describe("QX-004 §7 · the files are real", () => {
   it("writes a PowerPoint whose slides are editable text, not a picture", async () => {
     const laid = layOutDeck(deck);
@@ -239,7 +244,7 @@ describe("photographs on slides (founder direction 2026-09-29)", () => {
     const laid = layOutDeck(photographed);
     const asked: string[] = [];
     const images = await fetchSlideImages(laid, (input) => {
-      asked.push(String(input));
+      asked.push(urlOf(input));
       return Promise.resolve(new Response(PNG));
     });
     expect(asked).toEqual([url]);
@@ -248,9 +253,11 @@ describe("photographs on slides (founder direction 2026-09-29)", () => {
     expect(pdf.byteLength).toBeGreaterThan(plain.byteLength);
     const pptx = await deckToPptx(laid, { title: "x" }, images);
     expect(pptx.byteLength).toBeGreaterThan(0);
+    const second = deck.slides[1];
+    if (second === undefined) throw new Error("fixture deck needs two slides");
     const elsewhere = layOutDeck({
       ...deck,
-      slides: [{ ...deck.slides[1]!, image: { url, alt: "a", credit: "c" } }],
+      slides: [{ ...second, image: { url, alt: "a", credit: "c" } }],
     });
     const tampered = {
       ...elsewhere,
@@ -265,7 +272,7 @@ describe("photographs on slides (founder direction 2026-09-29)", () => {
     };
     const none: string[] = [];
     await fetchSlideImages(tampered, (input) => {
-      none.push(String(input));
+      none.push(urlOf(input));
       return Promise.resolve(new Response(PNG));
     });
     expect(none).toEqual([]);

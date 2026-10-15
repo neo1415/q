@@ -1,0 +1,247 @@
+# CAPITAL Q — FULL ENGINEERING TAKEOVER, RELEASE & PRODUCT COMPLETION
+
+You are taking over as the **primary engineering agent and release owner for Capital Q**, repository `neo1415/q`.
+
+This is a continuation of a substantial existing product, not a new build. Claude Code has been developing and deploying it, but its latest session hit usage limits during a genuinely failed CI run. You are now responsible for carrying the remaining work through implementation, integration, deployment and real-world verification.
+
+**MISSION: Make Capital Q's existing product work exceptionally well, complete the integrated super-agent legion, finish Tavus immersive rehearsals, improve speed and UX, and deploy verified working releases.**
+
+Do not spend this session merely auditing, planning, creating infrastructure or explaining what should happen. Execute.
+
+## 1. Recover the exact project state
+
+Repository: `https://github.com/neo1415/q`
+
+Read these files before making architectural decisions:
+
+- `AGENTS.md`
+- `CLAUDE.md` — honor its product and engineering invariants; reconcile superseded operational notes
+- `docs/ai-handoff/START-HERE.md`
+- `docs/ai-handoff/STATE.md`
+- `docs/ai-handoff/ACTIVE-TASKS.md`
+- Latest entries in `HANDOFF-LOG.md`
+- `DECISIONS.md`
+- `AGENT-EXECUTION-MATRIX.md`
+- `PROMISE-COVERAGE.md` and `LANDING-PROMISES.md`
+- `docs/adr/0066-tavus-faces-for-rehearsals.md`
+
+Read other relevant product specifications and existing implementation as needed.
+
+Inspect the actual branches, open PRs, CI checks, Railway revisions and working-tree state. **GitHub is the source of truth when handoff documentation is stale.**
+
+Continue from the latest existing work. Do not recreate Q, replace the orchestrator, duplicate the workforce, discard the UI, or introduce a second voice architecture.
+
+Use your own branch/worktree. Claude may resume automatically, so avoid simultaneous edits to the same branch or competing deployments.
+
+## 2. FIRST: Fix PR #14 and get it live
+
+PR: `https://github.com/neo1415/q/pull/14`
+
+Last known head: `3a0aea343b8a16cb1dd47c494f4b4e0907cf1d52`.
+
+GitHub Actions run: `38208967641`.
+
+I independently fetched its complete failing test logs. **Exactly two tests failed, while 12,931 passed.**
+
+**Failure A**
+
+`packages/model-gateway/test/natural-conversation-eval.test.ts`, around line 466.
+
+The test expects "Cheque size" but the actual response correctly says "Cheque compatibility".
+
+Preserve the intended product terminology. Update the stale assertion if appropriate, not the improved product wording.
+
+**Failure B**
+
+`packages/q-tools/test/fit-tools.test.ts`, around line 250.
+
+A response measuring 31,353 characters exceeded the test's less-than-31,000-character target. Investigate why newly included fit information bloats the multi-company tool response.
+
+Preserve meaningful evidence and rich company information, but remove redundant repeated text and unnecessary payload duplication. Do not casually increase model-tool size limits, erase legitimate data or weaken the test.
+
+Run the targeted tests and full release checks.
+
+PR #14 also contains:
+
+- The identified memo-generation fix: document findings may contain up to 8,000 characters, without truncating the original research.
+- Tensorgate's $4M round, investor cheque, $100k minimum cheque, post-money SAFE and $30M cap shown in the mandate-fit interface with accurate source labels.
+- Shorter, clearer explanations and progressive disclosure.
+- A fix to prevent cancelled superseded CI runs producing misleading quality-gate failures.
+
+Preserve these changes.
+
+Once the exact commit passes quality and database checks, merge and promote through the established `build/int-rc` → CI lane → `recovery/2026-09-12` release flow. Confirm all four Railway services actually deploy successfully.
+
+Use the repository's established PR-based promotion path if protected branches reject direct pushes.
+
+**Do not stop at CI GREEN. Proceed to LIVE VERIFIED.**
+
+## 3. SECOND: Complete the integrated Q super-agent legion
+
+The latest production workforce acceptance successfully:
+
+- Understood the natural-language multi-step investor request.
+- Created the team-job plan and approval card.
+- Accepted approval.
+- Completed research with five sources.
+- Failed when preparing the investment memo.
+
+The memo failure was traced to a 2,000-character artifact finding limit and is addressed in PR #14, but the entire workflow must now pass for real.
+
+Use `scripts/handoff/live/workforce-acceptance.mjs` and existing fictional, authorized investor/company records.
+
+Complete and verify this exact journey:
+
+**Natural-language request → Q understands goal → proposes governed team job → investor approves → Research specialist → Documents investment memo → independent specialist critique → revised memo → Diligence questions → founder-contact approval card → completed Work deliverables.**
+
+Validate that:
+
+- Specialists genuinely execute and produce persisted, readable outputs.
+- The memo is attached to the correct named company and authorized investor.
+- The reviewer genuinely examines the memo, and a revision is recorded when warranted.
+- Dependency ordering and parallel execution work correctly.
+- No failures disappear into catch blocks or misleading DONE statuses.
+- No founder messages or outward actions are sent without required approval.
+- Progress and deliverables appear naturally in Q and Work.
+- The original conversation maintains context and lets the user continue working with the results.
+
+Fix every live failure until this flow passes. Do not replace real execution with mocked success.
+
+Then expand integration using **the workforce Q already possesses**, connecting it coherently to Q's voice, standing instructions, relationships, documents, meetings, investor/founder operations and existing tools. Do not build an independent agent product alongside Q.
+
+An ordinary question must remain fast. A genuine complex goal or explicit delegation request must route intelligently without requiring magic keywords.
+
+## 4. THIRD: FINISH TAVUS IMMERSIVE VIDEO REHEARSALS
+
+Do not stop at the existing Tavus API adapter or ADR.
+
+Inspect the existing Rehearsals feature, its six versioned archetypes, Q voice implementation, `rehearsals.say`, review/scoring system, authorized screen context, and the dormant Tavus client.
+
+**Tavus should supply the face, voice and real-time conversational interface. Capital Q must remain the brain.**
+
+Implement the complete existing-product experience:
+
+- Launch a video rehearsal from the actual Rehearsals UI.
+- Provide four clearly differentiated, selectable stock-avatar interviewers with distinct conversational styles.
+- Support culturally natural accents where genuinely available, including appropriate Nigerian voices if supported, without impersonating real people or manufacturing stereotypes.
+- Use Q's existing company, pitch, mandate, persona and rehearsal context subject to authorization.
+- Support natural spoken dialogue, interruptions and appropriate screen/presentation awareness.
+- Stream intelligently, without unnecessary round trips or long silent gaps.
+- Enforce a hard 180-second total session limit using server-side lifecycle enforcement and a provider backstop.
+- Give the avatar an opportunity to conclude naturally before forced termination.
+- End and clean up provider conversations reliably, including disconnects, callbacks, retries and failed sessions.
+- Persist the authorized transcript, feedback and rehearsal review using the existing product model.
+- Track provider usage and enforce the configured cost/plan budget.
+- Keep keys server-side and preserve the existing Q voice-rehearsal fallback.
+
+Start with one genuinely working video interviewer, verify it live, then complete and distinguish the others.
+
+Respect Tavus account entitlements and API limits. Do not invent available voices, misuse multiple keys to bypass quotas, or consume expensive video minutes for unnecessary tests.
+
+Meeting participation via Zoom, Google Meet or Teams must use the existing permissions, consent and entitlement gates; do not claim it is supported until verified.
+
+**Success: A founder launches Rehearsals, talks naturally to a responsive avatar powered by Q, finishes within three minutes, and receives a meaningful review.**
+
+## 5. FOURTH: PERFORMANCE IS A FIRST-CLASS REQUIREMENT
+
+Capital Q must feel fast, not merely have sophisticated internal capabilities.
+
+Measure and improve:
+
+- Time to first useful text.
+- Time to first audio.
+- Time to first Work/agent progress.
+- Model classification, retrieval and tool-call overhead.
+- Specialist execution durations.
+- Tavus conversational round-trip latency.
+- Total completion of multi-agent work.
+
+Investigate repeated classifications, slow selected-company responses, unnecessary sequential model calls, duplicate context reads, long blocking preparations, oversized tool results and poor streaming.
+
+Preserve Q's intelligence. Parallelize independent operations and stream real progress.
+
+Avoid adding another model call simply to decide something already available from structured context.
+
+Show before/after measurements from actual runs. Do not invent timings or claim latency improvements based only on code inspection.
+
+## 6. FIFTH: PRODUCT COMPLETENESS AND PREMIUM UX
+
+Audit the existing founder and investor journeys against actual implemented functionality and product promises.
+
+Continue fixing defects rather than merely documenting them.
+
+Pay particular attention to:
+
+- Company discovery, evidence and investor mandate fit.
+- InvestIQ and existing investment assessment methodology.
+- Q's awareness of visible company data, decks, pitches and relationships.
+- Founder/investor permissions and two-sided actions.
+- Documents and durable work products.
+- Onboarding, credit/usage behavior, navigation and unresolved dead ends.
+- Voice/text continuity.
+- Rehearsals and reviews.
+
+Keep presentations intelligent, concise and visually premium.
+
+Do deep reasoning internally, but use short useful explanations by default. Show the strongest insights first; reveal detailed evidence on demand.
+
+Use actual authorized pitch/deck values in the UI, clearly attributed, without falsely scoring unverified figures.
+
+Do not rebuild the frontend or replace functioning interactions to achieve superficial visual improvements.
+
+## 7. RELEASE AUTONOMOUSLY AND VERIFY EVERYTHING
+
+You are authorized to carry out ordinary repository engineering, CI fixes, PR creation, required gated merges and normal deployment promotions for this project.
+
+Follow the existing security, migrations, RLS and approval rules. Never bypass required human approvals, weaken tests or deploy knowingly failing code.
+
+For each substantial completed milestone:
+
+1. Implement and test.
+2. Push a focused commit/PR.
+3. Obtain required passing CI.
+4. Merge through the normal release lanes.
+5. Verify Railway actually deployed the correct revision.
+6. Exercise the real product using authorized fictional accounts.
+7. Capture success/failure evidence.
+8. Update shared handoff files.
+9. Continue to the next unfinished milestone.
+
+When CI is running, work on another independent, non-conflicting task rather than sitting idle. Do not keep pushing cosmetic changes to the same PR and repeatedly cancelling CI.
+
+If external permissions, credentials, provider access or budget requirements block an action, explain the precise blocker and continue with other productive work.
+
+Never expose secrets, commit private evidence or claim live acceptance from local tests.
+
+## 8. EXECUTION PRIORITY FOR THIS CODEX RUN
+
+Use the available extended execution window productively.
+
+Priority order:
+
+**P0:** Fix PR #14's two real CI failures, merge, deploy and verify.
+
+**P1:** Make the complete agent-legion investor task actually pass, with persisted memo, critique, revision and diligence approval.
+
+**P2:** Deliver the first fully integrated, working Tavus video rehearsal, then extend to the four-interviewer experience.
+
+**P3:** Improve measured latency, voice experience and broader integrated agent coverage.
+
+**P4:** Resolve remaining important investor/founder UX defects and product-promise gaps.
+
+Keep going after completing each milestone. Do not stop once the first PR is merged or the first test passes.
+
+Maintain detailed, useful shared handoff checkpoints so another Codex session can continue without losing progress.
+
+At the end, report only verified facts:
+
+- What is implemented.
+- What is CI green.
+- What is deployed.
+- What passed real end-to-end tests.
+- Exact remaining blockers and unfinished work.
+- The next executable step.
+
+**Capital Q is already a substantial running product. Your job is to finish, integrate, accelerate, test and ship it—not reinvent it.**
+
+Begin immediately with the current repository and PR #14's two known test failures. Continue autonomously.

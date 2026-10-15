@@ -2,6 +2,8 @@ import localFont from "next/font/local";
 import type { CSSProperties, ReactNode } from "react";
 
 import { PWA_STANDALONE_SCRIPT } from "@/auth/landing-route";
+import { ThemeToggle } from "@/features/appearance/theme-toggle";
+import { PublicBrandStyle } from "@/features/brand-theme/public-brand-style";
 
 import { CallScene } from "./call-scene";
 import { ConvergeScene } from "./converge-scene";
@@ -51,6 +53,7 @@ export function LandingPage() {
     <div className={`lp cq-landing ${hanken.variable}`}>
       {/* An installed launch never sees this page (src/auth/landing-route.ts). */}
       <script dangerouslySetInnerHTML={{ __html: PWA_STANDALONE_SCRIPT }} />
+      <PublicBrandStyle />
       <Sprite />
       <header className="nav" data-lp-nav="">
         <div className="wrap">
@@ -61,6 +64,7 @@ export function LandingPage() {
           <nav className="nav-links" aria-label="Primary">
             <a href={`#${GATEQ_ANCHOR}`}>Try GateQ</a>
             <a href={`#${HOW_ANCHOR}`}>How Q works</a>
+            <ThemeToggle display="icons" size="touch" />
             <a href={SIGN_IN_HREF}>Sign in</a>
             <a className="btn btn-primary" href={SIGN_UP_HREF}>
               Get started

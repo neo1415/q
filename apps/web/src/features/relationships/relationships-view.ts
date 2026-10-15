@@ -22,6 +22,8 @@ export type RowFacts = {
   readonly unread: number;
   readonly followUpDue: boolean;
   readonly nextCallAt: string | null;
+  /** False: the calls could not be read, so nextCallAt is unknown (R1). */
+  readonly callsRead?: boolean | undefined;
   readonly lastMessageAt: string | null;
   /** Founder: requests still open. Investor: shares not yet opened. */
   readonly diligence: {
@@ -185,6 +187,10 @@ export function nextStepFor(
       `Call ${callTime.format(new Date(nextCall))}`,
       false,
     );
+  }
+  if (item.nextStep === "SCHEDULE_MEETING" && facts?.callsRead === false) {
+    // Unknown is not "none booked": no Book a call over a call we can't see.
+    return step(null, null, null, "Calls couldn't be read just now", false);
   }
   if (item.nextStep === "SCHEDULE_MEETING") {
     return step(

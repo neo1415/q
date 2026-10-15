@@ -81,7 +81,14 @@ const UNRUNNABLE: JobPlanResultV2 = {
   cannot: [],
 };
 
-function world(withinLimit = true, plan: JobPlanResultV2 = PLAN) {
+function world(
+  withinLimit: boolean | (() => Promise<boolean>) = true,
+  plan: JobPlanResultV2 = PLAN,
+) {
+  const checkLimit = () =>
+    typeof withinLimit === "function"
+      ? withinLimit()
+      : Promise.resolve(withinLimit);
   const store = createInMemoryWorkforceStore();
   const expressed: { by: string; companyId: string; key: string }[] = [];
   let plans = 0;
@@ -118,11 +125,11 @@ function world(withinLimit = true, plan: JobPlanResultV2 = PLAN) {
         },
       }),
       ports: portsFor(who),
-      withinLimit: () => Promise.resolve(withinLimit),
+      withinLimit: checkLimit,
     });
   const board = createWorkforceJobBoard({
     jobsFor,
-    withinLimit: () => Promise.resolve(withinLimit),
+    withinLimit: checkLimit,
   });
   // Recovery D3: approval enqueues; the durable runner carries it out.
   const queue = createInMemoryAgentWorkQueue();
@@ -180,6 +187,43 @@ async function execute(
 }
 
 describe("a job the lead Q proposes (J1, J4)", () => {
+  it("does not plan new work when the spending ledger is unavailable", async () => {
+    const { board, plans } = world(() =>
+      Promise.reject(new Error("ledger unavailable")),
+    );
+    expect(
+      (await board.port.prepare(actor, "run-ledger-down", "Find me fits"))
+        .status,
+    ).toBe("NOT_PLANNED");
+    expect(plans()).toBe(0);
+  });
+
+  it("holds already-approved queued work when spending cannot be checked", async () => {
+    let unavailable = false;
+    const { board, definition, store, expressed } = world(() =>
+      unavailable
+        ? Promise.reject(new Error("ledger unavailable"))
+        : Promise.resolve(true),
+    );
+    await board.port.prepare(actor, "run-ledger-after", "Find me fits");
+    const proposal = await board.proposer.propose({
+      runId: "run-ledger-after",
+      actor,
+    } as unknown as Parameters<typeof board.proposer.propose>[0]);
+    if (proposal === null || "refused" in proposal) throw new Error("none");
+    unavailable = true;
+    await execute(
+      definition,
+      WorkforceJobStartPayloadSchema.parse(proposal.payload),
+      actor,
+    );
+    await vi.waitFor(() => expect(store.rows.jobs[0]?.status).toBe("HELD"));
+    expect(expressed).toEqual([]);
+    expect(store.rows.runs.find((run) => run.role === "LEAD")?.summary).toMatch(
+      /couldn't check.*spending/i,
+    );
+  });
+
   it("plans, shows the plan in plain words, and proposes it as the card", async () => {
     const { board } = world();
     const prepared = await board.port.prepare(actor, "run-1", "Find me fits");

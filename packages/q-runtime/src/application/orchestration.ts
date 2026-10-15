@@ -249,6 +249,65 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * readiness leads that answer (QA 2026-10-03, run 2cba241a).
    */
   readonly questionKind?: string | undefined;
+  /** The turn reader named someone other than the conversation's subject. */
+  readonly aboutNamedOther?: boolean | undefined;
+  /**
+   * K8: the reader read a question about something prepared for this turn
+   * (their mandate, the record on screen, Q's work for them). The router
+   * answers it from that context without a tool round when it is there.
+   */
+  readonly preparedSubject?:
+    "MANDATE" | "ON_SCREEN_RECORD" | "Q_WORK" | "OWN_COMPANY" | undefined;
+  /**
+   * K1: a DISCOVER_COMPANIES request as the reader read it ("three
+   * fintech companies in Nigeria"). Answered from the catalog by code, fit
+   * only when asked for; never the analyst, never the public web.
+   */
+  readonly discoverCompanies?:
+    | {
+        /** Their question in its words, for the answer's heading. */
+        readonly text: string;
+        readonly sectors: readonly string[];
+        readonly countries: readonly string[];
+        readonly stages: readonly string[];
+        readonly count: number | null;
+        readonly ranking: "NONE" | "FIT" | "TOP";
+        readonly mandateRelevant: boolean;
+        readonly previous: boolean;
+      }
+    | undefined;
+  /**
+   * W2: a PERSON_SEARCH request as the first read understood it: one named
+   * person, company or government body to identify from public sources,
+   * with only the clues the person gave. Answered by code as an identity
+   * card from the lookup tool; never the analyst describing someone.
+   */
+  readonly personSearch?:
+    | {
+        readonly name: string;
+        readonly entityKind: "PERSON" | "ORGANIZATION" | "GOVERNMENT_AGENCY";
+        readonly city: string | null;
+        readonly country: string | null;
+        readonly organization: string | null;
+        readonly role: string | null;
+        readonly freshSearch: boolean;
+      }
+    | undefined;
+  /**
+   * D1: investors of a region or kind, no name given ("top three Arab
+   * investors that may be interested in this"), as the first read
+   * understood it. Region words are as the member said them; code maps
+   * them to countries. Answered by code with candidate cards.
+   */
+  readonly discoverInvestors?:
+    | {
+        readonly regions: readonly string[];
+        readonly sector: string | null;
+        readonly stage: string | null;
+        readonly count: number | null;
+        readonly aboutMyCompany: boolean;
+      }
+    | undefined;
   /**
    * A FIT question as the reader read it (live 2026-10-09): their question
    * in its words -- the earlier ask when this turn only pressed on it
@@ -256,7 +315,13 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
    * no number. Answered from the computed fit, never the public web.
    */
   readonly fitQuestion?:
-    { readonly text: string; readonly count: number | null } | undefined;
+    | {
+        readonly text: string;
+        readonly count: number | null;
+        /** The reader read it as about the companies Q just showed. */
+        readonly previous?: boolean | undefined;
+      }
+    | undefined;
   /**
    * Lines code composed to open this answer (readiness for "what should I
    * do next?"), said before the model's own words. Absent: none.

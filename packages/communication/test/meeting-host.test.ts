@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   addressedToQ,
   asksQToBreakRules,
+  waitMaxMsFromEnv,
   boundedPolicy,
   createMeetingHost,
   DEFAULT_HOST_LIMITS,
@@ -459,75 +460,27 @@ describe("meeting host: bounded waiting and who turns up", () => {
   const leaves = (actions: readonly HostAction[]) =>
     actions.flatMap((a) => (a.kind === "LEAVE" ? [a.reason] : []));
 
-  it("nobody comes: at the end of the grace period Q leaves and reports a no-show", () => {
+  it("nobody comes: at the end of the grace period Q leaves, reporting that nobody came (the booking is untouched)", () => {
     const host = createMeetingHost(CONTEXT);
     expect(host.handle({ kind: "TICK", at: START + GRACE - 1_000 })).toEqual(
       [],
     );
     const out = host.handle({ kind: "TICK", at: START + GRACE });
-    expect(outcomes(out)).toEqual([{ kind: "NO_SHOW" }]);
+    expect(outcomes(out)).toEqual([{ kind: "NO_SHOW", cause: "WAIT_EXPIRED" }]);
     expect(leaves(out)).toEqual(["POLICY"]);
     expect(host.phase()).toBe("LEFT");
   });
 
-  it("one side comes: Q apologises, offers to reach the other side, and asks to let them know", () => {
+  it("one side comes: at the grace period Q checks in and stays; it does not leave", () => {
     const host = createMeetingHost(CONTEXT);
     run(host, { kind: "JOIN", participant: ADAEZE, at: START - 60_000 });
     const asked = run(host, { kind: "TICK", at: START + GRACE });
     expect(said(asked).at(-1)?.text).toBe(
-      "I'm sorry, Tunde hasn't joined. I'll reach out to them to find a new time. Shall I let you know once it's rescheduled?",
+      "It looks like we're still waiting for the other participant. Would you like me to keep waiting or help you prepare?",
     );
     expect(host.phase()).toBe("ONE_SIDED");
-    const answer = host.handle({
-      kind: "UTTERANCE",
-      participant: ADAEZE,
-      text: "Yes please.",
-      at: START + GRACE + 20_000,
-    });
-    expect(outcomes(answer)).toEqual([
-      {
-        kind: "ONE_SIDED",
-        presentSide: "FOUNDER",
-        absentSide: "INVESTOR",
-        presentUserIds: ["u-founder"],
-        reschedule: true,
-      },
-    ]);
-    expect(said(answer).map((s) => s.text)).toEqual([
-      "Thank you. I'll let you know once it's rescheduled. I'll leave you now.",
-    ]);
-    expect(leaves(answer)).toEqual(["POLICY"]);
-  });
-
-  it("never mind is recorded, and Q stops", () => {
-    const host = createMeetingHost(CONTEXT);
-    run(host, { kind: "JOIN", participant: ADAEZE, at: START - 60_000 });
-    run(host, { kind: "TICK", at: START + GRACE });
-    const answer = host.handle({
-      kind: "UTTERANCE",
-      participant: ADAEZE,
-      text: "Oh never mind, we'll sort it ourselves.",
-      at: START + GRACE + 20_000,
-    });
-    expect(outcomes(answer)).toMatchObject([
-      { kind: "ONE_SIDED", reschedule: false },
-    ]);
-    expect(said(answer).map((s) => s.text)).toEqual([
-      "Understood, I won't. I'll leave you now.",
-    ]);
-  });
-
-  it("no answer to the question is taken as a yes after the wait", () => {
-    const host = createMeetingHost(CONTEXT);
-    run(host, { kind: "JOIN", participant: ADAEZE, at: START - 60_000 });
-    run(host, { kind: "TICK", at: START + GRACE });
-    const out = host.handle({
-      kind: "TICK",
-      at: START + GRACE + DEFAULT_HOST_POLICY.answerWaitMs + 1,
-    });
-    expect(outcomes(out)).toMatchObject([
-      { kind: "ONE_SIDED", reschedule: true },
-    ]);
+    expect(leaves(asked)).toEqual([]);
+    expect(outcomes(asked)).toEqual([]);
   });
 
   it("a late arrival within the grace period: introductions as normal, no outcome", () => {
@@ -545,7 +498,7 @@ describe("meeting host: bounded waiting and who turns up", () => {
     expect(host.phase()).toBe("LISTENING");
   });
 
-  it("the missing side arriving while Q is asking cancels the apology path", () => {
+  it("the missing side arriving after the check-in is recognised and the call continues", () => {
     const host = createMeetingHost(CONTEXT);
     run(host, { kind: "JOIN", participant: ADAEZE, at: START - 60_000 });
     run(host, { kind: "TICK", at: START + GRACE });
@@ -720,5 +673,238 @@ describe('"Q, be quiet" (ADR 0039)', () => {
     expect(
       said(run(host, { kind: "TICK", at: near + 20_000 })).map((s) => s.text),
     ).toEqual(["Nothing was agreed yet."]);
+  });
+});
+
+describe("meeting host: waiting for the other participant (live bug 2026-10-09)", () => {
+  const START = CONTEXT.startsAt.getTime();
+  const GRACE = DEFAULT_HOST_POLICY.graceAfterStartMs;
+  const PATIENCE = DEFAULT_HOST_POLICY.checkInPatienceMs;
+  const CAP = DEFAULT_HOST_POLICY.waitMaxAfterStartMs;
+  const outcomes = (actions: readonly HostAction[]) =>
+    actions.flatMap((a) => (a.kind === "OUTCOME" ? [a.outcome] : []));
+  const leaves = (actions: readonly HostAction[]) =>
+    actions.flatMap((a) => (a.kind === "LEAVE" ? [a] : []));
+  const say = (
+    host: ReturnType<typeof createMeetingHost>,
+    text: string,
+    at: number,
+  ) => run(host, { kind: "UTTERANCE", participant: ADAEZE, text, at });
+
+  function waiting() {
+    const host = createMeetingHost(CONTEXT);
+    run(host, { kind: "JOIN", participant: ADAEZE, at: START - 60_000 });
+    return host;
+  }
+
+  it("silence is never consent: no reschedule, no cancel, and Q stays until the wait runs out", () => {
+    const host = waiting();
+    run(host, { kind: "TICK", at: START + GRACE }); // the check-in
+    const quiet = host.handle({
+      kind: "TICK",
+      at: START + GRACE + PATIENCE - 5_000,
+    });
+    expect(leaves(quiet)).toEqual([]);
+    expect(outcomes(quiet)).toEqual([]);
+    expect(host.phase()).not.toBe("LEFT");
+    // When the wait does run out it is a departure with a reason, and the
+    // outcome carries no request to reschedule.
+    const out = host.handle({ kind: "TICK", at: START + GRACE + PATIENCE + 1 });
+    const outcome = outcomes(out)[0];
+    expect(outcome).toMatchObject({
+      kind: "ONE_SIDED",
+      cause: "WAIT_EXPIRED",
+      rescheduleRequested: false,
+    });
+    expect(leaves(out)[0]?.cause).toBe("WAIT_EXPIRED");
+    expect(out.some((a) => a.kind === "RESCHEDULE_REQUESTED")).toBe(false);
+  });
+
+  it("ordinary speech while waiting is a conversation, not a reschedule decision", () => {
+    const host = waiting();
+    run(host, { kind: "TICK", at: START + GRACE });
+    const out = say(
+      host,
+      "Yes please, tell me about the investor.",
+      START + GRACE + 20_000,
+    );
+    expect(outcomes(out)).toEqual([]);
+    expect(leaves(out)).toEqual([]);
+    expect(out.some((a) => a.kind === "RESCHEDULE_REQUESTED")).toBe(false);
+    expect(host.phase()).not.toBe("LEFT");
+  });
+
+  it.each([
+    "wait",
+    "Wait, hang on a second",
+    "Hang on",
+    "Hold on a minute",
+    "Don't leave",
+    "Q, don't leave",
+    "Stay with me",
+    "Q, stay with me please",
+    "Let's talk while we wait",
+    "Give them a few more minutes",
+    "Please give him ten more minutes",
+    "Keep waiting",
+    "They're on their way",
+    "She's running late",
+    "Just a moment",
+    "Can you stick around a bit longer",
+  ])("understands %j as a request to keep waiting", (text) => {
+    const host = waiting();
+    run(host, { kind: "TICK", at: START + GRACE });
+    const at = START + GRACE + 30_000;
+    const out = say(host, text, at);
+    expect(out.some((a) => a.kind === "COMPOSE")).toBe(false);
+    expect(said(out).map((s) => s.why)).toContain("WAITING");
+    expect(
+      said(out)
+        .map((s) => s.text)
+        .join(" "),
+    ).not.toContain("couldn't");
+    // The wait moved later: past where it would have run out unasked.
+    const past = host.handle({
+      kind: "TICK",
+      at: START + GRACE + PATIENCE + 1,
+    });
+    expect(leaves(past)).toEqual([]);
+    expect(host.phase()).not.toBe("LEFT");
+  });
+
+  it("a wait request is not abusable: the configured cap still ends the wait, with the reason said", () => {
+    const host = waiting();
+    let at = START + GRACE;
+    run(host, { kind: "TICK", at });
+    // Keep asking to wait, again and again, all the way to the cap.
+    while (at < START + CAP - 60_000) {
+      at += 2 * 60_000;
+      const out = host.handle({
+        kind: "UTTERANCE",
+        participant: ADAEZE,
+        text: "Please keep waiting",
+        at,
+      });
+      expect(leaves(out)).toEqual([]);
+    }
+    const out = host.handle({ kind: "TICK", at: START + CAP });
+    const lines = said(out);
+    expect(lines.at(-1)?.why).toBe("LEAVING");
+    expect(lines.at(-1)?.text).toContain("Tunde still hasn't joined");
+    expect(lines.at(-1)?.text).toContain(
+      "Nothing about the meeting has changed",
+    );
+    expect(leaves(out)[0]?.cause).toBe("WAIT_CAP");
+    expect(outcomes(out)).toMatchObject([
+      { kind: "ONE_SIDED", cause: "WAIT_CAP", rescheduleRequested: false },
+    ]);
+  });
+
+  it("the wait cap is configurable and bounded, and never past the hard cap", () => {
+    expect(
+      boundedPolicy({ waitMaxAfterStartMs: 40 * 60_000 }).waitMaxAfterStartMs,
+    ).toBe(40 * 60_000);
+    expect(boundedPolicy({ waitMaxAfterStartMs: 0 }).waitMaxAfterStartMs).toBe(
+      5 * 60_000,
+    );
+    expect(
+      boundedPolicy({ waitMaxAfterStartMs: 9 * 3_600_000 }).waitMaxAfterStartMs,
+    ).toBe(60 * 60_000);
+    expect(
+      boundedPolicy({
+        waitMaxAfterStartMs: 60 * 60_000,
+        hardCapAfterStartMs: 30 * 60_000,
+      }).waitMaxAfterStartMs,
+    ).toBeLessThan(30 * 60_000);
+    expect(waitMaxMsFromEnv(undefined)).toBe(20 * 60_000);
+    expect(waitMaxMsFromEnv("35")).toBe(35 * 60_000);
+    expect(waitMaxMsFromEnv("soon")).toBe(20 * 60_000);
+  });
+
+  it("a person asking for a new time is recorded, nothing is moved, and Q keeps waiting", () => {
+    const host = waiting();
+    run(host, { kind: "TICK", at: START + GRACE });
+    const out = say(host, "Can we reschedule this?", START + GRACE + 10_000);
+    expect(out.filter((a) => a.kind === "RESCHEDULE_REQUESTED")).toHaveLength(
+      1,
+    );
+    expect(leaves(out)).toEqual([]);
+    expect(outcomes(out)).toEqual([]);
+    const end = host.handle({ kind: "TICK", at: START + CAP });
+    expect(outcomes(end)).toMatchObject([
+      { kind: "ONE_SIDED", rescheduleRequested: true },
+    ]);
+  });
+
+  it("the check-in comes once per cycle, and Q greets the present attendee first", () => {
+    const host = waiting();
+    const first = run(host, { kind: "TICK", at: START + GRACE });
+    const second = run(host, { kind: "TICK", at: START + GRACE + 100_000 });
+    expect(
+      [...said(first), ...said(second)].filter((s) => s.why === "ONE_SIDED"),
+    ).toHaveLength(1);
+  });
+
+  it("a live conversation is not walked out of when the soft wait runs out", () => {
+    const host = waiting();
+    run(host, { kind: "TICK", at: START + GRACE });
+    const at = START + GRACE + PATIENCE - 20_000;
+    host.handle({
+      kind: "UTTERANCE",
+      participant: ADAEZE,
+      text: "Q, what does the investor usually ask founders?",
+      at,
+    });
+    const out = host.handle({ kind: "TICK", at: START + GRACE + PATIENCE + 1 });
+    expect(leaves(out)).toEqual([]);
+  });
+
+  it("a late joiner is recognised: greeted, introduced to the other side, and the wait ends", () => {
+    const host = waiting();
+    run(host, { kind: "TICK", at: START + GRACE });
+    const late = run(host, {
+      kind: "JOIN",
+      participant: TUNDE,
+      at: START + GRACE + PATIENCE - 30_000,
+    });
+    const why = said(late).map((s) => s.why);
+    expect(why).toContain("GREET");
+    expect(why).toContain("INTRO");
+    expect(said(late).find((s) => s.why === "GREET")?.text).toContain(
+      "Hi Tunde",
+    );
+    const after = run(host, { kind: "TICK", at: START + CAP + 5 * 60_000 });
+    expect(leaves(after)).toEqual([]);
+    expect(outcomes(after)).toEqual([]);
+    expect(host.phase()).toBe("LISTENING");
+  });
+
+  it("a speaker whose join Q never saw is attributed, not dropped", () => {
+    const host = createMeetingHost(CONTEXT);
+    const out = say(host, "Q, can you hear me?", START + 30_000);
+    const roster = out.flatMap((a) => (a.kind === "ROSTER" ? [a.entry] : []));
+    expect(roster.map((r) => [r.callName, r.kind])).toEqual([
+      ["Adaeze Okafor", "ARRIVED"],
+    ]);
+    expect(out.some((a) => a.kind === "COMPOSE")).toBe(true);
+    expect(host.stats().attributedImplicit).toBe(1);
+  });
+
+  it("the reader's fallback extends the wait the same bounded way", () => {
+    const host = waiting();
+    run(host, { kind: "TICK", at: START + GRACE });
+    host.keepWaiting(START + GRACE + PATIENCE - 1_000);
+    const out = run(host, { kind: "TICK", at: START + GRACE + PATIENCE + 1 });
+    expect(leaves(out)).toEqual([]);
+    expect(said(out).map((s) => s.why)).toContain("WAITING");
+  });
+
+  it("stats count each stage of a line, never its words", () => {
+    const host = waiting();
+    say(host, "Q, what is on the agenda?", START + 60_000);
+    const stats = host.stats();
+    expect(stats.utterances).toBe(1);
+    expect(stats.addressed).toBe(1);
+    expect(JSON.stringify(stats)).not.toContain("agenda");
   });
 });

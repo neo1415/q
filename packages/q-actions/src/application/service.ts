@@ -399,6 +399,39 @@ export function toApprovalView(
   });
 }
 
+/**
+ * The records an action is bound to (G-D23): what it declares, or -- for an
+ * action on the person's own records that names no other entity -- the
+ * proposer themselves. The same rule at proposal and at revision.
+ */
+function targetsOf(
+  definition: AnyQActionDefinition,
+  payload: unknown,
+  proposerUserId: string,
+): readonly QSubjectRef[] {
+  const declared: readonly QSubjectRef[] = definition.targets(payload);
+  return declared.length > 0
+    ? declared
+    : [{ kind: "USER", userId: proposerUserId }];
+}
+
+/**
+ * What a setter sets, for "a newer card replaces the older one": the
+ * definition's own resource key; else its declared targets. A setter that
+ * declares no targets and no key never replaces anything -- its default
+ * target (the proposer) would match every card of theirs (G-D23 follow-up).
+ */
+function supersedeKeyOf(
+  definition: AnyQActionDefinition,
+  payload: unknown,
+): string | null {
+  if (definition.supersedeKey !== undefined) {
+    return definition.supersedeKey(payload);
+  }
+  const declared = definition.targets(payload);
+  return declared.length === 0 ? null : canonicalJsonStringify([...declared]);
+}
+
 export function createQActionService(
   dependencies: QActionServiceDependencies,
 ): QActionService {
@@ -1032,10 +1065,14 @@ export function createQActionService(
     if (!payload.success) {
       throw new QActionNotPermittedError();
     }
-    const targets: readonly QSubjectRef[] = definition.targets(payload.data);
-    if (targets.length === 0) {
-      throw new QActionNotPermittedError();
-    }
+    // G-D23 (2026-10-09): an action on the person's own records (their
+    // profile answer, their settings, their inbox) names no other entity.
+    // Refusing it here dropped every such card after the tool had said
+    // PREPARED, so nothing could ever be approved. Its subject is the
+    // proposer themselves, bound like any target (in the payload hash and
+    // on the action row); the definition's own authorize step below still
+    // decides whether they may take it.
+    const targets = targetsOf(definition, payload.data, actor.userId);
     // The person's authority to take THIS action, now. Approval later never
     // creates what is missing here.
     const authorized = await definition.authorize(payload.data, actor);
@@ -1207,12 +1244,19 @@ export function createQActionService(
             // card replaces the older ones (lead 2026-10-03, run
             // a4618f34: "investors" and "my organisation only" both
             // waited for one deck, and approving both applied the last).
-            const targetKey = canonicalJsonStringify([...targets]);
+            const resourceKey = supersedeKeyOf(definition, payload.data);
             const replaced: QActionRecord[] = [];
-            for (const older of definition.supersedes === true ? waiting : []) {
+            for (const older of definition.supersedes === true &&
+            resourceKey !== null
+              ? waiting
+              : []) {
+              if (older.action.runId === run.id) continue;
+              const olderPayload = definition.payload.safeParse(
+                older.action.payload,
+              );
               if (
-                older.action.runId === run.id ||
-                canonicalJsonStringify([...older.action.targets]) !== targetKey
+                !olderPayload.success ||
+                supersedeKeyOf(definition, olderPayload.data) !== resourceKey
               ) {
                 continue;
               }
@@ -2049,7 +2093,8 @@ export function createQActionService(
         throw new QActionNotPermittedError();
       }
       // Same consequence, other words: another target is another action.
-      const targets: readonly QSubjectRef[] = definition.targets(next.data);
+      // The same default as at proposal (G-D23): the original proposer.
+      const targets = targetsOf(definition, next.data, action.proposedByUserId);
       if (
         canonicalJsonStringify([...targets]) !==
         canonicalJsonStringify([...action.targets])

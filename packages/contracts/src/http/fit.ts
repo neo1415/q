@@ -4,6 +4,7 @@ import { UuidSchema } from "../common/ids.js";
 import { MoneySchema } from "../common/money.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { EvidenceStatusSchema } from "../evidence/vocabulary.js";
+import { CompanyRaiseViewSchema } from "./company-raise.js";
 
 /**
  * Fit with your mandate (founder brief 2026-10-05, B1-B4; ADR 0052).
@@ -70,6 +71,56 @@ export const FIT_CONFIDENCE_LEVELS = ["HIGH", "MEDIUM", "LOW"] as const;
 export const FitConfidenceSchema = z.enum(FIT_CONFIDENCE_LEVELS);
 export type FitConfidence = z.infer<typeof FitConfidenceSchema>;
 
+/**
+ * Where a value shown beside a fit row comes from (2026-10-12). The fit
+ * scores only declared inputs; these say what is KNOWN to this reader and
+ * from where, so a row never looks empty because scoring cannot use it.
+ */
+export const FIT_CONTEXT_SOURCES = [
+  "PITCH",
+  "DECK",
+  "PITCH_AND_DECK",
+  "SHARED",
+  "YOUR_MANDATE",
+] as const;
+export const FitContextSourceSchema = z.enum(FIT_CONTEXT_SOURCES);
+export type FitContextSource = z.infer<typeof FitContextSourceSchema>;
+
+export const FIT_CONTEXT_SOURCE_LABELS: Readonly<
+  Record<FitContextSource, string>
+> = {
+  PITCH: "From pitch",
+  DECK: "From deck",
+  PITCH_AND_DECK: "From pitch and deck",
+  SHARED: "Shared with you",
+  YOUR_MANDATE: "Your mandate",
+};
+
+export const FitContextItemSchema = z
+  .object({
+    /** "Raise", "Your cheque", "Instrument", "Valuation cap". */
+    label: z.string().min(1).max(40),
+    /** The value as stated, e.g. "$4M", "Post-money SAFE". */
+    value: z.string().min(1).max(60),
+    source: FitContextSourceSchema,
+  })
+  .strict();
+export type FitContextItem = z.infer<typeof FitContextItemSchema>;
+
+export const FitParameterContextSchema = z
+  .object({
+    /** What is known, each with its source; never scored. */
+    items: z.array(FitContextItemSchema).max(6),
+    /**
+     * What is still open, said separately from what is known: "Ticket fit
+     * not scored until the round is formally shared", "Lead investor
+     * required: not stated". Null when nothing is.
+     */
+    open: z.string().min(1).max(120).nullable(),
+  })
+  .strict();
+export type FitParameterContext = z.infer<typeof FitParameterContextSchema>;
+
 export const FitParameterResultDtoSchema = z
   .object({
     parameter: FitParameterSchema,
@@ -85,6 +136,14 @@ export const FitParameterResultDtoSchema = z
      * counts toward neither fit nor confidence (outcome is UNKNOWN).
      */
     applicable: z.boolean(),
+    /**
+     * The reason names what the company STATED where this reader may see
+     * it (a pitch, a confirmed deck) but did not formally share: shown as
+     * stated, never scored. Only on UNKNOWN rows; absent otherwise.
+     */
+    stated: z.literal(true).optional(),
+    /** Known values beside the row, with their sources (CHEQUE_SIZE, ROUND_TERMS). */
+    context: FitParameterContextSchema.optional(),
   })
   .strict();
 export type FitParameterResultDto = z.infer<typeof FitParameterResultDtoSchema>;
@@ -214,6 +273,12 @@ export const FitComparisonEntryDtoSchema = z
     about: z.string().max(400).nullable().optional(),
     /** The current raise, only where disclosure lets this reader see it. */
     raise: MoneySchema.nullable().optional(),
+    /**
+     * R2: the raise as this reader sees it on every surface (`raiseFor`),
+     * for display. `raise` above stays the disclosed objective the fit
+     * itself was computed from. Absent where no reader is composed.
+     */
+    raiseView: CompanyRaiseViewSchema.optional(),
     sources: z.array(FitCandidateSourceSchema).min(1).max(3),
     profile: FitProfileDtoSchema,
     /** Rows where this entry is the best of the set (shown with a word, never colour alone). */
@@ -343,12 +408,14 @@ export const FIT_PARAMETER_LABELS: Readonly<Record<FitParameter, string>> = {
   STAGE: "Stage",
   SECTOR: "Sector",
   GEOGRAPHY: "Geography",
-  CHEQUE_SIZE: "Cheque size",
+  // The raise is the round, not anyone's cheque: this row compares the
+  // investor's own cheque with the round (2026-10-12).
+  CHEQUE_SIZE: "Cheque compatibility",
   BUSINESS_MODEL: "Business model",
   TRACTION: "Traction",
   TEAM: "Team",
   THESIS: "Thesis",
-  ROUND_TERMS: "Round",
+  ROUND_TERMS: "Round terms",
 };
 
 export const FIT_OUTCOME_LABELS: Readonly<Record<FitOutcome, string>> = {
@@ -360,6 +427,12 @@ export const FIT_OUTCOME_LABELS: Readonly<Record<FitOutcome, string>> = {
 
 /** The word for a parameter the investor declared no preference on. */
 export const FIT_NOT_APPLICABLE_LABEL = "No preference";
+
+/**
+ * The word for an UNKNOWN row whose reason names what the company stated
+ * where the reader may see it (`stated`): known from them, not scored.
+ */
+export const FIT_STATED_LABEL = "Stated";
 
 export const Q_VIEW_VERDICT_LABELS: Readonly<Record<QViewVerdict, string>> = {
   WORTH_A_LOOK: "Worth a look",

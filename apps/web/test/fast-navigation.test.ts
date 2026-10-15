@@ -13,6 +13,7 @@ import type { QFastNavigationResponse } from "@capital-q/contracts";
 
 import {
   movedEarlyTo,
+  noteAsked,
   performClientAction,
   registerShellRouter,
   setHardLoad,
@@ -24,10 +25,12 @@ import {
   navigationHeard,
   navigationHeardFor,
   navigationHearingDelta,
+  navigationTyping,
   resetFastNavigation,
   setNavigationTransport,
   type FastNavigationTransport,
 } from "../src/features/q/control/fast-navigation";
+import { lastNavigationTo } from "../src/features/q/control/navigation-lifecycle";
 import { fastMoveLine } from "../src/features/voice/live/live-call";
 import { performTurnChain } from "../src/features/voice/use-follow-turn";
 import {
@@ -35,7 +38,7 @@ import {
   releaseVoiceAudio,
 } from "../src/features/voice/voice-audio";
 import {
-  expectNavigation,
+  requestMove,
   noteRedirect,
   noteRoute,
   onNavigationOutcome,
@@ -176,9 +179,10 @@ describe("fast navigation at the end of the sentence", () => {
     await navigationHeard("open privacy settings");
     performClientAction({ kind: "OPEN_SETTINGS", section: "privacy" });
     await new Promise((resolve) => setTimeout(resolve, 20));
-    // A later, separate request to the same page moves again.
+    // A later, separate request (a new sentence) to the same page moves again.
     window.history.replaceState(null, "", "/home");
     noteRoute("/home");
+    noteAsked();
     performClientAction({ kind: "OPEN_SETTINGS", section: "privacy" });
     await vi.waitFor(() => expect(pushed).toEqual([PRIVACY, PRIVACY]));
   });
@@ -205,6 +209,41 @@ describe("partial words while they speak", () => {
       { text: "Take me to Shiftwell relationship", final: false },
     ]);
     expect(pushed).toEqual([]);
+  });
+
+  it("latency: words being typed resolve and prefetch the record before Send; Send asks nothing more", async () => {
+    const { asked } = stub(server);
+    const say = "Take me to Shiftwell relationship";
+    navigationTyping("Take me to Shift");
+    navigationTyping(say);
+    await vi.waitFor(() =>
+      expect(prefetched).toEqual([`/relationships/company/${SHIFTWELL}`]),
+    );
+    expect(pushed).toEqual([]);
+    await navigationHeard(say);
+    expect(asked).toEqual([{ text: say, final: false }]);
+    expect(pushed).toEqual([`/relationships/company/${SHIFTWELL}`]);
+  });
+
+  it("typed self-correction: only the last page named moves, never the first", async () => {
+    const { asked } = stub(server);
+    await navigationHeard("Open Discover, no, actually Rehearsals");
+    expect(pushed).toEqual(["/rehearsals"]);
+    expect(asked).toEqual([]);
+  });
+
+  it("spoken self-correction: interim words prefetch at most; the finalized last target moves", async () => {
+    stub(server);
+    navigationHearingDelta("item_sc", "open discover");
+    await vi.waitFor(() => expect(prefetched).toContain("/discover"));
+    navigationHearingDelta("item_sc", ", no, actually rehearsals");
+    await vi.waitFor(() => expect(prefetched).toContain("/rehearsals"));
+    expect(pushed).toEqual([]);
+    await navigationHeardFor(
+      "item_sc",
+      "Open discover, no, actually rehearsals.",
+    );
+    expect(pushed).toEqual(["/rehearsals"]);
   });
 
   it("'open discover... no wait' never moves", async () => {
@@ -338,25 +377,33 @@ describe("GPT-Live transcript sequences", () => {
  * that arrived, never FAILED.
  */
 describe("a move to a page that redirects", () => {
-  it("is DONE when it lands where that page sent it", () => {
+  it("is DONE when it lands where that page sent it", async () => {
     const seen: NavigationOutcome[] = [];
     const stop = onNavigationOutcome((outcome) => seen.push(outcome));
-    expectNavigation("/investors");
+    // The router's push is still on its way when the page sends them on.
+    registerClientRouter(() => undefined);
+    const move = requestMove({ path: "/investors" });
     noteRedirect("/investors", "/discover");
     noteRoute("/discover");
+    await move.settled;
     stop();
     expect(seen).toEqual([
-      { status: "DONE", expected: "/investors", route: "/discover" },
+      expect.objectContaining({
+        status: "DONE",
+        expected: "/investors",
+        route: "/discover",
+      }),
     ]);
   });
 
-  it("without the page's word, landing elsewhere is not arrival", () => {
+  it("without the page's word, landing elsewhere is not arrival", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const seen: NavigationOutcome[] = [];
     const stop = onNavigationOutcome((outcome) => seen.push(outcome));
-    expectNavigation("/rehearsals");
+    registerClientRouter(() => undefined);
+    requestMove({ path: "/rehearsals" });
     noteRoute("/relationships");
-    vi.advanceTimersByTime(21_000);
+    await vi.advanceTimersByTimeAsync(21_000);
     stop();
     expect(seen.map((outcome) => outcome.status)).toEqual(["FAILED"]);
   });
@@ -374,18 +421,23 @@ describe("every move gets a receipt", () => {
     return { seen, stop };
   }
 
-  it("Q's OPEN_RECORD_PAGE after the fast path already opened it: DONE, one push", async () => {
+  it("G2-D2: Q's OPEN_RECORD_PAGE after the fast path already opened it: that receipt, no second move", async () => {
     stub(server);
     await navigationHeard("Take me to Shiftwell relationship");
+    const path = `/relationships/company/${SHIFTWELL}`;
+    expect(lastNavigationTo(path)?.phase).toBe("VERIFIED");
+    const fastId = lastNavigationTo(path)?.intentId;
     const { seen, stop } = receipts();
     performClientAction({
       kind: "OPEN_RECORD_PAGE",
       page: "RELATIONSHIP_COMPANY",
       id: SHIFTWELL,
     });
-    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     stop();
-    expect(seen[0]?.status).toBe("DONE");
+    // The same sentence's move: its one receipt stands (nav-X-1), no nav-X-2.
+    expect(seen).toEqual([]);
+    expect(lastNavigationTo(path)?.intentId).toBe(fastId);
     expect(pushed).toHaveLength(1);
   });
 
@@ -400,7 +452,12 @@ describe("every move gets a receipt", () => {
     } as unknown as Parameters<typeof performTurnChain>[0]);
     stop();
     expect(seen).toEqual([
-      { status: "DONE", expected: "/discover", route: "/discover" },
+      {
+        status: "DONE",
+        intentId: expect.any(String) as unknown,
+        expected: "/discover",
+        route: "/discover",
+      },
     ]);
   });
 });

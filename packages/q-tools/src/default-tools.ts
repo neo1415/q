@@ -16,11 +16,15 @@ import {
   createResearchPublicWebTool,
   RESEARCH_PUBLIC_WEB,
 } from "./tools/research-public-web.js";
+import { createDiscoverCounterpartsTool } from "./tools/discover-counterparts.js";
+import { createFindPublicEntityTool } from "./tools/find-public-entity.js";
+import { createBriefPublicEntityTool } from "./tools/brief-public-entity.js";
 import {
   createGetMyPlanTool,
   gateQTool,
   type QToolGate,
 } from "./tools/plan.js";
+import { createDiscoverCompaniesTool } from "./tools/discover-companies.js";
 import { createDiscoverySlateTool } from "./tools/discovery-slate.js";
 import {
   createFitProfileTool,
@@ -126,6 +130,9 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     createGetInvestorMandateTool(ports),
     createSearchCompaniesTool(ports),
     ...(ports.discovery === undefined ? [] : [createDiscoverySlateTool(ports)]),
+    ...(ports.companyCatalog === undefined
+      ? []
+      : [createDiscoverCompaniesTool(ports)]),
     ...(ports.discovery === undefined
       ? []
       : [createFindProspectiveInvestorsTool(ports)]),
@@ -147,6 +154,20 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...(ports.profileMaterial === undefined
       ? []
       : [createCompanyAssumptionsTool(ports.profileMaterial)]),
+    ...(ports.people === undefined
+      ? []
+      : [
+          createFindPublicEntityTool({ ...ports, people: ports.people }),
+          createBriefPublicEntityTool({ ...ports, people: ports.people }),
+        ]),
+    ...(ports.counterparts === undefined
+      ? []
+      : [
+          createDiscoverCounterpartsTool({
+            ...ports,
+            counterparts: ports.counterparts,
+          }),
+        ]),
     ...(research === undefined
       ? []
       : [

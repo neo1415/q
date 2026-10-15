@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, fetch, URL, crypto, setTimeout */
 /**
  * Developer artifact journey smoke (QX-003D/E/F; ADR 0013).
  *

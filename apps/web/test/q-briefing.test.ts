@@ -403,3 +403,71 @@ describe("decideBriefing (once a day, per browser)", () => {
     expect(decideBriefing(undefined, NOW)).toBeNull();
   });
 });
+
+describe("connected lines read the Relationship Brief's calls (R1)", () => {
+  const brief = (meetings: unknown) => ({
+    relationshipId: REL,
+    yourSide: "INVESTOR",
+    counterparty: { kind: "COMPANY", id: COMPANY, name: "Acme Robotics" },
+    generatedAt: NOW.toISOString(),
+    state: null,
+    messages: {
+      count: 12,
+      latest: { status: "UNAVAILABLE", reason: "READ_FAILED" },
+    },
+    noShows: [],
+    meetings,
+    pendingDecisions: { items: [], complete: false },
+    obligations: { status: "UNAVAILABLE", reason: "READ_FAILED" },
+    documents: { status: "UNAVAILABLE", reason: "READ_FAILED" },
+    sourceVersions: {
+      projector: "relationship-state.v2",
+      historySequence: 9,
+      brief: "relationship-brief.v1",
+    },
+  });
+  const investorWith = (meetings: unknown) =>
+    reads({
+      investorRelationships: () => Promise.resolve({ items: [relationship()] }),
+      relationshipBriefs: (query) => {
+        expect(query.relationshipIds).toEqual([REL]);
+        return Promise.resolve({ items: [brief(meetings)] } as never);
+      },
+    }).reads;
+  const line = async (r: BriefingReads) => {
+    const facts = await readBriefingFacts(
+      { kind: "INVESTOR", investorOrganisationId: INVESTOR_ORG, label: null },
+      r,
+      NOW,
+    );
+    return JSON.stringify(facts === null ? null : composeBriefing(facts));
+  };
+
+  it("a booked call is said, never 'a first meeting is next'", async () => {
+    const text = await line(
+      investorWith({
+        status: "OK",
+        items: [],
+        nextScheduled: {
+          id: APPROVAL,
+          status: "SCHEDULED",
+          startsAt: "2026-09-29T15:00:00.000Z",
+          endsAt: "2026-09-29T15:30:00.000Z",
+          timing: "UPCOMING",
+          organisedByYou: true,
+          noShow: false,
+        },
+      }),
+    );
+    expect(text).toContain("Your call is booked for");
+    expect(text).not.toContain("natural next step");
+  });
+
+  it("unread calls are said as unread, never as none booked", async () => {
+    const text = await line(
+      investorWith({ status: "UNAVAILABLE", reason: "READ_FAILED" }),
+    );
+    expect(text).toContain("couldn't be read");
+    expect(text).not.toContain("natural next step");
+  });
+});

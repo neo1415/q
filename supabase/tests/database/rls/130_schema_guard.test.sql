@@ -175,6 +175,14 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'person_standing',          'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'rehearsals',               'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'persona_profiles',         'RLS_REQUIRED',         '{SELECT}'),
+  ('q_runtime', 'rehearsal_external_subjects', 'RLS_REQUIRED',      '{SELECT}'),
+  ('q_runtime', 'demo_rehearsal_access',     'RLS_REQUIRED',         '{SELECT}'),
+  ('q_runtime', 'external_persons',          'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'external_person_briefs',    'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'external_entity_aliases',   'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'external_entity_sources',   'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'external_entity_facts',     'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_runtime', 'name_pronunciations',       'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'delegations',              'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'delegation_lanes',         'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'delegation_steps',         'RLS_REQUIRED',         '{SELECT}'),
@@ -383,7 +391,10 @@ select is(
                             'is_conversation_party',
                             -- 2026-10-02: which side of a relationship the caller is an active member of, for
                             -- network.relationship_passes RLS (search_path '', boolean only, membership-based).
-                            'is_relationship_side_member')),
+                            'is_relationship_side_member',
+                            -- Recovery K: any active membership, for knowledge.company_profiles RLS
+                            -- (network_visible is for participants; search_path '', boolean only).
+                            'is_network_participant')),
   '',
   'the set of SECURITY DEFINER helpers is exactly the reviewed set (new ones are listed on failure)');
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global console, fetch, process, URL */
 // P13: seed the 10 real companies as unclaimed public profiles.
 //
 //   SUPABASE_ACCESS_TOKEN=... node scripts/seed/real-companies/seed.mjs           dry run

@@ -107,6 +107,63 @@ export function createPostgresArtifactRepository(options: {
 }): ArtifactRepository {
   const { sql } = options;
   return {
+    findForWorkforce: async (actor, input) => {
+      const rows = await sql`
+        select * from artifacts.artifacts
+         where workforce_job_id = ${input.jobId}
+           and workforce_step_key = ${input.stepKey}
+           and workforce_intent_sha256 = ${input.intentSha256}
+           and tenant_id = ${actor.tenantId}
+           and organisation_id = ${actor.organisationId ?? null}
+           and created_by_user_id = ${actor.userId}
+           and type = ${input.type}
+           and company_id is not distinct from ${input.companyId}::uuid
+           and investor_organisation_id is not distinct from ${input.investorOrganisationId}::uuid
+           and archived_at is null
+         limit 1
+      `;
+      return rows.length === 0 ? null : toArtifact(rows[0]);
+    },
+    createForWorkforce: async (tx, artifact, binding) => {
+      const inserted = await tx.sql`
+        insert into artifacts.artifacts (
+          tenant_id, organisation_id, type, company_id,
+          investor_organisation_id, created_by_user_id,
+          workforce_job_id, workforce_step_key, workforce_intent_sha256
+        ) values (
+          ${artifact.tenantId}, ${artifact.organisationId}, ${artifact.type},
+          ${artifact.companyId}, ${artifact.investorOrganisationId},
+          ${artifact.createdByUserId}, ${binding.jobId}, ${binding.stepKey},
+          ${binding.intentSha256}
+        )
+        on conflict (workforce_job_id, workforce_step_key)
+          where workforce_job_id is not null do nothing
+        returning *
+      `;
+      if (inserted.length > 0) {
+        return { artifact: toArtifact(inserted[0]), created: true };
+      }
+      // A separate statement sees the committed winner of an insert race
+      // under READ COMMITTED. A same-statement CTE would use the earlier
+      // snapshot and can miss the row it just lost to.
+      const existing = await tx.sql`
+        select * from artifacts.artifacts
+         where workforce_job_id = ${binding.jobId}
+           and workforce_step_key = ${binding.stepKey}
+           and workforce_intent_sha256 = ${binding.intentSha256}
+           and tenant_id = ${artifact.tenantId}
+           and organisation_id = ${artifact.organisationId}
+           and created_by_user_id = ${artifact.createdByUserId}
+           and type = ${artifact.type}
+           and company_id is not distinct from ${artifact.companyId}::uuid
+           and investor_organisation_id is not distinct from ${artifact.investorOrganisationId}::uuid
+           and archived_at is null
+         limit 1
+      `;
+      return existing.length === 0
+        ? null
+        : { artifact: toArtifact(existing[0]), created: false };
+    },
     create: async (tx, artifact) => {
       const rows = await tx.sql`
         insert into artifacts.artifacts (

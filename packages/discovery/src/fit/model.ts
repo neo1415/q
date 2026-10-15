@@ -7,6 +7,7 @@ import {
   type FitHardRuleDto,
   type FitOutcome,
   type FitParameter,
+  type FitParameterContext,
   type FitParameterResultDto,
   type FitProfileDto,
 } from "@capital-q/contracts";
@@ -31,6 +32,13 @@ export type FitObservation = {
   readonly stale: boolean;
   /** Slot values for the reason sentence; only facts the reader may already see. */
   readonly facts: Readonly<Record<string, string | undefined>>;
+  /**
+   * The sentence names what the company stated where the reader may see it
+   * (not formally shared): shown as stated, never scored.
+   */
+  readonly stated?: boolean | undefined;
+  /** Known values beside the row, with sources, and what is still open. */
+  readonly context?: FitParameterContext | undefined;
 };
 
 export type FitInputs = {
@@ -63,13 +71,16 @@ export function unknownObservation(
   };
 }
 
-export function notApplicableObservation(): FitObservation {
+/** Facts here only name context in the sentence; nothing is scored. */
+export function notApplicableObservation(
+  facts: Readonly<Record<string, string | undefined>> = {},
+): FitObservation {
   return {
     outcome: "UNKNOWN",
     applicable: false,
     evidenceStatus: null,
     stale: false,
-    facts: {},
+    facts,
   };
 }
 
@@ -115,6 +126,8 @@ export function assessFit(
       evidenceStatus: known ? o.evidenceStatus : null,
       stale: known && o.stale,
       applicable: o.applicable,
+      ...(!known && o.stated === true ? { stated: true } : {}),
+      ...(o.context === undefined ? {} : { context: o.context }),
     });
   }
 

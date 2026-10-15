@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global console, process, URL */
 /**
  * Read-only: which source-controlled migrations the HOSTED Supabase project
  * has not applied yet (and any it has that the repo does not know).

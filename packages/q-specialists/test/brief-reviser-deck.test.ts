@@ -182,3 +182,41 @@ describe("a document's look (founder live 2026-09-30)", () => {
     expect(revised.content.look).toBeUndefined();
   });
 });
+
+describe("the canonical evidence gaps during revision", () => {
+  it("shows the existing gap list without creating a second gap source", async () => {
+    const gaps = [
+      "Traction has not been verified.",
+      "Team roles are not documented.",
+    ];
+    const { reviser, prompts } = reviserReturning({
+      sections: [
+        { heading: "Evidence gaps", body: "Revenue reached $5 million." },
+      ],
+      slides: [],
+      style: null,
+    });
+    const revised = await reviser.revise({
+      base: {
+        title: "Private draft",
+        summary: "s",
+        content: { ...content, gaps },
+      },
+      instruction:
+        "Make the opening concise and clearly label the existing evidence gaps.",
+      grounding: content.sections.map((section) => section.body),
+      sensitivity: "CONFIDENTIAL",
+      attribution: {
+        tenantId: "t",
+        userId: "u",
+        qRunId: "r",
+        correlationId: "c",
+      },
+    });
+    expect(prompts[0]).toContain("READ-ONLY EVIDENCE GAPS");
+    expect(prompts[0]).toContain(gaps[0]);
+    expect(prompts[0]).toContain(gaps[1]);
+    expect(revised.content.gaps).toEqual(gaps);
+    expect(revised.content.sections).toEqual(content.sections);
+  });
+});

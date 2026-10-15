@@ -4,6 +4,7 @@ import type { QFindingType } from "@capital-q/contracts";
 
 import { formatDay } from "@/components/date-format";
 
+import { useCardHidden } from "./cards/card-visibility";
 import type { QTurn, QTurnObjectBlock } from "./conversation";
 import { QResultBlocks } from "./q-result-blocks";
 import { Q_CONFIDENCE_LABELS } from "./wire-constants";
@@ -49,8 +50,13 @@ export function splitBlocks(blocks: readonly QTurnObjectBlock[]): {
       case "ARTIFACT_REFERENCE":
       case "UI_INTENT":
       case "COMPARISON_CARDS":
-        // COMPARISON_CARDS is the answer itself, laid out: never tucked
-        // behind Sources.
+      case "TABLE":
+      case "CHART":
+      case "MAP":
+      case "TIMELINE":
+      case "ATTENTION":
+        // Laid-out data (E4, G-R4) and COMPARISON_CARDS are the answer
+        // itself, rendered in the thread: never tucked behind Sources.
         visible.push(block);
         break;
       case "ACTION_PROPOSAL":
@@ -66,8 +72,8 @@ export function splitBlocks(blocks: readonly QTurnObjectBlock[]): {
         evidence.push(block);
         break;
       default:
-        // A block kind this build does not know yet (another packet may
-        // add one): kept, behind the disclosure.
+        // A block kind a newer server sends that this build does not know:
+        // kept, behind the disclosure, never dropped.
         evidence.push(block);
     }
   }
@@ -104,7 +110,13 @@ export function QEvidence({
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
 }) {
   const summary = evidenceSummary(turn);
-  if (summary === null) return null;
+  // Founder P5: Sources the person cleared are not drawn (and take no space).
+  const hidden = useCardHidden({
+    category: "SOURCE",
+    key: `source:${turn.id}`,
+    names: ["sources"],
+  });
+  if (summary === null || hidden) return null;
   return (
     <details className="cq-q-evidence" data-q-evidence>
       <summary className="cq-q-evidence-summary">

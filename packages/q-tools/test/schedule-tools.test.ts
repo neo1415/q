@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   GOOGLE_RECONNECT_PATH,
+  RelationshipBriefSchema,
   type PermittedContextPlan,
+  type RelationshipBrief,
 } from "@capital-q/contracts";
 
 import {
@@ -73,6 +75,7 @@ function world(
     counterpartCanHost?: boolean;
     profileZone?: string | null;
     findSlots?: ScheduleIntelligencePort["findSlots"];
+    relationshipBriefs?: ScheduleIntelligencePort["relationshipBriefs"];
   } = {},
 ) {
   const prepared: { actionType: string; payload: unknown }[] = [];
@@ -145,6 +148,9 @@ function world(
       ),
     counterpartCanHost: () =>
       Promise.resolve(options.counterpartCanHost === true),
+    ...(options.relationshipBriefs === undefined
+      ? {}
+      : { relationshipBriefs: options.relationshipBriefs }),
   };
   const executor = createQToolExecutor({
     registry: createQToolRegistry(
@@ -688,6 +694,105 @@ describe("schedule tools", () => {
     expect(outcome.result).toMatchObject({
       ok: true,
       data: { meetings: [{ id: MEETING, with: ["Ada"], brief: null }] },
+    });
+  });
+});
+
+describe("list_schedule reads each relationship's calls from the brief (R1)", () => {
+  /** TensorGate: a booked call the person did not organise, now past and recorded as a no-show. */
+  const tensorGate = (
+    meetings: RelationshipBrief["meetings"],
+  ): RelationshipBrief =>
+    RelationshipBriefSchema.parse({
+      relationshipId: RELATIONSHIP,
+      yourSide: "INVESTOR",
+      counterparty: { kind: "COMPANY", id: MEETING, name: "Tensorgate" },
+      generatedAt: "2026-10-09T23:30:00.000Z",
+      state: null,
+      messages: {
+        count: 12,
+        latest: { status: "OK", message: null, fromThem: null },
+      },
+      meetings,
+      pendingDecisions: { items: [], complete: true },
+      obligations: { status: "OK", openRequests: [], answeredCount: 0 },
+      documents: { status: "OK", items: [] },
+      sourceVersions: {
+        projector: null,
+        historySequence: 1,
+        brief: "relationship-brief.v1",
+      },
+    });
+  const run = async (
+    briefs: ScheduleIntelligencePort["relationshipBriefs"],
+  ) => {
+    const { executor } = world({ relationshipBriefs: briefs });
+    return executor.execute(
+      { callId: "s7", name: "list_schedule", arguments: {} },
+      contextFor(actorB, ownPlan()),
+    );
+  };
+
+  it("names a past call that did not take place, booked by someone else", async () => {
+    const outcome = await run(() =>
+      Promise.resolve([
+        tensorGate({
+          status: "OK",
+          items: [
+            {
+              id: "88888888-0000-4000-8000-0000000000d9",
+              status: "SCHEDULED",
+              startsAt: "2026-10-08T15:00:00.000Z",
+              endsAt: "2026-10-08T15:30:00.000Z",
+              timing: "PAST",
+              organisedByYou: false,
+              noShow: true,
+            },
+          ],
+          nextScheduled: null,
+        }),
+      ]),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: {
+        byRelationship: {
+          status: "OK",
+          items: [
+            {
+              relationshipId: RELATIONSHIP,
+              counterpartName: "Tensorgate",
+              calls: {
+                status: "OK",
+                lastPastAt: "2026-10-08T15:00:00.000Z",
+                lastPastDidNotTakePlace: true,
+              },
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it("unread calls are UNAVAILABLE per relationship, and a failed read is UNAVAILABLE overall -- the tool still answers", async () => {
+    const one = await run(() =>
+      Promise.resolve([
+        tensorGate({ status: "UNAVAILABLE", reason: "READ_FAILED" }),
+      ]),
+    );
+    expect(one.result).toMatchObject({
+      ok: true,
+      data: {
+        byRelationship: {
+          status: "OK",
+          items: [{ calls: { status: "UNAVAILABLE" } }],
+        },
+      },
+    });
+    const failed = await run(() => Promise.reject(new Error("db down")));
+    expect(failed.result).toMatchObject({
+      ok: true,
+      data: { byRelationship: { status: "UNAVAILABLE" } },
     });
   });
 });

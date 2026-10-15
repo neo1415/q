@@ -20,6 +20,7 @@ import {
   type NavigationOutcome,
 } from "../src/features/q/ui-act-controller";
 import { onLineNote } from "../src/features/voice/line-cards";
+import { setHardLoad } from "../src/features/q/control/router-registry";
 import { standardLineCards } from "../src/features/voice/provider/standard-cards";
 import {
   MOVE_FAILED_LINE,
@@ -241,12 +242,18 @@ describe("a spoken move reports its receipt like a typed one (with workstream C)
           if (respond) notes.push(say);
         }),
       );
+      // No router on this screen and no call: the last resort is a load,
+      // which (here) never lands.
+      setHardLoad(() => undefined);
+      cleanups.push(() => setHardLoad(null));
       performTurnChain(moveTurn, () => true);
       vi.advanceTimersByTime(NAVIGATION_WAIT_MS + 10);
       expect(outcomes).toEqual([
         {
           status: "FAILED",
+          intentId: expect.any(String) as unknown,
           expected: expect.stringMatching(/capital/u) as unknown,
+          reason: "NOT_LANDED",
         },
       ]);
       expect(notes).toEqual([MOVE_FAILED_LINE]);

@@ -388,6 +388,8 @@ export type PendingDecisionStart = {
   ) => Promise<PendingDecisionOutcome>;
   /** The turn went elsewhere: stop the reading in flight, if any. */
   readonly cancel: () => void;
+  /** K fast lane: whether a change is waiting on their word (a quick read). */
+  readonly waiting: () => Promise<boolean>;
 };
 
 export function startPendingDecision(
@@ -421,6 +423,12 @@ export function startPendingDecision(
       .catch(() => undefined);
   }
   return {
+    waiting: () =>
+      staged.then(
+        (stage) => stage.kind !== "NOTHING",
+        // Unknown is not "nothing waiting": the fast lane stays shut.
+        () => true,
+      ),
     cancel: () => {
       controller.abort();
     },

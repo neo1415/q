@@ -92,6 +92,9 @@ describe("Q and rehearsals", () => {
     expect(recordPagePath("COMPANY_REHEARSAL", id)).toBe(
       `/rehearsals/company/${id}`,
     );
+    expect(recordPagePath("EXTERNAL_REHEARSAL", id)).toBe(
+      `/rehearsals/person/${id}`,
+    );
   });
 
   it("suggests rehearsing an upcoming call on Home", () => {

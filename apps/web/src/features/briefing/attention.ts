@@ -1,5 +1,8 @@
 import {
+  ArrivalSnapshotSchema,
+  Q_ARRIVAL_SNAPSHOT_PATH,
   Q_ATTENTION_PATH,
+  type ArrivalSnapshot,
   QAttentionReportSchema,
   type NotificationDto,
   type QAttentionItem,
@@ -61,6 +64,78 @@ export function createQApiAttentionReader(
     } catch {
       return null;
     }
+  };
+}
+
+/**
+ * W1: the Arrival Snapshot from the Q API, the one read the welcome, Q's
+ * turns, the live voice and the Work list share. Null when it could not be
+ * read (the arrival then uses the attention read and its bridge); never an
+ * empty snapshot standing in for a failure.
+ */
+export function createQApiArrivalSnapshotReader(
+  session: { readonly baseUrl: string; readonly accessToken: string } | null,
+  fetchImpl: typeof fetch = fetch,
+): () => Promise<ArrivalSnapshot | null> {
+  return async () => {
+    if (session === null) return null;
+    try {
+      const response = await fetchImpl(
+        new URL(Q_ARRIVAL_SNAPSHOT_PATH, session.baseUrl),
+        {
+          headers: { authorization: `Bearer ${session.accessToken}` },
+          cache: "no-store",
+          signal: AbortSignal.timeout(6_000),
+        },
+      );
+      if (!response.ok) return null;
+      const read = ArrivalSnapshotSchema.safeParse(await response.json());
+      return read.success ? read.data : null;
+    } catch {
+      return null;
+    }
+  };
+}
+
+/**
+ * W1: the welcome's "what needs you" report, from the snapshot, so every
+ * line the welcome says is a headline Q's follow-ups are answered from. The
+ * same items, in the same order, with the same keys and words.
+ */
+export function attentionFromSnapshot(
+  snapshot: ArrivalSnapshot,
+): QAttentionReport {
+  return {
+    items: snapshot.items.map((item): QAttentionItem => {
+      const ids = item.ids;
+      const entity =
+        ids.relationshipId !== null
+          ? { kind: "RELATIONSHIP" as const, id: ids.relationshipId }
+          : ids.approvalId !== null
+            ? { kind: "APPROVAL" as const, id: ids.approvalId }
+            : ids.jobId !== null
+              ? { kind: "JOB" as const, id: ids.jobId }
+              : ids.meetingId !== null
+                ? { kind: "MEETING" as const, id: ids.meetingId }
+                : ids.documentId !== null
+                  ? { kind: "DOCUMENT" as const, id: ids.documentId }
+                  : undefined;
+      return {
+        key: item.key,
+        source: item.kind,
+        title: item.headline,
+        ...(item.facts.note === null ? {} : { note: item.facts.note }),
+        ...(entity === undefined ? {} : { entity }),
+        ...(item.counterpart?.name == null
+          ? {}
+          : { counterpart: clip(item.counterpart.name, 120) }),
+        since: item.since,
+        decidable: item.decidable,
+      };
+    }),
+    activity: snapshot.activity,
+    unread: snapshot.unread,
+    readAt: snapshot.asOf,
   };
 }
 

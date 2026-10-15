@@ -41,6 +41,7 @@ import {
 import {
   CorrelationIdSchema,
   type AdminUsageDto,
+  NO_RAISE_VIEW,
   PolicyExtractionDtoSchema,
 } from "@capital-q/contracts";
 import {
@@ -273,6 +274,7 @@ import {
   composeChatSafety,
   composeSchedule,
   createCounterpartNotices,
+  createMeetingProposalPort,
   createPushSubscriptionStore,
 } from "@capital-q/communication";
 import {
@@ -296,12 +298,17 @@ import {
   createPostgresApplicationIdentityLookup,
   createPostgresAuthorizationPolicySource,
   createPostgresPersonProfileStore,
+  createPostgresSessionLiveness,
 } from "@capital-q/security/postgres";
-import { createSupabaseAccessTokenAuthenticator } from "@capital-q/security/supabase";
+import {
+  createLocalJwtAccessTokenAuthenticator,
+  createSupabaseAccessTokenAuthenticator,
+} from "@capital-q/security/supabase";
 
 import { apiServiceIdentity, createApp } from "./app.js";
 import { createChatSafetyAudit } from "./chat-safety-audit.js";
 import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
+import { createApiCompanyRaiseReader } from "./company-raise.js";
 import { createRaiseSharing } from "./pitch-claims.js";
 import { createQWorkPagePort, createWorkforceJobPort } from "./q-work-port.js";
 import { createProductionEventRegistry } from "./event-registry.js";
@@ -389,10 +396,21 @@ const platformAdmin = createPlatformAdmin({
 });
 // end ADMIN block
 
+// SUB-SECOND Phase 4: access tokens are verified here against the
+// project's published ES256 key, and the session is checked in the
+// database (fresh for writes, at most 15 s old for reads), instead of
+// asking the Auth server on every request (~208 ms median, 2-6 s tail).
+// CQ_AUTH_LOCAL_JWT=off restores the Auth-server check.
+const accessTokens =
+  process.env["CQ_AUTH_LOCAL_JWT"]?.trim().toLowerCase() === "off"
+    ? createSupabaseAccessTokenAuthenticator(supabaseAuth)
+    : createLocalJwtAccessTokenAuthenticator({
+        url: supabaseAuth.url,
+        sessions: createPostgresSessionLiveness({ sql: database.sql }),
+        fallback: createSupabaseAccessTokenAuthenticator(supabaseAuth),
+      });
 const security = {
-  authenticator: createSupabaseRequestAuthenticator(
-    createSupabaseAccessTokenAuthenticator(supabaseAuth),
-  ),
+  authenticator: createSupabaseRequestAuthenticator(accessTokens),
   resolver: withSuspension(
     createPostgresActorContextResolver({ sql: database.sql }),
     platformAdmin.isSuspended,
@@ -919,6 +937,12 @@ const relationships: RelationshipQueryPort = {
       database.sql,
       companyId,
       investorOrganisationId,
+    ),
+  findManyByInvestor: (investorOrganisationId, companyIds) =>
+    relationshipRepository.findByInvestorAndCompanies(
+      database.sql,
+      investorOrganisationId,
+      companyIds,
     ),
   listEvents: (relationshipId, page = {}) =>
     relationshipEventRepository.listByRelationship(
@@ -1547,6 +1571,37 @@ const discoverablePitches = createPostgresDiscoverablePitchQueryPort({
   sql: database.sql,
 });
 
+// R2: the one company read for the raise. The Discover card and the
+// profile both render this, so one reader is told one thing on both.
+const companyRaise = createApiCompanyRaiseReader({
+  sql: database.sql,
+  companies: disclosurePorts.companies,
+  capital: disclosurePorts.capital,
+  disclosure,
+  policies: createPostgresDisclosurePolicyRepository(),
+  isInvestor: async (actor) =>
+    (await slates.eligibilityPorts.investorSubject.investorOrganisationFor(
+      actor,
+    )) !== null,
+  pitches: () => discoverablePitches,
+  mayPlay: async (actor, companyId, mediaAssetId) => {
+    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+    return parsed.success
+      ? media.mayPlayPitch({ actor, companyId, mediaAssetId: parsed.data })
+      : false;
+  },
+  pitchCues: async (actor, companyId, mediaAssetId) => {
+    const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+    if (!parsed.success) return null;
+    const view = await media.getPitchTranscript({
+      actor,
+      companyId,
+      mediaAssetId: parsed.data,
+    });
+    return view.status === "AVAILABLE" ? view.cues : null;
+  },
+});
+
 /**
  * The visibility control centre (CQ-BIZ-003). The same disclosure layer
  * the reads above use, plus its policy manager for shares and revokes;
@@ -2016,13 +2071,15 @@ const { app, logger } = createApp(config, security, {
     // is no traction figure because nothing declared and network-visible
     // carries one, and unknown stays unknown.
     feedSummaries: async (actor, companyIds) => {
-      const [raises, sectors] = await Promise.all([
+      const [raises, sectors, views] = await Promise.all([
         discoverFilterFacts.disclosedRaises === undefined
           ? new Map<string, { amount: string; currency: string }>()
           : discoverFilterFacts.disclosedRaises({ actor, companyIds }),
         companySectors.sectors === undefined
           ? new Map<string, readonly string[]>()
           : companySectors.sectors(companyIds),
+        // R2: what the card says, from the same read the profile uses.
+        companyRaise.raisesFor(actor, companyIds),
       ]);
       return new Map(
         companyIds.map((companyId) => {
@@ -2039,6 +2096,7 @@ const { app, logger } = createApp(config, security, {
                       truthClass: "USER_CLAIM" as const,
                       evidenceStatus: "SELF_REPORTED" as const,
                     },
+              raiseView: views.get(companyId) ?? NO_RAISE_VIEW,
             },
           ] as const;
         }),
@@ -2151,6 +2209,8 @@ const { app, logger } = createApp(config, security, {
       capital: disclosurePorts.capital,
       policies: createPostgresDisclosurePolicyRepository(),
     }),
+    // R2: the same raise read the Discover card renders.
+    raiseView: (actor, companyId) => companyRaise.raiseFor(actor, companyId),
     disclosedRaise: async (actor, companyId) =>
       (
         await discoverFilterFacts.disclosedRaises?.({
@@ -2389,6 +2449,12 @@ const { app, logger } = createApp(config, security, {
   chat,
   chatSafety,
   schedule,
+  // D (2026-10-11): meeting time proposals; booking after an acceptance goes
+  // through the schedule service as the accepting person.
+  proposals: createMeetingProposalPort({
+    transactions: database.transactions,
+    schedule,
+  }),
   // AUTO block (ADR 0030): Web Push; the key is public, the private half
   // stays with the workers that send.
   push: {

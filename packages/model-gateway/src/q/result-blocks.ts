@@ -590,8 +590,37 @@ function visualBlock(
 ): QResultBlock | null {
   if (hint === "MAP") return investorsMapBlock(investorsOf(read));
   if (hint === "TABLE") return investorsTableBlock(investorsOf(read));
-  // TIMELINE and CHART need dated events or evidenced figures, which no
-  // run read carries yet; nothing is drawn rather than something made up
-  // (docs/recovery/specs/E-rich-ui-promises.md §3.3).
+  if (hint === "TIMELINE" && read.relationships.size === 1) {
+    const relationship = [...read.relationships.values()][0];
+    if (relationship === undefined || relationship.relationship === null)
+      return null;
+    const counterpart = relationship.counterpart;
+    const subject: QSubjectRef =
+      counterpart.kind === "COMPANY"
+        ? { kind: "COMPANY", companyId: counterpart.id }
+        : {
+            kind: "INVESTOR_ORGANISATION",
+            investorOrganisationId: counterpart.id,
+          };
+    const seen = new Set<string>();
+    return timelineBlock({
+      title: `Relationship history${counterpart.name === null ? "" : ` with ${counterpart.name.slice(0, 120)}`}`,
+      events: relationship.relationship.milestones
+        .filter((event) => {
+          const key = `${event.at}:${event.state}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .map((event) => ({
+          at: event.at,
+          label: event.state.toLowerCase().replaceAll("_", " "),
+          note: relationship.source,
+          subject,
+        })),
+    });
+  }
+  // CHART still requires a typed read of evidenced figures. No numbers
+  // are extracted from model prose to fill a visual.
   return null;
 }

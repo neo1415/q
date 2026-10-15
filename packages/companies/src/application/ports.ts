@@ -197,6 +197,13 @@ export type CompanyQueryPort = {
     companyId: CompanyId,
   ) => Promise<CompanyVisibilityFacts | null>;
   /**
+   * S2: `findCanonicalCompanyVisibility` for many companies in one read.
+   * A company that does not exist is simply absent from the result.
+   */
+  readonly findCanonicalCompanyVisibilities: (
+    companyIds: readonly CompanyId[],
+  ) => Promise<readonly CompanyVisibilityFacts[]>;
+  /**
    * A founder profile's ownership (the Person) and its intrinsic
    * visibility_scope, tenant-agnostic, for disclosure resolution. No
    * summaries or narrative are returned through this port.

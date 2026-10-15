@@ -1,3 +1,7 @@
+import {
+  WorkforceDocumentCritiqueRequestSchema,
+  WorkforceOwnDocumentRequestSchema,
+} from "@capital-q/contracts";
 import { z } from "zod";
 
 import { TaskFrameSchema } from "./common.js";
@@ -404,3 +408,157 @@ export const JobPlanResultV2Schema = z
   })
   .strict();
 export type JobPlanResultV2 = z.infer<typeof JobPlanResultV2Schema>;
+
+/** v3 retains the exact typed document request in the approved plan. */
+export const JOB_PLAN_V3_SCHEMA_VERSION = 3;
+export const JobPlanResultV3Schema = JobPlanResultV2Schema.extend({
+  steps: z
+    .array(
+      JobPlanResultV2Schema.shape.steps.element
+        .extend({
+          document: WorkforceOwnDocumentRequestSchema.optional(),
+        })
+        .strict(),
+    )
+    .max(12),
+}).strict();
+export type JobPlanResultV3 = z.infer<typeof JobPlanResultV3Schema>;
+
+/**
+ * v4 (2026-10-12): the lead may also ask for a memo about the ONE company
+ * the job names, and for a second specialist to critique and revise a
+ * document an earlier step prepared. The planner never writes a company
+ * id: code binds NAMED_COMPANY to the record the goal names, or refuses.
+ */
+export const JOB_PLAN_V4_SCHEMA_VERSION = 4;
+export const PlannedNamedCompanyDocumentSchema = z
+  .object({
+    operation: z.literal("PREPARE"),
+    kind: z.enum(["MEMO", "ONE_PAGER", "INVESTMENT_BRIEF"]),
+    scope: z.literal("NAMED_COMPANY"),
+  })
+  .strict();
+export const JobPlanResultV4Schema = JobPlanResultV2Schema.extend({
+  steps: z
+    .array(
+      JobPlanResultV2Schema.shape.steps.element
+        .extend({
+          document: z
+            .union([
+              WorkforceOwnDocumentRequestSchema,
+              PlannedNamedCompanyDocumentSchema,
+              WorkforceDocumentCritiqueRequestSchema,
+            ])
+            .optional(),
+        })
+        .strict(),
+    )
+    .max(12),
+}).strict();
+export type JobPlanResultV4 = z.infer<typeof JobPlanResultV4Schema>;
+
+// SUBSTANCE_CRITIQUE (2026-10-12): a second specialist's critique of a
+// prepared document, against the evidence it was built from.
+export const SUBSTANCE_CRITIQUE_SCHEMA_NAME = "SubstanceCritiqueResult";
+export const SUBSTANCE_CRITIQUE_SCHEMA_VERSION = 1;
+export const SUBSTANCE_CRITIQUE_ISSUE_KINDS = [
+  "UNSUPPORTED",
+  "CONTRADICTION",
+  "MISSING_RISK",
+  "MISSING_INFORMATION",
+  "UNCLEAR_CONCLUSION",
+  "GENERIC",
+] as const;
+
+export const SubstanceCritiqueVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    documentKind: z.string().min(1).max(40),
+    principalName: z.string().min(1).max(120),
+    companyName: z.string().min(1).max(120),
+    /** The job step's goal: what the document is for. UNTRUSTED. */
+    purpose: z.string().min(1).max(600),
+    /** The findings the document was built from. UNTRUSTED. */
+    evidence: z.string().max(12_000),
+    /** The document's sections as text. UNTRUSTED. */
+    document: z.string().min(1).max(24_000),
+  })
+  .strict();
+export type SubstanceCritiqueVariables = z.infer<
+  typeof SubstanceCritiqueVariablesSchema
+>;
+export const SUBSTANCE_CRITIQUE_UNTRUSTED = [
+  "purpose",
+  "evidence",
+  "document",
+] as const;
+
+export const SubstanceCritiqueResultSchema = z
+  .object({
+    material: z.boolean(),
+    issues: z
+      .array(
+        z
+          .object({
+            kind: z.enum(SUBSTANCE_CRITIQUE_ISSUE_KINDS),
+            section: z.string().trim().min(1).max(120),
+            problem: z.string().trim().min(1).max(400),
+            fix: z.string().trim().min(1).max(400),
+          })
+          .strict(),
+      )
+      .max(8),
+    strengths: z.array(z.string().trim().min(1).max(240)).max(3),
+  })
+  .strict();
+export type SubstanceCritiqueResult = z.infer<
+  typeof SubstanceCritiqueResultSchema
+>;
+
+// DILIGENCE_QUESTIONS (2026-10-12): founder questions from a prepared
+// document's gaps and its critique, for the person's approval.
+export const DILIGENCE_QUESTIONS_SCHEMA_NAME = "DiligenceQuestionsResult";
+export const DILIGENCE_QUESTIONS_SCHEMA_VERSION = 1;
+export const DiligenceQuestionsVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    companyName: z.string().min(1).max(120),
+    /** The job step's goal. UNTRUSTED. */
+    purpose: z.string().min(1).max(600),
+    /** What the document says is not known. UNTRUSTED. */
+    gaps: z.string().max(4_000),
+    /** The critique's missing-information and risk issues. UNTRUSTED. */
+    critique: z.string().max(4_000),
+    /** The document's sections as text. UNTRUSTED. */
+    document: z.string().min(1).max(16_000),
+  })
+  .strict();
+export type DiligenceQuestionsVariables = z.infer<
+  typeof DiligenceQuestionsVariablesSchema
+>;
+export const DILIGENCE_QUESTIONS_UNTRUSTED = [
+  "purpose",
+  "gaps",
+  "critique",
+  "document",
+] as const;
+export const DiligenceQuestionsResultSchema = z
+  .object({
+    questions: z
+      .array(
+        z
+          .object({
+            /** Asked of the founder, as sent (the send action's limit). */
+            question: z.string().trim().min(8).max(180),
+            /** The gap or risk it settles, in a few words. */
+            about: z.string().trim().min(1).max(120),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(5),
+  })
+  .strict();
+export type DiligenceQuestionsResult = z.infer<
+  typeof DiligenceQuestionsResultSchema
+>;

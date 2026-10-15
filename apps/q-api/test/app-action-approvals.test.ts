@@ -329,6 +329,7 @@ describe("app cards name who they are for (QA 2026-10-03, instruction ff4ceb3f)"
         interests: {
           expressInterest: () => Promise.reject(new Error("unused")),
           respondToInterest: () => Promise.reject(new Error("unused")),
+          mayRespondToInterest: () => Promise.resolve(true),
           listIncomingInterest: ({ companyId }) =>
             Promise.resolve(
               companyId === COMPANY

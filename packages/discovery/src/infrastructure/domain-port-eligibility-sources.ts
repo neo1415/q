@@ -3,7 +3,7 @@ import {
   marketplaceParticipationOf,
   type CompanyMarketplaceQueryPort,
 } from "@capital-q/companies";
-import type { DatabaseExecutor } from "@capital-q/database";
+import { cachedInRun, type DatabaseExecutor } from "@capital-q/database";
 import {
   InvestorMandateIdSchema,
   InvestorOrganisationIdSchema,
@@ -111,6 +111,40 @@ export function createDomainEligibilityPorts(
     },
   });
 
+  const readActiveMandate = async ({
+    tenantId,
+    investorOrganisationId,
+    mandateId,
+  }: {
+    readonly tenantId: string;
+    readonly investorOrganisationId: string;
+    readonly mandateId: string | null;
+  }): Promise<ActiveMandateLookup> => {
+    const tenant = TenantIdSchema.parse(tenantId);
+    const investor = InvestorOrganisationIdSchema.parse(investorOrganisationId);
+    // Tenant- and organisation-scoped reads only: a mandate id that is
+    // not this investor's resolves as absent, never as somebody else's.
+    if (mandateId !== null) {
+      const pinned = await mandates.getMandate(
+        tenant,
+        investor,
+        InvestorMandateIdSchema.parse(mandateId),
+      );
+      return pinned === null
+        ? { kind: "NONE" }
+        : { kind: "FOUND", mandate: toSnapshot(pinned) };
+    }
+    const active = await mandates.listActiveMandates(tenant, investor);
+    if (active.length === 0) return { kind: "NONE" };
+    if (active.length > 1) return { kind: "AMBIGUOUS" };
+    const [only] = active;
+    if (only === undefined) return { kind: "NONE" };
+    const snapshot = await mandates.getMandate(tenant, investor, only.id);
+    return snapshot === null
+      ? { kind: "NONE" }
+      : { kind: "FOUND", mandate: toSnapshot(snapshot) };
+  };
+
   return {
     companies: {
       findMany: async (companyIds) => {
@@ -136,71 +170,76 @@ export function createDomainEligibilityPorts(
       listActive: async (subjects) => {
         const out = new Map<string, readonly CompanyClassification[]>();
         // Read under each company's own tenant, as the Taxonomy context
-        // requires; a candidate set is bounded upstream (ELIGIBILITY_BATCH_MAX).
-        await Promise.all(
-          subjects.map(async ({ companyId, tenantId }) => {
-            const rows = await assignments.listCurrent(
-              sql,
-              TenantIdSchema.parse(tenantId),
-              { subjectType: "COMPANY", subjectId: companyId },
-            );
-            out.set(
-              companyId,
-              rows.map((r) => ({
-                nodeId: r.nodeId,
-                vocabularyCode: r.vocabularyCode,
-                source: r.assignmentSource,
-              })),
-            );
-          }),
+        // requires (the tenant and the id are matched as a pair); a
+        // candidate set is bounded upstream (ELIGIBILITY_BATCH_MAX). One
+        // statement for the set (S2), not one per company.
+        for (const { companyId } of subjects) out.set(companyId, []);
+        const rows = await assignments.listCurrentForSubjects(
+          sql,
+          "COMPANY",
+          subjects.map(({ companyId, tenantId }) => ({
+            tenantId: TenantIdSchema.parse(tenantId),
+            subjectId: companyId,
+          })),
         );
+        const grouped = new Map<string, CompanyClassification[]>();
+        for (const r of rows) {
+          const list = grouped.get(r.subjectId) ?? [];
+          list.push({
+            nodeId: r.nodeId,
+            vocabularyCode: r.vocabularyCode,
+            source: r.assignmentSource,
+          });
+          grouped.set(r.subjectId, list);
+        }
+        for (const [companyId, list] of grouped) out.set(companyId, list);
         return out;
       },
     },
 
     mandates: {
-      activeMandate: async ({
-        tenantId,
-        investorOrganisationId,
-        mandateId,
-      }): Promise<ActiveMandateLookup> => {
-        const tenant = TenantIdSchema.parse(tenantId);
-        const investor = InvestorOrganisationIdSchema.parse(
-          investorOrganisationId,
-        );
-        // Tenant- and organisation-scoped reads only: a mandate id that is
-        // not this investor's resolves as absent, never as somebody else's.
-        if (mandateId !== null) {
-          const pinned = await mandates.getMandate(
-            tenant,
-            investor,
-            InvestorMandateIdSchema.parse(mandateId),
-          );
-          return pinned === null
-            ? { kind: "NONE" }
-            : { kind: "FOUND", mandate: toSnapshot(pinned) };
-        }
-        const active = await mandates.listActiveMandates(tenant, investor);
-        if (active.length === 0) return { kind: "NONE" };
-        if (active.length > 1) return { kind: "AMBIGUOUS" };
-        const [only] = active;
-        if (only === undefined) return { kind: "NONE" };
-        const snapshot = await mandates.getMandate(tenant, investor, only.id);
-        return snapshot === null
-          ? { kind: "NONE" }
-          : { kind: "FOUND", mandate: toSnapshot(snapshot) };
-      },
+      // S2: one turn resolves the same mandate through the feed, the fit and
+      // the standing reads (up to four times, each a mandate, constraints and
+      // preferences read). Once per run, keyed by tenant, investor and pinned
+      // mandate; a write this run makes to a mandate table drops it.
+      activeMandate: (query) =>
+        cachedInRun(
+          {
+            aggregate: "eligibility-active-mandate",
+            tables: [
+              "core.investor_mandates",
+              "core.investor_mandate_constraints",
+              "taxonomy.mandate_preferences",
+            ],
+            actor: `${query.tenantId}/${query.investorOrganisationId}`,
+            fingerprint: query.mandateId ?? "",
+          },
+          () => readActiveMandate(query),
+        ),
     },
 
     investorSubject: {
-      investorOrganisationFor: async (actor) => {
-        if (actor.organisationId === undefined) return null;
-        const found = await investorOrganisations.findByOrganisation(
-          sql,
-          actor.tenantId,
-          actor.organisationId,
+      // S2: the actor's own investor organisation, once per run (the same
+      // reason as `ownInvestorOrganisation` in the composition root).
+      investorOrganisationFor: (actor) => {
+        const organisationId = actor.organisationId;
+        if (organisationId === undefined) return Promise.resolve(null);
+        return cachedInRun(
+          {
+            aggregate: "eligibility-investor-organisation",
+            tables: ["core.investor_organisations"],
+            actor: `${actor.tenantId}/${organisationId}`,
+            fingerprint: "",
+          },
+          async () => {
+            const found = await investorOrganisations.findByOrganisation(
+              sql,
+              actor.tenantId,
+              organisationId,
+            );
+            return found === null ? null : { investorOrganisationId: found.id };
+          },
         );
-        return found === null ? null : { investorOrganisationId: found.id };
       },
     },
 
@@ -248,23 +287,38 @@ export function createDomainEligibilityPorts(
         );
         const out = new Map<string, RelationshipStanding>();
         const passed: { companyId: string; relationshipId: string }[] = [];
-        await Promise.all(
-          companyIds.map(async (companyId) => {
-            const relationship = await relationships.findByParties(
-              CompanyIdSchema.parse(companyId),
-              investor,
-            );
-            out.set(
-              companyId,
-              relationship === null
-                ? { kind: "NONE" }
-                : { kind: "STATE", currentState: relationship.currentState },
-            );
-            if (relationship?.currentState === "PASSED") {
-              passed.push({ companyId, relationshipId: relationship.id });
-            }
-          }),
-        );
+        const parsedIds = companyIds.map((id) => CompanyIdSchema.parse(id));
+        // One read for the set (S2) when the port offers it.
+        const found =
+          relationships.findManyByInvestor !== undefined
+            ? new Map(
+                (
+                  await relationships.findManyByInvestor(investor, parsedIds)
+                ).map((r) => [r.companyId as string, r] as const),
+              )
+            : new Map(
+                (
+                  await Promise.all(
+                    parsedIds.map((id) =>
+                      relationships.findByParties(id, investor),
+                    ),
+                  )
+                ).flatMap((r) =>
+                  r === null ? [] : [[r.companyId as string, r] as const],
+                ),
+              );
+        for (const companyId of companyIds) {
+          const relationship = found.get(companyId) ?? null;
+          out.set(
+            companyId,
+            relationship === null
+              ? { kind: "NONE" }
+              : { kind: "STATE", currentState: relationship.currentState },
+          );
+          if (relationship?.currentState === "PASSED") {
+            passed.push({ companyId, relationshipId: relationship.id });
+          }
+        }
         // Re-approach after a pass (doc 19 §67): only for the few passed
         // pairs, and only when both reads are composed.
         const passStanding = relationships.passStanding;

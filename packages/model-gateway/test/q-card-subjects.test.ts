@@ -6,6 +6,7 @@ import type { QToolCallOutcome } from "@capital-q/q-runtime";
 import {
   companiesInOutcome,
   createRunCompanies,
+  namedCompanySubjects,
   withCardSubjects,
 } from "../src/q/card-subjects.js";
 
@@ -78,5 +79,96 @@ describe("answer card subjects", () => {
     ]);
     // Taken once: another answer of the same run starts empty.
     expect(runs.take("run-1").size).toBe(0);
+  });
+});
+
+describe("explicit company finding attribution", () => {
+  const profile = (
+    companyId = HALYARD,
+    canonicalName = "Halyard Security",
+  ) => ({
+    companyId,
+    canonicalName,
+    legalName: null,
+    websiteUrl: null,
+    foundedDate: null,
+    headquartersCountry: null,
+    headquartersCity: null,
+    currentStageCode: null,
+    shortDescription: null,
+    primaryDescription: null,
+    companyStatus: "active",
+    relationToYou: "SHARED",
+    truthClass: "USER_CLAIM",
+  });
+  const complete = (data = profile()): QToolCallOutcome => ({
+    callId: "profile",
+    toolName: "company.get",
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    status: "SUCCEEDED",
+    failureCode: null,
+    sensitivity: "PUBLIC",
+    result: { ok: true, data },
+    latencyMs: 1,
+  });
+  it("accepts a complete authorised read and a whole canonical name, never a name embedded in another", () => {
+    const runs = createRunCompanies();
+    runs.note("r", complete());
+    const read = runs.take("r");
+    expect(
+      namedCompanySubjects("What does Halyard Security do?", read),
+    ).toEqual([{ kind: "COMPANY", companyId: HALYARD }]);
+    expect(
+      namedCompanySubjects("What does Superhalyard Security do?", read),
+    ).toEqual([]);
+    expect(namedCompanySubjects("What does this company do?", read)).toEqual(
+      [],
+    );
+  });
+  it.each(["search", "denied", "malformed", "failed", "unclassified"])(
+    "does not attribute findings from %s output",
+    (kind) => {
+      const runs = createRunCompanies();
+      const base = complete();
+      const read: QToolCallOutcome = {
+        ...base,
+        ...(kind === "search" ? { toolName: "company.search" } : {}),
+        ...(kind === "denied" ? { status: "DENIED" as const } : {}),
+        ...(kind === "failed"
+          ? {
+              result: {
+                ok: false as const,
+                error: { code: "NOT_AVAILABLE", safeMessage: "Not available" },
+              },
+            }
+          : {}),
+        ...(kind === "malformed"
+          ? {
+              result: {
+                ok: true as const,
+                data: { companyId: HALYARD, canonicalName: "Halyard Security" },
+              },
+            }
+          : {}),
+      };
+      runs.note("r", kind === "unclassified" ? { result: read.result } : read);
+      expect(namedCompanySubjects("Halyard Security", runs.take("r"))).toEqual(
+        [],
+      );
+    },
+  );
+  it("leaves duplicate identities and multi-company claims unattributed", () => {
+    for (const otherName of ["Halyard Security", "Clearwater Assurance"]) {
+      const runs = createRunCompanies();
+      runs.note("r", complete());
+      runs.note("r", complete(profile(CLEARWATER, otherName)));
+      expect(
+        namedCompanySubjects(
+          "Compare Halyard Security and Clearwater Assurance",
+          runs.take("r"),
+        ),
+      ).toEqual([]);
+    }
   });
 });

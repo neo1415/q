@@ -1,4 +1,3 @@
-/* global URL */
 // P13: real companies as unclaimed public profiles. Pure planning only: this
 // module turns docs/seed/real-companies/companies.json into the rows and the
 // one transaction per company that seed.mjs runs. No I/O, no secrets.

@@ -5,8 +5,11 @@ import {
   toRelationshipSummaryDto,
   type ConnectionService,
   type InterestService,
+  type RelationshipBriefBatchSources,
+  type RelationshipBriefSources,
   type RelationshipListing,
 } from "@capital-q/network";
+import type { RelationshipBrief } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import type {
   QActionProposal,
@@ -201,25 +204,75 @@ export function createRelationshipIntelligencePort(dependencies: {
         >
       >)
     | undefined;
+  /** The Relationship Brief's readers (R1). Absent: no brief. */
+  readonly briefSources?: RelationshipBriefSources | undefined;
+  /**
+   * The batch readers (R1 batching). Present, each listed relationship's
+   * latest message comes from the chat's own batched read (unsends
+   * folded) instead of `latestMessages`.
+   */
+  readonly briefBatchSources?: RelationshipBriefBatchSources | undefined;
 }): RelationshipIntelligencePort {
-  const { interests, board, ownCompany, connections, latestMessages } =
-    dependencies;
+  const {
+    interests,
+    board,
+    ownCompany,
+    connections,
+    latestMessages,
+    briefSources,
+    briefBatchSources,
+  } = dependencies;
   // Who wrote last, from the actor's side: never fails the list.
   const withLatest = async (
+    actor: ActorContext,
     side: "INVESTOR" | "COMPANY",
     items: readonly OwnRelationship[],
   ): Promise<readonly OwnRelationship[]> => {
+    const threads = briefBatchSources?.threads;
+    if (threads !== undefined && items.length > 0) {
+      const read = await threads(
+        actor,
+        items.map((item) => item.relationshipId),
+      ).catch(() => null);
+      return items.map((item): OwnRelationship => {
+        // A failed read, or a thread the read did not answer, is marked
+        // unread -- never left to look like "no messages" (R1).
+        const entry = read?.get(item.relationshipId);
+        if (entry === undefined) {
+          return { ...item, lastMessageRead: "UNAVAILABLE" };
+        }
+        const latest = entry.latest;
+        return latest === null
+          ? { ...item, lastMessageRead: "OK" }
+          : {
+              ...item,
+              lastMessageRead: "OK",
+              lastMessage: {
+                from: latest.from === "OTHER_SIDE" ? "THEM" : "YOU",
+                at: latest.sentAt,
+                preview: (latest.preview ?? "")
+                  .replace(/\s+/g, " ")
+                  .trim()
+                  .slice(0, 240),
+              },
+            };
+      });
+    }
     if (latestMessages === undefined || items.length === 0) return items;
     const latest = await latestMessages(
       items.map((item) => item.relationshipId),
     ).catch(() => null);
-    if (latest === null) return items;
+    // A failed read is marked, never left to look like "no messages" (R1).
+    if (latest === null) {
+      return items.map((item) => ({ ...item, lastMessageRead: "UNAVAILABLE" }));
+    }
     return items.map((item) => {
       const message = latest.get(item.relationshipId);
       return message === undefined
-        ? item
+        ? { ...item, lastMessageRead: "OK" }
         : {
             ...item,
+            lastMessageRead: "OK",
             lastMessage: {
               from: message.side === side ? "YOU" : "THEM",
               at: message.at,
@@ -294,6 +347,7 @@ export function createRelationshipIntelligencePort(dependencies: {
         return {
           side: "INVESTOR",
           items: await withLatest(
+            actor,
             "INVESTOR",
             items.map((item) => ownRow(item, "INVESTOR")),
           ),
@@ -311,6 +365,7 @@ export function createRelationshipIntelligencePort(dependencies: {
       return {
         side: "COMPANY",
         items: await withLatest(
+          actor,
           "COMPANY",
           items.map((item) => ownRow(item, "COMPANY")),
         ),
@@ -330,6 +385,16 @@ export function createRelationshipIntelligencePort(dependencies: {
       });
       return status === null ? null : toRelationshipStatusDto(status);
     },
+    ...(briefSources === undefined
+      ? {}
+      : {
+          brief: (actor: ActorContext, relationshipId: string) =>
+            interests.relationshipBrief({
+              actor,
+              relationshipId,
+              sources: briefSources,
+            }),
+        }),
     byRelationship: async (actor, relationshipId) => {
       const view = await interests.relationshipById({ actor, relationshipId });
       return view === null
@@ -352,5 +417,32 @@ export function createRelationshipIntelligencePort(dependencies: {
     mayAnswerInterest: (actor, interestId) =>
       interests.mayRespondToInterest({ actor, interestId }),
     prepareForApproval: board.prepareForApproval,
+  };
+}
+
+/**
+ * The person's own relationships' briefs from one batched read (R1): the
+ * investor side first (the Network context resolves the organisation from
+ * the membership and refuses anyone else), else their own company. Null:
+ * they have no side.
+ */
+export function createOwnBriefsReader(dependencies: {
+  readonly interests: InterestService;
+  readonly ownCompany?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
+  readonly sources: RelationshipBriefBatchSources;
+}): (actor: ActorContext) => Promise<readonly RelationshipBrief[] | null> {
+  const { interests, ownCompany, sources } = dependencies;
+  return async (actor) => {
+    const briefs = interests.relationshipBriefs;
+    if (briefs === undefined) throw new Error("briefs not composed");
+    try {
+      return await briefs({ actor, sources });
+    } catch (error) {
+      if (!(error instanceof InterestNotPermittedError)) throw error;
+    }
+    const companyId = ownCompany === undefined ? null : await ownCompany(actor);
+    if (companyId === null) return null;
+    return briefs({ actor, companyId, sources });
   };
 }

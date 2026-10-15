@@ -246,6 +246,29 @@
   min-width: 0;
   cursor: pointer;
 }
+/* K5: a card with a record carries an explicit Open beside the X. */
+.cq-ac-head:has([data-ac-open]) {
+  grid-template-columns: auto minmax(0, 1fr) auto auto 44px;
+}
+.cq-ac-open {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  border-radius: var(--cq-radius-md);
+  border: 1px solid var(--cq-border-subtle);
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cq-ac-open:hover {
+  background: var(--cq-surface-strong);
+}
+.cq-ac-open:focus-visible {
+  outline: 2px solid var(--cq-focus-ring);
+  outline-offset: 2px;
+}
 .cq-ac-rank {
   width: 26px;
   height: 26px;
@@ -409,6 +432,9 @@
 .cq-ac-lvl-ink {
   color: var(--hue);
 }
+.cq-ac-lvl-ink[data-level="MISMATCH"] {
+  color: var(--cq-text-secondary);
+}
 .cq-ac-lvl-ink[data-level="UNKNOWN"] {
   color: var(--cq-text-tertiary);
 }
@@ -430,6 +456,10 @@
   align-items: center;
   gap: 6px;
   cursor: pointer;
+}
+.cq-ac-btn[data-ac-external] {
+  min-height: 44px;
+  text-decoration: none;
 }
 .cq-ac-btn:hover {
   background: var(--cq-surface-subtle);

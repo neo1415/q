@@ -4,6 +4,7 @@ import { UtcTimestampSchema } from "../common/time.js";
 import { UuidSchema } from "../common/ids.js";
 import { CurrencyCodeSchema } from "../common/money.js";
 import { StageCodeSchema } from "./companies.js";
+import { CompanyRaiseViewSchema } from "./company-raise.js";
 import { PitchSummaryDtoSchema } from "./media.js";
 import { MoneySchema } from "../common/money.js";
 import {
@@ -37,6 +38,13 @@ export const FeedCompanySummaryDtoSchema = z
       })
       .strict()
       .nullable(),
+    /**
+     * The raise as this reader sees it on every surface (the one company
+     * read model, `raiseFor`). The card renders this; `raise` above stays
+     * the disclosed objective only, which is what the raise filter uses.
+     * Absent from older servers.
+     */
+    raiseView: CompanyRaiseViewSchema.optional(),
   })
   .strict();
 export type FeedCompanySummaryDto = z.infer<typeof FeedCompanySummaryDtoSchema>;

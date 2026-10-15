@@ -1,4 +1,3 @@
-/* global process, console, fetch */
 // Clear fictional bench accounts and everything they own (founder rule:
 // "clear the bench accounts from the DB when testing is done").
 //

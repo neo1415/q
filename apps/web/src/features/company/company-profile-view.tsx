@@ -10,14 +10,11 @@ import type {
   PitchClaimDto,
   RelationshipStateV2,
 } from "@capital-q/contracts";
-import {
-  ChevronRight,
-  Globe,
-  ICON_SIZE,
-  ShieldCheck,
-} from "@capital-q/ui/icons";
+import { deckAskTerms } from "@capital-q/contracts";
+import { ChevronRight, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { formatLongDay } from "@/components/date-format";
+import { VerifiedBadge } from "@/components/verified-badge";
 import { capitalTabHref } from "@/features/capital/capital-tabs";
 
 import { ExpressInterest } from "../network/express-interest";
@@ -33,6 +30,8 @@ import {
 } from "./company-profile-parts";
 import { countryLabel, stageLabel } from "./declared-labels";
 import { compactMoneyText, moneyText } from "./money-text";
+import { RaiseFact } from "./raise-fact";
+import { raiseWords } from "./raise-words";
 import {
   elevatorHref,
   Fold,
@@ -280,14 +279,32 @@ export function CompanyProfileView({
     claims.filter((claim) => claim.kind === kind);
   const sayRaise = overview?.raiseFromPitch ?? claimsOf("RAISE")[0] ?? null;
   const traction = claimsOf("TRACTION");
+  // The pitch states a figure but no round details are shared with this
+  // reader: the fold explains the difference instead of listing both.
+  const pitchOnly = overview?.raise === null && sayRaise !== null;
+  const sayRaiseAmount =
+    sayRaise === null
+      ? ""
+      : sayRaise.money === null
+        ? pitchRaiseText(sayRaise) || "money"
+        : compactMoneyText(sayRaise.money);
+  // R2: with the one raise read, the line says exactly the card's words.
+  const viewWords =
+    overview?.raiseView === undefined
+      ? null
+      : raiseWords(overview.raiseView, own);
   const raiseSummary = [
-    overview?.raise
-      ? compactMoneyText(overview.raise)
-      : overview?.raiseFromPitch
-        ? `${pitchRaiseText(overview.raiseFromPitch)}, ${pitchSaid}`
-        : own
-          ? "Not added yet"
-          : "Not shared with you",
+    viewWords !== null
+      ? viewWords.amount === null
+        ? viewWords.label
+        : `${viewWords.amount} · ${viewWords.label}`
+      : overview?.raise
+        ? compactMoneyText(overview.raise)
+        : overview?.raiseFromPitch
+          ? `${pitchRaiseText(overview.raiseFromPitch)}, ${pitchSaid}`
+          : own
+            ? "Not added yet"
+            : "Not shared with you",
     investor
       ? overview?.deck
         ? "deck shared with you"
@@ -377,12 +394,14 @@ export function CompanyProfileView({
             {line === "" ? null : (
               <p className="cq-caption text-(--cq-text-secondary)">{line}</p>
             )}
-            {overview?.organisationVerified === true ? (
-              <p className="cq-caption flex items-center gap-1.5 text-(--cq-text-secondary)">
-                <ShieldCheck size={ICON_SIZE.compact} aria-hidden="true" />
-                Organisation verified by Capital Q
-              </p>
-            ) : null}
+            <VerifiedBadge
+              status={
+                overview?.organisationVerified === true ? "VERIFIED" : null
+              }
+              className="self-start"
+            >
+              Organisation verified by Capital Q
+            </VerifiedBadge>
           </div>
         </header>
 
@@ -492,7 +511,36 @@ export function CompanyProfileView({
                     {stageLabel(profile.currentStageCode) ?? "Not declared"}
                   </StripCell>
                   <StripCell term="Raising">
-                    {overview.raise !== null ? (
+                    {overview.raiseView !== undefined ? (
+                      // R2: the server's one raise read, in the same words
+                      // as the Discover card.
+                      own && overview.raiseView.source === "NONE" ? (
+                        <AddYourRaise />
+                      ) : (
+                        <RaiseFact
+                          words={raiseWords(overview.raiseView, own)}
+                          {...(overview.raiseView.pitch === null
+                            ? {}
+                            : {
+                                source: (label: string) => (
+                                  <ProfileTabLink
+                                    tab="elevator"
+                                    fallbackHref={elevatorHref(
+                                      profile.companyId,
+                                    )}
+                                    className="underline underline-offset-4"
+                                    data-raise-source="PITCH_VIDEO"
+                                  >
+                                    {label},{" "}
+                                    {pitchMoment(
+                                      overview.raiseView?.pitch?.atSeconds ?? 0,
+                                    )}
+                                  </ProfileTabLink>
+                                ),
+                              })}
+                        />
+                      )
+                    ) : overview.raise !== null ? (
                       compactMoneyText(overview.raise)
                     ) : overview.raiseFromPitch !== null ? (
                       <>
@@ -529,7 +577,7 @@ export function CompanyProfileView({
                 overviewExtra === undefined ? null : (
                   <Fold
                     id="company-assumptions"
-                    title="Assumptions to test"
+                    title="Questions to investigate"
                     summary={
                       overviewExtraSummary ?? "What to ask before a call"
                     }
@@ -545,6 +593,20 @@ export function CompanyProfileView({
                   title="The raise"
                   summary={raiseSummary}
                 >
+                  {pitchOnly ? (
+                    // A figure from the pitch with no round formally shared:
+                    // one sentence says both halves, so "$4M" and "not
+                    // shared" never read as a contradiction (2026-10-11),
+                    // and nothing repeats what the rows below say.
+                    <p
+                      className="cq-body-sm text-(--cq-text-secondary)"
+                      data-raise-explainer="PITCH_ONLY"
+                    >
+                      {own
+                        ? "Investors who can watch your pitch see the amount you say in it, as your statement. Your round details stay private until you share them."
+                        : `${profile.canonicalName} states ${sayRaiseAmount} in its pitch, its own statement; the round isn't formally shared with you yet.`}
+                    </p>
+                  ) : null}
                   {sayRaise === null ? null : (
                     <PitchQuote
                       claim={sayRaise}
@@ -556,15 +618,17 @@ export function CompanyProfileView({
                       // The raise is founder-private until shared with this
                       // reader; "not shared" never says whether one exists.
                       [
-                        overview.raise === null && sayRaise !== null
-                          ? "Raise on Capital Q"
-                          : "Raising",
+                        pitchOnly ? "Round details" : "Raising",
                         overview.raise !== null ? (
                           moneyText(overview.raise)
                         ) : own ? (
                           <AddYourRaise />
                         ) : diligence === null ? (
-                          "Not shared with you"
+                          pitchOnly ? (
+                            "Not shared with you yet"
+                          ) : (
+                            "Not shared with you"
+                          )
                         ) : (
                           <NotSharedYet href={diligence.href} />
                         ),
@@ -609,6 +673,12 @@ export function CompanyProfileView({
                         : []),
                     ]}
                   />
+                  {/* The round as their confirmed deck states it (2026-10-12). */}
+                  {investor ? (
+                    <Suspense fallback={null}>
+                      <DeckRoundTerms deck={deck} />
+                    </Suspense>
+                  ) : null}
                   {claimsOf("USE_OF_FUNDS").map((claim) => (
                     <PitchQuote
                       key={`${claim.pitchId}-${String(claim.atSeconds)}`}
@@ -826,6 +896,46 @@ export function CompanyProfileView({
 }
 
 type Eventually<T> = T | Promise<T>;
+
+/**
+ * The round's terms as the deck's confirmed "The ask" states them, for an
+ * investor who may see the deck: the same reading the fit uses
+ * (deckAskTerms), labelled as the deck's, never as verified. A lead that
+ * the deck does not name is said once, here; nothing if the deck is silent.
+ */
+function DeckRoundTerms({
+  deck: eventually,
+}: {
+  readonly deck: Eventually<CompanyDeckView | null> | null;
+}) {
+  const deck = useSettled(eventually);
+  const terms = deckAskTerms(deck?.extraction?.sections);
+  const rows: (readonly [string, string])[] = [
+    ...(terms.instrument === undefined
+      ? []
+      : ([["Instrument", terms.instrument]] as const)),
+    ...(terms.valuationCap === undefined
+      ? terms.valuation === undefined
+        ? []
+        : ([["Valuation", terms.valuation]] as const)
+      : ([["Valuation cap", terms.valuationCap]] as const)),
+    ...(terms.minimumCheque === undefined
+      ? []
+      : ([["Minimum cheque", terms.minimumCheque]] as const)),
+    ...(terms.committedInvestors === "NOT_IN_DECK"
+      ? ([["Lead or committed investors", "Not in the deck"]] as const)
+      : []),
+  ];
+  if (rows.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1" data-deck-round-terms>
+      <span className="cq-caption text-(--cq-text-tertiary)">
+        From their confirmed deck
+      </span>
+      <ProfileRows rows={rows} />
+    </div>
+  );
+}
 
 function useSettled<T>(value: Eventually<T>): T {
   return value instanceof Promise ? use(value) : value;

@@ -125,6 +125,22 @@ export type ChatStore = {
   readonly activeBlockSides: (
     relationshipId: string,
   ) => Promise<readonly ChatSide[]>;
+  /**
+   * R1 batching: for each listed relationship where `organisationId` is a
+   * party, that organisation's side and the newest few originals from each
+   * side with their revisions, in one read. A relationship where it is not
+   * a party is absent. Optional: narrow fakes need not carry it.
+   */
+  readonly recentForRelationships?: (
+    organisationId: string,
+    relationshipIds: readonly string[],
+  ) => Promise<
+    readonly {
+      readonly relationshipId: string;
+      readonly side: ChatSide;
+      readonly rows: readonly ChatMessageRow[];
+    }[]
+  >;
   /** Unread counts on every thread of one party organisation, for one reader. */
   readonly unreadForOrganisation: (
     organisationId: string,

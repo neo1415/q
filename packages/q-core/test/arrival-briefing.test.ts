@@ -121,14 +121,15 @@ describe("lowdown from facts", () => {
   it("is quiet when nothing happened, and never invents a zero", () => {
     const quiet = lowdownOf({ activity: {}, decisions: 0, hoursAway: 3 });
     expect(quiet.quiet).toBe(true);
-    expect(quiet.text).toMatch(/nothing needs you/u);
+    // P4: a quiet day has no line of its own (never "All quiet").
+    expect(quiet.text).toBe("");
     const zeros = lowdownOf({
       activity: { sent: { n: 0, names: [] } },
       decisions: 0,
       hoursAway: 40,
     });
     expect(zeros.quiet).toBe(true);
-    expect(zeros.text).toMatch(/away/u);
+    expect(zeros.text).toBe("");
   });
 
   it("leads with decisions when Q did nothing itself", () => {

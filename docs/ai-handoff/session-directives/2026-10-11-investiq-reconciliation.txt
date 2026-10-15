@@ -1,0 +1,299 @@
+# CAPITAL Q: INVESTIQ ACCURACY, METHODOLOGY & ARCHITECTURAL RECONCILIATION ADDENDUM
+
+This addendum supplements the urgent investor-demo directive.
+
+In addition to making Capital Q fast, reliable and impressive, I want you to make its institutional intelligence as accurate, defensible, evidence-driven and internally consistent as possible.
+
+**Investor confidence depends on the quality of Q's conclusions, not merely its speed or presentation.**
+
+You have standing engineering authorization to investigate, fix, refactor, test and deploy technical corrections covered by our existing authorization.
+
+Work autonomously. Do not repeatedly ask for approval.
+
+However, preserve tomorrow's investor-demo readiness as the immediate release priority. Pursue the InvestIQ and documentation work in parallel wherever feasible without destabilizing that journey.
+
+## 1. Treat the locked PADL as the architectural authority
+
+Read the actual source documents carefully, not just previous AI summaries:
+
+- Real PADL - Capital Q Product Architecture Decision Log
+- Real CAPITAL Q PRODUCT SPECIFICATION
+- Capital Q Final System Review
+- CapitalQ_GateQ_Product_Feature_Specification
+
+Also inspect their current repository versions and relevant implementation code.
+
+Identify contradictions, obsolete requirements, repeated identifiers, unimplemented locked decisions and missing specifications.
+
+Distinguish between:
+
+1. Genuine contradictions.
+2. Deliberately unresolved methodology decisions.
+3. Superseded historical specifications.
+4. Existing implementations that violate approved requirements.
+5. Correct implementations that lack adequate validation.
+
+Do not treat these categories interchangeably.
+
+## 2. Resolve the Core Seven versus original ten dimensions
+
+The earlier Product Specification describes ten dimensions. The later locked InvestIQ architecture adopts seven core institutional dimensions.
+
+The canonical InvestIQ framework shall follow the locked Core Seven:
+
+1. Founder & Leadership
+2. Market Opportunity
+3. Product & Technology
+4. Commercial Performance
+5. Financial Health
+6. Governance & Institutional Readiness
+7. Capital Strategy
+
+Preserve useful assessment criteria from the original ten, but map them into the appropriate canonical framework or separate outputs.
+
+In particular:
+
+- Investment Readiness remains distinct from Business Quality.
+- Investor Fit remains investor-specific and separate from InvestIQ.
+- Growth potential should be assessed through applicable institutional dimensions, not automatically introduced as an eighth headline dimension.
+- Execution Capacity can contribute supporting evidence to applicable dimensions and deeper diligence without recreating an independent core operational audit.
+- Intelligence Confidence remains distinct from institutional business strength.
+
+Produce an explicit legacy-to-canonical mapping.
+
+Do not delete historical assessment data or silently reinterpret historical scores.
+
+## 3. Reconcile duplicate architectural decision identifiers
+
+The PADL reuses certain decision numbers across chapters.
+
+Establish a canonical, uniquely identifiable decision registry with:
+
+- Stable decision identifier.
+- Original number and title.
+- Source document, chapter and location.
+- Approval or locked status.
+- Canonical or superseded status.
+- Relevant implementation contracts.
+- Corresponding tests.
+- Links to related decisions.
+
+Preserve historical references and source provenance.
+
+Do not silently rewrite approved PADL decisions.
+
+Create an additive reconciliation or corrigendum that can later be formally adopted by product leadership.
+
+Where a decision is truly contradictory and requires business approval, document the exact alternatives and your recommended resolution.
+
+Continue all independent engineering work rather than waiting.
+
+## 4. Investigate the actual scoring implementations
+
+Audit every scoring mechanism and where it appears:
+
+- InvestIQ institutional assessment.
+- Business Quality.
+- Investment Readiness.
+- Intelligence Confidence.
+- Investor Thesis Match.
+- Discovery ranking.
+- GateQ qualification and prioritization.
+- Q Card fit scores and coverage.
+- Any existing founder-private readiness or advisory scoring.
+
+Trace each score from authorized input evidence through calculation, persistence, API contracts and user-facing presentation.
+
+Identify:
+
+- Hardcoded values.
+- Unjustified numeric constants.
+- Fixed or generic weightings.
+- Hidden defaults.
+- Repeated or suspiciously uniform scores.
+- Incorrect handling of missing information.
+- Omitted negative or contradictory evidence.
+- Inconsistent rounding.
+- Stale or incorrectly cached assessments.
+- Differences between canonical calculations and displayed numbers.
+- Cases where an unrelated score is presented as InvestIQ.
+
+Reproduce genuine failures against authorized realistic records, as well as controlled fixtures.
+
+The earlier 8.8 observation remains historically unresolved. Do not claim it is explained merely by finding a mathematical fixture that outputs 8.8.
+
+Also investigate the repeated 6.0 and 3.5 values seen in the current authorized investor data. Repeated values alone do not prove a defect, but determine whether they reflect valid scoring bands, insufficient differentiation, defaults or implementation problems.
+
+## 5. Improve scoring correctness without inventing institutional facts
+
+Every assessment must distinguish:
+
+- Verified evidence.
+- Founder-supplied claims.
+- Third-party evidence.
+- AI inference.
+- Missing information.
+- Negative evidence.
+- Contradictory evidence.
+- Inapplicable criteria.
+- Outdated evidence.
+
+Do not treat UNKNOWN as MISMATCH, or MISMATCH as UNKNOWN.
+
+Do not inflate coverage by excluding unfavorable criteria.
+
+Do not confuse evidence completeness with business quality.
+
+Do not penalize an early-stage business simply because later-stage expectations are inapplicable.
+
+Do not allow a favorable investor match to disguise weak institutional evidence.
+
+For every score, preserve explainable lineage and its methodology version.
+
+For anything that cannot be assessed responsibly, communicate the limitation instead of inventing precision.
+
+## 6. Develop InvestIQ Quantitative Methodology v1
+
+The approved sources define the qualitative architecture but do not contain a complete approved mathematical scoring algorithm.
+
+Treat that as a methodology-design task, not permission to pretend one already exists.
+
+Develop a serious, institutionally defensible proposed methodology that includes:
+
+- Core Seven dimension-specific assessment rubrics.
+- Subcriteria and contextual applicability.
+- Stage, sector and business-model adjustment rules.
+- Dynamic contextual weighting.
+- Evidence quality and reliability treatment.
+- Handling of missing, contradictory and outdated evidence.
+- Intelligence Confidence calculation or calibration approach.
+- Aggregation and rounding rules.
+- Score confidence and interpretability.
+- Historical methodology versioning.
+- Benchmarking strategy.
+- Manipulation and gaming resistance.
+- Calibration and consistency tests.
+
+Research relevant institutional investment evaluation methods and credible quantitative approaches when useful. Distinguish external reference methods from Capital Q's own product decisions.
+
+Avoid arbitrary fixed percentages presented as institutional truth.
+
+The methodology should be deterministic and reproducible where numerical scores are calculated, while using AI for evidence extraction, contextual assessment and well-grounded reasoning.
+
+Produce an implementation-ready candidate, with precise assumptions, test vectors and sensitivity analyses.
+
+**Important authority boundary:** You may independently design, prototype, test and recommend a methodology. Do not label new quantitative business rules as officially approved FDN intellectual property, or silently replace existing production scoring semantics, until the methodology has appropriate product or investment leadership approval.
+
+Continue shipping independently verifiable correctness fixes that do not require those decisions.
+
+## 7. Separate InvestIQ from investor matching
+
+Design and enforce a clear separation between:
+
+**InvestIQ:** An institutional assessment of the business.
+
+**Investment Readiness:** Its preparedness for the relevant capital objective.
+
+**Intelligence Confidence:** The reliability and completeness of the assessment.
+
+**Investor Thesis Match:** Fit against a specific investor's declared investment criteria.
+
+**Discovery Ranking:** The ordering of opportunities for a particular authorized context.
+
+**Investor Interest:** Actual investor behavior, not a predicted score.
+
+**Relationship State:** The actual progression of the investment relationship.
+
+Ensure internal types, APIs, tool outputs and user interfaces maintain these distinctions.
+
+Never collapse them into one generic company score.
+
+## 8. Protect institutional truth and permissions
+
+Preserve the distinction between founder-private intelligence, investor-private information and authorized shared company evidence.
+
+Confidential founder disclosures must not silently influence investor-facing rankings or be exposed through explanations, derived results or generated reports without appropriate authority.
+
+Maintain one consistent versioned institutional assessment while enforcing lawful and legitimate evidence visibility.
+
+An assessment shown to an investor must be supported by evidence that can legitimately influence that investor-facing conclusion.
+
+Enforce this below the presentation layer.
+
+## 9. Verify with realistic assessment scenarios
+
+Construct a representative evaluation set, including:
+
+- Pre-seed startup with little revenue but strong founder and product evidence.
+- Seed business with strong traction and weak governance.
+- Growth-stage company with substantial revenue but poor unit economics.
+- Business with attractive claims but unsupported evidence.
+- Business with contradictory financial disclosures.
+- Company with insufficient information.
+- Company outside an investor's explicit mandate.
+- Strong institutional business with poor investor-specific fit.
+- Weak institutional business with superficially attractive investor fit.
+- Two similar companies whose material evidence differs.
+
+For every scenario, test that:
+
+- The correct institutional dimensions are assessed.
+- Inapplicable criteria are handled appropriately.
+- Uncertainty is communicated.
+- Evidence lineage is preserved.
+- Unfavorable evidence remains visible.
+- Scores are reproducible under the same methodology version.
+- Relevant differences produce justified assessment differences.
+- Changes in underlying evidence are reflected appropriately.
+- Investor-facing responses respect permissions.
+- Q explains the outcome coherently.
+
+Do not optimize for making scores look diverse. Optimize for justified discrimination.
+
+## 10. Preserve the immediate investor demonstration
+
+Tomorrow's demo is still the top release priority.
+
+Do not block the existing demonstration while trying to perfect the entire quantitative methodology.
+
+Tonight, prioritize in this order:
+
+1. Any confirmed incorrect score, missing evidence, broken explanation or authorization defect that could materially mislead investors.
+2. Existing investor question-answering, discovery, comparison and response-speed defects.
+3. Validation that the corrected assessment and fit information reaches real Q answers and cards.
+4. Canonical document reconciliation and implementation-ready methodology design.
+5. Broader quantitative methodology implementation after appropriate approval.
+
+If current production InvestIQ numerical scoring cannot be supported by an approved methodology, do not misrepresent it as a verified institutional assessment. Use accurate, clearly differentiated existing evidence-based outputs and qualification language.
+
+Never hardcode showcase answers or fabricate scores to make the demonstration look impressive.
+
+## 11. Report concrete outcomes
+
+Maintain a concise engineering record of:
+
+- Confirmed source contradictions and their resolution.
+- Existing locked decisions requiring no new approval.
+- Open quantitative methodology decisions.
+- Exact scoring and presentation defects discovered.
+- Changes implemented.
+- Tests passed and failed.
+- Actual production behavior verified.
+- Changes deployed versus awaiting release.
+- Questions genuinely requiring business-methodology approval.
+
+The key deliverables are:
+
+**A. An investor demonstration with fast, reliable, evidence-backed assessments and explanations.**
+
+**B. A canonical, versioned architectural decision reconciliation.**
+
+**C. An implementation-ready proposed FDN InvestIQ Quantitative Methodology v1.**
+
+**D. Correct scoring and evidence presentation across the existing product.**
+
+Do the necessary engineering independently. Do not wait for me to supervise technical implementation.
+
+But never substitute unsupported mathematical assumptions for approved institutional methodology.
+
+**Accuracy first. Evidence always. Speed without sacrificing truth. Preserve the existing product and keep shipping.**

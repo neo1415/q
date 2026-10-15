@@ -6,6 +6,7 @@ import {
   type ChatThreadDto,
   type DiligenceDto,
   type MeetingDto,
+  type RelationshipBrief,
   type RelationshipStatusDto,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
@@ -29,6 +30,7 @@ import { EntityAvatar, EntityCover } from "@/features/entity/entity-avatar";
 import { JoinCallForm } from "@/features/schedule/join-call-form";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
 
+import { briefLines } from "./brief-lines";
 import { ScheduleDialog } from "./schedule-dialog";
 import { callToRecord } from "./call-to-record";
 
@@ -101,6 +103,7 @@ export function RelationshipDetail({
   basePath,
   media = null,
   diligence = null,
+  brief = null,
 }: {
   readonly side: RelationshipSide;
   readonly counterpart: string;
@@ -124,11 +127,15 @@ export function RelationshipDetail({
   readonly media?: ReactNode;
   /** The diligence area once diligence started (its own tab). */
   readonly diligence?: DiligenceDto | null | undefined;
+  /** The Relationship Brief (R1): the same read Q answers from. */
+  readonly brief?: RelationshipBrief | null | undefined;
 }) {
   // The match outlives CONNECTED (relationship-state.v2).
   const connected =
     relationship !== null && isMatchedRelationshipState(relationship.state);
-  const messageCount = thread?.messages.length ?? 0;
+  // The brief counts the whole history; the thread is only its first page.
+  const messageCount = brief?.messages.count ?? thread?.messages.length ?? 0;
+  const standing = brief === null ? [] : briefLines(brief, counterpart);
   const call =
     relationship === null
       ? null
@@ -277,6 +284,17 @@ export function RelationshipDetail({
           aria-label="Next"
         >
           <Card title="Next" id="next" className="max-lg:order-first">
+            {standing.length === 0 ? null : (
+              <ul
+                className="cq-body-sm mb-3 flex flex-col gap-1 text-(--cq-text-secondary)"
+                aria-label="Where this stands"
+                data-relationship-brief
+              >
+                {standing.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
             <DockAvoidZone className="flex flex-col items-stretch gap-2">
               {actions}
               {connected && relationship !== null ? (

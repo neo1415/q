@@ -38,6 +38,15 @@ export type FakeBehaviour =
       readonly value: unknown;
       readonly usage?: ModelUsage | undefined;
       readonly delayMs?: number | undefined;
+      /**
+       * Streams the first `afterChars` characters, then waits for `until`
+       * before streaming the rest: a model that is still writing. Lets a
+       * test observe what a listener has received while the turn is
+       * deliberately unfinished.
+       */
+      readonly hold?:
+        | { readonly afterChars: number; readonly until: Promise<void> }
+        | undefined;
     }
   | {
       /** Proposes tool calls, as a tool-capable model would when tools are offered. */
@@ -180,7 +189,13 @@ export function createFakeModelProvider(
               await delay(behaviour.delayMs, context.signal);
             }
             const json = JSON.stringify(behaviour.value);
-            emit(context, json);
+            if (behaviour.hold === undefined) {
+              emit(context, json);
+            } else {
+              emit(context, json.slice(0, behaviour.hold.afterChars));
+              await behaviour.hold.until;
+              emit(context, json.slice(behaviour.hold.afterChars));
+            }
             return {
               text: json,
               toolCalls: undefined,

@@ -186,6 +186,43 @@ describe("the screen context on a Q run", () => {
     expect(none.runs[0]?.screen).toBeNull();
   });
 
+  it("keeps the open artifact and its position as read-back hints, without granting a subject", async () => {
+    const h = harness(() => false);
+    const screen = {
+      route: "DOCUMENTS" as const,
+      artifactId: DOCUMENT,
+      artifactVersion: 1,
+      artifactSlide: 2,
+    };
+    await h.ask(screen);
+    expect(h.runs[0]?.screen).toEqual(screen);
+    expect(h.runs[0]?.subjects).toEqual([]);
+    expect(h.conversations[0]?.subjects).toEqual([]);
+    expect(h.resolved).toEqual([]);
+  });
+
+  it("does not retain artifact positions without an artifact reference", async () => {
+    const h = harness(() => true);
+    await h.ask({ route: "DOCUMENTS", artifactVersion: 1, artifactSlide: 2 });
+    expect(h.runs[0]?.screen).toEqual({ route: "DOCUMENTS" });
+  });
+
+  it("keeps a document page only with the resolved document", async () => {
+    for (const allowed of [true, false]) {
+      const h = harness(() => allowed);
+      await h.ask({
+        route: "DOCUMENTS",
+        documentId: DOCUMENT,
+        documentPage: 3,
+      });
+      expect(h.runs[0]?.screen).toEqual(
+        allowed
+          ? { route: "DOCUMENTS", documentId: DOCUMENT, documentPage: 3 }
+          : { route: "DOCUMENTS" },
+      );
+    }
+  });
+
   it("R35: the Discover card on screen is 'this company' -- a subject, with no words read", async () => {
     // The request carries no phrase to match: whatever the person says
     // ("what is this about?", "save it", "I'm interested"), the screen

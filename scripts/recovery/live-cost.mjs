@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console */
 /**
  * Recovery G: what a LIVE run costs, before and after. No invented numbers.
  *

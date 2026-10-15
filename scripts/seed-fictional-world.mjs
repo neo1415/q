@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Seed the fictional demo world (SEED): twelve invented companies with
  * stories, evidence and pitch decks, eight invented investors with

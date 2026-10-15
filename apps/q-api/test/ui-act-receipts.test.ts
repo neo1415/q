@@ -227,6 +227,27 @@ describe("UI act receipts reach the Q API as the person (RECOVERY C2)", () => {
       `Opened ${route} on their screen (DONE).`,
       "NOT done: /company/5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70?tab=dataroom never opened on their screen (FAILED).",
     ]);
+    // R3: a move's receipt carries its intent id and closed failure reason;
+    // the same intent posted twice is one receipt; Q reads the reason.
+    const reasoned = {
+      status: "FAILED",
+      expected: "/admin",
+      intentId: "nav-7",
+      reason: "UNAUTHORIZED",
+    } as const;
+    for (let i = 0; i < 2; i += 1) {
+      const again = await app.inject({
+        method: "POST",
+        url: Q_UI_ACT_RECEIPTS_PATH,
+        headers: { authorization: `Bearer ${BEARER}` },
+        payload: { reports: [], navigations: [reasoned] },
+      });
+      expect(again.statusCode).toBe(200);
+      expect(again.json()).toEqual({ accepted: i === 0 ? 1 : 0 });
+    }
+    expect(navigationFacts(ledger.recentNavigations(ACTOR)).at(-1)).toBe(
+      "NOT done: /admin did not open on their screen (FAILED: that page is not available to their account).",
+    );
     // A route is ids and fixed segments, never page text.
     const prose = await app.inject({
       method: "POST",

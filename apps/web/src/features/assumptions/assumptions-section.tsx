@@ -7,15 +7,20 @@ import {
   diligenceQuestionsText,
   type AssumptionBoardDto,
 } from "@capital-q/contracts";
+import Link from "next/link";
+
 import { Button } from "@capital-q/ui/button";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
+
+import { useGlobalQ } from "@/components/app-shell/global-q";
 
 import { sendQuestionsAction } from "./assumption-actions";
 import { StandingBadge } from "./standing-badge";
 import { assumptionLabels, claimLine } from "./words";
 
 /**
- * Q.07 "Assumptions to test" on an investor's view of a company profile
+ * Q.07 "Questions to investigate" (was "Assumptions to test") on an
+ * investor's view of a company profile
  * (2026-10-07; design docs/design/2026-10-07/investor-promises "assume").
  *
  * The board is the API's, built from what this investor may see; this
@@ -34,6 +39,9 @@ export type QuestionsRoute =
   /** Not connected: questions can be picked and copied, not sent. */
   | { readonly kind: "NOT_CONNECTED" };
 
+/** The most important first; the rest one tap away (2026-10-12). */
+export const ASSUMPTIONS_SHOWN_FIRST = 3;
+
 const shortDay = (iso: string) =>
   new Date(iso).toLocaleDateString("en-GB", {
     day: "numeric",
@@ -45,13 +53,18 @@ export function AssumptionsSection({
   board,
   companyName,
   route,
+  dataRoomHref,
 }: {
   readonly board: AssumptionBoardDto;
   readonly companyName: string;
   readonly route: QuestionsRoute;
+  /** The profile's Data room tab, where documents are requested. */
+  readonly dataRoomHref?: string | undefined;
 }) {
+  const { askNow } = useGlobalQ();
   const [picked, setPicked] = useState<readonly string[]>([]);
   const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [key, setKey] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -116,13 +129,34 @@ export function AssumptionsSection({
           id="assumptions-title"
           className="cq-title-sm text-(--cq-text-primary)"
         >
-          Assumptions to test
+          Questions to investigate
         </h2>
+        {/* The insight first; how the three paths work is one tap away
+            (progressive disclosure, 2026-10-12). */}
         <p className="cq-body-sm text-(--cq-text-secondary)">
           {board.basis === "NOTHING_SHARED"
-            ? `${companyName} hasn't shared a confirmed deck reading with you yet, so every key claim is not known yet. These are the first things to ask.`
-            : `What ${companyName} says, what each claim rests on, and what is not known yet, from their confirmed deck reading. Only what they share with you.`}
+            ? `No confirmed deck reading shared yet: the first things to find out about ${companyName}.`
+            : `What ${companyName}'s case rests on, from the deck reading they confirmed for you.`}
         </p>
+        <details className="group" data-assumptions-help>
+          <summary className="cq-caption min-h-[44px] cursor-pointer text-(--cq-text-tertiary) underline underline-offset-4 sm:min-h-0">
+            How to settle one
+          </summary>
+          <p className="cq-body-sm pt-1 text-(--cq-text-secondary)">
+            <b className="font-medium text-(--cq-text-primary)">
+              Ask Q to check
+            </b>{" "}
+            the evidence you already have,{" "}
+            <b className="font-medium text-(--cq-text-primary)">
+              tick it to ask {companyName}
+            </b>{" "}
+            directly, or{" "}
+            <b className="font-medium text-(--cq-text-primary)">
+              request a document
+            </b>{" "}
+            that would settle it.
+          </p>
+        </details>
       </div>
       <div className="flex flex-wrap gap-2" aria-label="Evidence board">
         <StandingBadge standing="EVIDENCED" count={board.counts.evidenced} />
@@ -130,7 +164,14 @@ export function AssumptionsSection({
         <StandingBadge standing="UNKNOWN" count={board.counts.unknown} />
       </div>
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
-        {board.assumptions.map((assumption) => {
+        {(showAll
+          ? board.assumptions
+          : board.assumptions.filter(
+              (assumption, index) =>
+                index < ASSUMPTIONS_SHOWN_FIRST ||
+                picked.includes(assumption.id),
+            )
+        ).map((assumption) => {
           const checked = picked.includes(assumption.id);
           return (
             <li
@@ -164,18 +205,49 @@ export function AssumptionsSection({
                   {assumption.restsOn.join(" · ")}
                 </p>
               )}
-              <label className="flex min-h-11 cursor-pointer items-start gap-3 pt-1">
+              <span
+                id={`ask-${assumption.id}`}
+                className="cq-caption pt-1 text-(--cq-text-tertiary)"
+              >
+                Tick to ask {companyName}
+              </span>
+              <label className="flex min-h-11 cursor-pointer items-start gap-3">
                 <input
                   type="checkbox"
                   checked={checked}
                   disabled={!checked && full}
                   onChange={() => toggle(assumption.id)}
                   className="mt-0.5 size-5 shrink-0 accent-(--cq-accent)"
+                  aria-describedby={`ask-${assumption.id}`}
                 />
                 <span className="cq-body-sm text-(--cq-text-primary)">
                   {assumption.question}
                 </span>
               </label>
+              <div
+                className="flex flex-wrap gap-x-4 gap-y-1 ps-8"
+                data-assumption-actions
+              >
+                <button
+                  type="button"
+                  className="cq-body-sm min-h-11 text-(--cq-text-primary) underline underline-offset-4"
+                  onClick={() =>
+                    askNow(
+                      `About ${companyName}: ${assumption.question} Check the evidence I can already see before I ask them. Say what is evidenced, what is only their claim, and what is missing.`,
+                    )
+                  }
+                >
+                  Ask Q to check the evidence
+                </button>
+                {dataRoomHref === undefined ? null : (
+                  <Link
+                    href={dataRoomHref}
+                    className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-4"
+                  >
+                    Request a document
+                  </Link>
+                )}
+              </div>
               {assumption.asked === undefined ? null : assumption.asked
                   .answer === null ? (
                 <p
@@ -215,6 +287,17 @@ export function AssumptionsSection({
           );
         })}
       </ul>
+      {showAll || board.assumptions.length <= ASSUMPTIONS_SHOWN_FIRST ? null : (
+        <Button
+          variant="quiet"
+          size="compact"
+          className="self-start"
+          onClick={() => setShowAll(true)}
+          data-assumptions-show-all
+        >
+          Show all {String(board.assumptions.length)}
+        </Button>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span
           className="cq-body-sm text-(--cq-text-secondary)"
@@ -222,7 +305,7 @@ export function AssumptionsSection({
         >
           {result ??
             (picked.length === 0
-              ? `Tick up to ${String(ASSUMPTION_QUESTIONS_SEND_MAX)} questions to ask ${companyName}.`
+              ? `Tick up to ${String(ASSUMPTION_QUESTIONS_SEND_MAX)} questions to send to ${companyName}. You see the exact message before it goes.`
               : route.kind === "NOT_CONNECTED"
                 ? "Questions go once you're connected. Express interest first."
                 : `${String(picked.length)} selected. You approve the exact wording before anything is sent.`)}

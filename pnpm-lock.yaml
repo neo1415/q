@@ -1934,6 +1934,9 @@ importers:
       '@capital-q/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@capital-q/database':
+        specifier: workspace:*
+        version: link:../database
       '@capital-q/observability':
         specifier: workspace:*
         version: link:../observability
@@ -1974,9 +1977,6 @@ importers:
       '@capital-q/config':
         specifier: workspace:*
         version: link:../config
-      '@capital-q/database':
-        specifier: workspace:*
-        version: link:../database
       '@capital-q/eventing':
         specifier: workspace:*
         version: link:../eventing
@@ -2050,6 +2050,9 @@ importers:
       '@capital-q/observability':
         specifier: workspace:*
         version: link:../observability
+      '@capital-q/q-core':
+        specifier: workspace:*
+        version: link:../q-core
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security
@@ -2290,6 +2293,9 @@ importers:
       '@supabase/supabase-js':
         specifier: 2.114.0
         version: 2.114.0(@opentelemetry/api@1.9.1)
+      jose:
+        specifier: 6.2.10
+        version: 6.2.10
       zod:
         specifier: 4.5.4
         version: 4.5.4

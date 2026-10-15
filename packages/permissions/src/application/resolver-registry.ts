@@ -2,6 +2,7 @@ import {
   DisclosureResourceRefSchema,
   type DisclosureResourceType,
 } from "../contracts/index.js";
+import type { DisclosureResourceDescriptor } from "../contracts/index.js";
 import type {
   DisclosureResourceResolver,
   DisclosureResourceResolverRegistry,
@@ -47,6 +48,39 @@ export function createDisclosureResourceResolverRegistry(
         return null;
       }
       return descriptor;
+    },
+    resolveMany: async (resources) => {
+      const out = new Map<string, DisclosureResourceDescriptor>();
+      const byKind = new Map<DisclosureResourceType, Set<string>>();
+      for (const resource of resources) {
+        const parsed = DisclosureResourceRefSchema.safeParse(resource);
+        if (!parsed.success) continue;
+        const ids = byKind.get(parsed.data.type) ?? new Set<string>();
+        ids.add(parsed.data.id);
+        byKind.set(parsed.data.type, ids);
+      }
+      await Promise.all(
+        [...byKind.entries()].map(async ([type, ids]) => {
+          const resolver = byType.get(type);
+          if (resolver === undefined) return;
+          const found =
+            resolver.resolveMany !== undefined
+              ? await resolver.resolveMany([...ids])
+              : (
+                  await Promise.all([...ids].map((id) => resolver.resolve(id)))
+                ).flatMap((d) => (d === null ? [] : [d]));
+          for (const descriptor of found) {
+            // A descriptor for a resource that was not asked for is dropped.
+            if (descriptor.resource.type !== type) continue;
+            if (!ids.has(descriptor.resource.id)) continue;
+            out.set(
+              `${descriptor.resource.type}:${descriptor.resource.id}`,
+              descriptor,
+            );
+          }
+        }),
+      );
+      return out;
     },
     has: (resourceType) => byType.has(resourceType as DisclosureResourceType),
     types: () => [...byType.keys()],

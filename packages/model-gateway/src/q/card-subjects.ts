@@ -3,8 +3,16 @@ import type {
   QAnswerCardsBlock,
   QMapPlace,
   QMapSpec,
+  QSubjectRef,
 } from "@capital-q/contracts";
 import type { QToolCallOutcome } from "@capital-q/q-runtime";
+import {
+  GET_COMPANY,
+  GetCompanyOutputSchema,
+  GET_RELATIONSHIP,
+  GetRelationshipOutputSchema,
+  type GetRelationshipOutput,
+} from "@capital-q/q-tools";
 
 /**
  * The record behind each answer card (R0, Zino live 2026-10-06: every card
@@ -182,6 +190,12 @@ function readOutcome(outcome: Pick<QToolCallOutcome, "result">): {
  * the investors and each subject's published country.
  */
 export class RunRead extends Map<string, string> {
+  /** Complete profiles actually read, distinct from search/list name matches. */
+  readonly profiles = new Map<string, string>();
+  readonly relationships = new Map<
+    string,
+    Pick<GetRelationshipOutput, "counterpart" | "relationship" | "source">
+  >();
   readonly investors = new Map<string, ReadInvestor>();
   /** Subject id (company or investor) -> ISO country, where published. */
   readonly countries = new Map<string, string>();
@@ -195,9 +209,34 @@ export class RunRead extends Map<string, string> {
 export function createRunCompanies(limit = 200) {
   const runs = new Map<string, RunRead>();
   return {
-    note(runId: string, outcome: Pick<QToolCallOutcome, "result">): void {
+    note(
+      runId: string,
+      outcome: Pick<QToolCallOutcome, "result"> &
+        Partial<
+          Pick<QToolCallOutcome, "toolName" | "status" | "classification">
+        >,
+    ): void {
       const found = readOutcome(outcome);
-      if (found.companies.length === 0 && found.investors.length === 0) return;
+      const profile =
+        outcome.toolName === GET_COMPANY &&
+        outcome.status === "SUCCEEDED" &&
+        outcome.classification === "READ_ONLY" &&
+        outcome.result.ok
+          ? GetCompanyOutputSchema.safeParse(outcome.result.data)
+          : null;
+      const relationship =
+        outcome.toolName === GET_RELATIONSHIP &&
+        outcome.status === "SUCCEEDED" &&
+        outcome.classification === "READ_ONLY" &&
+        outcome.result.ok
+          ? GetRelationshipOutputSchema.safeParse(outcome.result.data)
+          : null;
+      if (
+        found.companies.length === 0 &&
+        found.investors.length === 0 &&
+        !relationship?.success
+      )
+        return;
       let known = runs.get(runId);
       if (known === undefined) {
         known = new RunRead();
@@ -206,6 +245,19 @@ export function createRunCompanies(limit = 200) {
           const oldest = runs.keys().next().value;
           if (oldest !== undefined) runs.delete(oldest);
         }
+      }
+      if (profile?.success) {
+        known.profiles.set(profile.data.companyId, profile.data.canonicalName);
+      }
+      if (relationship?.success) {
+        known.relationships.set(
+          `${relationship.data.counterpart.kind}:${relationship.data.counterpart.id}`,
+          {
+            counterpart: relationship.data.counterpart,
+            relationship: relationship.data.relationship,
+            source: relationship.data.source,
+          },
+        );
       }
       for (const { companyId, name, country } of found.companies) {
         const key = nameKey(name);
@@ -242,6 +294,38 @@ export function createRunCompanies(limit = 200) {
       return known;
     },
   };
+}
+
+/**
+ * For an explicitly named company, screen focus cannot label its findings.
+ * Bind only a single exact name in the current question to a complete profile
+ * this run successfully read. Search candidates and model-written ids do not
+ * establish it. Ambiguous or unread targets have no company attribution.
+ */
+export function containsCompanyName(text: string, name: string): boolean {
+  const words = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[̀-ͯ]/gu, "")
+      .replace(/[^a-z0-9]+/gu, " ")
+      .trim();
+  const phrase = words(name);
+  return phrase.length > 0 && ` ${words(text)} `.includes(` ${phrase} `);
+}
+
+export function namedCompanySubjects(
+  text: string,
+  read: RunRead,
+): QSubjectRef[] {
+  const matches = [...read.profiles].filter(([, name]) =>
+    containsCompanyName(text, name),
+  );
+  if (matches.length !== 1) return [];
+  const target = matches[0];
+  return target === undefined
+    ? []
+    : [{ kind: "COMPANY", companyId: target[0] }];
 }
 
 const LOCATION_LABEL =

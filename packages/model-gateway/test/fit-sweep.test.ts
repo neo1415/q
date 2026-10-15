@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { withOneCaveat } from "@capital-q/q-core";
 
-import { askedCount, fitSweepAsk } from "../src/q/fit-sweep.js";
+import {
+  askedCount,
+  fitSweepAsk,
+  fitSweepAskOfReading,
+} from "../src/q/fit-sweep.js";
 import {
   claimsListOnScreen,
   withoutUnbackedScreenClaims,
@@ -58,6 +62,14 @@ describe("a fit question over a set the person owns", () => {
       "Top 3 startups from South Africa for me?",
       { scope: "CANDIDATES", place: "South Africa", fitAsked: true, count: 3 },
     ],
+    [
+      "Show my top 3 companies that fit my mandate better than this company.",
+      { scope: "CANDIDATES", place: null, fitAsked: true, count: 3 },
+    ],
+    [
+      "Compare this company with other companies against my mandate.",
+      { scope: "CANDIDATES", place: null, fitAsked: true, count: null },
+    ],
   ])("%s", (question, expected) => {
     expect(fitSweepAsk(question)).toEqual(expected);
   });
@@ -67,6 +79,8 @@ describe("a fit question over a set the person owns", () => {
     "Tell me about Portside",
     "Book a call with Baridi tomorrow",
     "What does fit mean?",
+    "What does this company actually do and why does it fit my mandate? Use its Capital Q records.",
+    "Explain this startup's fit and evidence gaps.",
   ])("is not one: %s", (question) => {
     expect(fitSweepAsk(question)).toBeNull();
   });
@@ -102,5 +116,24 @@ describe("one disclaimer at most", () => {
     expect(text).toBe(
       "Both match your stage. Round size isn't known yet. That is a prioritisation for diligence. Maji Loop is closer.",
     );
+  });
+});
+
+describe("named comparison stays within resolved records", () => {
+  const named = [
+    "3ab2cc02-160f-4812-a6b1-000000000001",
+    "3ab2cc02-160f-4812-a6b1-000000000002",
+  ];
+  it("compares two explicitly resolved companies even after a prose follow-up", () => {
+    const text =
+      "Compare Halyard and Savanna against my mandate using authorized company records.";
+    expect(fitSweepAsk(text, [], named)).toMatchObject({
+      scope: "PREVIOUS",
+      within: named,
+      count: 2,
+    });
+    expect(
+      fitSweepAskOfReading({ text, count: null }, [], named),
+    ).toMatchObject({ scope: "PREVIOUS", within: named, count: 2 });
   });
 });

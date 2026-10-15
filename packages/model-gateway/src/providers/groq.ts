@@ -247,10 +247,17 @@ function reasoningEffort(
 export function toMessages(
   messages: readonly ModelMessage[],
 ): ChatCompletionMessageParam[] {
-  return messages.map((m): ChatCompletionMessageParam => {
+  // Only the leading system messages keep the system role (audit F-D3; K
+  // Part 11 §6): a SYSTEM message added mid-turn can carry fetched,
+  // untrusted text and must not gain instruction authority. It travels as
+  // a marked user note, as the OpenAI and Google adapters place it.
+  const leading = messages.findIndex((m) => m.role !== "SYSTEM");
+  return messages.map((m, index): ChatCompletionMessageParam => {
     switch (m.role) {
       case "SYSTEM":
-        return { role: "system", content: m.content };
+        return leading === -1 || index < leading
+          ? { role: "system", content: m.content }
+          : { role: "user", content: `[Capital Q note] ${m.content}` };
       case "USER":
         return m.images === undefined
           ? { role: "user", content: m.content }

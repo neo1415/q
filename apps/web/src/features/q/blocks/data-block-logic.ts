@@ -64,6 +64,45 @@ export function valueScale(values: readonly number[]): {
   return { min, max: max === min ? min + 1 : max };
 }
 
+/** Merge the supplied category orders without inventing an order or a value. */
+export function chartLabels(
+  series: readonly { readonly points: readonly { readonly label: string }[] }[],
+): string[] | null {
+  const edges = new Map<string, Set<string>>();
+  const incoming = new Map<string, number>();
+  for (const { points } of series) {
+    const seen = new Set<string>();
+    for (const [i, point] of points.entries()) {
+      if (seen.has(point.label)) return null;
+      seen.add(point.label);
+      if (!edges.has(point.label)) {
+        edges.set(point.label, new Set());
+        incoming.set(point.label, 0);
+      }
+      const previous = points[i - 1]?.label;
+      if (previous !== undefined && !edges.get(previous)?.has(point.label)) {
+        edges.get(previous)?.add(point.label);
+        incoming.set(point.label, (incoming.get(point.label) ?? 0) + 1);
+      }
+    }
+  }
+  const ready = [...incoming]
+    .filter(([, count]) => count === 0)
+    .map(([label]) => label);
+  const labels: string[] = [];
+  for (let i = 0; i < ready.length; i += 1) {
+    const label = ready[i];
+    if (label === undefined) continue;
+    labels.push(label);
+    for (const next of edges.get(label) ?? []) {
+      const count = (incoming.get(next) ?? 0) - 1;
+      incoming.set(next, count);
+      if (count === 0) ready.push(next);
+    }
+  }
+  return labels.length === edges.size ? labels : null;
+}
+
 /** Figures as the reader reads them, with the currency when there is one. */
 export function formatValue(
   value: number,

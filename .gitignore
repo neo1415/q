@@ -4,6 +4,8 @@ node_modules/
 
 # Build output
 dist/
+# A symlink named dist (a worktree pointing at another checkout) is not a directory.
+dist
 .next/
 out/
 *.tsbuildinfo

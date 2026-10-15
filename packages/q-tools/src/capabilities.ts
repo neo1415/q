@@ -1159,6 +1159,11 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   ),
   tool("search_companies", "RECORDS", "Searches companies on Capital Q."),
   tool(
+    "discover_companies",
+    "RECORDS",
+    "Lists companies on Capital Q by sector, country or stage.",
+  ),
+  tool(
     "discovery_slate",
     "RECORDS",
     "Reads the companies in their Discover feed.",
@@ -1204,6 +1209,21 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "research_public_web",
     "RESEARCH",
     "Researches public web sources, cited.",
+  ),
+  tool(
+    "find_public_entity",
+    "RESEARCH",
+    "Finds one named person, company or government body from public sources and shows an identity card.",
+  ),
+  tool(
+    "discover_investors",
+    "RESEARCH",
+    "Finds investors of a region or kind from the prepared index and a short public search, as cards with a soft reason each could fit.",
+  ),
+  tool(
+    "brief_public_entity",
+    "RESEARCH",
+    "Builds or reuses the evidence-classed brief on a public person or organisation already found.",
   ),
   tool(
     "extract_public_web",

@@ -30,7 +30,7 @@ import {
 } from "../src/features/q/control/registry";
 import { currentManifest } from "../src/features/q/manifest";
 import {
-  expectNavigation,
+  requestMove,
   noteRoute,
   navigationInFlight,
   onNavigationOutcome,
@@ -70,15 +70,22 @@ const act_ = (
   return { kind: "UI_ACT", actId: `uia_test${String(n)}xx`, act, ...extra };
 };
 
+/** The router's pushes (R3: the move's own executor pushes, once). */
+let pushes: string[] = [];
+
 beforeEach(() => {
   resetControls();
   resetUiActController();
+  pushes = [];
+  // A client router that records the push; each test settles the route.
+  registerClientRouter((path) => pushes.push(path));
   inView.clear();
   Element.prototype.scrollIntoView = scrollIntoView;
   Element.prototype.getBoundingClientRect = rectOf;
 });
 afterEach(() => {
   cleanup();
+  registerClientRouter(null);
   vi.useRealTimers();
 });
 
@@ -391,7 +398,7 @@ describe("UI acts run through the control's own handler, with a receipt (C2)", (
 
   it("runs a chain in order and waits for the page a move is going to", async () => {
     noteRoute("/discover");
-    expectNavigation();
+    requestMove({ path: "/capital" });
     const first = performUiAct(act_("SELECT_TAB", { target: "tab.readiness" }));
     const second = performUiAct(act_("SCROLL_TO", { target: "section.risks" }));
     // The new page arrives after the acts were queued.
@@ -454,52 +461,59 @@ describe("UI acts run through the control's own handler, with a receipt (C2)", (
   });
 });
 
-describe("Q's moves are confirmed by the settled route (C3)", () => {
-  it("a move is DONE when the router settles, with the route it landed on", () => {
+describe("Q's moves are confirmed by the settled route (C3, R3 lifecycle)", () => {
+  it("a move is DONE when the router settles, with the route it landed on", async () => {
     noteRoute("/home");
     const outcomes: NavigationOutcome[] = [];
     const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
-    expectNavigation("/capital?tab=readiness");
+    const move = requestMove({ path: "/capital?tab=readiness" });
     expect(outcomes).toEqual([]);
+    await vi.waitFor(() => expect(pushes).toEqual(["/capital?tab=readiness"]));
     noteRoute("/capital?tab=readiness");
+    await move.settled;
     stop();
     expect(outcomes).toEqual([
       {
         status: "DONE",
+        intentId: move.intentId,
         expected: "/capital?tab=readiness",
         route: "/capital?tab=readiness",
       },
     ]);
   });
 
-  it("a move that never lands is FAILED, never assumed", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    noteRoute("/home");
-    const outcomes: NavigationOutcome[] = [];
-    const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
-    expectNavigation("/documents");
-    await vi.advanceTimersByTimeAsync(21_000);
-    stop();
-    expect(outcomes).toEqual([{ status: "FAILED", expected: "/documents" }]);
-  });
-
-  it("G-D14: a slow page that lands after the deadline is corrected to DONE", async () => {
+  it("a move that never lands is pushed once more, then FAILED with a reason, never assumed", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     noteRoute("/home");
     window.history.replaceState(null, "", "/home");
     const outcomes: NavigationOutcome[] = [];
     const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
-    expectNavigation("/company/x?tab=dataroom");
+    const move = requestMove({ path: "/documents" });
     await vi.advanceTimersByTimeAsync(21_000);
-    // A dev-mode compile took 25 s: the page lands after the FAILED.
-    noteRoute("/company/x?tab=dataroom");
     stop();
-    expect(outcomes.map((o) => o.status)).toEqual(["FAILED", "DONE"]);
-    expect(outcomes.at(-1)).toEqual({
-      status: "DONE",
-      expected: "/company/x?tab=dataroom",
-      route: "/company/x?tab=dataroom",
-    });
+    expect(pushes).toEqual(["/documents", "/documents"]);
+    expect(outcomes).toEqual([
+      {
+        status: "FAILED",
+        intentId: move.intentId,
+        expected: "/documents",
+        reason: "NOT_LANDED",
+      },
+    ]);
+  });
+
+  it("one receipt per move: a page landing after FAILED is not a second receipt", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    noteRoute("/home");
+    window.history.replaceState(null, "", "/home");
+    const outcomes: NavigationOutcome[] = [];
+    const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
+    requestMove({ path: "/company/x?tab=dataroom" });
+    await vi.advanceTimersByTimeAsync(21_000);
+    noteRoute("/company/x?tab=dataroom");
+    await vi.advanceTimersByTimeAsync(10);
+    stop();
+    expect(outcomes.map((o) => o.status)).toEqual(["FAILED"]);
   });
 
   it("G-D14: at the deadline, a tab that is already there is DONE, never FAILED", async () => {
@@ -508,52 +522,60 @@ describe("Q's moves are confirmed by the settled route (C3)", () => {
     window.history.replaceState(null, "", "/home");
     const outcomes: NavigationOutcome[] = [];
     const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
-    expectNavigation("/relationships/company/x");
+    requestMove({ path: "/relationships/company/x" });
     // The URL moved but the settled-route report was missed.
     window.history.replaceState(null, "", "/relationships/company/x");
     await vi.advanceTimersByTimeAsync(21_000);
     stop();
     expect(outcomes).toEqual([
-      {
+      expect.objectContaining({
         status: "DONE",
         expected: "/relationships/company/x",
         route: "/relationships/company/x",
-      },
+      }),
     ]);
   });
 
-  it("G-D14: the page rewriting its own URL (/home?c=) is not the move landing", () => {
+  it("G-D14: the page rewriting its own URL (/home?c=) is not the move landing", async () => {
     noteRoute("/home");
     window.history.replaceState(null, "", "/home");
     const outcomes: NavigationOutcome[] = [];
     const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
-    expectNavigation("/relationships/company/x");
+    const move = requestMove({ path: "/relationships/company/x" });
     expect(navigationInFlight()).toBe(true);
     noteRoute("/home?c=abc");
+    await new Promise((resolve) => setTimeout(resolve, 10));
     expect(outcomes).toEqual([]);
     noteRoute("/relationships/company/x");
+    await move.settled;
     stop();
     expect(outcomes).toEqual([
-      {
+      expect.objectContaining({
         status: "DONE",
         expected: "/relationships/company/x",
         route: "/relationships/company/x",
-      },
+      }),
     ]);
     expect(navigationInFlight()).toBe(false);
   });
 
-  it("the same move asked twice is one move, one receipt; already there is DONE at once", () => {
+  it("the same move asked twice is one move, one receipt; already there is DONE at once", async () => {
     noteRoute("/home");
     window.history.replaceState(null, "", "/home");
     const outcomes: NavigationOutcome[] = [];
     const stop = onNavigationOutcome((outcome) => outcomes.push(outcome));
-    expectNavigation("/documents");
-    expectNavigation("/documents");
+    const one = requestMove({ path: "/documents" });
+    const two = requestMove({ path: "/documents" });
+    expect(two.intentId).toBe(one.intentId);
+    await vi.waitFor(() => expect(pushes).toEqual(["/documents"]));
     noteRoute("/documents");
-    expectNavigation("/documents?tab=mine");
+    await one.settled;
+    const there = requestMove({ path: "/documents" });
+    await there.settled;
     stop();
-    expect(outcomes.map((o) => o.status)).toEqual(["DONE"]);
+    expect(outcomes.map((o) => o.status)).toEqual(["DONE", "DONE"]);
+    // Already there: no second push.
+    expect(pushes).toEqual(["/documents"]);
     expect(routesMatch("/documents", "/documents?c=1")).toBe(true);
     expect(routesMatch("/company/x?tab=dataroom", "/company/x")).toBe(false);
   });
@@ -566,14 +588,20 @@ describe("Q's moves are confirmed by the settled route (C3)", () => {
     window.addEventListener("cq:navigation-receipt", record);
     noteRoute("/home");
     window.history.replaceState(null, "", "/home");
-    expectNavigation("/work");
+    const move = requestMove({ path: "/work" });
     noteRoute("/work");
+    await move.settled;
     render(<Tabs />);
     await performUiAct(act_("SCROLL_TO", { target: "section.risks" }));
     window.removeEventListener("cq:ui-act-receipt", record);
     window.removeEventListener("cq:navigation-receipt", record);
     expect(seen).toEqual([
-      { status: "DONE", expected: "/work", route: "/work" },
+      {
+        status: "DONE",
+        intentId: move.intentId,
+        expected: "/work",
+        route: "/work",
+      },
       expect.objectContaining({
         status: "DONE",
         act: "SCROLL_TO",
@@ -627,6 +655,7 @@ describe("INC-1: opening a named record is confirmed and reported with its route
     expect(report.navigations).toEqual([
       {
         status: "DONE",
+        intentId: expect.any(String) as unknown,
         expected: `/relationships/company/${SHIFTWELL}`,
         route: `/relationships/company/${SHIFTWELL}`,
       },
@@ -655,7 +684,9 @@ describe("INC-1: opening a named record is confirmed and reported with its route
     expect(report.navigations).toEqual([
       {
         status: "FAILED",
+        intentId: expect.any(String) as unknown,
         expected: `/company/${SHIFTWELL}?tab=dataroom`,
+        reason: "NOT_LANDED",
       },
     ]);
   });

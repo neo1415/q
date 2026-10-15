@@ -40,6 +40,7 @@ export const LEVEL_WORD: Readonly<Record<QAnswerCardLevel, string>> = {
   STRONG: "Strong",
   GOOD: "Good",
   PARTIAL: "Partial",
+  MISMATCH: "Does not match",
   UNKNOWN: "Unknown",
 };
 

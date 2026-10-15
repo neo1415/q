@@ -2,6 +2,15 @@
 
 Persistent instructions for Claude Code in this repository. Read fully before the first edit of any packet.
 
+## Current instructions — 2026-10-11 (supersede dated notes below where they conflict)
+
+Cross-model engineering handoff: @docs/ai-handoff/START-HERE.md
+
+- **Shared memory:** Claude Code and Codex share one handoff (`docs/ai-handoff/`; Codex reads root `AGENTS.md`). Read `START-HERE.md`, `STATE.md`, `ACTIVE-TASKS.md` and the latest `HANDOFF-LOG.md` entry first. Update them and commit/push at the end of every substantial session.
+- **Lead:** from 2026-10-11 the engineering lead is Codex Cloud. A Claude session works only on a slice that `ACTIVE-TASKS.md` assigns, in its own worktree.
+- **Superseded:** the $250 budget and pacing rules, the 2026-09-28 deadline, Claude-specific model and cache settings, "packet" discipline, and the hosting line that points at ADR 0001 (Vercel/Render). Hosting is **Railway for all four services** (ADR 0014); web is in europe-west4 on the private network. Branches: integrate on `build/int-rc`; push `recovery/2026-09-12-8y2j4w` for CI; push `recovery/2026-09-12` to deploy. Details: `docs/ai-handoff/LEGACY-RECONCILIATION.md`.
+- **Still binding, unchanged:** every product invariant, the Q architecture, data/tenant/permission rules, contracts, UX rules, Forbidden Shortcuts and ADR-001 vocabulary below.
+
 ## Budget — Not a Blank Cheque (founder rule, applies to every session and every agent)
 
 **Claude credits.** The cloud budget is **$250 total**; that total is the only hard ceiling. **Deadline: the whole product done, polished and deployed, with seeded videos, by Monday 2026-09-28 morning.** The founder is unavailable on Sunday. **Never stop or pause work because of a daily figure.** Pacing exists to remove waste, not to idle. Spend where it moves the product toward the Monday definition of done in `docs/handoff/cloud-cost-playbook.md` section 0.

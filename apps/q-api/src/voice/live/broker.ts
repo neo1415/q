@@ -8,12 +8,15 @@ import {
   sensitivityWithin,
   type ModelSensitivity,
 } from "@capital-q/contracts";
+import type { ArrivalSnapshot } from "@capital-q/contracts";
 import type { ModelUsageRepository } from "@capital-q/model-gateway";
 import { createCorrelationId, type Logger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import type { ActorContext } from "@capital-q/security";
 import type { SpokenFacts } from "@capital-q/q-core";
+import { parseNameCorrection } from "@capital-q/q-core/names";
 
+import type { ExternalRehearsalLatency } from "../../composition/external-rehearsal-latency.js";
 import type { VoiceSessionBinding } from "../bindings.js";
 import { askQFactsOutput, forRealtime } from "../duplex/broker.js";
 import type { DuplexSpendLedger } from "../duplex/spend.js";
@@ -38,7 +41,47 @@ import type {
   LiveTranscriptReport,
   LiveUsageReport,
 } from "./contracts.js";
+import {
+  arrivalLines,
+  liveContextPackage,
+  referentsOf,
+  REFERENTS_MAX,
+  type LiveContextFacts,
+} from "./context.js";
+import { heardRequest, spokenWords, UNHEARD_COMMENTARY } from "./heard.js";
+import type { PronunciationStore } from "./pronunciations.js";
 import { livePrompt } from "./prompt.js";
+
+/** The exchange since the previous delegation that Q Brain is shown. */
+const LEAD_TURNS_MAX = 6;
+const LEAD_TURN_MAX_CHARS = 600;
+
+/**
+ * The turns the person and the voice exchanged since the previous
+ * delegation, before this request (a clarifying question and its answer,
+ * the voice saying back what it understood): shown to Q Brain before the
+ * request, so a fragment ("especially across FinTech") is read with what
+ * it answers. Transcriber markers and empty turns are dropped; the
+ * request's own words, at the end of the window, are not repeated.
+ */
+export function leadTurns(
+  context: LiveDelegationRequest["context"],
+  request: string,
+): VoiceTranscriptTurn[] {
+  const turns = (context ?? [])
+    .map((turn) => ({
+      role: turn.role === "q" ? ("agent" as const) : ("user" as const),
+      content: spokenWords(turn.text).slice(0, LEAD_TURN_MAX_CHARS),
+    }))
+    .filter((turn) => turn.content.length > 0);
+  const asked = spokenWords(request);
+  while (turns.length > 0) {
+    const last = turns[turns.length - 1];
+    if (last?.role !== "user" || !asked.includes(last.content)) break;
+    turns.pop();
+  }
+  return turns.slice(-LEAD_TURNS_MAX);
+}
 
 /**
  * The screen move a run recorded on the turn board, when it is a route
@@ -111,10 +154,22 @@ type Delegation = {
   readonly controller: AbortController;
   result: Promise<Omit<LiveDelegationResult, "stale">>;
   settled: boolean;
+  /**
+   * The first verified words the run said, once it has said some and has
+   * neither held code-built facts nor moved the screen; null if the run
+   * ended without that. Settles at most once.
+   */
+  first: Promise<string | null>;
+  /** What was handed to the voice early; null until then. */
+  partialSent: string | null;
+  /** Everything the run said and the facts it held, when it ended. */
+  ended: { readonly said: string; readonly facts: SpokenFacts | null } | null;
 };
 
 type LiveLine = {
   readonly voiceSessionId: string;
+  /** The provider's session (GPT-Live), ended from here if left open. */
+  readonly providerSessionId: string;
   readonly actor: ActorContext;
   readonly binding: VoiceSessionBinding;
   readonly openedAt: number;
@@ -134,6 +189,14 @@ type LiveLine = {
    * a 25 s answer that way (2026-10-09). Queued, every answer lands.
    */
   tail: Promise<unknown>;
+  /** Names Q said on this line, most recent first (the context package). */
+  referents: string[];
+  /**
+   * Set on a persona line (a rehearsal with a researched external person):
+   * the voice plays the prepared persona with no tools, nothing is
+   * delegated, and its transcript is kept as the rehearsal's turns.
+   */
+  rehearsalId?: string | undefined;
 };
 
 export type LiveBroker = {
@@ -196,12 +259,59 @@ export type LiveBrokerDependencies = {
   readonly providerCeiling: ModelSensitivity;
   readonly syntheticDemo: boolean;
   readonly logger: Logger;
+  /**
+   * The persona line for a rehearsal with a researched external person.
+   * Absent, or `prepare` answering null (any other rehearsal), a rehearsal
+   * line is refused as before and the standard rehearsal voice carries it.
+   */
+  readonly rehearsalLine?:
+    | {
+        readonly prepare: (
+          actor: ActorContext,
+          rehearsalId: string,
+          hints: {
+            readonly firstName?: string | undefined;
+            readonly locale?: string | undefined;
+          },
+        ) => Promise<{ readonly instructions: string } | null>;
+        readonly record: (
+          actor: ActorContext,
+          rehearsalId: string,
+          segments: LiveTranscriptReport["segments"],
+        ) => Promise<number | null>;
+        readonly latency?: ExternalRehearsalLatency | undefined;
+      }
+    | undefined;
   readonly now?: (() => number) | undefined;
   /**
    * q_runtime.voice_line_turns (A's duplex write path): both sides of the
    * line, routed 'live', so what GPT-Live said can be audited.
    */
   readonly transcripts?: Pick<DuplexTranscriptStore, "record"> | undefined;
+  /**
+   * Part 6: the person's approved background (side, organisation, declared
+   * mandate or company card facts), for the call's context package.
+   */
+  readonly contextFor?:
+    ((actor: ActorContext) => Promise<LiveContextFacts | null>) | undefined;
+  /**
+   * W1: what Q told them on arrival, for the call's context package (the
+   * same snapshot the welcome and Q's turns are given).
+   */
+  readonly arrivalFor?:
+    ((actor: ActorContext) => Promise<ArrivalSnapshot | null>) | undefined;
+  /**
+   * W3: verified and user-corrected name pronunciations. Read into the
+   * call's context as a hint list; a spoken correction ("it's pronounced
+   * KISH-ta") is stored for this person.
+   */
+  readonly pronunciations?:
+    Pick<PronunciationStore, "hintsFor" | "recordCorrection"> | undefined;
+  /**
+   * W5: one compact line per prepared public research entity (name, kind,
+   * one line, stable id), read from memory: no database, no web.
+   */
+  readonly preparedEntityLines?: (() => readonly string[]) | undefined;
   /**
    * The voice turn board (what the turn handler recorded for the line):
    * read after a run, so the delegation's result says whether the run
@@ -225,19 +335,37 @@ const SPOKEN_MAX = 6_000;
 const MIN_BILLED_SECONDS = 15;
 /** An unreported line is estimated at wall-clock, at most this past the cap. */
 const GRACE_MS = 30_000;
+/** How often lines are checked for expiry and inactivity (on a timer). */
+export const LIVE_SWEEP_MS = 30_000;
+/**
+ * No request from the browser for this long past the idle window (no usage,
+ * transcript, delegation): the browser is gone (a killed tab, a connect
+ * that failed after /open). A live call posts its transcript every few
+ * seconds of speech, and the browser itself closes after `idleMs` silence.
+ */
+export const LIVE_INACTIVE_GRACE_MS = 2 * 60 * 1000;
 
 /** Q's run, collected: what it said, or the facts of a code-built answer. */
-function collector(id: string): {
+function collector(
+  id: string,
+  /** Called once, with the first words, while the run is still going. */
+  onFirstWords?: (said: string, facts: SpokenFacts | null) => void,
+): {
   readonly speaker: VoiceSpeaker;
   readonly said: () => string;
   readonly held: () => SpokenFacts | null;
 } {
   let text = "";
   let held: SpokenFacts | null = null;
+  let announced = false;
   const add = (part: string) => {
     const trimmed = part.trim();
     if (trimmed.length === 0 || text.length >= SPOKEN_MAX) return;
     text = text.length === 0 ? trimmed : `${text} ${trimmed}`;
+    if (!announced) {
+      announced = true;
+      onFirstWords?.(text, held);
+    }
   };
   return {
     speaker: {
@@ -287,6 +415,48 @@ function spokenCommentary(facts: SpokenFacts, context: string): string {
     return `${LIVE_SPEAK_GUIDE} ${context} ${say}${names}${next} Never quote anyone's message.`;
   }
   return `${LIVE_SPEAK_GUIDE} ${context} ${say}${names}${next} Details for follow-up questions: ${JSON.stringify(askQFactsOutput(facts))}`;
+}
+
+/** The start of an answer, handed to the voice while the run goes on. */
+export function partialCommentary(request: string, words: string): string {
+  const { say } = forRealtime(words);
+  return `${LIVE_SPEAK_GUIDE} They asked: ${JSON.stringify(request.slice(0, 300))}. Q's backend has begun answering and the rest follows in a moment: say this much in your own words now, and do not close or ask whether they want more yet: ${JSON.stringify(say)}`;
+}
+
+/**
+ * What the voice still has to say once its start was handed over early:
+ * the rest of the words (never the start again), or the run's own facts
+ * and flags when it ended differently from how it began.
+ */
+function restOf(
+  running: Pick<Delegation, "request" | "partialSent" | "ended">,
+  result: Omit<LiveDelegationResult, "stale">,
+): Omit<LiveDelegationResult, "stale"> {
+  const ended = running.ended;
+  const sent = running.partialSent ?? "";
+  if (ended === null) return result;
+  const already =
+    "You have already said the start of this answer; say only what follows, continuing naturally, never repeating it. ";
+  if (ended.facts !== null) {
+    return {
+      ...result,
+      commentary:
+        result.commentary === null ? null : `${already}${result.commentary}`,
+    };
+  }
+  const rest = ended.said.startsWith(sent)
+    ? ended.said.slice(sent.length).trim()
+    : ended.said;
+  const commentary = commentaryFor({
+    request: running.request,
+    facts: null,
+    said: rest,
+    approvalPending: result.approvalPending,
+  });
+  return {
+    ...result,
+    commentary: commentary === null ? null : `${already}${commentary}`,
+  };
 }
 
 export function commentaryFor(input: {
@@ -374,15 +544,41 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       },
       "live voice line ended",
     );
+    // The provider session is ended from here too, unless its browser saw
+    // it close (final usage): a superseded, expired, abandoned or failed
+    // line never keeps billing because its browser did not close it.
+    if (!line.finalReported) {
+      void (
+        provider?.closeSession?.(line.providerSessionId) ??
+        Promise.resolve(false)
+      )
+        .then((confirmed) => {
+          logger.info(
+            { qVoiceSessionId: line.voiceSessionId, reason, confirmed },
+            "live voice provider session closed from the server",
+          );
+        })
+        .catch(() => undefined);
+    }
   };
 
   const sweep = () => {
     const at = now();
-    for (const line of lines.values()) {
-      if (at - line.openedAt > config.maxSessionMs + GRACE_MS)
+    for (const line of [...lines.values()]) {
+      if (at - line.openedAt > config.maxSessionMs + GRACE_MS) {
         forget(line, "expired");
+      } else if (
+        at - line.lastActivityAt >
+        config.idleMs + LIVE_INACTIVE_GRACE_MS
+      ) {
+        forget(line, "inactive");
+      }
     }
   };
+  // On a timer too, not only on this person's next request: a line whose
+  // browser is gone is ended (and its provider session closed) in time.
+  const sweeper = setInterval(sweep, LIVE_SWEEP_MS);
+  sweeper.unref();
 
   const ownLine = (actor: ActorContext, voiceSessionId: string) => {
     sweep();
@@ -395,6 +591,31 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       return null;
     }
     return line;
+  };
+
+  /**
+   * W3: "it's pronounced X" / "the name is spelled Y" said on the line is
+   * kept for this person under the name it is about (named in the
+   * sentence, else the one Q said last). It is their word, stored as
+   * theirs; nothing is inferred when no name can be tied to it.
+   */
+  const learnCorrection = async (line: LiveLine, said: string) => {
+    const store = deps.pronunciations;
+    if (store === undefined) return;
+    const correction = parseNameCorrection(spokenWords(said));
+    if (correction === null) return;
+    const name = correction.name ?? line.referents[0] ?? null;
+    if (name === null) return;
+    try {
+      await store.recordCorrection({
+        actor: line.actor,
+        name,
+        kind: correction.kind,
+        value: correction.value,
+      });
+    } catch (error: unknown) {
+      logger.warn({ err: error }, "name correction could not be stored");
+    }
   };
 
   const reserved = () => {
@@ -410,11 +631,29 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
   };
 
   /** ONE run of Q Brain for one delegation. */
-  const runQ = (line: LiveLine, id: string, request: string): Delegation => {
+  const runQ = (
+    line: LiveLine,
+    id: string,
+    request: string,
+    lead: readonly VoiceTranscriptTurn[] = [],
+  ): Delegation => {
     const controller = new AbortController();
     let deadline: ReturnType<typeof setTimeout> | undefined;
     const before = line.tail;
-    const speaker = collector(`live_${line.voiceSessionId}`);
+    let sequenceBefore = 0;
+    let releaseFirst: (words: string | null) => void = () => undefined;
+    const first = new Promise<string | null>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const speaker = collector(`live_${line.voiceSessionId}`, (said, facts) => {
+      // Early only for plain words the model wrote: code-built facts are
+      // said from the whole run, an approval question ends the answer, and
+      // a screen move is followed before the voice speaks at all.
+      const moved =
+        (deps.board?.read(line.voiceSessionId).sequence ?? 0) > sequenceBefore;
+      if (facts !== null || moved || said.includes(APPROVAL_QUESTION)) return;
+      releaseFirst(said);
+    });
     const asked: VoiceTranscriptTurn = { role: "user", content: request };
     const startedAt = now();
     const delegation: Delegation = {
@@ -422,6 +661,9 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       request,
       controller,
       settled: false,
+      first,
+      partialSent: null,
+      ended: null,
       result: Promise.resolve({
         delegationId: id,
         commentary: null,
@@ -444,12 +686,11 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         deadline = setTimeout(() => {
           controller.abort();
         }, config.delegationDeadlineMs);
-        const sequenceBefore =
-          deps.board?.read(line.voiceSessionId).sequence ?? 0;
+        sequenceBefore = deps.board?.read(line.voiceSessionId).sequence ?? 0;
         const outcome = await turn(
           line.binding,
           // GPT-Live already ended their turn: never held as unfinished.
-          settledTurn([...line.history, asked]),
+          settledTurn([...line.history, ...lead, asked]),
           controller.signal,
           speaker.speaker,
         );
@@ -465,6 +706,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
         }
         const said = speaker.said();
         const facts = speaker.held();
+        delegation.ended = { said, facts };
         const approvalPending = said.endsWith(APPROVAL_QUESTION);
         const commentary = commentaryFor({
           request,
@@ -472,7 +714,11 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           said,
           approvalPending,
         });
-        line.history.push(asked);
+        line.history.push(...lead, asked);
+        line.referents = [
+          ...referentsOf(facts?.mustSay),
+          ...line.referents,
+        ].slice(0, REFERENTS_MAX);
         const kept = facts?.fallback ?? said;
         if (kept.length > 0)
           line.history.push({ role: "agent", content: kept });
@@ -507,6 +753,8 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       } finally {
         if (deadline !== undefined) clearTimeout(deadline);
         delegation.settled = true;
+        // No early words came: whoever waits for them stops waiting.
+        releaseFirst(null);
         logger.info(
           {
             qVoiceSessionId: line.voiceSessionId,
@@ -540,14 +788,35 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     }) => {
       if (!enabled || provider === undefined)
         return { kind: "REFUSED", reason: "OFF" };
-      if (binding.thread.rehearsal !== undefined) {
-        return { kind: "REFUSED", reason: "REHEARSAL" };
+      // A rehearsal line is GPT-Live only for a researched external person,
+      // from the persona prepared before the call; any other rehearsal
+      // speaks only as the person Q plays, on the standard line.
+      let persona: { readonly instructions: string } | null = null;
+      const rehearsal = binding.thread.rehearsal;
+      if (rehearsal !== undefined) {
+        persona =
+          deps.rehearsalLine === undefined
+            ? null
+            : await deps.rehearsalLine
+                .prepare(binding.actor, rehearsal.rehearsalId, {
+                  firstName,
+                  locale,
+                })
+                .catch(() => null);
+        if (persona === null) return { kind: "REFUSED", reason: "REHEARSAL" };
       }
       const { actor } = binding;
       sweep();
-      // One live line per person: a new one replaces what was open.
+      // One live line per person: a new one replaces what was open. A
+      // renewal of the same call (same voice session) keeps what Q was
+      // asked and said, and the names discussed.
+      let carried: Pick<LiveLine, "history" | "referents"> | null = null;
       for (const line of [...lines.values()]) {
-        if (line.actor.userId === actor.userId) forget(line, "replaced");
+        if (line.actor.userId !== actor.userId) continue;
+        if (line.voiceSessionId === binding.voiceSessionId) {
+          carried = { history: line.history, referents: line.referents };
+        }
+        forget(line, "replaced");
       }
       let spent: number;
       try {
@@ -586,16 +855,19 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       try {
         created = await provider.createWebRtcSession({
           config: {
-            instructions: livePrompt({
-              firstName,
-              locale,
-              briefingOpening,
-              role,
-              names,
-              guided:
-                binding.thread.onboarding !== undefined ||
-                binding.thread.welcome === true,
-            }),
+            instructions:
+              persona !== null
+                ? persona.instructions
+                : livePrompt({
+                    firstName,
+                    locale,
+                    briefingOpening,
+                    role,
+                    names,
+                    guided:
+                      binding.thread.onboarding !== undefined ||
+                      binding.thread.welcome === true,
+                  }),
             voice: config.voices[binding.voice],
           },
           sdp,
@@ -613,16 +885,59 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
       const at = now();
       lines.set(binding.voiceSessionId, {
         voiceSessionId: binding.voiceSessionId,
+        providerSessionId: created.sessionId,
         actor,
         binding,
         openedAt: at,
         lastActivityAt: at,
-        history: [],
+        history: carried === null ? [] : [...carried.history],
         delegations: new Map(),
         latest: null,
         recordedSeconds: 0,
         finalReported: false,
         tail: Promise.resolve(),
+        referents: carried === null ? [] : [...carried.referents],
+        ...(persona === null || rehearsal === undefined
+          ? {}
+          : { rehearsalId: rehearsal.rehearsalId }),
+      });
+      // Part 6: the background note for this session (and its renewals).
+      // A persona line gets none: its prepared context is the whole of what
+      // it may use, and no record of the founder's rides in on the side.
+      let facts: LiveContextFacts | null = null;
+      let arrival: string[] = [];
+      try {
+        // A rehearsal persona line carries the persona only: no Q
+        // background, no arrival briefing.
+        if (persona === null) {
+          const [read, snapshot] = await Promise.all([
+            deps.contextFor?.(actor) ?? Promise.resolve(null),
+            deps.arrivalFor?.(actor).catch(() => null) ?? Promise.resolve(null),
+          ]);
+          facts = read ?? null;
+          arrival = arrivalLines(snapshot);
+        } else {
+          facts = null;
+        }
+      } catch (error: unknown) {
+        // A failed read costs the call its background, never the call.
+        logger.warn({ err: error }, "live voice context could not be read");
+      }
+      let pronunciations: readonly string[] = [];
+      try {
+        pronunciations = (await deps.pronunciations?.hintsFor(actor)) ?? [];
+      } catch (error: unknown) {
+        // A failed read costs the call its hints, never the call.
+        logger.warn({ err: error }, "live voice pronunciations unreadable");
+      }
+      const context = liveContextPackage({
+        firstName,
+        role,
+        facts,
+        referents: carried?.referents ?? [],
+        arrival,
+        pronunciations,
+        preparedEntities: deps.preparedEntityLines?.() ?? [],
       });
       logger.info(
         { qVoiceSessionId: binding.voiceSessionId, model: created.model },
@@ -640,6 +955,7 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           model: created.model,
           maxSessionMs: config.maxSessionMs,
           idleMs: config.idleMs,
+          context,
         },
       };
     },
@@ -659,20 +975,68 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
           ended: true,
         };
       }
+      // A persona line delegates nothing: no Q run, no tool, no search. The
+      // voice is told there is nothing to add and carries on in character.
+      if (line.rehearsalId !== undefined) {
+        return {
+          delegationId: delegation.delegationId,
+          commentary: null,
+          stale: false,
+          approvalPending: false,
+          failed: false,
+        };
+      }
       // One delegation id, one run: a repeat joins the run in flight.
       let running = line.delegations.get(delegation.delegationId);
       if (running === undefined) {
-        const request = delegation.request.trim().slice(0, 2_000);
+        const request = spokenWords(delegation.request).slice(0, 2_000);
+        // Nothing usable was heard ("(inaudible)", empty, filler): no Q
+        // run is created; the voice checks with the person instead.
+        if (!heardRequest(request)) {
+          logger.info(
+            { qVoiceSessionId: line.voiceSessionId },
+            "live delegation had no usable words: no Q run",
+          );
+          return {
+            delegationId: delegation.delegationId,
+            commentary: UNHEARD_COMMENTARY,
+            stale: false,
+            approvalPending: false,
+            failed: false,
+            unheard: true,
+          };
+        }
         running = runQ(
           line,
           delegation.delegationId,
-          request.length === 0 ? "(inaudible)" : request,
+          request,
+          leadTurns(delegation.context, request),
         );
         line.delegations.set(delegation.delegationId, running);
         line.latest = delegation.delegationId;
       }
+      // The first verified words, before the run ends, for a client that
+      // asked for them. They go once; the same id asked again is the rest.
+      if (delegation.early === true && running.partialSent === null) {
+        const words = await running.first;
+        if (words !== null && running.partialSent === null) {
+          running.partialSent = words;
+          return {
+            delegationId: delegation.delegationId,
+            commentary: partialCommentary(running.request, words),
+            stale: line.latest !== delegation.delegationId,
+            approvalPending: false,
+            failed: false,
+            partial: true,
+          };
+        }
+      }
       const result = await running.result;
-      return { ...result, stale: line.latest !== delegation.delegationId };
+      const stale = line.latest !== delegation.delegationId;
+      if (running.partialSent !== null && !result.failed) {
+        return { ...restOf(running, result), stale };
+      }
+      return { ...result, stale };
     },
 
     cancel: async ({ actor, voiceSessionId, delegationId }) => {
@@ -690,6 +1054,27 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
     transcript: async ({ actor, voiceSessionId, report }) => {
       const line = ownLine(actor, voiceSessionId);
       if (line === null) return null;
+      line.lastActivityAt = now();
+      if (line.rehearsalId !== undefined) {
+        const timings = report.timings;
+        if (timings?.firstAudioMs !== undefined) {
+          deps.rehearsalLine?.latency?.record(
+            "first_audio_ms",
+            timings.firstAudioMs,
+          );
+        }
+        for (const ms of timings?.turnLatencyMs ?? []) {
+          deps.rehearsalLine?.latency?.record("turn_latency_ms", ms);
+        }
+        // The rehearsal keeps the words as its turns, for the evaluation.
+        return (
+          (await deps.rehearsalLine?.record(
+            line.actor,
+            line.rehearsalId,
+            report.segments,
+          )) ?? 0
+        );
+      }
       const store = deps.transcripts;
       if (store === undefined) return 0;
       const at = now();
@@ -710,6 +1095,9 @@ export function createLiveBroker(deps: LiveBrokerDependencies): LiveBroker {
             ),
           });
           recorded += 1;
+          if (segment.role === "USER") {
+            await learnCorrection(line, segment.text);
+          }
         } catch (error: unknown) {
           logger.warn(
             { err: error, qVoiceSessionId: line.voiceSessionId },

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { FIT_PARAMETERS } from "../http/fit.js";
 import { QSubjectRefSchema } from "./subject.js";
+import { ExternalSourceStatusSchema } from "./external-person.js";
 
 /**
  * Q's answer as cards (founder brief 2026-10-05, C1-C5; ADR 0053).
@@ -26,6 +27,7 @@ export const Q_ANSWER_CARD_LEVELS = [
   "STRONG",
   "GOOD",
   "PARTIAL",
+  "MISMATCH",
   "UNKNOWN",
 ] as const;
 export const QAnswerCardLevelSchema = z.enum(Q_ANSWER_CARD_LEVELS);
@@ -148,6 +150,8 @@ export const QAnswerCardSchema = z
     said: z.string().trim().max(300).nullable(),
     /** How many of the answer's sources this card rests on. */
     sourceCount: z.number().int().min(0).max(100),
+    /** Of sourceCount, how many were actually read (prepared entities). */
+    sourcesRead: z.number().int().min(0).max(100).optional(),
     /** The resolved record behind the card, when there is one. */
     subject: QSubjectRefSchema.nullable(),
     /**
@@ -157,6 +161,45 @@ export const QAnswerCardSchema = z
     fitBasis: z
       .array(z.string().trim().min(1).max(160))
       .max(Q_ANSWER_CARD_FIT_BASIS_MAX)
+      .optional(),
+    /**
+     * W4: an identity card for a researched person, organisation or agency
+     * (not a Capital Q record, so no `subject`). `rehearse` offers a
+     * labelled AI rehearsal with them; `profileUrl` is the public page
+     * the identity rests on.
+     */
+    external: z
+      .object({
+        /** Null for a candidate that is not yet a researched record. */
+        externalPersonId: z.string().uuid().nullable(),
+        profileUrl: z
+          .string()
+          .url()
+          .max(2048)
+          .startsWith("https://")
+          .nullable(),
+        rehearse: z.boolean(),
+        /**
+         * R5: set when the entity is a canonical (unclaimed) investor
+         * organisation; Rehearse then opens the investor rehearsal.
+         */
+        investorOrganisationId: z.string().uuid().nullable().optional(),
+        /** The public sources the card rests on, to open (https only). */
+        sources: z
+          .array(
+            z
+              .object({
+                label: z.string().trim().min(1).max(120),
+                url: z.string().url().max(2048).startsWith("https://"),
+                /** Reading status of the source (prepared entities). */
+                status: ExternalSourceStatusSchema.optional(),
+              })
+              .strict(),
+          )
+          .max(8)
+          .optional(),
+      })
+      .strict()
       .optional(),
   })
   .strict();

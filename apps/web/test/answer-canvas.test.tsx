@@ -26,6 +26,12 @@ import {
 import { boardTimeline, groupByDay } from "../src/features/q/board-timeline";
 import type { QTurn } from "../src/features/q/conversation";
 import { announceQSaid } from "../src/features/q-swarm/q-said";
+import { registerClientRouter } from "../src/features/q/client-actions";
+import { registerNavigationViewer } from "../src/features/q/control/app-routes";
+import {
+  onNavigationPhase,
+  resetNavigationLifecycle,
+} from "../src/features/q/control/navigation-lifecycle";
 import { useAnswerPlayback } from "../src/features/q/use-answer-playback";
 
 /**
@@ -167,6 +173,69 @@ describe("the canvas (C1, C3)", () => {
     expect(opened).toEqual([companyId]);
   });
 
+  it("K5: a card with a record has an explicit Open that goes through the one lifecycle; a tap still spotlights", () => {
+    const companyId = "0a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+    const investorId = "1b9c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e";
+    const block = demoTop(3);
+    const withSubjects = {
+      ...block,
+      cards: block.cards.map((card, index) =>
+        index === 0
+          ? { ...card, subject: { kind: "COMPANY" as const, companyId } }
+          : index === 1
+            ? {
+                ...card,
+                subject: {
+                  kind: "INVESTOR_ORGANISATION" as const,
+                  investorOrganisationId: investorId,
+                },
+              }
+            : card,
+      ),
+    };
+    const pushes: string[] = [];
+    registerClientRouter((path) => pushes.push(path));
+    const phases: string[] = [];
+    const stop = onNavigationPhase((state) => phases.push(state.phase));
+    const onFocus = vi.fn();
+    try {
+      render(
+        <AnswerCanvas
+          block={withSubjects}
+          focus={-1}
+          said=""
+          onFocus={onFocus}
+        />,
+      );
+      const heads = [
+        ...document.querySelectorAll("[data-ac-card] .cq-ac-head-main"),
+      ];
+      // A tap on the card keeps the spotlight; nothing moves.
+      fireEvent.click(heads[0] as Element);
+      expect(onFocus).toHaveBeenCalledWith(0);
+      expect(pushes).toEqual([]);
+      // Open: the company's page, like a record move.
+      const name0 = block.cards[0]?.name ?? "";
+      const name1 = block.cards[1]?.name ?? "";
+      fireEvent.click(screen.getByRole("button", { name: `Open ${name0}` }));
+      expect(pushes).toEqual([`/company/${companyId}`]);
+      expect(phases.slice(0, 3)).toEqual([
+        "REQUESTED",
+        "VALIDATED",
+        "EXECUTING",
+      ]);
+      // An investor's card opens the relationship with them.
+      fireEvent.click(screen.getByRole("button", { name: `Open ${name1}` }));
+      expect(pushes.at(-1)).toBe(`/relationships/investor/${investorId}`);
+      // A card with no record behind it has no Open.
+      expect(document.querySelectorAll("[data-ac-open]")).toHaveLength(2);
+    } finally {
+      stop();
+      registerClientRouter(null);
+      resetNavigationLifecycle();
+    }
+  });
+
   it("opens the focused card with its reasons, fit in words and measure words", () => {
     render(
       <AnswerCanvas block={demoTop(3)} focus={0} said="Norrland fits best." />,
@@ -186,6 +255,30 @@ describe("the canvas (C1, C3)", () => {
     expect(
       screen.getAllByText("Seed round inside your cheque range").length,
     ).toBeGreaterThan(0);
+  });
+
+  it("shows a known mismatch as words and a cross, separate from unknown evidence", () => {
+    const base = demoTop(1);
+    const block = {
+      ...base,
+      cards: base.cards.map((card) => ({
+        ...card,
+        fit: null,
+        measures: [
+          { label: "Sector", level: "MISMATCH" as const, value: null },
+          { label: "Round terms", level: "UNKNOWN" as const, value: null },
+        ],
+      })),
+    };
+    render(<AnswerCanvas block={block} focus={0} said="" />);
+    expect(screen.getAllByText("Does not match").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0);
+    expect(
+      document.querySelector('[data-level="MISMATCH"] path'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('[data-level="UNKNOWN"] circle[stroke-dasharray]'),
+    ).not.toBeNull();
   });
 
   it("has an X on every card and one on the whole answer", () => {
@@ -313,5 +406,173 @@ describe("the Board's timeline (C7)", () => {
     expect(groupByDay(entries, new Date("2026-10-05T23:00:00Z"))[0]?.day).toBe(
       "Today",
     );
+  });
+});
+
+describe("W4: an identity card of a researched person", () => {
+  const externalPersonId = "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d";
+  const profileUrl = "https://qa.linkedin.com/in/shadi-qishta-282453a";
+  const block = (() => {
+    const base = demoTop(1);
+    return {
+      ...base,
+      cards: base.cards.map((card) => ({
+        ...card,
+        name: "Shadi Qishta",
+        subject: null,
+        external: { externalPersonId, profileUrl, rehearse: true },
+      })),
+    };
+  })();
+
+  it("offers Rehearse with <first name>, which opens the rehearsal through the one lifecycle, and Open profile for the source", () => {
+    const pushes: string[] = [];
+    registerClientRouter((path) => pushes.push(path));
+    const phases: string[] = [];
+    const stop = onNavigationPhase((state) => phases.push(state.phase));
+    try {
+      render(<AnswerCanvas block={block} focus={0} said="" />);
+      const rehearse = screen.getByRole("button", {
+        name: "Rehearse with Shadi",
+      });
+      expect(rehearse.getAttribute("data-ac-external")).not.toBeNull();
+      fireEvent.click(rehearse);
+      expect(pushes).toEqual([`/rehearsals/person/${externalPersonId}`]);
+      expect(phases.slice(0, 3)).toEqual([
+        "REQUESTED",
+        "VALIDATED",
+        "EXECUTING",
+      ]);
+      const profile = screen.getByRole("link", { name: "Open profile" });
+      expect(profile.getAttribute("href")).toBe(profileUrl);
+      expect(profile.getAttribute("target")).toBe("_blank");
+      expect(profile.getAttribute("rel")).toContain("noopener");
+      // No record behind it, so no ordinary Open button.
+      expect(document.querySelectorAll("[data-ac-open]")).toHaveLength(0);
+    } finally {
+      stop();
+      resetNavigationLifecycle();
+    }
+  });
+
+  it("offers no rehearsal when the card does not (and no profile link without a URL)", () => {
+    const plain = {
+      ...block,
+      cards: block.cards.map((card) => ({
+        ...card,
+        external: { externalPersonId, profileUrl: null, rehearse: false },
+      })),
+    };
+    render(<AnswerCanvas block={plain} focus={0} said="" />);
+    expect(screen.queryByRole("button", { name: /Rehearse with/u })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open profile" })).toBeNull();
+  });
+});
+
+describe("W4: an identity card's sources are links", () => {
+  const sources = [1, 2, 3, 4, 5].map((n) => ({
+    label: `Source ${String(n)}`,
+    url: `https://example.org/s${String(n)}`,
+  }));
+  const base = demoTop(1);
+  const block = {
+    ...base,
+    cards: base.cards.map((card) => ({
+      ...card,
+      subject: null,
+      external: {
+        externalPersonId: "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+        profileUrl: null,
+        rehearse: false,
+        sources,
+      },
+    })),
+  };
+
+  it("shows the top three in a new tab and the rest behind More sources", () => {
+    render(<AnswerCanvas block={block} focus={0} said="" />);
+    const links = [...document.querySelectorAll("[data-ac-source-link]")];
+    expect(links).toHaveLength(5);
+    const shown = links.filter((link) => link.closest("details") === null);
+    expect(shown.map((link) => link.textContent)).toEqual([
+      "Source 1",
+      "Source 2",
+      "Source 3",
+    ]);
+    for (const link of links) {
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toContain("noopener");
+    }
+    const more = document.querySelector("[data-ac-source-links] details");
+    expect(more?.querySelector("summary")?.textContent).toBe("More sources");
+    expect(more?.querySelectorAll("a")).toHaveLength(2);
+  });
+
+  it("with three or fewer there is no disclosure", () => {
+    const few = {
+      ...block,
+      cards: block.cards.map((card) => ({
+        ...card,
+        external: card.external && {
+          ...card.external,
+          sources: sources.slice(0, 2),
+        },
+      })),
+    };
+    render(<AnswerCanvas block={few} focus={0} said="" />);
+    expect(document.querySelectorAll("[data-ac-source-link]")).toHaveLength(2);
+    expect(document.querySelector("[data-ac-source-links] details")).toBeNull();
+  });
+});
+
+describe("R5: an identity card of a prepared investor organisation", () => {
+  const externalPersonId = "0a0a5a19-7007-5711-864e-3c7d2beab5f2";
+  const investorOrganisationId = "b0075742-0000-4000-8000-0000000000c1";
+  const block = (() => {
+    const base = demoTop(1);
+    return {
+      ...base,
+      cards: base.cards.map((card) => ({
+        ...card,
+        name: "QInvest LLC",
+        subject: null,
+        external: {
+          externalPersonId,
+          investorOrganisationId,
+          profileUrl: null,
+          rehearse: true,
+        },
+      })),
+    };
+  })();
+
+  it("opens the investor rehearsal for a founder", () => {
+    const pushes: string[] = [];
+    registerClientRouter((path) => pushes.push(path));
+    registerNavigationViewer({ kind: "FOUNDER", admin: false });
+    try {
+      render(<AnswerCanvas block={block} focus={0} said="" />);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Rehearse with QInvest" }),
+      );
+      expect(pushes).toEqual([
+        `/rehearsals/investor/${investorOrganisationId}`,
+      ]);
+    } finally {
+      registerNavigationViewer(null);
+      resetNavigationLifecycle();
+    }
+  });
+
+  it("hides Rehearse from an investor viewer", () => {
+    registerNavigationViewer({ kind: "INVESTOR", admin: false });
+    try {
+      render(<AnswerCanvas block={block} focus={0} said="" />);
+      expect(
+        screen.queryByRole("button", { name: /Rehearse with/u }),
+      ).toBeNull();
+    } finally {
+      registerNavigationViewer(null);
+    }
   });
 });

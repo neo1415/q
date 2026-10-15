@@ -641,7 +641,7 @@ export function ArtifactViewer({
             {current.content.gaps.length === 0 ? null : (
               <section className="flex flex-col gap-2" data-q-artifact-gaps>
                 <h3 className="cq-title-sm text-(--cq-text-primary)">
-                  What isn&apos;t on record yet
+                  Evidence gaps
                 </h3>
                 {/* Unknown stays unknown, in the document itself, because
                     an investor should see the shape of the gap. */}

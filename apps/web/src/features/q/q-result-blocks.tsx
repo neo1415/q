@@ -15,9 +15,15 @@ import { CompanyAvatar } from "../company/company-avatar";
 import { destinationPath } from "../voice/destinations";
 import { ArtifactCard } from "./artifact-card";
 import { CalendarConnectCard } from "./calendar-connect-card";
+import { HideableCard } from "./cards/hideable-card";
 import { ComparisonCards } from "./comparison-cards";
 import { StaticAnswerCards } from "./static-answer-cards";
-import { recordPagePath, settingsPath, setupPath } from "./client-actions";
+import {
+  recordIntentPath,
+  recordPagePath,
+  settingsPath,
+  setupPath,
+} from "./client-actions";
 import { roomCardHref } from "./room/room-card-view";
 import type { QTurnObjectBlock } from "./conversation";
 import { AttentionBody } from "./blocks/attention-block";
@@ -87,6 +93,7 @@ const INTENT_ROUTES: Readonly<
       | "SHOW_IN_Q_ROOM"
       | "SHOW_CALENDAR_CONNECT"
       | "DOCUMENT_ACT"
+      | "CARDS"
       | "UI_ACT"
     >,
     string | null
@@ -127,12 +134,13 @@ export function intentHref(intent: QUiIntent): string | null {
     // Q room R5: its own card below, not a link.
     intent.kind === "SHOW_CALENDAR_CONNECT" ||
     intent.kind === "DOCUMENT_ACT" ||
+    intent.kind === "CARDS" ||
     intent.kind === "UI_ACT"
   ) {
     return null;
   }
   if (intent.kind === "OPEN_RECORD_PAGE") {
-    return recordPagePath(intent.page, intent.id, intent.companyId);
+    return recordIntentPath(intent);
   }
   // The company page exists now (CQ-WEB-022) and authorises the read as
   // the person; an OPEN_COMPANY card that went nowhere was R0 (live
@@ -217,7 +225,8 @@ function intentLabel(intent: QUiIntent): string {
             : intent.page === "INVESTOR"
               ? "Open the investor"
               : intent.page === "INVESTOR_REHEARSAL" ||
-                  intent.page === "COMPANY_REHEARSAL"
+                  intent.page === "COMPANY_REHEARSAL" ||
+                  intent.page === "EXTERNAL_REHEARSAL"
                 ? "Rehearse the meeting"
                 : intent.page.endsWith("_MESSAGES")
                   ? "Open the chat"
@@ -239,6 +248,8 @@ function intentLabel(intent: QUiIntent): string {
       return "Connect Google Calendar";
     case "DOCUMENT_ACT":
       return "The open document";
+    case "CARDS":
+      return "Cards on this screen";
     case "UI_ACT":
       return "On this page";
   }
@@ -538,7 +549,18 @@ export function QResultBlocks({
           case "UI_INTENT": {
             // Q room R5: suggested times and the connect card, in the room.
             if (block.intent.kind === "SHOW_CALENDAR_CONNECT") {
-              return <CalendarConnectCard key={key} intent={block.intent} />;
+              return (
+                <HideableCard
+                  key={key}
+                  card={{
+                    category: "CONNECTION",
+                    key: `connect:${key}`,
+                    names: ["calendar", "connect calendar", "google calendar"],
+                  }}
+                >
+                  <CalendarConnectCard intent={block.intent} />
+                </HideableCard>
+              );
             }
             // Their own website, opened in a new tab as the answer arrived;
             // the link stays for a browser that blocked the automatic open.

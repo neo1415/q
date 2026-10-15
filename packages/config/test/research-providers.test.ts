@@ -30,6 +30,9 @@ describe("research provider configuration", () => {
       "TAVILY_API_KEY",
       "BRIGHT_DATA_API_KEY",
       "SERP_API_KEY",
+      "SERPER_API_KEY",
+      "SCRAPING_BEE_API",
+      "SCRAPIG_BEE_API",
     ]);
     for (const name of RESEARCH_PROVIDER_ENV_NAMES) {
       expect(name.startsWith("NEXT_PUBLIC_")).toBe(false);
@@ -45,6 +48,8 @@ describe("research provider configuration", () => {
       brightData: "unconfigured",
       brightDataZones: "unconfigured",
       serpApi: "unconfigured",
+      serper: "unconfigured",
+      scrapingBee: "unconfigured",
     });
     expect(none.secrets.researchProviders.tavily).toBeUndefined();
 
@@ -56,8 +61,19 @@ describe("research provider configuration", () => {
       brightData: "unconfigured",
       brightDataZones: "unconfigured",
       serpApi: "unconfigured",
+      serper: "unconfigured",
+      scrapingBee: "unconfigured",
     });
     expect(configured.secrets.researchProviders.tavily?.reveal()).toBe(KEY);
+  });
+
+  it("reads ScrapingBee under its correct name and under the typo it was first deployed with", () => {
+    const typo = parseQApiConfig({ ...base, SCRAPIG_BEE_API: KEY });
+    expect(typo.secrets.researchProviders.scrapingBee?.reveal()).toBe(KEY);
+    const right = parseQApiConfig({ ...base, SCRAPING_BEE_API: KEY });
+    expect(right.secrets.researchProviders.scrapingBee?.reveal()).toBe(KEY);
+    const serper = parseQApiConfig({ ...base, SERPER_API_KEY: KEY });
+    expect(serper.secrets.researchProviders.serper?.reveal()).toBe(KEY);
   });
 
   it("rejects a value too short to be a key, without echoing it", () => {

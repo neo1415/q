@@ -64,6 +64,7 @@ function ports(held: "OK" | "REFUSED") {
         cancel: vi.fn(),
         createReminder: vi.fn(),
         dismissReminder: vi.fn(),
+        organisedMeeting: vi.fn(),
         joinCall: vi.fn(),
       },
       outcomes: {

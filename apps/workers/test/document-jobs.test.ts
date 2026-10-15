@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { QDocumentPipelineStage } from "@capital-q/contracts";
+import {
+  workforceCorrelationId,
+  type QDocumentPipelineStage,
+} from "@capital-q/contracts";
 import type {
   ClaimedDocumentJob,
   ComposedArtifact,
@@ -118,6 +121,7 @@ function fakes(claimed: ClaimedDocumentJob | null, fail = false) {
   });
   return {
     runner,
+    jobs,
     stages,
     finished,
     filed,
@@ -127,6 +131,83 @@ function fakes(claimed: ClaimedDocumentJob | null, fail = false) {
 }
 
 describe("the document worker", () => {
+  it("keeps workforce provenance while disabling optional paid stages until a durable budget can be proven", async () => {
+    const claimed = job();
+    const workforce = {
+      jobId: "f0000000-0000-4000-8000-0000000000b3",
+      runId: "f0000000-0000-4000-8000-0000000000b4",
+      budgetUsd: 0.08,
+    };
+    const world = fakes({ ...claimed, input: { ...claimed.input, workforce } });
+    let paidCalls = 0;
+    let recorded: unknown;
+    const runner = createDocumentJobRunner({
+      jobs: world.jobs,
+      artifacts: {
+        completeDocumentJob: () => Promise.resolve({} as never),
+        failDocumentJob: () => Promise.resolve(),
+      },
+      polisher: {
+        polish: () => {
+          paidCalls += 1;
+          return Promise.resolve(null);
+        },
+      },
+      images: {
+        illustrationsFor: () => {
+          paidCalls += 1;
+          return undefined;
+        },
+      },
+      criticFor: () => {
+        paidCalls += 1;
+        return undefined;
+      },
+      logger: {
+        ...logger,
+        info: (input) => {
+          recorded = input;
+        },
+      },
+    });
+    await runner.runOnce();
+    expect(paidCalls).toBe(0);
+    expect(recorded).toMatchObject({
+      qRunId: claimed.runId,
+      correlationId: workforceCorrelationId(workforce.jobId, workforce.runId),
+    });
+  });
+
+  it("foreground document jobs still compose their configured polish, images and critic", async () => {
+    const world = fakes(job());
+    const called: string[] = [];
+    const runner = createDocumentJobRunner({
+      jobs: world.jobs,
+      artifacts: {
+        completeDocumentJob: () => Promise.resolve({} as never),
+        failDocumentJob: () => Promise.resolve(),
+      },
+      polisher: {
+        polish: () => {
+          called.push("polish");
+          return Promise.resolve(null);
+        },
+      },
+      images: {
+        illustrationsFor: () => {
+          called.push("images");
+          return undefined;
+        },
+      },
+      criticFor: () => {
+        called.push("critic");
+        return undefined;
+      },
+      logger,
+    });
+    await runner.runOnce();
+    expect(called.sort()).toEqual(["critic", "images", "polish"]);
+  });
   it("says each stage, files version 1 with its audit, and finishes", async () => {
     const world = fakes(job());
     expect(await world.runner.runOnce()).toBe(true);

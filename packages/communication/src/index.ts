@@ -28,6 +28,7 @@ export { createPostgresChatSafetyStore } from "./safety-postgres.js";
 export {
   createChatService,
   foldChatRows,
+  type BriefLatestMessage,
   type ChatDocumentPort,
   type ChatDownloadPort,
   type ChatParty,
@@ -97,6 +98,33 @@ export {
   createPostgresMeetingDirectory,
   createPostgresScheduleStore,
 } from "./schedule/postgres.js";
+// MEET-TIME block (2026-10-09): a meeting time is a proposal the investor
+// accepts; nothing is booked or called confirmed before that.
+export {
+  createProposalService,
+  PROPOSAL_TRANSITIONS,
+  transition as transitionProposal,
+  type ProposalAction,
+  type ProposalBooking,
+  type ProposalEvent,
+  type ProposalOutcome,
+  type ProposalParties,
+  type ProposalRecord,
+  type ProposalRefusal,
+  type ProposalService,
+  type ProposalSide,
+  type ProposalState,
+  type ProposalStore,
+  type TimeOption,
+} from "./schedule/proposal.js";
+export {
+  createMeetingProposalPort,
+  type MeetingProposalPort,
+} from "./schedule/proposal-port.js";
+export {
+  createPostgresProposalParties,
+  createPostgresProposalStore,
+} from "./schedule/proposal-postgres.js";
 export {
   createMeetingAssistantService,
   meetingAssistantView,
@@ -185,6 +213,11 @@ export {
   hostCarded,
   INTERRUPT_GRACE_MS,
   saysNeverMind,
+  asksQToWait,
+  asksToReschedule,
+  waitMinutesAsked,
+  waitMaxMsFromEnv,
+  type LeaveCause,
   type HostOutcome,
   type HostPolicy,
   DEFAULT_HOST_LIMITS,
@@ -226,4 +259,51 @@ export {
   type ScreenWatch,
   type ScreenWatchLimits,
 } from "./meeting-host/screen.js";
+export {
+  isCorrection,
+  isHearingCheck,
+  isOpinionAsk,
+  isRememberAsk,
+  isResume,
+  isStayQuiet,
+  isWhereWeAre,
+  routeMeetingTurn,
+  type BrainInput,
+  type BrainRoute,
+} from "./meeting-host/brain.js";
+export {
+  affirms,
+  attributeSpeaker,
+  createMeetingMemory,
+  dueTextOf,
+  readLine,
+  type FollowUp,
+  type MeetingEvent,
+  type MeetingEventKind,
+  type MeetingMemory,
+  type MeetingStance,
+  type SpeakerRef,
+  type WorkingSummary,
+} from "./meeting-host/memory.js";
+export {
+  answerFromSnapshot,
+  audienceOf,
+  buildMeetingSnapshot,
+  factsFor,
+  layersPermittedFor,
+  MEETING_SNAPSHOT_VERSION,
+  renderSnapshot,
+  SNAPSHOT_LAYERS,
+  type Audience,
+  type MeetingContextSnapshot,
+  type PreparedAnswer,
+  type RoomMember,
+  type SnapshotFact,
+  type SnapshotLayer,
+  type SnapshotParticipant,
+  type SnapshotSide,
+  type SnapshotSources,
+  type SnapshotTopic,
+  type SnapshotTruth,
+} from "./meeting-host/snapshot.js";
 // end MEET-HOST block

@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 
 import { contextAs } from "../support/auth.js";
-import { awaits } from "../support/expected-red.js";
 import { navigationReceipts, recordReceipts, send } from "../support/q.js";
 import { answer, useScript } from "../support/script.js";
 import { CAST, world } from "../support/stack.js";
@@ -113,10 +112,6 @@ for (const ask of ASKS) {
 test("a name that matches nothing is not navigated and not claimed", async ({
   browser,
 }) => {
-  awaits(
-    ["C"],
-    "NOT_AVAILABLE must produce a FAILED or no navigation, and Q must not say it opened it",
-  );
   const page = await (await contextAs(browser, CAST.investor)).newPage();
   await recordReceipts(page);
   await useScript([

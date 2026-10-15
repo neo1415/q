@@ -68,3 +68,39 @@ export function onScreenCompanyFact(
     source: "Capital Q canonical company profile",
   };
 }
+
+/**
+ * K Part 4: a founder's own company from their Tier A working snapshot
+ * (their own organisation's canonical record), said the same way. Only
+ * when this run's plan holds that company's profile scope: the snapshot
+ * never widens what the Context Firewall admitted for the run.
+ */
+export function ownCompanySnapshotFact(
+  own: {
+    readonly companyId: string;
+    readonly name: string;
+    readonly shortDescription: string | null;
+    readonly stageCode: string | null;
+    readonly countryCode: string | null;
+  },
+  plan: { readonly scopes: readonly unknown[] },
+): AuthorisedFact | null {
+  const permitted = plan.scopes.some((scope) => {
+    const held = scope as {
+      readonly kind?: unknown;
+      readonly companyId?: unknown;
+    };
+    return held.kind === "COMPANY_PROFILE" && held.companyId === own.companyId;
+  });
+  if (!permitted) return null;
+  return onScreenCompanyFact(
+    {
+      canonicalName: own.name,
+      shortDescription: own.shortDescription,
+      currentStageCode: own.stageCode,
+      headquartersCountry: own.countryCode,
+      relationToYou: "OWN",
+    },
+    'Their own company (the one they mean by "my company")',
+  );
+}

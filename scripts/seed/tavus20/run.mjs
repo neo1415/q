@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console */
 /**
  * Seeds the tavus-20 fictional companies into the deployed app through its
  * own UI (Playwright, one Chromium), as each founder and team member would.
@@ -43,7 +42,9 @@ for (const c of lib.companies()) {
   await ctx.addInitScript(() => {
     try {
       sessionStorage.setItem("cq.splash.seen", "1");
-    } catch {}
+    } catch {
+      // Storage can be blocked in a fresh context; the splash then just shows.
+    }
   });
   const page = await ctx.newPage();
   page.setDefaultTimeout(30000);

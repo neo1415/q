@@ -187,6 +187,12 @@ function composeEligibility(input: {
         companyId,
         investorOrganisationId,
       ),
+    findManyByInvestor: (investorOrganisationId, companyIds) =>
+      relationshipRepository.findByInvestorAndCompanies(
+        sql,
+        investorOrganisationId,
+        companyIds,
+      ),
     listEvents: (id, page = {}) =>
       relationshipEventRepository.listByRelationship(sql, id, {
         afterSequence: page.afterSequence,

@@ -9,6 +9,7 @@ import {
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
 import { RelationshipTimeline } from "@/features/relationships/relationship-timeline";
+import { messageCountOf } from "@/features/relationships/brief-lines";
 import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
 
@@ -51,12 +52,22 @@ export default async function InvestorCallsPage({
         profile={loaded.profile}
         basePath={basePath}
         current="CALLS"
-        messageCount={loaded.thread?.messages.length ?? 0}
+        messageCount={messageCountOf(loaded)}
         diligence={loaded.diligence}
         meetings={loaded.meetings}
         readAt={loaded.readAt}
       >
         <section className="flex max-w-(--cq-layout-reading) flex-col gap-4">
+          {loaded.meetingsRead ? null : (
+            // R1: an unread schedule is unknown, never "no calls".
+            <p
+              className="cq-body-sm text-(--cq-text-secondary)"
+              data-calls-unavailable
+            >
+              Calls couldn&apos;t be read just now. Nothing has changed; try
+              again in a moment.
+            </p>
+          )}
           <RelationshipSchedule
             relationshipId={relationship.relationshipId}
             counterpart={loaded.counterpart}

@@ -1,4 +1,3 @@
-/* global console, fetch, process, setTimeout */
 // Zino's standing instruction with scoped delegation ON, through the real
 // app path (founder 2026-10-07: "add the stuff for me, the instructions to
 // my account... the agents don't need approval for everything").

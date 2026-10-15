@@ -237,7 +237,7 @@ describe("QX-003E · the viewer", () => {
     expect(screen.getByText("Northstar Logistics moves freight.")).toBeTruthy();
     expect(screen.getByText(/user claim · self reported/)).toBeTruthy();
     // Unknown stays unknown, in the document.
-    const gaps = screen.getByText("What isn't on record yet").parentElement;
+    const gaps = screen.getByText("Evidence gaps").parentElement;
     expect(within(gaps as HTMLElement).getByText("Traction")).toBeTruthy();
     // And it says what it is not.
     expect(screen.getByText(/not verified evidence/i)).toBeTruthy();

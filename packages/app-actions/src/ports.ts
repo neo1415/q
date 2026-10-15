@@ -2,6 +2,7 @@ import type { CapitalRoundService, CapitalService } from "@capital-q/capital";
 import type {
   ChatSafetyService,
   ChatService,
+  MeetingProposalPort,
   PushSubscriptionStore,
   ScheduleService,
 } from "@capital-q/communication";
@@ -209,13 +210,22 @@ export type AppActionPorts = {
         | "dismissReminder"
         | "confirmHeld"
         | "joinCall"
+        | "organisedMeeting"
       >
     | undefined;
+  /**
+   * Meeting time proposals: who the actor is on a relationship, and the
+   * proposal service that books as that actor once an acceptance is recorded.
+   */
+  readonly proposals?: MeetingProposalPort | undefined;
   /** Interest and connection requests: the network services. */
   readonly interests?:
     | Pick<
         InterestService,
-        "expressInterest" | "respondToInterest" | "listIncomingInterest"
+        | "expressInterest"
+        | "respondToInterest"
+        | "listIncomingInterest"
+        | "mayRespondToInterest"
       >
     | undefined;
   readonly connections?:

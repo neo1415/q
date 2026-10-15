@@ -3,12 +3,14 @@ import { z } from "zod";
 import { QUiActIntentSchema } from "./ui-act.js";
 import { UuidSchema } from "../common/ids.js";
 import { StageCodeSchema } from "../http/companies.js";
+import { DeckSectionCodeSchema } from "../http/deck.js";
 import {
   DISCOVER_FILTER_LIST_MAX,
   DiscoverRaiseFilterSchema,
 } from "../http/discovery.js";
 import { TaxonomyCanonicalCodeSchema } from "../http/taxonomy.js";
 import { QEvidenceRefsSchema } from "./evidence-ref.js";
+import type { QManifestTab } from "./screen-manifest.js";
 import type { QVoiceChoice, QVoiceDestination } from "./voice.js";
 
 /**
@@ -44,6 +46,7 @@ export const Q_UI_INTENT_KINDS = [
   "SHOW_IN_Q_ROOM",
   "SHOW_CALENDAR_CONNECT",
   "DOCUMENT_ACT",
+  "CARDS",
 ] as const;
 
 export type QUiIntentKind = (typeof Q_UI_INTENT_KINDS)[number];
@@ -282,6 +285,10 @@ export const Q_RECORD_PAGES = [
   "INVESTOR_REHEARSAL",
   // REHEARSE: an investor's rehearsal with a company they are connected to.
   "COMPANY_REHEARSAL",
+  // A rehearsal with a researched external person, organisation or agency
+  // (the identity card's "Rehearse with them"); the id is its
+  // externalPersonId. No account or relationship is needed.
+  "EXTERNAL_REHEARSAL",
   // follow-55 (Zino, live 2026-10-04: "open the questions for…" opened the
   // Documents list): one of their own documents, by its artifact id, in
   // the shell's document viewer.
@@ -303,9 +310,67 @@ export const Q_RECORD_PAGES = [
   "WORK_ITEM",
   "CAPITAL_ROUND",
   "GATEQ_APPLICATION",
+  // P4: one Q Daily edition, at the exact story or section (`anchor`).
+  // The id is the edition id; the Daily home is never the target when the
+  // story is known.
+  "DAILY_EDITION",
 ] as const;
 export const QRecordPageSchema = z.enum(Q_RECORD_PAGES);
 export type QRecordPage = z.infer<typeof QRecordPageSchema>;
+
+/**
+ * N2: the tabs of a record's page Q can select, a closed subset of the
+ * screen manifest's tabs (`QManifestTabSchema`). Company profile tabs and
+ * the relationship page's tabs; never free text.
+ */
+export const Q_COMPANY_PROFILE_TABS = [
+  "overview",
+  "elevator",
+  "dataroom",
+  "deck",
+  "team",
+] as const satisfies readonly QManifestTab[];
+export const Q_RELATIONSHIP_TABS = [
+  "messages",
+  "calls",
+  "diligence",
+] as const satisfies readonly QManifestTab[];
+export const Q_RECORD_TABS = [
+  ...Q_COMPANY_PROFILE_TABS,
+  ...Q_RELATIONSHIP_TABS,
+] as const;
+export const QRecordTabSchema = z.enum(Q_RECORD_TABS);
+export type QRecordTab = z.infer<typeof QRecordTabSchema>;
+
+const COMPANY_PROFILE_PAGES: ReadonlySet<string> = new Set([
+  "COMPANY",
+  "COMPANY_ELEVATOR",
+  "COMPANY_DATA_ROOM",
+  "COMPANY_DECK",
+  "COMPANY_TEAM",
+]);
+const RELATIONSHIP_PAGES: ReadonlySet<string> = new Set([
+  "RELATIONSHIP_COMPANY",
+  "RELATIONSHIP_INVESTOR",
+  "RELATIONSHIP_COMPANY_MESSAGES",
+  "RELATIONSHIP_INVESTOR_MESSAGES",
+]);
+
+/** Whether a tab belongs to a record page (a company's tab on a relationship is not one). */
+export function recordPageHasTab(page: QRecordPage, tab: QRecordTab): boolean {
+  if (COMPANY_PROFILE_PAGES.has(page)) {
+    return (Q_COMPANY_PROFILE_TABS as readonly string[]).includes(tab);
+  }
+  if (RELATIONSHIP_PAGES.has(page)) {
+    return (Q_RELATIONSHIP_TABS as readonly string[]).includes(tab);
+  }
+  return false;
+}
+
+/** An element id inside a Q Daily edition page (story or section). */
+export const QDailyAnchorSchema = z
+  .string()
+  .regex(/^(?:story|section)-[A-Za-z0-9_-]{1,64}$/u);
 
 export const QOpenRecordPageIntentSchema = z
   .object({
@@ -316,12 +381,43 @@ export const QOpenRecordPageIntentSchema = z
     companyId: UuidSchema.optional(),
     /** DATA_ROOM_DOCUMENT: its title, as the data room lists it. */
     title: z.string().trim().min(1).max(200).optional(),
+    /** N2: the page's tab to select ("open their team tab"). */
+    tab: QRecordTabSchema.optional(),
+    /** N2: a section of the pitch deck's read (a deck sub-tab). */
+    subTab: DeckSectionCodeSchema.optional(),
+    /** N2: open the deck in its viewer at once (the deck tab only). */
+    viewer: z.literal("OPEN").optional(),
+    /**
+     * P4: DAILY_EDITION only -- the element id of the story or section in
+     * the edition ("story-<id>", "section-<CODE>"); the page scrolls to
+     * it and marks it.
+     */
+    anchor: QDailyAnchorSchema.optional(),
   })
   .strict()
+  .refine(
+    (intent) => intent.anchor === undefined || intent.page === "DAILY_EDITION",
+    { message: "an anchor belongs to a Daily edition", path: ["anchor"] },
+  )
   .refine(
     (intent) =>
       intent.page !== "DATA_ROOM_DOCUMENT" || intent.companyId !== undefined,
     { message: "a data-room document names its company", path: ["companyId"] },
+  )
+  .refine(
+    (intent) =>
+      intent.tab === undefined || recordPageHasTab(intent.page, intent.tab),
+    { message: "that tab is not one of this page's", path: ["tab"] },
+  )
+  .refine(
+    (intent) =>
+      (intent.subTab === undefined && intent.viewer === undefined) ||
+      intent.tab === "deck" ||
+      (intent.tab === undefined && intent.page === "COMPANY_DECK"),
+    {
+      message: "a sub-tab and the viewer belong to the deck tab",
+      path: ["subTab"],
+    },
   );
 
 /**
@@ -595,6 +691,54 @@ export const QDocumentActIntentSchema = z
   );
 export type QDocumentActIntent = z.infer<typeof QDocumentActIntentSchema>;
 
+/**
+ * Founder P5: clearing the Q page's temporary cards, by voice or click.
+ * PRESENTATION ONLY: it hides cards on this device for the session and
+ * restores them; it never approves, rejects, deletes or cancels anything
+ * and calls no business API. Categories are the card families the Q page
+ * fills up with; `name` is a spoken card name ("TensorGate"), matched
+ * against the cards on screen, never an identifier.
+ */
+export const Q_CARD_ACTIONS = [
+  "HIDE_ALL",
+  "HIDE_CATEGORY",
+  "HIDE_ONE",
+  "RESTORE_ALL",
+  "RESTORE_ONE",
+] as const;
+export const QCardActionSchema = z.enum(Q_CARD_ACTIONS);
+export type QCardAction = z.infer<typeof QCardActionSchema>;
+
+export const Q_CARD_CATEGORIES = [
+  "NEEDS_YOU",
+  "CONNECTION",
+  "SOURCE",
+  "RECOMMENDATION",
+  "ANSWER",
+] as const;
+export const QCardCategorySchema = z.enum(Q_CARD_CATEGORIES);
+export type QCardCategory = z.infer<typeof QCardCategorySchema>;
+export const Q_CARD_NAME_MAX = 120;
+
+export const QCardsIntentSchema = z
+  .object({
+    kind: z.literal("CARDS"),
+    action: QCardActionSchema,
+    category: QCardCategorySchema.optional(),
+    name: z.string().trim().min(1).max(Q_CARD_NAME_MAX).optional(),
+  })
+  .strict()
+  .refine((i) => i.action !== "HIDE_CATEGORY" || i.category !== undefined, {
+    message: "HIDE_CATEGORY names a category",
+  })
+  .refine(
+    (i) =>
+      (i.action !== "HIDE_ONE" && i.action !== "RESTORE_ONE") ||
+      i.name !== undefined,
+    { message: "HIDE_ONE and RESTORE_ONE name a card" },
+  );
+export type QCardsIntent = z.infer<typeof QCardsIntentSchema>;
+
 export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QScreenActIntentSchema,
   QSetDiscoverFiltersIntentSchema,
@@ -610,6 +754,7 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QShowInQRoomIntentSchema,
   QShowCalendarConnectIntentSchema,
   QDocumentActIntentSchema,
+  QCardsIntentSchema,
   // RECOVERY-2026-10: universal application control (ui-act.ts).
   QUiActIntentSchema,
 ]);
@@ -740,6 +885,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QShowInQRoomIntentSchema,
   QShowCalendarConnectIntentSchema,
   QDocumentActIntentSchema,
+  QCardsIntentSchema,
   QUiActIntentSchema,
 ]);
 

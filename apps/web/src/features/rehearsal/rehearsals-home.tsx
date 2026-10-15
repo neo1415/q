@@ -35,6 +35,24 @@ export function lobbyHref(
     : `${base}?meeting=${encodeURIComponent(meetingId)}`;
 }
 
+/** Where a researched (demo-access) entity's lobby lives. */
+export function researchedHref(
+  entity: NonNullable<QRehearsalPartnersDto["researched"]>[number],
+): string {
+  return entity.investorOrganisationId === null
+    ? `/rehearsals/person/${encodeURIComponent(entity.externalPersonId)}`
+    : `/rehearsals/investor/${encodeURIComponent(entity.investorOrganisationId)}`;
+}
+
+/** What Q plays, in words: the role, or the person's public priorities. */
+export function researchedCaption(
+  entity: NonNullable<QRehearsalPartnersDto["researched"]>[number],
+): string {
+  return entity.roleLine === null
+    ? "Research-informed simulation of their public priorities"
+    : `Research-informed simulation: ${entity.roleLine}`;
+}
+
 function Avatar({
   counterpart,
   size,
@@ -146,7 +164,11 @@ export function RehearsalsHome({
     filter === null
       ? rehearsals
       : rehearsals.filter((item) => item.counterpart.id === filter);
-  const nothingToPick = partners.upcoming.length === 0 && people.length === 0;
+  const researched = partners.researched ?? [];
+  const nothingToPick =
+    partners.upcoming.length === 0 &&
+    people.length === 0 &&
+    researched.length === 0;
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 sm:gap-10">
@@ -239,6 +261,57 @@ export function RehearsalsHome({
           </ul>
         )}
       </section>
+
+      {researched.length === 0 ? null : (
+        <section
+          aria-labelledby="researched-title"
+          className="flex flex-col gap-3"
+        >
+          <div className="flex flex-col gap-0.5">
+            <h2
+              id="researched-title"
+              className="cq-title-sm text-(--cq-text-primary)"
+            >
+              Researched rehearsals
+            </h2>
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              Q plays them from public sources, labelled as a simulation, not
+              the real person. No connection or request is needed.
+            </p>
+          </div>
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {researched.map((entity) => (
+              <li key={entity.externalPersonId}>
+                <Link
+                  href={researchedHref(entity)}
+                  className="group flex h-full min-h-44 flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 transition-[transform,border-color] duration-(--cq-motion-fast) hover:border-(--cq-border) active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                >
+                  <EntityAvatar
+                    kind="investor"
+                    name={entity.name}
+                    investorOrganisationId={
+                      entity.investorOrganisationId ?? undefined
+                    }
+                    size="lg"
+                    decorative
+                  />
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="cq-body line-clamp-2 font-medium text-(--cq-text-primary)">
+                      {entity.name}
+                    </span>
+                    <span className="cq-caption text-(--cq-text-secondary)">
+                      {researchedCaption(entity)}
+                    </span>
+                  </span>
+                  <span className="cq-body-sm mt-auto font-semibold text-(--cq-accent)">
+                    Rehearse
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {latest === undefined || scored.length < 2 ? null : (
         <section

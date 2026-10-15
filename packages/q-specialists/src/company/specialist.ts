@@ -605,6 +605,7 @@ export function createCompanyIntelligenceSpecialist(
       // A company known only publicly is always researched: the public
       // web is the only place anything about it is.
       const wantsResearch =
+        request.preparationMode !== "EVIDENCE_ONLY" &&
         research !== undefined &&
         (request.publicResearch === true || publicOnly);
       if (wantsResearch) {
@@ -623,9 +624,10 @@ export function createCompanyIntelligenceSpecialist(
         : Promise.resolve(null);
       // The actor's own documents are not what a company nobody holds is
       // described by; a public-only investigation reads none of them.
-      const retrieving = publicOnly
-        ? Promise.resolve([])
-        : evidence.search(context.plan, request.question, context.signal);
+      const retrieving =
+        publicOnly || request.preparationMode === "EVIDENCE_ONLY"
+          ? Promise.resolve([])
+          : evidence.search(context.plan, request.question, context.signal);
       const [researchRead, hits] = await Promise.all([researching, retrieving]);
       if (researchRead !== null) {
         telemetry = {
@@ -640,7 +642,10 @@ export function createCompanyIntelligenceSpecialist(
           blockedResult(companyId, "CANCELLED", asOfStamp, telemetry),
         );
       }
-      telemetry = { ...telemetry, retrievalCalls: 1 };
+      telemetry = {
+        ...telemetry,
+        retrievalCalls: request.preparationMode === "EVIDENCE_ONLY" ? 0 : 1,
+      };
 
       const assembled = assembleCompanyContext({
         plan: context.plan,
@@ -686,6 +691,74 @@ export function createCompanyIntelligenceSpecialist(
       const staleKeys = readings
         .filter((reading) => reading.freshness.stale)
         .map((reading) => reading.object.knowledgeKey);
+
+      if (request.preparationMode === "EVIDENCE_ONLY") {
+        // Copy authorized statements with their original evidence status. An
+        // unsettled or stale reading contributes its uncertainty, never a
+        // freshly asserted business fact. No synthesis or side effects occur.
+        const observations: CompanyFinding[] = assembled.facts
+          .filter((fact) => !fact.stale && !fact.disputed)
+          .map((fact) => ({
+            findingId: findingId(`record:${fact.label}`),
+            runId: context.runId,
+            subjects: [...subjects],
+            sensitivity: context.plan.maxSensitivity,
+            visibilityScope: "organisation_private",
+            validAt: fact.validAt ?? asOfStamp,
+            derivation: "DETERMINISTIC",
+            type: "OBSERVATION",
+            dimension: fact.dimension ?? "DESCRIPTION",
+            statement: fact.fact.statement,
+            truthClass: fact.fact.truthClass,
+            evidenceStatus: fact.fact.evidenceStatus,
+            confidence:
+              fact.fact.evidenceStatus === "SELF_REPORTED" ? "LOW" : "MODERATE",
+            evidenceRefs: [...fact.evidenceRefs],
+          }));
+        const findings = [...computed, ...observations];
+        telemetry = {
+          ...telemetry,
+          evidenceRefCount: findings.reduce(
+            (sum, finding) => sum + finding.evidenceRefs.length,
+            0,
+          ),
+          contradictionCount: contradictions.length,
+          gapCount: findings.filter((finding) => finding.type === "GAP").length,
+          uncertaintyCount: findings.filter(
+            (finding) => finding.type === "UNCERTAINTY",
+          ).length,
+          staleFactCount: assembled.facts.filter((fact) => fact.stale).length,
+          findingCountsByType: Object.fromEntries(
+            [...new Set(findings.map((finding) => finding.type))].map(
+              (type) => [
+                type,
+                findings.filter((finding) => finding.type === type).length,
+              ],
+            ),
+          ),
+        };
+        return finish({
+          companyId,
+          companyName: canonicalRead.canonicalName,
+          canonicalDescription: canonicalRead.description ?? null,
+          specialistVersion: `${COMPANY_INTELLIGENCE_ID}/${COMPANY_INTELLIGENCE_VERSION}`,
+          asOf: asOfStamp,
+          blocked: null,
+          findings,
+          coverage: coverageByDimension(assembled.facts, findings),
+          materialChanges: changes,
+          contradictions,
+          informationConfidence: informationConfidence(
+            assembled.facts,
+            disputes,
+          ),
+          synthesis: null,
+          research: null,
+          recordedStatements: [],
+          artifactRequest: null,
+          telemetry,
+        });
+      }
 
       // ---- 4. one model call (§43, §100) ---------------------------------
       const notes = institutionalNotes({
