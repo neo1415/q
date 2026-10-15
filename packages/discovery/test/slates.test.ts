@@ -20,6 +20,10 @@ import type {
 } from "../src/hybrid/contracts.js";
 import type { HybridCandidateService } from "../src/hybrid/service.js";
 import {
+  DISCOVER_FEED_ELIGIBILITY_V1,
+  type PlayablePitchPort,
+} from "../src/ranking/feed-eligibility.js";
+import {
   RANKER_VERSION,
   RankedCandidateSchema,
   RankingInputError,
@@ -317,6 +321,7 @@ type Scenario = {
   readonly now?: () => Date;
   readonly rerank?: RerankService;
   readonly discoverable?: DiscoverablePoolPort;
+  readonly playable?: PlayablePitchPort | null;
 };
 
 /**
@@ -331,6 +336,15 @@ const realRerank = (): RerankService =>
     reranker: createReranker(),
     signals: { forCompanies: () => Promise.resolve(new Map()) },
   });
+
+/**
+ * discover-feed-eligibility.v1 requires a playable pitch; these cases are
+ * about the builder's own behaviour, so every candidate has one. The rule
+ * itself is exercised in its own block below.
+ */
+const everyPitchPlayable: PlayablePitchPort = {
+  companiesWithPlayablePitch: (ids) => Promise.resolve(new Set(ids)),
+};
 
 const THREE = [candidate(1), candidate(2), candidate(3)];
 const RANKED_THREE = [
@@ -357,6 +371,8 @@ function scenario(s: Scenario = {}) {
     slates: store.repo,
     transactions,
     pool: s.discoverable,
+    playablePitches:
+      s.playable === null ? undefined : (s.playable ?? everyPitchPlayable),
     clock: s.now ?? (() => new Date("2026-09-19T10:00:00.000Z")),
   });
   return { builder, store };
@@ -487,6 +503,7 @@ describe("slate builder (CQ-REC-006)", () => {
     const builder2 = createSlateBuilder({
       ports: ports(),
       hybrid: { generate: () => Promise.resolve(pool(THREE)) },
+      playablePitches: everyPitchPlayable,
       ranking: {
         rankCandidates: () =>
           Promise.resolve(
@@ -539,6 +556,7 @@ describe("slate builder (CQ-REC-006)", () => {
     const mismatched = createSlateBuilder({
       ports: ports(),
       hybrid: { generate: () => Promise.resolve(pool(THREE)) },
+      playablePitches: everyPitchPlayable,
       ranking: {
         rankCandidates: () => Promise.resolve(rankedResult(RANKED_THREE)),
       },
@@ -727,5 +745,64 @@ describe("slate builder (CQ-REC-006)", () => {
       "REC006_PRIVATE",
     );
     expect(JSON.stringify(d)).not.toContain("REC006_PRIVATE");
+  });
+});
+
+describe("Discover feed eligibility: only companies with a playable pitch (discover-feed-eligibility.v1)", () => {
+  // Ranks exactly what it is handed, so the gate's effect is visible.
+  const echoRanking: RankingService = {
+    rankCandidates: ({ candidates }) =>
+      Promise.resolve(
+        rankedResult(
+          RANKED_THREE.filter((r) =>
+            candidates.some((c) => c.companyId === r.companyId),
+          ).map((r, index) => ({ ...r, rank: index + 1 })),
+        ),
+      ),
+  };
+
+  it("holds a company without a playable pitch out of the slate; the others keep their order", async () => {
+    const { builder, store } = scenario({
+      ranking: echoRanking,
+      playable: {
+        companiesWithPlayablePitch: () =>
+          Promise.resolve(new Set([id(1), id(3)])),
+      },
+    });
+    const result = await builder.build(query);
+    if (result.kind !== "PUBLISHED") throw new Error(result.kind);
+    const items = store.rows.get(result.slate.id)?.items ?? [];
+    expect(items.map((i) => i.companyId)).toEqual([id(1), id(3)]);
+  });
+
+  it("fails closed: with no way to confirm a pitch, nobody enters the feed", async () => {
+    const { builder, store } = scenario({
+      ranking: echoRanking,
+      playable: null,
+    });
+    const result = await builder.build(query);
+    if (result.kind !== "PUBLISHED") throw new Error(result.kind);
+    expect(store.rows.get(result.slate.id)?.items ?? []).toEqual([]);
+  });
+
+  it("fails closed when the pitch read itself fails", async () => {
+    const { builder, store } = scenario({
+      ranking: echoRanking,
+      playable: {
+        companiesWithPlayablePitch: () =>
+          Promise.reject(new Error("media unavailable")),
+      },
+    });
+    const result = await builder.build(query);
+    if (result.kind !== "PUBLISHED") throw new Error(result.kind);
+    expect(store.rows.get(result.slate.id)?.items ?? []).toEqual([]);
+  });
+
+  it("is a published, versioned policy that requires a playable pitch", () => {
+    expect(DISCOVER_FEED_ELIGIBILITY_V1.version).toBe(
+      "discover-feed-eligibility.v1",
+    );
+    expect(DISCOVER_FEED_ELIGIBILITY_V1.requirePlayablePitch).toBe(true);
+    expect(Object.isFrozen(DISCOVER_FEED_ELIGIBILITY_V1)).toBe(true);
   });
 });

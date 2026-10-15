@@ -96,6 +96,12 @@ export const DiscoveryNoteDtoSchema = z.enum([
   /** Companies are discoverable and pass the hard rules; none matched the mandate. */
   "NONE_MATCH_MANDATE",
   /**
+   * Companies pass the hard rules, but none has a playable pitch video, so
+   * the video feed is empty (discover-feed-eligibility.v1). They remain
+   * reachable through Search, Explore and Q.
+   */
+  "NONE_WITH_PLAYABLE_PITCH",
+  /**
    * The reader's own Discover filters left nothing on this first page's
    * scan (lead-owned contract change, ux/discover-filters). Never said when
    * no filter is applied.

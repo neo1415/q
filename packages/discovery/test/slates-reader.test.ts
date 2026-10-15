@@ -194,6 +194,8 @@ function harness(
     readonly volume?: number | null;
     /** Companies this organisation has passed on (CQ-REC-009R). */
     readonly passed?: readonly string[];
+    /** Companies with a playable pitch now (discover-feed-eligibility.v1). */
+    readonly playable?: readonly string[] | "FAILS";
     /** A proven reason to offer one of them again; nothing produces one in V1. */
     readonly reintroduce?: Readonly<
       Record<string, string | { reason: string; change: string | null }>
@@ -404,6 +406,16 @@ function harness(
     pool,
     requester: options.requester === false ? undefined : requester,
     filterFacts: options.filterFacts,
+    ...(options.playable === undefined
+      ? {}
+      : {
+          playablePitches: {
+            companiesWithPlayablePitch: () =>
+              options.playable === "FAILS"
+                ? Promise.reject(new Error("media read failed"))
+                : Promise.resolve(new Set(options.playable)),
+          },
+        }),
     ...(options.volume === undefined
       ? {}
       : { volume: () => Promise.resolve(options.volume ?? null) }),
@@ -489,6 +501,21 @@ describe("slate reader (CQ-REC-006)", () => {
     expect(page.nextCursor).toBeNull();
     // The guard saw the whole page: withholding is a filter, not a re-rank.
     expect(h.evaluated[0]).toEqual([id(1), id(2), id(3), id(4)]);
+  });
+
+  it("discover-feed-eligibility.v1 at read: a company whose pitch stopped being playable leaves a gap, never a substitute", async () => {
+    const h = harness({ playable: [id(1), id(3)] });
+    await publish(h.store, KEY, 4);
+    const page = await h.reader.pageCompanies({ actor, limit: 4 });
+    expect(page.items.map((i) => i.companyId)).toEqual([id(1), id(3)]);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("discover-feed-eligibility.v1 at read fails closed when the pitch read fails", async () => {
+    const h = harness({ playable: "FAILS" });
+    await publish(h.store, KEY, 3);
+    const page = await h.reader.pageCompanies({ actor, limit: 3 });
+    expect(page.items).toEqual([]);
   });
 
   it("a cursor is not authority: another investor's slate, a forged value and a stale format are all refused alike", async () => {
@@ -799,6 +826,27 @@ describe("why a slate is empty, and what could not be checked", () => {
     const page = await h.reader.pageCompanies({ actor });
     expect(page.notes).toEqual(["NONE_MATCH_MANDATE"]);
     expect(page.excludingRules).toEqual([]);
+  });
+
+  it("companies pass the rules but none has a playable pitch: NONE_WITH_PLAYABLE_PITCH, not a mandate miss", async () => {
+    const h = harness({
+      pool: { discoverable: 12, latestChangeAt: null, sample: twelve },
+      playable: [],
+    });
+    await publish(h.store, KEY, 0);
+    const page = await h.reader.pageCompanies({ actor });
+    expect(page.notes).toEqual(["NONE_WITH_PLAYABLE_PITCH"]);
+    expect(page.discoverableCount).toBe(12);
+  });
+
+  it("an eligible company with a playable pitch keeps the mandate-miss reading", async () => {
+    const h = harness({
+      pool: { discoverable: 12, latestChangeAt: null, sample: twelve },
+      playable: [id(100)],
+    });
+    await publish(h.store, KEY, 0);
+    const page = await h.reader.pageCompanies({ actor });
+    expect(page.notes).toEqual(["NONE_MATCH_MANDATE"]);
   });
 
   it("an empty slate older than the newest discoverable-company change is rebuilt on read, and says so", async () => {

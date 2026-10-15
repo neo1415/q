@@ -40,42 +40,49 @@ export function ActivityBars({
           {total}
         </span>
       </figcaption>
-      <div className="relative" onPointerLeave={() => setActive(null)}>
-        <div
-          aria-hidden="true"
-          className="flex h-20 items-end gap-0.5 border-b border-(--cq-border)"
-        >
-          {points.map((point, index) => (
-            <span
-              key={point.start}
-              onPointerEnter={() => setActive(index)}
-              className="flex h-full min-w-0 flex-1 items-end"
-            >
-              <span
-                className={`block w-full rounded-t-[3px] ${
-                  active === index
-                    ? "bg-(--cq-accent-hover)"
-                    : "bg-(--cq-accent)"
-                }`}
-                style={{
-                  height:
-                    point.value === 0
-                      ? 0
-                      : `${String(Math.max(6, Math.round((point.value / max) * 100)))}%`,
-                }}
-              />
-            </span>
-          ))}
-        </div>
-        {shown === null || shown === undefined ? null : (
-          <span
-            role="status"
-            className="cq-caption pointer-events-none absolute -top-2 right-0 -translate-y-full rounded-(--cq-radius-sm) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-2 py-1 text-(--cq-text-primary) shadow-(--cq-shadow-sm)"
+      {total === 0 ? (
+        // Nothing to draw: said, not shown as an empty axis.
+        <p className="cq-body-sm flex h-20 items-center border-b border-(--cq-border-subtle) text-(--cq-text-tertiary)">
+          None in this period
+        </p>
+      ) : (
+        <div className="relative" onPointerLeave={() => setActive(null)}>
+          <div
+            aria-hidden="true"
+            className="flex h-20 items-end gap-0.5 border-b border-(--cq-border)"
           >
-            {label(shown.start)} · {shown.value}
-          </span>
-        )}
-      </div>
+            {points.map((point, index) => (
+              <span
+                key={point.start}
+                onPointerEnter={() => setActive(index)}
+                className="flex h-full min-w-0 flex-1 items-end"
+              >
+                <span
+                  className={`block w-full rounded-t-[3px] ${
+                    active === index
+                      ? "bg-(--cq-accent-hover)"
+                      : "bg-(--cq-accent)"
+                  }`}
+                  style={{
+                    height:
+                      point.value === 0
+                        ? 0
+                        : `${String(Math.max(6, Math.round((point.value / max) * 100)))}%`,
+                  }}
+                />
+              </span>
+            ))}
+          </div>
+          {shown === null || shown === undefined ? null : (
+            <span
+              role="status"
+              className="cq-caption pointer-events-none absolute -top-2 right-0 -translate-y-full rounded-(--cq-radius-sm) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-2 py-1 text-(--cq-text-primary) shadow-(--cq-shadow-sm)"
+            >
+              {label(shown.start)} · {shown.value}
+            </span>
+          )}
+        </div>
+      )}
       {first === undefined || last === undefined ? null : (
         <div
           aria-hidden="true"
