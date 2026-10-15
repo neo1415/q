@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest";
+
+import { GATEQ_VIDEO_BRIDGE_PATH } from "@capital-q/contracts";
+import { createTavusClient, createTavusKeyPool } from "@capital-q/integrations";
+
+import {
+  bridgeBaseUrl,
+  createTavusGateqVideoProvider,
+} from "../src/gateq/video-provider.js";
+
+/** A provider that records what it was asked; no live Tavus call. */
+function fakeTavus() {
+  const bodies: { url: string; body: unknown }[] = [];
+  const doFetch: typeof fetch = (input, init) => {
+    const url = input instanceof Request ? input.url : String(input);
+    const text = typeof init?.body === "string" ? init.body : "{}";
+    bodies.push({ url, body: JSON.parse(text) });
+    const json = url.endsWith("/v2/pals")
+      ? { pal_id: "pal_1" }
+      : {
+          conversation_id: "conv_1",
+          conversation_url: "https://tavus.daily.co/conv_1",
+          meeting_token: "mt_1",
+          status: "active",
+        };
+    return Promise.resolve(
+      new Response(JSON.stringify(json), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+  };
+  const pool = createTavusKeyPool({
+    keys: ["disabled-locally-000000000000"],
+    createClient: (apiKey) => createTavusClient({ apiKey, fetch: doFetch }),
+  });
+  return { bodies, pool };
+}
+
+describe("GateQ video provider bridge URL", () => {
+  it("gives Tavus the OpenAI-compatible base, which it suffixes itself", async () => {
+    const { bodies, pool } = fakeTavus();
+    const provider = createTavusGateqVideoProvider({
+      pool,
+      publicBaseUrl: "https://api.example/",
+      faceId: "face_1",
+      keyCount: 1,
+    });
+    await provider.createRoom({
+      sessionId: "s1",
+      maxSeconds: 180,
+      testMode: false,
+      greeting: "Hello",
+      bridge: { path: GATEQ_VIDEO_BRIDGE_PATH, bearer: "b".repeat(43) },
+    });
+    const pal = bodies.find((b) => b.url.endsWith("/v2/pals"));
+    const baseUrl = (pal?.body as { layers: { llm: { base_url: string } } })
+      .layers.llm.base_url;
+    expect(baseUrl).toBe("https://api.example/v1/gateq/video/bridge");
+    // What Tavus will call is exactly the route the api serves.
+    expect(`${baseUrl}/chat/completions`).toBe(
+      `https://api.example${GATEQ_VIDEO_BRIDGE_PATH}`,
+    );
+  });
+
+  it("refuses a bridge route Tavus could not reach", () => {
+    expect(() => bridgeBaseUrl("https://api.example", "/v1/x")).toThrow();
+  });
+});

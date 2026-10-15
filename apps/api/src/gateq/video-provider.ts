@@ -9,6 +9,23 @@ import type { GateqVideoProvider } from "@capital-q/gateq-intake";
  * never content. The client itself refuses any call longer than its paid
  * test-run cap (180 s) whatever the caller asks.
  */
+const CHAT_COMPLETIONS = "/chat/completions";
+
+/**
+ * Tavus treats `base_url` as an OpenAI-compatible base and POSTs to
+ * `${base_url}/chat/completions` itself. Handing it the full route made it
+ * call `.../chat/completions/chat/completions`, a 404, and Tavus ended the
+ * meeting on the applicant's first line (found in the first paid run).
+ */
+export function bridgeBaseUrl(
+  publicBaseUrl: string,
+  bridgePath: string,
+): string {
+  if (!bridgePath.endsWith(CHAT_COMPLETIONS))
+    throw new Error("gateq video bridge path must end in /chat/completions");
+  return `${publicBaseUrl.replace(/\/+$/u, "")}${bridgePath.slice(0, -CHAT_COMPLETIONS.length)}`;
+}
+
 export function createTavusGateqVideoProvider(deps: {
   readonly pool: TavusKeyPool;
   /** Absolute origin of this API, e.g. https://api.example. */
@@ -34,7 +51,7 @@ export function createTavusGateqVideoProvider(deps: {
           layers: {
             llm: {
               model: "capital-q-gateq-interview",
-              base_url: `${deps.publicBaseUrl}${input.bridge.path}`,
+              base_url: bridgeBaseUrl(deps.publicBaseUrl, input.bridge.path),
               api_key: input.bridge.bearer,
               // One request per finished utterance: each line is a real
               // canonical turn, never a speculative one.
