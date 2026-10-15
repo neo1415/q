@@ -162,6 +162,31 @@ describe("Hub foundation", () => {
         "SELECTED",
       );
   });
+  it("answers a tab click at once: the chosen tab underlined, the page dimmed, the current page unchanged", () => {
+    // Owner 2026-10-16: switching CRM tabs felt slow.
+    const { container } = render(
+      <div>
+        <header>
+          <HubNavigation view="overview" />
+        </header>
+        <main />
+      </div>,
+    );
+    const pipeline = screen.getByRole("link", { name: "Pipeline" });
+    pipeline.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(pipeline);
+    expect(pipeline.className).toContain("border-(--cq-accent)");
+    // aria-current stays with the page actually shown until it changes.
+    expect(pipeline.getAttribute("aria-current")).toBeNull();
+    expect(
+      screen
+        .getByRole("link", { name: "Overview" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(container.firstElementChild?.hasAttribute("data-hub-pending")).toBe(
+      true,
+    );
+  });
   it("registers only rendered role destinations and confirms already selected tab", async () => {
     render(
       <>
