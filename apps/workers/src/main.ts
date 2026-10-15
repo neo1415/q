@@ -494,6 +494,18 @@ const presenceResearch =
         suggestions: createPostgresOnboardingSuggestionRepository(),
         createSuggestion: (command) =>
           onboarding.internal.createSuggestion(command as never),
+        // The same synthetic markers the verification sweep reads, plus the
+        // fictional-world seed's own; a read failure keeps the old behaviour.
+        isFictionalAccount: async (userId) => {
+          const rows = await database.sql<{ fictional: boolean }[]>`
+            select coalesce(u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb
+                        and u.raw_app_meta_data -> 'fictional_demo' = 'true'::jsonb,
+                        false) as fictional
+              from identity.user_profiles p
+              join auth.users u on u.id = p.auth_user_id
+             where p.id = ${userId}::uuid`.catch(() => []);
+          return rows[0]?.fictional === true;
+        },
         logger,
       });
 logger.info(
