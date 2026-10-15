@@ -143,7 +143,10 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
       // controls and footnote would otherwise squeeze it to a sliver.
       <div className="cq-stage relative min-h-60 flex-1 overflow-hidden rounded-(--cq-radius-xl)">
         <iframe
-          src={joinUrlWithName(props.joinUrl, props.participantName ?? "") ?? undefined}
+          src={
+            joinUrlWithName(props.joinUrl, props.participantName ?? "") ??
+            undefined
+          }
           title={props.tileLabel}
           allow="camera; microphone; autoplay; display-capture; fullscreen"
           referrerPolicy="no-referrer"
