@@ -23,6 +23,12 @@ import {
   setAwayAction,
   stopWorkAction,
 } from "./work-actions";
+import {
+  STAGE_WORDS,
+  STATUS_WORDS,
+  VERDICT,
+  WORK_KIND_LABELS,
+} from "./work-words";
 import { instructionWords } from "./instruction-words";
 
 /**
@@ -37,41 +43,6 @@ import { instructionWords } from "./instruction-words";
 const POLL_MS = 10_000;
 
 type Lane = QWorkDto["lanes"][number];
-
-const STAGE_WORDS: Readonly<Record<Lane["stage"], string>> = {
-  SHORTLISTED: "Picked",
-  WAITING_ACCEPTANCE: "Waiting for them to accept",
-  CHATTING: "Talking with them",
-  INTERVIEWING: "First-stage interview",
-  REPORT_READY: "Report ready",
-  NEEDS_TIMES: "Needs your time",
-  CALL_BOOKED: "Call booked",
-  STANDING_IN: "Q answered while you were away",
-  DECLINED: "They declined",
-  DONE: "Done",
-  STOPPED: "Stopped",
-  FAILED: "Couldn't continue",
-};
-
-const WORK_KIND_LABELS: Readonly<Record<QWorkDto["kind"], string>> = {
-  INVESTOR_OUTREACH: "Outreach",
-  FOUNDER_STAND_IN: "Stand-in",
-  STANDING_INSTRUCTION: "Standing instruction",
-};
-
-const STATUS_WORDS: Readonly<Record<QWorkDto["status"], string>> = {
-  ACTIVE: "Running",
-  DONE: "Finished",
-  STOPPED: "Stopped",
-  FAILED: "Couldn't finish",
-  EXPIRED: "Time's up",
-};
-
-const VERDICT = {
-  PROCEED: "Q suggests you proceed",
-  MAYBE: "Q is unsure",
-  PASS: "Q suggests you pass",
-} as const;
 
 const OPEN_STAGES: readonly Lane["stage"][] = [
   "SHORTLISTED",

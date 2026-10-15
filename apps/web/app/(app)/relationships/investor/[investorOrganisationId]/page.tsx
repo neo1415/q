@@ -7,6 +7,8 @@ import {
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
 import { loadCompanySideRelationship } from "@/features/relationships/relationship-page-data";
+import { recordWorkRead } from "@/features/relationships/record-workspace-data";
+import { recordWorkSlot } from "@/features/relationships/record-workspace-sections";
 
 export const metadata: Metadata = { title: "Relationship" };
 export const dynamic = "force-dynamic";
@@ -28,7 +30,10 @@ export default async function CompanyRelationshipPage({
   readonly params: Promise<{ readonly investorOrganisationId: string }>;
 }) {
   const { investorOrganisationId } = await params;
-  const loaded = await loadCompanySideRelationship(investorOrganisationId);
+  const [loaded, work] = await Promise.all([
+    loadCompanySideRelationship(investorOrganisationId),
+    recordWorkRead(investorOrganisationId),
+  ]);
   if (loaded.kind === "UNAVAILABLE") {
     return <RelationshipUnavailable sentence={loaded.sentence} />;
   }
@@ -62,6 +67,7 @@ export default async function CompanyRelationshipPage({
         diligence={loaded.diligence}
         brief={loaded.brief}
         basePath={`/relationships/investor/${investorOrganisationId}`}
+        work={recordWorkSlot(work)}
         absentSentence={loaded.absentSentence}
         actions={
           pending !== null && relationship?.nextStep === "ANSWER_INTEREST" ? (

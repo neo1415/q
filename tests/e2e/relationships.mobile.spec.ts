@@ -8,12 +8,10 @@ import { expectNoHorizontalOverflow } from "./support/local-auth.js";
  * fits, and its empty state points to setup. The investor journey spec
  * covers the populated profile (R25) and the investor empty state.
  */
-test("Relationships is a tab, and its empty state points to setup", async ({
-  page,
-}) => {
+test("CRM is a tab, and its empty state points to setup", async ({ page }) => {
   await page.goto("/discover");
   const nav = page.getByRole("navigation", { name: "Primary" });
-  const tab = nav.getByRole("link", { name: "Relationships" });
+  const tab = nav.getByRole("link", { name: "CRM" });
   const box = await tab.boundingBox();
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
   // The whole label is visible: nothing is clipped by the five-tab grid.
