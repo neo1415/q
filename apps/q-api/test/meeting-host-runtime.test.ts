@@ -87,8 +87,15 @@ function setup(
     askerCard?: boolean;
     /** meet2-64: lines spoken a sentence at a time. */
     pieces?: boolean;
+    /** Owner decision 35: Q's Tavus face; live or not. */
+    face?: { live: boolean };
   } = {},
 ) {
+  const face = {
+    started: [] as string[],
+    said: [] as string[],
+    ended: [] as string[],
+  };
   const logs: { message: string; fields: Record<string, unknown> }[] = [];
   const cards: { askerUserId: string; text: string }[] = [];
   const stops: string[] = [];
@@ -196,6 +203,17 @@ function setup(
     tickEveryMs: null,
     leaveDelayMs: 0,
     speakInPieces: options.pieces ?? false,
+    ...(options.face === undefined
+      ? {}
+      : {
+          face: {
+            start: (meetingId: string) => face.started.push(meetingId),
+            live: () => options.face?.live === true,
+            say: (_meetingId: string, text: string) => face.said.push(text),
+            end: (_meetingId: string, reason: string) =>
+              face.ended.push(reason),
+          },
+        }),
   });
   /** Events in, then the room goes quiet so queued lines come out. */
   const send = async (...bodies: unknown[]) => {
@@ -222,6 +240,7 @@ function setup(
     send,
     cards,
     stops,
+    face,
   };
 }
 
@@ -302,6 +321,49 @@ describe("meeting host endpoint", () => {
     );
     expect(text).toContain("Adaeze Okafor, founder side, Nixo");
     expect(text).not.toMatch(/email|@/i);
+  });
+});
+
+describe("meeting host with Q's face (owner decision 35)", () => {
+  it("sends the face when Q is in the call; while it is live, Q's lines are said by the face, not the bot", async () => {
+    const { said, asked, send, face } = setup({ face: { live: true } });
+    await send(
+      event("participant_events.join", 1, "Adaeze Okafor"),
+      event("participant_events.join", 2, "Tunde Bello"),
+    );
+    await send(
+      event(
+        "transcript.data",
+        2,
+        "Tunde Bello",
+        "Q, can you share the agenda?",
+      ),
+    );
+    expect(face.started).toEqual([MEETING]);
+    // Same decisions, same words: only the mouth changed.
+    expect(asked).toHaveLength(1);
+    expect(face.said[0]).toContain(`Hi Adaeze, welcome. ${HOST_INTRO}`);
+    expect(face.said.at(-1)).toBe(
+      "We're here to talk about Nixo's seed round.",
+    );
+    expect(said).toEqual([]);
+  });
+
+  it("keeps the bot's own voice when the face is not live (refused, failed or off)", async () => {
+    const { said, send, face } = setup({ face: { live: false } });
+    await send(event("participant_events.join", 1, "Adaeze Okafor"));
+    expect(face.started).toEqual([MEETING]);
+    expect(face.said).toEqual([]);
+    expect(said[0]).toContain(`Hi Adaeze, welcome. ${HOST_INTRO}`);
+  });
+
+  it("ignores the face as a participant: it is Q, never a guest to introduce", async () => {
+    const { roster, send } = setup({ face: { live: true } });
+    await send(
+      event("participant_events.join", 1, "Adaeze Okafor"),
+      event("participant_events.join", 9, "Q · Capital Q"),
+    );
+    expect(roster).toEqual(["ARRIVED:Adaeze Okafor"]);
   });
 });
 

@@ -93,6 +93,7 @@ import { useFollowNewest } from "./follow-newest";
 import { threadInOrder, type SpokenLine } from "./spoken";
 import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
 import { readTypedDraft } from "./control/fast-navigation";
+import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
 
 /*
  * Q room W7: what opens on request -- a document Q made, the previous
@@ -467,6 +468,9 @@ export function QConversationPanel({
       autoTried.current = true;
       void (async () => {
         if (endedThisTab()) return;
+        // A Q Pitch tour holds the voice: its own Start opens the line,
+        // never this arrival (a paid line before Start, 15 Oct).
+        if (qPitchHoldsVoice()) return;
         if (!(await microphoneGranted()) || left) return;
         await talkRef.current();
       })();

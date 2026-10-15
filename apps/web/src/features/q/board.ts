@@ -114,3 +114,19 @@ export function openQuestions(
       block.kind === "CLARIFICATION_REQUEST",
   );
 }
+
+/**
+ * A board row's label: the record's name where this reader may see it,
+ * "Company 2" only while it is unknown (15 Oct: a card read "Company 1"
+ * for Harbourline Cargo because the row never asked for the name).
+ */
+export function referenceRowLabel(
+  kind: "COMPANIES" | "INVESTORS",
+  index: number,
+  name: string | null,
+): string {
+  return (
+    name ??
+    `${kind === "COMPANIES" ? "Company" : "Investor"} ${String(index + 1)}`
+  );
+}

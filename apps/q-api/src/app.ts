@@ -109,6 +109,8 @@ import {
   registerRehearsalVideoRoutes,
   type RehearsalVideoRoutesDependencies,
 } from "./http/rehearsal-video.js";
+import { registerMeetingFaceRoutes } from "./http/meeting-face.js";
+import type { MeetingFaceService } from "./composition/meeting-face.js";
 import {
   registerReadinessBlueprintRoutes,
   type ReadinessBlueprintRoutesDependencies,
@@ -205,6 +207,8 @@ export type QApiModules = {
   /** Zino 2026-10-08: the briefing's free-form words, read into card verbs. */
   readonly briefingCommand?: BriefingCommandReader | undefined;
   readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
+  /** Owner decision 35: Q's Tavus face in Google Meet (its bridge). */
+  readonly meetingFace?: MeetingFaceService | undefined;
   /** ADR 0066: the rehearsal met by video (a stock AI interviewer). */
   readonly rehearsalVideo?:
     RehearsalVideoRoutesDependencies["video"] | undefined;
@@ -670,6 +674,11 @@ export function createApp(
       resolver: security.resolver,
       video: modules.rehearsalVideo,
     });
+  }
+
+  // The face's bridge: authenticated by its per-session bearer alone.
+  if (modules.meetingFace !== undefined) {
+    registerMeetingFaceRoutes(app, { face: modules.meetingFace });
   }
 
   if (modules.meetingAssistant !== undefined) {

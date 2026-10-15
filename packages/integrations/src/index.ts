@@ -131,6 +131,7 @@ export {
 export {
   createTavusClient,
   TAVUS_MAX_JOIN_GRACE_SECONDS,
+  TAVUS_MEETING_MAX_SECONDS,
   TavusError,
   tavusFailureKind,
   type TavusClient,

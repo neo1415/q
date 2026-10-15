@@ -42,6 +42,7 @@ import {
 } from "@capital-q/q-core";
 import { etiquetteFor, type EtiquetteSource } from "./etiquette.js";
 import type { MeetingEventStore } from "./meeting-events.js";
+import type { MeetingFacePort } from "./meeting-face.js";
 import type { MeetingSnapshotContext } from "./meeting-snapshot.js";
 import { z } from "zod";
 
@@ -511,6 +512,12 @@ export function createMeetingHostRuntime(dependencies: {
   readonly leaveDelayMs?: number;
   /** A line spoken a sentence at a time (default); false: whole lines. */
   readonly speakInPieces?: boolean;
+  /**
+   * 2026-10-15 (owner decision 35): Q's Tavus face in the call. While it is
+   * live, Q's lines (decided here, as always) are said by the face rather
+   * than played through the bot; otherwise nothing changes.
+   */
+  readonly face?: MeetingFacePort | undefined;
 }): MeetingHostRuntime {
   const sessions = new Map<string, Session>();
   const opening = new Map<string, Promise<Session | null>>();
@@ -631,6 +638,9 @@ export function createMeetingHostRuntime(dependencies: {
         };
         owner.session = session;
         sessions.set(meetingId, session);
+        // Q is in the call (its bot's events are arriving): its face may
+        // join too, when the ledger allows. Never blocks or throws.
+        dependencies.face?.start(meetingId);
         // Usually already built when the bot was created; else built now.
         const ready = session;
         ready.snapshotReady = prepareSnapshot(meetingId).then((snapshot) => {
@@ -677,6 +687,7 @@ export function createMeetingHostRuntime(dependencies: {
     );
     sessions.delete(session.meetingId);
     prepared.delete(session.meetingId);
+    dependencies.face?.end(session.meetingId, "CALL_ENDED");
     void saveHeard(session, true);
     closeRecord(session);
   }
@@ -798,6 +809,15 @@ export function createMeetingHostRuntime(dependencies: {
     text: string,
     why: string,
   ): Promise<void> {
+    const face = dependencies.face;
+    if (face?.live(session.meetingId) === true) {
+      face.say(session.meetingId, text);
+      logger?.info?.(
+        { meetingId: session.meetingId, why, chars: text.length },
+        "meeting host spoke through its face",
+      );
+      return;
+    }
     const epoch = session.epoch;
     const [first, ...rest] =
       dependencies.speakInPieces === false ? [text] : speechPieces(text);
@@ -1013,6 +1033,10 @@ export function createMeetingHostRuntime(dependencies: {
           setTimeout(done, dependencies.leaveDelayMs ?? 2_500).unref(),
         );
         await voice.leave(session.botId);
+        dependencies.face?.end(
+          session.meetingId,
+          action.reason === "REMOVED" ? "REMOVED" : "CALL_ENDED",
+        );
         if (action.reason === "REMOVED" && action.byUserId !== null) {
           await store.removedBy(session.meetingId, action.byUserId);
         }

@@ -760,6 +760,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/rehearsal-video.ts POST `${Q_REHEARSAL_VIDEO_EVENTS_BASE_PATH}/:token`":
     WEBHOOK,
   // end REHEARSE block
+  // G4: Tavus asks the meeting face for its next line; a per-session
+  // bearer, and the host runtime decides every word (no person acts).
+  "q-api/http/meeting-face.ts POST `${Q_MEETING_FACE_BRIDGE_BASE_PATH}/chat/completions`":
+    WEBHOOK,
   "q-api/http/meeting-assistant.ts GET Q_MEETING_ASSISTANT_PATH": exempt(
     "the organiser reading whether Q is in their call and its notes; shown on the meeting itself",
   ),
@@ -1211,6 +1215,8 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/http/rehearsal-video.ts POST `${Q_REHEARSAL_VIDEO_BRIDGE_BASE_PATH}/chat/completions`",
   // G3: the provider's room events drive the room's clock (its transport).
   "q-api/http/rehearsal-video.ts POST `${Q_REHEARSAL_VIDEO_EVENTS_BASE_PATH}/:token`",
+  // G4: the meeting face's bridge is Q's call transport, not an action.
+  "q-api/http/meeting-face.ts POST `${Q_MEETING_FACE_BRIDGE_BASE_PATH}/chat/completions`",
   // RECOVERY-2026-10 (C2): what came of Q's UI acts on the screen; the
   // conversation's own transport, never a person's action.
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",

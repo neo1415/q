@@ -17,6 +17,11 @@ import { z } from "zod";
 
 const BASE_URL = "https://tavusapi.com";
 
+/** The longest a meeting face may stay, whatever the caller asks. */
+export const TAVUS_MEETING_MAX_SECONDS = 1_800;
+const MEETING_MAX_SECONDS = TAVUS_MEETING_MAX_SECONDS;
+const GOOGLE_MEET_URL = /^https:\/\/meet\.google\.com\/[a-z0-9-]{3,64}$/u;
+
 const ConversationSchema = z
   .object({
     conversation_id: z.string().min(1).max(128),
@@ -182,6 +187,17 @@ export type TavusClient = {
     /** Spoken before the greeting and shown on screen, every call. */
     readonly disclosure?:
       { readonly spoken: string; readonly shown: string } | undefined;
+    /**
+     * A meeting identity (`<username>@tavusinvite.com`), required before
+     * the PAL can be sent into a Google Meet. The allowlist decides who may
+     * invite it by email; dispatch by API is authorised by the key alone.
+     */
+    readonly conferencing?:
+      | {
+          readonly username: string;
+          readonly allowlist: readonly string[];
+        }
+      | undefined;
   }) => Promise<{ readonly palId: string }>;
   readonly deletePal: (palId: string) => Promise<void>;
   readonly createConversation: (input: {
@@ -203,6 +219,18 @@ export type TavusClient = {
     /** A private room: only the holder of the returned token joins. */
     readonly requireAuth?: boolean | undefined;
   }) => Promise<TavusCreatedConversation>;
+  /**
+   * Sends the PAL into an existing Google Meet as a participant (Tavus
+   * `meeting_url`). Its own bound: a meeting face is longer than a
+   * rehearsal, so it never shares the 180 s cap above.
+   */
+  readonly joinMeeting: (input: {
+    readonly palId: string;
+    readonly faceId: string;
+    readonly name: string;
+    readonly meetingUrl: string;
+    readonly maxCallSeconds: number;
+  }) => Promise<TavusConversation>;
   /** Recovery only, on this same account; unrelated rooms never escape. */
   readonly findConversationsForPal: (
     palId: string,
@@ -281,7 +309,17 @@ export function createTavusClient(dependencies: {
               verbal_disclosure: input.disclosure.spoken,
               visual_disclosure: input.disclosure.shown,
             }),
-        layers: input.layers,
+        layers: {
+          ...input.layers,
+          ...(input.conferencing === undefined
+            ? {}
+            : {
+                conferencing: {
+                  username: input.conferencing.username,
+                  allowlist: [...input.conferencing.allowlist],
+                },
+              }),
+        },
       });
       const parsed = PalSchema.parse(raw);
       const palId = parsed.pal_id ?? parsed.persona_id;
@@ -348,6 +386,32 @@ export function createTavusClient(dependencies: {
         ...conversationOf(created),
         meetingToken: created.meeting_token ?? null,
       };
+    },
+    joinMeeting: async (input) => {
+      if (
+        !Number.isInteger(input.maxCallSeconds) ||
+        input.maxCallSeconds < 60 ||
+        input.maxCallSeconds > MEETING_MAX_SECONDS
+      ) {
+        throw new TavusError("meeting duration", 400);
+      }
+      // Only a Google Meet link leaves Capital Q: never an arbitrary URL.
+      if (!GOOGLE_MEET_URL.test(input.meetingUrl)) {
+        throw new TavusError("meeting link", 400);
+      }
+      const raw = await call("join meeting", "POST", "/v2/conversations", {
+        pal_id: input.palId,
+        face_id: input.faceId,
+        conversation_name: input.name,
+        meeting_url: input.meetingUrl,
+        properties: {
+          // The provider's own backstop: the face cannot outlive this.
+          max_call_duration: input.maxCallSeconds,
+          participant_left_timeout: 30,
+          participant_absent_timeout: 120,
+        },
+      });
+      return conversationOf(raw);
     },
     findConversationsForPal: async (palId) => {
       const schema = z.object({
