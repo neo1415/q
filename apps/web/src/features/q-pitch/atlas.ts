@@ -1,5 +1,6 @@
 import {
   PREMIERE_CERTIFICATION_LEDGER,
+  ATLAS_SCRIPT,
   PREMIERE_SCRIPT,
   SHORT_SCRIPT,
   certifyTour,
@@ -64,13 +65,15 @@ export function tourOptions(now: string): readonly TourOption[] {
 }
 
 export function atlasChapters(now: string): readonly AtlasChapter[] {
-  const ok = admitted(PREMIERE_SCRIPT, now);
-  return PREMIERE_SCRIPT.chapters.map((chapter) => ({
+  // The Atlas lists every chapter, the deeper ones included, and opens each
+  // in the Atlas tour (the premiere itself is the main cut).
+  const ok = admitted(ATLAS_SCRIPT, now);
+  return ATLAS_SCRIPT.chapters.map((chapter) => ({
     chapterId: chapter.chapterId,
     title: chapter.title,
     standing: chapter.sceneIds.every((id) => ok.has(id))
       ? "CERTIFIED"
       : "INTERNAL_ONLY",
-    href: `/home?qpitch=premiere&chapter=${encodeURIComponent(chapter.chapterId)}`,
+    href: `/home?qpitch=atlas&chapter=${encodeURIComponent(chapter.chapterId)}`,
   }));
 }

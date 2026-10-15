@@ -35,8 +35,30 @@ describe("TourAction v1", () => {
         "selectTab",
         "showQJob",
         "showReview",
+        // v5 (16 Oct): deterministic, receipted, non-consequential UI acts
+        // on registered controls, and record pages by fixture key.
+        "uiAct",
+        "openRecord",
       ].sort(),
     );
+    // Consequential acts are never tour actions, and a uiAct is limited
+    // to the non-consequential set.
+    expect(
+      TourActionSchema.safeParse({
+        actionId: "ta_x1y",
+        kind: "uiAct",
+        act: "SET",
+        target: "toggle.anything",
+      }).success,
+    ).toBe(false);
+    expect(
+      TourActionSchema.safeParse({
+        actionId: "ta_x1y",
+        kind: "openRecord",
+        record: "GATEQ_APPLICATION",
+        key: "https://example.com",
+      }).success,
+    ).toBe(false);
     for (const kind of [
       "playPitch",
       "saveCompany",

@@ -8,6 +8,7 @@ import { ArrowUpRight, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { useQControlGroup } from "@/features/q/control/q-control";
 import { QPageState } from "@/features/q/q-section";
+import { LinkPending } from "@/components/link-pending";
 
 import {
   hubDestinations,
@@ -67,13 +68,14 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
             data-hub-view={entry.view}
             aria-current={open ? "page" : undefined}
             className={cx(
-              "cq-body-sm -mb-px inline-flex min-h-11 flex-none items-center border-b-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
+              "cq-body-sm relative -mb-px inline-flex min-h-11 flex-none items-center border-b-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
               open
                 ? "border-(--cq-accent) font-semibold text-(--cq-text-primary)"
                 : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
             )}
           >
             {entry.label}
+            <LinkPending />
           </Link>
         );
       })}

@@ -7,6 +7,8 @@ import {
 
 import { z } from "zod";
 
+import { withoutUnaskedMoves } from "./unasked-moves.js";
+
 import {
   MODEL_TOOLS_MAX,
   isCalendarBlock,
@@ -4015,19 +4017,23 @@ export function createModelGatewayQAnswer(
         // INC-1: one card per canonical record across every block, exactly
         // the count asked for, "them" held to the set just shown, and every
         // score labelled mandate fit with how it was made.
-        const carried = withFitIntegrity(
-          [
-            ...(given ?? []),
-            ...publicSources.map((source) => ({
-              kind: "PUBLIC_SOURCE" as const,
-              ...publicSourceBlockFields(source),
-            })),
-            ...clientActionBlocks,
-          ],
-          {
-            asked: latest.content,
-            previous: previousCardCompanyIds(earlier),
-          },
+        const carried = withoutUnaskedMoves(
+          withFitIntegrity(
+            [
+              ...(given ?? []),
+              ...publicSources.map((source) => ({
+                kind: "PUBLIC_SOURCE" as const,
+                ...publicSourceBlockFields(source),
+              })),
+              ...clientActionBlocks,
+            ],
+            {
+              asked: latest.content,
+              previous: previousCardCompanyIds(earlier),
+            },
+          ),
+          // A map they asked to see is not replaced by a page they did not.
+          latest.content,
         );
         const blocks = carried.length === 0 ? undefined : carried;
         // A tie is said as a tie, with why (INC-1: three cards at 8.8 read

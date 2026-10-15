@@ -58,3 +58,11 @@ export {
   type DailyNewsStory,
 } from "./daily-news.js";
 export { splitSentences } from "../communication/sentences.js";
+
+// Owner 2026-10-15: a map asked for is drawn, never a move (shared with the
+// browser's follow rule).
+export {
+  asksForDrawing,
+  asksForMove,
+  isDrawingObject,
+} from "../conversation/drawing-request.js";
