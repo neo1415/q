@@ -189,6 +189,14 @@ export type CompanyQueryPort = {
     companyId: CompanyId,
   ) => Promise<CompanyIdentity | null>;
   /**
+   * S5 (lane S): the same identities for many companies in one read, for
+   * list views that would otherwise read them one by one. Absent ids are
+   * left out. Optional: callers fall back to findCanonicalCompany.
+   */
+  readonly findCanonicalCompanies?: (
+    companyIds: readonly CompanyId[],
+  ) => Promise<readonly CompanyIdentity[]>;
+  /**
    * The company's ownership and intrinsic disclosure classification for the
    * Permissions bounded context (CQ-PERM-001). marketplace_visibility stays
    * owned here; disclosure reads it through this port and never copies it.

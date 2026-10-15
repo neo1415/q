@@ -41,10 +41,15 @@ export type TourActionId = z.infer<typeof TourActionIdSchema>;
  * A record key, never a uuid or a name. `card-N` (N = 1..9) is the Nth
  * company card of the tour's latest acknowledged Q answer with cards: the
  * company comes from what the actor was actually shown (scene receipt), so
- * a script never hard-codes a company. Other keys name seeded demo records.
+ * a script never hard-codes a company. `subject` is the tour's subject
+ * company, named only by the server (CQ_Q_PITCH_SUBJECT_COMPANY_ID) and
+ * re-checked for the viewer. Other keys name seeded demo records.
  */
 export const FixtureKeySchema = z.string().regex(/^[a-z][a-z0-9-]{1,62}$/u);
 export type FixtureKey = z.infer<typeof FixtureKeySchema>;
+
+/** The tour's subject company (server setting, viewer-checked). */
+export const SUBJECT_KEY = "subject" as const;
 
 /** `card-N`: N (1-based) if the key is a receipt card key, else null. */
 export function receiptCardIndex(key: FixtureKey): number | null {

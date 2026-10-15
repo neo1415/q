@@ -1,6 +1,12 @@
 # Capital Q as a demo founder — PROPOSED (owner + integration owner decision)
 
-Directive 2026-10-15 §E; lead request 15 Oct. **DECIDED 15 Oct by the lead: Option A.** Capital Q stays `organisation_private` and never appears in Discover. Investors' questions about Capital Q are answered from the knowledge pack (`CAPITAL_Q_KNOWLEDGE_PACK`), with every unknown figure stated as unknown. **No seeder changes.** The seed plan in §3 is kept only as a record of what was considered; it is not to be built.
+Directive 2026-10-15 §E; lead request 15 Oct. **SUPERSEDED 15 Oct (owner override, relayed by the lead):** Capital Q is now a **real seeded founder company**, created by **lane V** through the normal founder flow: profile, deck, data room, a USD 2M raise and a pitch video of 60 s or less. **Lane P does not create it.** Q Pitch will use that company as its subject once it exists. Lane P needs the following from V, through the lead:
+
+1. how the tour resolves it without hard-coding (preferred: a server-side showcase subject setting, read by the page and the host, with authorisation re-checked; or the company appearing in the demo investor's own receipt cards);
+2. its classification (real company, not `fictional_demo`). The tour actor's views of it must be whatever the founder chose to share;
+3. which figures are approved owner material (for example the raise), so the knowledge pack's `kp.unknown.funding` can move from UNKNOWN to a sourced claim with provenance.
+
+Earlier decision, kept for history: **DECIDED 15 Oct by the lead: Option A.** Capital Q stays `organisation_private` and never appears in Discover. Investors' questions about Capital Q are answered from the knowledge pack (`CAPITAL_Q_KNOWLEDGE_PACK`), with every unknown figure stated as unknown. **No seeder changes.** The seed plan in §3 is kept only as a record of what was considered; it is not to be built.
 
 ## 1. What exists today (fixture review, 15 Oct)
 

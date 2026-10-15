@@ -68,6 +68,7 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/pitch/[mediaAssetId]",
   "/pitch/new",
   "/profile",
+  "/q-pitch",
   "/rehearsals",
   "/rehearsals/company/[companyId]",
   "/rehearsals/investor/[investorOrganisationId]",
