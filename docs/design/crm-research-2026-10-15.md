@@ -123,10 +123,12 @@ Company requests, the company page), and the CRM's front page does not say
    (critique 2026-10-15). The rebuild makes **Pipeline** the one record
    list, with table and board layouts, saved views and the stage filter.
    "Relationships" (`?view=relationships`) redirects there with its filters.
-3. **Inbound streams are queues inside the CRM, not separate apps.** GateQ
-   applications, company requests and investor asks show as one "Inbound"
-   row on Overview, each linking to its owning page. The owning pages stay
-   where they are: no parallel truth.
+3. **Inbound streams reach the person through the queue, not through more
+   links.** GateQ applications, company requests and investor asks arrive
+   as notices, so they appear in Needs you, each linking to its owning page.
+   The owning pages stay where they are, so there is no parallel truth. A
+   separate "Inbound" line was dropped in S1: it repeated the header's
+   GateQ link and the sidebar.
 4. **Evidence, never scores.** Fit is the band in words, interest is what
    happened, engagement is "viewed 2 days ago". No percentages, no heat.
 5. **The record is the unit.** Every row opens the one relationship record.
@@ -137,7 +139,7 @@ Company requests, the company page), and the CRM's front page does not say
 
 ```
 CRM  (/relationships)
-├── Overview        needs-you queue · inbound · stage funnel · period report + exports
+├── Overview        needs-you queue · stage funnel · period report + exports
 └── Pipeline        every relationship: table | board, saved views, search, stage, columns
     └── Record      /relationships/{company|investor}/[id]: overview · messages · calls · diligence
 ```
@@ -148,16 +150,16 @@ Pipeline tab until the catalog moves (same id, no break).
 
 ### 3.3 Overview, top to bottom
 
-1. **Needs you** (at most 5 rows): reminders due, unanswered diligence asks,
-   unread messages, relationships quiet for 14 days or more with an open
-   next step. Each row names the counterpart, the reason in words and one
-   action. Empty: "Nothing needs you today."
-2. **Inbound**: three counts in one line, each a link. Investor: GateQ
-   inbox · Company requests · Messages. Founder: Applications · Investor
-   asks · Messages.
-3. **Pipeline by stage**: the existing stage funnel (Results), each stage a
+1. **Needs you** (5 rows, then "See all"): unread notices folded to one row
+   per relationship and kind (messages, diligence asks, interest, requests,
+   Q work), plus reminders that are due. Each row names the counterpart,
+   the reason in words and one action; the cross clears it. Empty: "Nothing
+   needs you right now." Unreadable: said in place (partial). Shipped in
+   S1. "Quiet for 14 days" rows are a later addition: they need a
+   last-activity read the Overview does not make yet.
+2. **Pipeline by stage**: the existing stage funnel (Results), each stage a
    link into Pipeline filtered by it.
-4. **Period**: the existing stat strip, activity bars, period selector and
+3. **Period**: the existing stat strip, activity bars, period selector and
    PDF/CSV downloads.
 
 ### 3.4 States, for every block
@@ -181,13 +183,13 @@ dark both come from `--cq-*` tokens only.
 
 ## 4. Build slices
 
-| Slice | Scope                                                                                                                                      | Tests                                                      |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| S1    | Overview "Needs you" queue and Inbound line (server read from existing reads: reminders, notices, unread, diligence asks), with all states | Unit: queue ranking, cap 5, empty and partial; page states |
-| S2    | Pipeline as the one record list: `?view=relationships` redirects into it; Relationships tab retired; Q ids kept or catalogued              | Redirect and tab tests; parity                             |
-| S3    | Private notes on a record (investor-private or founder-private, append-only, RLS)                                                          | Migration, RLS positive and cross-tenant negative, UI      |
-| S4    | Investor portfolio list (closed and funded relationships) on Overview                                                                      | Read-model and UI                                          |
-| S5    | Decision record: pass or commit with reason, conditions and who decided, from existing outcome and commitment events                       | Unit and UI                                                |
+| Slice | Scope                                                                                                                                   | Tests                                                      |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| S1    | Overview "Needs you" queue from the existing notices and reminders reads, with all states; removed from the Relationships tab (shipped) | Unit: queue ranking, cap 5, empty and partial; page states |
+| S2    | Pipeline as the one record list: `?view=relationships` redirects into it; Relationships tab retired; Q ids kept or catalogued           | Redirect and tab tests; parity                             |
+| S3    | Private notes on a record (investor-private or founder-private, append-only, RLS)                                                       | Migration, RLS positive and cross-tenant negative, UI      |
+| S4    | Investor portfolio list (closed and funded relationships) on Overview                                                                   | Read-model and UI                                          |
+| S5    | Decision record: pass or commit with reason, conditions and who decided, from existing outcome and commitment events                    | Unit and UI                                                |
 
 S3 to S5 add or extend data; S1 and S2 rearrange what exists. Ship S1 and S2
 first.
