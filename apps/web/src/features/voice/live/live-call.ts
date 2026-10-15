@@ -131,6 +131,11 @@ export type LiveCall = {
    * that line plays into silence; the caller lifts the hush once it ends.
    */
   readonly hush: (on: boolean) => void;
+  /**
+   * The microphone track reports acoustic echo cancellation as on (read
+   * back from the track's settings, not assumed from what was asked).
+   */
+  readonly echoCancelled: () => boolean;
   readonly setMuted: (muted: boolean) => void;
   readonly setVolume: (volume: number) => void;
   /** 0..1 levels, sampled for the presence visual. */
@@ -1055,6 +1060,10 @@ export async function startLiveCall(
     brief: (text) => {
       bridge.brief(text);
     },
+    echoCancelled: () =>
+      mic
+        .getAudioTracks()
+        .some((track) => track.getSettings().echoCancellation === true),
     hush: (on) => {
       hushed = on;
       audio.volume = hushed ? 0 : chosenVolume;

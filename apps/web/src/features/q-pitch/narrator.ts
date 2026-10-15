@@ -1,5 +1,5 @@
 import type { QVoiceChoice } from "@capital-q/contracts";
-import type { SceneLine } from "@capital-q/q-pitch";
+import type { SceneLine, TranscriptSegment } from "@capital-q/q-pitch";
 
 /**
  * The Q Pitch narrator: Q's own voice, with captions always (owner 15 Oct).
@@ -321,5 +321,54 @@ export async function standardVoiceLine(
   } finally {
     standardPlaying -= 1;
     URL.revokeObjectURL(url);
+  }
+}
+
+/** The longest a spoken line may be (Q_SPEECH_MAX_CHARS is 600). */
+const SPOKEN_MAX = 590;
+
+/** A turn cut at a sentence end, so the voice gateway accepts it. */
+export function spokenPart(text: string): string {
+  const words = text.trim();
+  if (words.length <= SPOKEN_MAX) return words;
+  const head = words.slice(0, SPOKEN_MAX);
+  const end = Math.max(
+    head.lastIndexOf(". "),
+    head.lastIndexOf("? "),
+    head.lastIndexOf("! "),
+  );
+  return end > 80
+    ? head.slice(0, end + 1)
+    : `${head.slice(0, head.lastIndexOf(" "))}…`;
+}
+
+/**
+ * Q plays both sides of a Q-to-Q (owner 15 Oct): the investor in Q's own
+ * standard voice, the simulated counterpart in the other voice, so they
+ * are told apart by ear as well as by the on-screen label. Each batch is
+ * synthesised up front, so the reply is ready when Q's line ends. With no
+ * audio the caption keeps its reading time.
+ */
+export async function speakRehearsalTurns(
+  segments: readonly TranscriptSegment[],
+  qVoice: QVoiceChoice,
+  signal: AbortSignal,
+): Promise<void> {
+  const other: QVoiceChoice = qVoice === "FEMALE" ? "MALE" : "FEMALE";
+  const voiceOf = (segment: TranscriptSegment): QVoiceChoice =>
+    segment.source === "REHEARSAL_COUNTERPART" ? other : qVoice;
+  for (const segment of segments) {
+    prefetchStandardVoice(spokenPart(segment.text), voiceOf(segment));
+  }
+  for (const segment of segments) {
+    if (signal.aborted) return;
+    const text = spokenPart(segment.text);
+    const started = performance.now();
+    if (!(await standardVoiceLine(text, voiceOf(segment), signal))) {
+      await abortableWait(
+        readingMs(text) - (performance.now() - started),
+        signal,
+      );
+    }
   }
 }

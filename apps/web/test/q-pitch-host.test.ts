@@ -14,6 +14,7 @@ import {
   createNarrator,
   LIVE_LATE_START_MS,
   readingMs,
+  spokenPart,
   type LiveNarration,
 } from "@/features/q-pitch/narrator";
 
@@ -290,6 +291,17 @@ describe("the voiced narrator (Q's own voice; captions stay)", () => {
     await h.narrator.speak([LINE("Hello.")], controller.signal);
     expect(h.said).toEqual([]);
     expect(h.tts).toEqual([]);
+  });
+});
+
+describe("a Q-to-Q turn, spoken", () => {
+  it("is cut at a sentence end to stay within the voice gateway's limit", () => {
+    const sentence = "We serve SME lenders across the region. ";
+    const long = sentence.repeat(30);
+    const part = spokenPart(long);
+    expect(part.length).toBeLessThanOrEqual(590);
+    expect(part.endsWith(".")).toBe(true);
+    expect(spokenPart("Short answer.")).toBe("Short answer.");
   });
 });
 

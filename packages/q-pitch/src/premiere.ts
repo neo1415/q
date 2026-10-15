@@ -8,6 +8,7 @@ import {
   TourScriptSchema,
   type CertificationEntry,
   type CertificationLedger,
+  type Chapter,
   type SceneLine,
   type SceneScript,
   type TourScript,
@@ -45,6 +46,34 @@ function codeEntry(
   };
 }
 
+/** Read-only views verified in a browser on production (GET only). */
+function viewEntries(
+  views: readonly {
+    featureId: string;
+    fixture: string;
+    receipt: string;
+    claims: readonly string[];
+    forbidden: readonly string[];
+  }[],
+): CertificationEntry[] {
+  return views.map((view) => ({
+    featureId: view.featureId,
+    status: "PRODUCTION_LIVE_VERIFIED",
+    actorContext: PILOT_ACTOR,
+    fixture: view.fixture,
+    appCommit: "web production d6ae5e69",
+    verifiedAt: "2026-10-15 13:28 UTC",
+    verifierType: "BROWSER",
+    receipt: view.receipt,
+    claimsAllowed: view.claims.map((text, index) => ({
+      claimId: `${view.featureId}.c${String(index + 1)}`,
+      text,
+    })),
+    claimsForbidden: [...view.forbidden],
+    validUntil: { invalidatedBy: `Next change to the ${view.featureId} page` },
+  }));
+}
+
 export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
   CertificationLedgerSchema.parse([
     ...PILOT_CERTIFICATION_LEDGER,
@@ -76,6 +105,82 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
       ],
       validUntil: { invalidatedBy: "Next GateQ inbox/dossier release" },
     },
+    ...viewEntries([
+      {
+        featureId: "EXPLORE-VIEW",
+        fixture: "/explore as Savanna Seed Partners (fictional demo investor)",
+        receipt:
+          "scratchpad qpitch-review/coverage/explore-savanna.png + pages-read.txt (Playwright, GET only)",
+        claims: [
+          "Explore searches companies, investors, people and pitches, and marks each pitch against the investor's mandate",
+          "Pitch summaries in Explore are labelled as AI-presented and AI-generated",
+        ],
+        forbidden: ["That an AI presenter is the real founder"],
+      },
+      {
+        featureId: "QWORK-VIEW",
+        fixture: "/work as Savanna Seed Partners (fictional demo investor)",
+        receipt:
+          "scratchpad qpitch-review/coverage/work-savanna.png + pages-read.txt (Playwright, GET only)",
+        claims: [
+          "Q Work shows what needs the investor, what Q suggests next and what Q has done, and nothing is sent until the investor decides",
+        ],
+        forbidden: [
+          "That Q sent anything during the tour",
+          "Any count or cost on screen as a result",
+        ],
+      },
+      {
+        featureId: "DOCUMENTS-VIEW",
+        fixture:
+          "/documents as Savanna Seed Partners (fictional demo investor)",
+        receipt:
+          "scratchpad qpitch-review/coverage/documents-savanna.png + pages-read.txt (Playwright, GET only)",
+        claims: [
+          "Documents holds the firm's documents, including memos and briefs Q made, each marked with who can see it",
+        ],
+        forbidden: [
+          "That a Q-made memo is verified analysis",
+          "Opening a document's content",
+        ],
+      },
+      {
+        featureId: "DAILY-VIEW",
+        fixture: "/daily as Savanna Seed Partners (fictional demo investor)",
+        receipt:
+          "scratchpad qpitch-review/coverage/daily-savanna.png + pages-read.txt (Playwright, GET only)",
+        claims: [
+          "The Q Daily is an edition written for the investor, following their mandate's sectors and stage, with each story's source named",
+        ],
+        forbidden: [
+          "That a news story is verified by Capital Q",
+          "Naming a story's companies as recommendations",
+        ],
+      },
+    ]),
+    {
+      featureId: "INV-MANDATE-VIEW",
+      status: "PRODUCTION_LIVE_VERIFIED",
+      actorContext: PILOT_ACTOR,
+      fixture:
+        "Savanna Seed Partners' own declared mandate on /capital (fictional demo investor)",
+      appCommit: "web production d6ae5e69",
+      verifiedAt: "2026-10-15 12:00 UTC",
+      verifierType: "BROWSER",
+      receipt:
+        "scratchpad qpitch-review/mandate/capital-mandate-savanna.png + capital-read.txt (Playwright, GET only)",
+      claimsAllowed: [
+        {
+          claimId: "INV-MANDATE-VIEW.c1",
+          text: "The investor's Capital page shows their declared mandate: stage, cheque range, sectors, geography, and business models and customers",
+        },
+      ],
+      claimsForbidden: [
+        "That Q set or changed the mandate",
+        "Any figure on screen as a Capital Q result",
+      ],
+      validUntil: { invalidatedBy: "Next change to the investor Capital page" },
+    },
     {
       featureId: "CRM-RELATIONSHIP-VIEW",
       status: "PRODUCTION_LIVE_VERIFIED",
@@ -98,6 +203,27 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
       ],
       validUntil: { invalidatedBy: "Next relationship hub release" },
     },
+    codeEntry({
+      featureId: "QP-SUBJECT",
+      fixture:
+        "Capital Q's own company record (CQ_Q_PITCH_SUBJECT_COMPANY_ID ee75a7d8-d457-4b59-9ad8-0d64b3026a3d), re-read per viewer",
+      receipt:
+        "apps/web/test/q-pitch-host.test.ts 'the tour's subject company' (2) PASS; browser receipt pending (production auth 504/500 at 13:48-13:51 UTC)",
+      claimsAllowed: [
+        {
+          claimId: "QP-SUBJECT.c1",
+          text: "The tour's subject company is Capital Q's own record on the platform, opened only when the viewer may read it",
+        },
+      ],
+      claimsForbidden: [
+        "The raise, valuation or any figure as verified (the USD 2,000,000 raise is the founder's claim)",
+        "That Capital Q is assessed more favourably than other companies",
+      ],
+      validUntil: {
+        invalidatedBy:
+          "Next change to subject resolution or the subject record",
+      },
+    }),
     codeEntry({
       featureId: "GATEQ-INBOX-DOSSIER",
       fixture:
@@ -236,6 +362,348 @@ const line = (
   source,
 });
 
+/**
+ * r4 (owner feedback 15 Oct, "less disjointed"): Q introduces itself on
+ * Home, opens the investor's real mandate, and each scene starts with a
+ * spoken transition, so the tour reads as one Q-led walk-through. The
+ * pilot script itself is unchanged; the premiere uses copies of its scenes
+ * with premiere wording (same scene ids, same actions, same claims).
+ */
+const intro: SceneScript = {
+  sceneId: "s.premiere.intro",
+  chapterId: "ch.premiere.intro",
+  title: "Hello, I'm Q",
+  featureIds: ["QP-HOME-HANDOFF"],
+  approvedClaimIds: [],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/home",
+  actions: [
+    { actionId: "ta_intro-home", kind: "openRoute", destination: "HOME" },
+  ],
+  lines: [
+    line(
+      "l.intro.hello",
+      "Hello, I'm Q, the investment analyst inside Capital Q.",
+      "AFTER_ACK",
+      "r4 intro (owner 15 Oct)",
+    ),
+    line(
+      "l.intro.what",
+      "Capital Q is an investment intelligence system for private capital. It helps investors and founders reach better-informed decisions: evidence first, opinion second.",
+      "AFTER_ACK",
+      "r4 intro; CLAUDE.md product identity",
+    ),
+    line(
+      "l.intro.plan",
+      "In the next few minutes I'll show you how an investor's mandate shapes what they see, how I read a company on the evidence, how founders reach investors through GateQ, how each relationship stays in one record, the work I do for you, and how you can rehearse a meeting before it happens. You can stop me or jump ahead at any time.",
+      "AFTER_ACK",
+      "r4 intro: the premiere's chapters",
+    ),
+    line(
+      "l.intro.real",
+      "Everything you'll see is the real product, on a demonstration account with fictional data.",
+      "AFTER_ACK",
+      "r4 intro; demo-identity rule",
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 20_000,
+};
+
+const mandate: SceneScript = {
+  sceneId: "s.premiere.mandate",
+  chapterId: "ch.premiere.mandate",
+  title: "Your mandate",
+  featureIds: ["INV-MANDATE-VIEW"],
+  approvedClaimIds: ["INV-MANDATE-VIEW.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/capital",
+  actions: [
+    { actionId: "ta_open-mandate", kind: "openRoute", destination: "CAPITAL" },
+  ],
+  lines: [
+    line(
+      "l.mandate.start",
+      "Everything starts with the investor's mandate. Let me open yours.",
+      "BEFORE_ACK",
+      "r4 transition",
+    ),
+    line(
+      "l.mandate.criteria",
+      "This is your mandate, as you declared it: the stage you invest at, your cheque range, your sectors, your geography, and the business models you back.",
+      "AFTER_ACK",
+      "CERTIFICATION INV-MANDATE-VIEW (r4 wording)",
+      ["INV-MANDATE-VIEW.c1"],
+    ),
+    line(
+      "l.mandate.yours",
+      "It's yours to set, and you can change it at any time.",
+      "AFTER_ACK",
+      "r4; declared mandate is the investor's",
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 20_000,
+};
+
+/** A short, navigation-only tour stop with one transition and its claims. */
+function viewScene(input: {
+  id: string;
+  title: string;
+  featureId: string;
+  destination: "EXPLORE" | "WORK" | "DOCUMENTS" | "DAILY";
+  route: string;
+  before: string;
+  after: readonly (readonly [string, readonly string[]])[];
+}): SceneScript {
+  const key = input.id.replace(/^s\.premiere\./u, "");
+  return {
+    sceneId: input.id,
+    chapterId: `ch.premiere.${key}`,
+    title: input.title,
+    featureIds: [input.featureId],
+    approvedClaimIds: input.after.flatMap(([, claims]) => [...claims]),
+    actor: PILOT_ACTOR,
+    expectedRoute: input.route,
+    actions: [
+      {
+        actionId: `ta_open-${key}`,
+        kind: "openRoute",
+        destination: input.destination,
+      },
+    ],
+    lines: [
+      line(
+        `l.${key}.start`,
+        input.before,
+        "BEFORE_ACK",
+        "r4 coverage transition",
+      ),
+      ...input.after.map(([text, claims], index) =>
+        line(
+          `l.${key}.${String.fromCharCode(97 + index)}`,
+          text,
+          "AFTER_ACK",
+          `CERTIFICATION ${input.featureId} (r4 wording)`,
+          claims,
+        ),
+      ),
+    ],
+    fallbackLines: [FALLBACK],
+    fallbackSceneId: null,
+    ackTimeoutMs: 20_000,
+  };
+}
+
+const explore = viewScene({
+  id: "s.premiere.explore",
+  title: "Explore the whole network",
+  featureId: "EXPLORE-VIEW",
+  destination: "EXPLORE",
+  route: "/explore",
+  before:
+    "Beyond your recommendations, you can look across the whole network yourself.",
+  after: [
+    [
+      "Explore searches companies, investors, people and pitches, and marks each pitch against your mandate.",
+      ["EXPLORE-VIEW.c1"],
+    ],
+    [
+      "The pitch videos are AI-presented summaries, and they're labelled that way.",
+      ["EXPLORE-VIEW.c2"],
+    ],
+  ],
+});
+
+const work = viewScene({
+  id: "s.premiere.work",
+  title: "Q Work: what I do for you",
+  featureId: "QWORK-VIEW",
+  destination: "WORK",
+  route: "/work",
+  before: "Now, the work itself.",
+  after: [
+    [
+      "This is what needs you, what I suggest next, and what I've already done. Nothing is sent until you decide.",
+      ["QWORK-VIEW.c1"],
+    ],
+  ],
+});
+
+const documents = viewScene({
+  id: "s.premiere.documents",
+  title: "Your documents",
+  featureId: "DOCUMENTS-VIEW",
+  destination: "DOCUMENTS",
+  route: "/documents",
+  before: "When work turns into paper, it lands here.",
+  after: [
+    [
+      "Your documents, including the memos and briefs I've drafted, each marked with who can see it.",
+      ["DOCUMENTS-VIEW.c1"],
+    ],
+  ],
+});
+
+const daily = viewScene({
+  id: "s.premiere.daily",
+  title: "The Q Daily",
+  featureId: "DAILY-VIEW",
+  destination: "DAILY",
+  route: "/daily",
+  before: "And there's the Q Daily.",
+  after: [
+    [
+      "An edition written for you, following your mandate's sectors and stage, with each story's source named.",
+      ["DAILY-VIEW.c1"],
+    ],
+  ],
+});
+
+/**
+ * Slice 8 (owner 15 Oct): the example company everyone recognises is Capital
+ * Q itself, read by Q under the same rules as any company. Named only by
+ * the server (`subject`), re-checked for the viewer; the scene falls back
+ * honestly when there is no subject.
+ */
+const subjectScene: SceneScript = {
+  sceneId: "s.premiere.subject",
+  chapterId: "ch.premiere.subject",
+  title: "Capital Q, on its own platform",
+  featureIds: ["QP-SUBJECT", "INV-PROFILE-FINDINGS"],
+  approvedClaimIds: ["QP-SUBJECT.c1", "INV-PROFILE-FINDINGS.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/company/[companyId]",
+  actions: [
+    { actionId: "ta_open-subject", kind: "openCompany", company: "subject" },
+    {
+      actionId: "ta_ask-subject",
+      kind: "askApprovedQuestion",
+      question: "q.company-profile",
+      subject: "subject",
+    },
+  ],
+  lines: [
+    line(
+      "l.subject.open",
+      "Now a company you'll recognise: Capital Q itself, on its own platform.",
+      "BEFORE_ACK",
+      "r4 slice 8",
+      ["QP-SUBJECT.c1"],
+    ),
+    line(
+      "l.subject.rules",
+      "I read it by the same rules as every other company.",
+      "BEFORE_ACK",
+      "r4 slice 8",
+    ),
+    line(
+      "l.subject.findings",
+      "What the founders state, what documents support, and what is still unknown, kept apart. Their raise is their own claim until evidence says otherwise.",
+      "AFTER_ACK",
+      "CERTIFICATION INV-PROFILE-FINDINGS (r4 wording); QP-SUBJECT forbidden list",
+      ["INV-PROFILE-FINDINGS.c1"],
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 45_000,
+};
+
+/** A pilot scene with premiere wording (same actions and claims). */
+function withLines(
+  id: string,
+  lines: (scene: SceneScript) => SceneLine[],
+): SceneScript {
+  const scene = PILOT_SCRIPT.scenes.find((s) => s.sceneId === id);
+  if (scene === undefined) throw new Error(`missing pilot scene ${id}`);
+  return {
+    ...scene,
+    // "Spoken start" belonged to the pilot; the premiere starts at the intro.
+    title:
+      id === "s.pilot.opening" ? "The best fits for your mandate" : scene.title,
+    lines: lines(scene),
+  };
+}
+
+const lineOf = (scene: SceneScript, id: string): SceneLine => {
+  const found = scene.lines.find((l) => l.lineId === id);
+  if (found === undefined) throw new Error(`missing line ${id}`);
+  return found;
+};
+
+const premiereTopThree = withLines("s.pilot.opening", (scene) => [
+  line(
+    "l.top3.find",
+    "Now let me find the companies that fit that mandate best.",
+    "BEFORE_ACK",
+    "r4 transition",
+  ),
+  lineOf(scene, "l.top3.cards"),
+  lineOf(scene, "l.top3.fit"),
+]);
+
+const premiereCompany = withLines("s.pilot.company", (scene) => [
+  line(
+    "l.company.open",
+    "Let's open the first one, and look at it the way an analyst would.",
+    "BEFORE_ACK",
+    "r4 transition",
+  ),
+  ...scene.lines,
+]);
+
+/**
+ * A first GateQ conversation, Q to Q (owner 15 Oct, item 5): Q as the
+ * investor and a labelled simulation of the fictional applicant Maji Loop,
+ * through the same short-rehearsal path (one of the actor's own rehearsal
+ * partners, resolved on the server). Short: two approved lines.
+ */
+const gateqInterview: SceneScript = {
+  sceneId: "s.premiere.gateq-interview",
+  chapterId: "ch.premiere.gateq-interview",
+  title: "A first conversation with an applicant, Q to Q",
+  featureIds: ["REH-Q2Q-SHORT"],
+  approvedClaimIds: ["REH-Q2Q-SHORT.c1"],
+  actor: PILOT_ACTOR,
+  expectedRoute: "/rehearsals/r/[rehearsalId]",
+  actions: [
+    {
+      actionId: "ta_gateq-q2q",
+      kind: "runShortRehearsal",
+      counterpart: "maji-loop",
+      lines: ["q.gq-open", "q.gq-evidence"],
+      maxMs: 45_000,
+    },
+  ],
+  lines: [
+    line(
+      "l.gq.both",
+      "Here's what a first conversation with an applicant can sound like. I'll play both sides: my own voice is the investor, the other voice is a labelled simulation of the founder, not the real person.",
+      "BEFORE_ACK",
+      "r4 (owner 15 Oct: Q plays both sides)",
+    ),
+    line(
+      "l.gq.saved",
+      "That's the end of it. The session is closed, and its transcript and review are saved.",
+      "AFTER_ACK",
+      "CERTIFICATION REH-Q2Q-SHORT (r3 wording)",
+      ["REH-Q2Q-SHORT.c1"],
+    ),
+    line(
+      "l.gq.decision",
+      "The decision still stays with you.",
+      "AFTER_ACK",
+      "r4; GateQ authority",
+    ),
+  ],
+  fallbackLines: [FALLBACK],
+  fallbackSceneId: null,
+  ackTimeoutMs: 120_000,
+};
+
 const candidates: SceneScript[] = [
   {
     sceneId: "s.premiere.privacy",
@@ -357,8 +825,8 @@ const candidates: SceneScript[] = [
         actionId: "ta_rehearse-short",
         kind: "runShortRehearsal",
         counterpart: "ledgerfold",
-        lines: ["q.reh-open", "q.reh-evidence", "q.reh-close"],
-        maxMs: 30_000,
+        lines: ["q.reh-open", "q.reh-evidence"],
+        maxMs: 45_000,
       },
     ],
     lines: [
@@ -367,6 +835,12 @@ const candidates: SceneScript[] = [
         "Before a meeting, it helps to rehearse the hard questions. This is a labelled simulation, not a real conversation.",
         "BEFORE_ACK",
         "Appendix A2 / §16.1 P8",
+      ),
+      line(
+        "l.reh.voices",
+        "I'll play both sides: in my own voice, the investor; in the other voice, a simulation of the founder.",
+        "BEFORE_ACK",
+        "r4 (owner 15 Oct: Q plays both sides)",
       ),
       line(
         "l.reh.review",
@@ -378,7 +852,7 @@ const candidates: SceneScript[] = [
     ],
     fallbackLines: [FALLBACK],
     fallbackSceneId: null,
-    ackTimeoutMs: 60_000,
+    ackTimeoutMs: 120_000,
   },
   {
     sceneId: "s.premiere.close",
@@ -411,28 +885,149 @@ const candidates: SceneScript[] = [
   },
 ];
 
+/**
+ * What the audience may call each chapter aloud (slice 6, owner 15 Oct:
+ * "show me GateQ", "go to the CRM part", "demo rehearsals").
+ */
+const SPOKEN_NAMES: Readonly<Record<string, readonly string[]>> = {
+  "ch.premiere.intro": ["introduction", "intro", "the beginning", "start"],
+  "ch.premiere.mandate": ["mandate", "my mandate", "investor mandate"],
+  "ch.pilot.discover": [
+    "top three",
+    "discover",
+    "discovery",
+    "best fits",
+    "recommendations",
+    "matches",
+  ],
+  "ch.pilot.company": [
+    "company",
+    "company analysis",
+    "analysis",
+    "findings",
+    "risks",
+    "evidence",
+  ],
+  "ch.pilot.compare": ["comparison", "compare", "side by side"],
+  "ch.premiere.privacy": ["privacy", "trust", "permissions", "private data"],
+  "ch.premiere.gateq": [
+    "gateq",
+    "gate q",
+    "gate",
+    "applications",
+    "inbox",
+    "front door",
+  ],
+  "ch.premiere.relationship": [
+    "crm",
+    "relationships",
+    "relationship",
+    "pipeline",
+    "investment hub",
+  ],
+  "ch.premiere.rehearsal": [
+    "rehearsal",
+    "rehearsals",
+    "rehearse",
+    "q to q",
+    "practice",
+    "meeting rehearsal",
+  ],
+  "ch.premiere.gateq-interview": [
+    "gateq interview",
+    "applicant conversation",
+    "first conversation",
+    "interview",
+    "interviews",
+  ],
+  "ch.premiere.subject": [
+    "capital q",
+    "capital q itself",
+    "your own company",
+    "the subject company",
+  ],
+  "ch.premiere.explore": ["explore", "search", "the network", "find companies"],
+  "ch.premiere.work": [
+    "q work",
+    "work",
+    "tasks",
+    "what q does",
+    "agent",
+    "agents",
+  ],
+  "ch.premiere.documents": ["documents", "memos", "files"],
+  "ch.premiere.daily": ["q daily", "daily", "the daily", "news", "briefing"],
+  "ch.premiere.close": ["the end", "your move", "close", "wrap up"],
+};
+
+function spoken<T extends { readonly chapterId: string }>(chapter: T): T {
+  const names = SPOKEN_NAMES[chapter.chapterId];
+  return names === undefined
+    ? chapter
+    : { ...chapter, spokenNames: [...names] };
+}
+
+function pilotSceneOf(id: string): SceneScript {
+  const scene = PILOT_SCRIPT.scenes.find((s) => s.sceneId === id);
+  if (scene === undefined) throw new Error(`missing pilot scene ${id}`);
+  return scene;
+}
+
+const PREMIERE_SCENES: SceneScript[] = [
+  intro,
+  mandate,
+  premiereTopThree,
+  premiereCompany,
+  pilotSceneOf("s.pilot.compare"),
+  ...candidates.flatMap((scene) =>
+    scene.sceneId === "s.premiere.privacy"
+      ? [scene, subjectScene, explore]
+      : scene.sceneId === "s.premiere.gateq"
+        ? [scene, gateqInterview]
+        : scene.sceneId === "s.premiere.relationship"
+          ? [scene, work, documents, daily]
+          : [scene],
+  ),
+];
+
+const ATLAS_TAB: Readonly<Record<string, Chapter["atlasTab"]>> = {
+  "ch.premiere.gateq": "GATEQ",
+  "ch.premiere.gateq-interview": "GATEQ",
+  "ch.premiere.privacy": "TRUST",
+  "ch.premiere.rehearsal": "REHEARSALS",
+  "ch.premiere.work": "Q_WORK",
+  "ch.premiere.daily": "DAILY",
+};
+
+/** Chapters in scene order; a pilot chapter keeps the pilot's title. */
+function premiereChapters(scenes: readonly SceneScript[]): Chapter[] {
+  const chapters: Chapter[] = [];
+  for (const scene of scenes) {
+    const last = chapters.at(-1);
+    if (last?.chapterId === scene.chapterId) {
+      last.sceneIds.push(scene.sceneId);
+      continue;
+    }
+    const pilot = PILOT_SCRIPT.chapters.find(
+      (c) => c.chapterId === scene.chapterId,
+    );
+    chapters.push({
+      chapterId: scene.chapterId,
+      title: pilot?.title ?? scene.title,
+      atlasTab: pilot?.atlasTab ?? ATLAS_TAB[scene.chapterId] ?? "INVESTOR",
+      sceneIds: [scene.sceneId],
+    });
+  }
+  return chapters;
+}
+
 export const PREMIERE_SCRIPT: TourScript = TourScriptSchema.parse({
   scriptId: "tour.investor-premiere",
-  scriptVersion: "0.2.0-draft",
+  scriptVersion: "0.3.0-draft",
   status: "DRAFT",
   reviewNote:
-    "DRAFT r3 (blueprint §16), pending owner review. Scenes 1-3 are the pilot's certified scenes (re-certification due). GateQ, privacy, relationship, rehearsal and close are CODE_VERIFIED only; an audience gate suppresses them until browser receipts promote them. q.private-runway and the q.reh-* lines are new approved-question proposals.",
-  chapters: [
-    ...PILOT_SCRIPT.chapters,
-    ...candidates.map((scene) => ({
-      chapterId: scene.chapterId,
-      title: scene.title,
-      atlasTab:
-        scene.sceneId === "s.premiere.gateq"
-          ? "GATEQ"
-          : scene.sceneId === "s.premiere.privacy"
-            ? "TRUST"
-            : scene.sceneId === "s.premiere.rehearsal"
-              ? "REHEARSALS"
-              : "INVESTOR",
-      sceneIds: [scene.sceneId],
-    })),
-  ],
+    "DRAFT r4 (owner feedback 15 Oct), pending owner review: a spoken introduction on Home, the investor's real mandate, then the pilot's scenes with spoken transitions, privacy, GateQ, relationship, rehearsal and close. Scenes without a browser receipt stay CODE_VERIFIED and an audience gate suppresses them.",
+  chapters: premiereChapters(PREMIERE_SCENES).map(spoken),
   questions: [
     ...PILOT_SCRIPT.questions,
     {
@@ -448,11 +1043,19 @@ export const PREMIERE_SCRIPT: TourScript = TourScriptSchema.parse({
       text: "Which of those claims can you support with documents today, and which are still your own estimates?",
     },
     {
+      questionId: "q.gq-open",
+      text: "Thanks for applying. In two sentences, what does the business do, and why does it fit our mandate?",
+    },
+    {
+      questionId: "q.gq-evidence",
+      text: "What can you show us today that supports that, and what is still an estimate?",
+    },
+    {
       questionId: "q.reh-close",
       text: "What would you need from us to make a decision quickly?",
     },
   ],
-  scenes: [...PILOT_SCRIPT.scenes, ...candidates],
+  scenes: PREMIERE_SCENES,
 });
 
 const pilotScene = (id: string): SceneScript => {
