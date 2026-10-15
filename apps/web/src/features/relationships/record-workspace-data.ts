@@ -3,11 +3,14 @@ import {
   getRelationshipGateqApplications,
   listQWork,
   listRelationshipNotes,
+  getRelationshipCommitments,
+  getRelationshipPass,
 } from "@capital-q/api-client";
 import type {
   FitProfileDto,
   RelationshipGateqApplicationsDto,
   RelationshipNoteList,
+  RelationshipStatusDto,
 } from "@capital-q/contracts";
 
 import {
@@ -16,6 +19,7 @@ import {
   resolveOwnContext,
 } from "@/features/q/context";
 
+import { decided, decisionOf, type Decision } from "./decision";
 import { recordWork, type Read, type RecordWorkRow } from "./record-workspace";
 
 /**
@@ -97,4 +101,27 @@ export async function recordNotesRead(
   } catch {
     return { kind: "UNAVAILABLE" };
   }
+}
+
+/**
+ * The record's decision (CRM S5), when its state is one: the pass as this
+ * side may see it, or the current commitment, read beside the record's
+ * other reads. Null when the state is no decision.
+ */
+export async function recordDecisionRead(
+  relationship: RelationshipStatusDto | null,
+  side: "INVESTOR" | "COMPANY",
+): Promise<Decision | null> {
+  if (relationship === null || !decided(relationship)) return null;
+  const session = await apiSession();
+  const id = relationship.relationshipId;
+  const [pass, commitments] = await Promise.all([
+    session === null || relationship.state !== "PASSED"
+      ? undefined
+      : getRelationshipPass(session, id).catch(() => undefined),
+    session === null || relationship.state !== "INVESTED"
+      ? undefined
+      : getRelationshipCommitments(session, id).catch(() => undefined),
+  ]);
+  return decisionOf({ relationship, side, pass, commitments });
 }
