@@ -708,3 +708,13 @@ Direct Railway read confirmed all four services SUCCESS on72d626cdebbb2a177734db
 ## 14 October 2026, 22:33 WAT — H2 protected release and real founder acceptance
 
 PR99 exactefd2 protectedCI38617987342 allPASS; normalproductionmerge48c6. Web/API/workersSUCCESS, q-apibuilding. Actualfounderdesktop table/board/search/sort/filter/pagination/persistentselection/savedviewreload/selected+filterednativeCSV/recordreturn/overflow/securitynegatives PASS. Otherdevices/roles/Q stillpending. Nativeoption/Next hiddenstreamed-copy harness issues recorded and corrected without changingproductassertions. Priorproduction dcb2 failure is media requestId UUID4018 falsepositive;39focusedtestsPASS narrowfix. PR101 preserves driver/testrepair. OriginaldirtyQ/H2safeWIPs pushed ef515bc6/2fc703cc; no failing98/97 merged, noDDL/providerroom/outwardactions.
+
+## 15 October 2026, 07:10 WAT — Claude four-lane round (releases A–C)
+
+- Claude led as integration lead, with lanes G (GateQ and video), C (CRM), P (Q Pitch), S (speed) and M (InvestIQ).
+- Released #107/#109, #108/#110 and #111/#112. All four services are on `242460c1`. Seven migrations were applied after pgTAP passed in CI.
+- Superseded PRs #97, #98 and #100 are closed. #86, #104 and #106 merged by inclusion. #88 is superseded by #86 plus the pronoun rule.
+- Paid spend this round, as estimated by the gateway (not vendor billing):
+  - OpenAI about $0.46: lane S $0.41, lane G about $0.05;
+  - Tavus $0.
+- Next: batch D (#113), the paid Tavus test after 09:00 WAT, the dossier-Q re-acceptance, the Q Pitch pilot re-run, CRM screenshots and walkthroughs, and the S3 after-deploy measures.

@@ -306,6 +306,63 @@ export const GATEQ_APPLY_INTERVIEW_OPEN_PATH =
 /** What is answered, unknown, declined, missing and contradictory. */
 export const GATEQ_APPLY_COVERAGE_PATH = "/v1/gateq/apply/coverage" as const;
 
+/**
+ * The GateQ video interview (C3): the applicant's own session, by their
+ * guest credential. GET reads (and says whether video is offered); POST
+ * starts or returns the same session; /end ends it, optionally continuing
+ * the same interview by typing. The bridge is the provider's alone.
+ */
+export const GATEQ_APPLY_VIDEO_PATH = "/v1/gateq/apply/video" as const;
+export const GATEQ_APPLY_VIDEO_END_PATH = "/v1/gateq/apply/video/end" as const;
+export const GATEQ_VIDEO_BRIDGE_PATH =
+  "/v1/gateq/video/bridge/chat/completions" as const;
+export const GATEQ_VIDEO_REFUSALS = [
+  "DISABLED",
+  "ALLOWANCE_EXHAUSTED",
+  "CONCURRENCY_LIMIT",
+  "PROVIDER_UNAVAILABLE",
+] as const;
+export const GateqVideoSessionDtoSchema = z
+  .object({
+    id: z.string().uuid(),
+    status: z.enum(["STARTING", "LIVE", "ENDED"]),
+    /** The provider's private room link, only while live. */
+    joinUrl: z.string().url().max(2048).nullable(),
+    endsAt: z.string().datetime(),
+    maxSeconds: z.number().int().min(1).max(3600),
+    endedReason: z
+      .enum([
+        "APPLICANT_ENDED",
+        "CONTINUED_BY_TYPING",
+        "TIME_LIMIT",
+        "PROVIDER_FAILED",
+        "SWEPT",
+      ])
+      .nullable(),
+    disclosure: z.string().max(300),
+  })
+  .strict();
+export type GateqVideoSessionDto = z.infer<typeof GateqVideoSessionDtoSchema>;
+export const GateqVideoStateDtoSchema = z
+  .object({
+    /** Whether a video interview may be started now; typing always may. */
+    available: z.boolean(),
+    session: GateqVideoSessionDtoSchema.nullable(),
+  })
+  .strict();
+export type GateqVideoStateDto = z.infer<typeof GateqVideoStateDtoSchema>;
+/** What the video provider sends the bridge; beyond messages, ignored. */
+export const GateqVideoBridgeBodySchema = z
+  .object({
+    messages: z
+      .array(z.object({ role: z.string().max(40), content: z.unknown() }))
+      .max(300),
+  })
+  .passthrough();
+export const GateqVideoEndRequestSchema = z
+  .object({ continueByTyping: z.boolean() })
+  .strict();
+
 export const GATEQ_CONTACT_CHANNELS = ["EMAIL", "PHONE"] as const;
 export const GateqContactChannelSchema = z.enum(GATEQ_CONTACT_CHANNELS);
 export type GateqContactChannel = z.infer<typeof GateqContactChannelSchema>;

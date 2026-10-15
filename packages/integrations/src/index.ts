@@ -125,3 +125,26 @@ export {
   type PostmarkInbound,
   type ReceiveInboundOutcome,
 } from "./inbound-email.js";
+
+// Tavus (ADR 0066): the one video provider adapter, shared by Rehearsals
+// (q-api) and the GateQ video interview (api).
+export {
+  createTavusClient,
+  TavusError,
+  tavusFailureKind,
+  type TavusClient,
+  type TavusConversation,
+  type TavusCreatedConversation,
+  type TavusFace,
+  type TavusFailureKind,
+  type TavusPalLayers,
+  type TavusVoice,
+} from "./tavus/client.js";
+export {
+  createTavusKeyPool,
+  TAVUS_MAX_KEYS,
+  tavusKeysFrom,
+  TavusKeysExhaustedError,
+  type TavusKeyHealth,
+  type TavusKeyPool,
+} from "./tavus/key-pool.js";
