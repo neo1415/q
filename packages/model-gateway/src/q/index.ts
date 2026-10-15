@@ -122,6 +122,8 @@ import {
 } from "./discover-companies.js";
 import {
   companyFactAskOf,
+  companyNameCandidates,
+  readNamedVisibleCompany,
   runNamedCompanyFact,
   type CompanyFactAnswer,
   type CompanyFactAsk,
@@ -2463,6 +2465,8 @@ export function createModelGatewayQAnswer(
      */
     const namedCompanies: AuthorisedFact[] = [];
     const namedCompanyCalls: QToolCallObservation[] = [];
+    /** Companies the own-records read above took, so none is read twice. */
+    const namedIds = new Set<string>();
     const namedRead = async (): Promise<void> => {
       const standingCall = standingOf();
       if (standingCall === null || !prefetchTools.has("get_company")) return;
@@ -2475,6 +2479,7 @@ export function createModelGatewayQAnswer(
         `${latest.content}\n${lastQ?.content.slice(0, 4_000) ?? ""}`,
         knownCompaniesOf(standing.result.data),
       ).filter((company) => company.companyId !== onScreen);
+      for (const company of named) namedIds.add(company.companyId);
       await Promise.all(
         named.map(async (company, index) => {
           const call = {
@@ -2498,6 +2503,53 @@ export function createModelGatewayQAnswer(
           if (fact !== null) namedCompanies.push(fact);
         }),
       );
+    };
+    /**
+     * S3a (lane S, live 2026-10-15): a company this turn names that is none
+     * of their own records ("tell me about Baridi", "risks with
+     * Ledgerfold") cost the model two tool rounds (company.search, then
+     * company.get, ~1.5-2.5 s each) before its first sentence. It is read
+     * here instead, through the same two tools and plan: only an exact,
+     * single visible match, after their own records (never twice), and
+     * only when no record is on screen, so "this company" stays the one
+     * they are looking at.
+     */
+    const visibleNamedRead = async (own: Promise<void>): Promise<void> => {
+      if (counterparty !== undefined) return;
+      const names = companyNameCandidates(latest.content);
+      if (names.length === 0) return;
+      const found = await Promise.all(
+        names.map((name, index) =>
+          readNamedVisibleCompany({
+            name,
+            exclude: new Set(),
+            tools,
+            context: toolContext,
+            available: prefetchTools,
+            callIndex: index,
+          }).catch(() => null),
+        ),
+      );
+      await own.catch(() => undefined);
+      for (const read of found) {
+        if (read === null) continue;
+        for (const { providerName, outcome } of read.calls) {
+          namedCompanyCalls.push({
+            toolName: outcome.toolName,
+            providerName,
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          });
+        }
+        if (namedIds.has(read.companyId)) continue;
+        namedIds.add(read.companyId);
+        const fact = onScreenCompanyFact(
+          read.data,
+          "A company on Capital Q this turn names",
+        );
+        if (fact !== null) namedCompanies.push(fact);
+      }
     };
     /**
      * The Q Daily on their screen, read for them (founder live
@@ -2802,11 +2854,13 @@ export function createModelGatewayQAnswer(
     const wide = (): Promise<WideReads> => {
       wideRead ??= (async (): Promise<WideReads> => {
         const wideStarted = Date.now();
+        const ownNamed = namedRead();
         await Promise.all([
           timed("standing", standingDone()),
           timed("index", indexDone()),
           timed("onboarding", onboardingRead()),
-          timed("named", namedRead()),
+          timed("named", ownNamed),
+          timed("named-visible", visibleNamedRead(ownNamed)),
           timed("day", dayRead()),
           timed("arrival", arrivalRead()),
         ]);

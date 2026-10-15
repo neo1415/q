@@ -277,3 +277,135 @@ export async function runNamedCompanyFact(input: {
     calls,
   };
 }
+
+/** Words that start a sentence or name Capital Q itself, never a company. */
+const NOT_COMPANY_WORDS = new Set([
+  "i",
+  "i'm",
+  "i'd",
+  "q",
+  "capital",
+  "discover",
+  "home",
+  "daily",
+  "gateq",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+  "ok",
+  "okay",
+  "hey",
+  "hi",
+  "please",
+  "tell",
+  "what",
+  "what's",
+  "which",
+  "who",
+  "who's",
+  "where",
+  "when",
+  "why",
+  "how",
+  "is",
+  "are",
+  "can",
+  "could",
+  "should",
+  "would",
+  "do",
+  "does",
+  "show",
+  "give",
+  "compare",
+  "find",
+  "open",
+  "and",
+  "so",
+  "the",
+]);
+
+/**
+ * S3a: up to `max` capitalised names in the words ("Tell me about Baridi",
+ * "risks with Ledgerfold"), as candidates to look up exactly. A candidate
+ * is only a search term: nothing is read unless the search, under the
+ * plan, returns exactly one visible company of exactly that name.
+ */
+export function companyNameCandidates(text: string, max = 2): string[] {
+  const found: string[] = [];
+  const pattern =
+    /\b\p{Lu}[\p{L}\p{N}&'-]*(?:\s+(?:\p{Lu}[\p{L}\p{N}&'-]*|\p{N}+))*/gu;
+  for (const match of text.replace(/[’]/gu, "'").matchAll(pattern)) {
+    const words = match[0]
+      .split(/\s+/u)
+      .filter((word) => !NOT_COMPANY_WORDS.has(word.toLowerCase()));
+    const name = words.join(" ").replace(/'s$/u, "").trim();
+    if (name.length < 2 || words.length > 4) continue;
+    if (!found.includes(name)) found.push(name);
+    if (found.length >= max) break;
+  }
+  return found;
+}
+
+/**
+ * The visible company exactly named, by search then profile, through the
+ * tool port; null for none, several, excluded ids or a profile not admitted.
+ */
+export async function readNamedVisibleCompany(input: {
+  readonly name: string;
+  readonly exclude: ReadonlySet<string>;
+  readonly tools: Pick<QToolPort, "execute">;
+  readonly context: QToolExecutionContext;
+  readonly available: ReadonlySet<string>;
+  readonly callIndex: number;
+}): Promise<{
+  readonly companyId: string;
+  readonly data: unknown;
+  readonly calls: readonly {
+    readonly providerName: string;
+    readonly outcome: QToolCallOutcome;
+  }[];
+} | null> {
+  const { name, tools, context, available } = input;
+  if (!available.has(SEARCH_TOOL) || !available.has(GET_TOOL)) return null;
+  const calls: { providerName: string; outcome: QToolCallOutcome }[] = [];
+  const search = await tools
+    .execute(
+      {
+        callId: `q-named-visible-search-${String(input.callIndex)}`,
+        name: SEARCH_TOOL,
+        arguments: { query: name, limit: 5 },
+      },
+      context,
+    )
+    .catch(() => null);
+  if (search !== null)
+    calls.push({ providerName: SEARCH_TOOL, outcome: search });
+  const wanted = nameKey(name);
+  const exact = new Set(
+    (itemsOf(search) ?? [])
+      .filter((item) => nameKey(item.canonicalName) === wanted)
+      .map((item) => item.companyId),
+  );
+  if (exact.size !== 1) return null;
+  const [companyId] = [...exact];
+  if (companyId === undefined || input.exclude.has(companyId)) return null;
+  const got = await tools
+    .execute(
+      {
+        callId: `q-named-visible-get-${String(input.callIndex)}`,
+        name: GET_TOOL,
+        arguments: { companyId },
+      },
+      context,
+    )
+    .catch(() => null);
+  if (got !== null) calls.push({ providerName: GET_TOOL, outcome: got });
+  if (got === null || !got.result.ok) return null;
+  if (profileOf(got)?.companyId !== companyId) return null;
+  return { companyId, data: got.result.data, calls };
+}

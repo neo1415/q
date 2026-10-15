@@ -4,6 +4,8 @@ import type { QToolCallOutcome, QToolPort } from "@capital-q/q-runtime";
 
 import {
   companyFactAskOf,
+  companyNameCandidates,
+  readNamedVisibleCompany,
   runNamedCompanyFact,
 } from "../src/q/named-company-fact.js";
 
@@ -205,5 +207,58 @@ describe("a declared company fact, by code (S2b)", () => {
     });
     expect(result).toBeNull();
     expect(asked).toEqual([]);
+  });
+});
+
+describe("a company this turn names, read ahead of the model (S3a)", () => {
+  it.each([
+    ["Tell me about Baridi", ["Baridi"]],
+    ["What are the risks with Ledgerfold?", ["Ledgerfold"]],
+    ["Compare Ledgerfold and F2 against my mandate", ["Ledgerfold", "F2"]],
+    ["What should I ask Maji Loop's founders in a first call?", ["Maji Loop"]],
+    ["what should I do next?", []],
+    ["Open Q Daily on Monday", []],
+  ])("%s", (said, names) => {
+    expect(companyNameCandidates(said)).toEqual(names);
+  });
+
+  const read = (
+    name: string,
+    exclude: ReadonlySet<string> = new Set(),
+    denied: readonly string[] = [],
+  ) => {
+    const p = port({ denied });
+    return readNamedVisibleCompany({
+      name,
+      exclude,
+      tools: p.tools,
+      context: CONTEXT,
+      available: AVAILABLE,
+      callIndex: 0,
+    }).then((result) => ({ result, asked: p.asked }));
+  };
+
+  it("reads exactly one visible company through search then get", async () => {
+    const { result, asked } = await read("Maji Loop");
+    expect(result?.companyId).toBe(MAJI);
+    expect(result?.calls.map((c) => c.providerName)).toEqual([
+      "search_companies",
+      "get_company",
+    ]);
+    expect(asked).toEqual(["search_companies", "get_company"]);
+  });
+
+  it("reads nothing more for an ambiguous or unknown name", async () => {
+    expect((await read("Maji")).result).toBeNull();
+    const unknown = await read("Nowhere Ltd");
+    expect(unknown.result).toBeNull();
+    expect(unknown.asked).toEqual(["search_companies"]);
+  });
+
+  it("never reads a profile the plan denies, nor an excluded company", async () => {
+    expect((await read("Maji Loop", new Set(), [MAJI])).result).toBeNull();
+    const excluded = await read("Maji Loop", new Set([MAJI]));
+    expect(excluded.result).toBeNull();
+    expect(excluded.asked).toEqual(["search_companies"]);
   });
 });
