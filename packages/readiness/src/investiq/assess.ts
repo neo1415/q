@@ -87,7 +87,7 @@ function isEarlyStage(stageCode: string | null): boolean {
   return stageCode !== null && stageRank(stageCode) === 1;
 }
 
-function exclusionOf(o: InvestIQObservation) {
+export function exclusionOf(o: InvestIQObservation) {
   if (o.lifecycleStatus === "SUPERSEDED") return "SUPERSEDED" as const;
   if (o.truthClass === "UNKNOWN") return "TRUTH_UNKNOWN" as const;
   if (o.truthClass === "Q_INFERENCE" && o.evidenceStatus === "NO_EVIDENCE") {

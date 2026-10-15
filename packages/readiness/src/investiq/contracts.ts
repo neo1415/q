@@ -72,6 +72,13 @@ export const InvestIQObservationSchema = z
     id: z.string().min(1).max(200),
     criterion: z.string().regex(/^[a-z]+\.[a-z_]+$/),
     reading: ObservationReadingSchema,
+    /**
+     * Rubric anchor 0-4 (investiq/v1), set by a deterministic producer or a
+     * human reviewer, never by a model alone. 2 is the stage-appropriate
+     * baseline. Must agree with the reading: weakness 0-1, recorded 2,
+     * strength 3-4. Absent: derived from the reading.
+     */
+    anchor: z.number().int().min(0).max(4).optional(),
     statement: z.string().min(1).max(500),
     truthClass: TruthClassSchema,
     evidenceStatus: EvidenceStatusSchema,

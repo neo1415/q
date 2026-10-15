@@ -45,6 +45,16 @@ const states = {};
 const assumptions = new Set();
 let conflicts = 0;
 let finalisable = 0;
+const v1 = {
+  overall: {},
+  businessQuality: {},
+  investmentReadiness: {},
+  reasons: {},
+  dimensionStatus: {},
+  confidence: {},
+  stage: {},
+};
+const tally = (o, k) => (o[k] = (o[k] ?? 0) + 1);
 
 rows.forEach((row, i) => {
   const asOf = new Date(row.assessed_at).toISOString();
@@ -56,6 +66,15 @@ rows.forEach((row, i) => {
   for (const e of shadowIn.excluded)
     exclusions[e.reason] = (exclusions[e.reason] ?? 0) + 1;
   const a = m.assessInvestIQ(shadowIn.input);
+  const b = m.assessInvestIQV1(shadowIn.input);
+  tally(v1.stage, b.stageBand ?? "UNKNOWN");
+  for (const g of ["overall", "businessQuality", "investmentReadiness"]) {
+    tally(v1[g], b[g].band ?? b[g].status);
+  }
+  tally(v1.confidence, b.overall.confidence ?? "none");
+  for (const r of b.overall.reasons) tally(v1.reasons, r.replace(/:.*/, ""));
+  for (const d of b.dimensions)
+    tally(v1.dimensionStatus, `${d.dimension}:${d.status}`);
   if (a.finalisation.reasons.length === 1) finalisable += 1;
   for (const d of a.dimensions) {
     for (const c of d.criteria) states[c.state] = (states[c.state] ?? 0) + 1;
@@ -90,6 +109,7 @@ console.log(
       criterionStates: states,
       dimensionsWithOpenConflict: conflicts,
       companiesWithOnlyMethodNotApprovedReason: finalisable,
+      investiqV1: v1,
       adapterExclusions: exclusions,
       adapterAssumptions: [...assumptions],
       perDimension: perDim,

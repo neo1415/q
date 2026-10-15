@@ -1,6 +1,6 @@
 # FDN InvestIQ Internal Strategy brief: reconciliation with the locked sources
 
-Status: **PREPARED FOR LEAD/OWNER DECISION**, 2026-10-15 (Lane M). Source: `FDN_InvestIQ_Internal_Strategy.pdf` / `.txt` in this folder ("Draft for Internal Alignment, October 2026"; cited as **FDN p.N** using the brief's own section numbers 01–09, with `.txt` line numbers). Locked extracts: `docs/product-sources/text/` (PADL `Real_PADL_…txt`, Spec `Real_CAPITAL_Q_PRODUCT_SPECIFICATION.txt`, FSR `Capital_Q_Final_System_Review.txt`). This continues `docs/ai-handoff/INVESTIQ-RECONCILIATION.md` (2026-10-11) and does not supersede it; the uncalibrated v0.2 experiment in `INVESTIQ-METHODOLOGY-PROPOSED.md` remains PROPOSED and is **not** adopted here. Proposed amendments: [ADR 0068](../../adr/0068-investiq-fdn-methodology-reconciliation.md).
+Status: **UPDATED WITH OWNER DECISIONS**, 2026-10-15 (Lane M): (1) InvestIQ is FDN's proprietary methodology and the canonical name; (2) the nine FDN dimensions are canonical; (3) weights, rules and bands were delegated to the lead, proposed as `investiq/v1` (§6, [RESEARCH.md](RESEARCH.md), [CALIBRATION.md](CALIBRATION.md)). Source: `FDN_InvestIQ_Internal_Strategy.pdf` / `.txt` in this folder ("Draft for Internal Alignment, October 2026"; cited as **FDN p.N** using the brief's own section numbers 01–09, with `.txt` line numbers). Locked extracts: `docs/product-sources/text/` (PADL `Real_PADL_…txt`, Spec `Real_CAPITAL_Q_PRODUCT_SPECIFICATION.txt`, FSR `Capital_Q_Final_System_Review.txt`). This continues `docs/ai-handoff/INVESTIQ-RECONCILIATION.md` (2026-10-11) and does not supersede it; the uncalibrated v0.2 experiment in `INVESTIQ-METHODOLOGY-PROPOSED.md` remains PROPOSED and is **not** adopted here. Proposed amendments: [ADR 0068](../../adr/0068-investiq-fdn-methodology-reconciliation.md).
 
 ## 1. The methodology as written
 
@@ -15,9 +15,9 @@ Status: **PREPARED FOR LEAD/OWNER DECISION**, 2026-10-15 (Lane M). Source: `FDN_
 | Guardrails | paying never guarantees access/approval/success; assessment and investor selection independent; a business may be advised not to raise equity; "Scores should never create false precision. Evidence quality and investment judgment must remain visible."; stage/instrument-specific models | FDN p.07 (:307-313) |
 | To be finalised | scoring formula and category weightings; score bands, thresholds and evidence standards; stage- and instrument-specific models; questionnaire; report template; pricing; rules for investor-facing visibility of any score; extent of CapitalQ integration | FDN p.08 (:325-340) |
 
-**Weights:** UNSPECIFIED. **Formula / aggregation:** UNSPECIFIED. **Thresholds and bands:** UNSPECIFIED. **Evidence standards:** UNSPECIFIED. **Missing-data rules:** UNSPECIFIED beyond "evidence gaps" as an output and "evidence quality … must remain visible". **Stage/instrument variants:** UNSPECIFIED. **Worked examples:** none. **Confidence model:** UNSPECIFIED. **Valuation arithmetic:** methods listed, selection and combination UNSPECIFIED.
+**As written in the brief:** weights, formula/aggregation, thresholds and bands, evidence standards, missing-data rules, stage/instrument variants, confidence model and valuation arithmetic are all UNSPECIFIED, and there are no worked examples. The owner has since **delegated** them to the lead. The proposal is `investiq/v1` (§6); it remains pending calibration.
 
-## 2. Mapping onto the canonical Core Seven
+## 2. Mapping between the canonical FDN nine and the Core Seven
 
 The Core Seven (PADL Ch4 #63, :2251-2262; Spec 4.3, :2818-2825) stay canonical. The FDN nine are carried as a **lens**: every FDN focus area becomes a criterion inside one Core Seven dimension (`packages/readiness/src/investiq/method-v0.ts`), and the result reports per FDN dimension which criteria fed it.
 
@@ -40,11 +40,11 @@ Each is marked **ADR/PADL** (needs an amendment) or **RECONCILABLE** (resolvable
 
 | # | Conflict | Brief | Locked source / code | Marking |
 | --- | --- | --- | --- | --- |
-| C1 | Nine dimensions vs Core Seven | FDN p.04 (:168-201) lists nine | PADL Ch4 #63 (:2253) "seven Core Assessment Dimensions … universal"; sector modules "extend rather than replace" | **RECONCILABLE** if the nine are a lens over the Core Seven (as implemented). **ADR/PADL** if the owner wants nine canonical dimensions. |
+| C1 | Nine dimensions vs Core Seven | FDN p.04 (:168-201) lists nine | PADL Ch4 #63 (:2253) "seven Core Assessment Dimensions … universal"; sector modules "extend rather than replace" | **OWNER DECIDED (2026-10-15): the nine are canonical.** This contradicts locked PADL #63, so it needs a **PADL #63 amendment** (ADR 0068 §1). Every FDN criterion maps to exactly one Core Seven dimension, and v1 emits a `coreSevenProjection` so Core Seven consumers keep working. |
 | C2 | No Product & Technology dimension | absent from FDN p.04 | PADL #63 (:2257) | **RECONCILABLE** (keep canonical; FDN lens leaves it unmapped). Owner to confirm (Q2). |
 | C3 | Investor Fit inside readiness | FDN p.04 #8 (:195-197); p.08 "Investor fit and capital strategy are part of readiness" (:332) | FSR §4 Finding 3 (:78-106) "Readiness ≠ Quality ≠ Fit…", "must not collapse into one score"; CLAUDE.md invariants; `fitScoreOutOf10` in `packages/contracts/src/http/fit.ts:387` is a separate mandate-fit system | **ADR**: FDN's "investor-fit profile" output is delivered by referencing the discovery fit system, never computed into readiness. |
 | C4 | InvestIQ prescribes capital form | FDN p.02 "what form of capital is most appropriate" (:105-107); p.05 "capital-structure recommendations" (:227); p.07 "may be advised not to raise equity if debt … more appropriate" (:310-311) | PADL Ch4 #74 (:2800-2830): Capital Strategy "rather than determining what type of capital the company should pursue"; must avoid "This business should pursue debt instead." (:2825), which is "the role of FDN Advisory" | **ADR/PADL**: either amend #74 or (recommended) assign capital-form advice to FDN human advisory outside Capital Q's automated InvestIQ. |
-| C5 | Same name, different system | FDN p.06 (:262-285): InvestIQ is FDN's "methodology-led" system; CapitalQ is the tech; "complementary, not interchangeable" | PADL Ch4 (#60-#78) and Spec Ch4 (:2742): InvestIQ is "the proprietary institutional reasoning system at the core of Capital Q" | **ADR/PADL**: name the relationship (Q4). |
+| C5 | Same name, different system | FDN p.06 (:262-285): InvestIQ is FDN's "methodology-led" system; CapitalQ is the tech; "complementary, not interchangeable" | PADL Ch4 (#60-#78) and Spec Ch4 (:2742): InvestIQ is "the proprietary institutional reasoning system at the core of Capital Q" | **OWNER DECIDED (2026-10-15): InvestIQ is FDN's proprietary methodology and the canonical name. The Capital Q engine *implements* FDN InvestIQ** (approved method versions only). Needs a wording corrigendum to PADL Ch4 / Spec Ch4 (ADR 0068 §8). |
 | C6 | Readiness-centric framing vs Business Quality separation | FDN p.01 "underlying quality, readiness and credibility" in one system (:31-32); "InvestIQ score or readiness profile" (:223) | PADL Ch4 #62 (:2218-2250) Business Quality distinct from readiness; PADL #105 (:5384) "Initial InvestIQ is an investment-readiness assessment" | **RECONCILABLE**: one InvestIQ system, separate outputs (Business Quality and Investment Readiness); no single "InvestIQ score". The PADL's own #62/#105 wording tension is pre-existing (see INVESTIQ-RECONCILIATION.md item 3). |
 | C7 | Operations / diligence scope | FDN p.04 #9 Diligence Readiness; p.03 Execute "Diligence coordination, Negotiation support, Transaction management" (:152-157) | PADL Ch4 #73 (:2739) operations outside the core framework; #75 support due diligence, not replace it; PADL #63 rationale "not to audit" | **RECONCILABLE**: diligence *readiness* (are records available) is assessable; transaction execution is FDN service work, not assessment. |
 | C8 | Valuation inside the assessment | FDN p.04 (:206-210) | Not in the Core Seven; PADL #74 assesses clarity, not correctness, of the raise | **ADR**: whether Capital Q computes valuations at all; today recorded only as "valuation stated" (UNSPECIFIED method). |
@@ -89,16 +89,29 @@ The comparison is `scripts/handoff/live/investiq-shadow-compare.mjs`. It ran one
 - 6 early-stage N/A applications.
 - 1214 of 1400 criterion slots are UNKNOWN. 178 are RECORDED, and 0 are judged strength or weakness, because no current producer emits merit readings. The FDN brief's criteria are far wider than what Capital Q collects today.
 
-## 6. Open questions for the owner
+## 6. InvestIQ v1 proposal (owner-delegated, pending calibration)
 
-1. Are the nine FDN dimensions a lens over the Core Seven (recommended), or a replacement needing a PADL amendment to #63?
+`packages/readiness/src/investiq/method-v1.ts` + `assess-v1.ts`, shadow only, no consumer wiring. Every parameter is traced in [RESEARCH.md](RESEARCH.md):
+- **Dimensions:** the canonical FDN nine. Eight are graded; Investor Fit has weight 0 and is routed to discovery fit (C3).
+- **Stage weights** (pre-seed / seed / Series A / growth): Team 30/25/20/15, Fundamentals 30/25/15/10, Commercial 10/15/20/20, Financial 5/10/15/20, Governance 5/5/10/10, Legal 5/5/5/10, Investment Case 10/10/7/5, Diligence 5/5/8/10. An unknown stage gets no band.
+- **Criterion scoring:** anchor 0–4 (2 = baseline), with an evidence multiplier by `evidence_status` × `truth_class` × lifecycle. Self-reported counts 0.5, document-supported 0.75, verified 1.0. No volume bonus.
+- **Bands:** NOT_YET_READY < 1.5 ≤ DEVELOPING < 2.0 ≤ READY < 2.75 ≤ STRONG. Each band is reported separately for the overall assessment, Business Quality and Investment Readiness.
+- **Confidence:** discrete HIGH/MODERATE/LOW from coverage and evidence quality, one level lower with an open conflict. READY and STRONG need at least MODERATE.
+- **Coverage:** a dimension is scored at ≥ 40% of its criteria; a band needs ≥ 60% of the stage weight scored, plus Team and Fundamentals. Below that the result is INSUFFICIENT_EVIDENCE, never a low band.
+- **Locked rules kept:** no capital-form output (#74, C4); valuation and dilution recorded but ungraded (C8); unknown never zero; conflicts withheld, not penalised.
+
+Shadow run over the 28 staging companies (read-only): overall **26 INSUFFICIENT_EVIDENCE, 2 DEVELOPING** (both capped by LOW confidence). Business Quality is the same; Investment Readiness is **28 INSUFFICIENT_EVIDENCE**. Main reasons: Team or Fundamentals unscored (27), weighted coverage below 60% (24), stage unknown (2). Team is scored for 23 companies and Investment Case for 19; Fundamentals and Commercial for 2; Financial, Governance, Legal and Diligence for none. Today's data records facts but no merit readings, so v1 cannot band most companies honestly yet. That is the intended behaviour, and it is why calibration needs FDN reviewer anchors (CALIBRATION.md).
+
+## 7. Open questions for the owner
+
+1. ~~Lens or canonical~~: decided, the nine are canonical (C1). Still open: approve the PADL #63 amendment text.
 2. Product & Technology has no FDN counterpart. Keep it as canonical? Should IP sit under Legal (FDN) or Product (PADL)?
 3. Diligence Readiness: a criterion group under Governance & Institutional Readiness, or a separate Investment Readiness facet?
-4. Naming: is "InvestIQ" FDN's methodology brand, Capital Q's engine, or both? The brief says the two are "complementary, not interchangeable". The PADL makes InvestIQ part of Capital Q.
+4. ~~Naming~~: decided (C5). InvestIQ is FDN's methodology, and the Capital Q engine implements it.
 5. Should instrument (equity/debt/strategic) become a #64 context axis next to stage, sector and business model?
 6. Investor-facing visibility of any InvestIQ output: who may see what, and when (PADL #104 blind-until-complete)?
 7. Capital-form recommendations: amend PADL #74, or keep them as FDN human advisory outside the product (recommended)?
 8. Valuation: does Capital Q compute valuations, or only record and check the clarity of a stated one?
-9. Approval of weights, bands, thresholds, evidence standards and the qualitative confidence levels. Until then the method stays shadow-only.
+9. ~~Weights, bands, thresholds~~: delegated to the lead; proposed as `investiq/v1`. Still open: sign-off after calibration (CALIBRATION.md).
 10. Business Quality composition: confirm the first five dimensions (PADL #62 reading), with Governance and Capital Strategy reported separately.
 11. Pilot: the brief proposes 3–5 FDN businesses (p.08 :349). Which ones, and may their evidence be used for calibration?
