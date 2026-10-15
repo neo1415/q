@@ -1,0 +1,511 @@
+{
+  "schema_version": "1.0",
+  "title": "Capital Q — further Qatari investors, researched public profiles (unclaimed)",
+  "prepared_as_of": "2026-10-15",
+  "purpose": "Researched, unclaimed public profiles of Qatari investors beyond the Qatar five. Every fact cites its source with retrieval date, truth_class, evidence_status and an uncertainty label.",
+  "important_distinctions": [
+    "QIA Fund of Funds invests in venture funds; a startup's route is a participating fund",
+    "Qatar Development Bank is a state development bank, not a private VC",
+    "Doha Tech Angels facts are from 2019 and need refreshing",
+    "No logins, mandates, quotes, decisions or endorsements for any real person or organisation"
+  ],
+  "truth_axes_note": "truth_class / evidence_status / lifecycle_status are separate axes (ADR-001). A public page is the entity's own or a reporter's statement (USER_CLAIM), never VERIFIED by Capital Q. No quotes, mandates, decisions or endorsements are attributed to any real person or organisation.",
+  "sources": {
+    "QI29": {
+      "url": "https://www.qdb.qa/About/News/News/QDB-Unveils-Startup-Qatar-Investment-Program-to-Attract-Tech-Startups",
+      "description": "Qatar Development Bank news release: Startup Qatar Investment Program (22 Feb 2024)",
+      "access": "FETCHED",
+      "note": "Read 2026-10-15; excerpt verbatim.",
+      "fetchedAt": "2026-10-15",
+      "status": "VERIFIED_AGAINST_SOURCE",
+      "status_note": "Read 2026-10-15.",
+      "excerpt": "Qatar Development Bank has announced the launch of its Startup Qatar Investment Program … funding of up to $500,000 or 1.8 million Qatari riyals for startups looking to establish a presence in Qatar … up to $5 million or 18 million Qatari riyals for established global startups",
+      "title": "Qatar Development Bank news release: Startup Qatar Investment Program (22 Feb 2024)",
+      "read_at": "2026-10-15",
+      "published_at": "2024-02-22"
+    },
+    "QI30": {
+      "url": "https://www.gulf-times.com/article/715230/business/qdb-doubles-investment-packages-to-attract-global-startups-to-doha",
+      "description": "Gulf Times: QDB doubles investment packages (17 Nov 2025)",
+      "access": "FETCHED",
+      "note": "Read 2026-10-15; excerpt verbatim.",
+      "fetchedAt": "2026-10-15",
+      "status": "VERIFIED_AGAINST_SOURCE",
+      "status_note": "Read 2026-10-15.",
+      "excerpt": "I am pleased to announce the doubling of investment packages: up to QR4mn for seed stage companies and up to QR20mn for growth stage companies.",
+      "title": "Gulf Times: QDB doubles investment packages (17 Nov 2025)",
+      "read_at": "2026-10-15",
+      "published_at": "2025-11-17"
+    },
+    "QI31": {
+      "url": "https://qna.org.qa/en/News-Area/News/2026-2/3/qna-interview-qdb-chief-executive-unveils-plans-to-expand-start-up-investment-program",
+      "description": "QNA interview with the QDB chief executive (3 Feb 2026)",
+      "access": "FETCHED",
+      "note": "Read 2026-10-15; excerpt verbatim.",
+      "fetchedAt": "2026-10-15",
+      "status": "VERIFIED_AGAINST_SOURCE",
+      "status_note": "Read 2026-10-15.",
+      "excerpt": "Since its launch, QDB's investment arm has committed around QR 390 million in direct and indirect venture investments. … the initiative has invested nearly QR 150 million in more than 40 start-ups from 15 countries",
+      "title": "QNA interview with the QDB chief executive (3 Feb 2026)",
+      "read_at": "2026-10-15",
+      "published_at": "2026-02-03"
+    },
+    "QI33": {
+      "url": "https://www.gulf-times.com/article/700891/qatar/fund-of-fundsaims-to-build-bridges-for-startups-with-global-venture-capital-ecosystem---ceo-of-qia",
+      "description": "Gulf Times: Fund of Funds aims to build bridges for startups (24 Feb 2025)",
+      "access": "FETCHED",
+      "note": "Read 2026-10-15; excerpt verbatim.",
+      "fetchedAt": "2026-10-15",
+      "status": "VERIFIED_AGAINST_SOURCE",
+      "status_note": "Read 2026-10-15.",
+      "excerpt": "In February 2024, QIA committed to invest USD 1 billion as part of the Fund of Funds program. … will invest more than USD 1 billion in international and regional venture capital funds … will place a priority focus on the tech and healthcare sectors.",
+      "title": "Gulf Times: Fund of Funds aims to build bridges for startups (24 Feb 2025)",
+      "read_at": "2026-10-15",
+      "published_at": "2025-02-24"
+    },
+    "QI34": {
+      "url": "https://meatechwatch.com/2026/02/02/pm-unveils-2bn-boost-for-tech-startups-at-web-summit-2026/",
+      "description": "MEA Tech Watch: PM unveils $2bn boost for tech startups at Web Summit 2026 (2 Feb 2026)",
+      "access": "NOT_FETCHED",
+      "note": "Found by search on 2026-10-15; page not read (fetch failed or not attempted). Nothing is claimed from it alone.",
+      "fetchedAt": null,
+      "status": "LINK_DISCOVERED",
+      "status_note": "Search result only.",
+      "excerpt": null,
+      "title": "MEA Tech Watch: PM unveils $2bn boost for tech startups at Web Summit 2026 (2 Feb 2026)",
+      "read_at": null,
+      "published_at": "2026-02-02"
+    },
+    "QI35": {
+      "url": "https://www.wamda.com/2025/02/qia-1-billion-fund-funds-kicks-investment-rasmal-ventures",
+      "description": "Wamda: QIA's $1 billion fund of funds kicks off with Rasmal Ventures (5 Feb 2025)",
+      "access": "FETCHED",
+      "note": "Read 2026-10-15; excerpt verbatim.",
+      "fetchedAt": "2026-10-15",
+      "status": "VERIFIED_AGAINST_SOURCE",
+      "status_note": "Read 2026-10-15.",
+      "excerpt": "Rasmal Ventures LLC, Qatar's first independent venture capital (VC) company, which was established in 2023 … Rasmal Innovation Fund I LLC … including fintech, B2B SaaS, HealthTech and AI … a target close of $100 million",
+      "title": "Wamda: QIA's $1 billion fund of funds kicks off with Rasmal Ventures (5 Feb 2025)",
+      "read_at": "2026-10-15",
+      "published_at": "2025-02-05"
+    },
+    "QI36": {
+      "url": "https://www.qatar-tribune.com/article/161768/latest-news/rasmal-ventures-innovation-fund-i-named-as-first-fund-in-qias-fund-of-funds-program",
+      "description": "Qatar Tribune: Rasmal Ventures Innovation Fund I named as first fund in QIA's Fund of Funds program",
+      "access": "NOT_FETCHED",
+      "note": "Found by search on 2026-10-15; page not read (fetch failed or not attempted). Nothing is claimed from it alone.",
+      "fetchedAt": null,
+      "status": "LINK_DISCOVERED",
+      "status_note": "Search result only.",
+      "excerpt": null,
+      "title": "Qatar Tribune: Rasmal Ventures Innovation Fund I named as first fund in QIA's Fund of Funds program",
+      "read_at": null,
+      "published_at": null
+    },
+    "QI37": {
+      "url": "https://thepeninsulaqatar.com/article/26/03/2019/Doha-Tech-Angels-unlocks-potential-in-Tech-Startups",
+      "description": "The Peninsula: Doha Tech Angels unlocks potential in tech startups (26 Mar 2019)",
+      "access": "FETCHED",
+      "note": "Read 2026-10-15; excerpt verbatim.",
+      "fetchedAt": "2026-10-15",
+      "status": "VERIFIED_AGAINST_SOURCE",
+      "status_note": "Read 2026-10-15.",
+      "excerpt": "Doha Tech Angels (DTA), a QFC registered Angel Fund launched last year … focused on providing seed funding for early stage technology startups … ShopUp (Singapore), Carzaty (Oman), Adfone ( US ), Droobi Health (Qatar ) and Stars League (Qatar).",
+      "title": "The Peninsula: Doha Tech Angels unlocks potential in tech startups (26 Mar 2019)",
+      "read_at": "2026-10-15",
+      "published_at": "2019-03-26"
+    }
+  },
+  "entities": [
+    {
+      "demo_id": "qa-demo-qdb",
+      "name": "Qatar Development Bank",
+      "entity_kind": "ORGANIZATION",
+      "primary_linkedin": null,
+      "aliases": ["Qatar Development Bank", "QDB", "QDB Ventures"],
+      "associated_organization": "Qatar Development Bank",
+      "identity_confidence": "public identity from cited sources; unclaimed on Capital Q",
+      "facts": [
+        {
+          "claim": "Qatar Development Bank launched the Startup Qatar Investment Program on 22 February 2024: up to USD 500,000 (QAR 1.8m) for startups establishing a presence in Qatar and up to USD 5 million (QAR 18m) for established global startups growing in Qatar.",
+          "source_ids": ["QI29"],
+          "evidence_class": "documented",
+          "topic": "WHAT_THEY_DO",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": "2024-02-22",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "HISTORICAL",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        },
+        {
+          "claim": "On 17 November 2025 its chief executive announced the packages were doubled to up to QAR 4m for seed-stage and up to QAR 20m for growth-stage companies.",
+          "source_ids": ["QI30"],
+          "evidence_class": "documented",
+          "topic": "ARTICLE",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": "2025-11-17",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        },
+        {
+          "claim": "In February 2026 QNA reported its investment arm had committed about QAR 390m in direct and indirect venture investments, including nearly QAR 150m in more than 40 startups from 15 countries.",
+          "source_ids": ["QI31"],
+          "evidence_class": "documented",
+          "topic": "ARTICLE",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": "2026-02-03",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": "QNA reports that",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        },
+        {
+          "claim": "The programme is for knowledge-based companies with innovative ideas that meet the needs of the Qatari market.",
+          "source_ids": ["QI29"],
+          "evidence_class": "documented",
+          "topic": "PRIORITIES",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": "2024-02-22",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "HISTORICAL",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        }
+      ],
+      "rehearsal_topics": [
+        "establishing a presence in Qatar",
+        "knowledge-based growth",
+        "seed versus growth package fit"
+      ],
+      "rehearsal_question_examples": [
+        "What will you build and hire in Qatar?",
+        "Which Qatari market need does the product meet?"
+      ],
+      "short_public_quotes": [],
+      "image": {
+        "status": "NOT_ATTACHED",
+        "url": null,
+        "attribution": null,
+        "note": "No logo attached until usage is permitted."
+      },
+      "research_status": "PREPARED_PUBLIC_SEED",
+      "last_researched_utc": "2026-10-15T00:00:00Z",
+      "requires_refresh": true,
+      "arabic_names": [],
+      "pronunciation": [],
+      "one_line": "Qatar's state development bank; its investment arm runs the Startup Qatar Investment Program, investing directly and through funds.",
+      "location": "Doha, Qatar",
+      "role": null,
+      "identity_read": "STRONG",
+      "source_ids": ["QI29", "QI30", "QI31"]
+    },
+    {
+      "demo_id": "qa-demo-qia-fof",
+      "name": "QIA Fund of Funds Program",
+      "entity_kind": "ORGANIZATION",
+      "primary_linkedin": null,
+      "aliases": [
+        "QIA Fund of Funds",
+        "Qatar Investment Authority Fund of Funds",
+        "QIA FoF"
+      ],
+      "associated_organization": "Qatar Investment Authority",
+      "identity_confidence": "public identity from cited sources; unclaimed on Capital Q",
+      "facts": [
+        {
+          "claim": "In February 2024 Qatar Investment Authority committed USD 1 billion to the Fund of Funds programme, to invest in international and regional venture capital funds with a priority on technology and healthcare.",
+          "source_ids": ["QI33"],
+          "evidence_class": "documented",
+          "topic": "WHAT_THEY_DO",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": "2024-02-26",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "HISTORICAL",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        },
+        {
+          "claim": "Its stated route is investing in venture capital funds, so a startup's way in is through a participating fund. Whether it ever invests directly in startups was not confirmed.",
+          "source_ids": ["QI33"],
+          "evidence_class": "documented",
+          "topic": "IDENTITY",
+          "status": "FACT_EXTRACTED",
+          "as_of": null,
+          "verification": {
+            "status": "PUBLICLY_REPORTED_UNCONFIRMED",
+            "checkedAt": "2026-10-15",
+            "basis": "Reported in search-result summaries of the cited pages; not read in full.",
+            "note": null
+          },
+          "soft_wording": "Public reports say",
+          "truth_class": "Q_INFERENCE",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Inferred from the cited page's description; direct investment neither confirmed nor ruled out."
+        },
+        {
+          "claim": "At Web Summit Qatar 2026 the programme's total commitment was reported as raised to USD 3 billion, with an additional USD 2 billion.",
+          "source_ids": ["QI34"],
+          "evidence_class": "documented",
+          "topic": "ARTICLE",
+          "status": "LINK_DISCOVERED",
+          "as_of": "2026-02-02",
+          "verification": {
+            "status": "PUBLICLY_REPORTED_UNCONFIRMED",
+            "checkedAt": "2026-10-15",
+            "basis": "Reported in search-result summaries of the cited pages; not read in full.",
+            "note": null
+          },
+          "soft_wording": "It was reported that",
+          "truth_class": "UNKNOWN",
+          "evidence_status": "NO_EVIDENCE",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": null,
+          "uncertainty": "Not read in full; treat as unconfirmed."
+        }
+      ],
+      "rehearsal_topics": [
+        "which participating fund fits",
+        "Series A to C readiness"
+      ],
+      "rehearsal_question_examples": [
+        "Which participating fund is the right lead for this round?"
+      ],
+      "short_public_quotes": [],
+      "image": {
+        "status": "NOT_ATTACHED",
+        "url": null,
+        "attribution": null,
+        "note": "No logo attached until usage is permitted."
+      },
+      "research_status": "PREPARED_PUBLIC_SEED",
+      "last_researched_utc": "2026-10-15T00:00:00Z",
+      "requires_refresh": true,
+      "arabic_names": [],
+      "pronunciation": [],
+      "one_line": "Qatar Investment Authority's venture fund-of-funds programme: it invests in venture capital funds, not directly in startups.",
+      "location": "Doha, Qatar",
+      "role": null,
+      "identity_read": "STRONG",
+      "source_ids": ["QI33", "QI34"]
+    },
+    {
+      "demo_id": "qa-demo-rasmal",
+      "name": "Rasmal Ventures",
+      "entity_kind": "ORGANIZATION",
+      "primary_linkedin": null,
+      "aliases": [
+        "Rasmal Ventures",
+        "Rasmal Ventures LLC",
+        "Rasmal Innovation Fund I"
+      ],
+      "associated_organization": "Rasmal Ventures",
+      "identity_confidence": "public identity from cited sources; unclaimed on Capital Q",
+      "facts": [
+        {
+          "claim": "Rasmal Ventures LLC was established in 2023 and is described as Qatar's first independent venture capital company.",
+          "source_ids": ["QI35"],
+          "evidence_class": "documented",
+          "topic": "IDENTITY",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": "2025-02-05",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": "It describes itself as",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        },
+        {
+          "claim": "Its Rasmal Innovation Fund I targets technology startups including fintech, B2B SaaS, health technology and AI, with a target close of USD 100 million.",
+          "source_ids": ["QI35"],
+          "evidence_class": "documented",
+          "topic": "WHAT_THEY_DO",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": "2025-02-05",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        },
+        {
+          "claim": "In February 2025 the fund was reported as the first fund to join QIA's Fund of Funds programme.",
+          "source_ids": ["QI35", "QI36"],
+          "evidence_class": "documented",
+          "topic": "ARTICLE",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": "2025-02-05",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        }
+      ],
+      "rehearsal_topics": [
+        "fintech and B2B SaaS traction",
+        "Qatar and MENA expansion"
+      ],
+      "rehearsal_question_examples": [
+        "What does the next 18 months of revenue look like?"
+      ],
+      "short_public_quotes": [],
+      "image": {
+        "status": "NOT_ATTACHED",
+        "url": null,
+        "attribution": null,
+        "note": "No logo attached until usage is permitted."
+      },
+      "research_status": "PREPARED_PUBLIC_SEED",
+      "last_researched_utc": "2026-10-15T00:00:00Z",
+      "requires_refresh": true,
+      "arabic_names": [],
+      "pronunciation": [],
+      "one_line": "Doha-based venture capital firm, described in trade press as Qatar's first independent VC; manages Rasmal Innovation Fund I.",
+      "location": "Doha, Qatar",
+      "role": null,
+      "identity_read": "STRONG",
+      "source_ids": ["QI35", "QI36"]
+    },
+    {
+      "demo_id": "qa-demo-doha-tech-angels",
+      "name": "Doha Tech Angels",
+      "entity_kind": "ORGANIZATION",
+      "primary_linkedin": null,
+      "aliases": ["Doha Tech Angels", "DTA"],
+      "associated_organization": "Doha Tech Angels",
+      "identity_confidence": "public identity from cited sources; unclaimed on Capital Q",
+      "facts": [
+        {
+          "claim": "Doha Tech Angels is a QFC-registered angel fund, launched in 2018, focused on seed funding for early-stage technology startups.",
+          "source_ids": ["QI37"],
+          "evidence_class": "documented",
+          "topic": "IDENTITY",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": "2019-03-26",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "HISTORICAL",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        },
+        {
+          "claim": "By March 2019 it had invested in ShopUp (Singapore), Carzaty (Oman), Adfone (US), Droobi Health (Qatar) and Stars League (Qatar). Later activity was not checked.",
+          "source_ids": ["QI37"],
+          "evidence_class": "documented",
+          "topic": "ARTICLE",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": "2019-03-26",
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": "As of 2019,",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "HISTORICAL",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        }
+      ],
+      "rehearsal_topics": ["seed-stage technology", "angel syndicate fit"],
+      "rehearsal_question_examples": [
+        "What milestone does this seed round fund?"
+      ],
+      "short_public_quotes": [],
+      "image": {
+        "status": "NOT_ATTACHED",
+        "url": null,
+        "attribution": null,
+        "note": "No logo attached until usage is permitted."
+      },
+      "research_status": "PREPARED_PUBLIC_SEED",
+      "last_researched_utc": "2026-10-15T00:00:00Z",
+      "requires_refresh": true,
+      "arabic_names": [],
+      "pronunciation": [],
+      "one_line": "A Qatar Financial Centre-registered angel fund launched in 2018 that provides seed funding to early-stage technology startups.",
+      "location": "Doha, Qatar",
+      "role": null,
+      "identity_read": "STRONG",
+      "source_ids": ["QI37"]
+    }
+  ],
+  "seed_version": "1.0",
+  "verified_at": "2026-10-15",
+  "verification_method": "Pages fetched 2026-10-15 by a page-fetch tool; excerpts are verbatim and stored with each source. Pages that failed (HTTP 403/404/503) are NOT_FETCHED and nothing is claimed from them alone."
+}
