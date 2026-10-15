@@ -3,5 +3,49 @@
     "companyId": "84b9641f-b618-4fa3-8b35-1d19b1c71d82",
     "mediaId": "2d0a6f16-da30-4ce2-bf67-85ad269dbc6a",
     "published": true
+  },
+  "fw-tarmacly": {
+    "companyId": "94ec9c88-d157-49d1-9bf4-fc01d1e7b8d3",
+    "mediaId": "f3aec1c0-1dca-4c6b-a645-1d7b904b5aca",
+    "published": true
+  },
+  "fw-yamfield-agro": {
+    "companyId": "e850cde3-bc05-443a-92d6-5b327d41644f",
+    "mediaId": "2c025df1-cdd4-4cd3-b0da-990a1c01fe2d",
+    "published": true
+  },
+  "fw-clinicrest": {
+    "companyId": "6b2f9851-d7e3-4197-9fd1-beffbdc153fe",
+    "mediaId": "20e8c6c9-45a8-44c6-935a-4aeaf83495ac",
+    "published": true
+  },
+  "fw-marketlight-grids": {
+    "companyId": "58540e1e-5be1-473e-bd88-72ac932c94cb",
+    "mediaId": "c04ff3da-4ebb-4b8f-bde6-f96162151fbc",
+    "published": true
+  },
+  "fw-tallyloom": {
+    "companyId": "40b1e42b-8b81-45ac-bacd-688c70852b17",
+    "mediaId": "f6b7f1e5-6f63-4c80-a594-170bffe329b1",
+    "published": true
+  },
+  "fw-ajopot": {
+    "companyId": "91de2a77-fe47-4af0-8534-d9abf9c55949",
+    "mediaId": "c8b47c52-0332-45c0-9d50-60a6627bf6f0",
+    "published": true
+  },
+  "fw-maji-loop": {
+    "companyId": "01c554bf-8bf1-4eb7-b460-5d841764c40b",
+    "mediaId": "1f0236bc-8a47-4bd5-bf7c-5c6aee5ebc64",
+    "published": true
+  },
+  "fw-nsuo-labs": {
+    "companyId": "b439cd80-55d4-491a-922f-95650c38a056",
+    "mediaId": "47dd744d-386f-42e3-b4fa-8cc4ff45d2c9",
+    "published": true
+  },
+  "fw-brightkloof-energy": {
+    "companyId": "37b0c9a0-c160-406e-9b83-04496665965d",
+    "mediaId": "520ef763-f165-4b3a-bd2d-7091cce694a2"
   }
 }

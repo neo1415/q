@@ -38,6 +38,10 @@ for (const job of jobs) {
   const v = (ledger.videos[job.slug] ??= {});
   if ((v.file && fs.existsSync(v.file)) || v.videoId) continue;
   for (;;) {
+    // Keys the lead has reserved (key#1 is also the Railway-configured key
+    // used by the live app): never used for new seeding jobs.
+    while ((ledger.excluded ?? []).includes(tag(ledger.activeKey)))
+      ledger.activeKey += 1;
     const i = ledger.activeKey;
     if (i >= keys().length) {
       console.log("ALL KEYS EXHAUSTED");

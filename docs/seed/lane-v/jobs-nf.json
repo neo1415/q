@@ -1,0 +1,326 @@
+[
+ {
+  "slug": "nf-103-tunde-cargo",
+  "n": 103,
+  "company": "Harbourline Cargo",
+  "founder": "Babatunde Oyelaran",
+  "replica_id": "r4ba1277e4fb",
+  "script": "At Apapa, a container that waits for a truck costs its owner money every day. Babatunde Oyelaran was a clearing agent there, and he built Harbourline Cargo to end that wait. Importers book vetted container trucks, track each move from terminal to warehouse, and keep the paperwork in one place. Harbourline now runs 3,900 container moves a month for 410 importers. It is raising a 9 million dollar Series A, for truck finance and two more ports. 35 percent of the new money goes to truck finance partnerships. I'm an AI presenter, sharing this pitch.",
+  "rank": 1
+ },
+ {
+  "slug": "nf-102-pesaflow",
+  "n": 102,
+  "company": "Dawaledger",
+  "founder": "Wairimu Njoroge",
+  "replica_id": "rcd970fadf46",
+  "script": "I'm an AI presenter, and this is Dawaledger. A Nairobi pharmacy can pay twenty distributors a month, mostly by hand. Wairimu Njoroge, a pharmacist herself, built Dawaledger to do it in one place. Pharmacies reconcile every invoice, pay by M-Pesa, and can draw up to thirty days of credit from a partner bank. 2,150 pharmacies now move about 6.8 million dollars a month through it. Dawaledger is raising a 7 million dollar Series A, to launch in Uganda. 30 percent of the new money goes to credit capital partnerships.",
+  "rank": 2
+ },
+ {
+  "slug": "nf-108-karoo-grid",
+  "n": 108,
+  "company": "Karoo Gridworks",
+  "founder": "Sipho Dlamini",
+  "replica_id": "rccbeedfc684",
+  "script": "A South African factory can install batteries and still pay peak tariffs, because nobody decides when to use them. Sipho Dlamini spent nine years in grid planning before co-founding Karoo Gridworks. Its software forecasts each site's load and tariffs, and dispatches batteries and solar on its own. It manages 141 sites and 67 megawatts of storage. Karoo Gridworks is raising 110 million rand in Series A equity. 40 percent of the new money goes to engineering and forecasting. I'm an AI presenter, summarising the company's pitch.",
+  "rank": 3
+ },
+ {
+  "slug": "nf-122-kisan-ledger",
+  "n": 122,
+  "company": "Arhat Ledger",
+  "founder": "Ananya Deshpande",
+  "replica_id": "r4dc9377a68e",
+  "script": "I'm an AI presenter, and this is Arhat Ledger. In an Indian grain mandi, the commission agent is the bank, the ledger and the payment rail, mostly on paper. Ananya Deshpande worked on mandi reform before co-founding Arhat Ledger. Agents keep their books in the app, pay farmers the same day, and draw working capital from partner lenders. 6,200 agents record about 520 crore rupees of trade a month. Arhat Ledger is raising a 10 million dollar Series A. 30 percent of the new money goes to lending partnerships.",
+  "rank": 4
+ },
+ {
+  "slug": "nf-132-riyadh-site",
+  "n": 132,
+  "company": "Binaa Sitewatch",
+  "founder": "Omar Haddad",
+  "replica_id": "rc39f215e8cb",
+  "script": "I'm an AI presenter, sharing Binaa Sitewatch' pitch. A developer in the Gulf may release millions to a contractor on a progress report it cannot easily check. Omar Haddad spent eleven years in project controls, and built Binaa Sitewatch to verify progress from the site itself. Weekly drone and 360-degree captures are compared with the schedule, and turned into a verified report. Binaa Sitewatch tracks 96 projects, with 4.2 million dollars of annual recurring revenue. It is raising a 12 million dollar Series A. 35 percent of the new money goes to riyadh office.",
+  "rank": 5
+ },
+ {
+  "slug": "nf-109-afya-scan",
+  "n": 109,
+  "company": "Afyascan",
+  "founder": "Dr. Grace Nakato",
+  "replica_id": "r5d40691d88d",
+  "script": "I'm an AI presenter, here with Afyascan's pitch. In much of rural Uganda, there is no specialist to read a cervical screening. Dr. Grace Nakato, a gynaecologist, built Afyascan to bring one in. Nurses capture images with a phone attachment, and specialists review them remotely, while the clinic tracks every follow-up. 52 clinics now run about 2,600 screenings a month. Afyascan does not diagnose on its own. It is raising 1.8 million dollars on a SAFE. 35 percent of the new money goes to clinic rollout.",
+  "rank": 6
+ },
+ {
+  "slug": "nf-113-umoja-insure",
+  "n": 113,
+  "company": "Umoja Cover",
+  "founder": "Brian Otieno",
+  "replica_id": "rccbeedfc684",
+  "script": "For a boda-boda rider in Nairobi, one accident can cost a year of savings. Brian Otieno, an actuary, built Umoja Cover so it doesn't. Riders buy health cover by the week, paid from their earnings inside the ride apps they already use. A licensed insurer underwrites it, and claims are paid by M-Pesa, in about three days. 41,000 riders are covered. Umoja Cover is raising 2.2 million dollars on a SAFE. 35 percent of the new money goes to distribution partnerships. I'm an AI presenter, sharing the company's pitch.",
+  "rank": 7
+ },
+ {
+  "slug": "nf-119-brixton-build",
+  "n": 119,
+  "company": "Plumbline Assure",
+  "founder": "Kwesi Mensah",
+  "replica_id": "rccbeedfc684",
+  "script": "I'm an AI presenter, with Plumbline Assure's pitch. A UK housing association has to prove that fire-safety work was done properly, building by building. Kwesi Mensah led compliance at a London housing association, and too often that proof was in a contractor's inbox. With Plumbline Assure, contractors capture evidence on site, and it becomes an audit-ready record. It covers 210,000 homes, and annual recurring revenue is 3.1 million pounds. Plumbline Assure is raising an 8 million pound Series A. 35 percent of the new money goes to engineering.",
+  "rank": 8
+ },
+ {
+  "slug": "nf-127-hanoi-ev",
+  "n": 127,
+  "company": "Pinlane",
+  "founder": "Tran Minh Khoa",
+  "replica_id": "r8495a788aa1",
+  "script": "For a delivery rider in Ho Chi Minh City, an hour spent charging is an hour without income. Tran Minh Khoa, an energy-storage engineer, founded Pinlane so riders never wait. They swap a scooter battery at a station in under a minute, on a monthly plan. 410 stations now serve 14,000 riders. Pinlane is raising a 15 million dollar Series A, mostly for stations and batteries, and to launch in Hanoi. 50 percent of the new money goes to stations and batteries. I'm an AI presenter, sharing the company's pitch.",
+  "rank": 9
+ },
+ {
+  "slug": "nf-129-sao-paulo-freight",
+  "n": 129,
+  "company": "Carga Certa",
+  "founder": "Diego Almeida",
+  "replica_id": "r3a715eeff8d",
+  "script": "In Brazil, every truckload comes with an electronic freight document, and many of them don't match the agreed rate. Diego Almeida ran logistics at a manufacturer, and saw the overpayments add up. Carga Certa audits every freight document against the shipper's contracts, and then pays carriers in one batch. 190 shippers use it, auditing about 165 million reais of freight a month. Carga Certa is raising 40 million reais in Series A equity. 35 percent of the new money goes to engineering. I'm an AI presenter, sharing this pitch.",
+  "rank": 10
+ },
+ {
+  "slug": "nf-106-mavuno-cold",
+  "n": 106,
+  "company": "Mavuno Cold",
+  "founder": "Neema Mollel",
+  "replica_id": "r1a0108fbd75",
+  "script": "Tomatoes at Kariakoo market have about two days before they spoil. Neema Mollel, a supply-chain analyst, founded Mavuno Cold to give traders more time. Its solar cold rooms sit inside the market, and traders pay per crate, per day, by mobile money. Nineteen rooms are live, storing about 31,000 crates a month. Mavuno Cold is raising 2 million dollars in equity, for twenty more rooms in Dar es Salaam, Arusha and Mwanza. 50 percent of the new money goes to twenty new rooms. This pitch is presented by an AI presenter.",
+  "rank": 11
+ },
+ {
+  "slug": "nf-105-dakar-learn",
+  "n": 105,
+  "company": "Xam Xam Learn",
+  "founder": "Mamadou Diallo",
+  "replica_id": "rccbeedfc684",
+  "script": "I'm an AI presenter, and this is Xam Xam Learn's pitch. Mamadou Diallo taught mathematics in Dakar for years, and saw students fail exams for want of a good lesson, not ability. Xam Xam Learn sends short audio lessons and quizzes over WhatsApp, written by Senegalese teachers for the national exams. 14,800 families now pay for it, and 46 schools have signed on. The company is raising 1.2 million euros on a SAFE, to launch in Côte d'Ivoire. 35 percent of the new money goes to curriculum content.",
+  "rank": 12
+ },
+ {
+  "slug": "nf-121-toronto-credit",
+  "n": 121,
+  "company": "Landfall Credit",
+  "founder": "Chidi Anyanwu",
+  "replica_id": "r4ba1277e4fb",
+  "script": "Chidi Anyanwu moved from Lagos to Toronto with a strong credit history. In Canada, it counted for nothing. Now a credit-risk modeller, he founded Landfall Credit for newcomers like him. With their consent, members bring their overseas banking history, open a credit-builder account, and borrow from a partner lender at fair rates. 36,000 members use it, and annual losses are about three percent. Landfall is raising 6 million Canadian dollars. 30 percent of the new money goes to lending partnerships. I'm an AI presenter, sharing this pitch.",
+  "rank": 13
+ },
+ {
+  "slug": "nf-115-kivu-coffee",
+  "n": 115,
+  "company": "Kivu Traceworks",
+  "founder": "Esther Kavira",
+  "replica_id": "rcd970fadf46",
+  "script": "Coffee from the hills above Lake Kivu can win specialty prices. Most of it is still sold anonymously, at commodity rates. Esther Kavira, a quality grader, founded Kivu Traceworks to connect those growers to roasters. Each lot is tracked from washing station to port, and roasters buy it directly. Kivu Traceworks exported 240 tonnes in the last twelve months, from 6,400 registered growers. It is raising 1.6 million dollars in equity. 40 percent of the new money goes to pre-harvest finance for growers. I'm an AI presenter, sharing this pitch.",
+  "rank": 14
+ },
+ {
+  "slug": "nf-116-joburg-fleet",
+  "n": 116,
+  "company": "Rankpay",
+  "founder": "Thabo Nkosi",
+  "replica_id": "r4ba1277e4fb",
+  "script": "Most South Africans commute by minibus taxi, and almost every fare is cash. That means owners cannot show income, and cannot borrow to replace old vehicles. Thabo Nkosi grew up in a taxi-owning family in Soweto, and built Rankpay to fix both. Commuters tap to pay on the driver's phone, owners see every fare, and a bank partner finances vehicles on that record. 1,850 taxis use it. Rankpay is raising 45 million rand. 35 percent of the new money goes to vehicle-finance book (with bank partner). I'm an AI presenter, sharing this pitch.",
+  "rank": 15
+ },
+ {
+  "slug": "nf-135-austin-ag",
+  "n": 135,
+  "company": "Tilthmark",
+  "founder": "Hannah Whitaker",
+  "replica_id": "rc8992fe8e8e",
+  "script": "Farmers can be paid for storing carbon in their soil, but only if buyers trust the measurement. Hannah Whitaker, a soil scientist, founded Tilthmark to earn that trust. It combines soil samples, lab results and satellite data into field-level estimates, and states the uncertainty instead of hiding it. Tilthmark has measured 920,000 acres for 13 programmes. It is raising a 14 million dollar Series A. 30 percent of the new money goes to soil lab capacity. I'm an AI presenter, and this is a summary of the company's pitch.",
+  "rank": 16
+ },
+ {
+  "slug": "nf-110-naija-reels",
+  "n": 110,
+  "company": "Studio Ekun",
+  "founder": "Folasade Adeyemi",
+  "replica_id": "r38a383b0173",
+  "script": "A Nollywood producer can sell one film to five platforms, and still not know what it has earned. Folasade Adeyemi negotiated those deals as a lawyer, then founded Studio Ekun. It keeps every right, territory and licence window in one catalogue, and reconciles royalty statements platform by platform. 240 producers pay for it, covering 4,300 titles. Studio Ekun is raising 1.4 million dollars on a SAFE. 40 percent of the new money goes to product. Kunle Bakare is CTO. I'm an AI presenter, and this is the company's pitch.",
+  "rank": 17
+ },
+ {
+  "slug": "nf-112-sahel-solar",
+  "n": 112,
+  "company": "Sahel Pumps",
+  "founder": "Fatoumata Traoré",
+  "replica_id": "radb9683b0eb",
+  "script": "Along the Niger River, many market gardeners grow one season a year, because diesel is too expensive for more. Fatoumata Traoré ran rural-energy programmes for eight years, then founded Sahel Pumps. Gardeners get a solar irrigation pump and pay for it over 24 months by mobile money. 3,100 pumps are in service, and about nine in ten instalments arrive on time. Sahel Pumps is raising 2.5 million euros, to launch in Burkina Faso. 45 percent of the new money goes to pump inventory financing. This pitch is presented by an AI presenter.",
+  "rank": 18
+ },
+ {
+  "slug": "nf-101-kilnworks",
+  "n": 101,
+  "company": "Laterra Bricks",
+  "founder": "Akosua Mensah-Boateng",
+  "replica_id": "r4f5b5ef55c8",
+  "script": "A two-bedroom home in Kumasi can spend a large share of its budget on blocks. Laterra Bricks makes them differently. Its mobile presses turn local soil into stabilised earth bricks, right on the building site. Akosua Mensah-Boateng, a civil engineer, started the company in 2022. Laterra Bricks has delivered 4.6 million bricks, and 112 contractors now buy from it. It is raising 1.5 million dollars in priced equity, for six more presses and a certified lab. 45 percent of the new money goes to six more mobile presses. I'm an AI presenter, sharing Laterra's pitch.",
+  "rank": 19
+ },
+ {
+  "slug": "nf-126-manila-nurse",
+  "n": 126,
+  "company": "Pasashift",
+  "founder": "Maria Clara Santos",
+  "replica_id": "r1ce7f5b22d4",
+  "script": "As nurses leave the Philippines to work abroad, Manila's private hospitals struggle to cover every shift. Maria Clara Santos was a nurse manager, and spent too many nights calling agencies. Pasashift lets hospitals post shifts, and licence-checked nurses pick them up and are paid weekly. 33 hospitals now fill about 5,400 shifts a month through it. Pasashift is raising 3.5 million dollars in equity, to launch in Cebu. 30 percent of the new money goes to cebu launch. I'm an AI presenter, and this is the company's pitch.",
+  "rank": 20
+ },
+ {
+  "slug": "nf-123-pune-robotics",
+  "n": 123,
+  "company": "Jodna Robotics",
+  "founder": "Vikram Kulkarni",
+  "replica_id": "rf8f3aa4b33e",
+  "script": "A small auto-component plant near Pune can have the orders, but not the welders. Vikram Kulkarni spent ten years in robotics at a car maker, and founded Jodna to bring welding robots to plants that never could afford one. Its collaborative cells learn a weld by demonstration, and are leased by the month. 74 cells now run at 37 manufacturers. Jodna is raising 5 million dollars in equity, to open a Chennai service hub. 40 percent of the new money goes to cell manufacturing. I'm an AI presenter, sharing this pitch.",
+  "rank": 21
+ },
+ {
+  "slug": "nf-128-bogota-shop",
+  "n": 128,
+  "company": "Mostrador",
+  "founder": "Mateo Restrepo",
+  "replica_id": "rbb3d627a705",
+  "script": "I'm an AI presenter, and this is Mostrador. Mateo Restrepo grew up behind the counter of his family's tienda in Bogotá, where stock lived in a notebook and in his mother's memory. Mostrador turns a phone into a till that tracks every sale and every item, and offers supplier credit based on that record. 8,300 shops pay for it. Mostrador is raising 4.5 million dollars in equity, to reach Medellín and Cali. 35 percent of the new money goes to credit capital. Laura Gómez is CTO.",
+  "rank": 22
+ },
+ {
+  "slug": "nf-120-paris-care",
+  "n": 120,
+  "company": "Aïna Care",
+  "founder": "Aïssatou Ba",
+  "replica_id": "radb9683b0eb",
+  "script": "A home carer in France can spend more time on the road and on paperwork than with the people she cares for. Aïssatou Ba ran a home-care agency for six years, and built Aïna Care for agencies like hers. It plans visits around real travel times, gives carers an app for visit notes, and prepares billing for local authorities. 128 agencies and 4,700 carers use it. Aïna Care is raising 3 million euros. 35 percent of the new money goes to product. I'm an AI presenter, sharing this pitch.",
+  "rank": 23
+ },
+ {
+  "slug": "nf-118-hairline",
+  "n": 118,
+  "company": "Kinkora",
+  "founder": "Simone Okonkwo-Harris",
+  "replica_id": "r1a0108fbd75",
+  "script": "Ask anyone with coily hair how many products are under their sink. Simone Okonkwo-Harris spent eight years in brand management, and founded Kinkora to stop the guessing. Customers build a hair profile that a licensed stylist reviews, then get a routine and monthly refills. 19,000 people subscribe, and 63 percent are still subscribed six months later. Kinkora is raising 4 million dollars in priced equity. 35 percent of the new money goes to growth marketing. Marcus Bell is COO. I'm an AI presenter, sharing the company's pitch.",
+  "rank": 24
+ },
+ {
+  "slug": "nf-125-jakarta-stock",
+  "n": 125,
+  "company": "Rantai Warung",
+  "founder": "Rizky Pratama",
+  "replica_id": "r31e11adf1d3",
+  "script": "I'm an AI presenter, here with Rantai Warung's pitch. A Jakarta warung owner can spend hours a week riding to wholesalers, cash in hand. Rizky Pratama managed categories at a distributor, and founded Rantai Warung to bring the wholesalers to the warung. Owners order from several distributors in one app, get next-day delivery, and can pay within seven days. 12,500 warungs order about 3.6 million dollars a month. Rantai Warung is raising 6 million dollars, to expand to Surabaya. 35 percent of the new money goes to surabaya expansion.",
+  "rank": 25
+ },
+ {
+  "slug": "nf-133-cairo-tutor",
+  "n": 133,
+  "company": "Sabbura",
+  "founder": "Nour El-Din Fahmy",
+  "replica_id": "r983d5889432",
+  "script": "Egyptian families spend heavily on private tutors for the Thanaweya Amma exams. Nour El-Din Fahmy taught physics in Giza, and ran a tutoring centre, before founding Sabbura. Students practise maths and science in Arabic, and every answer is marked step by step, with explanations recorded by teachers. 27,000 students pay for it. Sabbura is raising 3 million dollars on a SAFE, to grow in Egypt and adapt to the Saudi curriculum. 35 percent of the new money goes to content. I'm an AI presenter, and this is the company's pitch.",
+  "rank": 26
+ },
+ {
+  "slug": "nf-131-cdmx-health",
+  "n": 131,
+  "company": "Consultorio Común",
+  "founder": "Sofía Hernández",
+  "replica_id": "rc8992fe8e8e",
+  "script": "Millions of people in Mexico City work without social security, and see a different doctor every time they fall ill. Dr. Sofía Hernández worked in community clinics in Iztapalapa, and founded Consultorio Común to give them one doctor who knows them. Members pay monthly for a named doctor, teleconsultations and cheaper lab tests. 23,000 members are enrolled across nine clinics. Consultorio Común is raising 5 million dollars in equity. 40 percent of the new money goes to new clinics. I'm an AI presenter, sharing this pitch.",
+  "rank": 27
+ },
+ {
+  "slug": "nf-134-berlin-heat",
+  "n": 134,
+  "company": "Pumpenrat",
+  "founder": "Jonas Becker",
+  "replica_id": "rff4f230c435",
+  "script": "I'm an AI presenter, here with Pumpenrat's pitch. Germany needs millions of heat pumps installed, and installers lose days on each one to calculations and subsidy forms. Jonas Becker is a master installer, and built Pumpenrat from his own workshop. Installers survey the house in an app, the heat load is calculated, and the subsidy application is prepared for the homeowner. 620 installers pay for it. Pumpenrat is raising 4 million euros, and will launch in Austria. 40 percent of the new money goes to product.",
+  "rank": 28
+ },
+ {
+  "slug": "nf-107-ledgerkid",
+  "n": 107,
+  "company": "Bursary Bridge",
+  "founder": "Hadiza Abubakar",
+  "replica_id": "red9211eea81",
+  "script": "Every September, some Nigerian children miss school while their parents find a whole term's fees at once. Hadiza Abubakar saw it as a school bursar. Bursary Bridge lets parents pay in instalments, and pays the school in full on day one, through a lending partner. Thirty-one schools and 1,350 families are on its pilot. Repayment data covers only two terms so far. Bursary Bridge is raising 600,000 dollars on a SAFE. 35 percent of the new money goes to lending partnerships. I'm an AI presenter, sharing the company's pitch.",
+  "rank": 29
+ },
+ {
+  "slug": "nf-104-shamba-sense",
+  "n": 104,
+  "company": "Shambasense",
+  "founder": "Aline Uwimana",
+  "replica_id": "r38a383b0173",
+  "script": "When should a Rwandan smallholder add fertiliser? Usually, it's a guess. Aline Uwimana, an agronomist, started Shambasense to replace that guess. A shared solar soil probe measures moisture and nutrients, and farmers get plain advice by SMS, in Kinyarwanda. Seventeen cooperatives, about 3,200 farmers, now use it in pilots. It is early, and the yield data is still coming in. Shambasense is raising 450,000 dollars on a SAFE. 40 percent of the new money goes to probe manufacturing. I'm an AI presenter, sharing the company's pitch.",
+  "rank": 30
+ },
+ {
+  "slug": "nf-124-ashaa-care",
+  "n": 124,
+  "company": "Janani Voice",
+  "founder": "Dr. Kavya Srivastava",
+  "replica_id": "rf0a4c22b435",
+  "script": "In rural Uttar Pradesh, a community health worker may carry the records of hundreds of pregnancies in a paper register. Dr. Kavya Srivastava ran a maternal-health programme there, and built Janani Voice so fewer warning signs are missed. Workers speak their visit notes in Hindi, and risk flags go straight to their nurse. 1,400 workers in six district pilots use it. Outcome data is still early. Janani Voice is raising 700,000 dollars on a SAFE. 35 percent of the new money goes to speech models for dialects. I'm an AI presenter, sharing this pitch.",
+  "rank": 31
+ },
+ {
+  "slug": "nf-114-lagos-legal",
+  "n": 114,
+  "company": "Clausekind",
+  "founder": "Ngozi Okafor-Bello",
+  "replica_id": "r4f5b5ef55c8",
+  "script": "I'm an AI presenter, with Clausekind's pitch. Most small businesses in Lagos sign tenancy and supplier contracts without a lawyer, because one costs too much. Ngozi Okafor-Bello practised commercial law for seven years, and founded Clausekind to change the price. It drafts and reviews contracts in plain language, and a licensed Nigerian lawyer signs off every document. 310 businesses have paid for a document, and it completes about 940 a month. Clausekind is raising 350,000 dollars on a SAFE. 45 percent of the new money goes to product.",
+  "rank": 32
+ },
+ {
+  "slug": "nf-111-accra-health",
+  "n": 111,
+  "company": "Kliniqa",
+  "founder": "Kwame Adjei-Larbi",
+  "replica_id": "r4ba1277e4fb",
+  "script": "I'm an AI presenter, sharing Kliniqa's pitch. In Accra, a patient referred from one clinic to another often repeats the same tests, because the records don't travel. Dr. Kwame Adjei-Larbi led health informatics at a teaching hospital, and built Kliniqa so they can. Clinics keep records and send referrals in one system, shared only with the patient's consent. Twenty-four clinics use it today, and most are not paying yet. Kliniqa is raising 500,000 dollars on a SAFE. 45 percent of the new money goes to product and security.",
+  "rank": 33
+ },
+ {
+  "slug": "nf-117-addis-pharma",
+  "n": 117,
+  "company": "Kefet Rx",
+  "founder": "Selam Tesfaye",
+  "replica_id": "red9211eea81",
+  "script": "I'm an AI presenter, and this is Kefet Rx. When a pharmacy in Addis Ababa runs short of an essential medicine, it starts phoning importers, one by one. Selam Tesfaye managed hospital procurement, and built Kefet Rx to replace those calls with one ordering app, showing stock across licensed importers. 260 pharmacies place about 2,400 orders a month through it. Importer commissions have only just started. Kefet Rx is raising 400,000 dollars on a SAFE. 40 percent of the new money goes to importer integrations. Dawit Alemu is CTO.",
+  "rank": 34
+ },
+ {
+  "slug": "nf-130-lima-water",
+  "n": 130,
+  "company": "Tinaja",
+  "founder": "Valeria Quispe",
+  "replica_id": "r983d5889432",
+  "script": "On Lima's hillsides, many families buy water from trucks, at several times the price of piped water, with no idea if it is clean. Valeria Quispe, a water engineer, founded Tinaja to change that. Households rent a tank with sensors that order refills from vetted suppliers and check water quality. Nine hundred households use it across three pilot neighbourhoods. Tinaja is raising 500,000 dollars on a SAFE. 45 percent of the new money goes to tanks and sensors. I'm an AI presenter, and this summary is the company's own.",
+  "rank": 35
+ },
+ {
+  "slug": "nf-136-lisbon-tourism",
+  "n": 136,
+  "company": "Lota Viva",
+  "founder": "Inês Carvalho",
+  "replica_id": "r011ad7b5727",
+  "script": "I'm an AI presenter, with Lota Viva's pitch. A small boat off the Algarve can land excellent fish, and still sell it at the lowest price, because nobody can prove how it was caught. Inês Carvalho, a marine biologist, founded Lota Viva to give fishers that proof. They log each catch in a simple app, and the data reaches the auction with the fish. 310 vessels log catches, across five auctions in pilot. Lota Viva is raising 600,000 euros on a SAFE. 35 percent of the new money goes to auction integrations.",
+  "rank": 36
+ }
+]

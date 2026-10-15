@@ -1,9 +1,14 @@
 {
- "activeKey": 0,
+ "activeKey": 1,
  "keys": {
   "key#1": {
-   "videos": 6,
-   "seconds": 224.9,
+   "videos": 13,
+   "seconds": 463.5,
+   "refusal": "HTTP 402 {\"message\":\"Payment required\"}"
+  },
+  "key#2": {
+   "videos": 0,
+   "seconds": 0,
    "refusal": null
   }
  },
@@ -46,37 +51,51 @@
   "fw-clinicrest": {
    "videoId": "190b96590f",
    "key": "key#1",
-   "replica": "rcd970fadf46"
+   "replica": "rcd970fadf46",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-clinicrest.mp4",
+   "seconds": 39.9
   },
   "fw-marketlight-grids": {
    "videoId": "201849d59e",
    "key": "key#1",
-   "replica": "r4f5b5ef55c8"
+   "replica": "r4f5b5ef55c8",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-marketlight-grids.mp4",
+   "seconds": 31.2
   },
   "fw-tallyloom": {
    "videoId": "10ac1227cc",
    "key": "key#1",
-   "replica": "r4ba1277e4fb"
+   "replica": "r4ba1277e4fb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-tallyloom.mp4",
+   "seconds": 35.9
   },
   "fw-maji-loop": {
    "videoId": "f7d9f0bba7",
    "key": "key#1",
-   "replica": "radb9683b0eb"
+   "replica": "radb9683b0eb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-maji-loop.mp4",
+   "seconds": 37.3
   },
   "fw-nsuo-labs": {
    "videoId": "11c81d2633",
    "key": "key#1",
-   "replica": "rccbeedfc684"
+   "replica": "rccbeedfc684",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-nsuo-labs.mp4",
+   "seconds": 32.8
   },
   "fw-brightkloof-energy": {
    "videoId": "51a7b24c87",
    "key": "key#1",
-   "replica": "r1a0108fbd75"
+   "replica": "r1a0108fbd75",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-brightkloof-energy.mp4",
+   "seconds": 32.8
   },
   "fw-souqsheet": {
    "videoId": "9a36e0da61",
    "key": "key#1",
-   "replica": "r983d5889432"
+   "replica": "r983d5889432",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-souqsheet.mp4",
+   "seconds": 28.7
   },
   "fw-kazikit": {
    "videoId": "da3fe79bce",
@@ -84,6 +103,65 @@
    "replica": "r4ba1277e4fb",
    "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-kazikit.mp4",
    "seconds": 33.3
+  },
+  "fw-souqsheet-v2": {
+   "videoId": "e1063c3cd6",
+   "key": "key#2",
+   "replica": "r983d5889432"
+  },
+  "nf-103-tunde-cargo": {
+   "videoId": "ec54c03dae",
+   "key": "key#2",
+   "replica": "r4ba1277e4fb"
+  },
+  "nf-102-pesaflow": {
+   "videoId": "38918930b0",
+   "key": "key#2",
+   "replica": "rcd970fadf46"
+  },
+  "nf-108-karoo-grid": {
+   "videoId": "e263e89d05",
+   "key": "key#2",
+   "replica": "rccbeedfc684"
+  },
+  "nf-122-kisan-ledger": {
+   "videoId": "46f100947c",
+   "key": "key#2",
+   "replica": "r4dc9377a68e"
+  },
+  "nf-132-riyadh-site": {
+   "videoId": "c8d05cf94f",
+   "key": "key#2",
+   "replica": "rc39f215e8cb"
+  },
+  "nf-109-afya-scan": {
+   "videoId": "517da3ff25",
+   "key": "key#2",
+   "replica": "r5d40691d88d"
+  },
+  "nf-113-umoja-insure": {
+   "videoId": "bad9da5372",
+   "key": "key#2",
+   "replica": "rccbeedfc684"
+  },
+  "nf-119-brixton-build": {
+   "videoId": "50f5df3ef5",
+   "key": "key#2",
+   "replica": "rccbeedfc684"
+  },
+  "nf-127-hanoi-ev": {
+   "videoId": "1293ca9d68",
+   "key": "key#2",
+   "replica": "r8495a788aa1"
+  },
+  "nf-129-sao-paulo-freight": {
+   "videoId": "b23a6741f5",
+   "key": "key#2",
+   "replica": "r3a715eeff8d"
   }
+ },
+ "excluded": [],
+ "notes": {
+  "key#1": "Lead 15 Oct: key#1 is NOT the Railway/Builder key; a disposable seeding key. Use until refusal."
  }
 }
