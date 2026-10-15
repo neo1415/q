@@ -134,6 +134,8 @@ export type GateqVideoSessionStore = {
   readonly openForApplication: (
     applicationId: string,
   ) => Promise<GateqVideoSessionRow | null>;
+  /** Sessions this application has ever had (its allowance used). */
+  readonly countForApplication: (applicationId: string) => Promise<number>;
   readonly byBridgeTokenHash: (
     hash: string,
   ) => Promise<GateqVideoSessionRow | null>;
@@ -230,8 +232,14 @@ export function createGateqVideoInterview(deps: {
     /** Whether this applicant may start (the lobby's question). */
     available: async (token: string): Promise<boolean> => {
       if (!deps.config.enabled || deps.provider === null) return false;
-      await deps.intake.authorise(token);
-      return true;
+      const guest = await deps.intake.authorise(token);
+      if (guest.application.status === "SUBMITTED") return false;
+      // Live 2026-10-15: the offer stayed up after the allowance was spent,
+      // so the button led only to a refusal. A used allowance is no offer.
+      return (
+        (await deps.store.countForApplication(guest.application.id)) <
+        deps.config.perApplication
+      );
     },
 
     start: async (input: {

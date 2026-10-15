@@ -24,12 +24,12 @@ describe("r3 premiere and the certification gate", () => {
       "s.pilot.compare",
       "s.premiere.gateq",
       "s.premiere.relationship",
+      "s.premiere.close",
     ]);
     const suppressed = gate.decisions.filter((d) => d.verdict === "SUPPRESSED");
     expect(suppressed.map((d) => d.sceneId)).toEqual([
       "s.premiere.privacy",
       "s.premiere.rehearsal",
-      "s.premiere.close",
     ]);
   });
 

@@ -217,7 +217,7 @@ describe("record GateQ applications", () => {
       day,
     );
     expect(row).toMatchObject({
-      title: "Seed gate · GQ-7",
+      title: "Seed gate",
       status: "Submitted 2026-10-02",
       href: `/gateq?tab=inbox&item=${submitted.applicationId}`,
       action: "Open the dossier",
@@ -230,11 +230,30 @@ describe("record GateQ applications", () => {
       day,
     );
     expect(rows[0]).toMatchObject({
-      title: "Application GQ-8",
+      title: "GateQ application",
       status: "In progress · started 2026-10-01",
       href: "/gateq?tab=applications",
       action: "Continue it in your applications",
     });
+  });
+
+  it("never titles a row with the opaque reference; numbers repeats", () => {
+    const rows = recordGateq(
+      {
+        relationshipId: RELATIONSHIP,
+        side: "INVESTOR",
+        items: [
+          submitted,
+          { ...submitted, applicationId: draft.applicationId },
+        ],
+      },
+      day,
+    );
+    expect(rows.map((row) => row.title)).toEqual([
+      "Seed gate · 1",
+      "Seed gate · 2",
+    ]);
+    expect(rows.some((row) => row.title.includes("GQ-7"))).toBe(false);
   });
 
   it("shows nothing for none and says an unreadable read plainly", () => {
