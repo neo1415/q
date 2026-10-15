@@ -658,6 +658,20 @@ describe("Q Pitch narration on the live line (owner 15 Oct)", () => {
     expect(h.bridge.state().transcript).toEqual([]);
   });
 
+  it("a tour brief is a standing instruction, not speech and not a request", () => {
+    const h = harness();
+    h.bridge.brief("Present the tour.");
+    expect(h.sent).toEqual([
+      expect.objectContaining({
+        type: "session.instructions.append",
+        delegation_id: null,
+        content: "Present the tour.",
+      }),
+    ]);
+    h.advance(10_000);
+    expect(h.asked).toEqual([]);
+  });
+
   it("sends nothing for an empty line", () => {
     const h = harness();
     h.bridge.narrate("   ");

@@ -181,6 +181,8 @@ export type VoiceSessionClient = {
    * call). Absent everywhere else, so the tour uses Q's standard TTS.
    */
   readonly narrate?: ((text: string) => boolean) | undefined;
+  /** Q Pitch: standing instructions for the rest of a GPT-Live call. */
+  readonly brief?: ((text: string) => boolean) | undefined;
   /** Q Pitch: silence (or restore) output at once; see LiveCall.hush. */
   readonly hush?: ((on: boolean) => void) | undefined;
   readonly setMuted: (muted: boolean) => void;

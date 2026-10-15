@@ -182,6 +182,17 @@ export function createNarrator(deps: NarratorDeps): Narrator {
   };
 }
 
+/** "Without voice" at the tour start: captions only, for this tab. */
+let voiceOn = true;
+
+export function setNarrationVoice(on: boolean): void {
+  voiceOn = on;
+}
+
+export function narrationVoiceOn(): boolean {
+  return voiceOn;
+}
+
 const MUTED_KEY = "cq.q.speech.muted";
 
 /** Standard-voice narration audio playing in this tab now. */
@@ -213,7 +224,7 @@ export async function standardVoiceLine(
   voice: QVoiceChoice,
   signal: AbortSignal,
 ): Promise<boolean> {
-  if (speechMuted() || signal.aborted) return false;
+  if (!voiceOn || speechMuted() || signal.aborted) return false;
   let url: string;
   try {
     const response = await fetch("/api/q-speech", {

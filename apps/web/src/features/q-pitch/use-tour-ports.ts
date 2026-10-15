@@ -34,6 +34,7 @@ import {
 import {
   abortableWait,
   createNarrator,
+  narrationVoiceOn,
   standardVoiceLine,
   type Narrator,
 } from "./narrator";
@@ -130,6 +131,7 @@ function sessionNarrator(current: () => QSessionValue | null): Narrator {
       const voice = current()?.voice;
       const client = voice?.client;
       if (
+        !narrationVoiceOn() ||
         voice === undefined ||
         client === undefined ||
         !voice.active ||

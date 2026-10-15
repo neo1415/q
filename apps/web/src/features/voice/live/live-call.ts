@@ -122,6 +122,8 @@ export type LiveCall = {
   readonly typed: (text: string) => void;
   /** Q Pitch: say one approved line verbatim on this call (see bridge). */
   readonly narrate: (text: string) => void;
+  /** Standing instructions for the rest of this call (see bridge). */
+  readonly brief: (text: string) => void;
   /**
    * Silence Q's output at once without touching the person's volume
    * choice: a cancelled narration (Pause, Skip, Back) stops being heard
@@ -1049,6 +1051,9 @@ export async function startLiveCall(
     },
     narrate: (text) => {
       bridge.narrate(text);
+    },
+    brief: (text) => {
+      bridge.brief(text);
     },
     hush: (on) => {
       hushed = on;

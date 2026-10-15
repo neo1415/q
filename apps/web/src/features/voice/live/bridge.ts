@@ -177,6 +177,8 @@ export type LiveBridge = {
    * not a request and Q Brain does not answer it.
    */
   readonly narrate: (text: string) => void;
+  /** Standing instructions for the rest of the call (a Q Pitch tour brief). */
+  readonly brief: (text: string) => void;
   readonly state: () => LiveBridgeState;
 };
 
@@ -661,6 +663,11 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
       const words = text.trim();
       if (words.length === 0) return;
       send("session.commentary.append", null, narrationContent(words));
+    },
+    brief: (text) => {
+      const words = text.trim();
+      if (words.length === 0) return;
+      send("session.instructions.append", null, words);
     },
     state: snapshot,
   };
