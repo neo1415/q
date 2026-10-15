@@ -57,6 +57,7 @@ import {
   RelationshipPipelineLimitError,
   RelationshipPipelineQueryError,
   RelationshipViewLimitError,
+  RelationshipNoteSupersededError,
   InterestNotPermittedError,
 } from "@capital-q/network";
 import {
@@ -455,6 +456,14 @@ function toProblem(
 
   if (error instanceof InterestIdempotencyConflictError) {
     return createProblemDetails({ code: "IDEMPOTENCY_CONFLICT", requestId });
+  }
+  // About the caller's own note: safe to say plainly.
+  if (error instanceof RelationshipNoteSupersededError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
   }
 
   // An answer is never overwritten; saying so is safe to the one party

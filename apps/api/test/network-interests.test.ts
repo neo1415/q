@@ -26,6 +26,8 @@ import {
   type RelationshipStatus,
   type RelationshipPipelineQueryService,
   type RelationshipViewService,
+  type RelationshipNoteService,
+  RelationshipNoteSupersededError,
   type RespondToInterestCommand,
 } from "@capital-q/network";
 import { CompanyIdSchema } from "@capital-q/companies";
@@ -169,6 +171,8 @@ function buildApp(
     readonly brief?: RelationshipBrief | null | undefined;
     /** CRM saved views; composed only when given. */
     readonly views?: RelationshipViewService | undefined;
+    /** CRM private notes (S3); composed only when given. */
+    readonly notes?: RelationshipNoteService | undefined;
     /** The pipeline read model (slice 3b); composed only when given. */
     readonly pipeline?: RelationshipPipelineQueryService | undefined;
     /** The party side relationshipById answers; null: not a party. */
@@ -310,6 +314,9 @@ function buildApp(
       ...(options.views === undefined
         ? {}
         : { relationshipViews: options.views }),
+      ...(options.notes === undefined
+        ? {}
+        : { relationshipNotes: options.notes }),
       ...(options.pipeline === undefined
         ? {}
         : { relationshipPipeline: options.pipeline }),
@@ -1100,6 +1107,101 @@ describe("GET /v1/network/relationships/:relationshipId/gateq-applications", () 
     });
     expect(reads.find((r) => r["read"] === "GATEQ")).toMatchObject({
       side: "COMPANY",
+    });
+  });
+});
+
+describe("CRM private notes HTTP boundary (S3)", () => {
+  const RELATIONSHIP = "a0000000-0000-4000-8000-000000000101";
+  const NOTE = "b0000000-0000-4000-8000-000000000101";
+  const COMPANY_ID = "c0000000-0000-4000-8000-000000000101";
+  const note = {
+    id: NOTE,
+    body: "Strong team",
+    authorName: null,
+    authoredByMe: true,
+    createdAt: "2026-10-15T10:00:00.000Z",
+    supersedesNoteId: null,
+  };
+  function notes(fail?: Error) {
+    const seen: unknown[][] = [];
+    const service: RelationshipNoteService = {
+      list: (...args) => {
+        seen.push(["list", ...args]);
+        return Promise.resolve({
+          items: [note],
+          visibility: "organisation_private",
+        });
+      },
+      add: (...args) => {
+        seen.push(["add", ...args]);
+        return fail === undefined
+          ? Promise.resolve(note)
+          : Promise.reject(fail);
+      },
+    };
+    return { service, seen };
+  }
+
+  it("reads each side's own notes under the actor, never cached", async () => {
+    const { service, seen } = notes();
+    const { app } = buildApp({ notes: service });
+    const investor = await app.inject({
+      method: "GET",
+      url: `/v1/network/relationships/${RELATIONSHIP}/notes`,
+    });
+    expect(investor.statusCode).toBe(200);
+    expect(investor.headers["cache-control"]).toBe("no-store");
+    expect(investor.json()).toMatchObject({
+      visibility: "organisation_private",
+    });
+    await app.inject({
+      method: "GET",
+      url: `/v1/network/companies/${COMPANY_ID}/relationships/${RELATIONSHIP}/notes`,
+    });
+    expect(seen).toEqual([
+      ["list", CONTEXT, RELATIONSHIP, undefined],
+      ["list", CONTEXT, RELATIONSHIP, COMPANY_ID],
+    ]);
+  });
+
+  it("adds a note through the contract, and refuses a blank or extra field", async () => {
+    const { service, seen } = notes();
+    const { app } = buildApp({ notes: service });
+    const added = await app.inject({
+      method: "PUT",
+      url: `/v1/network/companies/${COMPANY_ID}/relationships/${RELATIONSHIP}/notes/${NOTE}`,
+      payload: { body: "Strong team" },
+    });
+    expect(added.statusCode).toBe(200);
+    expect(added.json()).toMatchObject({ id: NOTE });
+    for (const bad of [
+      { body: "   " },
+      { body: "x", visibility: "public_external" },
+    ]) {
+      const refused = await app.inject({
+        method: "PUT",
+        url: `/v1/network/relationships/${RELATIONSHIP}/notes/${NOTE}`,
+        payload: bad,
+      });
+      expect(refused.statusCode).toBe(422);
+    }
+    expect(seen).toEqual([
+      ["add", CONTEXT, RELATIONSHIP, NOTE, { body: "Strong team" }, COMPANY_ID],
+    ]);
+  });
+
+  it("says a second correction conflicts, in words", async () => {
+    const { service } = notes(new RelationshipNoteSupersededError());
+    const { app } = buildApp({ notes: service });
+    const refused = await app.inject({
+      method: "PUT",
+      url: `/v1/network/relationships/${RELATIONSHIP}/notes/${NOTE}`,
+      payload: { body: "Again", supersedesNoteId: NOTE.replace("b0", "b1") },
+    });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toMatchObject({
+      detail: "That note was already corrected. Reload to see the latest.",
     });
   });
 });

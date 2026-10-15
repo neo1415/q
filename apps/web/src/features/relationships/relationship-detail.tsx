@@ -109,6 +109,7 @@ export function RelationshipDetail({
   fitAndInterest = null,
   work = null,
   gateq = null,
+  notes = null,
 }: {
   readonly side: RelationshipSide;
   readonly counterpart: string;
@@ -140,6 +141,8 @@ export function RelationshipDetail({
   readonly work?: ReactNode;
   /** GateQ applications on this relationship; null when there are none. */
   readonly gateq?: ReactNode;
+  /** This side's private notes (CRM S3); null when there is no record. */
+  readonly notes?: ReactNode;
 }) {
   // The match outlives CONNECTED (relationship-state.v2).
   const connected =
@@ -289,6 +292,12 @@ export function RelationshipDetail({
           {work === null || work === undefined ? null : (
             <Card title="Q Work" id="q-work">
               {work}
+            </Card>
+          )}
+
+          {notes === null || notes === undefined ? null : (
+            <Card title="Private notes" id="notes">
+              {notes}
             </Card>
           )}
 

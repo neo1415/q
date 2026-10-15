@@ -519,3 +519,8 @@ export {
   listRelationshipViews,
   saveRelationshipView,
 } from "./relationship-views.js";
+// CRM private notes (S3, 2026-10-15).
+export {
+  addRelationshipNote,
+  listRelationshipNotes,
+} from "./relationship-notes.js";

@@ -7,10 +7,12 @@ import {
   RelationshipDetail,
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
+import { RelationshipNotes } from "@/features/relationships/relationship-notes";
 import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
 import {
   recordFitRead,
   recordGateqRead,
+  recordNotesRead,
   recordWorkRead,
 } from "@/features/relationships/record-workspace-data";
 import {
@@ -47,10 +49,14 @@ export default async function InvestorRelationshipPage({
     return <RelationshipUnavailable sentence={loaded.sentence} />;
   }
   // GateQ applications on this relationship, by its canonical id (lane G).
-  const gateq =
+  // GateQ and this side's private notes: their own reads, side by side.
+  const [gateq, notes] =
     loaded.relationship === null
-      ? null
-      : await recordGateqRead(loaded.relationship.relationshipId);
+      ? [null, null]
+      : await Promise.all([
+          recordGateqRead(loaded.relationship.relationshipId),
+          recordNotesRead(loaded.relationship.relationshipId),
+        ]);
   const { relationship, own, counterpart } = loaded;
 
   // The investor's one action is expressing interest. Once it is
@@ -90,6 +96,16 @@ export default async function InvestorRelationshipPage({
         brief={loaded.brief}
         basePath={`/relationships/company/${loaded.companyId}`}
         gateq={gateq === null ? null : recordGateqSlot(gateq)}
+        notes={
+          notes === null || relationship === null ? null : (
+            <RelationshipNotes
+              relationshipId={relationship.relationshipId}
+              side="INVESTOR"
+              read={notes}
+              now={loaded.readAt}
+            />
+          )
+        }
         fitAndInterest={
           <FitAndInterest
             fit={fit}

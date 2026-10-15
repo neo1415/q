@@ -2,13 +2,19 @@ import {
   getFitProfiles,
   getRelationshipGateqApplications,
   listQWork,
+  listRelationshipNotes,
 } from "@capital-q/api-client";
 import type {
   FitProfileDto,
   RelationshipGateqApplicationsDto,
+  RelationshipNoteList,
 } from "@capital-q/contracts";
 
-import { apiSession, qApiSession } from "@/features/q/context";
+import {
+  apiSession,
+  qApiSession,
+  resolveOwnContext,
+} from "@/features/q/context";
 
 import { recordWork, type Read, type RecordWorkRow } from "./record-workspace";
 
@@ -58,6 +64,35 @@ export async function recordGateqRead(
     return {
       kind: "READ",
       value: await getRelationshipGateqApplications(session, relationshipId),
+    };
+  } catch {
+    return { kind: "UNAVAILABLE" };
+  }
+}
+
+/**
+ * The side's own private notes on this relationship (CRM S3). The side is
+ * the person's own active context (a founder's company, else their firm),
+ * never the URL; the API answers only that side's notes.
+ */
+export async function recordNotesRead(
+  relationshipId: string,
+): Promise<Read<RelationshipNoteList>> {
+  const [session, context] = await Promise.all([
+    apiSession(),
+    resolveOwnContext(),
+  ]);
+  if (session === null) return { kind: "UNAVAILABLE" };
+  if (context.kind !== "FOUNDER" && context.kind !== "INVESTOR")
+    return { kind: "UNAVAILABLE" };
+  try {
+    return {
+      kind: "READ",
+      value: await listRelationshipNotes(
+        session,
+        relationshipId,
+        context.kind === "FOUNDER" ? context.companyId : undefined,
+      ),
     };
   } catch {
     return { kind: "UNAVAILABLE" };
