@@ -19,6 +19,7 @@ import { ActorContextSchema } from "@capital-q/security";
 import { createSpecialistQAnswer } from "../src/answer.js";
 import {
   focusFromHistory,
+  hereFromManifest,
   listsFromHistory,
   listsFromManifest,
   referenceAskOf,
@@ -123,6 +124,7 @@ const resolve = (
       (block) => block.kind === "ANSWER_CARDS",
     ),
     focus: focusFromHistory(history),
+    here: hereFromManifest(manifest),
   });
 };
 
@@ -719,5 +721,80 @@ describe("opening an exact pipeline relationship uses its native link", () => {
         (b) => b.kind === "UI_INTENT" && b.intent.kind === "UI_ACT",
       ),
     ).toBe(false);
+  });
+});
+
+/**
+ * Lane W (2026-10-15): "this one" and "the second one" prefer what the
+ * person is looking at -- the records visible now, the pitch playing.
+ */
+describe("what they are looking at (lane W)", () => {
+  const co = (n: number) =>
+    `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const page = (extra: Partial<QPageManifest> = {}): QPageManifest => ({
+    v: 2,
+    seq: 1,
+    inView: ["list"],
+    dialogs: [],
+    sections: [
+      {
+        id: "list",
+        kind: "COMPANY_LIST",
+        refs: [1, 2, 3, 4, 5].map((n) => ({ kind: "COMPANY", id: co(n) })),
+        total: 5,
+        visible: [4, 5].map((n) => ({ kind: "COMPANY", id: co(n) })),
+      },
+    ],
+    ...extra,
+  });
+
+  it("reads 'this one' and 'the one I'm looking at'", () => {
+    expect(referenceAskOf("is this one a fit?")).toEqual({
+      kind: "THIS",
+      entityKind: null,
+    });
+    expect(referenceAskOf("tell me about this investor")).toEqual({
+      kind: "THIS",
+      entityKind: "INVESTOR_ORGANISATION",
+    });
+    expect(referenceAskOf("who made this pitch?")).toEqual({
+      kind: "THIS",
+      entityKind: "COMPANY",
+    });
+    // An ordinal still wins.
+    expect(referenceAskOf("this one, the second")?.kind).toBe("ORDINAL");
+  });
+
+  it("counts 'the second one' through what is visible first", () => {
+    expect(one(resolve("open the second one", [], page()))?.id).toBe(co(5));
+    // An older web sends no visible refs: the whole list, as before.
+    const older = page();
+    const [section] = older.sections;
+    if (section === undefined) throw new Error("fixture");
+    const { visible: _visible, ...rest } = section;
+    expect(
+      one(resolve("open the second one", [], { ...older, sections: [rest] }))
+        ?.id,
+    ).toBe(co(2));
+  });
+
+  it("binds 'this one' to the window, then focus, then the pitch, then what is visible", () => {
+    expect(one(resolve("is this one a fit?", [], page()))?.id).toBe(co(4));
+    const playing = page({
+      media: { kind: "PITCH", companyId: co(9), state: "PLAYING" },
+    });
+    expect(one(resolve("who made this pitch?", [], playing))?.id).toBe(co(9));
+    const focused = page({
+      ...playing,
+      focus: { kind: "COMPANY", id: co(7) },
+    });
+    expect(one(resolve("is this one a fit?", [], focused))?.id).toBe(co(7));
+    // Nothing on the page: no binding, the turn is read as before.
+    expect(
+      resolve("is this one a fit?", [], {
+        ...page(),
+        inView: [],
+      }),
+    ).toBeNull();
   });
 });
