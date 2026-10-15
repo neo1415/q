@@ -110,3 +110,11 @@ Core Seven remains the governing assessment framework. The new directive authori
 20. Do not buy new infrastructure or subscriptions without the founder's approval. Founder provider credits (OpenAI, Gemini, ElevenLabs, Deepgram, Recall, Serper, Tavily, etc.) are for product use. Tests use disabled keys (`disabled-locally-000000000000`).
 21. Deploy fast and incrementally, but never with destructive migrations, failing required CI, authorization bypasses, or success claims that haven't been verified.
 22. Secrets never go into Git, logs or handoff files. Record credential **names** only.
+
+## Paid test budget (2026-10-15)
+
+23. The owner approved paid live testing for the four-lane round. The lead set these caps, per round, on top of the unchanged daily voice caps:
+    - Tavus about $10: about 5 interviews of up to 3 minutes, production only, seeded demo accounts.
+    - OpenAI live baselines about $3.
+    - Q Pitch voice runs about $2.
+    Every paid session is logged with its estimated cost in the lane report and `HANDOFF-LOG.md`. Unit, e2e and eval tests still use disabled keys.
