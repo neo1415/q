@@ -3,11 +3,41 @@
 import dynamic from "next/dynamic";
 import { useState, useSyncExternalStore } from "react";
 
+import type { TourSubject } from "./subject-model";
 import type { TourChoice } from "./tour-host";
+
+type Start = { readonly tour: TourChoice; readonly chapter: string | null };
+function choiceOf(value: string | null): TourChoice | null {
+  return value === "pilot" || value === "premiere" || value === "short"
+    ? value
+    : null;
+}
+const CHAPTER = /^ch\.[a-z0-9][a-z0-9.-]{1,62}$/u;
+
+let lastRead: { readonly search: string; readonly start: Start | null } | null =
+  null;
+/** Parsed once per address, so the snapshot is stable between renders. */
+function readStart(): Start | null {
+  const search = window.location.search;
+  if (lastRead?.search === search) return lastRead.start;
+  const params = new URLSearchParams(search);
+  const tour = choiceOf(params.get("qpitch"));
+  const chapter = params.get("chapter");
+  const start: Start | null =
+    tour === null
+      ? null
+      : {
+          tour,
+          chapter: chapter !== null && CHAPTER.test(chapter) ? chapter : null,
+        };
+  lastRead = { search, start };
+  return start;
+}
 
 /**
  * Starts a Q Pitch rehearsal when the page is opened with `?qpitch=pilot`
- * (the certified pilot) or `?qpitch=premiere` (the r3 cut, internal only).
+ * (the certified pilot), `?qpitch=premiere` (the r3 cut, internal only) or
+ * `?qpitch=short` (two minutes), optionally `&chapter=<id>` (Feature Atlas).
  * The host's code loads only then. Once started, the tour lives in the
  * application layout, so it survives route changes until "End tour".
  *
@@ -24,22 +54,18 @@ const noSubscription = () => () => undefined;
 export function QPitchEntry({
   account,
   role,
+  subject = null,
 }: {
   readonly account: string;
+  readonly subject?: TourSubject | null | undefined;
   readonly role: "INVESTOR" | "FOUNDER";
 }) {
   // Read once from the address the page was opened with; false on the server.
-  const asked = useSyncExternalStore(
-    noSubscription,
-    (): TourChoice | null => {
-      const asked = new URLSearchParams(window.location.search).get("qpitch");
-      return asked === "pilot" || asked === "premiere" ? asked : null;
-    },
-    () => null,
-  );
+  // Read from the address the page was opened with; null on the server.
+  const asked = useSyncExternalStore(noSubscription, readStart, () => null);
   // Latched: the tour must outlive the first route change, whose address no
   // longer carries the parameter.
-  const [started, setStarted] = useState<TourChoice | null>(null);
+  const [started, setStarted] = useState<Start | null>(null);
   const [ended, setEnded] = useState(false);
   if (asked !== null && started === null) setStarted(asked);
   if (started === null || ended) return null;
@@ -47,7 +73,9 @@ export function QPitchEntry({
     <QPitchHost
       account={account}
       role={role}
-      tour={started}
+      tour={started.tour}
+      chapter={started.chapter}
+      subject={subject}
       onExit={() => setEnded(true)}
     />
   );

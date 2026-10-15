@@ -53,6 +53,7 @@ const TAB_CLASS =
 export function MobileNavigation({
   scope = "unset",
   admin = false,
+  qPitch = false,
   verifyNudge = null,
   organisations = [],
 }: {
@@ -60,6 +61,8 @@ export function MobileNavigation({
   readonly scope?: ContextScope | undefined;
   /** A platform admin: the More sheet adds the Admin group. */
   readonly admin?: boolean | undefined;
+  /** The server enabled Q Pitch: the More sheet lists it. */
+  readonly qPitch?: boolean | undefined;
   readonly verifyNudge?: VerifyNudge | null | undefined;
 }) {
   const pathname = usePathname();
@@ -122,6 +125,7 @@ export function MobileNavigation({
             organisations={organisations}
             scope={scope}
             admin={admin}
+            qPitch={qPitch}
             pathname={pathname}
             verifyNudge={verifyNudge}
           />
@@ -141,18 +145,20 @@ function MoreSheet({
   organisations,
   scope,
   admin,
+  qPitch,
   pathname,
   verifyNudge,
 }: {
   readonly organisations: readonly MyOrganisationDto[];
   readonly scope: ContextScope;
   readonly admin: boolean;
+  readonly qPitch: boolean;
   readonly pathname: string;
   readonly verifyNudge: VerifyNudge | null;
 }) {
   const [open, setOpen] = useState(false);
-  const items = moreSectionsFor(scope, { admin });
-  const groups = moreGroupsFor(scope, { admin });
+  const items = moreSectionsFor(scope, { admin, qPitch });
+  const groups = moreGroupsFor(scope, { admin, qPitch });
   const inside = items.some((item) => isActiveRoute(pathname, item.href));
   const notices = useNotices();
   const needsYou = (notices.items ?? []).filter(

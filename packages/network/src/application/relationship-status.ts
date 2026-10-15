@@ -33,7 +33,7 @@ import {
   RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED,
 } from "../domain/event-registry.js";
 import type { ExpressInterestDependencies } from "./express-interest.js";
-import { readHistory } from "./relationship-history.js";
+import { readHistories, readHistory } from "./relationship-history.js";
 import { COMPANY_INTEREST_VIEW } from "./respond-to-interest.js";
 
 const INVESTOR_VIEW = capability("investor.view");
@@ -276,6 +276,41 @@ export function createListRelationshipsForInvestor(
       );
     if (query.scanLimit !== undefined && relationships.length >= 1001)
       throw new RelationshipPipelineLimitError();
+    const among = dependencies.companyVisibility.visibleToInvestorAmong;
+    const findMany = dependencies.companies.findCanonicalCompanies;
+    if (among !== undefined && findMany !== undefined) {
+      // S5 (lane S, live 2026-10-15: 4 reads per relationship, 92 of a
+      // cold arrival snapshot's 126): the same rule and the same reads,
+      // batched -- one visibility evaluation, one company read, one
+      // history read for the whole list. A company out of this investor's
+      // sight is still not listed, and nothing more of it is read.
+      const visible = await among(
+        actor,
+        relationships.map((relationship) => relationship.companyId),
+      );
+      const seen = relationships.filter((relationship) =>
+        visible.has(relationship.companyId),
+      );
+      const [companies, histories] = await Promise.all([
+        findMany([...new Set(seen.map((r) => r.companyId))]),
+        readHistories(
+          dependencies,
+          seen.map((relationship) => relationship.id),
+        ),
+      ]);
+      const byId = new Map(companies.map((company) => [company.id, company]));
+      return seen.flatMap((relationship) => {
+        const company = byId.get(relationship.companyId);
+        const view = viewOf(
+          relationship,
+          histories.get(relationship.id) ?? [],
+          "INVESTOR",
+        );
+        return company !== undefined && view !== null
+          ? [{ ...view, counterpartName: company.canonicalName }]
+          : [];
+      });
+    }
     const listed = await inBatches(relationships, async (relationship) => {
       // The same rule as the single read: a company that has since gone
       // out of this investor's sight is not listed, and nothing more of it
@@ -325,10 +360,20 @@ export function createListRelationshipsForCompany(
       );
     if (query.scanLimit !== undefined && relationships.length >= 1001)
       throw new RelationshipPipelineLimitError();
+    // S5 (lane S): every history in one read where the repository can;
+    // the same events in the same order, so the projection is unchanged.
+    const histories =
+      dependencies.repositories.events.listFirstByRelationships === undefined
+        ? null
+        : await readHistories(
+            dependencies,
+            relationships.map((relationship) => relationship.id),
+          );
     const listed = await inBatches(relationships, async (relationship) => {
       const view = viewOf(
         relationship,
-        await readHistory(dependencies, relationship.id),
+        histories?.get(relationship.id) ??
+          (await readHistory(dependencies, relationship.id)),
         "COMPANY",
       );
       // Nothing visible to the company: an investor's private discovery.

@@ -1022,6 +1022,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "the old address of a founder's rehearsal with an investor; it only redirects",
   ),
   // REHEARSE block
+  "/q-pitch": exempt(
+    "Q Pitch tour entry (owner request 15 Oct), flag-gated; the sidebar opens it and Q narrates the tour itself",
+  ),
   "/rehearsals": cap("navigate.REHEARSALS"),
   "/rehearsals/investor/[investorOrganisationId]": cap("tool.open_page"),
   "/rehearsals/company/[companyId]": cap("tool.open_page"),

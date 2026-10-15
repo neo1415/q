@@ -25,6 +25,7 @@ import {
   type PromptRegistry,
   citeAuthorisedFacts,
   citePublicSources,
+  createSentenceCutter,
 } from "@capital-q/q-core";
 import {
   CompanyAnalystV22ResultSchema,
@@ -42,6 +43,7 @@ import {
 // quieter answer to a question the gateway already governs (§99).
 import {
   budgetForTaskClass,
+  createPartialAnswerReader,
   PROFILE_UPDATE_NOTE,
   DISPLAY_NAME_NOTE,
   NEXT_STEP_NOTE,
@@ -829,6 +831,39 @@ export function createCompanyIntelligenceSpecialist(
 
       let analyst: CompanyAnalystV19Result | undefined;
       let blocked: QSpecialistBlockedReason | null = null;
+      /**
+       * S3 (lane S, live 2026-10-15: a selected-record "main risks" answer
+       * reached the person only at 31.6 s, all at once): the answer's
+       * whole sentences go out as the model writes them, read out of the
+       * JSON by key and through the same citation rewriting as the stored
+       * synthesis. The last sentence never goes early; the stored message
+       * stays the durable form and decides what was said.
+       */
+      const onSentence = context.onAnswerSentence;
+      const partial =
+        onSentence === undefined ? null : createPartialAnswerReader();
+      const cutter = onSentence === undefined ? null : createSentenceCutter();
+      let seen = "";
+      const cited = (sentence: string): string =>
+        citeAuthorisedFacts(
+          citePublicSources(sentence, researchRead?.sources ?? []),
+          assembled.facts.map((labelled) => ({
+            ref: labelled.label,
+            source: labelled.presentedSource ?? undefined,
+          })),
+        );
+      const onTextDelta =
+        onSentence === undefined || partial === null || cutter === null
+          ? undefined
+          : (fragment: string): void => {
+              seen += fragment;
+              const fresh = partial.push(seen);
+              if (fresh.length === 0) return;
+              for (const sentence of cutter.push(fresh)) {
+                const out = cited(sentence).trim();
+                if (out.length > 0) onSentence(out);
+              }
+            };
       try {
         const result = await gateway.execute<CompanyAnalystV19Result>(
           {
@@ -865,6 +900,7 @@ export function createCompanyIntelligenceSpecialist(
             // away the change beside it (CQ-QX-007 A5).
             invalidListItems: "DROP",
             ...(context.signal === undefined ? {} : { signal: context.signal }),
+            ...(onTextDelta === undefined ? {} : { onTextDelta }),
           },
         );
         telemetry = {
