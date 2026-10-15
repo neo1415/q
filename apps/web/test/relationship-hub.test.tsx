@@ -357,7 +357,7 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
 
   it("says nothing needs them, not a blank area", async () => {
     await overview();
-    expect(screen.getByText("Nothing needs you right now.")).toBeDefined();
+    expect(screen.getByText(/Nothing needs you right now\./u)).toBeDefined();
   });
 
   it("is partial, never 'nothing', when the notices cannot be read", async () => {
@@ -366,7 +366,7 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
     expect(
       screen.getByText(/What needs you couldn't be read just now/u),
     ).toBeDefined();
-    expect(screen.queryByText("Nothing needs you right now.")).toBeNull();
+    expect(screen.queryByText(/Nothing needs you right now\./u)).toBeNull();
   });
 
   it("keeps the queue when only the period report fails", async () => {

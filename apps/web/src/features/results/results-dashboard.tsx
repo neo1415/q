@@ -1,4 +1,7 @@
 import Link from "next/link";
+
+import { PagedList } from "@/components/paged-list";
+import { Panel as SurfacePanel, panelLinkClassName } from "@/components/panel";
 import type { ReactNode } from "react";
 
 import type {
@@ -63,40 +66,37 @@ export type ResultsDashboardProps = {
   readonly results: FounderResults | InvestorResults;
 };
 
+/**
+ * One question of the period, as a bordered panel under "This period"
+ * (redesign 2026-10-16: sections were hard to tell apart). Its heading
+ * sits one level under the period's.
+ */
 function Panel({
   id,
   title,
   action,
   children,
   className,
+  flush = false,
 }: {
-  readonly id?: string;
+  readonly id: string;
   readonly title: string;
   readonly action?: ReactNode;
   readonly children: ReactNode;
   readonly className?: string;
+  readonly flush?: boolean;
 }) {
   return (
-    <section
+    <SurfacePanel
       id={id}
-      aria-labelledby={id === undefined ? undefined : `${id}-title`}
-      className={cx(
-        // A section, not a card (redesign 2026-10-15): one rule above it.
-        "flex min-w-0 flex-col gap-4 border-t border-(--cq-border-subtle) pt-5",
-        className,
-      )}
+      title={title}
+      headingLevel={3}
+      action={action}
+      flush={flush}
+      className={className}
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <h2
-          id={id === undefined ? undefined : `${id}-title`}
-          className="cq-title-sm text-(--cq-text-primary)"
-        >
-          {title}
-        </h2>
-        {action}
-      </div>
       {children}
-    </section>
+    </SurfacePanel>
   );
 }
 
@@ -133,7 +133,7 @@ function Tile({
   // Hairlines between cells, none around them: two by two on a phone, one
   // row of four from large screens.
   const frame =
-    "flex min-w-0 flex-col gap-1 border-(--cq-border-subtle) py-4 odd:pr-4 even:border-l even:pl-4 sm:py-5 [&:nth-child(n+3)]:border-t lg:border-l lg:px-5 lg:first:border-l-0 lg:first:pl-0 lg:[&:nth-child(n+3)]:border-t-0";
+    "flex min-w-0 flex-col gap-1 border-(--cq-border-subtle) p-4 even:border-l sm:p-5 [&:nth-child(n+3)]:border-t lg:border-l lg:first:border-l-0 lg:[&:nth-child(n+3)]:border-t-0";
   return href === undefined ? (
     <div className={frame}>{body}</div>
   ) : (
@@ -163,7 +163,7 @@ function Header({
         {props.heading === null ? null : (
           <Heading
             className={cx(
-              props.headingLevel === 2 ? "cq-title-sm" : "cq-title-xl",
+              props.headingLevel === 2 ? "cq-title-md" : "cq-title-xl",
               "text-(--cq-text-primary)",
             )}
           >
@@ -280,6 +280,9 @@ type DrillRow = {
   readonly avatar: ReactNode;
 };
 
+/** Pipeline rows per page on the Overview. */
+const PIPELINE_PAGE = 8;
+
 function Pipeline({
   props,
   side,
@@ -312,7 +315,7 @@ function Pipeline({
         picked === null ? null : (
           <Link
             href={stageHref(props.basePath, props.range, null)}
-            className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-accent) underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-0"
+            className={panelLinkClassName}
           >
             Show everyone
           </Link>
@@ -382,8 +385,10 @@ function Pipeline({
               them on Relationships.
             </p>
           ) : shown.length === 0 ? null : (
-            <ul className="divide-y divide-(--cq-border-subtle) border-t border-(--cq-border-subtle)">
-              {shown.map((row) => {
+            // A pipeline longer than a screen pages by cursor (owner
+            // 2026-10-16), eight rows at a time.
+            <PagedList
+              items={shown.map((row, index) => {
                 const inner = (
                   <>
                     {row.avatar}
@@ -399,9 +404,10 @@ function Pipeline({
                     </span>
                   </>
                 );
-                return (
-                  <li key={row.key}>
-                    {row.href === null ? (
+                return {
+                  key: `${row.state}:${row.key}:${String(index)}`,
+                  node:
+                    row.href === null ? (
                       <span className="flex min-h-14 items-center gap-3 px-1 py-2">
                         {inner}
                       </span>
@@ -417,11 +423,14 @@ function Pipeline({
                           className="shrink-0 text-(--cq-text-tertiary)"
                         />
                       </Link>
-                    )}
-                  </li>
-                );
+                    ),
+                };
               })}
-            </ul>
+              pageSize={PIPELINE_PAGE}
+              noun="relationships"
+              className="divide-y divide-(--cq-border-subtle) border-t border-(--cq-border-subtle)"
+              footerClassName="border-t border-(--cq-border-subtle) pt-3"
+            />
           )}
         </>
       )}
@@ -540,7 +549,10 @@ function InvestorDashboard(
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       <Header props={props} name={results.organisationName} />
-      <div className="grid grid-cols-2 border-t border-(--cq-border-subtle) lg:grid-cols-4">
+      <div
+        className="grid grid-cols-2 border border-(--cq-border-subtle) bg-(--cq-surface) lg:grid-cols-4"
+        data-stat-strip
+      >
         <Tile
           label="Interest sent"
           value={String(interest?.sent ?? f.interest)}
@@ -613,7 +625,7 @@ function InvestorDashboard(
             action={
               <Link
                 href="/relationships?view=capital"
-                className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-accent) underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-0"
+                className={panelLinkClassName}
               >
                 Open Capital
               </Link>
@@ -639,10 +651,7 @@ function InvestorDashboard(
             id="q-work"
             title="Q’s work"
             action={
-              <Link
-                href="/settings/usage"
-                className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-accent) underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-0"
-              >
+              <Link href="/settings/usage" className={panelLinkClassName}>
                 Usage
               </Link>
             }
@@ -726,10 +735,7 @@ function RaisePanel({ results }: { readonly results: FounderResults }) {
       id="raise"
       title="Your round"
       action={
-        <Link
-          href="/relationships?view=capital"
-          className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-accent) underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-0"
-        >
+        <Link href="/relationships?view=capital" className={panelLinkClassName}>
           Open Capital
         </Link>
       }
@@ -829,7 +835,10 @@ function FounderDashboard(
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       <Header props={props} name={results.organisationName} />
-      <div className="grid grid-cols-2 border-t border-(--cq-border-subtle) lg:grid-cols-4">
+      <div
+        className="grid grid-cols-2 border border-(--cq-border-subtle) bg-(--cq-surface) lg:grid-cols-4"
+        data-stat-strip
+      >
         <Tile
           label="Investors engaged"
           value={
@@ -878,10 +887,7 @@ function FounderDashboard(
             id="rehearsals"
             title="Rehearsals"
             action={
-              <Link
-                href="/rehearsals"
-                className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-accent) underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-0"
-              >
+              <Link href="/rehearsals" className={panelLinkClassName}>
                 Rehearse
               </Link>
             }

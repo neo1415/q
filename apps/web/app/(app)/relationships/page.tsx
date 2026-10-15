@@ -216,42 +216,51 @@ export default async function RelationshipsPage({
       side === "NONE"
         ? [null, null]
         : await Promise.all([apiSession(), qApiSession()]);
-    // The queue's reads run beside the period's, never after them.
-    const [results, usage, items, needs] = await Promise.all([
-      session === null ? null : getResults(session, period).catch(() => null),
-      qSession === null || side !== "INVESTOR"
-        ? null
-        : getMyUsage(qSession).catch(() => null),
-      side === "NONE" ? [] : ownRelationships(context),
-      side === "NONE"
-        ? { notices: [], reminders: [], unavailable: false }
-        : noticesAndReminders(),
-    ]);
-    const now = readClock();
-    // S4: the investor's portfolio, from the same list; each of the first
-    // rows reads its current commitment, side by side.
-    const portfolio =
-      side === "INVESTOR" && items !== undefined
-        ? portfolioOf(items)
-        : undefined;
-    const commitments = new Map(
-      session === null || portfolio === undefined
-        ? []
-        : await Promise.all(
-            portfolio
-              .slice(0, PORTFOLIO_READ_LIMIT)
-              .map(
-                async (item) =>
-                  [
-                    item.relationshipId,
-                    await getRelationshipCommitments(
-                      session,
+    // The queue's reads run beside the period's, never after them; the
+    // portfolio's commitments follow the list alone, so they run beside
+    // the period's read too instead of after it (tab switch latency,
+    // owner 2026-10-16).
+    const listed =
+      side === "NONE" ? Promise.resolve([]) : ownRelationships(context);
+    const withCommitments = listed.then(async (items) => {
+      // S4: the investor's portfolio, from the same list; each of the
+      // first rows reads its current commitment, side by side.
+      const portfolio =
+        side === "INVESTOR" && items !== undefined
+          ? portfolioOf(items)
+          : undefined;
+      const commitments = new Map(
+        session === null || portfolio === undefined
+          ? []
+          : await Promise.all(
+              portfolio
+                .slice(0, PORTFOLIO_READ_LIMIT)
+                .map(
+                  async (item) =>
+                    [
                       item.relationshipId,
-                    ).catch(() => undefined),
-                  ] as const,
-              ),
-          ),
-    );
+                      await getRelationshipCommitments(
+                        session,
+                        item.relationshipId,
+                      ).catch(() => undefined),
+                    ] as const,
+                ),
+            ),
+      );
+      return { items, portfolio, commitments };
+    });
+    const [results, usage, { items, portfolio, commitments }, needs] =
+      await Promise.all([
+        session === null ? null : getResults(session, period).catch(() => null),
+        qSession === null || side !== "INVESTOR"
+          ? null
+          : getMyUsage(qSession).catch(() => null),
+        withCommitments,
+        side === "NONE"
+          ? { notices: [], reminders: [], unavailable: false }
+          : noticesAndReminders(),
+      ]);
+    const now = readClock();
     // The Results endpoint authorises each projection. A conflicting role read
     // is unavailable, never silently rendered as the other party's perspective.
     const available =
@@ -264,8 +273,9 @@ export default async function RelationshipsPage({
       context.unavailable !== true;
     return (
       // The Overview's blocks are separate questions (what needs me, what
-      // I hold, how the period went): more air between them than within.
-      <PageContainer className="flex flex-col gap-8">
+      // I hold, how the period went): each its own panel, more air between
+      // them than within.
+      <PageContainer className="flex flex-col gap-6 sm:gap-8">
         <HubHeader side={side} view={view} />
         {unset ? (
           <EmptyState

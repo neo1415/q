@@ -1,4 +1,8 @@
+import { Suspense } from "react";
+
 import { PageContainer } from "@/components/app-shell/page-container";
+
+import { HubLoadingTabs } from "./hub-loading-tabs";
 
 /**
  * Loading shapes for the CRM (research 2026-10-15 §3.4): each block at its
@@ -11,13 +15,16 @@ const bar =
 function Rows({
   count,
   label,
+  ruled = true,
 }: {
   readonly count: number;
   readonly label: string;
+  /** Hairlines above and below; a panel draws its own edges. */
+  readonly ruled?: boolean;
 }) {
   return (
     <ul
-      className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)"
+      className={`flex flex-col divide-y divide-(--cq-border-subtle) ${ruled ? "border-y border-(--cq-border-subtle)" : ""}`}
       aria-hidden="true"
       data-loading-rows={label}
     >
@@ -35,10 +42,38 @@ function Rows({
   );
 }
 
-/** The CRM header and tabs, then rows: Overview and Pipeline alike. */
+/** A panel's shape: its header bar, then rows (the Overview's grammar). */
+function PanelShape({
+  rows,
+  label,
+  lead = false,
+}: {
+  readonly rows: number;
+  readonly label: string;
+  readonly lead?: boolean;
+}) {
+  return (
+    <div
+      className={`border border-(--cq-border-subtle) bg-(--cq-surface) ${lead ? "border-l-[3px] border-l-(--cq-border-strong)" : ""}`}
+    >
+      <span className="flex min-h-[3.25rem] items-center border-b border-(--cq-border-subtle) px-4 sm:px-5">
+        <span className={`${bar} h-4 w-28`} />
+      </span>
+      <div className="px-4 sm:px-5">
+        <Rows count={rows} label={label} ruled={false} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The CRM header and tabs, then the open tab's shape. The tab just chosen
+ * is underlined at once (HubLoadingTabs reads the new address), so a
+ * switch answers the click before the server does.
+ */
 export function HubLoading() {
   return (
-    <PageContainer className="flex flex-col gap-8">
+    <PageContainer className="flex flex-col gap-6 sm:gap-8">
       <div
         className="flex flex-col gap-2"
         role="status"
@@ -49,15 +84,16 @@ export function HubLoading() {
         <span className="flex min-h-8 items-center">
           <span className={`${bar} h-7 w-56`} />
         </span>
-        <span className="flex min-h-11 items-end gap-1 border-b border-(--cq-border-subtle)">
-          <span className={`${bar} mb-3 ml-3 h-3.5 w-16`} />
-          <span className={`${bar} mb-3 ml-6 h-3.5 w-16`} />
-        </span>
+        <Suspense
+          fallback={
+            <span className="flex min-h-11 border-b border-(--cq-border-subtle)" />
+          }
+        >
+          <HubLoadingTabs />
+        </Suspense>
       </div>
-      <div className="flex flex-col gap-2">
-        <span className={`${bar} h-5 w-28`} />
-        <Rows count={5} label="queue" />
-      </div>
+      <PanelShape rows={3} label="queue" lead />
+      <PanelShape rows={4} label="list" />
     </PageContainer>
   );
 }
