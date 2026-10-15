@@ -44,6 +44,7 @@ function fixture(
   const states = {
     upsert: vi.fn(() => Promise.resolve(true)),
     behind: vi.fn(() => Promise.resolve(options.behind ?? [])),
+    behindAll: vi.fn(() => Promise.resolve([] as readonly string[])),
     count: vi.fn(() => Promise.resolve(options.count ?? all.length)),
     page: vi.fn(
       (
