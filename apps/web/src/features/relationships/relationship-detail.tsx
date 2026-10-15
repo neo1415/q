@@ -384,8 +384,13 @@ export function RelationshipDetail({
                     (demo audit 2026-10-03: six equal actions under Next).
                   */}
                   <details className="group" data-next-more>
-                    <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-center rounded-md text-(--cq-text-secondary) hover:text-(--cq-text-primary) [&::-webkit-details-marker]:hidden">
+                    <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-(--cq-radius-md) text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
                       More
+                      <ChevronDown
+                        size={ICON_SIZE.compact}
+                        aria-hidden="true"
+                        className="transition-transform duration-(--cq-motion-fast) group-open:rotate-180 motion-reduce:transition-none"
+                      />
                     </summary>
                     <div className="flex flex-col items-stretch gap-2 pt-2">
                       <RelationshipErrands
@@ -595,7 +600,7 @@ export function RelationshipHero({
   return (
     <section
       aria-label={`${counterpart} at a glance`}
-      className="grid gap-4 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-xs) sm:p-5 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-center lg:gap-x-8"
+      className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-end lg:gap-x-8"
       data-relationship-hero
     >
       <div className="flex min-w-0 flex-col gap-4">
@@ -615,7 +620,7 @@ export function RelationshipHero({
             decorative
           />
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <h1 className="cq-title-lg text-(--cq-text-primary)">
+            <h1 className="cq-title-lg break-words text-(--cq-text-primary)">
               {counterpart}
             </h1>
             <div className="max-sm:hidden">
@@ -802,16 +807,17 @@ export function RelationshipTabs({
       : diligence.side === "COMPANY"
         ? diligence.requests.filter((r) => r.status === "OPEN").length
         : diligence.shares.filter((share) => share.viewedAt === null).length;
+  // The same tab treatment as the CRM's own tabs, one level down.
   const tab = (active: boolean) =>
-    `cq-body-sm inline-flex min-h-11 items-center gap-2 border-b-2 px-1 ${
+    `cq-body-sm -mb-px inline-flex min-h-11 flex-none items-center gap-2 border-b-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) ${
       active
-        ? "border-(--cq-text-primary) text-(--cq-text-primary)"
-        : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+        ? "border-(--cq-accent) font-semibold text-(--cq-text-primary)"
+        : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
     }`;
   return (
     <nav
       aria-label="Relationship"
-      className="flex gap-5 overflow-x-auto border-b border-(--cq-border-subtle)"
+      className="-mx-4 flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
     >
       <Link
         href={basePath}
@@ -999,7 +1005,7 @@ export function RelationshipUnavailable({
   return (
     <PageContainer className="flex flex-col gap-6">
       <BackToRelationships />
-      <h1 className="cq-title-xl text-(--cq-text-primary)">Relationship</h1>
+      <h1 className="cq-title-lg text-(--cq-text-primary)">Relationship</h1>
       <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
         {sentence}
       </p>

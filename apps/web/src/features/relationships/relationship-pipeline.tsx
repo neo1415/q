@@ -14,6 +14,7 @@ import {
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
+import { Download, ICON_SIZE, Search } from "@capital-q/ui/icons";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 
 import { PipelineLayoutSwitch } from "./pipeline-layout-switch";
@@ -21,7 +22,12 @@ import { effectShown } from "@/features/q/control/perform";
 import { currentRoute } from "@/features/q/control/route-state";
 import { QPageState, useQDialog } from "@/features/q/q-section";
 import { formatDay } from "@/components/date-format";
-import { PIPELINE_NEXT_WORDS } from "./pipeline-presentation";
+import {
+  BOARD_STATES,
+  BOARD_STOPPED,
+  PIPELINE_NEXT_WORDS,
+  pipelinePresentedRows,
+} from "./pipeline-presentation";
 import { STATE_WORDS } from "./relationship-words";
 import {
   DEFAULT_PIPELINE_PREFERENCES,
@@ -35,7 +41,9 @@ import {
 import { PipelineSavedViews, type AppliedView } from "./pipeline-saved-views";
 
 const inputClass =
-  "cq-body-sm min-h-11 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary)";
+  "cq-body-sm min-h-11 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
+/** A select reads as a quiet control in the view bar, not a form field. */
+const selectClass = `${inputClass} max-w-full pr-8`;
 const href = (row: RelationshipSummaryDto) =>
   `/relationships/${row.counterpart.kind === "COMPANY" ? "company" : "investor"}/${encodeURIComponent(row.counterpart.id)}`;
 function localStorageOrNull() {
@@ -235,6 +243,8 @@ export function RelationshipPipeline({
     if (key !== "cursor" && key !== "pageSize" && value !== undefined)
       exports.set(key, String(value));
   if (selected.length > 0) exports.set("selected", selected.join(","));
+  const filtered = query.q !== undefined || query.state !== undefined;
+  const rows = pipelinePresentedRows(data.items, layout);
   return (
     <div
       ref={ref}
@@ -249,36 +259,55 @@ export function RelationshipPipeline({
           ...(query.state === undefined ? {} : { stage: query.state }),
         }}
       />
-      <form
-        onSubmit={submit}
-        className="flex flex-wrap gap-2"
-        aria-label="Pipeline filters"
-      >
-        <input
-          ref={searchRef}
-          aria-label={
-            side === "INVESTOR" ? "Search companies" : "Search investors"
-          }
-          placeholder={
-            side === "INVESTOR" ? "Search companies" : "Search investors"
-          }
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className={inputClass}
-          maxLength={120}
-        />
-        <button
-          data-pipeline-search-button
-          className={buttonClassName("secondary")}
-          type="submit"
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <form
+          onSubmit={submit}
+          className="flex min-w-0 flex-1 basis-full items-center gap-2 sm:max-w-md sm:basis-auto"
+          role="search"
+          aria-label="Pipeline filters"
         >
-          Search
-        </button>
-      </form>
+          <div className="relative min-w-0 flex-1">
+            <Search
+              size={ICON_SIZE.compact}
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-(--cq-text-tertiary)"
+            />
+            <input
+              ref={searchRef}
+              aria-label={
+                side === "INVESTOR" ? "Search companies" : "Search investors"
+              }
+              placeholder={
+                side === "INVESTOR" ? "Search companies" : "Search investors"
+              }
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className={`${inputClass} w-full pl-9 lg:min-h-10`}
+              maxLength={120}
+            />
+          </div>
+          <button
+            data-pipeline-search-button
+            className={buttonClassName("secondary")}
+            type="submit"
+          >
+            Search
+          </button>
+        </form>
+        <PipelineLayoutSwitch
+          layout={layout}
+          hrefs={{
+            list: pipelineListLayoutHref(query),
+            table: pipelineHref(query, "table"),
+            board: pipelineHref(query, "board"),
+          }}
+        />
+      </div>
       {/*
         One "View options" panel on a phone (production review 2026-10-15:
         the controls filled the first screen); from tablet width up the
-        panel is always open and its summary hidden. Search stays outside.
+        panel is always open and its summary hidden. Search and layout stay
+        outside: they are what a person reaches for first.
       */}
       <details
         className="group md:[&::details-content]:[content-visibility:visible]"
@@ -290,16 +319,16 @@ export function RelationshipPipeline({
             {optionsSummary === "" ? "All · latest first" : optionsSummary}
           </span>
         </summary>
-        <div className="flex flex-col gap-3 pt-3 md:pt-0">
+        <div className="flex flex-col gap-2 pt-3 md:flex-row md:flex-wrap md:items-center md:border-y md:border-(--cq-border-subtle) md:py-2">
           <div
-            className="flex flex-wrap gap-2"
+            className="flex flex-wrap items-center gap-2"
             aria-label="Filter and sort"
             role="group"
           >
             <select
               ref={stateRef}
               aria-label="Relationship state"
-              className={inputClass}
+              className={selectClass}
               value={query.state ?? "ALL"}
               onChange={(event) =>
                 move({
@@ -323,7 +352,7 @@ export function RelationshipPipeline({
             <select
               ref={sortRef}
               aria-label="Sort relationships"
-              className={inputClass}
+              className={selectClass}
               value={query.sort ?? "recent"}
               onChange={(event) =>
                 move({
@@ -338,14 +367,35 @@ export function RelationshipPipeline({
               <option value="name">Name A–Z</option>
               <option value="name-desc">Name Z–A</option>
             </select>
-            <a
-              className={buttonClassName("quiet")}
-              href={`/relationships/export?${exports.toString()}`}
-            >
-              {selected.length === 0
-                ? "Export filtered CSV"
-                : `Export ${String(selected.length)} selected`}
-            </a>
+            {layout === "table" ? (
+              <details className="cq-body-sm relative">
+                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-(--cq-radius-md) px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
+                  Columns
+                </summary>
+                <div className="flex flex-col px-3 pb-1">
+                  {(["state", "since", "next"] as const).map((column) => (
+                    <label
+                      key={column}
+                      className="flex min-h-11 items-center gap-2 text-(--cq-text-primary)"
+                    >
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-(--cq-accent)"
+                        checked={preferences.columns.includes(column)}
+                        onChange={(event) =>
+                          setColumn(column, event.target.checked)
+                        }
+                      />
+                      {column === "state"
+                        ? "State"
+                        : column === "since"
+                          ? "State changed"
+                          : "Next step"}
+                    </label>
+                  ))}
+                </div>
+              </details>
+            ) : null}
           </div>
           <PipelineSavedViews
             initial={views}
@@ -367,40 +417,19 @@ export function RelationshipPipeline({
             onApply={applyView}
             onNotice={setNotice}
           />
-          <div className="flex flex-wrap items-center gap-2">
-            <PipelineLayoutSwitch
-              layout={layout}
-              hrefs={{
-                list: pipelineListLayoutHref(query),
-                table: pipelineHref(query, "table"),
-                board: pipelineHref(query, "board"),
-              }}
-            />
-            <details className="cq-body-sm">
-              <summary className="inline-flex min-h-11 cursor-pointer items-center px-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary)">
-                Columns
-              </summary>
-              {(["state", "since", "next"] as const).map((column) => (
-                <label
-                  key={column}
-                  className="flex min-h-11 items-center gap-2"
-                >
-                  <input
-                    type="checkbox"
-                    checked={preferences.columns.includes(column)}
-                    onChange={(event) =>
-                      setColumn(column, event.target.checked)
-                    }
-                  />
-                  {column === "state"
-                    ? "State"
-                    : column === "since"
-                      ? "State changed"
-                      : "Next step"}
-                </label>
-              ))}
-            </details>
-          </div>
+          <a
+            className={buttonClassName("quiet", "regular", "md:ml-auto")}
+            href={`/relationships/export?${exports.toString()}`}
+            // The bar says "Export"; the name says what the file holds.
+            aria-label={
+              selected.length === 0 ? "Export filtered CSV" : undefined
+            }
+          >
+            <Download size={ICON_SIZE.compact} aria-hidden="true" />
+            {selected.length === 0
+              ? "Export"
+              : `Export ${String(selected.length)} selected`}
+          </a>
         </div>
       </details>
       {notice === null ? null : (
@@ -408,7 +437,7 @@ export function RelationshipPipeline({
           {notice}
         </p>
       )}
-      <p className="cq-caption text-(--cq-text-secondary)">
+      <p className="cq-caption cq-numeric text-(--cq-text-secondary)">
         {/* An upper bound until every row was checked against the reader's
             current sight of the counterpart: said as such, never as exact. */}
         {String(data.items.length)} on this page ·{" "}
@@ -416,42 +445,78 @@ export function RelationshipPipeline({
         {String(data.total)} matching relationships
       </p>
       {data.total === 0 ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          No relationships match this view.
-        </p>
+        <div
+          className="flex flex-col items-start gap-3 border-y border-(--cq-border-subtle) py-8"
+          data-pipeline-empty
+        >
+          <p className="cq-body text-(--cq-text-primary)">
+            {filtered
+              ? "No relationships match this view."
+              : "No relationships yet."}
+          </p>
+          <p className="cq-body-sm max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
+            {filtered
+              ? "Clear the search or the state to see every relationship."
+              : side === "INVESTOR"
+                ? "A relationship starts when you express interest in a company."
+                : "When an investor expresses interest in your company, it appears here. Investors can only find you once your company is visible."}
+          </p>
+          <Link
+            className={buttonClassName("secondary")}
+            href={
+              filtered
+                ? pipelineHref({ sort: query.sort }, layout)
+                : side === "INVESTOR"
+                  ? "/discover"
+                  : "/company/visibility"
+            }
+          >
+            {filtered
+              ? "Clear filters"
+              : side === "INVESTOR"
+                ? "Open Discover"
+                : "Check visibility"}
+          </Link>
+        </div>
       ) : layout === "table" ? (
-        <div className="overflow-x-auto">
-          <table data-pipeline-records className="cq-body-sm w-full text-left">
-            <thead className="cq-caption text-(--cq-text-secondary) [&_th]:font-medium">
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <table
+            data-pipeline-records
+            className="cq-body-sm w-full border-collapse text-left"
+          >
+            <thead className="cq-caption border-b border-(--cq-border) text-(--cq-text-secondary) [&_th]:font-medium [&_th]:whitespace-nowrap">
               <tr>
-                <th className="p-3">
+                <th className="w-11 py-2 pr-1">
                   <span className="sr-only">Select</span>
                 </th>
-                <th className="p-3">
+                <th className="py-2 pr-4">
                   {side === "INVESTOR" ? "Company" : "Investor"}
                 </th>
                 {preferences.columns.includes("state") ? (
-                  <th className="p-3">State</th>
+                  <th className="py-2 pr-4">State</th>
                 ) : null}
                 {preferences.columns.includes("since") ? (
-                  <th className="p-3">State changed</th>
+                  <th className="py-2 pr-4">State changed</th>
                 ) : null}
                 {preferences.columns.includes("next") ? (
-                  <th className="p-3">Next step</th>
+                  <th className="py-2 pr-4">Next step</th>
                 ) : null}
-                <th className="p-3">Details</th>
+                <th className="py-2 text-right">
+                  <span className="sr-only">Details</span>
+                </th>
               </tr>
             </thead>
-            <tbody>
-              {data.items.map((row) => (
+            <tbody className="divide-y divide-(--cq-border-subtle)">
+              {rows.map((row) => (
                 <tr
                   key={row.relationshipId}
-                  className="border-t border-(--cq-border-subtle)"
+                  className="relative transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) has-[:checked]:bg-(--cq-surface-subtle)"
                 >
-                  <td className="p-3">
-                    <label className="inline-flex min-h-11 min-w-11 items-center justify-center">
+                  <td className="relative py-0 pr-1 align-middle">
+                    <label className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center">
                       <input
                         type="checkbox"
+                        className="size-4 accent-(--cq-accent)"
                         aria-label={`Select ${row.counterpart.name}`}
                         checked={selected.includes(row.relationshipId)}
                         onChange={(event) =>
@@ -466,9 +531,11 @@ export function RelationshipPipeline({
                       />
                     </label>
                   </td>
-                  <td className="p-3">
+                  <td className="max-w-80 py-3 pr-4">
+                    {/* The whole row opens the record; the checkbox and
+                        Preview sit above the link's stretched area. */}
                     <Link
-                      className="font-medium text-(--cq-text-primary) underline-offset-4 hover:underline"
+                      className="line-clamp-2 font-medium break-words text-(--cq-text-primary) after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-(--cq-focus-ring)"
                       href={href(row)}
                       data-q-item
                     >
@@ -476,20 +543,25 @@ export function RelationshipPipeline({
                     </Link>
                   </td>
                   {preferences.columns.includes("state") ? (
-                    <td className="p-3">{STATE_WORDS[row.state]}</td>
+                    <td className="py-3 pr-4 whitespace-nowrap text-(--cq-text-primary)">
+                      {STATE_WORDS[row.state]}
+                    </td>
                   ) : null}
                   {preferences.columns.includes("since") ? (
-                    <td className="p-3">
+                    <td className="cq-numeric py-3 pr-4 whitespace-nowrap text-(--cq-text-secondary)">
                       <time dateTime={row.stateSince}>
                         {formatDay(row.stateSince)}
                       </time>
                     </td>
                   ) : null}
                   {preferences.columns.includes("next") ? (
-                    <td className="p-3">{PIPELINE_NEXT_WORDS[row.nextStep]}</td>
+                    <td className="py-3 pr-4 text-(--cq-text-secondary)">
+                      {PIPELINE_NEXT_WORDS[row.nextStep]}
+                    </td>
                   ) : null}
-                  <td>
+                  <td className="relative py-1 text-right">
                     <button
+                      type="button"
                       className={buttonClassName("quiet", "compact")}
                       onClick={() => setPreview(row)}
                     >
@@ -502,60 +574,104 @@ export function RelationshipPipeline({
           </table>
         </div>
       ) : (
+        // One row of stage columns, left to right, scrolling sideways when
+        // there are more than fit; a phone shows one column and a glimpse
+        // of the next, so the row reads as scrollable.
         <div
           data-pipeline-records
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          className="-mx-4 flex snap-x snap-mandatory scroll-px-4 items-start gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:snap-none sm:scroll-px-0 sm:px-0"
         >
-          {RELATIONSHIP_STATES_V2.filter((state) =>
-            data.items.some((row) => row.state === state),
-          ).map((state) => (
-            <section key={state} aria-label={STATE_WORDS[state]}>
-              <h2 className="cq-title-sm mb-3">{STATE_WORDS[state]}</h2>
-              <ul className="flex flex-col gap-2">
-                {data.items
-                  .filter((row) => row.state === state)
-                  .map((row) => (
+          {BOARD_STATES.filter((state) =>
+            rows.some((row) => row.state === state),
+          ).map((state) => {
+            const column = rows.filter((row) => row.state === state);
+            const stopped = BOARD_STOPPED.has(state);
+            return (
+              <section
+                key={state}
+                aria-labelledby={`board-${state}`}
+                className="flex w-[80%] flex-none snap-start flex-col gap-2 rounded-(--cq-radius-lg) bg-(--cq-surface-subtle) p-2 sm:w-64"
+                data-board-column={state}
+              >
+                <h2
+                  id={`board-${state}`}
+                  className="flex items-baseline justify-between gap-2 px-2 pt-1"
+                >
+                  <span
+                    className={`cq-label ${stopped ? "text-(--cq-text-secondary)" : "text-(--cq-text-primary)"}`}
+                  >
+                    {STATE_WORDS[state]}
+                  </span>{" "}
+                  <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
+                    {column.length}
+                  </span>
+                </h2>
+                <ul className="flex flex-col gap-1.5">
+                  {column.map((row) => (
                     <li
                       key={row.relationshipId}
-                      className="rounded-(--cq-radius-md) border border-(--cq-border-subtle) p-3"
+                      className="relative flex items-start justify-between gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2.5 pr-1.5 pl-3 transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border)"
                     >
-                      <Link
-                        href={href(row)}
-                        data-q-item
-                        className="cq-body-sm underline underline-offset-2"
-                      >
-                        {row.counterpart.name}
-                      </Link>
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <Link
+                          href={href(row)}
+                          data-q-item
+                          className="cq-body-sm line-clamp-2 font-medium break-words text-(--cq-text-primary) after:absolute after:inset-0 after:rounded-(--cq-radius-md) focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-(--cq-focus-ring)"
+                        >
+                          {row.counterpart.name}
+                        </Link>
+                        {row.nextStep === "NONE" ? null : (
+                          <p className="cq-caption text-(--cq-text-secondary)">
+                            {PIPELINE_NEXT_WORDS[row.nextStep]}
+                          </p>
+                        )}
+                        <p className="cq-caption cq-numeric text-(--cq-text-tertiary)">
+                          Since{" "}
+                          <time dateTime={row.stateSince}>
+                            {formatDay(row.stateSince)}
+                          </time>
+                        </p>
+                      </div>
                       <button
-                        className={buttonClassName("quiet", "compact")}
+                        type="button"
+                        className={buttonClassName(
+                          "quiet",
+                          "compact",
+                          "relative flex-none",
+                        )}
                         onClick={() => setPreview(row)}
                       >
                         Preview
                       </button>
                     </li>
                   ))}
-              </ul>
-            </section>
-          ))}
+                </ul>
+              </section>
+            );
+          })}
         </div>
       )}
-      <div className="flex gap-2">
-        <Link
-          className={buttonClassName("quiet")}
-          href={pipelineHref({ ...query, cursor: undefined }, layout)}
-        >
-          Start of view
-        </Link>
-        {data.nextCursor === null ? null : (
-          <Link
-            data-pipeline-next
-            className={buttonClassName("secondary")}
-            href={pipelineHref({ ...query, cursor: data.nextCursor }, layout)}
-          >
-            Next page
-          </Link>
-        )}
-      </div>
+      {query.cursor === undefined && data.nextCursor === null ? null : (
+        <nav aria-label="Pages" className="flex flex-wrap gap-2">
+          {query.cursor === undefined ? null : (
+            <Link
+              className={buttonClassName("quiet")}
+              href={pipelineHref({ ...query, cursor: undefined }, layout)}
+            >
+              Start of view
+            </Link>
+          )}
+          {data.nextCursor === null ? null : (
+            <Link
+              data-pipeline-next
+              className={buttonClassName("secondary")}
+              href={pipelineHref({ ...query, cursor: data.nextCursor }, layout)}
+            >
+              Next page
+            </Link>
+          )}
+        </nav>
+      )}
       <DialogRoot
         open={preview !== null}
         onOpenChange={(open) => {

@@ -9,6 +9,7 @@ import type {
   SavedRelationshipViewList,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
+import { Bookmark, ICON_SIZE } from "@capital-q/ui/icons";
 import type { z } from "zod";
 
 import { useQControl } from "@/features/q/control/q-control";
@@ -234,59 +235,69 @@ export function PipelineSavedViews({
           </optgroup>
         )}
       </select>
-      <input
-        aria-label="View name"
-        placeholder="View name"
-        className={inputClass}
-        value={name}
-        maxLength={64}
-        onChange={(event) => setName(event.target.value)}
-      />
-      {teamEditable ? (
-        <select
-          aria-label="Who sees this view"
-          className={inputClass}
-          value={share}
-          onChange={(event) =>
-            setShare(
-              event.target.value === "ORGANISATION"
-                ? "ORGANISATION"
-                : "PERSONAL",
-            )
-          }
-        >
-          <option value="PERSONAL">Only me</option>
-          <option value="ORGANISATION">My team</option>
-        </select>
-      ) : null}
-      <button
-        type="button"
-        className={buttonClassName("quiet")}
-        onClick={save}
-        disabled={pending || initial === null}
-      >
-        Save view
-      </button>
-      {changeable ? (
-        <>
+      {/* Naming, sharing and changing a view are occasional: one tap
+          away, so the bar shows only the views themselves. */}
+      <details data-pipeline-view-manage>
+        <summary className="cq-body-sm inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-(--cq-radius-md) px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
+          <Bookmark size={ICON_SIZE.compact} aria-hidden="true" />
+          Manage views
+        </summary>
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+          <input
+            aria-label="View name"
+            placeholder="View name"
+            className={inputClass}
+            value={name}
+            maxLength={64}
+            onChange={(event) => setName(event.target.value)}
+          />
+          {teamEditable ? (
+            <select
+              aria-label="Who sees this view"
+              className={inputClass}
+              value={share}
+              onChange={(event) =>
+                setShare(
+                  event.target.value === "ORGANISATION"
+                    ? "ORGANISATION"
+                    : "PERSONAL",
+                )
+              }
+            >
+              <option value="PERSONAL">Only me</option>
+              <option value="ORGANISATION">My team</option>
+            </select>
+          ) : null}
           <button
             type="button"
             className={buttonClassName("quiet")}
-            onClick={rename}
-            disabled={pending}
+            onClick={save}
+            disabled={pending || initial === null}
           >
-            Rename view
+            Save view
           </button>
-          <button
-            type="button"
-            className={buttonClassName("quiet")}
-            onClick={remove}
-            disabled={pending}
-          >
-            Delete view
-          </button>
-        </>
-      ) : null}
+          {changeable ? (
+            <>
+              <button
+                type="button"
+                className={buttonClassName("quiet")}
+                onClick={rename}
+                disabled={pending}
+              >
+                Rename view
+              </button>
+              <button
+                type="button"
+                className={buttonClassName("quiet")}
+                onClick={remove}
+                disabled={pending}
+              >
+                Delete view
+              </button>
+            </>
+          ) : null}
+        </div>
+      </details>
     </div>
   );
 }
