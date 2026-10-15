@@ -7,6 +7,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { resolveOwnContext } from "@/features/q/context";
 import { atlasChapters, tourOptions } from "@/features/q-pitch/atlas";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
+import { resolveTourSubject } from "@/features/q-pitch/subject";
 
 export const metadata: Metadata = { title: "Q Pitch" };
 export const dynamic = "force-dynamic";
@@ -36,6 +37,7 @@ export default async function QPitchPage() {
     );
   }
 
+  const subject = await resolveTourSubject();
   const options = tourOptions(now);
   const chapters = atlasChapters(now);
   return (
@@ -45,6 +47,11 @@ export default async function QPitchPage() {
         Q guides you through the real app. These are internal rehearsals of a
         draft script on demonstration data. You can pause, go back, skip or ask
         a question at any point.
+      </p>
+      <p className="mt-2 cq-body-sm text-(--cq-text-secondary)">
+        {subject === null
+          ? "No subject company is set, or it is not visible to you."
+          : `Subject company: ${subject.name}, as its founder has made it visible to you.`}
       </p>
 
       <h2 className="mt-8 cq-title text-(--cq-text-primary)">Guided tours</h2>

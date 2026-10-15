@@ -116,6 +116,7 @@ export type TranscriptSink = {
 export function useTourPorts(
   script: TourScript,
   transcript: TranscriptSink,
+  subject: ResolvedCompany | null,
 ): TourPorts | null {
   const session = useQSessionOptional();
   const { setOpen } = useGlobalQ();
@@ -140,7 +141,7 @@ export function useTourPorts(
       qRef.current?.q.state.messages ?? [];
 
     const companyOf = (key: string) =>
-      resolveCompanyFixture(key, receipt.current);
+      resolveCompanyFixture(key, receipt.current, subject);
 
     const waitFor = (
       ready: () => boolean,
@@ -428,5 +429,5 @@ export function useTourPorts(
     };
     // The ports read the session through a ref; they are rebuilt only
     // when Q itself appears or goes.
-  }, [hasSession, script, router, setOpen, transcript]);
+  }, [hasSession, script, router, setOpen, transcript, subject]);
 }

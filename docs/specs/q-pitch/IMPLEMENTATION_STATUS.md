@@ -66,6 +66,13 @@ Audited what `packages/q-pitch/src/` actually implements, against the rows above
 - Founders are told that no founder edition exists yet.
 - Tests in `apps/web/test/q-pitch-entry.test.ts`; route registered; parity regenerated.
 
+## Tour subject company (15 Oct, Lane P / `claude/p-subject-oct15`)
+
+- The server setting `CQ_Q_PITCH_SUBJECT_COMPANY_ID` names the subject company. It is resolved per viewer through the ordinary `GET /v1/companies/:id/profile`: a refusal means no subject.
+- The record key `subject` resolves only to that company.
+- Lane V creates the company. No scene uses `subject` yet; Lane P adds subject scenes once the lead passes on V's company id.
+- The USD 2,000,000 raise is owner-stated. Lane V records it in the knowledge pack as USER_CLAIM / SELF_REPORTED; other figures stay unknown.
+
 ## Dependencies
 
 | Depends on                                                      | Status                                                            | Notes                                                                           |

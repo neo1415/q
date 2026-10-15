@@ -28,6 +28,7 @@ import {
 
 import { useQSessionOptional } from "@/features/q/q-session";
 
+import type { TourSubject } from "./subject-model";
 import { useTourPorts, type TranscriptSink } from "./use-tour-ports";
 
 /**
@@ -123,9 +124,12 @@ export function QPitchHost({
   role,
   tour,
   chapter,
+  subject,
   onExit,
 }: {
   readonly account: string;
+  /** The subject company, already re-checked for this viewer on the server. */
+  readonly subject: TourSubject | null;
   readonly role: "INVESTOR" | "FOUNDER";
   readonly tour: TourChoice;
   /** Feature Atlas: start at this chapter (a director jump, never a URL). */
@@ -138,7 +142,7 @@ export function QPitchHost({
     return parsed.success ? parsed.data : null;
   }, [account, role]);
   const transcript: TranscriptSink = useRef(null);
-  const ports = useTourPorts(choice.script, transcript);
+  const ports = useTourPorts(choice.script, transcript, subject);
   const session = useQSessionOptional();
   // The live runner, held in a tiny external store: the effect that owns
   // its lifetime publishes it, so a remount (Strict Mode) builds a fresh one.
