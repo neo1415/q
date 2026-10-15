@@ -27,11 +27,13 @@ export function GateqVideoEntry({
   token,
   fund,
   coverage,
+  participantName,
   onEnded,
 }: {
   readonly token: string;
   readonly fund: string;
   readonly coverage: ApplicationCoverageDto | null;
+  readonly participantName: string;
   /** After the room closes: refresh the transcript; `typed` false → review. */
   readonly onEnded: (typed: boolean) => Promise<void>;
 }) {
@@ -61,6 +63,7 @@ export function GateqVideoEntry({
         fund={fund}
         session={session}
         coverage={coverage}
+        participantName={participantName}
         onEnd={async (typed) => {
           const result = await endVideoAction(token, typed);
           if (!result.ok) return { message: result.message };
