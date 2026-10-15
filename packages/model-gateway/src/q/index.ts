@@ -120,6 +120,12 @@ import {
   type DiscoverAsk,
   type DiscoveryAnswer,
 } from "./discover-companies.js";
+import {
+  companyFactAskOf,
+  runNamedCompanyFact,
+  type CompanyFactAnswer,
+  type CompanyFactAsk,
+} from "./named-company-fact.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
 import {
   runInvestorDiscovery,
@@ -2277,6 +2283,15 @@ export function createModelGatewayQAnswer(
             fitSweepAskOfReading(fitQuestion, shownBefore, namedComparison),
           )
         : Promise.resolve(null);
+    // S2b: one declared profile fact about a company named outright, read
+    // by code through the same tools and plan (search, then get).
+    const factFor = (ask: CompanyFactAsk): Promise<CompanyFactAnswer | null> =>
+      runNamedCompanyFact({
+        ask,
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+      }).catch(() => null);
     // K1: companies of a kind, from the catalog by code, through the same
     // tools and plan; fit only for an investor and only when asked for.
     const discoverFor = (ask: DiscoverAsk): Promise<DiscoveryAnswer | null> =>
@@ -2853,6 +2868,7 @@ export function createModelGatewayQAnswer(
       fitSweep,
       sweptAtPrepare: sweepAsk !== null,
       discoverFor,
+      factFor,
       personFor,
       investorsFor,
       sweepForReading,
@@ -2957,12 +2973,20 @@ export function createModelGatewayQAnswer(
         fitSweep,
         sweptAtPrepare,
         discoverFor,
+        factFor,
         personFor,
         investorsFor,
         sweepForReading,
         attention,
         counterparty,
       } = prepared;
+      // S2b: one declared profile fact about a company named outright.
+      const companyFactAsk =
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+          ? companyFactAskOf(latest.content)
+          : null;
       // Grows only by what use_capability loads (lead 2026-10-04).
       let toolContext = preparedToolContext;
       took(warmed === undefined ? "prepare-reads" : "prepare-reads-warmed");
@@ -3060,7 +3084,8 @@ export function createModelGatewayQAnswer(
       // below before the model is asked.
       const personByCode =
         (request.personSearch !== undefined ||
-          request.discoverInvestors !== undefined) &&
+          request.discoverInvestors !== undefined ||
+          companyFactAsk !== null) &&
         request.writingDocument !== true &&
         request.askedAction === undefined &&
         (request.turnKind === undefined ||
@@ -3961,6 +3986,37 @@ export function createModelGatewayQAnswer(
               totalMs: Date.now() - startedAt,
             },
             "q answered a person search",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+      }
+      // S2b (live 2026-10-15: 8-13 s, 3-4 model calls for one field): a
+      // basic profile fact about a company named outright, from its own
+      // declared profile, said as declared. Null (not exactly one visible
+      // company, or not admitted): the full path answers.
+      if (companyFactAsk !== null) {
+        const factStarted = Date.now();
+        const fact = await factFor(companyFactAsk);
+        if (fact !== null) {
+          const message = await persistAnswer(fact.text, [
+            { kind: "COMPANY_REFERENCE", companyId: fact.companyId },
+          ]);
+          logger?.info(
+            {
+              qRunId: request.runId,
+              aspect: companyFactAsk.aspect,
+              toolCalls: fact.calls.length,
+              modelCalls: 0,
+              prepareMs: prepared.prepareMs,
+              factMs: Date.now() - factStarted,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered a company fact from its declared profile",
           );
           return {
             kind: "ANSWERED",
