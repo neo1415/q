@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 
 import type {
@@ -17,17 +16,12 @@ import {
   MessageSquare,
   Search,
   Upload,
-  X,
 } from "@capital-q/ui/icons";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { effectShown } from "@/features/q/control/perform";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 import { RelationshipFitLine } from "@/features/fit/relationship-fit-chips";
-import {
-  dismissReminderAction,
-  markNoticesReadAction,
-} from "@/features/schedule/schedule-actions";
 
 import type { RelationshipDigest } from "./relationship-data";
 import { relationshipHref, STATE_WORDS } from "./relationship-words";
@@ -40,7 +34,6 @@ import {
   since,
   stageTone,
   type ListSide,
-  type NeedsYouCard,
   type NextStep,
   type RowFacts,
 } from "./relationships-view";
@@ -48,8 +41,7 @@ import { StatusPill, type StatusTone } from "./status-pill";
 
 /**
  * The Relationships list (founder critique 2026-10-04): search first, then
- * where each stands as tabs with counts, then "Needs you" as one card per
- * relationship and action, then one row per relationship with its
+ * where each stands as tabs with counts, then one row per relationship with its
  * counterpart, its stage, the time since anything last happened, and the
  * ONE next step as a button. Rows page by cursor; nothing is ranked.
  */
@@ -135,7 +127,6 @@ export function RelationshipsBoard({
   items,
   digests: initialDigests,
   unread,
-  needsYou,
   firstCursor,
   now,
   fits,
@@ -150,7 +141,6 @@ export function RelationshipsBoard({
   readonly digests: Readonly<Record<string, RelationshipDigest>>;
   /** R34: unread chat messages per relationship id. */
   readonly unread: Readonly<Record<string, number>>;
-  readonly needsYou: readonly NeedsYouCard[];
   /** The cursor after the first page; null when it is the whole list. */
   readonly firstCursor: string | null;
   /** When the page was read, so server and browser say the same "2h". */
@@ -326,10 +316,6 @@ export function RelationshipsBoard({
           );
         })}
       </div>
-
-      {filter === "ALL" && needle.length === 0 && needsYou.length > 0 ? (
-        <NeedsYouStrip cards={needsYou} now={now} />
-      ) : null}
 
       {visible.length === 0 ? (
         <p
@@ -550,136 +536,7 @@ function RelationshipRow({
  * a time, the rest one tap away. Acting on a card (or dismissing it) clears
  * every notice it stands for.
  */
-function NeedsYouStrip({
-  cards,
-  now,
-}: {
-  readonly cards: readonly NeedsYouCard[];
-  readonly now: number;
-}) {
-  const router = useRouter();
-  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
-  const [all, setAll] = useState(false);
-  const [, startClearing] = useTransition();
-  const left = cards.filter((card) => !gone.has(card.key));
-  if (left.length === 0) return null;
-  const shown = all ? left : left.slice(0, 3);
-
-  const clear = (card: NeedsYouCard) => {
-    setGone((current) => new Set([...current, card.key]));
-    startClearing(async () => {
-      if (card.noticeIds.length > 0) {
-        await markNoticesReadAction([...card.noticeIds]);
-      }
-      if (card.reminderId !== null) {
-        await dismissReminderAction(card.reminderId);
-      }
-    });
-  };
-
-  return (
-    <section
-      aria-labelledby="needs-you"
-      className="flex flex-col gap-2.5"
-      data-needs-you
-    >
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 id="needs-you" className="cq-title-sm text-(--cq-text-primary)">
-          Needs you
-        </h2>
-        {left.length > 3 ? (
-          <button
-            type="button"
-            onClick={() => setAll((open) => !open)}
-            className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
-            aria-expanded={all}
-          >
-            {all ? "Show fewer" : `See all ${String(left.length)}`}
-          </button>
-        ) : null}
-      </div>
-      <ul
-        className={cx(
-          "-mx-(--cq-page-gutter) grid snap-x snap-mandatory gap-2.5 overflow-x-auto px-(--cq-page-gutter) pb-1 [scrollbar-width:none] md:mx-0 md:grid-flow-row md:grid-cols-3 md:overflow-visible md:px-0",
-          all ? "grid-flow-row" : "auto-cols-[82%] grid-flow-col",
-        )}
-      >
-        {shown.map((card, index) => {
-          const relationship = card.relationship;
-          return (
-            <li key={card.key} className="snap-start">
-              <article
-                aria-label={card.title}
-                className="relative flex h-full flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-xs)"
-                data-needs-you-card
-              >
-                <div className="flex min-w-0 items-center gap-2.5 pr-9">
-                  {relationship === null ? null : (
-                    <CounterpartAvatar item={relationship} size={32} />
-                  )}
-                  <span className="flex min-w-0 flex-col">
-                    {relationship === null ? null : (
-                      <span className="cq-body-sm truncate font-semibold text-(--cq-text-primary)">
-                        {relationship.counterpart.name}
-                      </span>
-                    )}
-                    <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
-                      {card.count > 1
-                        ? `${String(card.count)} updates · ${since(card.latestAt, now)}`
-                        : since(card.latestAt, now)}
-                    </span>
-                  </span>
-                </div>
-                <p className="cq-body line-clamp-2 font-medium text-(--cq-text-primary)">
-                  {card.title}
-                </p>
-                <div className="mt-auto">
-                  {card.action.href === null ? (
-                    <button
-                      type="button"
-                      onClick={() => clear(card)}
-                      className={buttonClassName("secondary", "compact")}
-                    >
-                      {card.action.label}
-                    </button>
-                  ) : (
-                    <Link
-                      href={card.action.href}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        clear(card);
-                        router.push(card.action.href ?? "/relationships");
-                      }}
-                      className={buttonClassName(
-                        index === 0 ? "primary" : "secondary",
-                        "compact",
-                      )}
-                    >
-                      {card.action.label === "Upload & share" ? (
-                        <Upload size={ICON_SIZE.compact} aria-hidden="true" />
-                      ) : null}
-                      {card.action.label}
-                    </Link>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => clear(card)}
-                  aria-label={`Dismiss ${card.title}`}
-                  className="absolute top-1 right-1 inline-flex size-11 items-center justify-center rounded-md text-(--cq-text-tertiary) hover:text-(--cq-text-primary)"
-                >
-                  <X size={ICON_SIZE.compact} aria-hidden="true" />
-                </button>
-              </article>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-function CounterpartAvatar({
+export function CounterpartAvatar({
   item,
   size,
 }: {

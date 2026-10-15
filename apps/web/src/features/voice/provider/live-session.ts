@@ -242,6 +242,21 @@ export function useLiveVoiceSession(
   const sendText = useCallback((text: string) => {
     callRef.current?.typed(text);
   }, []);
+  const narrate = useCallback((text: string): boolean => {
+    const call = callRef.current;
+    if (call === null) return false;
+    call.narrate(text);
+    return true;
+  }, []);
+  const brief = useCallback((text: string): boolean => {
+    const call = callRef.current;
+    if (call === null) return false;
+    call.brief(text);
+    return true;
+  }, []);
+  const hush = useCallback((on: boolean) => {
+    callRef.current?.hush(on);
+  }, []);
   const setMuted = useCallback((next: boolean) => {
     setMutedState(next);
     callRef.current?.setMuted(next);
@@ -264,6 +279,9 @@ export function useLiveVoiceSession(
       start,
       end,
       sendText,
+      narrate,
+      brief,
+      hush,
       setMuted,
       setVolume,
       inputLevel,
@@ -277,6 +295,9 @@ export function useLiveVoiceSession(
       start,
       end,
       sendText,
+      narrate,
+      brief,
+      hush,
       setMuted,
       setVolume,
       inputLevel,

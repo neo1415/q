@@ -113,10 +113,20 @@ function sectionOf(word: string): DeckSectionCode | null {
 
 const SUFFIX = "(?:\\s+(?:tab|page|section|view))?";
 
+const THEIR_DOCUMENTS =
+  /^(?:their|its|this\s+company'?s|the\s+company'?s|that\s+company'?s)\s+(?:documents?|docs|files)$/iu;
+
 function fromObject(rawObject: string): TabAsk | null {
   const object = tidy(rawObject);
   // Indefinite: "a deck", "some team", "my deck" are not a record's tab.
   if (/^(?:a|an|some|another|my|our)\s/iu.test(object)) return null;
+
+  // Owner 2026-10-15: "open their documents" on a company's page is its
+  // Data room tab. Only with a word pointing at the record on screen: "the
+  // documents" and "my documents" stay the person's own Documents page.
+  if (THEIR_DOCUMENTS.test(object)) {
+    return { tab: "dataroom", subTab: null, name: null, viewer: false };
+  }
 
   // One section of the deck: "the traction section of the deck", "the ask
   // in Nixo's deck", "the deck's market section".

@@ -316,7 +316,9 @@ export const PILOT_SCRIPT: TourScript = TourScriptSchema.parse({
       ],
       fallbackLines: [FALLBACK],
       fallbackSceneId: null,
-      ackTimeoutMs: 30_000,
+      // Production 15 Oct: company runs with public research took 14-24 s;
+      // 30 s left too little margin under load.
+      ackTimeoutMs: 45_000,
     },
     {
       sceneId: "s.pilot.compare",

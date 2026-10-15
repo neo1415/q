@@ -522,6 +522,31 @@ export function investorsMapBlock(
 }
 
 /**
+ * Lane A (live 2026-10-15: "show me on a map where they are based" about
+ * three companies drew nothing, though their countries had been read):
+ * where the run's companies are, as each publishes it. Only companies an
+ * authorised read of this run returned; a company with no published
+ * country is listed without a place, never guessed.
+ */
+export function companiesMapBlock(read: RunRead): QResultBlock | null {
+  const companies = [...read.companyNames.entries()].slice(0, 20);
+  if (!companies.some(([companyId]) => read.countries.has(companyId))) {
+    return null;
+  }
+  return {
+    kind: "MAP",
+    title: "Where they're based",
+    basis: "Country, as each company publishes it on Capital Q.",
+    places: companies.map(([companyId, name]) => ({
+      label: name.slice(0, 80),
+      countryCode: read.countries.get(companyId) ?? null,
+      subject: { kind: "COMPANY", companyId },
+      note: null,
+    })),
+  };
+}
+
+/**
  * The run's investors side by side, each column headed by its name and
  * opening its profile; rows are what they publish. An unread fact is an
  * empty cell ("not known"), never a guess.
@@ -626,7 +651,13 @@ function visualBlock(
   hint: string | null | undefined,
   read: RunRead,
 ): QResultBlock | null {
-  if (hint === "MAP") return investorsMapBlock(investorsOf(read));
+  if (hint === "MAP") {
+    return (
+      investorsMapBlock(investorsOf(read)) ??
+      // Companies when the run read no investor with a published place.
+      companiesMapBlock(read)
+    );
+  }
   if (hint === "TABLE") return investorsTableBlock(investorsOf(read));
   if (hint === "TIMELINE" && read.relationships.size === 1) {
     const relationship = [...read.relationships.values()][0];

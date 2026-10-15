@@ -121,28 +121,6 @@ describe("RelationshipsIndex", () => {
     expect(screen.getByRole("status").textContent).toContain("Nothing matches");
   });
 
-  it("shows Needs you once per relationship and action", () => {
-    render(
-      <RelationshipsIndex
-        side="INVESTOR"
-        items={[ITEM]}
-        notices={[1, 2].map((n) => ({
-          id: `c0000000-0000-4000-8000-00000000000${String(n)}`,
-          kind: "Q_WORK" as const,
-          title: "Q is waiting to be let in",
-          body: null,
-          linkPath: null,
-          read: false,
-          createdAt: "2026-09-21T10:00:00.000Z",
-          priority: "NEEDS_YOU" as const,
-        }))}
-      />,
-    );
-    const section = screen.getByRole("region", { name: "Needs you" });
-    expect(within(section).getAllByRole("article")).toHaveLength(1);
-    expect(section.textContent).toContain("2 updates");
-  });
-
   it("points an investor with none to Discover", () => {
     render(<RelationshipsIndex side="INVESTOR" items={[]} />);
     expect(

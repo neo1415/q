@@ -153,6 +153,40 @@ export const QManifestDialogSchema = z
   .strict();
 export type QManifestDialog = z.infer<typeof QManifestDialogSchema>;
 
+/**
+ * Lane A (2026-10-15): the result-block kinds a browser reports as drawn
+ * on the Q stage. A closed list of its own, so this module needs nothing
+ * from the result-block contract.
+ */
+export const Q_MANIFEST_DRAWN_KINDS = [
+  "ANSWER_CARDS",
+  "COMPARISON",
+  "COMPARISON_CARDS",
+  "TABLE",
+  "CHART",
+  "MAP",
+  "TIMELINE",
+  "ARTIFACT_REFERENCE",
+  "CLARIFICATION_REQUEST",
+] as const;
+export const QManifestDrawnKindSchema = z.enum(Q_MANIFEST_DRAWN_KINDS);
+export type QManifestDrawnKind = z.infer<typeof QManifestDrawnKindSchema>;
+
+/**
+ * What Q showed that this browser actually drew, after its code loaded
+ * and committed: the run it came from and its block kinds. A report, not
+ * authority -- it only lets Q refer to an object the person can see (a
+ * tampered report can at most make Q mention an object on its own
+ * screen); it grants no read.
+ */
+export const QManifestDrawnSchema = z
+  .object({
+    run: UuidSchema,
+    kinds: z.array(QManifestDrawnKindSchema).min(1).max(8),
+  })
+  .strict();
+export type QManifestDrawn = z.infer<typeof QManifestDrawnSchema>;
+
 export const QPageManifestSchema = z
   .object({
     v: z.literal(2),
@@ -180,6 +214,8 @@ export const QPageManifestSchema = z
       .array(QManifestControlSchema)
       .max(Q_MANIFEST_CONTROLS_MAX)
       .optional(),
+    /** Lane A: the Q object drawn on this tab now, if any. */
+    drawn: QManifestDrawnSchema.optional(),
   })
   .strict();
 export type QPageManifest = z.infer<typeof QPageManifestSchema>;

@@ -199,6 +199,8 @@ export class RunRead extends Map<string, string> {
   readonly investors = new Map<string, ReadInvestor>();
   /** Subject id (company or investor) -> ISO country, where published. */
   readonly countries = new Map<string, string>();
+  /** Company id -> its name as the authorised read returned it (lane A). */
+  readonly companyNames = new Map<string, string>();
 }
 
 /**
@@ -262,6 +264,9 @@ export function createRunCompanies(limit = 200) {
       for (const { companyId, name, country } of found.companies) {
         const key = nameKey(name);
         if (key.length > 0 && !known.has(key)) known.set(key, companyId);
+        if (!known.companyNames.has(companyId)) {
+          known.companyNames.set(companyId, name);
+        }
         if (country !== null && !known.countries.has(companyId)) {
           known.countries.set(companyId, country);
         }
