@@ -149,6 +149,35 @@ export function createPostgresRelationshipPartyStates() {
       return rows.map((row) => UuidSchema.parse(row["id"]));
     },
 
+    /**
+     * Every relationship (any party) whose stored folds are missing or behind,
+     * in id order after `after`: the worker's backfill at start.
+     */
+    async behindAll(
+      sql: DatabaseExecutor,
+      page: {
+        readonly after: string | null;
+        readonly limit: number;
+        readonly version: string;
+      },
+    ): Promise<readonly string[]> {
+      const rows = await sql`
+        select r.id
+          from network.relationships r
+         where (${page.after}::uuid is null or r.id > ${page.after}::uuid)
+           and exists (
+             select 1
+               from (values ('INVESTOR'), ('COMPANY')) as p(party)
+               left join network.relationship_party_states s
+                 on s.relationship_id = r.id and s.party = p.party
+              where s.relationship_id is null
+                 or s.source_sequence < r.last_event_sequence
+                 or s.projector_version <> ${page.version})
+         order by r.id
+         limit ${page.limit}`;
+      return rows.map((row) => UuidSchema.parse(row["id"]));
+    },
+
     async count(sql: DatabaseExecutor, filter: PipelineFilter) {
       const [row] =
         await sql`select count(*)::int as count ${scoped(sql, filter)}`;

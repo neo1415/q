@@ -1,4 +1,7 @@
-import type { RelationshipId } from "../contracts/index.js";
+import {
+  RelationshipIdSchema,
+  type RelationshipId,
+} from "../contracts/index.js";
 import {
   projectRelationshipState,
   RELATIONSHIP_PROJECTOR_VERSION,
@@ -45,6 +48,12 @@ export type RelationshipStateProjector = {
     readonly scanned: number;
     readonly changed: number;
     readonly anomalies: number;
+    /**
+     * The CRM pipeline read model's backfill in the same run: relationships
+     * whose per-party folds were missing or behind, folded again. Null: the
+     * pass could not run (e.g. its migration not applied); never fatal.
+     */
+    readonly readModel?: { readonly folded: number } | null | undefined;
   }>;
 };
 
@@ -83,6 +92,46 @@ export function createRelationshipStateProjector(
       return "WRITTEN";
     } catch {
       return "FAILED";
+    }
+  }
+
+  /**
+   * The read model's own backfill (slice 3b follow-up): relationships the
+   * cache pass did not touch but whose per-party folds are missing or
+   * behind. Bounded by the same budget; each write compare-and-set; a
+   * failure only ends this pass.
+   */
+  async function backfillPartyStates(
+    limit: number,
+    max: number,
+  ): Promise<{ readonly folded: number } | null> {
+    let folded = 0;
+    let after: string | null = null;
+    try {
+      for (;;) {
+        const ids = await partyStates.behindAll(sql, {
+          after,
+          limit,
+          version: RELATIONSHIP_PROJECTOR_VERSION,
+        });
+        for (const raw of ids) {
+          if (folded >= max) return { folded };
+          const id = RelationshipIdSchema.parse(raw);
+          if (
+            (await writePartyStates(
+              id,
+              await readHistory(dependencies, id),
+            )) === "FAILED"
+          )
+            return { folded };
+          folded += 1;
+        }
+        const last = ids.at(-1);
+        if (ids.length < limit || last === undefined) return { folded };
+        after = last;
+      }
+    } catch {
+      return null;
     }
   }
 
@@ -131,7 +180,12 @@ export function createRelationshipStateProjector(
         if (ids.length < limit || last === undefined || scanned >= max) break;
         after = last;
       }
-      return { scanned, changed, anomalies };
+      return {
+        scanned,
+        changed,
+        anomalies,
+        readModel: await backfillPartyStates(limit, max),
+      };
     },
   };
 }
