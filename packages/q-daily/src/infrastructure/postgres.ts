@@ -316,6 +316,14 @@ export async function readInterestProfile(
   };
 }
 
+/**
+ * Fictional synthetic demo accounts (auth app_metadata `synthetic` and
+ * `fictional_demo`, the markers every fictional seed writes and the presence
+ * guard reads) never receive Daily: an invented person has no news to read,
+ * each edition costs model calls, and their addresses cannot take email.
+ * They are enrolled OFF with email off, and never claimed even when a row
+ * says otherwise (rows written before this guard).
+ */
 export function createPostgresDailyWorkerStore(
   sql: DatabaseExecutor,
 ): DailyWorkerStore {
@@ -324,11 +332,19 @@ export function createPostgresDailyWorkerStore(
       // People with an active membership in a company or investor
       // organisation (setup done) and no preferences yet: weekly default.
       const rows = await sql<
-        { user_id: string; tenant_id: string; timezone: string | null }[]
+        {
+          user_id: string;
+          tenant_id: string;
+          timezone: string | null;
+          fictional: boolean;
+        }[]
       >`
-        select distinct on (m.user_id) m.user_id, m.tenant_id, p.timezone
+        select distinct on (m.user_id) m.user_id, m.tenant_id, p.timezone,
+               coalesce(u.raw_app_meta_data ->> 'synthetic' = 'true'
+                        and u.raw_app_meta_data ->> 'fictional_demo' = 'true', false) as fictional
           from identity.organisation_memberships m
           join identity.user_profiles p on p.id = m.user_id and p.status = 'active'
+          left join auth.users u on u.id = p.auth_user_id
          where m.membership_status = 'active'
            and (exists (select 1 from core.companies c where c.organisation_id = m.organisation_id)
                 or exists (select 1 from core.investor_organisations io where io.organisation_id = m.organisation_id))
@@ -337,10 +353,13 @@ export function createPostgresDailyWorkerStore(
          limit ${limit}`;
       let created = 0;
       for (const row of rows) {
-        const due = nextDueAt("WEEKLY", row.timezone, now);
+        const due = row.fictional
+          ? null
+          : nextDueAt("WEEKLY", row.timezone, now);
         const inserted = await sql`
-          insert into q_runtime.daily_preferences (user_id, tenant_id, frequency, next_due_at)
-          values (${row.user_id}, ${row.tenant_id}, 'WEEKLY', ${due})
+          insert into q_runtime.daily_preferences (user_id, tenant_id, frequency, email, next_due_at)
+          values (${row.user_id}, ${row.tenant_id},
+                  ${row.fictional ? "OFF" : "WEEKLY"}, ${!row.fictional}, ${due})
           on conflict (user_id) do nothing
           returning user_id`;
         created += inserted.length;
@@ -363,6 +382,12 @@ export function createPostgresDailyWorkerStore(
         with due as (
           select user_id from q_runtime.daily_preferences
            where next_due_at <= ${now} and (frequency <> 'OFF' or requested_at is not null)
+             and not exists (
+               select 1 from identity.user_profiles fp
+                 join auth.users fu on fu.id = fp.auth_user_id
+                where fp.id = daily_preferences.user_id
+                  and fu.raw_app_meta_data ->> 'synthetic' = 'true'
+                  and fu.raw_app_meta_data ->> 'fictional_demo' = 'true')
            order by next_due_at asc
            limit ${limit}
            for update skip locked
