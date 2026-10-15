@@ -173,6 +173,40 @@ describe("video lobby admission and durable navigation", () => {
     expect(actions.video).not.toHaveBeenCalled();
   });
 
+  it("offers video on an iPad-sized touch screen exactly as on desktop (no device gate)", async () => {
+    // Owner report 2026-10-15: video was missing on tablets. Admission is the
+    // server's catalogue alone; the lobby must never narrow it by device.
+    const agent = vi
+      .spyOn(window.navigator, "userAgent", "get")
+      .mockReturnValue(
+        "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+      );
+    Object.defineProperty(window.navigator, "maxTouchPoints", {
+      configurable: true,
+      get: () => 5,
+    });
+    const width = window.innerWidth;
+    window.innerWidth = 768;
+    try {
+      actions.interviewers.mockResolvedValue({ ok: true, value: catalogue });
+      render(
+        <RehearsalLobby
+          kind="INVESTOR_ORGANISATION"
+          counterpartId={ID}
+          requestedVideo
+        />,
+      );
+      expect(
+        await screen.findByRole("radio", { name: /Video, up to 3 minutes/u }),
+      ).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
+    } finally {
+      agent.mockRestore();
+      Reflect.deleteProperty(window.navigator, "maxTouchPoints");
+      window.innerWidth = width;
+    }
+  });
+
   it("preserves the same canonical id in a durable voice URL after confirmed video fallback", async () => {
     vi.spyOn(window.history, "replaceState").mockImplementation(
       () => undefined,
