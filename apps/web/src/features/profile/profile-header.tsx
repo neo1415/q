@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { ProfileImageSubjectType } from "@capital-q/contracts";
 import { MapPin, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
+import { CoverBand } from "@/features/entity/cover-band";
 import { ProfileImageEditor } from "./profile-image-editor";
 
 /**
@@ -62,7 +63,14 @@ export function ProfileHero({
       data-profile-hero
     >
       <div className="relative aspect-[4/1] min-h-24 w-full bg-(--cq-surface-strong)">
-        {images.coverUrl === null ? null : (
+        {images.coverUrl === null ? (
+          // Someone else's profile without a cover: a quiet horizon rather
+          // than an empty band (owner 2026-10-16). Their own stays plain,
+          // with the button to add one.
+          images.editable ? null : (
+            <CoverBand seed={images.subjectId} className="absolute inset-0" />
+          )
+        ) : (
           // eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived storage URL: fetched by the browser from storage directly, never proxied through Next.js
           <img
             src={images.coverUrl}
