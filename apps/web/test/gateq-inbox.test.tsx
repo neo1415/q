@@ -152,7 +152,7 @@ describe("the inbox's words (pure)", () => {
       model.replyWords({ replyState: "NONE", daysLeft: null, folder: "INBOX" }),
     ).toBeNull();
     expect(model.rulesWords({ met: 3, total: 4, unknown: 1 })).toBe(
-      "3 of 4 rules, 1 unanswered",
+      "3 of 4 rules, 1 needing clarification",
     );
     expect(model.chipsFor(true).map(([v]) => v)).not.toContain(
       "ASSIGNED_TO_ME",
@@ -168,7 +168,7 @@ describe("the inbox's words (pure)", () => {
       model.qView(
         item(1, { fit: "PARTIAL", rules: { met: 3, total: 4, unknown: 1 } }),
       ).why,
-    ).toMatch(/Unanswered isn't a no/);
+    ).toMatch(/unclear rule is not a rejection/);
   });
 
   it("F28: a gate with no rules is never 'Fits your rules'", () => {

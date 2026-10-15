@@ -1,0 +1,101 @@
+import type {
+  FitProfileDto,
+  InterestDto,
+  QWorkDto,
+} from "@capital-q/contracts";
+
+import {
+  STAGE_WORDS,
+  STATUS_WORDS,
+  VERDICT,
+  WORK_KIND_LABELS,
+} from "@/features/work/work-words";
+
+/**
+ * The CRM record's own view model (owner directive 2026-10-15 §D, record
+ * workspace): what the record says about Q's work with this counterpart,
+ * and about fit and interest, kept as separate statements. Pure, so the
+ * words and the joins are tested as such.
+ *
+ * Every join is by canonical id (a Q Work lane's counterpart id), never by
+ * a name: two companies can share a name, and a name match would put
+ * another record's work on this one.
+ */
+
+/** A read that answered, answered nothing, or could not be made. */
+export type Read<T> =
+  | { readonly kind: "READ"; readonly value: T }
+  | { readonly kind: "UNAVAILABLE" };
+
+export type RecordWorkRow = {
+  readonly key: string;
+  readonly title: string;
+  /** Where the job stands overall, and this counterpart's stage within it. */
+  readonly status: string;
+  readonly stage: string;
+  readonly href: string;
+  /** Q's first-stage report on this counterpart, when written. */
+  readonly report: {
+    readonly headline: string;
+    readonly verdict: string;
+    readonly href: string;
+  } | null;
+  readonly updatedAt: string;
+};
+
+/** Q's jobs that have a lane for this counterpart, newest first. */
+export function recordWork(
+  items: readonly QWorkDto[],
+  counterpartId: string,
+): readonly RecordWorkRow[] {
+  return items
+    .flatMap((work) =>
+      work.lanes
+        .filter((lane) => lane.counterpart?.id === counterpartId)
+        .map((lane): RecordWorkRow => ({
+          key: `${work.id}:${lane.id}`,
+          title: work.goal ?? WORK_KIND_LABELS[work.kind],
+          status: STATUS_WORDS[work.status],
+          stage: STAGE_WORDS[lane.stage],
+          href: `/work/${work.id}`,
+          report:
+            lane.report === null
+              ? null
+              : {
+                  headline: lane.report.headline,
+                  verdict: VERDICT[lane.report.recommendation],
+                  href: `/work/${work.id}/report/${lane.id}`,
+                },
+          updatedAt: lane.updatedAt,
+        })),
+    )
+    .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/**
+ * The investor's own interest, in words. Interest is what the investor
+ * did; it is never inferred from fit, viewing or Q's work.
+ */
+export function interestWords(
+  interest: Read<InterestDto | null>,
+  day: (iso: string) => string,
+): string {
+  if (interest.kind === "UNAVAILABLE") return "Couldn't be read right now";
+  const value = interest.value;
+  if (value === null) return "Not expressed";
+  if (value.status === "WITHDRAWN") return "Withdrawn";
+  const since = `Expressed ${day(value.expressedAt)}`;
+  return value.response === "ACCEPTED"
+    ? `${since} · they accepted`
+    : value.response === "DECLINED"
+      ? `${since} · they declined`
+      : `${since} · awaiting their answer`;
+}
+
+/** Fit with the investor's declared mandate: a band, or why there is none. */
+export function fitState(
+  fit: Read<FitProfileDto | null>,
+): "UNAVAILABLE" | "NOT_SET_UP" | "PROFILE" {
+  if (fit.kind === "UNAVAILABLE") return "UNAVAILABLE";
+  return fit.value === null ? "NOT_SET_UP" : "PROFILE";
+}

@@ -21,6 +21,7 @@ import { BrandStyle, loadBrandStyle } from "@/features/brand-theme/brand-style";
 import { InstallPrompt } from "@/pwa/install-prompt";
 import { loadMyOrganisations } from "@/features/team/load-organisations";
 import { PitchWarmup } from "@/features/discover/player/pitch-warmup-trigger";
+import { QPitchEntry } from "@/features/q-pitch/tour-entry";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -41,7 +42,7 @@ export default async function ApplicationLayout({
 }: {
   children: ReactNode;
 }): Promise<ReactNode> {
-  await requireSessionUser();
+  const user = await requireSessionUser();
   const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
   // Every read the shell needs, asked side by side (L1 latency sweep,
   // 2026-10-06): context, standing, onboarding (two journeys), KYB, admin
@@ -122,6 +123,14 @@ export default async function ApplicationLayout({
         <PitchWarmup />
       ) : null}
       <QSwarmPointer />
+      {/* Q Pitch rehearsal host (QP-F08): off unless the server enables it;
+          the host itself admits only fictional demo accounts. */}
+      {process.env.CQ_Q_PITCH_TOUR === "1" &&
+      unfinished === null &&
+      user.email !== null &&
+      (context.kind === "INVESTOR" || context.kind === "FOUNDER") ? (
+        <QPitchEntry account={user.email} role={context.kind} />
+      ) : null}
       {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
           receipts to the Q API, and the notice when an act did not happen. */}
       <Suspense fallback={null}>

@@ -290,7 +290,7 @@ test.describe("investor onboarding (desktop, real API)", () => {
     // R27: Relationships is top-level; with none yet it points to Discover.
     await page
       .getByRole("complementary")
-      .getByRole("link", { name: "Relationships" })
+      .getByRole("link", { name: "CRM" })
       .click();
     await expect(page).toHaveURL(/\/relationships$/);
     await expect(

@@ -22,6 +22,7 @@ import {
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const ALL = new Set([
+  "gateq_inbox_summarise",
   "get_company",
   "list_my_relationships",
   "list_my_documents",
@@ -31,6 +32,169 @@ const ALL = new Set([
   "list_q_work",
   "read_my",
 ]);
+
+describe("the selected GateQ dossier", () => {
+  const sourceReading = (text: string, applicationId = id(7)) => ({
+    v: 1,
+    subject: {
+      kind: "GATEQ_SUBMISSION",
+      gatewayId: id(100),
+      applicationId,
+      reference: "ga_submitted",
+      submittedAt: "2026-10-14T13:12:00.000Z",
+      dossierSchemaVersion: "gateq-dossier.v1",
+    },
+    text,
+    sources: [],
+  });
+  const manifest = QPageManifestSchema.parse({
+    v: 2,
+    seq: 1,
+    inView: [],
+    sections: [],
+    dialogs: [],
+    focus: { kind: "GATEQ_APPLICATION", id: id(7) },
+  });
+  it("reads the exact focused application rather than treating the inbox list as its content", () => {
+    const reads = manifestReads(manifest, ALL);
+    expect(reads).toContainEqual({
+      key: `gateq_inbox_summarise:${id(7)}`,
+      name: "gateq_inbox_summarise",
+      arguments: { applicationId: id(7) },
+    });
+    const facts = manifestFacts(
+      manifest,
+      new Map([
+        [
+          `gateq_inbox_summarise:${id(7)}`,
+          {
+            status: "DONE",
+            says: "Read the application.",
+            reading: sourceReading(
+              "Customers pay by the litre [truth=USER_CLAIM; evidence=SELF_REPORTED; sourceTurnSeq=2]\nMissing: revenue evidence.",
+            ),
+          },
+        ],
+      ]),
+    );
+    const text = facts.map((f) => f.statement).join("\n");
+    expect(text).toContain("Customers pay by the litre");
+    expect(text).toContain("truth=USER_CLAIM; evidence=SELF_REPORTED");
+    expect(text).toContain("Missing: revenue evidence");
+    expect(text).toContain("not an investment decision");
+  });
+  it("does not hydrate refused, malformed, different or unoffered dossier reads", () => {
+    expect(
+      manifestReads(manifest, new Set(["read_my"])).some(
+        (r) => r.name === "gateq_inbox_summarise",
+      ),
+    ).toBe(false);
+    for (const [key, result] of [
+      [
+        `gateq_inbox_summarise:${id(7)}`,
+        {
+          status: "NOT_DONE",
+          says: "Refused",
+          reading: sourceReading("Foreign secret"),
+        },
+      ],
+      [
+        `gateq_inbox_summarise:${id(7)}`,
+        { status: "DONE", reading: sourceReading("Foreign secret") },
+      ],
+      [
+        `gateq_inbox_summarise:${id(8)}`,
+        {
+          status: "DONE",
+          says: "Read",
+          reading: sourceReading("Foreign secret"),
+        },
+      ],
+      [
+        `gateq_inbox_summarise:${id(7)}`,
+        {
+          status: "DONE",
+          says: "Read",
+          reading: sourceReading("Foreign secret", id(8)),
+        },
+      ],
+    ] as const) {
+      expect(
+        manifestFacts(manifest, new Map([[key, result]]))
+          .map((f) => f.statement)
+          .join("\n"),
+      ).not.toContain("Foreign secret");
+    }
+  });
+  it("follows a changed focus and never reuses the previous application's reading", () => {
+    const results = new Map<string, unknown>([
+      [
+        `gateq_inbox_summarise:${id(7)}`,
+        {
+          status: "DONE",
+          says: "Read",
+          reading: sourceReading("Previous company's private findings"),
+        },
+      ],
+      [
+        `gateq_inbox_summarise:${id(8)}`,
+        {
+          status: "DONE",
+          says: "Read",
+          reading: sourceReading("Current company's supplied business", id(8)),
+        },
+      ],
+    ]);
+    const changed = {
+      ...manifest,
+      focus: { kind: "GATEQ_APPLICATION" as const, id: id(8) },
+    };
+    const text = manifestFacts(changed, results)
+      .map((f) => f.statement)
+      .join("\n");
+    expect(text).toContain("Current company's supplied business");
+    expect(text).not.toContain("Previous company's private findings");
+    expect(
+      manifestFacts(
+        QPageManifestSchema.parse({ ...manifest, focus: undefined }),
+        results,
+      )
+        .map((f) => f.statement)
+        .join("\n"),
+    ).not.toContain("private findings");
+    expect(
+      manifestFacts(manifest, results)
+        .map((f) => f.statement)
+        .join("\n"),
+    ).toContain("Previous company's private findings");
+  });
+  it("keeps long substantive findings separate from short screen-list descriptions", () => {
+    const text = [
+      ...Array.from(
+        { length: 9 },
+        (_, n) =>
+          `Claim ${n}: ${"business detail ".repeat(60)} [truth=USER_CLAIM; evidence=SELF_REPORTED]`,
+      ),
+      "Use of funds: 150 additional kiosks, founder reported, not verified.",
+    ].join("\n");
+    const facts = manifestFacts(
+      manifest,
+      new Map([
+        [
+          `gateq_inbox_summarise:${id(7)}`,
+          { status: "DONE", says: "Read", reading: sourceReading(text) },
+        ],
+      ]),
+    );
+    expect(facts.map((f) => f.statement).join("\n")).toContain(
+      "Use of funds: 150 additional kiosks",
+    );
+    expect(facts.every((f) => f.statement.length <= 7_800)).toBe(true);
+    expect(facts.every((f) => f.source?.includes(`/gateq?item=${id(7)}`))).toBe(
+      true,
+    );
+  });
+});
 
 function discover(): QPageManifest {
   return QPageManifestSchema.parse({

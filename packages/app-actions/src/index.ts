@@ -19,6 +19,7 @@ export {
   type AppActionCard,
   type AppActionCardNames,
   type AppActionClass,
+  type AppActionReading,
   type AppActionContext,
   type AppActionDefinition,
   type AppActionHttp,

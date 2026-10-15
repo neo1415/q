@@ -371,3 +371,97 @@ describe("the known-entity instant lane", () => {
     expect(s.delegated[0]?.questionKind).not.toBe("PERSON_SEARCH");
   });
 });
+
+/**
+ * S2 (lane S, 2026-10-15): a plain fit ranking of their own candidates, and
+ * words a code lane answers (a page, a screen command, cards), make no
+ * classification call. Authorisation is unchanged: the same plan reaches
+ * the delegate, and without their own mandate in the plan the readers run.
+ */
+describe("S2: code lanes ahead of the skim", () => {
+  const prereadOf = (s: ReturnType<typeof seam>, req: QAnswerRequest) =>
+    s.answer.preread?.({
+      runId: req.runId,
+      tenantId: req.tenantId,
+      actor: req.actor,
+      correlationId: req.correlationId,
+    });
+
+  it.each([
+    "Show my top 3 companies against my mandate",
+    "Rank my top five companies",
+    "Which three companies in my feed fit my mandate best?",
+    "top 5 startups in Kenya for my mandate",
+  ])(
+    "%s: computed fit with zero model calls, under the same plan",
+    async (said) => {
+      const s = seam(said);
+      const req = investorRequest();
+      prereadOf(s, req);
+      await s.answer.answer(req);
+      expect(s.modelCalls()).toBe(0);
+      expect(s.delegated).toHaveLength(1);
+      const delegated = s.delegated[0];
+      expect(delegated?.plan).toBe(req.plan);
+      expect(delegated?.actor).toBe(req.actor);
+      expect(delegated?.questionKind).toBe("FIT");
+      expect(delegated?.fitQuestion).toEqual({
+        text: said,
+        count: null,
+        previous: false,
+      });
+      expect(await delegated?.research).toMatchObject({ mode: "NEVER" });
+    },
+  );
+
+  it("keeps the readers without their own mandate in the plan", async () => {
+    const s = seam("Rank my top five companies");
+    await s.answer.answer(request());
+    expect(s.modelCalls()).toBeGreaterThan(0);
+    expect(s.delegated[0]?.fitQuestion).toBeUndefined();
+  });
+
+  it("keeps the readers for a mandate bound to another organisation", async () => {
+    const s = seam("Rank my top five companies");
+    const base = investorRequest();
+    await s.answer.answer({
+      ...base,
+      plan: PermittedContextPlanSchema.parse({
+        ...base.plan,
+        scopes: base.plan.scopes.map((scope) => ({
+          ...scope,
+          subject: {
+            kind: "INVESTOR_ORGANISATION",
+            investorOrganisationId: randomUUID(),
+          },
+        })),
+      }),
+    });
+    expect(s.modelCalls()).toBeGreaterThan(0);
+    expect(s.delegated[0]?.fitQuestion).toBeUndefined();
+  });
+
+  it.each([
+    "take me to discover",
+    "open settings",
+    "go to the calls tab",
+    "scroll down",
+    "clear all cards",
+  ])("%s: no early skim or reading is begun", async (said) => {
+    const s = seam(said);
+    prereadOf(s, investorRequest());
+    await later(30, null);
+    expect(s.modelCalls()).toBe(0);
+  });
+
+  it.each([
+    "what does Ledgerfold do?",
+    "open discover, not now",
+    "Show my top 3 companies with scores against my mandate and explain why.",
+  ])("%s: the early reading still starts", async (said) => {
+    const s = seam(said);
+    prereadOf(s, investorRequest());
+    await later(30, null);
+    expect(s.skimCalls()).toBe(1);
+  });
+});

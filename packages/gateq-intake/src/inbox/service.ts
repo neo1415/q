@@ -939,7 +939,7 @@ export function createInboxService(dependencies: {
                 ? "Meets"
                 : c.status === "NO_MATCH"
                   ? "Doesn't meet"
-                  : "Not answered",
+                  : "Needs clarification",
           })),
         shared,
         omitted,

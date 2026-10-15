@@ -97,6 +97,9 @@ const SIGNATURE_SIZE = { width: 32, height: 18 } as const;
 
 type Layout = "SPOTLIGHT" | "TILED";
 
+// Hide a RoundButton responsively with `max-sm:hidden` / `max-md:hidden`:
+// a plain `hidden` loses to its own `inline-flex`, which is how Captions
+// and Present stayed visible on phones and pushed Leave off-screen.
 function RoundButton({
   label,
   icon: Icon,
@@ -126,7 +129,7 @@ function RoundButton({
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex size-12 shrink-0 items-center justify-center rounded-(--cq-radius-full) transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-50 motion-reduce:transition-none ${
+      className={`inline-flex size-11 shrink-0 items-center sm:size-12 justify-center rounded-(--cq-radius-full) transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-50 motion-reduce:transition-none ${
         off
           ? "bg-(--cq-danger) text-(--cq-text-inverse) hover:opacity-90"
           : pressed === true
@@ -977,11 +980,13 @@ export function RehearsalRoom({
             | Rehearsal with {name} · {elapsedLabel(startedAt, now)}
           </span>
         </p>
-        <p className="cq-caption text-(--cq-stage-text-muted) md:hidden">
+        {/* Below 400 px the controls need the whole row: Leave must never be
+            pushed off-screen (it was clipped at 390 px). */}
+        <p className="cq-caption hidden text-(--cq-stage-text-muted) min-[400px]:block md:hidden">
           {elapsedLabel(startedAt, now)}
         </p>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
           <RoundButton
             label={micOn ? "Turn off microphone" : "Turn on microphone"}
             icon={micOn ? Mic : MicOff}
@@ -1007,7 +1012,7 @@ export function RehearsalRoom({
             icon={captionsOn ? Captions : CaptionsOff}
             pressed={captionsOn}
             onClick={() => setCaptionsOn((on) => !on)}
-            className="hidden sm:inline-flex"
+            className="max-sm:hidden"
           />
           <RoundButton
             label={hand ? "Lower hand" : "Raise hand"}
@@ -1023,7 +1028,7 @@ export function RehearsalRoom({
               pressed={sharing}
               onClick={() => void toggleShare()}
               disabled={ended}
-              className="hidden md:inline-flex"
+              className="max-md:hidden"
             />
           ) : null}
           <div className="relative">
@@ -1118,7 +1123,7 @@ export function RehearsalRoom({
             onClick={() => void leave()}
             aria-label="Leave the rehearsal"
             title="Leave the rehearsal"
-            className="inline-flex h-12 w-16 items-center justify-center rounded-(--cq-radius-full) bg-(--cq-danger) text-(--cq-text-inverse) hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            className="inline-flex h-11 w-14 shrink-0 items-center justify-center rounded-(--cq-radius-full) bg-(--cq-danger) sm:h-12 sm:w-16 text-(--cq-text-inverse) hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           >
             <PhoneOff size={20} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </button>

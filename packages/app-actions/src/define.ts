@@ -30,6 +30,24 @@ import type { ReferenceKind } from "./references.js";
 
 export type AppActionClass = "READ" | "INSTANT" | "CONSEQUENTIAL";
 
+/** Versioned source reading, never an action acknowledgement or approval. */
+export type AppActionReading = {
+  readonly v: 1;
+  readonly subject: {
+    readonly kind: "GATEQ_SUBMISSION";
+    readonly gatewayId: string;
+    readonly applicationId: string;
+    readonly reference: string;
+    readonly submittedAt: string;
+    readonly dossierSchemaVersion: "gateq-dossier.v1" | null;
+  };
+  readonly text: string;
+  readonly sources: readonly {
+    readonly factId: string;
+    readonly transcriptSeq: number | null;
+  }[];
+};
+
 /** Who is acting and under which key. A route and a tool both build one. */
 export type AppActionContext = {
   readonly actor: ActorContext;
@@ -259,6 +277,9 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
     input: In,
     names: Readonly<Record<string, string>>,
   ) => string;
+  /** Authorized READ data for reasoning, separate from the short action receipt. */
+  readonly reading?:
+    ((out: Out, input: In) => AppActionReading | undefined) | undefined;
   /** Whether it did what was asked (a refusal can be an outcome). Default: yes. */
   readonly succeeded?: ((out: Out) => boolean) | undefined;
   readonly http?: AppActionHttp<In, Out> | undefined;
