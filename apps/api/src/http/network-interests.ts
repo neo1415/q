@@ -44,6 +44,7 @@ import {
   InterestNotFoundError,
   selectRelationshipPipeline,
   relationshipPipelineScopeBinding,
+  RelationshipPipelineLimitError,
   RelationshipPipelineQueryError,
   relationshipPipelineExportRows,
   toConnectionRequestDto,
@@ -354,6 +355,35 @@ export function registerNetworkInterestRoutes(
       company ? companyIdOf(request) : "INVESTOR",
     ].join(":");
   };
+  // Slice 3b: the read model when it is ready for this party; null keeps
+  // the bounded in-memory path (never a page missing relationships).
+  const pipelineFromReadModel = async (
+    request: FastifyRequest,
+    query: Parameters<typeof selectRelationshipPipeline>[1],
+    company: boolean,
+  ) => {
+    try {
+      return (
+        (await service.relationshipPipeline?.page({
+          actor: getActorContext(request),
+          companyId: company ? companyIdOf(request) : undefined,
+          query,
+          actorScope: pipelineScope(request, company),
+        })) ?? null
+      );
+    } catch (error: unknown) {
+      // A refusal or a bad cursor is the caller's answer, as before.
+      if (
+        error instanceof RelationshipPipelineQueryError ||
+        error instanceof RelationshipPipelineLimitError
+      )
+        throw error;
+      // Otherwise (e.g. the read model's migration not yet applied) the
+      // bounded path answers, which re-runs every authorisation itself.
+      request.log.warn({ err: error }, "pipeline read model unavailable");
+      return null;
+    }
+  };
   app.get(
     NETWORK_INVESTOR_PIPELINE_PATH,
     { onRequest: withContext },
@@ -362,11 +392,13 @@ export function registerNetworkInterestRoutes(
         RelationshipPipelineQuerySchema,
         request.query,
       );
-      const page = selectRelationshipPipeline(
-        await pipelineRows(request, false),
-        query,
-        pipelineScope(request, false),
-      );
+      const page =
+        (await pipelineFromReadModel(request, query, false)) ??
+        selectRelationshipPipeline(
+          await pipelineRows(request, false),
+          query,
+          pipelineScope(request, false),
+        );
       void reply.header("Cache-Control", "no-store");
       return RelationshipPipelineDtoSchema.parse({
         ...page,
@@ -382,11 +414,13 @@ export function registerNetworkInterestRoutes(
         RelationshipPipelineQuerySchema,
         request.query,
       );
-      const page = selectRelationshipPipeline(
-        await pipelineRows(request, true),
-        query,
-        pipelineScope(request, true),
-      );
+      const page =
+        (await pipelineFromReadModel(request, query, true)) ??
+        selectRelationshipPipeline(
+          await pipelineRows(request, true),
+          query,
+          pipelineScope(request, true),
+        );
       void reply.header("Cache-Control", "no-store");
       return RelationshipPipelineDtoSchema.parse({
         ...page,
@@ -403,7 +437,19 @@ export function registerNetworkInterestRoutes(
       RelationshipPipelineExportQuerySchema,
       request.query,
     );
-    const authorisedRows = await pipelineRows(request, company);
+    const fromReadModel = await service.relationshipPipeline
+      ?.all({
+        actor: getActorContext(request),
+        companyId: company ? companyIdOf(request) : undefined,
+        query,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof RelationshipPipelineLimitError) throw error;
+        request.log.warn({ err: error }, "pipeline read model unavailable");
+        return null;
+      });
+    const authorisedRows =
+      fromReadModel ?? (await pipelineRows(request, company));
     if (
       query.scope !==
       relationshipPipelineScopeBinding(query, pipelineScope(request, company))

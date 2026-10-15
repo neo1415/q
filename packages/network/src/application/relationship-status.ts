@@ -33,7 +33,7 @@ import {
   RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED,
 } from "../domain/event-registry.js";
 import type { ExpressInterestDependencies } from "./express-interest.js";
-import { readHistory } from "./relationship-projection.js";
+import { readHistory } from "./relationship-history.js";
 import { COMPANY_INTEREST_VIEW } from "./respond-to-interest.js";
 
 const INVESTOR_VIEW = capability("investor.view");
@@ -92,6 +92,36 @@ function viewOf(
         relationship,
         projection,
         visibleHistory: visible,
+        nextStep: nextStepFor(
+          projection.state,
+          party,
+          lastExpresser(visible),
+          lastPauser(visible),
+        ),
+      };
+}
+
+/**
+ * One party's fold, as the pipeline read model stores it (CRM slice 3b):
+ * the same visibility filter, projector and next-step rule as `viewOf`,
+ * so a stored row and a fresh read can never disagree. Null: nothing on
+ * record this party may see.
+ */
+export function partyView(
+  history: Parameters<typeof visibleToParty>[0],
+  party: RelationshipParty,
+): {
+  readonly state: RelationshipStatus["projection"]["state"];
+  readonly stateSince: string;
+  readonly nextStep: RelationshipStatus["nextStep"];
+} | null {
+  const visible = visibleToParty(history, party);
+  const projection = projectRelationshipState(visible);
+  return projection === null
+    ? null
+    : {
+        state: projection.state,
+        stateSince: projection.stateSince,
         nextStep: nextStepFor(
           projection.state,
           party,
