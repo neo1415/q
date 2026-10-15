@@ -1,0 +1,89 @@
+{
+ "activeKey": 0,
+ "keys": {
+  "key#1": {
+   "videos": 6,
+   "seconds": 224.9,
+   "refusal": null
+  }
+ },
+ "videos": {
+  "00-capital-q": {
+   "videoId": "97afad16b2",
+   "key": "key#1",
+   "replica": "rccbeedfc684",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/00-capital-q.mp4",
+   "seconds": 50.3
+  },
+  "fw-ledgerfold": {
+   "videoId": "6da0d27331",
+   "key": "key#1",
+   "replica": "r5d40691d88d",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-ledgerfold.mp4",
+   "seconds": 36.2
+  },
+  "fw-ajopot": {
+   "videoId": "d3bd6b9727",
+   "key": "key#1",
+   "replica": "r38a383b0173",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-ajopot.mp4",
+   "seconds": 33.5
+  },
+  "fw-tarmacly": {
+   "videoId": "5aebc423c8",
+   "key": "key#1",
+   "replica": "r4ba1277e4fb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-tarmacly.mp4",
+   "seconds": 36.5
+  },
+  "fw-yamfield-agro": {
+   "videoId": "5772c51096",
+   "key": "key#1",
+   "replica": "rccbeedfc684",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-yamfield-agro.mp4",
+   "seconds": 35.1
+  },
+  "fw-clinicrest": {
+   "videoId": "190b96590f",
+   "key": "key#1",
+   "replica": "rcd970fadf46"
+  },
+  "fw-marketlight-grids": {
+   "videoId": "201849d59e",
+   "key": "key#1",
+   "replica": "r4f5b5ef55c8"
+  },
+  "fw-tallyloom": {
+   "videoId": "10ac1227cc",
+   "key": "key#1",
+   "replica": "r4ba1277e4fb"
+  },
+  "fw-maji-loop": {
+   "videoId": "f7d9f0bba7",
+   "key": "key#1",
+   "replica": "radb9683b0eb"
+  },
+  "fw-nsuo-labs": {
+   "videoId": "11c81d2633",
+   "key": "key#1",
+   "replica": "rccbeedfc684"
+  },
+  "fw-brightkloof-energy": {
+   "videoId": "51a7b24c87",
+   "key": "key#1",
+   "replica": "r1a0108fbd75"
+  },
+  "fw-souqsheet": {
+   "videoId": "9a36e0da61",
+   "key": "key#1",
+   "replica": "r983d5889432"
+  },
+  "fw-kazikit": {
+   "videoId": "da3fe79bce",
+   "key": "key#1",
+   "replica": "r4ba1277e4fb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fw-kazikit.mp4",
+   "seconds": 33.3
+  }
+ }
+}
