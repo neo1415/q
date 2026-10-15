@@ -177,6 +177,8 @@ import {
   createPostgresApplicationTurnRepository,
   createPostgresSubmissionInbox,
   createGateqInbox,
+  createRelationshipGateqApplications,
+  gateqInboxAuthority,
   renderApplicationContactCodeEmail,
   renderClaimCodeEmail,
   sendGateqEmailLogged,
@@ -2569,6 +2571,12 @@ const { app, logger } = createApp(config, security, {
           });
         },
   gateqInbox: createPostgresSubmissionInbox({ sql: database.sql }),
+  // CRM record: the applications on one relationship, under GateQ's own
+  // gateway authority for the investor side.
+  gateqRelationshipApplications: createRelationshipGateqApplications({
+    sql: database.sql,
+    authority: gateqInboxAuthority(gateq),
+  }),
   // F3: "Find my startup": claim requests and saved startup searches.
   // P14 item 7: a platform admin makes an unclaimed company's profile
   // public (or returns it to the network); the console authorises.
