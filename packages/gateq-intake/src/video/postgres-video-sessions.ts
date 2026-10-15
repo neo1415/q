@@ -118,6 +118,14 @@ export function createPostgresGateqVideoSessions(deps: {
          order by created_at desc limit 1`;
       return rows[0] === undefined ? null : toRow(rows[0]);
     },
+    countForApplication: async (applicationId) =>
+      z.coerce
+        .number()
+        .parse(
+          (
+            await sql`select count(*) as n from gateq.application_video_sessions where application_id = ${applicationId}`
+          )[0]?.["n"] ?? 0,
+        ),
     byBridgeTokenHash: async (hash) => {
       if (!/^[0-9a-f]{64}$/u.test(hash)) return null;
       const rows =
