@@ -48,7 +48,7 @@ import type { QToolPorts } from "../ports.js";
  *   - an investor about its own organisation: the public display name.
  * A subject the plan denies, or that does not exist, is "not available" —
  * one wording, never a confirmation (§27). The open web stays reachable:
- * the same tool without a companyId searches the person's own words.
+ * the same tool with target GENERAL searches the person's own words.
  *
  * Results are public material of unknown reliability (`truthClass: UNKNOWN`)
  * and untrusted data: a page that instructs is still only a page (§12).
@@ -60,6 +60,12 @@ const EXCERPT_MAX = RESEARCH_BOUNDS.maxExcerptChars;
 
 export const ResearchPublicWebInputSchema = z
   .object({
+    target: z
+      .enum(["CONVERSATION_SUBJECT", "GENERAL"])
+      .default("CONVERSATION_SUBJECT")
+      .describe(
+        "GENERAL for markets, competitors or a different public topic independent of the selected company or your own firm. It never attaches results to that subject. CONVERSATION_SUBJECT (default) preserves research about the conversation's company. GENERAL cannot be combined with companyId or aboutThemselves:true.",
+      ),
     query: z
       .string()
       .trim()
@@ -85,7 +91,7 @@ export const ResearchPublicWebInputSchema = z
         "When looking up one company or person by name, that name exactly as the person said it. Pages are then checked to be about them before anything is attributed.",
       ),
     companyId: UuidSchema.optional().describe(
-      "The company the research is about, when this conversation has one. Omit for a general question or someone else named by the person (use entityName). If it comes back not available, search again without it.",
+      "The company the research is about, when this conversation has one. For a general question or someone else named by the person, set target GENERAL and omit companyId (use entityName for their public name). If this company is not available, do not attach the research to it; use target GENERAL for the person's public wording.",
     ),
     freshness: z
       .enum(PUBLIC_WEB_FRESHNESS)
@@ -118,7 +124,16 @@ export const ResearchPublicWebInputSchema = z
         "Pin the search to these public domains, e.g. the company's own website.",
       ),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) =>
+      input.target !== "GENERAL" ||
+      (input.companyId === undefined && !input.aboutThemselves),
+    {
+      message:
+        "General research cannot specify a company or ask about themselves.",
+    },
+  );
 export type ResearchPublicWebInput = z.infer<
   typeof ResearchPublicWebInputSchema
 >;
@@ -218,7 +233,7 @@ export function createResearchPublicWebTool(
     status: "ACTIVE",
     providerName: "research_public_web",
     description:
-      "Searches the open web (several indexes, up to four phrasings in parallel) and reads the best public pages (up to 6), returning bounded excerpts with URL, domain, title, publication date and retrieval time, which pages are about a named company or person, and Capital Q's own comparison notes against its records. Call it for anything the person wants looked up or that lives outside Capital Q: markets, competitors, news, accelerator cohorts (e.g. YC companies), funds, a company or person by name with or without a website, or what the web says about them or their own organisation. Results are unverified public material, never facts; they never change Capital Q records.",
+      "Searches the open web (several indexes, up to four phrasings in parallel) and reads the best public pages (up to 6), returning bounded excerpts with URL, domain, title, publication date and retrieval time, which pages are about a named company or person, and Capital Q's own comparison notes against its records. For a general question independent of the selected company or own firm, set target: GENERAL. Call it for anything the person wants looked up or that lives outside Capital Q: markets, competitors, news, accelerator cohorts (e.g. YC companies), funds, a company or person by name with or without a website, or what the web says about them or their own organisation. Results are unverified public material, never facts; they never change Capital Q records.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],
@@ -240,6 +255,11 @@ export function createResearchPublicWebTool(
       const { actor, plan } = context;
       if (actorWideScope(plan, "PUBLIC_EXTERNAL_DATA") === undefined) {
         return deny("NOT_AVAILABLE");
+      }
+      // General research remains under the same actor-wide public scope,
+      // but the selected company/firm is not its subject or Evidence owner.
+      if (input.target === "GENERAL") {
+        return allow("PUBLIC", { subject: null });
       }
       // The subject: the named company, else the conversation's single
       // company, else the actor's own investor organisation, else none.
