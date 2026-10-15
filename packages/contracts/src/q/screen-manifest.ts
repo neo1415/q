@@ -66,6 +66,18 @@ export const Q_MANIFEST_SECTION_KINDS = [
   "DAILY",
   "PITCH",
   "Q_ROOM_CARD",
+  /** Lane W: the pages the manifest did not cover before. */
+  "DILIGENCE",
+  "INVESTOR_PROFILE",
+  "REHEARSAL",
+  "SEARCH_RESULTS",
+  "EXPLORE",
+  "INTEREST_LIST",
+  "REVIEW_LIST",
+  "VISIBILITY",
+  "VERIFICATION",
+  "BILLING",
+  "MEMORY",
   "OTHER",
 ] as const;
 export const QManifestSectionKindSchema = z.enum(Q_MANIFEST_SECTION_KINDS);

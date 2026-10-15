@@ -8,6 +8,7 @@ import {
 } from "@/components/app-shell/page-container";
 import { PitchVideoPage } from "@/features/pitch/pitch-video-page";
 import { resolveOwnContext } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Video" };
 
@@ -29,11 +30,24 @@ export default async function PitchVideoRoute({
   if (context.kind !== "FOUNDER") redirect("/pitch");
   return (
     <PageContainer>
-      <PageHeader title="Video" />
-      <PitchVideoPage
-        companyId={context.companyId}
-        mediaAssetId={mediaAssetId}
-      />
+      <QSection
+        id="pitch"
+        kind="PITCH"
+        refs={[
+          { kind: "MEDIA", id: mediaAssetId },
+          ...(context.kind === "FOUNDER"
+            ? [{ kind: "COMPANY" as const, id: context.companyId }]
+            : []),
+        ]}
+        total={1}
+        label="a pitch video"
+      >
+        <PageHeader title="Video" />
+        <PitchVideoPage
+          companyId={context.companyId}
+          mediaAssetId={mediaAssetId}
+        />
+      </QSection>
     </PageContainer>
   );
 }

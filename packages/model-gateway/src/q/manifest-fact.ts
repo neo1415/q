@@ -257,6 +257,17 @@ const SECTION_LABELS: Readonly<Record<QManifestSectionKind, string>> = {
   DAILY: "The Q Daily",
   PITCH: "a pitch",
   Q_ROOM_CARD: "a card Q opened in the Q room",
+  DILIGENCE: "the diligence for a relationship",
+  INVESTOR_PROFILE: "an investor's profile",
+  REHEARSAL: "a pitch rehearsal",
+  SEARCH_RESULTS: "search results",
+  EXPLORE: "Explore (companies to browse)",
+  INTEREST_LIST: "investors interested in their company",
+  REVIEW_LIST: "reviews",
+  VISIBILITY: "their visibility and discovery settings",
+  VERIFICATION: "their verification",
+  BILLING: "their plan, billing and usage",
+  MEMORY: "what Q remembers about them",
   OTHER: "a section",
 };
 

@@ -13,6 +13,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { remainingOf, unitsOf } from "@/features/billing/plan-words";
 import { apiSession, qApiSession } from "@/features/q/context";
 import { RehearsalsHome } from "@/features/rehearsal/rehearsals-home";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Rehearsals" };
 export const dynamic = "force-dynamic";
@@ -53,30 +54,34 @@ export default async function RehearsalsPage({
   if (partners === null) {
     return (
       <PageContainer>
-        <EmptyState
-          title="Rehearsals couldn't load."
-          description="Try again in a moment."
-          action={
-            <Link href="/rehearsals" className={buttonClassName("secondary")}>
-              Try again
-            </Link>
-          }
-        />
+        <QSection id="rehearsals" kind="REHEARSAL" label="your rehearsals">
+          <EmptyState
+            title="Rehearsals couldn't load."
+            description="Try again in a moment."
+            action={
+              <Link href="/rehearsals" className={buttonClassName("secondary")}>
+                Try again
+              </Link>
+            }
+          />
+        </QSection>
       </PageContainer>
     );
   }
   if (partners.role === null) {
     return (
       <PageContainer>
-        <EmptyState
-          title="Rehearsals are for founders and investors."
-          description="Finish setting up your company or your fund, then rehearse your meetings here."
-          action={
-            <Link href="/home" className={buttonClassName("secondary")}>
-              Go to Q
-            </Link>
-          }
-        />
+        <QSection id="rehearsals" kind="REHEARSAL" label="your rehearsals">
+          <EmptyState
+            title="Rehearsals are for founders and investors."
+            description="Finish setting up your company or your fund, then rehearse your meetings here."
+            action={
+              <Link href="/home" className={buttonClassName("secondary")}>
+                Go to Q
+              </Link>
+            }
+          />
+        </QSection>
       </PageContainer>
     );
   }
@@ -93,17 +98,20 @@ export default async function RehearsalsPage({
         };
   return (
     <PageContainer>
-      <RehearsalsHome
-        basePath="/rehearsals"
-        partners={{ ...partners, role: partners.role }}
-        history={history}
-        allowance={allowanceWords}
-        withId={
-          params["with"] !== undefined && /^[0-9a-f-]{36}$/.test(params["with"])
-            ? params["with"]
-            : null
-        }
-      />
+      <QSection id="rehearsals" kind="REHEARSAL" label="your rehearsals">
+        <RehearsalsHome
+          basePath="/rehearsals"
+          partners={{ ...partners, role: partners.role }}
+          history={history}
+          allowance={allowanceWords}
+          withId={
+            params["with"] !== undefined &&
+            /^[0-9a-f-]{36}$/.test(params["with"])
+              ? params["with"]
+              : null
+          }
+        />
+      </QSection>
     </PageContainer>
   );
 }

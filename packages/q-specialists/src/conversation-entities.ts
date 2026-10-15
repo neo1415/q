@@ -172,6 +172,9 @@ const LIST_SECTIONS: ReadonlySet<QManifestSectionKind> = new Set([
   "DOCUMENT_LIST",
   "UPLOAD_LIST",
   "GATEQ_INBOX",
+  "SEARCH_RESULTS",
+  "EXPLORE",
+  "INTEREST_LIST",
 ]);
 
 /**

@@ -23,6 +23,7 @@ import { ConnectionRequest } from "@/features/network/connection-request";
 import { ProfileHero } from "@/features/profile/profile-header";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QControl } from "@/features/q/control/q-control";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Investor" };
 export const dynamic = "force-dynamic";
@@ -45,15 +46,23 @@ export default async function InvestorPage({
   if (context.kind !== "FOUNDER" || session === null) {
     return (
       <PageContainer>
-        <EmptyState
-          title="This page is for founders."
-          description="Founders see investors who chose to be discoverable, and can ask to connect."
-          action={
-            <Link href="/home" className={buttonClassName("secondary")}>
-              Go to Q
-            </Link>
-          }
-        />
+        <QSection
+          id="investor"
+          kind="INVESTOR_PROFILE"
+          refs={[{ kind: "INVESTOR_ORGANISATION", id: investorOrganisationId }]}
+          total={1}
+          label="an investor profile"
+        >
+          <EmptyState
+            title="This page is for founders."
+            description="Founders see investors who chose to be discoverable, and can ask to connect."
+            action={
+              <Link href="/home" className={buttonClassName("secondary")}>
+                Go to Q
+              </Link>
+            }
+          />
+        </QSection>
       </PageContainer>
     );
   }
@@ -68,18 +77,26 @@ export default async function InvestorPage({
   if (investor === null) {
     return (
       <PageContainer>
-        <EmptyState
-          title="This investor couldn't load."
-          description="Nothing is wrong with your profile. Try again in a moment."
-          action={
-            <Link
-              href={`/investors/${investorOrganisationId}`}
-              className={buttonClassName("secondary")}
-            >
-              Try again
-            </Link>
-          }
-        />
+        <QSection
+          id="investor"
+          kind="INVESTOR_PROFILE"
+          refs={[{ kind: "INVESTOR_ORGANISATION", id: investorOrganisationId }]}
+          total={1}
+          label="an investor profile"
+        >
+          <EmptyState
+            title="This investor couldn't load."
+            description="Nothing is wrong with your profile. Try again in a moment."
+            action={
+              <Link
+                href={`/investors/${investorOrganisationId}`}
+                className={buttonClassName("secondary")}
+              >
+                Try again
+              </Link>
+            }
+          />
+        </QSection>
       </PageContainer>
     );
   }
@@ -92,109 +109,117 @@ export default async function InvestorPage({
   const deployment = deploymentLabel(investor.deploymentState);
   return (
     <PageContainer>
-      <Link
-        href="/investors"
-        className="cq-body-sm inline-flex min-h-11 items-center gap-1 self-start text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+      <QSection
+        id="investor"
+        kind="INVESTOR_PROFILE"
+        refs={[{ kind: "INVESTOR_ORGANISATION", id: investorOrganisationId }]}
+        total={1}
+        label="an investor profile"
       >
-        <ChevronLeft size={ICON_SIZE.compact} aria-hidden="true" />
-        Investors
-      </Link>
-      <ProfileHero
-        name={investor.displayName}
-        headline={investorTypeLabel(investor.investorType)}
-        location={where}
-        square
-        facts={[
-          ...(deployment === null ? [] : [deployment]),
-          ...(investor.websiteUrl === null
-            ? []
-            : [
-                <a
-                  key="web"
-                  href={investor.websiteUrl}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="inline-flex items-center gap-1 underline underline-offset-4"
-                >
-                  <Globe size={ICON_SIZE.compact} aria-hidden="true" />
-                  {investor.websiteUrl.replace(/^https?:\/\//i, "")}
-                </a>,
-              ]),
-        ]}
-        images={{
-          subjectType: "INVESTOR_ORGANISATION",
-          subjectId: investor.investorOrganisationId,
-          avatarUrl: investor.photoUrl ?? null,
-          coverUrl: investor.coverUrl ?? null,
-          editable: false,
-          avatarLabel: "logo",
-        }}
-      />
-      {/*
+        <Link
+          href="/investors"
+          className="cq-body-sm inline-flex min-h-11 items-center gap-1 self-start text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+        >
+          <ChevronLeft size={ICON_SIZE.compact} aria-hidden="true" />
+          Investors
+        </Link>
+        <ProfileHero
+          name={investor.displayName}
+          headline={investorTypeLabel(investor.investorType)}
+          location={where}
+          square
+          facts={[
+            ...(deployment === null ? [] : [deployment]),
+            ...(investor.websiteUrl === null
+              ? []
+              : [
+                  <a
+                    key="web"
+                    href={investor.websiteUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1 underline underline-offset-4"
+                  >
+                    <Globe size={ICON_SIZE.compact} aria-hidden="true" />
+                    {investor.websiteUrl.replace(/^https?:\/\//i, "")}
+                  </a>,
+                ]),
+          ]}
+          images={{
+            subjectType: "INVESTOR_ORGANISATION",
+            subjectId: investor.investorOrganisationId,
+            avatarUrl: investor.photoUrl ?? null,
+            coverUrl: investor.coverUrl ?? null,
+            editable: false,
+            avatarLabel: "logo",
+          }}
+        />
+        {/*
         Q.05: what they publish (public profile + gate criteria only, never
         the private mandate) and the founder's own fit, then "Draft my
         application" through the existing GateQ form.
       */}
-      {/* RECOVERY-2026-10 (C1): what they look for is their public mandate. */}
-      <QControl id="section.mandate" kind="SECTION">
-        <LooksForSection
-          session={session}
-          investorOrganisationId={investor.investorOrganisationId}
-          investorName={investor.displayName}
-        />
-      </QControl>
-      <Link
-        href={`/rehearsals/investor/${encodeURIComponent(investor.investorOrganisationId)}`}
-        className={`${buttonClassName("secondary")} self-start`}
-      >
-        Rehearse a meeting with them
-      </Link>
-      <QControl id="section.connect" kind="SECTION">
-        <section
-          aria-labelledby="investor-reach"
-          className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
+        {/* RECOVERY-2026-10 (C1): what they look for is their public mandate. */}
+        <QControl id="section.mandate" kind="SECTION">
+          <LooksForSection
+            session={session}
+            investorOrganisationId={investor.investorOrganisationId}
+            investorName={investor.displayName}
+          />
+        </QControl>
+        <Link
+          href={`/rehearsals/investor/${encodeURIComponent(investor.investorOrganisationId)}`}
+          className={`${buttonClassName("secondary")} self-start`}
         >
-          <h2
-            id="investor-reach"
-            className="cq-title-md text-(--cq-text-primary)"
-          >
-            Connect
-          </h2>
-          <p className="cq-body-sm text-(--cq-text-secondary)">
-            {inboundLabel(investor.inboundPreference)}.
-          </p>
-          {status === null ? (
-            <p className="cq-body-sm text-(--cq-text-secondary)">
-              Whether you can send a request couldn&apos;t be checked just now.
-              Reload to try again.
-            </p>
-          ) : (
-            <ConnectionRequest
-              investorOrganisationId={investor.investorOrganisationId}
-              investorName={investor.displayName}
-              status={status}
-            />
-          )}
-        </section>
-      </QControl>
-      {investor.publicDescription === null ? null : (
-        <QControl id="section.about" kind="SECTION">
+          Rehearse a meeting with them
+        </Link>
+        <QControl id="section.connect" kind="SECTION">
           <section
-            aria-labelledby="investor-about"
-            className="flex flex-col gap-2 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
+            aria-labelledby="investor-reach"
+            className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
           >
             <h2
-              id="investor-about"
+              id="investor-reach"
               className="cq-title-md text-(--cq-text-primary)"
             >
-              About
+              Connect
             </h2>
-            <p className="cq-body whitespace-pre-line text-(--cq-text-secondary)">
-              {investor.publicDescription}
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {inboundLabel(investor.inboundPreference)}.
             </p>
+            {status === null ? (
+              <p className="cq-body-sm text-(--cq-text-secondary)">
+                Whether you can send a request couldn&apos;t be checked just
+                now. Reload to try again.
+              </p>
+            ) : (
+              <ConnectionRequest
+                investorOrganisationId={investor.investorOrganisationId}
+                investorName={investor.displayName}
+                status={status}
+              />
+            )}
           </section>
         </QControl>
-      )}
+        {investor.publicDescription === null ? null : (
+          <QControl id="section.about" kind="SECTION">
+            <section
+              aria-labelledby="investor-about"
+              className="flex flex-col gap-2 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
+            >
+              <h2
+                id="investor-about"
+                className="cq-title-md text-(--cq-text-primary)"
+              >
+                About
+              </h2>
+              <p className="cq-body whitespace-pre-line text-(--cq-text-secondary)">
+                {investor.publicDescription}
+              </p>
+            </section>
+          </QControl>
+        )}
+      </QSection>
     </PageContainer>
   );
 }

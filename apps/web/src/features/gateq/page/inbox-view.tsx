@@ -50,6 +50,7 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import { QPageState, QSection, useQDialog } from "@/features/q/q-section";
 
 import { QNavIcon } from "@/components/app-shell/q-nav-icon";
+import { qRef } from "@/features/q/q-ref";
 
 import {
   ApplicationComparison,
@@ -1051,6 +1052,7 @@ function Row({
   return (
     <div
       data-id={item.applicationId}
+      {...qRef("GATEQ_APPLICATION", item.applicationId)}
       className={`gq-row${item.unread ? " gq-unread" : ""}`}
       role="option"
       aria-selected={selected}

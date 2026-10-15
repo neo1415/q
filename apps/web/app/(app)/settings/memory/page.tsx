@@ -9,6 +9,7 @@ import {
 } from "@/components/app-shell/page-container";
 import { getSessionAccessToken } from "@/auth/session";
 import { QMemoryList } from "@/features/settings/q-memory-list";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "What Q remembers" };
 export const dynamic = "force-dynamic";
@@ -28,20 +29,22 @@ export default async function QMemoryPage() {
         );
   return (
     <PageContainer width="reading" className="flex flex-col gap-6">
-      <PageHeader
-        title="What Q remembers"
-        description="Q uses this in every conversation. Forget anything wrong."
-      />
-      {read === null ? (
-        <p
-          className="cq-body text-(--cq-text-secondary)"
-          data-state="unavailable"
-        >
-          Q&apos;s memory couldn&apos;t be read just now. Reload in a moment.
-        </p>
-      ) : (
-        <QMemoryList items={read.items} />
-      )}
+      <QSection id="memory" kind="MEMORY" label="what Q remembers">
+        <PageHeader
+          title="What Q remembers"
+          description="Q uses this in every conversation. Forget anything wrong."
+        />
+        {read === null ? (
+          <p
+            className="cq-body text-(--cq-text-secondary)"
+            data-state="unavailable"
+          >
+            Q&apos;s memory couldn&apos;t be read just now. Reload in a moment.
+          </p>
+        ) : (
+          <QMemoryList items={read.items} />
+        )}
+      </QSection>
     </PageContainer>
   );
 }
