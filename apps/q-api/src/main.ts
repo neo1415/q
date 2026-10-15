@@ -416,6 +416,7 @@ import {
 } from "@capital-q/q-specialists";
 import {
   actorPrincipal,
+  DISCLOSURE_BATCH_MAX,
   createDefaultDisclosureResolvers,
   createDisclosureAccessService,
   createDisclosureResourceResolverRegistry,
@@ -1418,6 +1419,17 @@ const currentSlateExplanations = createCurrentSlateExplanationService({
 // as the application API composes it — the feed's investor subject, the
 // network-preview disclosure rule, the same capability, idempotency and
 // outbox — so Q's approved action and the feed button are one command.
+/** The network preview's rule: network-visible or public to this actor. */
+function networkVisible(decision: {
+  readonly outcome: string;
+  readonly reasonCode: string;
+}): boolean {
+  return (
+    decision.outcome === "ALLOW" &&
+    (decision.reasonCode === "NETWORK_VISIBLE" ||
+      decision.reasonCode === "PUBLIC_EXTERNAL")
+  );
+}
 const interestServiceOptions: InterestServiceOptions = {
   sql: database.sql,
   transactions: database.transactions,
@@ -1436,11 +1448,28 @@ const interestServiceOptions: InterestServiceOptions = {
         resource: { type: "company", id: companyId },
         requestedAccess: "view",
       });
-      return (
-        decision.outcome === "ALLOW" &&
-        (decision.reasonCode === "NETWORK_VISIBLE" ||
-          decision.reasonCode === "PUBLIC_EXTERNAL")
-      );
+      return networkVisible(decision);
+    },
+    // S5 (lane S): the same rule for a whole relationship list in one
+    // bounded evaluation (canDisclose is evaluateMany of one request).
+    visibleToInvestorAmong: async (actor, companyIds) => {
+      const distinct = [...new Set(companyIds)];
+      const visible = new Set<string>();
+      for (let at = 0; at < distinct.length; at += DISCLOSURE_BATCH_MAX) {
+        const chunk = distinct.slice(at, at + DISCLOSURE_BATCH_MAX);
+        const decisions = await disclosure.evaluateMany(
+          chunk.map((id) => ({
+            principal: actorPrincipal(actor),
+            resource: { type: "company" as const, id },
+            requestedAccess: "view" as const,
+          })),
+        );
+        decisions.forEach((decision, index) => {
+          const id = chunk[index];
+          if (id !== undefined && networkVisible(decision)) visible.add(id);
+        });
+      }
+      return visible;
     },
   },
 };
