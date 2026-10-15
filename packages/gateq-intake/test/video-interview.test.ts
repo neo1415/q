@@ -26,6 +26,8 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
   const rows: GateqVideoSessionRow[] = [];
   const limits = { remaining: 5, platformFull: false };
   const hashes = new Map<string, string>();
+  const eventHashes = new Map<string, string>();
+  const GRACE_MS = 30_000;
   const open = (r: GateqVideoSessionRow) =>
     r.status !== "ENDED" && Date.parse(r.endsAt) > clock();
   return {
@@ -68,9 +70,12 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
         maxSeconds: input.maxSeconds,
         createdAt: new Date(now).toISOString(),
         endsAt: new Date(now + input.maxSeconds * 1000).toISOString(),
+        roomReadyAt: null,
+        liveAt: null,
       };
       rows.push(row);
       hashes.set(input.bridgeTokenHash, row.id);
+      eventHashes.set(input.eventsTokenHash, row.id);
       return Promise.resolve({ kind: "CREATED" as const, row });
     },
     markLive: (input) => {
@@ -78,16 +83,43 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
       const row = rows[i];
       if (row === undefined || row.status !== "STARTING")
         return Promise.resolve(null);
-      // As the database: the clock starts when the room is ready.
+      // As the database: joinable, provisional end = the hard stop.
       const live: GateqVideoSessionRow = {
         ...row,
         status: "LIVE",
         providerConversationId: input.providerConversationId,
         joinUrlSealed: input.joinUrlSealed,
-        endsAt: new Date(clock() + row.maxSeconds * 1000).toISOString(),
+        roomReadyAt: new Date(clock()).toISOString(),
+        endsAt: new Date(
+          clock() + GRACE_MS + row.maxSeconds * 1000,
+        ).toISOString(),
       };
       rows[i] = live;
       return Promise.resolve(live);
+    },
+    markInRoom: (id) => {
+      const i = rows.findIndex((r) => r.id === id);
+      const row = rows[i];
+      if (
+        row === undefined ||
+        row.status !== "LIVE" ||
+        row.liveAt !== null ||
+        row.roomReadyAt === null ||
+        Date.parse(row.endsAt) <= clock()
+      )
+        return Promise.resolve(null);
+      const at = Math.min(clock(), Date.parse(row.roomReadyAt) + GRACE_MS);
+      const next: GateqVideoSessionRow = {
+        ...row,
+        liveAt: new Date(at).toISOString(),
+        endsAt: new Date(at + row.maxSeconds * 1000).toISOString(),
+      };
+      rows[i] = next;
+      return Promise.resolve(next);
+    },
+    byEventsTokenHash: (hash) => {
+      const id = eventHashes.get(hash);
+      return Promise.resolve(rows.find((r) => r.id === id) ?? null);
     },
     end: (input) => {
       const i = rows.findIndex((r) => r.id === input.id);
@@ -131,6 +163,7 @@ function world(config: Partial<GateqVideoConfig> = {}) {
   const clock = () => now;
   const store = memoryStore(clock);
   const bearers: string[] = [];
+  const eventTokens: string[] = [];
   const provider = {
     createRoom: vi.fn(
       (input: {
@@ -139,8 +172,11 @@ function world(config: Partial<GateqVideoConfig> = {}) {
         testMode: boolean;
         greeting: string;
         bridge: { path: string; bearer: string };
+        joinGraceSeconds: number;
+        events: { path: string; token: string };
       }) => {
         bearers.push(input.bridge.bearer);
+        eventTokens.push(input.events.token);
         return Promise.resolve({
           conversationId: `c${String(bearers.length)}`,
           joinUrl: `https://tavus.daily.co/c${String(bearers.length)}?t=x`,
@@ -180,6 +216,7 @@ function world(config: Partial<GateqVideoConfig> = {}) {
     intake,
     conversation,
     bridgePath: "/v1/gateq/video/bridge",
+    eventsPath: "/v1/gateq/video/events",
     now: clock,
   });
   return {
@@ -189,6 +226,7 @@ function world(config: Partial<GateqVideoConfig> = {}) {
     conversation,
     intake,
     bearers,
+    eventTokens,
     apps,
     advance: (ms: number) => {
       now += ms;
@@ -255,20 +293,109 @@ describe("the GateQ video interview session", () => {
     expect(JSON.stringify(w.store.rows)).not.toContain(w.bearers[0] ?? "x");
   });
 
-  it("starts the applicant's clock when the room is ready, not when it was requested", async () => {
+  it("holds the clock until Q is in the room, then gives the full cap (live 2026-10-15)", async () => {
     const w = world();
     const slow = w.provider.createRoom.getMockImplementation();
-    // The provider takes 88 s to make the room (production, 2026-10-15).
+    // The provider takes 13 s to make the room, Q's face 13 s more.
     w.provider.createRoom.mockImplementationOnce(async (input) => {
-      w.advance(88_000);
+      w.advance(13_000);
       if (slow === undefined) throw new Error("no default room");
       return slow(input);
     });
     const requestedAt = Date.parse("2026-10-15T09:00:00Z");
     const session = await w.video.start({ token: TOKEN, correlationId: "c" });
-    expect(Date.parse(session.endsAt)).toBe(
-      requestedAt + 88_000 + session.maxSeconds * 1000,
+    expect(session.liveAt).toBeNull();
+    // Joinable: the end is only the hard stop, ready + 30 s grace + cap.
+    expect(Date.parse(session.endsAt)).toBe(requestedAt + 13_000 + 210_000);
+    expect(w.provider.createRoom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        joinGraceSeconds: 30,
+        events: expect.objectContaining({
+          path: "/v1/gateq/video/events",
+        }) as unknown,
+      }),
     );
+    w.advance(13_000);
+    const joined = await w.video.providerEvent({
+      token: w.eventTokens[0] ?? "",
+      eventType: "system.replica_joined",
+      conversationId: "c1",
+    });
+    expect(joined).toEqual({
+      kind: "ACCEPTED",
+      liveAt: new Date(requestedAt + 26_000).toISOString(),
+    });
+    const now = await w.video.current(TOKEN);
+    expect(Date.parse(now?.endsAt ?? "")).toBe(requestedAt + 26_000 + 180_000);
+    // A second joined event never moves the clock again.
+    w.advance(5_000);
+    await w.video.providerEvent({
+      token: w.eventTokens[0] ?? "",
+      eventType: "system.replica_joined",
+      conversationId: "c1",
+    });
+    expect((await w.video.current(TOKEN))?.endsAt).toBe(now?.endsAt);
+  });
+
+  it("a late or missing joined event never extends past the hard stop", async () => {
+    const w = world();
+    const session = await w.video.start({ token: TOKEN, correlationId: "c" });
+    w.advance(45_000);
+    await w.video.providerEvent({
+      token: w.eventTokens[0] ?? "",
+      eventType: "system.replica_joined",
+      conversationId: null,
+    });
+    const after = await w.video.current(TOKEN);
+    // Started at the end of the grace: exactly the stop it already had.
+    expect(after?.endsAt).toBe(session.endsAt);
+    expect(Date.parse(after?.liveAt ?? "")).toBe(
+      Date.parse(session.endsAt) - 180_000,
+    );
+  });
+
+  it("Q's first heard line starts the clock when the joined event is lost", async () => {
+    const w = world();
+    await w.video.start({ token: TOKEN, correlationId: "c" });
+    w.advance(20_000);
+    await w.video.bridgeTurn({
+      bearer: w.bearers[0] ?? "",
+      utterance: "Hello.",
+      utteranceId: "u1",
+      correlationId: "c",
+    });
+    const after = await w.video.current(TOKEN);
+    expect(Date.parse(after?.endsAt ?? "")).toBe(
+      Date.parse("2026-10-15T09:00:20Z") + 180_000,
+    );
+  });
+
+  it("ignores other events, another room's id and an unknown secret", async () => {
+    const w = world();
+    await w.video.start({ token: TOKEN, correlationId: "c" });
+    const token = w.eventTokens[0] ?? "";
+    expect(
+      await w.video.providerEvent({
+        token,
+        eventType: "application.transcription_ready",
+        conversationId: "c1",
+      }),
+    ).toEqual({ kind: "ACCEPTED", liveAt: null });
+    expect(
+      await w.video.providerEvent({
+        token,
+        eventType: "system.replica_joined",
+        conversationId: "someone-else",
+      }),
+    ).toEqual({ kind: "ACCEPTED", liveAt: null });
+    expect(
+      await w.video.providerEvent({
+        token: "y".repeat(43),
+        eventType: "system.replica_joined",
+        conversationId: null,
+      }),
+    ).toEqual({ kind: "UNKNOWN_SESSION" });
+    expect(JSON.stringify(w.store.rows)).not.toContain(token);
   });
 
   it("a retry or reconnect returns the same session and clock, never a second room", async () => {
@@ -424,7 +551,7 @@ describe("the provider bridge", () => {
         correlationId: "c",
       }),
     ).toEqual({ kind: "UNKNOWN_SESSION" });
-    w.advance(181_000);
+    w.advance(211_000);
     expect(
       await w.video.bridgeTurn({
         bearer: w.bearers[0] ?? "",
@@ -439,7 +566,7 @@ describe("the provider bridge", () => {
   it("the sweep ends rooms past their deadline and keeps a failed end for the next pass", async () => {
     const w = world();
     await w.video.start({ token: TOKEN, correlationId: "c" });
-    w.advance(181_000);
+    w.advance(211_000);
     w.provider.endRoom.mockRejectedValueOnce(new Error("provider down"));
     expect(await w.video.sweep()).toEqual({ ended: 0, failed: 1 });
     expect(w.store.rows[0]?.status).toBe("LIVE");

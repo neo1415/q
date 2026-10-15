@@ -136,6 +136,7 @@ export function registerGateQApplyRoutes(
   const refuse = (
     error: unknown,
     reply: { callNotFound: () => void },
+    toldApart: readonly IntakeRefusedError["refusal"][] = [],
   ): undefined => {
     // A spent allowance is the one refusal that is not a 404. Telling an
     // honest founder their application had vanished, when it is simply
@@ -148,7 +149,8 @@ export function registerGateQApplyRoutes(
     if (
       error instanceof IntakeRefusedError &&
       error.refusal !== "TOO_MANY_REQUESTS" &&
-      error.refusal !== "CONTACT_NOT_CONFIRMED"
+      error.refusal !== "CONTACT_NOT_CONFIRMED" &&
+      !toldApart.includes(error.refusal)
     ) {
       reply.callNotFound();
       return undefined;
@@ -327,7 +329,11 @@ export function registerGateQApplyRoutes(
         application: summaryDto(summary),
       });
     } catch (error: unknown) {
-      return refuse(error, reply);
+      // Live 2026-10-15: a real application with a required answer still
+      // unknown (stage) was told it had vanished. Only a verified
+      // credential reaches this refusal, so saying "not ready" tells the
+      // applicant nothing they cannot read on their own coverage screen.
+      return refuse(error, reply, ["NOT_READY_TO_SUBMIT"]);
     }
   });
 

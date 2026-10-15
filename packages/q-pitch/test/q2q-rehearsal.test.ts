@@ -196,3 +196,71 @@ describe("short Q-to-Q rehearsal", () => {
     runner.dispose();
   });
 });
+
+describe("short Q-to-Q rehearsal, spoken (owner 15 Oct: Q plays both sides)", () => {
+  it("speaks each exchange in order before the next one, both sides, tagged by owner", async () => {
+    const { ports, calls } = fakeRehearsal({ stepMs: 5_000 });
+    const spoken: string[] = [];
+    const outcome = await runShortRehearsal(
+      {
+        ...ports,
+        speakTurns: (segments) => {
+          calls.push(`speak:${String(segments.length)}`);
+          for (const s of segments) spoken.push(`${s.source}:${s.text}`);
+          return Promise.resolve();
+        },
+      },
+      { ...PLAN, narratorLines: PLAN.narratorLines.slice(0, 2) },
+      new AbortController().signal,
+      () => undefined,
+    );
+    expect(outcome.ok).toBe(true);
+    // Opening, then each say's two turns, before the next call.
+    expect(calls.slice(0, 5)).toEqual([
+      "start",
+      "speak:1",
+      "say",
+      "speak:2",
+      "say",
+    ]);
+    expect(spoken[0]).toBe("REHEARSAL_COUNTERPART:Tell me why now.");
+    expect(spoken[1]).toMatch(/^NARRATOR_Q:/u);
+    expect(spoken[2]).toMatch(/^REHEARSAL_COUNTERPART:/u);
+    expect(calls).toContain("finish");
+  });
+
+  it("a failing voice never stops the rehearsal or skips its explicit finish", async () => {
+    const { ports, calls } = fakeRehearsal({});
+    const outcome = await runShortRehearsal(
+      { ...ports, speakTurns: () => Promise.reject(new Error("no audio")) },
+      PLAN,
+      new AbortController().signal,
+      () => undefined,
+    );
+    expect(outcome.ok).toBe(true);
+    expect(calls).toContain("finish");
+  });
+});
+
+describe("short Q-to-Q rehearsal, timing", () => {
+  it("a slow start does not use up the budget: at least one exchange always happens", async () => {
+    const { ports, calls } = fakeRehearsal({ stepMs: 5_000 });
+    let clock = 0;
+    const slow: RehearsalPorts = {
+      ...ports,
+      now: () => clock,
+      start: async () => {
+        clock += 40_000; // longer than the whole budget
+        return ports.start();
+      },
+    };
+    const outcome = await runShortRehearsal(
+      slow,
+      PLAN,
+      new AbortController().signal,
+      () => undefined,
+    );
+    expect(outcome.ok).toBe(true);
+    expect(calls.filter((c) => c === "say").length).toBeGreaterThanOrEqual(1);
+  });
+});

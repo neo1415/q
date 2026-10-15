@@ -25,6 +25,7 @@ import type {
   GateqVideoStateDto,
 } from "@capital-q/contracts";
 import {
+  GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
   ApplicationAnswersRequestSchema,
   ApplicationContactRequestSchema,
   ApplicationContactConfirmRequestSchema,
@@ -186,8 +187,12 @@ export async function submitApplicationAction(
     };
   } catch (error: unknown) {
     if (
+      // The server's code is RESOURCE_CONFLICT; matching a code it never
+      // sends left this branch dead. The exact detail tells the two
+      // same-screen refusals apart (the other, not-ready, reads as is).
       error instanceof ApiProblemError &&
-      error.code === "CONTACT_NOT_CONFIRMED"
+      error.status === 409 &&
+      error.problem?.detail === GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL
     )
       return {
         ok: false,

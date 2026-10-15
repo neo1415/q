@@ -12,10 +12,11 @@ import {
   type RelationshipSummaryDto,
   type SavedRelationshipViewList,
 } from "@capital-q/contracts";
-import { cx } from "@capital-q/ui";
 import { buttonClassName } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
+
+import { PipelineLayoutSwitch } from "./pipeline-layout-switch";
 import { effectShown } from "@/features/q/control/perform";
 import { currentRoute } from "@/features/q/control/route-state";
 import { QPageState, useQDialog } from "@/features/q/q-section";
@@ -25,6 +26,7 @@ import { STATE_WORDS } from "./relationship-words";
 import {
   DEFAULT_PIPELINE_PREFERENCES,
   pipelineHref,
+  pipelineListLayoutHref,
   readPipelinePreferences,
   writePipelinePreferences,
   type PipelineColumn,
@@ -116,14 +118,6 @@ export function RelationshipPipeline({
     ids: {
       "button.pipeline-search": "[data-pipeline-search-button]",
       "button.pipeline-next": "[data-pipeline-next]",
-    },
-  });
-  useQControlGroup({
-    kind: "TAB",
-    ref,
-    ids: {
-      "tab.pipeline-table": "[data-pipeline-layout=table]",
-      "tab.pipeline-board": "[data-pipeline-layout=board]",
     },
   });
   useQControl({
@@ -374,28 +368,14 @@ export function RelationshipPipeline({
             onNotice={setNotice}
           />
           <div className="flex flex-wrap items-center gap-2">
-            <div
-              role="group"
-              aria-label="Layout"
-              className="inline-flex rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
-            >
-              {(["table", "board"] as const).map((entry) => (
-                <Link
-                  key={entry}
-                  href={pipelineHref(query, entry)}
-                  data-pipeline-layout={entry}
-                  aria-current={layout === entry ? "page" : undefined}
-                  className={cx(
-                    "cq-body-sm inline-flex min-h-10 items-center rounded-(--cq-radius-sm) px-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
-                    layout === entry
-                      ? "bg-(--cq-surface-strong) font-semibold text-(--cq-text-primary)"
-                      : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
-                  )}
-                >
-                  {entry === "table" ? "Table" : "Board"}
-                </Link>
-              ))}
-            </div>
+            <PipelineLayoutSwitch
+              layout={layout}
+              hrefs={{
+                list: pipelineListLayoutHref(query),
+                table: pipelineHref(query, "table"),
+                board: pipelineHref(query, "board"),
+              }}
+            />
             <details className="cq-body-sm">
               <summary className="inline-flex min-h-11 cursor-pointer items-center px-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary)">
                 Columns

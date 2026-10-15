@@ -31,7 +31,9 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
     ids: {
       "tab.overview": '[data-hub-view="overview"]',
       "tab.pipeline": '[data-hub-view="pipeline"]',
-      "tab.relationships": '[data-hub-view="relationships"]',
+      // Kept for Q (catalog-stable): the Relationships tab became the
+      // Pipeline's List layout, so its id selects the Pipeline tab.
+      "tab.relationships": '[data-hub-view="pipeline"]',
     },
   });
 

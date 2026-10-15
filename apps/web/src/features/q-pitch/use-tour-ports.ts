@@ -36,6 +36,7 @@ import {
   createNarrator,
   narrationVoiceOn,
   prefetchStandardVoice,
+  speakRehearsalTurns,
   standardVoiceLine,
   type Narrator,
 } from "./narrator";
@@ -370,12 +371,23 @@ export function useTourPorts(
           }
           // Real model turns: only in an approved live run (owner cap).
           const result = await runShortRehearsal(
-            rehearsalPorts(action.counterpart),
+            {
+              ...rehearsalPorts(action.counterpart),
+              // Q plays both sides, in two voices (owner 15 Oct).
+              speakTurns: (segments, speaking) =>
+                speakRehearsalTurns(
+                  segments,
+                  qRef.current?.voice.voice ?? "FEMALE",
+                  speaking,
+                ),
+            },
             {
               narratorLines: lines,
               maxMs: action.maxMs,
-              reviewReads: 6,
-              reviewReadGapMs: 1_500,
+              // Spoken turns make the exchange longer, and the review is
+              // written after the finish (15 Oct: not ready within 9 s).
+              reviewReads: 12,
+              reviewReadGapMs: 2_000,
             },
             signal,
             (segment) => transcript.current?.(segment),

@@ -30,6 +30,7 @@ import { useQSessionOptional } from "@/features/q/q-session";
 
 import type { TourSubject } from "./subject-model";
 import { setNarrationVoice, standardVoicePlaying } from "./narrator";
+import { RESUME_KEY } from "./resume";
 import { openTourVoice } from "./tour-voice";
 import { useTourPorts, type TranscriptSink } from "./use-tour-ports";
 
@@ -112,7 +113,7 @@ const TOURS = {
     ledger: PREMIERE_CERTIFICATION_LEDGER,
     accepted: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
     label:
-      "Internal rehearsal · draft r3 · includes code-verified scenes without a browser receipt · demonstration data",
+      "Internal rehearsal · draft r4 · includes code-verified scenes without a browser receipt · demonstration data",
   },
 } as const;
 
@@ -248,10 +249,11 @@ export function QPitchHost({
             // in the standard TTS voice is the narrator's own audio too.
             narratorPlaying: qSpeaking || standardVoicePlaying(),
             counterpartPlaying: false,
-            // The voice providers ask for echo cancellation but do not
-            // report it back, so it is not assumed: spoken control while
-            // Q is talking is refused (ECHO_UNGUARDED); buttons still work.
-            echoCancellation: false,
+            // Only as the live line's mic track reports it, never assumed:
+            // without it, spoken control while Q is talking is refused
+            // (ECHO_UNGUARDED); the menu and Escape still work.
+            echoCancellation:
+              sessionRef.current?.voice.client.echoCancelled?.() ?? false,
           },
         );
       } else {
@@ -306,6 +308,8 @@ export function QPitchHost({
       runner={runner}
       label={choice.label}
       simulation={simulation}
+      voiceHint={session?.voice.active === true}
+      tour={tour}
       onExit={onExit}
     />
   );
@@ -371,15 +375,35 @@ function TourOverlay({
   runner,
   label,
   simulation,
+  voiceHint,
+  tour,
   onExit,
 }: {
   readonly runner: TourRunner;
   readonly label: string;
   readonly simulation: TranscriptSegment | null;
+  /** A voice line is open, so the audience can steer by speaking. */
+  readonly voiceHint: boolean;
+  readonly tour: TourChoice;
   readonly onExit: () => void;
 }) {
   const snapshot = useSnapshot(runner);
-  const [chaptersOpen, setChaptersOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chapterNow = snapshot.scene?.chapterId ?? null;
+  useEffect(() => {
+    if (chapterNow === null) return;
+    try {
+      window.sessionStorage.setItem(
+        RESUME_KEY,
+        JSON.stringify({
+          tour,
+          chapter: snapshot.phase === "COMPLETE" ? null : chapterNow,
+        }),
+      );
+    } catch {
+      // A preference that cannot be kept is simply not kept.
+    }
+  }, [tour, chapterNow, snapshot.phase]);
 
   const send = (
     kind: TourControlKind,
@@ -420,8 +444,10 @@ function TourOverlay({
       ) {
         return;
       }
-      // Escape pauses: the one key that is always safe to steal.
-      if (event.key === "Escape" && !halted) send("PAUSE", "KEYBOARD");
+      // Escape closes the menu, else pauses: always safe to steal.
+      if (event.key !== "Escape") return;
+      if (menuOpen) setMenuOpen(false);
+      else if (!halted) send("PAUSE", "KEYBOARD");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -437,108 +463,212 @@ function TourOverlay({
     snapshot.notice?.kind === "FALLBACK" ? snapshot.notice.failureCode : null;
 
   const panel = useQPanel();
+  const menu = (placement: "up" | "down") => (
+    <TourMenu
+      label={label}
+      placement={placement}
+      halted={halted}
+      chapters={snapshot.chapters}
+      open={menuOpen}
+      onOpenChange={setMenuOpen}
+      onControl={(kind, chapterId) => send(kind, "POINTER", chapterId)}
+      onExit={onExit}
+    />
+  );
+  // While the Q side panel (a modal) is open, everything outside it is
+  // inert, so the same small menu is offered inside it.
   const panelControls =
     panel === null
       ? null
       : createPortal(
-          // In flow, not absolute: the panel is a flex column, so `order-first`
-          // makes this its own strip above the header instead of covering the
-          // panel's subtitle (browser receipt 41b3b4ee, 15 Oct).
           <div
-            role="toolbar"
-            aria-label="Tour controls"
             data-q-pitch-panel-controls
-            className="order-first flex shrink-0 items-center justify-end gap-1 border-b border-(--cq-border) px-4 py-2"
+            className="order-first flex shrink-0 items-center justify-between gap-2 border-b border-(--cq-border) px-4 py-2"
           >
-            <TourButton label="Back" onPress={() => send("BACK")} />
-            {halted ? (
-              <TourButton
-                label="Resume tour"
-                primary
-                onPress={() => send("RESUME")}
-              />
-            ) : (
-              <TourButton
-                label="Pause tour"
-                primary
-                onPress={() => send("PAUSE")}
-              />
-            )}
-            <TourButton label="Skip" onPress={() => send("SKIP")} />
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              Q Pitch {halted ? "· paused" : "· playing"}
+            </p>
+            {menu("down")}
           </div>,
           panel,
         );
 
+  const meta = [scene?.title, position, PHASE_WORDS[snapshot.phase]]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <TourFrame label={label} onExit={onExit}>
+    <section
+      aria-label="Q Pitch tour"
+      data-q-pitch
+      className="fixed inset-x-4 bottom-24 z-(--cq-z-presence) mx-auto flex max-w-2xl items-end gap-3 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) px-4 py-3 shadow-(--cq-shadow-overlay) lg:bottom-6"
+    >
       {panelControls}
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <p className="cq-label text-(--cq-text-primary)">
-          {scene?.title ?? "Q Pitch"}
-        </p>
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          {[position, PHASE_WORDS[snapshot.phase]].filter(Boolean).join(" · ")}
-        </p>
-      </div>
-      <p
-        className="cq-body min-h-12 text-(--cq-text-primary)"
-        aria-live="polite"
-        data-q-pitch-caption
-      >
-        {snapshot.caption?.text ?? working ?? ""}
-      </p>
-      {simulation === null ||
-      snapshot.awaiting?.kind !== "runShortRehearsal" ? null : (
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <p className="cq-body-sm text-(--cq-text-secondary)">{meta}</p>
         <p
-          className="cq-body-sm text-(--cq-text-secondary)"
-          data-q-pitch-simulation
+          className="cq-body text-(--cq-text-primary)"
+          aria-live="polite"
+          data-q-pitch-caption
         >
-          Simulation ·{" "}
-          {simulation.source === "REHEARSAL_COUNTERPART" ? "Counterpart" : "Q"}:{" "}
-          {simulation.text}
+          {snapshot.caption?.text ?? working ?? ""}
         </p>
-      )}
-      {fallback === null ? null : (
-        <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          Q stopped here and won&apos;t describe it ({fallback}). Resume, or go
-          back.
-        </p>
-      )}
-      <div
-        className="flex flex-wrap items-center gap-2"
-        role="toolbar"
-        aria-label="Tour controls"
-      >
-        <TourButton label="Back" onPress={() => send("BACK")} />
-        {halted ? (
-          <TourButton label="Resume" primary onPress={() => send("RESUME")} />
-        ) : (
-          <TourButton label="Pause" primary onPress={() => send("PAUSE")} />
+        {simulation === null ||
+        snapshot.awaiting?.kind !== "runShortRehearsal" ? null : (
+          <p
+            className="cq-body-sm text-(--cq-text-secondary)"
+            data-q-pitch-simulation
+          >
+            Simulation ·{" "}
+            {simulation.source === "REHEARSAL_COUNTERPART"
+              ? "Counterpart"
+              : "Q"}
+            : {simulation.text}
+          </p>
         )}
-        <TourButton label="Show me that again" onPress={() => send("REPEAT")} />
-        <TourButton label="Skip" onPress={() => send("SKIP")} />
-        <TourButton
-          label="Chapters"
-          expanded={chaptersOpen}
-          onPress={() => setChaptersOpen((open) => !open)}
-        />
+        {fallback === null ? null : (
+          <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
+            Q stopped here and won&apos;t describe it ({fallback}).
+          </p>
+        )}
+        {halted || voiceHint ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {voiceHint
+              ? halted
+                ? "Paused. Say “continue”, or name a part to see."
+                : "Say “pause”, “go back”, or “show me GateQ”."
+              : "Paused. Resume from the Tour menu."}
+          </p>
+        ) : null}
       </div>
-      {chaptersOpen ? (
-        <ul className="flex flex-col gap-1" aria-label="Chapters">
-          {snapshot.chapters.map((chapter) => (
-            <li key={chapter.chapterId}>
-              <TourButton
-                label={chapter.title}
-                onPress={() => {
-                  setChaptersOpen(false);
-                  send("JUMP", "POINTER", chapter.chapterId);
-                }}
-              />
-            </li>
-          ))}
-        </ul>
+      {menu("up")}
+    </section>
+  );
+}
+
+/**
+ * The tour's one visible control: a small menu (owner 15 Oct: no control
+ * bar over the product). Voice is the main way to steer; this is the
+ * accessible fallback, and Escape pauses.
+ */
+function TourMenu({
+  label,
+  placement,
+  halted,
+  chapters,
+  open,
+  onOpenChange,
+  onControl,
+  onExit,
+}: {
+  readonly label: string;
+  readonly placement: "up" | "down";
+  readonly halted: boolean;
+  readonly chapters: readonly { chapterId: string; title: string }[];
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onControl: (kind: TourControlKind, chapterId?: string) => void;
+  readonly onExit: () => void;
+}) {
+  const [chaptersOpen, setChaptersOpen] = useState(false);
+  const act = (kind: TourControlKind, chapterId?: string) => {
+    onOpenChange(false);
+    setChaptersOpen(false);
+    onControl(kind, chapterId);
+  };
+  const item =
+    "flex min-h-11 w-full items-center rounded-md px-3 text-left cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)";
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => onOpenChange(!open)}
+        className="inline-flex min-h-11 items-center rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"
+      >
+        Tour
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          aria-label="Tour"
+          className={`absolute right-0 z-(--cq-z-popover) flex max-h-96 w-72 flex-col gap-1 overflow-y-auto rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) p-2 shadow-(--cq-shadow-overlay) ${placement === "up" ? "bottom-full mb-2" : "top-full mt-2"}`}
+        >
+          <p className="px-3 py-1 cq-body-sm text-(--cq-text-secondary)">
+            {label}
+          </p>
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => act(halted ? "RESUME" : "PAUSE")}
+          >
+            {halted ? "Resume" : "Pause"}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => act("BACK")}
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => act("REPEAT")}
+          >
+            Show me that again
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => act("SKIP")}
+          >
+            Skip
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            aria-expanded={chaptersOpen}
+            className={item}
+            onClick={() => setChaptersOpen((value) => !value)}
+          >
+            Chapters
+          </button>
+          {chaptersOpen ? (
+            <ul className="flex flex-col gap-1 pl-3" aria-label="Chapters">
+              {chapters.map((chapter) => (
+                <li key={chapter.chapterId}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={item}
+                    onClick={() => act("JUMP", chapter.chapterId)}
+                  >
+                    {chapter.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => {
+              onOpenChange(false);
+              onExit();
+            }}
+          >
+            End tour
+          </button>
+        </div>
       ) : null}
-    </TourFrame>
+    </div>
   );
 }
 

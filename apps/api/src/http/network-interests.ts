@@ -3,6 +3,9 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   NETWORK_COMPANY_RELATIONSHIP_VIEWS_PATH,
   NETWORK_RELATIONSHIP_VIEWS_PATH,
+  NETWORK_RELATIONSHIP_NOTES_PATH,
+  NETWORK_COMPANY_RELATIONSHIP_NOTES_PATH,
+  RelationshipNoteListSchema,
   SavedRelationshipViewListSchema,
   CompanyInterestStatusDtoSchema,
   ConnectionStatusDtoSchema,
@@ -561,6 +564,31 @@ export function registerNetworkInterestRoutes(
         void reply.header("Cache-Control", "no-store");
         return SavedRelationshipViewListSchema.parse(
           await views.list(getActorContext(request), party(request)),
+        );
+      });
+    }
+  }
+
+  // CRM private notes (S3, 2026-10-15): the read. Adding one is an app
+  // action (@capital-q/app-actions relationship-notes). Only the reader's
+  // own side's notes, never the counterpart's.
+  const notes = service.relationshipNotes;
+  if (notes !== undefined) {
+    for (const [notesPath, company] of [
+      [NETWORK_RELATIONSHIP_NOTES_PATH, false],
+      [NETWORK_COMPANY_RELATIONSHIP_NOTES_PATH, true],
+    ] as const) {
+      app.get(notesPath, { onRequest: withContext }, async (request, reply) => {
+        void reply.header("Cache-Control", "no-store");
+        // Validated by the service; an invalid id is the same not-found.
+        const raw = (request.params as { relationshipId?: unknown })
+          .relationshipId;
+        return RelationshipNoteListSchema.parse(
+          await notes.list(
+            getActorContext(request),
+            typeof raw === "string" ? raw : "",
+            company ? companyIdOf(request) : undefined,
+          ),
         );
       });
     }

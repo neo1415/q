@@ -65,6 +65,25 @@ export function GateqVideoEntry({
     };
   }, [token]);
 
+  // Q is still joining: the server starts the clock when Q is in the room,
+  // so re-read the session until it says when (bounded by its hard stop).
+  const joining = session?.status === "LIVE" && session.liveAt === null;
+  useEffect(() => {
+    if (!joining) return;
+    let live = true;
+    const timer = window.setInterval(() => {
+      void videoStateAction(token).then((result) => {
+        if (!live || !result.ok) return;
+        const next = result.state.session;
+        if (next?.status === "LIVE" && next.liveAt !== null) setSession(next);
+      });
+    }, 3_000);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [joining, token]);
+
   if (session !== null && session.status === "LIVE") {
     return (
       <GateqVideoRoom

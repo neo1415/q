@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDefaultPromptRegistry,
+  INSTRUCTION_REPLY_GUIDANCE,
   WOO_FEEDBACK,
   WOO_GUIDANCE,
   WOO_PROBLEMS,
@@ -75,11 +76,21 @@ describe("the woo check", () => {
 
 describe("the prompts carry it", () => {
   const registry = createDefaultPromptRegistry();
-  it("INSTRUCTION_PLAN v8 is active, with the guidance and the new length", () => {
+  it("INSTRUCTION_PLAN v9 is active: concise guidance in place of the woo guidance (Lane N)", () => {
     const active = registry.getActive("INSTRUCTION_PLAN").definition;
-    expect(active.version).toBe(8);
-    expect(active.template).toContain(WOO_GUIDANCE);
-    expect(active.template).toContain("60-120 words, in their tone");
+    expect(active.version).toBe(9);
+    expect(active.template).not.toContain(WOO_GUIDANCE);
+    expect(active.template).toContain(INSTRUCTION_REPLY_GUIDANCE);
+    expect(active.template).toContain("A reply at most 80 words");
+    expect(active.template).not.toContain("60-120 words");
+    expect(active.template).toContain("GOAL REACHED");
+    expect(active.template).toContain("do not accept it in chat");
+    expect(active.template).toContain("only needs an approval");
+    expect(active.template).toContain("No thanks, no restating.");
+    expect(active.template).not.toContain("Thank them, take up");
+    expect(active.template).toContain(
+      "Restating the person's own declared figures",
+    );
     expect(active.template).not.toContain("At most 60 words");
     expect(active.template).toContain("their delegation is on");
     expect(active.template).toContain("BEFORE YOU WRITE");

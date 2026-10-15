@@ -28,6 +28,7 @@ const input = {
   tenantId: TENANT,
   applicationId: APP,
   bridgeTokenHash: "a".repeat(64),
+  eventsTokenHash: "b".repeat(64),
   guestCredentialSealed: "sealed",
   maxSeconds: 180,
   perApplication: 1,

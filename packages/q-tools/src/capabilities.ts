@@ -502,6 +502,16 @@ const OFFERS: readonly QCapability[] = [
     "RELATIONSHIPS",
     "A saved view is the person's own way of seeing their CRM, and a team view changes what their colleagues see first; they name and share it on the pipeline itself.",
   ),
+  // CRM S3 private notes (2026-10-15): the person writes them on the
+  // relationship record. Q neither writes nor reads them: they are not Q
+  // context (Context Firewall), and a note in Q's words would not be theirs.
+  offer(
+    "crm_notes",
+    "RELATIONSHIP",
+    "Add or correct a private note on one of their relationships (the relationship's page, Private notes)",
+    "RELATIONSHIPS",
+    "A private note is the person's own record for their side only; Q does not write or read it, and takes them to the relationship where they write it.",
+  ),
   // --- DOCS block: the person's own say over their brand ------------------
   offer(
     "confirm_brand",

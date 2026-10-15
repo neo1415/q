@@ -1,6 +1,7 @@
 import type { QMessage } from "@capital-q/contracts";
 import {
   SUBJECT_KEY,
+  demoCompany,
   receiptCardIndex,
   type FixtureKey,
   type TourAction,
@@ -41,7 +42,9 @@ export function receiptCompanies(
 
 /**
  * `card-N` from the acknowledged receipt; `subject` from the viewer-checked
- * server setting; anything else never resolves.
+ * server setting; a named fictional demo company from the q-pitch package's
+ * DEMO_COMPANIES (owner decision 15 Oct; the page re-checks the viewer when
+ * it opens); anything else never resolves.
  */
 export function resolveCompanyFixture(
   key: FixtureKey,
@@ -49,6 +52,8 @@ export function resolveCompanyFixture(
   subject: ResolvedCompany | null = null,
 ): ResolvedCompany | null {
   if (key === SUBJECT_KEY) return subject;
+  const named = demoCompany(key);
+  if (named !== null) return named;
   const index = receiptCardIndex(key);
   return index === null ? null : (receipt[index - 1] ?? null);
 }

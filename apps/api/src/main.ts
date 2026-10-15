@@ -45,6 +45,7 @@ import {
 } from "@capital-q/database";
 import {
   GATEQ_VIDEO_BRIDGE_PATH,
+  GATEQ_VIDEO_EVENTS_PATH,
   CorrelationIdSchema,
   type AdminUsageDto,
   NO_RAISE_VIEW,
@@ -800,6 +801,7 @@ function composeGateqVideo(apply: {
     intake: apply.intake,
     conversation: apply.conversation,
     bridgePath: GATEQ_VIDEO_BRIDGE_PATH,
+    eventsPath: GATEQ_VIDEO_EVENTS_PATH,
   });
   // Rooms past their deadline are ended even after a restart; the
   // provider's own max_call_duration is the backstop behind this.
@@ -822,8 +824,10 @@ const gateqApply =
           transactions: database.transactions,
         });
         const intake = createIntakeService({
-          // C2 two-phase rollout: enable after the web release that parses it.
-          coverageSources: process.env["CQ_GATEQ_COVERAGE_SOURCES"] === "1",
+          // C2 phase two (live 2026-10-15): every web release since C2 parses
+          // the optional source fields, and a fact heard in the transcript
+          // must say which turn it came from. "0" is the one way back.
+          coverageSources: process.env["CQ_GATEQ_COVERAGE_SOURCES"] !== "0",
           applications: createPostgresApplicationRepository({
             sql: database.sql,
           }),

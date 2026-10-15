@@ -254,6 +254,10 @@ export function useLiveVoiceSession(
     call.brief(text);
     return true;
   }, []);
+  const echoCancelled = useCallback(
+    (): boolean => callRef.current?.echoCancelled() ?? false,
+    [],
+  );
   const hush = useCallback((on: boolean) => {
     callRef.current?.hush(on);
   }, []);
@@ -281,6 +285,7 @@ export function useLiveVoiceSession(
       sendText,
       narrate,
       brief,
+      echoCancelled,
       hush,
       setMuted,
       setVolume,
@@ -297,6 +302,7 @@ export function useLiveVoiceSession(
       sendText,
       narrate,
       brief,
+      echoCancelled,
       hush,
       setMuted,
       setVolume,

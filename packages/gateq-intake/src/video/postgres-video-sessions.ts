@@ -26,6 +26,9 @@ const Row = z.object({
   max_seconds: z.coerce.number().int(),
   created_at: z.coerce.date(),
   ends_at: z.coerce.date(),
+  // Optional: a row read before 20261227150000 had neither column.
+  room_ready_at: z.coerce.date().nullable().optional(),
+  live_at: z.coerce.date().nullable().optional(),
 });
 
 const toRow = (raw: unknown): GateqVideoSessionRow => {
@@ -42,6 +45,8 @@ const toRow = (raw: unknown): GateqVideoSessionRow => {
     maxSeconds: r.max_seconds,
     createdAt: r.created_at.toISOString(),
     endsAt: r.ends_at.toISOString(),
+    roomReadyAt: r.room_ready_at?.toISOString() ?? null,
+    liveAt: r.live_at?.toISOString() ?? null,
   };
 };
 
@@ -116,9 +121,9 @@ export function createPostgresGateqVideoSessions(deps: {
             return { kind: "CONCURRENCY" as const };
           const created = await tx.sql`
           insert into gateq.application_video_sessions
-            (id, tenant_id, application_id, bridge_token_hash, guest_credential_sealed, max_seconds, created_at, ends_at)
+            (id, tenant_id, application_id, bridge_token_hash, events_token_hash, guest_credential_sealed, max_seconds, created_at, ends_at)
           values (${input.id}, ${input.tenantId}, ${input.applicationId}, ${input.bridgeTokenHash},
-                  ${input.guestCredentialSealed}, ${input.maxSeconds}, now(),
+                  ${input.eventsTokenHash}, ${input.guestCredentialSealed}, ${input.maxSeconds}, now(),
                   now() + make_interval(secs => ${input.maxSeconds}))
           returning *`;
           return { kind: "CREATED" as const, row: toRow(created[0]) };
@@ -139,14 +144,35 @@ export function createPostgresGateqVideoSessions(deps: {
         : null;
     },
     markLive: async (input) => {
-      // The clock starts when the room is ready (migration 20261226160000).
+      // Joinable, clock not started: the provisional end is the hard stop,
+      // ready + join grace + cap (migration 20261227150000).
       const rows = await sql`
         update gateq.application_video_sessions
            set status = 'LIVE', provider_conversation_id = ${input.providerConversationId},
                join_url_sealed = ${input.joinUrlSealed},
-               live_at = now(), ends_at = now() + make_interval(secs => max_seconds)
+               room_ready_at = now(),
+               ends_at = now() + interval '30 seconds' + make_interval(secs => max_seconds)
          where id = ${input.id} and status = 'STARTING'
          returning *`;
+      return rows[0] === undefined ? null : toRow(rows[0]);
+    },
+    markInRoom: async (id) => {
+      // Q is in the room: the cap runs from now, never later than the
+      // grace allows, so the end only ever moves earlier. Once.
+      const rows = await sql`
+        update gateq.application_video_sessions
+           set live_at = greatest(room_ready_at, least(now(), room_ready_at + interval '30 seconds')),
+               ends_at = greatest(room_ready_at, least(now(), room_ready_at + interval '30 seconds'))
+                         + make_interval(secs => max_seconds)
+         where id = ${id} and status = 'LIVE' and live_at is null
+           and room_ready_at is not null and ends_at > now()
+         returning *`;
+      return rows[0] === undefined ? null : toRow(rows[0]);
+    },
+    byEventsTokenHash: async (hash) => {
+      if (!/^[0-9a-f]{64}$/u.test(hash)) return null;
+      const rows =
+        await sql`select * from gateq.application_video_sessions where events_token_hash = ${hash}`;
       return rows[0] === undefined ? null : toRow(rows[0]);
     },
     end: async (input) => {

@@ -6,7 +6,9 @@ import {
   GATEQ_APPLY_VIDEO_END_PATH,
   GATEQ_APPLY_VIDEO_PATH,
   GATEQ_VIDEO_BRIDGE_PATH,
+  GATEQ_VIDEO_EVENTS_PATH,
   GateqVideoBridgeBodySchema,
+  GateqVideoProviderEventSchema,
   GateqVideoEndRequestSchema,
   GateqVideoStateDtoSchema,
   PROBLEM_CONTENT_TYPE,
@@ -184,6 +186,28 @@ export function registerGateqVideoRoutes(
       return notFound(error, request, reply);
     }
   });
+
+  // The provider's room events (live run 2026-10-15: the clock started 13 s
+  // before Q's face appeared). No guest credential: the path secret is the
+  // session's. An unknown secret is the same 404 as any unknown route.
+  app.post<{ Params: { token: string } }>(
+    `${GATEQ_VIDEO_EVENTS_PATH}/:token`,
+    { bodyLimit: 64_000 },
+    async (request, reply) => {
+      const body = GateqVideoProviderEventSchema.safeParse(request.body);
+      if (!body.success)
+        return problem(request, reply, "INVALID_REQUEST", "Invalid request.");
+      const result = await video.providerEvent({
+        token: request.params.token,
+        eventType: body.data.event_type,
+        conversationId: body.data.conversation_id ?? null,
+      });
+      if (result.kind === "UNKNOWN_SESSION")
+        return problem(request, reply, "RESOURCE_NOT_FOUND", "Not found.");
+      void reply.header("Cache-Control", "no-store");
+      return reply.status(204).send();
+    },
+  );
 
   // The provider's bridge. No guest credential: the bearer is the session's.
   app.post(

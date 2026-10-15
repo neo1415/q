@@ -98,10 +98,15 @@ export function createTavusGateqVideoProvider(deps: {
             palId,
             faceId: deps.faceId,
             name: `cq-gateq-${input.sessionId}`,
-            callbackUrl: null,
+            // Room events: the replica joining starts the applicant's
+            // clock. The secret is the URL's last segment, stored only as
+            // a hash; a leaked one can only start that one session's
+            // clock, within its grace, never extend or open anything.
+            callbackUrl: `${deps.publicBaseUrl.replace(/\/+$/u, "")}${input.events.path}/${encodeURIComponent(input.events.token)}`,
             greeting: input.greeting.slice(0, 600),
             context: null,
             maxCallSeconds: input.maxSeconds,
+            joinGraceSeconds: input.joinGraceSeconds,
             testMode: input.testMode,
             requireAuth: true,
           });

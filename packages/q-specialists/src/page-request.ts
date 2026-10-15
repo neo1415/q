@@ -526,7 +526,7 @@ const ORDINALS: Readonly<Record<string, number>> = {
 };
 
 const ORDINAL =
-  /^(?:(?:can|could|would)\s+you\s+|please\s+)*(?:open(?:\s+up)?|show\s+me|take\s+me\s+to|go\s+to|pull\s+up|bring\s+up|tell\s+me\s+(?:more\s+)?about|what\s+about|more\s+(?:on|about))\s+(?:the\s+)?(?:(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|1st|2nd|3rd|[4-9]th|10th)\s+(?:one|company|startup|card|business|result|option)|(?:company|card|one)\s+number\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})|number\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2}))(?:\s+(?:on|in|from)\s+(?:the|this|that|your|my)\s+(?:list|screen|cards?|ranking|results))?(?:\s+(?:please|for me))?$/iu;
+  /^(?:(?:can|could|would)\s+you\s+|please\s+)*(?:open(?:\s+up)?|show\s+me|take\s+me\s+to|go\s+to|pull\s+up|bring\s+up|tell\s+me\s+(?:more\s+)?about|what\s+about|more\s+(?:on|about))\s+(?:the\s+)?(?:(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|1st|2nd|3rd|[4-9]th|10th)\s+(?:one|company|startup|card|business|result|option|investor|fund|firm|relationship|deal|application|row|item|entry)|(?:company|card|one)\s+number\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})|number\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2}))(?:\s+(?:on|in|from)\s+(?:the|this|that|your|my)\s+(?:list|screen|cards?|ranking|results|pipeline|page|inbox|table))?(?:\s+(?:please|for me))?$/iu;
 
 /** The position a turn points at ("the third company"), 1-based; -1 is last. */
 export function ordinalOf(text: string): number | null {

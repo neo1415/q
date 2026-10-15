@@ -13,7 +13,11 @@ import {
   HubNavigation,
   HubRelated,
 } from "@/features/relationships/hub-navigation";
-import { hubViewOf } from "@/features/relationships/hub-view";
+import {
+  hubViewOf,
+  pipelineLayoutOf,
+  pipelineListHref,
+} from "@/features/relationships/hub-view";
 import {
   controlOf,
   manifestControls,
@@ -31,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   digests: vi.fn(),
   notices: vi.fn(),
   reminders: vi.fn(),
+  commitments: vi.fn(),
 }));
 vi.mock("next/navigation", async (load) => ({
   ...(await load<typeof import("next/navigation")>()),
@@ -50,6 +55,8 @@ vi.mock("@capital-q/api-client", async (load) => ({
   getResults: mocks.results,
   listNotifications: mocks.notices,
   listReminders: mocks.reminders,
+  getChatUnread: vi.fn().mockResolvedValue({ items: [] }),
+  getRelationshipCommitments: mocks.commitments,
 }));
 vi.mock("@/features/results/results-dashboard", () => ({
   ResultsDashboard: ({
@@ -92,9 +99,20 @@ async function overview() {
 
 describe("Hub foundation", () => {
   it("preserves old record-list links and fails unknown views to the existing list", () => {
-    expect(hubViewOf(undefined)).toBe("relationships");
-    expect(hubViewOf("invalid")).toBe("relationships");
+    // A bare /relationships still opens the record list: the Pipeline's
+    // List layout (S2).
+    expect(hubViewOf(undefined)).toBe("pipeline");
+    expect(hubViewOf("invalid")).toBe("pipeline");
+    expect(hubViewOf("relationships")).toBe("pipeline");
     expect(hubViewOf("overview")).toBe("overview");
+    expect(pipelineLayoutOf(undefined)).toBe("list");
+    expect(pipelineLayoutOf("table")).toBe("table");
+    expect(pipelineLayoutOf("board")).toBe("board");
+    expect(pipelineLayoutOf("x")).toBe("list");
+    expect(
+      pipelineListHref({ view: "relationships", q: "kivu", cursor: "drop" }),
+    ).toBe("/relationships?view=pipeline&layout=list&q=kivu");
+    expect(pipelineListHref({ view: "pipeline" })).toBeNull();
   });
   it("offers investor inbox without founder-only Capital or application links", () => {
     render(
@@ -119,7 +137,7 @@ describe("Hub foundation", () => {
     render(
       <>
         <HubRelated side="COMPANY" />
-        <HubNavigation view="relationships" />
+        <HubNavigation view="pipeline" />
       </>,
     );
     expect(
@@ -131,10 +149,11 @@ describe("Hub foundation", () => {
     for (const name of ["Capital", "Q Work", "Discover"])
       expect(screen.queryByRole("link", { name })).toBeNull();
     expect(screen.queryByRole("link", { name: "Investment inbox" })).toBeNull();
-    expect(
-      manifestControls().find((entry) => entry.id === "tab.relationships")
-        ?.state,
-    ).toBe("SELECTED");
+    // Q's old id stays stable: it names the Pipeline tab now.
+    for (const id of ["tab.pipeline", "tab.relationships"])
+      expect(manifestControls().find((entry) => entry.id === id)?.state).toBe(
+        "SELECTED",
+      );
   });
   it("registers only rendered role destinations and confirms already selected tab", async () => {
     render(
@@ -167,16 +186,16 @@ describe("Hub foundation", () => {
       </>,
     );
     noteRoute("/relationships?view=overview");
-    const link = screen.getByRole("link", { name: "Relationships" });
+    const link = screen.getByRole("link", { name: "Pipeline" });
     link.addEventListener("click", (event) => {
       event.preventDefault();
       page.rerender(
         <>
           <HubRelated side="INVESTOR" />
-          <HubNavigation view="relationships" />
+          <HubNavigation view="pipeline" />
         </>,
       );
-      noteRoute("/relationships?view=relationships");
+      noteRoute("/relationships?view=pipeline");
     });
     const entry = controlOf("tab.relationships");
     if (entry === undefined) throw new Error("Missing relationships control");
@@ -192,7 +211,7 @@ describe("Hub foundation", () => {
     expect(receipt).toBe("DONE");
     expect(
       screen
-        .getByRole("link", { name: "Relationships" })
+        .getByRole("link", { name: "Pipeline" })
         .getAttribute("aria-current"),
     ).toBe("page");
   });
@@ -366,5 +385,148 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
     expect(within(queue).getAllByRole("listitem")).toHaveLength(5);
     fireEvent.click(within(queue).getByRole("button", { name: "See all 7" }));
     expect(within(queue).getAllByRole("listitem")).toHaveLength(7);
+  });
+});
+
+describe("S2: the Pipeline is the one record list", () => {
+  it("redirects an old Relationships link to the Pipeline's List layout", async () => {
+    const thrown: unknown = await RelationshipsPage({
+      searchParams: Promise.resolve({ view: "relationships", q: "kivu" }),
+    }).catch((error: unknown) => error);
+    const digest =
+      thrown instanceof Error && "digest" in thrown
+        ? String(thrown.digest)
+        : "";
+    expect(digest).toContain("/relationships?view=pipeline&layout=list&q=kivu");
+  });
+
+  it("opens the list under the Pipeline tab, with List current and Table and Board beside it", async () => {
+    mocks.digests.mockResolvedValue({});
+    render(
+      await RelationshipsPage({
+        searchParams: Promise.resolve({ view: "pipeline", layout: "list" }),
+      }),
+    );
+    expect(
+      screen
+        .getByRole("link", { name: "Pipeline" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(screen.queryByRole("link", { name: "Relationships" })).toBeNull();
+    const layouts = screen.getByRole("group", { name: "Layout" });
+    expect(
+      within(layouts)
+        .getByRole("link", { name: "List" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(
+      within(layouts).getByRole("link", { name: "Table" }).getAttribute("href"),
+    ).toContain("view=pipeline&layout=table");
+    expect(
+      manifestControls().some((entry) => entry.id === "tab.pipeline-list"),
+    ).toBe(true);
+  });
+
+  it("keeps a bare /relationships on the list, never a redirect loop", async () => {
+    mocks.digests.mockResolvedValue({});
+    render(await RelationshipsPage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getByRole("group", { name: "Layout" })).toBeDefined();
+  });
+});
+
+describe("S4: the investor's portfolio on the Overview", () => {
+  const invested = (n: number, since: string) => ({
+    relationshipId: `d0000000-0000-4000-8000-00000000010${String(n)}`,
+    counterpart: {
+      kind: "COMPANY" as const,
+      id: `c0000000-0000-4000-8000-00000000010${String(n)}`,
+      name: `Portfolio ${String(n)}`,
+    },
+    state: "INVESTED" as const,
+    stateSince: since,
+    nextStep: "NONE" as const,
+  });
+  const current = (status: string) => ({
+    current: {
+      id: "e0000000-0000-4000-8000-000000000101",
+      amount: "250000.00",
+      currencyCode: "USD",
+      level: "FIRM",
+      status,
+      source: "PERSON",
+      quote: null,
+      statedByYourSide: true,
+      statedAt: "2026-10-01T10:00:00.000Z",
+      confirmedAt: null,
+      note: null,
+      meetingId: null,
+      canConfirm: false,
+    },
+    history: [],
+    detected: [],
+    connected: true,
+  });
+  beforeEach(() => {
+    mocks.results.mockResolvedValue({
+      side: "INVESTOR",
+      organisationName: "Fund",
+      pipelineFit: [],
+    });
+  });
+
+  it("lists invested companies only, newest first, each with its money in words", async () => {
+    mocks.relationships.mockResolvedValue([
+      invested(1, "2026-09-01T10:00:00.000Z"),
+      invested(2, "2026-10-01T10:00:00.000Z"),
+      {
+        ...invested(3, "2026-10-02T10:00:00.000Z"),
+        state: "CONNECTED" as const,
+      },
+    ]);
+    mocks.commitments.mockImplementation((_session: unknown, id: string) =>
+      id.endsWith("101")
+        ? Promise.resolve(current("RECEIVED"))
+        : Promise.reject(new Error("down")),
+    );
+    await overview();
+    const section = screen.getByRole("region", { name: /Portfolio/u });
+    const rows = within(section).getAllByRole("link");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Portfolio 2"),
+      expect.stringContaining("Portfolio 1"),
+    ]);
+    expect(rows[1]?.textContent).toContain("USD 250,000 · received");
+    // Unknown stays unknown: a failed read is said, never zero.
+    expect(rows[0]?.textContent).toContain("Commitment couldn't be read");
+    expect(rows[0]?.getAttribute("href")).toBe(
+      "/relationships/company/c0000000-0000-4000-8000-000000000102",
+    );
+  });
+
+  it("says none yet when nothing is invested, and unavailable when the list fails", async () => {
+    await overview();
+    expect(screen.getByText(/No investments recorded yet/u)).toBeDefined();
+    cleanup();
+    mocks.relationships.mockResolvedValue(undefined);
+    await overview();
+    expect(
+      screen.getByText(/Your portfolio couldn't be read just now/u),
+    ).toBeDefined();
+  });
+
+  it("is the investor's alone: a founder's Overview has no portfolio", async () => {
+    mocks.context.mockResolvedValue({
+      kind: "FOUNDER",
+      companyId: "c0000000-0000-4000-8000-000000000001",
+      label: "Company",
+    });
+    mocks.results.mockResolvedValue({
+      side: "FOUNDER",
+      organisationName: "Founder company",
+      pipeline: { rows: [], byState: [] },
+    });
+    await overview();
+    expect(screen.queryByRole("region", { name: /Portfolio/u })).toBeNull();
+    expect(mocks.commitments).not.toHaveBeenCalled();
   });
 });
