@@ -84,6 +84,10 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
           (r) => r.applicationId === applicationId && r.status !== "ENDED",
         ) ?? null,
       ),
+    countForApplication: (applicationId) =>
+      Promise.resolve(
+        rows.filter((r) => r.applicationId === applicationId).length,
+      ),
     byBridgeTokenHash: (hash) => {
       const id = hashes.get(hash);
       return Promise.resolve(rows.find((r) => r.id === id) ?? null);
@@ -238,8 +242,11 @@ describe("the GateQ video interview session", () => {
 
   it("allows one session per application by default, even after it ended", async () => {
     const w = world();
+    expect(await w.video.available(TOKEN)).toBe(true);
     await w.video.start({ token: TOKEN, correlationId: "c" });
     await w.video.end({ token: TOKEN, continueByTyping: true });
+    // No offer that can only lead to a refusal (live 2026-10-15).
+    expect(await w.video.available(TOKEN)).toBe(false);
     await expect(
       w.video.start({ token: TOKEN, correlationId: "c" }),
     ).rejects.toMatchObject({ reason: "ALLOWANCE_EXHAUSTED" });
