@@ -45,3 +45,6 @@ export {
   type ReadinessObjective,
   type ReadinessOnboardingPort,
 } from "./application/sources.js";
+// InvestIQ shadow assessment (ADR 0068, PROPOSED): never replaces a
+// production readiness, fit or card value.
+export * from "./investiq/index.js";
