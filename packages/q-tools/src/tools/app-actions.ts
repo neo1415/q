@@ -375,12 +375,30 @@ function toolFor(
   });
 }
 
+/** The output schema caps cited sources; a large dossier must not fail the whole read. */
+const MAX_READING_SOURCES = 64;
+
+function citedSources(
+  sources: AppActionReading["sources"],
+  text: string,
+): AppActionReading["sources"][number][] {
+  const seen = new Set<string>();
+  const kept: AppActionReading["sources"][number][] = [];
+  for (const source of sources) {
+    if (kept.length === MAX_READING_SOURCES) break;
+    if (seen.has(source.factId) || !text.includes(source.factId)) continue;
+    seen.add(source.factId);
+    kept.push(source);
+  }
+  return kept;
+}
+
 /** Keep complete evidence lines; disclose omissions instead of cutting a claim. */
 function boundedReading(
   reading: AppActionReading,
 ): NonNullable<z.infer<typeof AppToolOutputSchema>["reading"]> {
   if (reading.text.length <= 14_000)
-    return { ...reading, sources: [...reading.sources] };
+    return { ...reading, sources: citedSources(reading.sources, reading.text) };
   const lines: string[] = [];
   let used = 0;
   let omitted = 0;
@@ -399,7 +417,7 @@ function boundedReading(
   return {
     ...reading,
     text,
-    sources: reading.sources.filter((source) => text.includes(source.factId)),
+    sources: citedSources(reading.sources, text),
   };
 }
 

@@ -146,7 +146,16 @@ describe("the selected GateQ application's authorized reading", () => {
   }
   const applicationId = "55555555-0000-4000-8000-0000000000a2";
   const gatewayId = "55555555-0000-4000-8000-0000000000a3";
-  function selected(refused = false) {
+  const longFact = {
+    label: "Description",
+    summary: "Waterworks uses metered kiosks. ".repeat(30),
+    truthClass: "USER_CLAIM",
+    evidenceStatus: "SELF_REPORTED",
+    provenance: "APPLICANT_PROVIDED",
+    sourceFactId: applicationId,
+    sourceTurnSeq: 2,
+  };
+  function selected(refused = false, facts: readonly object[] = [longFact]) {
     let revoked = false;
     const reads: { actor: string; gatewayId: string; applicationId: string }[] =
       [];
@@ -185,19 +194,7 @@ describe("the selected GateQ application's authorized reading", () => {
                   dimensions: [
                     {
                       group: "COMPANY",
-                      facts: [
-                        {
-                          label: "Description",
-                          summary: "Waterworks uses metered kiosks. ".repeat(
-                            30,
-                          ),
-                          truthClass: "USER_CLAIM",
-                          evidenceStatus: "SELF_REPORTED",
-                          provenance: "APPLICANT_PROVIDED",
-                          sourceFactId: applicationId,
-                          sourceTurnSeq: 2,
-                        },
-                      ],
+                      facts,
                     },
                   ],
                   unknowns: [],
@@ -261,6 +258,30 @@ describe("the selected GateQ application's authorized reading", () => {
     expect(out.result.data).toMatchObject({
       reading: { sources: [{ factId: applicationId, transcriptSeq: 2 }] },
     });
+  });
+  it("a dossier with more findings than the source cap still yields a valid bounded reading", async () => {
+    const many = Array.from({ length: 90 }, (_, index) => ({
+      label: `F${index}`,
+      summary: "ok",
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "SELF_REPORTED",
+      provenance: "APPLICANT_PROVIDED",
+      sourceFactId: `55555555-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      sourceTurnSeq: index + 1,
+    }));
+    const { executor } = selected(false, many);
+    const out = await executor.execute(
+      call("gateq_inbox_summarise", { applicationId }),
+      selectedContext(),
+    );
+    if (!out.result.ok) throw new Error(JSON.stringify(out.result.error));
+    const data = out.result.data as {
+      status: string;
+      reading: { sources: readonly { factId: string }[] };
+    };
+    expect(data.status).toBe("DONE");
+    expect(data.reading.sources.length).toBe(64);
+    expect(new Set(data.reading.sources.map((s) => s.factId)).size).toBe(64);
   });
   it("retains the inbox refusal and returns no reading", async () => {
     const { executor } = selected(true);
