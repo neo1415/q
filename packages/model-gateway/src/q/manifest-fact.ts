@@ -441,6 +441,19 @@ export function manifestFacts(
   return [...selectedSources, ...facts.slice(0, 2)];
 }
 
+/**
+ * Whether the selected GateQ application's submitted dossier was read for
+ * this turn (the focus is one, and its own summarise read came back DONE
+ * for exactly that application). A routing condition only: it grants
+ * nothing, and the facts are the ones `manifestFacts` carries.
+ */
+export function selectedDossierRead(
+  manifest: QPageManifest,
+  results: ManifestReadResults,
+): boolean {
+  return selectedDossierFacts(manifest, results).length > 0;
+}
+
 /** The substantive frozen source has its own bounded reading budget, not the UI list's. */
 function selectedDossierFacts(
   manifest: QPageManifest,
