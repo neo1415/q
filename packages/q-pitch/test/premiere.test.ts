@@ -7,6 +7,7 @@ import {
   TourControlGate,
   certifyTour,
   classifyAudienceJump,
+  demoCompany,
   classifyAudienceSpeech,
   type TranscriptSegment,
 } from "../src/index.js";
@@ -248,6 +249,34 @@ describe("coverage (slice 7)", () => {
       ["show me the gateq interview", "ch.premiere.gateq-interview"],
     ] as const) {
       expect(said(text), text).toBe(chapterId);
+    }
+  });
+});
+
+describe("named fictional companies after the top three (owner decision 15 Oct)", () => {
+  it("open Harbourline Cargo (and its data room) and compare it with Clinicrest, never a ranked card", () => {
+    const company = PREMIERE_SCRIPT.scenes.find(
+      (s) => s.sceneId === "s.pilot.company",
+    );
+    const compare = PREMIERE_SCRIPT.scenes.find(
+      (s) => s.sceneId === "s.pilot.compare",
+    );
+    expect(company?.actions[0]).toMatchObject({
+      kind: "openCompany",
+      company: "harbourline-cargo",
+    });
+    expect(company?.actions.at(-1)).toMatchObject({
+      kind: "selectTab",
+      target: "tab.dataroom",
+    });
+    expect(compare?.actions[0]).toMatchObject({
+      kind: "buildComparison",
+      companies: ["harbourline-cargo", "clinicrest"],
+    });
+    const keys = JSON.stringify([company?.actions, compare?.actions]);
+    expect(keys).not.toMatch(/card-[0-9]/u);
+    for (const key of ["harbourline-cargo", "clinicrest"]) {
+      expect(demoCompany(key)).not.toBeNull();
     }
   });
 });
