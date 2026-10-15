@@ -18,6 +18,12 @@ import {
 import type { EligibilityPorts } from "../eligibility/ports.js";
 import type { EligibilityService } from "../eligibility/service.js";
 import { RANKING_CONFIG_CURRENT } from "../ranking/config.js";
+import {
+  applyFeedEligibility,
+  DISCOVER_FEED_ELIGIBILITY_CURRENT,
+  type DiscoverFeedEligibility,
+  type PlayablePitchPort,
+} from "../ranking/feed-eligibility.js";
 import type { ProactiveSuppressionPort } from "../rerank/suppression.js";
 import {
   decodeSlateCursor,
@@ -184,6 +190,14 @@ export type SlateReadServiceDependencies = {
   readonly filterFacts?: DiscoverFilterFactsPort | undefined;
   /** When present, a missing or expired slate asks for a rebuild. */
   readonly requester?: RefreshRequester | undefined;
+  /**
+   * Discover feed eligibility, re-checked at read: a company whose pitch
+   * stopped being playable after its slate was built leaves a gap, like
+   * any other read-time guard. The builder is where the rule is enforced
+   * (fail closed); absent here, the reader trusts the slate.
+   */
+  readonly playablePitches?: PlayablePitchPort | undefined;
+  readonly feedEligibility?: DiscoverFeedEligibility | undefined;
   readonly policy?: SlatePolicy | undefined;
   /**
    * BILLING-2 (ADR 0036): how far down the ranked slate this reader may
@@ -218,8 +232,11 @@ export function createSlateReadService(
     cards,
     pool,
     requester,
+    playablePitches,
     logger,
   } = dependencies;
+  const feedPolicy =
+    dependencies.feedEligibility ?? DISCOVER_FEED_ELIGIBILITY_CURRENT;
   const filterFacts = dependencies.filterFacts ?? {};
   const policy = dependencies.policy ?? SLATE_POLICY_V1;
   const clock = dependencies.clock ?? (() => new Date());
@@ -369,9 +386,19 @@ export function createSlateReadService(
     // reproducible and the history remains auditable; it simply is not
     // offered again. The tail of a slate is still reachable, which is
     // why demotion alone was not suppression (REC-009R).
-    const shown = input.items.filter(
+    const guarded = input.items.filter(
       (i) => eligibleIds.has(i.companyId) && !suppressedIds.has(i.companyId),
     );
+    const shown =
+      playablePitches === undefined
+        ? guarded
+        : (
+            await applyFeedEligibility({
+              policy: feedPolicy,
+              port: playablePitches,
+              candidates: guarded,
+            })
+          ).admitted;
     const cardById = await cards.cardsByIds(shown.map((i) => i.companyId));
     const items: (SlatePageItem & { readonly rank: number })[] = [];
     for (const item of shown) {

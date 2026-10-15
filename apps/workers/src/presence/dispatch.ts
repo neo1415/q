@@ -97,6 +97,17 @@ export type PresenceResearchDispatchDependencies = {
     }[];
     readonly confidence: string | null;
   }) => Promise<unknown>;
+  /**
+   * True when the person answering is a fictional synthetic demo account
+   * (auth app_metadata `synthetic` and `fictional_demo`). Their company is
+   * invented, so the open web can only return real namesakes (live
+   * 2026-10-06: a fictional "Prumo" was given facts about a real Brazilian
+   * port operator) and every search is a paid provider call. Absent: every
+   * session is researched, as before.
+   */
+  readonly isFictionalAccount?:
+    | ((userId: string) => Promise<boolean>)
+    | undefined;
   readonly logger?: Logger | undefined;
 };
 
@@ -146,6 +157,7 @@ export function createPresenceResearchDispatch(
     responses,
     suggestions,
     createSuggestion,
+    isFictionalAccount,
     logger,
   } = dependencies;
 
@@ -184,6 +196,17 @@ export function createPresenceResearchDispatch(
               ? committed.value.text.trim()
               : "";
           if (name.length < 2) return;
+          // An invented subject has no public presence to find.
+          if (
+            isFictionalAccount !== undefined &&
+            (await isFictionalAccount(session.userId))
+          ) {
+            logger?.info(
+              { sessionId: session.id, subjectType: naming.subjectType },
+              "presence research skipped: fictional synthetic account",
+            );
+            return;
+          }
 
           // Only a founder's company has a separate website step to offer
           // alongside its name; an investor organisation's name is asked

@@ -56,6 +56,7 @@ import {
 } from "@capital-q/eventing/publisher";
 import {
   createRecommendationPipeline,
+  playablePitchPortFrom,
   createRefreshRequester,
   requestRebuildsForVersionDrift,
   createSlateInvalidationService,
@@ -131,6 +132,7 @@ import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
 import {
   createPostgresAutomatedModeration,
   createPostgresDiscoverablePitchQueryPort,
+  DISCOVERABLE_PITCH_BATCH_MAX,
   MediaAssetIdSchema,
 } from "@capital-q/media";
 import { createLogger, createTelemetryRuntime } from "@capital-q/observability";
@@ -494,6 +496,18 @@ const presenceResearch =
         suggestions: createPostgresOnboardingSuggestionRepository(),
         createSuggestion: (command) =>
           onboarding.internal.createSuggestion(command as never),
+        // The same synthetic markers the verification sweep reads, plus the
+        // fictional-world seed's own; a read failure keeps the old behaviour.
+        isFictionalAccount: async (userId) => {
+          const rows = await database.sql<{ fictional: boolean }[]>`
+            select coalesce(u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb
+                        and u.raw_app_meta_data -> 'fictional_demo' = 'true'::jsonb,
+                        false) as fictional
+              from identity.user_profiles p
+              join auth.users u on u.id = p.auth_user_id
+             where p.id = ${userId}::uuid`.catch(() => []);
+          return rows[0]?.fictional === true;
+        },
         logger,
       });
 logger.info(
@@ -573,6 +587,14 @@ const recommendations = createRecommendationPipeline({
   sql: database.sql,
   transactions: database.transactions,
   disclosure,
+  // discover-feed-eligibility.v1: the Discover video feed admits only
+  // companies with a playable pitch, by the Media context's own rule.
+  playablePitches: playablePitchPortFrom({
+    findDiscoverablePitches: createPostgresDiscoverablePitchQueryPort({
+      sql: database.sql,
+    }).findDiscoverablePitches,
+    batchMax: DISCOVERABLE_PITCH_BATCH_MAX,
+  }),
   // After a post-meeting pass, the company comes back only on a material
   // change (doc 19 §67): a new pitch, a new raise, or a changed mandate.
   materialChanges: createMaterialChanges({
