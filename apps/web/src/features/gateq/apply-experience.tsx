@@ -36,6 +36,7 @@ import {
   submitApplicationAction,
 } from "./apply-actions";
 import { CoveragePanel } from "./coverage-panel";
+import { GateqVideoEntry } from "./gateq-video-entry";
 import { readRecovery, amendRecovery } from "./form/session-recovery";
 import {
   criterionLines,
@@ -1214,7 +1215,20 @@ export function ApplyExperience({
     coverage !== null &&
     stage === "TALKING" &&
     closing === null ? (
-      <CoveragePanel coverage={coverage} fund={fund} />
+      <div className="flex flex-col gap-4">
+        <CoveragePanel coverage={coverage} fund={fund} />
+        {token === null ? null : (
+          <GateqVideoEntry
+            token={token}
+            fund={fund}
+            coverage={coverage}
+            onEnded={async (typed) => {
+              await loadProgress();
+              if (!typed) setStage("STOPPED");
+            }}
+          />
+        )}
+      </div>
     ) : null;
 
   if (compact) {

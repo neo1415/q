@@ -298,6 +298,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('gateq', 'application_sessions', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'application_submissions', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'application_turns', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'application_video_sessions', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'applications', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'contact_verification_limits', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'gateway_criteria', 'INTERNAL_SERVER_ONLY', '{}'),

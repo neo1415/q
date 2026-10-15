@@ -19,6 +19,9 @@ const calls = vi.hoisted(() => ({
   contact: vi.fn(),
   confirm: vi.fn(),
   submit: vi.fn(),
+  videoState: vi.fn(),
+  videoStart: vi.fn(),
+  videoEnd: vi.fn(),
 }));
 vi.mock("../src/features/gateq/apply-actions", () => ({
   interviewProgressAction: calls.progress,
@@ -27,6 +30,9 @@ vi.mock("../src/features/gateq/apply-actions", () => ({
   confirmContactAction: calls.confirm,
   submitApplicationAction: calls.submit,
   startApplicationAction: vi.fn(),
+  videoStateAction: calls.videoState,
+  startVideoAction: calls.videoStart,
+  endVideoAction: calls.videoEnd,
 }));
 vi.mock("../src/features/q-swarm/q-swarm", () => ({ QSwarm: () => null }));
 const { ApplyExperience } =
@@ -131,6 +137,10 @@ beforeEach(() => {
     submitKey: "",
   });
   Element.prototype.scrollIntoView = vi.fn();
+  calls.videoState.mockResolvedValue({
+    ok: true,
+    state: { available: false, session: null },
+  });
 });
 afterEach(cleanup);
 describe("founder interview and review", () => {
@@ -219,6 +229,85 @@ describe("founder interview and review", () => {
     expect(panel.textContent).toContain("A document would support");
     expect(panel.textContent).not.toMatch(/verified/i);
   });
+  it("offers video only when the server does, after explicit consent, and opens the owned room", async () => {
+    const live = {
+      id: "00000000-0000-4000-8000-0000000000c1",
+      status: "LIVE" as const,
+      joinUrl: "https://tavus.daily.co/c1?t=x",
+      endsAt: new Date(Date.now() + 180_000).toISOString(),
+      maxSeconds: 180,
+      endedReason: null,
+      disclosure: "Q is an AI interviewer.",
+    };
+    calls.videoState.mockResolvedValue({
+      ok: true,
+      state: { available: true, session: null },
+    });
+    calls.videoStart.mockResolvedValue({
+      ok: true,
+      state: { available: true, session: live },
+    });
+    await mount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const go = screen.getByRole<HTMLButtonElement>("button", {
+      name: "Continue by video",
+    });
+    expect(go.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: /AI interviewer/ }));
+    await press("Continue by video");
+    expect(calls.videoStart).toHaveBeenCalledWith(token);
+    expect(
+      document.querySelector('iframe[title^="Video interview for"]'),
+    ).not.toBeNull();
+    // Typing continues the same interview and reloads the durable state.
+    calls.videoEnd.mockResolvedValue({
+      ok: true,
+      state: { available: false, session: null },
+    });
+    await press("Continue by typing instead");
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(calls.videoEnd).toHaveBeenCalledWith(token, true);
+    expect(calls.progress).toHaveBeenCalledTimes(2);
+    expect(document.querySelector("iframe")).toBeNull();
+  });
+
+  it("a refresh during a live video session reopens that same session, never a new one", async () => {
+    calls.videoState.mockResolvedValue({
+      ok: true,
+      state: {
+        available: false,
+        session: {
+          id: "00000000-0000-4000-8000-0000000000c1",
+          status: "LIVE" as const,
+          joinUrl: "https://tavus.daily.co/c1?t=x",
+          endsAt: new Date(Date.now() + 180_000).toISOString(),
+          maxSeconds: 180,
+          endedReason: null,
+          disclosure: "Q is an AI interviewer.",
+        },
+      },
+    });
+    await mount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(
+      document.querySelector('iframe[title^="Video interview for"]'),
+    ).not.toBeNull();
+    expect(calls.videoStart).not.toHaveBeenCalled();
+  });
+
+  it("shows no video option when the server does not offer it", async () => {
+    await mount();
+    expect(
+      screen.queryByRole("button", { name: "Continue by video" }),
+    ).toBeNull();
+  });
+
   it("retries the same answer with its original turn ID and blocks a changed answer", async () => {
     calls.turn
       .mockResolvedValueOnce({ ok: false, message: "Connection interrupted." })
