@@ -390,7 +390,7 @@ export const INSTRUCTION_PLAN_V8: PromptDefinition<
   InstructionPlanV4Variables,
   InstructionPlanV5Result
 > = {
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -410,6 +410,74 @@ export const INSTRUCTION_PLAN_V8: PromptDefinition<
     schema: InstructionPlanV5ResultSchema,
   },
   template: PLAN_V8_SOURCE,
+};
+
+/**
+ * v9 (Lane N, owner 2026-10-15: "the conversations are AI slop ... they
+ * keep talking after the time was agreed"). Live Tensorgate/Zino thread:
+ * six agent messages after "Wednesday at 2:00 p.m. UTC works well for me",
+ * each opening with thanks and restating the pitch. Messages are now short
+ * and businesslike (a reply at most 80 words, one ask, no thanks or
+ * restating); code's GOAL REACHED line means write nothing; a time they
+ * proposed to an investor is the person's booking card, not a chat reply;
+ * the terms flag is for terms, not for the person's own declared figures;
+ * and a can't-line is never just "needs approval".
+ */
+export const INSTRUCTION_REPLY_GUIDANCE = `HOW TO WRITE (concise and businesslike)
+- Say one thing: answer their point, or move the goal one step (for example, offer two concrete times). One ask at most, and only when needed.
+- No greetings beyond a name, no thanks unless they did something new, no compliments, no restating what either side already said, no sign-off filler ("I look forward to...").
+- A reply: one to three plain sentences, at most 80 words. A first message: at most 120 words, with one specific reason this conversation is worth their time.
+- Never invent a fact, a number, a name or shared history. No pressure, no deadlines.`;
+
+const PLAN_V9_SOURCE = PLAN_V8_SOURCE.replace(
+  `\n${WOO_GUIDANCE}\n`,
+  `\n${INSTRUCTION_REPLY_GUIDANCE}\n`,
+)
+  .replace(
+    "  - 60-120 words, in their tone; never more than 160.",
+    "  - A reply at most 80 words; a first message or follow-up at most 120. In their tone.",
+  )
+  .replace(
+    "Thank them, take up what their chat line says they wrote about, give one point from WHO YOU WRITE AS or from what your side already said there (those words and numbers are the person's own; use them as written), and end with one soft offer -- the deck, a short note, or a time where meetings are allowed.",
+    "Answer what their chat line says they wrote about in one to three sentences, using WHO YOU WRITE AS or what your side already said there (those words and numbers are the person's own; use them as written), with at most one ask -- a time where meetings are allowed. No thanks, no restating.",
+  )
+  .replace(
+    "- touchesTermsOrMoney: true for anything about terms, valuation, amounts, money, commitments or signing; such steps are always theirs to approve.",
+    "- touchesTermsOrMoney: true for terms, valuation, investment amounts offered or asked for, commitments or signing; such steps are always theirs to approve. Restating the person's own declared figures or traction already on record is not terms.",
+  )
+  .replace(
+    "- Nothing to do now: empty steps -- never while a REPLY WAITING stands.",
+    '- Nothing to do now: empty steps -- never while a REPLY WAITING stands.\n- Where THEIR PEOPLE says GOAL REACHED, plan no message to them at all: no thanks, no confirmation, no "see you then". Code books the call and tells everyone.\n- When you write as the investor and they proposed a concrete time, do not accept it in chat: code asks the person to confirm and books it.\n- Never write a cannot line for something a listed action does or that only needs an approval: plan the step; code decides whether the reviewer or the person signs it off.',
+  )
+  .replace(
+    "(v8, with request, each cannot's needs and each step's message)",
+    "(v9, with request, each cannot's needs and each step's message)",
+  );
+
+export const INSTRUCTION_PLAN_V9: PromptDefinition<
+  InstructionPlanV4Variables,
+  InstructionPlanV5Result
+> = {
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  effectiveFrom: "2026-10-15",
+  id: "INSTRUCTION_PLAN",
+  version: 9,
+  changeDescription:
+    "Lane N 2026-10-15: concise, businesslike messages (reply at most 80 words, one ask, no thanks or restating) in place of the woo guidance; GOAL REACHED means no message; an investor does not accept a proposed time in chat (code's booking card); the terms flag is for terms, not declared figures; no can't-line for what only needs an approval. Same variables and output as v8.",
+  variables: {
+    schema: InstructionPlanV4VariablesSchema,
+    untrusted: [...INSTRUCTION_PLAN_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: INSTRUCTION_PLAN_SCHEMA_NAME,
+    schemaVersion: INSTRUCTION_PLAN_V5_SCHEMA_VERSION,
+    schema: InstructionPlanV5ResultSchema,
+  },
+  template: PLAN_V9_SOURCE,
 };
 
 const THREAD_READER = `TASK: INSTRUCTION_THREAD_READER

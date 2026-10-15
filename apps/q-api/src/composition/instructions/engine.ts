@@ -39,6 +39,25 @@ import {
 } from "./planner.js";
 import { needsYouNotice } from "./digest.js";
 import {
+  mentionsCommercialTerms,
+  termsFlagNeedsOwner,
+} from "./delegation-policy.js";
+import {
+  acceptsATime,
+  bookingKey,
+  goalIsMeeting,
+  goalLine,
+  isTerminal,
+  meetingGoalState,
+  slotsIn,
+  slotWords,
+  type BookedCall,
+  type MeetingGoalState,
+  type Negotiation,
+  type Slot,
+} from "./meeting-goal.js";
+import { qualityProblem } from "./message-quality.js";
+import {
   checkMessage,
   distinctiveWords,
   factAnswer,
@@ -165,6 +184,15 @@ export const REFUSAL_CODES = [
   "OPENS_WITH_DEMAND",
   "NOTHING_SPECIFIC",
   "PUSHY",
+  // Lane N (owner 2026-10-15): the meeting goal is reached in this
+  // conversation (code's read): nothing more is written to them.
+  "GOAL_REACHED",
+  // Their time goes to the person as one booking card, not a chat "yes".
+  "BOOKING_FOR_YOUR_YES",
+  // Lane N: code's quality checks against what the side already wrote.
+  "NEAR_DUPLICATE",
+  "REPEATED_PLEASANTRY",
+  "MORE_THAN_ONE_ASK",
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -279,6 +307,27 @@ export const REFUSAL_WORDS: Readonly<
       "they haven't accepted your interest yet, so a message would be unsolicited",
     instead: "I'll express interest instead, and write only once they accept",
   },
+  GOAL_REACHED: {
+    reason: "you've both agreed a time, so there's nothing left to say",
+    instead: "I'll handle the booking and tell you when it's in the calendar",
+  },
+  BOOKING_FOR_YOUR_YES: {
+    reason: "they proposed a time, and agreeing it is yours",
+    instead:
+      "I've asked you to confirm it; approving books it and sends the invite",
+  },
+  NEAR_DUPLICATE: {
+    reason: "it repeated a message your side already sent",
+    instead: "I'll write only if there's something new to say",
+  },
+  REPEATED_PLEASANTRY: {
+    reason: "it opened with thanks again, like the last message",
+    instead: "I'll get straight to the point",
+  },
+  MORE_THAN_ONE_ASK: {
+    reason: "it asked more than one thing",
+    instead: "I'll ask one thing at a time",
+  },
 };
 
 /**
@@ -291,6 +340,21 @@ export const NEEDS_CONNECTION: ReadonlySet<string> = new Set([
   "chat.message.send",
   "schedule.meeting.book",
 ]);
+
+/** Lane N: whether the person writes as the investor in this relationship. */
+export function ourSideIsInvestor(
+  people: readonly InstructionPerson[],
+  relationshipId: string | null,
+): boolean {
+  return (
+    relationshipId !== null &&
+    people.some(
+      (person) =>
+        person.relationshipId === relationshipId &&
+        person.counterpartKind === "COMPANY",
+    )
+  );
+}
 
 /** Whether this person's relationship is open for messages (matched). */
 export function connectedFor(
@@ -329,6 +393,11 @@ export const ASK_WORDS: Readonly<Record<string, string>> = {
   MEETING_NEEDS_YES: "it proposes a call, and calls are yours to agree",
   NEAR_THE_BAR:
     "the reviewer rated it just under your bar, so you should read it first",
+  // Lane N: the delegation policy's owner-only reasons.
+  CALENDAR_COMMITMENT: "it agrees a time, and your calendar is yours",
+  COMMERCIAL_TERMS: "it mentions terms, and terms are yours",
+  GOAL_BOOKING:
+    "you both agreed this time; approving books it and sends the invite",
 };
 
 // ---------------------------------------------------------------------------
@@ -480,10 +549,33 @@ export type ValidationContext = {
         {
           readonly theirTerms: readonly string[];
           readonly ourNumbers: readonly number[];
+          /** Lane N: the sender's side's own messages there, oldest first. */
+          readonly ours?: readonly string[] | undefined;
         }
       >
     | undefined;
+  /**
+   * Lane N: each conversation's meeting goal, read by code (meeting-goal.ts)
+   * when the instruction's goal is a meeting. Terminal: nothing is written.
+   */
+  readonly goals?: ReadonlyMap<string, MeetingGoalState> | undefined;
 };
+
+/**
+ * Lane N: whether Q's draft commits the person to a time -- it accepts, and
+ * names a time or answers their single proposed one. Code's read.
+ */
+function commitsATime(
+  body: string,
+  goal: MeetingGoalState | undefined,
+  now: Date,
+  timeZone: string,
+): boolean {
+  if (!acceptsATime(body)) return false;
+  return (
+    slotsIn(body, now, timeZone).length > 0 || goal?.state === "PROPOSED_TO_US"
+  );
+}
 
 /** A transcript's messages from the sender's side, oldest first. */
 function ownLines(transcript: string): readonly string[] {
@@ -625,6 +717,29 @@ export function inScope(
   );
 }
 
+/**
+ * Lane N: a can't-line whose whole reason is that something needs the
+ * person's approval, or already waits for it. Code's read of Q's own words.
+ */
+const ONLY_APPROVAL =
+  /\b(?:already (?:pending|awaiting|waiting)|pending (?:\w+(?:'s)? )?approval|awaiting (?:\w+(?:'s)? )?approval|requires? (?:\w+(?:'s)? )?(?:approval|yes)|needs? (?:\w+(?:'s)? )?(?:approval|yes)|approve (?:the|a|an|it)\b)/iu;
+
+export function onlyNeedsApproval(entry: {
+  readonly reason: string;
+  readonly instead: string;
+}): boolean {
+  return ONLY_APPROVAL.test(entry.reason) || ONLY_APPROVAL.test(entry.instead);
+}
+
+/** A can't-line's identity for the day: its first words, normalised. */
+function cannotKey(what: string): string {
+  return what
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-|-$/gu, "")
+    .slice(0, 60);
+}
+
 /** The plan's can't-lines that need neither an action nor the engine. */
 export function realCannots<T extends { readonly needs: string }>(
   cannot: readonly T[],
@@ -750,6 +865,36 @@ export function validateStep(
       return {
         verdict: "REFUSED",
         code: "NOT_CONNECTED",
+        relationshipId: subject,
+      };
+    }
+    // Lane N: the meeting goal is reached here (agreed or booked, code's
+    // read): no further message, whatever the plan says.
+    const goal = subject === null ? undefined : context.goals?.get(subject);
+    if (isTerminal(goal)) {
+      return {
+        verdict: "REFUSED",
+        code: "GOAL_REACHED",
+        relationshipId: subject,
+      };
+    }
+    // Their concrete time, on the investor side: the person's confirmation
+    // is the booking card (prepared by the firing), never a chat "yes".
+    const draft = textBody(parsed.data);
+    if (
+      goal?.state === "PROPOSED_TO_US" &&
+      ourSideIsInvestor(context.people, subject) &&
+      draft !== null &&
+      commitsATime(
+        draft,
+        goal,
+        context.now,
+        context.grant.workingHours.timeZone,
+      )
+    ) {
+      return {
+        verdict: "REFUSED",
+        code: "BOOKING_FOR_YOUR_YES",
         relationshipId: subject,
       };
     }
@@ -890,7 +1035,42 @@ export function validateStep(
   // A declared cheque range or role, in code's own words, answering their
   // question about it, is a declared fact, not terms or a commitment (live
   // QA, ASK card f3e411b7): the planner's flag does not make it a card.
-  if (step.touchesTermsOrMoney && !factReply) return ask("TERMS_OR_MONEY");
+  // Lane N (Zino, 12-15 Oct): the planner's flag alone no longer holds a
+  // delegated reply that restates the person's own declared facts -- code's
+  // message checks already found every number on record (factReply, or no
+  // problem above). Real terms, an unapproved fact or a committed time
+  // still go to the owner (delegation-policy.ts); the reviewer must still
+  // pass the draft before it goes (`unreviewed` below).
+  const draftBody =
+    action.name === "chat.message.send" ? textBody(parsed.data) : null;
+  const commits =
+    draftBody !== null &&
+    commitsATime(
+      draftBody,
+      subject === null ? undefined : context.goals?.get(subject),
+      context.now,
+      context.grant.workingHours.timeZone,
+    );
+  if (commits) return ask("CALENDAR_COMMITMENT");
+  if (
+    step.touchesTermsOrMoney &&
+    !factReply &&
+    termsFlagNeedsOwner({
+      // Only under the recorded delegation: its messages go only once the
+      // reviewer passed them (`unreviewed` below).
+      delegated,
+      body: draftBody ?? "",
+      // Reaching here, code found nothing ungrounded in a message.
+      grounded: draftBody !== null,
+      acceptsTime: commits,
+    })
+  ) {
+    return ask(
+      draftBody !== null && mentionsCommercialTerms(draftBody)
+        ? "COMMERCIAL_TERMS"
+        : "TERMS_OR_MONEY",
+    );
+  }
   // Code, not the planner, reads the thread's facts: where they raised
   // terms or money, or said no, Q does not act alone.
   const thread = subject === null ? undefined : context.facts?.get(subject);
@@ -1268,20 +1448,24 @@ function messageProblem(
   const woo = wooProblem({
     body: body.body,
     replying,
+    // Lane N (owner 2026-10-15, "AI slop"): a reply answers them; it no
+    // longer has to restate their profile to pass (Tensorgate: every reply
+    // re-said "hardware enclaves" to satisfy this). A follow-up keeps it.
     recipientTerms:
-      answeringThem || (!written && !replying) || anchors.length === 0
+      answeringThem || replying || !written || anchors.length === 0
         ? []
-        : [
-            ...anchors,
-            // Tensorgate, 8 Oct: a reply that takes up what they said is
-            // specific to them, though it names nothing from their profile.
-            // Only widens a check that already applies; never adds one.
-            ...(replying ? (read?.theirTerms ?? []) : []),
-          ],
+        : anchors,
   });
   if (woo !== null) {
     return refuse(woo === "WOO_TOO_LONG" ? "MESSAGE_TOO_LONG" : woo);
   }
+  // Lane N: short, new and one ask -- against what this side already wrote.
+  const quality = qualityProblem({
+    body: body.body,
+    replying,
+    ours: read?.ours ?? [],
+  });
+  if (quality !== null) return refuse(quality);
   if (context.material === undefined) return pass;
   const first = !written && !replying;
   // A first message only inside the sender's declared hard criteria.
@@ -1500,9 +1684,90 @@ export type InstructionEngineDependencies = {
         waitingOnPerson?: boolean,
       ) => Promise<void>)
     | undefined;
+  /**
+   * Lane N: each relationship's booked calls and open meeting-time
+   * proposals, read as the person (the schedule's and the proposal state
+   * machine's own reads). Absent, a meeting goal is read from the words
+   * alone and booking cards use the schedule path.
+   */
+  readonly meetingEvidence?:
+    | ((
+        actor: ActorContext,
+        relationshipIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, MeetingEvidence>>)
+    | undefined;
   readonly now?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
+
+/** Lane N: what the schedule holds for one relationship. */
+export type MeetingEvidence = {
+  readonly calls: readonly BookedCall[];
+  /** Proposals waiting on the investor (task C's state machine). */
+  readonly proposals: readonly {
+    readonly id: string;
+    readonly state: string;
+    readonly options: readonly { readonly startsAt: string }[];
+  }[];
+};
+
+/**
+ * Lane N: the one confirmation card for an agreed (or proposed) time, on
+ * the investor side. A structured proposal waiting on them is accepted
+ * through its own state machine (schedule.proposal.accept, bound to the
+ * option); otherwise the time is booked through the schedule path
+ * (schedule.meeting.book), bound to the exact start, length and zone. The
+ * idempotency key is the relationship and the start, so every firing
+ * prepares the same card and an approved booking replayed is one booking.
+ */
+export function goalBookingCard(input: {
+  readonly relationshipId: string;
+  readonly counterpartName: string;
+  readonly slot: Slot;
+  readonly durationMinutes: number;
+  readonly proposals: MeetingEvidence["proposals"];
+}): {
+  readonly actionType: string;
+  readonly payload: Record<string, unknown>;
+  readonly words: string;
+  readonly key: string;
+} {
+  const key = bookingKey(input.relationshipId, input.slot);
+  const when = `${slotWords(input.slot)} (${String(input.durationMinutes)} min)`;
+  for (const proposal of input.proposals) {
+    if (proposal.state !== "INVESTOR_REVIEW") continue;
+    const optionIndex = proposal.options.findIndex(
+      (option) => Date.parse(option.startsAt) === input.slot.startsAt.getTime(),
+    );
+    if (optionIndex < 0) continue;
+    return {
+      actionType: "app.schedule.proposal.accept",
+      payload: {
+        relationshipId: input.relationshipId,
+        proposalId: proposal.id,
+        idempotencyKey: key,
+        input: { optionIndex },
+      },
+      words: `Confirm ${when} with ${input.counterpartName}? Approving books it on your calendar and sends them the invite with the Meet link.`,
+      key,
+    };
+  }
+  return {
+    actionType: "app.schedule.meeting.book",
+    payload: {
+      relationshipId: input.relationshipId,
+      idempotencyKey: key,
+      input: {
+        purpose: `Call with ${input.counterpartName}`.slice(0, 200),
+        startsAt: input.slot.startsAt.toISOString(),
+        durationMinutes: input.durationMinutes,
+        timeZone: input.slot.timeZone,
+      },
+    },
+    words: `Confirm ${when} with ${input.counterpartName}? Approving books it on your calendar and sends them the invite with the Meet link.`,
+    key,
+  };
+}
 
 /** The id of the chat message a send produced, when it produced one. */
 function sentMessageId(out: unknown): string | null {
@@ -1613,6 +1878,8 @@ function peopleLines(
     /** The person's own side's earlier words there. */
     readonly ourWords: ReadonlyMap<string, string>;
   },
+  /** Lane N: code's meeting goal per conversation. */
+  goals?: ReadonlyMap<string, MeetingGoalState>,
 ): string {
   if (people.length === 0) return "No one yet.";
   return people
@@ -1645,6 +1912,10 @@ function peopleLines(
                 // had written first.
                 "they wrote first and your side hasn't replied: any message is a reply to them, not an introduction"
               : "no message from your side yet",
+        // Lane N: a reached goal, in code's words: write nothing.
+        person.relationshipId === null
+          ? null
+          : goalLine(goals?.get(person.relationshipId)),
         // Tensorgate, 8 Oct: a reply that waits is said in code's words,
         // with what the person's own side already said there.
         person.relationshipId !== null &&
@@ -2077,6 +2348,8 @@ export function createInstructionEngine(
         string,
         { readonly thread: string; readonly theirLatest: string | null }
       >();
+      // Lane N: each conversation's scheduling state, code's read.
+      const negotiations = new Map<string, Negotiation>();
       if (dependencies.readThread !== undefined) {
         // Conversations with a card still waiting are read first (F24: a
         // stale draft is only seen as stale once its thread is read).
@@ -2097,7 +2370,11 @@ export function createInstructionEngine(
             topics: grant.data.topics,
             now: at,
             maxCostUsd: Math.max(0, spare) / 1_000_000,
+            timeZone: grant.data.workingHours.timeZone,
           });
+          if (read.negotiation !== undefined) {
+            negotiations.set(relationshipId, read.negotiation);
+          }
           if (read.costUsd > 0) {
             left -= micros(read.costUsd);
             await store.addSpend(row.id, read.costUsd);
@@ -2172,6 +2449,7 @@ export function createInstructionEngine(
                 ? []
                 : distinctiveWords(read.theirLatest),
             ourNumbers: threadOwnNumbers(read.thread),
+            ours: ownLines(read.thread),
           },
         ]),
       );
@@ -2239,6 +2517,135 @@ export function createInstructionEngine(
           .catch(() => false);
       }
 
+      // Lane N (owner 2026-10-15): when the goal is a meeting, code decides
+      // per conversation whether it is reached -- and acts on it before any
+      // planning: the investor side gets ONE confirmation card for the
+      // agreed time; the side that did not book is told once it is booked.
+      const goals = new Map<string, MeetingGoalState>();
+      if (goalIsMeeting(row.goal_text, grant.data.actions)) {
+        const ids = [...new Set([...negotiations.keys(), ...covered])];
+        const evidence =
+          dependencies.meetingEvidence === undefined || ids.length === 0
+            ? new Map<string, MeetingEvidence>()
+            : await dependencies
+                .meetingEvidence(actor, ids)
+                .catch(() => new Map<string, MeetingEvidence>());
+        for (const id of ids) {
+          const goal = meetingGoalState({
+            negotiation: negotiations.get(id),
+            calls: evidence.get(id)?.calls ?? [],
+            now: at,
+          });
+          if (goal.state !== "OPEN") goals.set(id, goal);
+        }
+        for (const [relationshipId, goal] of goals) {
+          const person = people.find(
+            (one) => one.relationshipId === relationshipId,
+          );
+          const name = (person?.name ?? "them").slice(0, 80);
+          if (goal.state === "BOOKED") {
+            if (goal.call.organisedByYou) continue;
+            // The other side booked: main Q tells the person, once a call.
+            const words = `${name} booked the call: ${slotWords({ startsAt: new Date(goal.call.startsAt), timeZone: goal.call.timeZone })}. The invite with the Meet link is in your email.`;
+            const fresh = await store
+              .recordStep({
+                instruction: row,
+                runKey,
+                stepIndex: 170,
+                action: "q.note",
+                mode: "ASK",
+                status: "NOTED",
+                relationshipId,
+                words,
+                reasonCode: "GOAL_BOOKED",
+                qActionId: null,
+                idempotencyKey: `instr:${row.id}:goal-booked:${goal.call.id}`,
+              })
+              .catch(() => false);
+            if (fresh) {
+              await store
+                .notify({
+                  instruction: row,
+                  key: `goal-booked:${goal.call.id}`,
+                  priority: "UPDATE",
+                  title: `${name} booked your call`,
+                  body: words,
+                })
+                .catch(() => false);
+            }
+            continue;
+          }
+          if (!ourSideIsInvestor(people, relationshipId)) continue;
+          const slot =
+            goal.state === "AGREED"
+              ? goal.slot
+              : goal.state === "PROPOSED_TO_US" && goal.slots.length === 1
+                ? goal.slots[0]
+                : undefined;
+          if (slot === undefined || slot.startsAt.getTime() <= at.getTime()) {
+            continue;
+          }
+          const card = goalBookingCard({
+            relationshipId,
+            counterpartName: name,
+            slot,
+            durationMinutes:
+              goal.state === "AGREED"
+                ? goal.durationMinutes
+                : (negotiations.get(relationshipId)?.durationMinutes ?? 30),
+            proposals: evidence.get(relationshipId)?.proposals ?? [],
+          });
+          const stepKey = `instr:${row.id}:${card.key}`;
+          if (await store.stepDone(stepKey)) continue;
+          const declared = dependencies.actions.find(
+            (action) => `app.${action.name}` === card.actionType,
+          );
+          if (
+            declared === undefined ||
+            !declared.input.safeParse(card.payload).success
+          ) {
+            logger?.warn(
+              {
+                instructionId: row.id,
+                relationshipId,
+                actionType: card.actionType,
+              },
+              "meeting goal booking card not valid; not offered",
+            );
+            continue;
+          }
+          const asked = await dependencies
+            .ask(actor, {
+              instructionId: row.id,
+              actionType: card.actionType,
+              payload: card.payload,
+              words: card.words,
+              key: stepKey,
+            })
+            .catch(() => null);
+          if (asked === null) continue;
+          await store
+            .recordStep({
+              instruction: row,
+              runKey,
+              stepIndex: 171,
+              action: card.actionType.slice("app.".length),
+              mode: "ASK",
+              status: "ASKED",
+              relationshipId,
+              words: `Waiting for your yes (${ASK_WORDS["GOAL_BOOKING"] ?? ""}): ${card.words}`,
+              reasonCode: "GOAL_BOOKING",
+              qActionId: asked.qActionId,
+              idempotencyKey: stepKey,
+            })
+            .catch(() => false);
+          logger?.info(
+            { instructionId: row.id, relationshipId, state: goal.state },
+            "meeting goal reached: booking card prepared",
+          );
+        }
+      }
+
       await dependencies
         .track?.(
           { tenantId: row.tenant_id, userId: row.user_id },
@@ -2262,6 +2669,13 @@ export function createInstructionEngine(
       const replyWaiting = reachable.filter((person) => {
         const id = person.relationshipId;
         if (id === null || paces.get(id)?.lastFrom !== "THEM") return false;
+        // Lane N: a reached goal has nothing waiting; neither does their
+        // time on the investor side (the booking card answers it).
+        const goal = goals.get(id);
+        if (isTerminal(goal)) return false;
+        if (goal?.state === "PROPOSED_TO_US" && ourSideIsInvestor(people, id)) {
+          return false;
+        }
         const read = facts.get(id);
         if (read?.declined === true || awaiting?.has(id) === true) {
           return false;
@@ -2338,6 +2752,7 @@ export function createInstructionEngine(
               introduced,
               { paces, now: at, timeZone: grant.data.workingHours.timeZone },
               { waiting: waitingIds, ourWords },
+              goals,
             ),
             history: (
               (history.length === 0
@@ -2393,6 +2808,7 @@ export function createInstructionEngine(
             delegatedToday: delegatedNow,
             threads,
             threadsRead,
+            goals,
           }),
         );
         const refused = verdicts
@@ -2456,7 +2872,7 @@ export function createInstructionEngine(
               )
               .join(
                 ", ",
-              )} wrote last and no one has answered. Write one REPLY chat.message.send to each now, following the rules: thank them, take up what they wrote about, one point from WHO YOU WRITE AS or what your side already said, and one soft offer.`,
+              )} wrote last and no one has answered. Write one REPLY chat.message.send to each now: one to three plain sentences that answer their point or move the goal one step, no thanks or restating, at most one question.`,
           ]
             .join("\n")
             .slice(0, 3_000);
@@ -2503,6 +2919,7 @@ export function createInstructionEngine(
           delegation,
           threads,
           threadsRead,
+          goals,
         };
         const reviewedPlan = plan;
         verdicts = await Promise.all(
@@ -2760,6 +3177,29 @@ export function createInstructionEngine(
               { instructionId: row.id, action: step.action },
               "instruction step dropped: not connected yet",
             );
+            return;
+          }
+          if (
+            verdict.code === "GOAL_REACHED" ||
+            verdict.code === "BOOKING_FOR_YOUR_YES"
+          ) {
+            // Lane N: suppressed after the goal -- logged and noted, never
+            // sent, never a refusal for the person to deal with.
+            logger?.info(
+              {
+                instructionId: row.id,
+                relationshipId: verdict.relationshipId,
+                code: verdict.code,
+              },
+              "instruction message suppressed: meeting goal reached",
+            );
+            await record({
+              status: "NOTED",
+              mode: "ASK",
+              words: `Not sent: ${REFUSAL_WORDS[verdict.code].reason}; ${REFUSAL_WORDS[verdict.code].instead}.`,
+              reasonCode: verdict.code,
+              qActionId: null,
+            });
             return;
           }
           refusedCount += 1;
@@ -3109,21 +3549,37 @@ export function createInstructionEngine(
       }
 
       // What no declared action can do: said now, with an alternative.
+      // Lane N ("they keep saying they need me for things they can do
+      // themselves"): a line that only says something needs an approval is
+      // not a can't -- cards are the approval path, and under delegation
+      // the reviewer signs routine messages off -- so it is dropped; and
+      // each can't is said once a day, not every firing (Savanna, 12-15
+      // Oct: the same line 20 times).
+      const day = at.toISOString().slice(0, 10);
       for (const [offset, entry] of plan.cannot.entries()) {
+        if (onlyNeedsApproval(entry)) {
+          logger?.info(
+            { instructionId: row.id, what: entry.what.slice(0, 80) },
+            "instruction can't-line dropped: it only needs an approval",
+          );
+          continue;
+        }
         const index = 100 + offset;
-        await store.recordStep({
-          instruction: row,
-          runKey,
-          stepIndex: index,
-          action: "q.cannot",
-          mode: "ASK",
-          status: "REFUSED",
-          relationshipId: null,
-          words: `Can't ${entry.what}: ${entry.reason}. Instead: ${entry.instead}`,
-          reasonCode: "CANNOT",
-          qActionId: null,
-          idempotencyKey: keyOf(index),
-        });
+        await store
+          .recordStep({
+            instruction: row,
+            runKey,
+            stepIndex: index,
+            action: "q.cannot",
+            mode: "ASK",
+            status: "REFUSED",
+            relationshipId: null,
+            words: `Can't ${entry.what}: ${entry.reason}. Instead: ${entry.instead}`,
+            reasonCode: "CANNOT",
+            qActionId: null,
+            idempotencyKey: `instr:${row.id}:cannot:${day}:${cannotKey(entry.what)}`,
+          })
+          .catch(() => false);
       }
       // Recovery D-11: the firing is over; the job is DONE, or HELD while
       // something waits on the person -- never left "Working".

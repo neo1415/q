@@ -229,6 +229,7 @@ import {
   createInstructionEngine,
   instructionPeople,
   type InstructionEngine,
+  type MeetingEvidence,
 } from "./composition/instructions/engine.js";
 import { createInstructionTriggers } from "./composition/instructions/triggers.js";
 import { createSendGuard } from "./composition/instructions/send-guard.js";
@@ -4950,6 +4951,36 @@ const instructionMaterial = createInstructionMaterialReader({
   },
 });
 instructionEngine.current = createInstructionEngine({
+  // Lane N: booked calls and open proposals per relationship, read as the
+  // person (scoped in SQL to relationships their organisation is party to).
+  meetingEvidence: async (actor, relationshipIds) => {
+    const calls = await schedule.listMeetingsForRelationships(
+      actor,
+      relationshipIds,
+    );
+    const service = appActionPorts.proposals?.forActor(
+      actor,
+      `cor_${randomUUID()}`,
+    );
+    const out = new Map<string, MeetingEvidence>();
+    for (const relationshipId of relationshipIds) {
+      const listed = await service
+        ?.list({ actorUserId: actor.userId, relationshipId })
+        .catch(() => null);
+      out.set(relationshipId, {
+        calls: calls.get(relationshipId) ?? [],
+        proposals:
+          listed?.outcome === "OK"
+            ? listed.proposals.map((proposal) => ({
+                id: proposal.id,
+                state: proposal.state,
+                options: proposal.options,
+              }))
+            : [],
+      });
+    }
+    return out;
+  },
   sendGuard: qSendGuard,
   review: outwardReview,
   track: workforceTracker(workforceStore, "INSTRUCTION"),
