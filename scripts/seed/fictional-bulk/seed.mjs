@@ -382,7 +382,7 @@ async function driveJourney(email, journeyType, answerFor) {
 
 // ------------------------------------------------------------ founders
 
-function founderAnswers(c, map) {
+function founderAnswers(c, getMap) {
   const t = c.traction;
   const f = c.fin;
   return async (step) => {
@@ -404,7 +404,7 @@ function founderAnswers(c, map) {
       case "F1.categories":
         return refs(
           "TAXONOMY_NODE",
-          nodeIds(map, c.categories, [
+          nodeIds(await getMap(), c.categories, [
             "industry",
             "product_category",
             "business_model",
@@ -561,8 +561,13 @@ async function seedCompany(c) {
   }
   if (!s.steps.journey) {
     await ensureProfile(f, c.founder);
-    const map = await loadTaxonomy(f);
-    const view = await driveJourney(f, "founder", founderAnswers(c, map));
+    // Taxonomy reads need an organisation: read when the step asks, after
+    // the journey's first answers created one.
+    const view = await driveJourney(
+      f,
+      "founder",
+      founderAnswers(c, () => loadTaxonomy(f)),
+    );
     const companyId = view.session.subject?.id;
     if (!companyId) throw new Error("the founder journey bound no company");
     await done("journey", { companyId });
@@ -739,13 +744,22 @@ async function seedCompany(c) {
       readiness: after.marketplaceReadinessState,
     });
   }
+  if (!s.steps.verify) {
+    // Ask Capital Q to verify, as the founder would. The deployment decides
+    // it under its own synthetic attestation, or leaves it pending.
+    const standing = await api(f, "GET", `${base}/verification`);
+    if (standing.requestable === true)
+      await api(f, "POST", `${base}/verification/requests`, undefined);
+    await done("verify");
+  }
   return s;
 }
 
 // ----------------------------------------------------------- investors
 
-function investorAnswers(inv, map) {
-  const tax = (codes, vocs) => refs("TAXONOMY_NODE", nodeIds(map, codes, vocs));
+function investorAnswers(inv, getMap) {
+  const tax = async (codes, vocs) =>
+    refs("TAXONOMY_NODE", nodeIds(await getMap(), codes, vocs));
   return async (step) => {
     switch (step.stepKey) {
       case "I0.investor_type":
@@ -863,12 +877,10 @@ async function seedInvestor(inv) {
   if (!s.steps.journey) {
     await ensureProfile(e, lead);
     // The first journey creates the organisation that taxonomy reads need.
-    const map = taxonomy ?? (await loadTaxonomy(e).catch(() => null));
-    const answers = map ? investorAnswers(inv, map) : null;
-    await driveJourney(e, "investor", async (step) =>
-      answers
-        ? answers(step)
-        : investorAnswers(inv, await loadTaxonomy(e))(step),
+    await driveJourney(
+      e,
+      "investor",
+      investorAnswers(inv, () => loadTaxonomy(e)),
     );
     await done("journey");
   }
