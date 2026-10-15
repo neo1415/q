@@ -130,9 +130,9 @@ function world(
         plan: () => {
           plans += 1;
           // A list: the lead's successive answers (a replan reads the next).
-          const one = Array.isArray(plan)
-            ? (plan[Math.min(plans, plan.length) - 1] ?? null)
-            : (plan as JobPlanResultV2 | null);
+          const answers: readonly (JobPlanResultV2 | null)[] =
+            plan === null || !("length" in plan) ? [plan] : plan;
+          const one = answers[Math.min(plans, answers.length) - 1] ?? null;
           return Promise.resolve(one === null ? null : asPlanV5(one));
         },
         readReply: () => Promise.resolve(null),
