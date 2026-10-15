@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 import { ChoiceList, MultiChoiceList } from "@capital-q/ui/choice-list";
+import { Input } from "@capital-q/ui/input";
 import { MoneyInput, type MoneyValue } from "@capital-q/ui/money-input";
 import { InlineNotice } from "@capital-q/ui/states";
 
@@ -41,6 +42,7 @@ export function CapitalObjectiveStep({
   const [useOfFunds, setUseOfFunds] = useState<readonly string[]>(
     saved?.useOfFunds ?? [],
   );
+  const [minCheque, setMinCheque] = useState<string>(saved?.minCheque ?? "");
   const [error, setError] = useState<string | undefined>(undefined);
   const [amountError, setAmountError] = useState<string | undefined>(undefined);
 
@@ -67,6 +69,8 @@ export function CapitalObjectiveStep({
       ...(instrument !== undefined ? { instrument } : {}),
       ...(timeframe !== undefined ? { timeframe } : {}),
       ...(useOfFunds.length > 0 ? { useOfFunds: [...useOfFunds] } : {}),
+      // Empty means any size is welcome: the step is skipped, never 0.
+      ...(step.asksMinCheque && /[1-9]/.test(minCheque) ? { minCheque } : {}),
     });
   }
 
@@ -144,6 +148,21 @@ export function CapitalObjectiveStep({
             disabled={busy}
             onChange={setUseOfFunds}
           />
+          {step.asksMinCheque ? (
+            <Input
+              id="raise-min-cheque"
+              label={`Smallest cheque you would take (${amount.currency})`}
+              description="Optional. Leave empty if any size is welcome."
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={minCheque}
+              disabled={busy}
+              onChange={(event) =>
+                setMinCheque(event.target.value.replace(/[^0-9]/g, ""))
+              }
+            />
+          ) : null}
         </>
       ) : null}
     </form>

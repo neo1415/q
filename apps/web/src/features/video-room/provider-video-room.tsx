@@ -15,12 +15,37 @@ import { Button } from "@capital-q/ui/button";
  * The time limit is the server's. The countdown is a courtesy; at zero the
  * room asks the caller to end (the server ends it regardless).
  */
+/**
+ * The room URL with the participant's own name, so Daily Prebuilt joins them
+ * directly instead of stopping on "Enter your name" (its `name` parameter;
+ * `userName` is ignored, checked in a production test-mode room). Only the
+ * provider's room is touched; a blank name leaves the URL as it was.
+ */
+export function joinUrlWithName(
+  joinUrl: string | null,
+  name: string,
+): string | null {
+  const display = name.trim().slice(0, 60);
+  if (joinUrl === null || display === "") return joinUrl;
+  try {
+    const url = new URL(joinUrl);
+    url.searchParams.set("name", display);
+    return url.toString();
+  } catch {
+    return joinUrl;
+  }
+}
+
+const JOINING_MS = 30_000;
+
 export type ProviderVideoRoomProps = {
   readonly title: string;
   /** Plain AI/recording disclosure, always visible. */
   readonly disclosure: string;
   /** The provider's private join link; null when it cannot be rejoined here. */
   readonly joinUrl: string | null;
+  /** Shown in the room as this person; skips the provider's name prompt. */
+  readonly participantName?: string | undefined;
   /** Accessible name of the provider tile. */
   readonly tileLabel: string;
   readonly endsAt: string;
@@ -32,6 +57,12 @@ export type ProviderVideoRoomProps = {
   /** Caller ends the session; `fallback` true continues without video. */
   readonly onEnd: (fallback: boolean) => Promise<{ readonly message?: string }>;
   readonly closingNote: string;
+  /**
+   * Shown while the provider's interviewer is still joining. Its face takes
+   * about 20 seconds to appear (production, 2026-10-15); an unexplained
+   * room with only your own camera reads as a broken, blank call.
+   */
+  readonly joiningNote?: string | undefined;
   /** Shown in the last 30 seconds. */
   readonly closingSoonNote?: string | undefined;
   readonly unavailableNote: ReactNode;
@@ -46,6 +77,7 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
     Math.max(0, Math.ceil((endsAt - Date.now()) / 1_000)),
   );
   const [message, setMessage] = useState<string | null>(null);
+  const [joining, setJoining] = useState(true);
   const [ending, setEnding] = useState(false);
   const ended = useRef(false);
   const onEnd = useRef(props.onEnd);
@@ -72,6 +104,11 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
       })
       .finally(() => setEnding(false));
   };
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setJoining(false), JOINING_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -102,9 +139,14 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
         {props.unavailableNote}
       </div>
     ) : (
-      <div className="cq-stage relative min-h-0 flex-1 overflow-hidden rounded-(--cq-radius-xl)">
+      // A floor keeps the room usable on a landscape phone, where the
+      // controls and footnote would otherwise squeeze it to a sliver.
+      <div className="cq-stage relative min-h-60 flex-1 overflow-hidden rounded-(--cq-radius-xl)">
         <iframe
-          src={props.joinUrl}
+          src={
+            joinUrlWithName(props.joinUrl, props.participantName ?? "") ??
+            undefined
+          }
           title={props.tileLabel}
           allow="camera; microphone; autoplay; display-capture; fullscreen"
           referrerPolicy="no-referrer"
@@ -146,6 +188,15 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
           </div>
         </div>
       )}
+
+      {joining &&
+      left > 0 &&
+      props.joinUrl !== null &&
+      props.joiningNote !== undefined ? (
+        <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
+          {props.joiningNote}
+        </p>
+      ) : null}
 
       {left > 0 && left <= 30 ? (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">

@@ -18,9 +18,12 @@ import {
   StartRehearsalVideoResponseSchema,
 } from "@capital-q/contracts";
 
-import type {
-  BridgeMessage,
-  RehearsalVideoService,
+import {
+  isTavusConnectivityCheck,
+  TAVUS_CONNECTIVITY_REPLY,
+  type BridgeMessage,
+  type BridgeResult,
+  type RehearsalVideoService,
 } from "../composition/rehearsal-video.js";
 import { sentences } from "../voice/speech.js";
 import {
@@ -279,12 +282,17 @@ export function registerRehearsalVideoRoutes(
       reply.raw.on("close", () => {
         if (!reply.raw.writableFinished) controller.abort();
       });
-      const result = await video.bridge(
-        params.data.videoSessionId,
-        bearer,
-        messages,
-        controller.signal,
-      );
+      // The provider's own setup probe: answered, never a founder turn.
+      const result: BridgeResult = isTavusConnectivityCheck(
+        messages.filter((m) => m.role === "user").map((m) => m.text),
+      )
+        ? { kind: "LINE" as const, text: TAVUS_CONNECTIVITY_REPLY }
+        : await video.bridge(
+            params.data.videoSessionId,
+            bearer,
+            messages,
+            controller.signal,
+          );
       if (result.kind === "UNAUTHORISED") {
         return problem(
           request,

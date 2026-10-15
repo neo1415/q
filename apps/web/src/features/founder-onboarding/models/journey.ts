@@ -8,7 +8,8 @@ import {
   CURRENCY_OPTIONS,
   FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V2_VERSION,
-  FOUNDER_DEFINITION_V3_VERSION,
+  FOUNDER_DEFINITION_V4_VERSION,
+  FOUNDER_FINANCIAL_STEPS,
   FOUNDER_STEPS,
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
@@ -82,6 +83,7 @@ export type Group = {
 export { SubmissionPlanError, type Submission };
 
 const S = FOUNDER_STEPS;
+const F = FOUNDER_FINANCIAL_STEPS;
 
 const SNAPSHOT_GROUP: Group = {
   id: "snapshot",
@@ -159,7 +161,22 @@ export const GROUPS: readonly Group[] = [
     kind: "traction",
     section: "business",
     title: "Business and traction",
-    stepKeys: [S.signal, S.pilots, S.revenueStatus, S.customers, S.growth],
+    // v4 adds the optional financials block after the traction questions;
+    // in a v2/v3 session those steps are never eligible, so never shown.
+    stepKeys: [
+      S.signal,
+      S.pilots,
+      S.revenueStatus,
+      S.customers,
+      S.growth,
+      F.currency,
+      F.monthlyRevenue,
+      F.revenueTrend,
+      F.grossMargin,
+      F.monthlyBurn,
+      F.cash,
+      F.runway,
+    ],
   },
   {
     id: "capital_objective",
@@ -173,6 +190,7 @@ export const GROUPS: readonly Group[] = [
       S.instrument,
       S.timeframe,
       S.useOfFunds,
+      F.minCheque,
       S.raiseConfirm,
     ],
   },
@@ -283,23 +301,21 @@ function renderValue(
 }
 
 /** Q's pending website suggestion, as a step field, when there is one. */
-function suggestedWebsiteOf(
-  suggestions: readonly FounderSuggestionView[],
-): { readonly suggestedWebsite?: string } {
+function suggestedWebsiteOf(suggestions: readonly FounderSuggestionView[]): {
+  readonly suggestedWebsite?: string;
+} {
   const found = suggestions.find(
     (suggestion) => suggestion.stepKey === S.website,
   );
   return found === undefined ? {} : { suggestedWebsite: found.value };
 }
 
-export function describeSuggestion(
-  suggestion: {
-    readonly id: string;
-    readonly stepKey: string;
-    readonly suggestedValue: OnboardingResponseValue;
-    readonly confidence: string | null;
-  },
-): FounderSuggestionView | null {
+export function describeSuggestion(suggestion: {
+  readonly id: string;
+  readonly stepKey: string;
+  readonly suggestedValue: OnboardingResponseValue;
+  readonly confidence: string | null;
+}): FounderSuggestionView | null {
   const group = GROUPS.find((candidate) =>
     candidate.stepKeys.includes(suggestion.stepKey),
   );
@@ -343,19 +359,20 @@ export function runtimeState(view: OnboardingSessionView): RuntimeState {
   };
 }
 
-/** The versions this screen renders: v2, and v3 (v2 plus two options). */
-const SUPPORTED_VERSIONS: ReadonlySet<number> = new Set([
-  FOUNDER_DEFINITION_V2_VERSION,
-  FOUNDER_DEFINITION_V3_VERSION,
-]);
-
 export function isSupportedVersion(view: OnboardingSessionView): boolean {
-  // v2 and its strict superset v3. A session pinned to v1 still runs v1's
-  // journey on the server; this screen would render its F2 as an upload
-  // it never collected, so it says plainly that it cannot render rather
-  // than misrepresenting it (§82). Live 2026-10-01: v3 was published and
-  // this check refused every new founder until it named v3 too.
-  return SUPPORTED_VERSIONS.has(view.session.definitionVersion);
+  // Decided by what the session asks, not by a list of version numbers:
+  // v2 onward, as long as every step on its path is one this screen draws.
+  // A session pinned to v1 still runs v1's journey on the server; this
+  // screen would render its F2 as an upload it never collected, so it says
+  // plainly that it cannot render rather than misrepresenting it (§82).
+  // Live 2026-10-01 (v3) and again 2026-10-15 (v4, published 2026-10-07):
+  // a hard-coded version list refused every new founder until it was edited.
+  // A later version that only adds options (v5: Gulf countries) renders as
+  // is; one that adds a step this build does not know is refused honestly.
+  return (
+    view.session.definitionVersion >= FOUNDER_DEFINITION_V2_VERSION &&
+    view.progress.eligibleSteps.every((step) => GROUP_BY_STEP.has(step.stepKey))
+  );
 }
 
 function single(state: RuntimeState, key: string): string | undefined {
@@ -805,8 +822,13 @@ function buildCapitalObjective(
   const instrument = single(state, S.instrument);
   const timeframe = single(state, S.timeframe);
   const useOfFunds = multi(state, S.useOfFunds);
+  const minCheque = range(state, F.minCheque);
   return {
     ...base(group, "capital_objective", state),
+    // Introduced in v4 and kept by every later version (a floor, not a list).
+    asksMinCheque:
+      state.eligible.has(F.minCheque) ||
+      state.view.session.definitionVersion >= FOUNDER_DEFINITION_V4_VERSION,
     help: "Your raise is kept separate from your company profile. You can change it any time.",
     raisingOptions: optionsOf(S.raising),
     instrumentOptions: optionsOf(S.instrument),
@@ -835,6 +857,7 @@ function buildCapitalObjective(
             ...(instrument === undefined ? {} : { instrument }),
             ...(timeframe === undefined ? {} : { timeframe }),
             ...(useOfFunds === undefined ? {} : { useOfFunds }),
+            ...(minCheque === undefined ? {} : { minCheque }),
           },
   };
 }
@@ -843,7 +866,8 @@ const MISSING_COPY: Readonly<Record<string, string>> = {
   description: "Add a sentence or two on what the company does.",
   categories: "Confirm the categories investors would find you under.",
   stage: "Set the company's stage.",
-  materials: "Add a deck or a memo so Q can read it; a founder without one is not turned away.",
+  materials:
+    "Add a deck or a memo so Q can read it; a founder without one is not turned away.",
   founder_count: "Complete the founding team facts.",
   team_size: "Add today's team size.",
   capital_objective: "Define your raise when you're ready.",
@@ -1151,6 +1175,10 @@ export function planSubmissions(
         selectOrSkip(S.instrument, response.instrument),
         selectOrSkip(S.timeframe, response.timeframe),
         multiOrSkip(S.useOfFunds, response.useOfFunds),
+        // Not eligible in a v2/v3 session: the executor passes over it.
+        response.minCheque === undefined
+          ? skip(F.minCheque)
+          : submit(F.minCheque, { type: "RANGE", value: response.minCheque }),
         submit(S.raiseConfirm, { type: "CONFIRMATION", confirmed: true }),
       ];
     }

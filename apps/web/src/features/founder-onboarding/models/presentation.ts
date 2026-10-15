@@ -117,6 +117,8 @@ export const StepResponseSchema = z.discriminatedUnion("kind", [
     instrument: z.string().optional(),
     timeframe: z.string().optional(),
     useOfFunds: z.array(z.string()).optional(),
+    /** v4: smallest cheque, a whole amount in the raise's currency. */
+    minCheque: z.string().regex(/^\d+$/).optional(),
   }),
   z.object({ kind: z.literal("snapshot"), confirmed: z.literal(true) }),
 ]);
@@ -259,6 +261,8 @@ export type StepView =
       readonly timeframeOptions: readonly ChoiceOption[];
       readonly useOfFundsOptions: readonly ChoiceOption[];
       readonly currencies: readonly CurrencyOption[];
+      /** v4 sessions ask for the smallest cheque (optional). */
+      readonly asksMinCheque: boolean;
       /** Present when an objective already exists: saving recalibrates it. */
       readonly existingObjective:
         { readonly amount: string; readonly currency: string } | undefined;

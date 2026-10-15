@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { OnboardingSessionViewSchema } from "@capital-q/contracts";
-import { FOUNDER_STEPS } from "@capital-q/founder-onboarding/definition";
+import {
+  FOUNDER_FINANCIAL_STEPS,
+  FOUNDER_STEPS,
+} from "@capital-q/founder-onboarding/definition";
 
 import { FounderOnboardingClientError } from "../src/features/founder-onboarding/adapters/client";
 import {
@@ -411,11 +414,58 @@ describe("founder journey over the runtime contract", () => {
       FOUNDER_STEPS.instrument,
       FOUNDER_STEPS.timeframe,
       FOUNDER_STEPS.useOfFunds,
+      FOUNDER_FINANCIAL_STEPS.minCheque,
       FOUNDER_STEPS.raiseConfirm,
     ]);
   });
 
-  it("refuses a session pinned to a definition version this build cannot present", async () => {
+  it("v4: the smallest cheque is submitted when given and skipped (never 0) when empty", () => {
+    const raise = requireGroup("capital_objective");
+    const plan = (minCheque?: string) =>
+      planSubmissions(raise, {
+        kind: "capital_objective",
+        raisingStatus: "active",
+        targetAmount: { amount: "2000000", currency: "USD" },
+        ...(minCheque === undefined ? {} : { minCheque }),
+      }).find((s) => s.stepKey === FOUNDER_FINANCIAL_STEPS.minCheque);
+    expect(plan("50000")).toMatchObject({
+      action: "submit",
+      value: { type: "RANGE", value: "50000" },
+    });
+    expect(plan()).toMatchObject({ action: "skip" });
+  });
+
+  it("v4: the financials block is asked on the traction screen, each answer or unknown on its own step", () => {
+    const traction = requireGroup("traction");
+    expect(traction.stepKeys).toEqual(
+      expect.arrayContaining(
+        Object.values(FOUNDER_FINANCIAL_STEPS).filter(
+          (key) => key !== FOUNDER_FINANCIAL_STEPS.minCheque,
+        ),
+      ),
+    );
+    const planned = planSubmissions(traction, {
+      kind: "traction",
+      metrics: {
+        [FOUNDER_STEPS.signal]: { value: "waitlist" },
+        [FOUNDER_FINANCIAL_STEPS.cash]: { unknown: true },
+        [FOUNDER_FINANCIAL_STEPS.monthlyBurn]: { value: "40000" },
+      },
+    });
+    const byKey = new Map(planned.map((s) => [s.stepKey, s]));
+    expect(byKey.get(FOUNDER_FINANCIAL_STEPS.cash)).toMatchObject({
+      action: "skip",
+    });
+    expect(byKey.get(FOUNDER_FINANCIAL_STEPS.monthlyBurn)).toMatchObject({
+      action: "submit",
+      value: { type: "RANGE", value: "40000" },
+    });
+    expect(byKey.get(FOUNDER_FINANCIAL_STEPS.runway)).toMatchObject({
+      action: "leave",
+    });
+  });
+
+  it("refuses a session whose definition has a step this build cannot present", async () => {
     const port = createFixtureRuntimePort({ storage: null, seed: "reset" });
     const unknownVersion: RuntimePort = {
       ...port,
@@ -423,8 +473,24 @@ describe("founder journey over the runtime contract", () => {
         const view = await port.current();
         return view === null
           ? null
-          : // 3 is presentable since founder v3 (a superset of v2).
-            { ...view, session: { ...view.session, definitionVersion: 99 } };
+          : // A later version is presentable unless its path holds a step
+            // this build cannot draw.
+            {
+              ...view,
+              session: { ...view.session, definitionVersion: 99 },
+              progress: {
+                ...view.progress,
+                eligibleSteps: [
+                  ...view.progress.eligibleSteps,
+                  {
+                    stepKey: "F9.unknown_question",
+                    phaseKey: "F9",
+                    required: false,
+                    status: "PENDING" as const,
+                  },
+                ],
+              },
+            };
       },
     };
     await expect(
