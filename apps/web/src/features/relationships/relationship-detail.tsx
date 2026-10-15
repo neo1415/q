@@ -107,6 +107,7 @@ export function RelationshipDetail({
   brief = null,
   fitAndInterest = null,
   work = null,
+  gateq = null,
 }: {
   readonly side: RelationshipSide;
   readonly counterpart: string;
@@ -136,6 +137,8 @@ export function RelationshipDetail({
   readonly fitAndInterest?: ReactNode;
   /** Q's work with this counterpart; null when there is none to show. */
   readonly work?: ReactNode;
+  /** GateQ applications on this relationship; null when there are none. */
+  readonly gateq?: ReactNode;
 }) {
   // The match outlives CONNECTED (relationship-state.v2).
   const connected =
@@ -273,6 +276,12 @@ export function RelationshipDetail({
                 side={side}
                 counterpart={counterpart}
               />
+            </Card>
+          )}
+
+          {gateq === null || gateq === undefined ? null : (
+            <Card title="GateQ" id="gateq">
+              {gateq}
             </Card>
           )}
 

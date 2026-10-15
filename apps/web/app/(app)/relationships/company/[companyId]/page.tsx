@@ -10,10 +10,12 @@ import {
 import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
 import {
   recordFitRead,
+  recordGateqRead,
   recordWorkRead,
 } from "@/features/relationships/record-workspace-data";
 import {
   FitAndInterest,
+  recordGateqSlot,
   recordWorkSlot,
 } from "@/features/relationships/record-workspace-sections";
 
@@ -44,6 +46,11 @@ export default async function InvestorRelationshipPage({
   if (loaded.kind === "UNAVAILABLE") {
     return <RelationshipUnavailable sentence={loaded.sentence} />;
   }
+  // GateQ applications on this relationship, by its canonical id (lane G).
+  const gateq =
+    loaded.relationship === null
+      ? null
+      : await recordGateqRead(loaded.relationship.relationshipId);
   const { relationship, own, counterpart } = loaded;
 
   // The investor's one action is expressing interest. Once it is
@@ -82,6 +89,7 @@ export default async function InvestorRelationshipPage({
         diligence={loaded.diligence}
         brief={loaded.brief}
         basePath={`/relationships/company/${loaded.companyId}`}
+        gateq={gateq === null ? null : recordGateqSlot(gateq)}
         fitAndInterest={
           <FitAndInterest
             fit={fit}

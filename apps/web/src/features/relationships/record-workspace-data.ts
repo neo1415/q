@@ -1,7 +1,14 @@
-import { getFitProfiles, listQWork } from "@capital-q/api-client";
-import type { FitProfileDto } from "@capital-q/contracts";
+import {
+  getFitProfiles,
+  getRelationshipGateqApplications,
+  listQWork,
+} from "@capital-q/api-client";
+import type {
+  FitProfileDto,
+  RelationshipGateqApplicationsDto,
+} from "@capital-q/contracts";
 
-import { qApiSession } from "@/features/q/context";
+import { apiSession, qApiSession } from "@/features/q/context";
 
 import { recordWork, type Read, type RecordWorkRow } from "./record-workspace";
 
@@ -36,6 +43,22 @@ export async function recordFitRead(
     const { items } = await getFitProfiles(session, [companyId]);
     const own = items.find((item) => item.companyId === companyId);
     return { kind: "READ", value: own?.profile ?? null };
+  } catch {
+    return { kind: "UNAVAILABLE" };
+  }
+}
+
+/** The relationship's GateQ applications, for this side (lane G's read). */
+export async function recordGateqRead(
+  relationshipId: string,
+): Promise<Read<RelationshipGateqApplicationsDto>> {
+  const session = await apiSession();
+  if (session === null) return { kind: "UNAVAILABLE" };
+  try {
+    return {
+      kind: "READ",
+      value: await getRelationshipGateqApplications(session, relationshipId),
+    };
   } catch {
     return { kind: "UNAVAILABLE" };
   }

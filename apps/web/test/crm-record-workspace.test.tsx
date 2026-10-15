@@ -7,10 +7,12 @@ import type { InterestDto, QWorkDto } from "@capital-q/contracts";
 import {
   fitState,
   interestWords,
+  recordGateq,
   recordWork,
 } from "@/features/relationships/record-workspace";
 import {
   FitAndInterest,
+  recordGateqSlot,
   recordWorkSlot,
 } from "@/features/relationships/record-workspace-sections";
 
@@ -187,5 +189,64 @@ describe("fit and interest stay separate", () => {
       />,
     );
     expect(screen.getByText("Fit not set up")).toBeDefined();
+  });
+});
+
+describe("record GateQ applications", () => {
+  const RELATIONSHIP = "e0000000-0000-4000-8000-000000000001";
+  const submitted = {
+    applicationId: "a1000000-0000-4000-8000-000000000001",
+    reference: "GQ-7",
+    gatewayName: "Seed gate",
+    status: "SUBMITTED" as const,
+    startedAt: "2026-10-01T10:00:00.000Z",
+    submittedAt: "2026-10-02T10:00:00.000Z",
+  };
+  const draft = {
+    ...submitted,
+    applicationId: "a1000000-0000-4000-8000-000000000002",
+    reference: "GQ-8",
+    gatewayName: null,
+    status: "IN_PROGRESS" as const,
+    submittedAt: null,
+  };
+
+  it("opens the exact application in an investor's inbox", () => {
+    const [row] = recordGateq(
+      { relationshipId: RELATIONSHIP, side: "INVESTOR", items: [submitted] },
+      day,
+    );
+    expect(row).toMatchObject({
+      title: "Seed gate · GQ-7",
+      status: "Submitted 2026-10-02",
+      href: `/gateq?tab=inbox&item=${submitted.applicationId}`,
+      action: "Open the dossier",
+    });
+  });
+
+  it("sends a founder to their own applications, drafts included", () => {
+    const rows = recordGateq(
+      { relationshipId: RELATIONSHIP, side: "COMPANY", items: [draft] },
+      day,
+    );
+    expect(rows[0]).toMatchObject({
+      title: "Application GQ-8",
+      status: "In progress · started 2026-10-01",
+      href: "/gateq?tab=applications",
+      action: "Continue it in your applications",
+    });
+  });
+
+  it("shows nothing for none and says an unreadable read plainly", () => {
+    expect(
+      recordGateqSlot({
+        kind: "READ",
+        value: { relationshipId: RELATIONSHIP, side: "INVESTOR", items: [] },
+      }),
+    ).toBeNull();
+    render(<>{recordGateqSlot({ kind: "UNAVAILABLE" })}</>);
+    expect(
+      screen.getByText(/GateQ applications couldn't be read/),
+    ).toBeDefined();
   });
 });

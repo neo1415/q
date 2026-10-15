@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-import type { FitProfileDto, InterestDto } from "@capital-q/contracts";
+import type {
+  FitProfileDto,
+  InterestDto,
+  RelationshipGateqApplicationsDto,
+} from "@capital-q/contracts";
 import { ArrowUpRight, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { RelationshipFitChips } from "@/features/fit/relationship-fit-chips";
@@ -9,6 +13,7 @@ import { dealDay } from "./deal-stage-strip";
 import {
   fitState,
   interestWords,
+  recordGateq,
   type Read,
   type RecordWorkRow,
 } from "./record-workspace";
@@ -129,5 +134,53 @@ export function RecordQWork({
 export function recordWorkSlot(rows: Read<readonly RecordWorkRow[]>) {
   return rows.kind === "READ" && rows.value.length === 0 ? null : (
     <RecordQWork rows={rows} />
+  );
+}
+
+/**
+ * GateQ on the record: each application on this relationship with where
+ * it stands and the one place it opens. Nothing when there are none; an
+ * unreadable read says so.
+ */
+export function recordGateqSlot(read: Read<RelationshipGateqApplicationsDto>) {
+  if (read.kind === "UNAVAILABLE") {
+    return (
+      <p className="cq-body-sm text-(--cq-text-secondary)">
+        GateQ applications couldn&apos;t be read right now.
+      </p>
+    );
+  }
+  const rows = recordGateq(read.value, dealDay);
+  if (rows.length === 0) return null;
+  return (
+    <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
+      {rows.map((row) => (
+        <li
+          key={row.key}
+          className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0"
+          data-record-gateq
+        >
+          <div className="flex min-w-0 flex-col">
+            <span className="cq-body font-medium text-(--cq-text-primary)">
+              {row.title}
+            </span>
+            <span className="cq-caption cq-numeric text-(--cq-text-secondary)">
+              {row.status}
+            </span>
+          </div>
+          <Link
+            href={row.href}
+            className="cq-body-sm inline-flex min-h-11 items-center gap-1 text-(--cq-text-primary) underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          >
+            {row.action}
+            <ArrowUpRight
+              size={ICON_SIZE.compact}
+              aria-hidden="true"
+              className="text-(--cq-text-tertiary)"
+            />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
