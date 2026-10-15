@@ -508,7 +508,7 @@ export function RelationshipDeal({
                 className="underline underline-offset-2"
                 href="/relationships?view=overview"
               >
-                Results
+                the CRM Overview
               </a>{" "}
               from the money received.
             </p>

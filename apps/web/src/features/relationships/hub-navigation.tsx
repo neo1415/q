@@ -80,9 +80,9 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
 }
 
 /**
- * Where a relationship's work continues outside the CRM (GateQ, Capital,
- * Q Work, Discover): quiet links beside the title, marked as leaving the
- * workspace. Q's control ids are unchanged.
+ * Where a relationship's work continues outside the CRM (GateQ): a quiet
+ * link beside the title, marked as leaving the workspace. Q keeps
+ * `button.hub-gateq`; the sidebar's own entries are not repeated here.
  */
 export function HubRelated({ side }: { readonly side: HubSide }) {
   const ref = useRef<HTMLElement>(null);
@@ -90,10 +90,7 @@ export function HubRelated({ side }: { readonly side: HubSide }) {
     kind: "BUTTON",
     ref,
     ids: {
-      "button.hub-discover": '[data-hub-link="discover"]',
       "button.hub-gateq": '[data-hub-link="gateq"]',
-      "button.hub-capital": '[data-hub-link="capital"]',
-      "button.hub-work": '[data-hub-link="work"]',
     },
   });
   const destinations = hubDestinations(side);

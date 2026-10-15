@@ -386,7 +386,7 @@ export function RelationshipPipeline({
                   data-pipeline-layout={entry}
                   aria-current={layout === entry ? "page" : undefined}
                   className={cx(
-                    "cq-body-sm inline-flex min-h-10 items-center rounded-[8px] px-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
+                    "cq-body-sm inline-flex min-h-10 items-center rounded-(--cq-radius-sm) px-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
                     layout === entry
                       ? "bg-(--cq-surface-strong) font-semibold text-(--cq-text-primary)"
                       : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",

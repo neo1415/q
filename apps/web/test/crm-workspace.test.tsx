@@ -180,9 +180,16 @@ describe("CRM tabs", () => {
     expect(
       manifestControls().some((entry) => entry.id === "button.hub-gateq"),
     ).toBe(true);
-    expect(
-      manifestControls().some((entry) => entry.id === "button.hub-results"),
-    ).toBe(false);
+    // Retired with the links they named (Reports merged into Overview;
+    // Discover, Capital and Q Work stay reachable from the sidebar and
+    // through open_page). The catalog no longer lists them.
+    for (const id of [
+      "button.hub-results",
+      "button.hub-discover",
+      "button.hub-capital",
+      "button.hub-work",
+    ])
+      expect(manifestControls().some((entry) => entry.id === id)).toBe(false);
   });
 });
 

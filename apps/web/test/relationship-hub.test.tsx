@@ -96,7 +96,7 @@ describe("Hub foundation", () => {
     ).toBe("SELECTED");
     expect(currentManifest()?.filters).toMatchObject({ view: "overview" });
   });
-  it("offers founder applications and Capital without investor inbox", () => {
+  it("offers founder applications without investor inbox or sidebar repeats", () => {
     render(
       <>
         <HubRelated side="COMPANY" />
@@ -108,9 +108,9 @@ describe("Hub foundation", () => {
         .getByRole("link", { name: "My applications" })
         .getAttribute("href"),
     ).toBe("/gateq?tab=applications");
-    expect(
-      screen.getByRole("link", { name: "Capital" }).getAttribute("href"),
-    ).toBe("/capital");
+    // Capital, Q Work and Discover are sidebar entries: not repeated here.
+    for (const name of ["Capital", "Q Work", "Discover"])
+      expect(screen.queryByRole("link", { name })).toBeNull();
     expect(screen.queryByRole("link", { name: "Investment inbox" })).toBeNull();
     expect(
       manifestControls().find((entry) => entry.id === "tab.relationships")
