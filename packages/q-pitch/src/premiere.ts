@@ -1360,12 +1360,21 @@ const meetingV5: SceneScript = {
   approvedClaimIds: ["MEETING-PREP-VIEW.c1"],
   actor: PILOT_ACTOR,
   expectedRoute: "/relationships/company/[companyId]",
+  // The relationship page, then its own Book a call dialog opened as a
+  // person would: a same-page #calls link is a hash-only move that the
+  // dialog never hears. Opening books nothing; times need a human click.
   actions: [
     {
-      actionId: "ta_open-booking",
+      actionId: "ta_open-relationship",
       kind: "openRecord",
-      record: "RELATIONSHIP_CALLS",
+      record: "RELATIONSHIP",
       key: "clinicrest",
+    },
+    {
+      actionId: "ta_open-booking",
+      kind: "uiAct",
+      act: "OPEN",
+      target: "dialog.book-call",
     },
   ],
   lines: [
@@ -1395,6 +1404,13 @@ const documentsV5: SceneScript = {
   approvedClaimIds: ["DOCUMENTS-VIEW.c1", "DOCUMENT-OPEN.c1"],
   actions: [
     ...documents.actions,
+    // What Q made first, so the item opened is a memo shown in place.
+    {
+      actionId: "ta_show-by-q",
+      kind: "uiAct",
+      act: "ACTIVATE",
+      target: "button.documents-by-q",
+    },
     {
       actionId: "ta_open-first-document",
       kind: "uiAct",

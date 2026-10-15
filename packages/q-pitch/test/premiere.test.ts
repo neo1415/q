@@ -143,7 +143,23 @@ describe("v5 premiere and the certification gate", () => {
     const activated = acts.flatMap((a) =>
       a.kind === "uiAct" && a.act === "ACTIVATE" ? [a.target] : [],
     );
-    expect(activated).toEqual(["button.feed-save"]);
+    // Save (reversible, private) and a list filter; never a booking button.
+    expect(activated).toEqual(["button.feed-save", "button.documents-by-q"]);
+    const meeting = PREMIERE_SCRIPT.scenes.find(
+      (s) => s.sceneId === "s.premiere.meeting",
+    );
+    expect(meeting?.actions.map((a) => a.kind)).toEqual([
+      "openRecord",
+      "uiAct",
+    ]);
+    expect(
+      meeting?.actions.some(
+        (a) =>
+          a.kind === "uiAct" &&
+          a.target === "dialog.book-call" &&
+          a.act === "OPEN",
+      ),
+    ).toBe(true);
   });
 });
 

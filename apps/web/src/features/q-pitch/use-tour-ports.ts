@@ -18,6 +18,8 @@ import {
 } from "@capital-q/q-pitch";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { openDocumentViewer } from "@/features/documents/document-ready";
+import { controlOf, registeredControlIds } from "@/features/q/control/registry";
 import {
   useQSessionOptional,
   type QSessionValue,
@@ -117,6 +119,30 @@ let actSequence = 0;
 function nextActId(): string {
   actSequence += 1;
   return `uia_qpitch${String(Date.now() % 1_000_000)}${String(actSequence)}`;
+}
+
+/**
+ * Before every move: no panel the last scene opened (notifications, a
+ * booking dialog, a memo in the viewer) is left over the next scene
+ * (lead 16 Oct). Closing is never consequential; each close is a receipted
+ * UI act, run only when something is open.
+ */
+async function closePanels(): Promise<void> {
+  openDocumentViewer(null);
+  if (
+    document.querySelector('[role="dialog"], [role="alertdialog"]') === null
+  ) {
+    return;
+  }
+  for (const id of registeredControlIds()) {
+    if (controlOf(id)?.kind !== "DIALOG") continue;
+    await performUiAct({
+      kind: "UI_ACT",
+      actId: nextActId(),
+      act: "CLOSE",
+      target: id,
+    });
+  }
 }
 
 /**
@@ -261,6 +287,7 @@ export function useTourPorts(
       signal: AbortSignal,
     ): Promise<ActionOutcome> => {
       setOpen(false);
+      await closePanels();
       const handle = requestMove({ path });
       const settled = await Promise.race([
         handle.settled,
@@ -400,7 +427,9 @@ export function useTourPorts(
         }
         case "uiAct": {
           // A page just opened may not have registered its control yet:
-          // retry a missing target briefly, never another act.
+          // retry a missing target briefly, never another act. A panel
+          // opened in place starts a scene too: the last one's goes first.
+          if (action.act === "OPEN") await closePanels();
           const until = Date.now() + UI_ACT_WAIT_MS;
           for (;;) {
             const receipt = await performUiAct({
