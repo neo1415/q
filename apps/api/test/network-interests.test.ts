@@ -15,6 +15,7 @@ import {
   InterestNotFoundError,
   relationshipPipelineScopeBinding,
   InterestNotPermittedError,
+  RelationshipPipelineQueryError,
   InterestResponseIdSchema,
   MatchIdSchema,
   RelationshipEventIdSchema,
@@ -23,6 +24,7 @@ import {
   type Interest,
   type InterestService,
   type RelationshipStatus,
+  type RelationshipPipelineQueryService,
   type RelationshipViewService,
   type RespondToInterestCommand,
 } from "@capital-q/network";
@@ -167,6 +169,8 @@ function buildApp(
     readonly brief?: RelationshipBrief | null | undefined;
     /** CRM saved views; composed only when given. */
     readonly views?: RelationshipViewService | undefined;
+    /** The pipeline read model (slice 3b); composed only when given. */
+    readonly pipeline?: RelationshipPipelineQueryService | undefined;
   } = {},
 ): {
   readonly app: FastifyInstance;
@@ -270,10 +274,15 @@ function buildApp(
     identities: { lookup: () => Promise.resolve(null) },
   };
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
-    interests:
-      options.views === undefined
-        ? interests
-        : { ...interests, relationshipViews: options.views },
+    interests: {
+      ...interests,
+      ...(options.views === undefined
+        ? {}
+        : { relationshipViews: options.views }),
+      ...(options.pipeline === undefined
+        ? {}
+        : { relationshipPipeline: options.pipeline }),
+    },
     namedPhotos,
   });
   return { app, calls, answers, reads, asked };
@@ -946,5 +955,73 @@ describe("CRM saved views HTTP boundary", () => {
     });
     expect(saved.statusCode).toBe(200);
     expect(seen[0]?.[4]).toBe(COMPANY);
+  });
+});
+
+describe("CRM pipeline read model HTTP boundary (slice 3b)", () => {
+  const url = "/v1/network/relationships/pipeline?pageSize=1";
+  const page = {
+    items: [
+      {
+        relationshipId: "a0000000-0000-4000-8000-000000000777",
+        counterpart: {
+          kind: "COMPANY" as const,
+          id: "c0000000-0000-4000-8000-000000000777",
+          name: "From the read model",
+        },
+        state: "CONNECTED" as const,
+        stateSince: "2026-10-14T01:00:00.000Z",
+        nextStep: "SCHEDULE_MEETING" as const,
+      },
+    ],
+    total: 9,
+    totalExact: false,
+    scope: "a".repeat(64),
+    nextCursor: null,
+  };
+  const pipeline = (
+    answer: () => Promise<typeof page | null>,
+  ): RelationshipPipelineQueryService => ({
+    page: answer,
+    all: () => Promise.resolve(null),
+  });
+
+  it("answers from the read model when it is ready, with the bound flagged", async () => {
+    const { app, reads } = buildApp({
+      pipeline: pipeline(() => Promise.resolve(page)),
+    });
+    const response = await app.inject({ method: "GET", url });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      total: 9,
+      totalExact: false,
+      items: [{ counterpart: { name: "From the read model" } }],
+    });
+    expect(reads).toHaveLength(0);
+  });
+
+  it("keeps the bounded path when the read model is not ready or fails", async () => {
+    for (const answer of [
+      () => Promise.resolve(null),
+      () => Promise.reject(new Error("relation does not exist")),
+    ]) {
+      const { app, reads } = buildApp({ pipeline: pipeline(answer) });
+      const response = await app.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(200);
+      expect(reads).toEqual([
+        { side: "INVESTOR_LIST", actor: CONTEXT, scanLimit: 1001 },
+      ]);
+    }
+  });
+
+  it("still refuses a bad cursor rather than falling back", async () => {
+    const { app, reads } = buildApp({
+      pipeline: pipeline(() =>
+        Promise.reject(new RelationshipPipelineQueryError()),
+      ),
+    });
+    const response = await app.inject({ method: "GET", url });
+    expect(response.statusCode).toBe(400);
+    expect(reads).toHaveLength(0);
   });
 });

@@ -1,10 +1,20 @@
-import type { RelationshipEvent, RelationshipId } from "../contracts/index.js";
+import type { RelationshipId } from "../contracts/index.js";
 import {
   projectRelationshipState,
   RELATIONSHIP_PROJECTOR_VERSION,
   type RelationshipProjection,
 } from "../domain/state-projector.js";
 import type { NetworkServiceDependencies } from "./dependencies.js";
+import { readHistory } from "./relationship-history.js";
+import { partyView } from "./relationship-status.js";
+import {
+  createPostgresRelationshipPartyStates,
+  type RelationshipPartyStateRepository,
+} from "../infrastructure/postgres-relationship-party-states.js";
+
+// Kept here too for older importers; the history read lives on its own so
+// the per-party fold (relationship-status) can use it without a cycle.
+export { readHistory } from "./relationship-history.js";
 
 /**
  * The relationship state projector at work (CQ-NET-012).
@@ -18,12 +28,12 @@ import type { NetworkServiceDependencies } from "./dependencies.js";
  * which is how a new projector version is rolled out: from history.
  */
 
-const EVENT_PAGE = 500;
-
 export type RelationshipStateProjector = {
   readonly project: (relationshipId: RelationshipId) => Promise<{
     readonly projection: RelationshipProjection | null;
     readonly changed: boolean;
+    /** The CRM pipeline read model's write; FAILED is repaired on read. */
+    readonly readModel?: "WRITTEN" | "FAILED" | undefined;
   }>;
   readonly rebuild: (options?: {
     /** Re-fold every relationship, not only those whose cache is behind. */
@@ -38,37 +48,52 @@ export type RelationshipStateProjector = {
   }>;
 };
 
-/** The whole ordered history of one relationship, page by page. */
-export async function readHistory(
-  dependencies: Pick<NetworkServiceDependencies, "sql" | "repositories">,
-  relationshipId: RelationshipId,
-): Promise<readonly RelationshipEvent[]> {
-  const out: RelationshipEvent[] = [];
-  let afterSequence = 0;
-  for (;;) {
-    const page = await dependencies.repositories.events.listByRelationship(
-      dependencies.sql,
-      relationshipId,
-      { afterSequence, limit: EVENT_PAGE },
-    );
-    out.push(...page);
-    const last = page.at(-1);
-    if (page.length < EVENT_PAGE || last === undefined) return out;
-    afterSequence = last.sequence;
-  }
-}
-
 export function createRelationshipStateProjector(
-  dependencies: Pick<NetworkServiceDependencies, "sql" | "repositories">,
+  dependencies: Pick<NetworkServiceDependencies, "sql" | "repositories"> & {
+    /** The CRM pipeline read model (slice 3b); the Postgres one by default. */
+    readonly partyStates?: RelationshipPartyStateRepository | undefined;
+  },
 ): RelationshipStateProjector {
   const { sql, repositories } = dependencies;
+  const partyStates =
+    dependencies.partyStates ?? createPostgresRelationshipPartyStates();
+
+  /**
+   * Each party's own fold for the CRM pipeline, from the same history, each
+   * compare-and-set on how far the history reached. Never fails the
+   * relationship's own projection: the read model is derived and the
+   * pipeline repairs a missing or stale row when it reads (a deployment
+   * ahead of its migration only loses the faster path).
+   */
+  async function writePartyStates(
+    relationshipId: RelationshipId,
+    history: Awaited<ReturnType<typeof readHistory>>,
+  ): Promise<"WRITTEN" | "FAILED"> {
+    try {
+      const sourceSequence = history.at(-1)?.sequence ?? 0;
+      for (const party of ["INVESTOR", "COMPANY"] as const) {
+        await partyStates.upsert(sql, {
+          relationshipId,
+          party,
+          view: partyView(history, party),
+          sourceSequence,
+          version: RELATIONSHIP_PROJECTOR_VERSION,
+        });
+      }
+      return "WRITTEN";
+    } catch {
+      return "FAILED";
+    }
+  }
 
   const project: RelationshipStateProjector["project"] = async (
     relationshipId,
   ) => {
     const history = await readHistory(dependencies, relationshipId);
+    const readModel = await writePartyStates(relationshipId, history);
     const projection = projectRelationshipState(history);
-    if (projection === null) return { projection: null, changed: false };
+    if (projection === null)
+      return { projection: null, changed: false, readModel };
     const changed = await repositories.relationships.recordProjection(sql, {
       relationshipId,
       state: projection.state,
@@ -76,7 +101,7 @@ export function createRelationshipStateProjector(
       throughSequence: projection.throughSequence,
       version: projection.version,
     });
-    return { projection, changed };
+    return { projection, changed, readModel };
   };
 
   return {

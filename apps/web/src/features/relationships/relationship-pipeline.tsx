@@ -373,8 +373,11 @@ export function RelationshipPipeline({
         </p>
       )}
       <p className="cq-caption text-(--cq-text-secondary)">
-        {String(data.items.length)} on this page · {String(data.total)} matching
-        relationships
+        {/* An upper bound until every row was checked against the reader's
+            current sight of the counterpart: said as such, never as exact. */}
+        {String(data.items.length)} on this page ·{" "}
+        {data.totalExact === false ? "up to " : ""}
+        {String(data.total)} matching relationships
       </p>
       {data.total === 0 ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
