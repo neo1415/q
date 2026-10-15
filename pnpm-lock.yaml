@@ -364,6 +364,9 @@ importers:
       '@capital-q/q-core':
         specifier: workspace:*
         version: link:../../packages/q-core
+      '@capital-q/q-pitch':
+        specifier: workspace:*
+        version: link:../../packages/q-pitch
       '@capital-q/q-specialists':
         specifier: workspace:*
         version: link:../../packages/q-specialists
@@ -2259,6 +2262,9 @@ importers:
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
     devDependencies:
       '@capital-q/config':
         specifier: workspace:*

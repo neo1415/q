@@ -163,7 +163,7 @@ function ComparisonTable({
                           ? "Meets"
                           : rule.standing === "DOES_NOT_MEET"
                             ? "Doesn't meet"
-                            : "Not answered"}{" "}
+                            : "Needs clarification"}{" "}
                         · {rule.required ? "Required" : "Preferred"}
                       </li>
                     ))
@@ -174,7 +174,7 @@ function ComparisonTable({
                           {
                             MATCH: "Meets",
                             NO_MATCH: "Doesn't meet",
-                            UNKNOWN: "Not answered",
+                            UNKNOWN: "Needs clarification",
                             NOT_APPLICABLE: "Not applicable",
                           }[rule.status]
                         }{" "}

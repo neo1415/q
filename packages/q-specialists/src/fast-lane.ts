@@ -496,3 +496,54 @@ export function dailyLaneOf(
   }
   return { questionKind: "DAILY_FOLLOW_UP" };
 }
+
+/**
+ * S2 (lane S, 2026-10-15): a plain ranking of the investor's own candidates
+ * against their own mandate ("show my top 3 companies against my mandate",
+ * "rank my top five companies", "which three companies in my feed fit my
+ * mandate best?") is recognised by code, so it no longer waits on TURN_SKIM
+ * (live 2026-10-15: 2 FAST_CLASSIFICATION calls, 1.5-2.6 s, before the same
+ * computed-fit answer). It hands over exactly what the skim's FIT lane
+ * hands over; the fit itself is still computed by the platform's
+ * deterministic fit through the tool port, never decided here.
+ *
+ * Deliberately narrow. Anything that asks for more than the ranking goes
+ * to the readers, because the computed-fit answer would drop it:
+ * - an action (draft, send, compare ...);
+ * - an explanation ("explain why", "pros and cons", risks);
+ * - a pointer at a record or a shown set ("this company", "them");
+ * - an exclusion ("except", "not");
+ * - a proper name other than a place after "in" or "from".
+ * The caller also requires their own mandate in the permitted plan.
+ */
+const FIT_RANK_SET =
+  /\b(?:companies|startups|deals|businesses|opportunities)\b/iu;
+const FIT_RANK_CUE =
+  /\b(?:top|best|strongest|highest[- ]scoring|rank|ranked|ranking)\b/iu;
+const FIT_RANK_OWN =
+  /\b(?:my|our)\s+(?:mandate|thesis|investment\s+criteria)\b|\brank\s+(?:my|our)\b|\b(?:my|our)\s+(?:top|best|strongest)\b/iu;
+const FIT_RANK_NOT =
+  /\b(?:why|explain\w*|reasons?|pros|cons|risks?|research\w*|memo|deck|brief|diligence|not|don'?t|except|excluding|other\s+than|besides|without|this|that|these|those|them|it|its|their|they|then|also|after|before|tell\s+me\s+about|what\s+(?:does|do|is|are)\s+\w+\s+do)\b/iu;
+const FIT_RANK_PLACE =
+  /\b(?:in|from|based\s+in|out\s+of)\s+[A-Z][\p{L}'’-]*(?:\s+[A-Z][\p{L}'’-]*){0,2}/gu;
+
+export function fitRankingLaneOf(utterance: string): FastLane | null {
+  const text = utterance.trim().replace(/[’]/gu, "'");
+  if (text.length === 0 || text.length > 160) return null;
+  // One ask: a second sentence or clause is the readers' to read.
+  if (/[.!?;].*\S/u.test(text.replace(/[.!?]+$/u, ""))) return null;
+  if (ACTION_WORDS.test(text) || FIT_RANK_NOT.test(text)) return null;
+  if (!FIT_RANK_SET.test(text) || !FIT_RANK_CUE.test(text)) return null;
+  if (!FIT_RANK_OWN.test(text)) return null;
+  // A proper name (a company, a person) beyond the first word, "I", "Q"
+  // or a place filter means the ask is about someone in particular.
+  const rest = text
+    .replace(FIT_RANK_PLACE, " ")
+    .slice(1)
+    .replace(/\b(?:I|Q|I'm|I'd)\b/gu, " ");
+  if (/\p{Lu}/u.test(rest)) return null;
+  return {
+    questionKind: "FIT",
+    fitQuestion: { text: text.slice(0, 1_000), count: null, previous: false },
+  };
+}

@@ -426,8 +426,8 @@ export function RehearsalLobby({
         interviewers.videoAvailable ? null : (
           <div role="alert" className="flex flex-col items-start gap-2">
             <p>
-              Video is not available for this account. No video room has been
-              started.
+              Video interviews aren&apos;t switched on for this account right
+              now. No video room has been started.
             </p>
             <Button variant="secondary" onClick={() => setMeetBy("VOICE")}>
               Use voice instead

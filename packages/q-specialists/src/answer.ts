@@ -107,6 +107,7 @@ import {
   type PreparedFollowUpPort,
   investorDiscoveryLaneOf,
   dailyLaneOf,
+  fitRankingLaneOf,
   type KnownEntityMatcher,
 } from "./fast-lane.js";
 
@@ -293,6 +294,7 @@ import {
   cardsOnScreen,
   ordinalOf,
   pageRequestOf,
+  takenBack,
   wordsNamePage,
 } from "./page-request.js";
 import {
@@ -2435,6 +2437,46 @@ export function createSpecialistQAnswer(
     investorDiscoveryLaneOf(utterance) ??
     dailyLaneOf(utterance, lastAnswerShowedCards(history));
 
+  /**
+   * The permitted plan binds their own investor mandate to this actor, run
+   * and tenant (only an owner receives it). A routing condition only: it
+   * grants nothing; the delegate still reads through the same plan.
+   */
+  const ownMandateInPlan = (request: QAnswerRequest): boolean =>
+    request.actor.organisationId !== undefined &&
+    request.plan.actor.organisationId === request.actor.organisationId &&
+    request.plan.actor.userId === request.actor.userId &&
+    request.plan.tenantId === request.tenantId &&
+    request.plan.runId === request.runId &&
+    request.plan.scopes.some(
+      (scope) =>
+        scope.kind === "INVESTOR_MANDATE" &&
+        scope.subject?.kind === "INVESTOR_ORGANISATION" &&
+        scope.subject.investorOrganisationId ===
+          scope.filter.investorOrganisationId &&
+        scope.filter.tenantId === request.tenantId,
+    );
+
+  /** S2: a plain fit ranking, only over their own firewall-bound mandate. */
+  const ownFitRankingOf = (request: QAnswerRequest, text: string) => {
+    const lane = fitRankingLaneOf(text);
+    return lane !== null && ownMandateInPlan(request) ? lane : null;
+  };
+
+  /**
+   * S2: words that code answers before any reading -- a page by its name,
+   * a bare screen command, a cards request, a plain fit ranking. The early
+   * skim and turn reading are not begun for them (live 2026-10-15: 64 of
+   * 70 runs that only navigated still paid 1-2 classification calls).
+   * Words only, so this can never widen what is answered; when a code lane
+   * then declines (a page not navigable here), the reading is made later.
+   */
+  const codeAnswersWords = (text: string): boolean =>
+    (pageRequestOf(text) !== null && !takenBack(text)) ||
+    screenActOf(text) !== null ||
+    cardsLaneOf(text) !== null ||
+    fitRankingLaneOf(text) !== null;
+
   /** A follow-up about a prepared entity, composed by code; null if none. */
   const preparedFollowUpOf = (
     utterance: string,
@@ -2468,6 +2510,7 @@ export function createSpecialistQAnswer(
       // An instant known-entity lookup is answered by code: no reading.
       if (instantLaneOf(latest.content, history) !== null) return null;
       if (preparedFollowUpOf(latest.content, history) !== null) return null;
+      if (codeAnswersWords(latest.content)) return null;
       // K fast lane: the short first read starts as early as the reading.
       if (dependencies.turnSkim !== undefined && !preskims.has(input.runId)) {
         preskims.set(input.runId, {
@@ -2786,20 +2829,8 @@ export function createSpecialistQAnswer(
       request.askedAction === undefined &&
       (request.turnKind === undefined ||
         request.turnKind === "QUESTION_TO_Q") &&
-      request.actor.organisationId !== undefined &&
       asksForOwnMandate(latest.content) &&
-      request.plan.actor.organisationId === request.actor.organisationId &&
-      request.plan.actor.userId === request.actor.userId &&
-      request.plan.tenantId === request.tenantId &&
-      request.plan.runId === request.runId &&
-      request.plan.scopes.some(
-        (scope) =>
-          scope.kind === "INVESTOR_MANDATE" &&
-          scope.subject?.kind === "INVESTOR_ORGANISATION" &&
-          scope.subject.investorOrganisationId ===
-            scope.filter.investorOrganisationId &&
-          scope.filter.tenantId === request.tenantId,
-      )
+      ownMandateInPlan(request)
     ) {
       // A sequence may have begun on another instance. Load the existing
       // durable core before deciding this recall can skip its turn reader.
@@ -2831,7 +2862,9 @@ export function createSpecialistQAnswer(
       request.plan.screen?.route !== "ONBOARDING" &&
       !sequences.has(conversationId)
     ) {
-      const instant = instantLaneOf(latest.content, history);
+      const instant =
+        instantLaneOf(latest.content, history) ??
+        ownFitRankingOf(request, latest.content);
       if (instant !== null) {
         const capabilities = await capabilitiesOf(request);
         logger?.info(
@@ -2840,7 +2873,9 @@ export function createSpecialistQAnswer(
             lane:
               instant.questionKind === "DISCOVER_INVESTORS"
                 ? "INVESTOR_DISCOVERY"
-                : "KNOWN_ENTITY",
+                : instant.questionKind === "FIT"
+                  ? "FIT_BY_CODE"
+                  : "KNOWN_ENTITY",
           },
           "q fast lane",
         );

@@ -37,6 +37,7 @@ import {
   RESEARCH_NOTE,
   type QUserStatementRecorder,
 } from "../src/q/index.js";
+import { publicResearchFollowUp } from "../src/q/research-follow-up.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 
 /**
@@ -1264,5 +1265,226 @@ describe("a refused structured tool round keeps the tools", () => {
     );
     expect(retried).toBeDefined();
     expect(messages.at(-1)?.content).toContain("Ajopot raised a seed round.");
+  });
+});
+
+describe("sourced public research follow-up continuity", () => {
+  function priorResearch(titles = ["Northstar Aviation"]) {
+    const run = build({
+      script: [],
+      userText:
+        "So what are they doing that I am not? Find market gaps and opportunities.",
+      subjects: [],
+    });
+    const latest = run.messages[0];
+    if (latest === undefined) throw new Error("Latest question missing");
+    const oldRun = randomUUID() as QConversationMessage["runId"];
+    const asked: QConversationMessage = {
+      ...latest,
+      runId: oldRun,
+      content:
+        "Search online for Northstar Aviation's actual competitors in Nigeria, Africa and globally.",
+    };
+    const answer: QConversationMessage = {
+      ...asked,
+      role: "Q",
+      content:
+        "Public sources describe the business; competitor evidence is incomplete.",
+      blocks: titles.map((title) => ({
+        kind: "PUBLIC_SOURCE",
+        title,
+        url: "https://northstar.example/about",
+        domain: "northstar.example",
+        publishedOn: null,
+        retrievedOn: "2026-10-14T07:00:00.000Z",
+      })),
+    };
+    return { run, asked, answer };
+  }
+
+  it("anchors the fallback in an immediately preceding sourced, user-named public business", async () => {
+    const tools = toolPort([GET_COMPANY, RESEARCH], (proposal) =>
+      researchOutcome(proposal, "Unverified public pages."),
+    );
+    const { run, asked, answer } = priorResearch();
+    run.messages.unshift(asked, answer);
+    const active = build({
+      tools: tools.port,
+      subjects: [],
+      userText: run.messages.at(-1)?.content,
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "g1",
+              name: "get_company",
+              arguments: { companyId: "x" },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(
+            "A supported partial comparison with missing evidence disclosed.",
+          ),
+        },
+      ],
+    });
+    active.messages.unshift(asked, answer);
+    await active.seam.answer({
+      ...active.request,
+      research: Promise.resolve({
+        mode: "EXPLICIT",
+        announceSourceChange: false,
+      }),
+    });
+    const call = tools.executed.find(
+      (entry) => entry.proposal.callId === "q-research",
+    );
+    expect(call?.proposal.arguments).toEqual({
+      target: "GENERAL",
+      entityName: "Northstar Aviation",
+      query: `Northstar Aviation competitors ${run.messages.at(-1)?.content}`,
+      maxSources: 4,
+    });
+    expect(call?.context.conversation?.earlierUserText).toContain(
+      asked.content,
+    );
+  });
+
+  it("does not bypass the current research tool offer when public research is unavailable", async () => {
+    const tools = toolPort([GET_COMPANY], (proposal) =>
+      researchOutcome(proposal, "No web call was authorized."),
+    );
+    const { asked, answer } = priorResearch();
+    const active = build({
+      tools: tools.port,
+      subjects: [],
+      userText: "What are they doing that I am not?",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "g1",
+              name: "get_company",
+              arguments: { companyId: "x" },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(
+            "Current public research is unavailable; the comparison remains incomplete.",
+          ),
+        },
+      ],
+    });
+    active.messages.unshift(asked, answer);
+    await active.seam.answer({
+      ...active.request,
+      research: Promise.resolve({
+        mode: "EXPLICIT",
+        announceSourceChange: false,
+      }),
+    });
+    expect(
+      tools.executed.some(
+        (entry) => entry.proposal.name === "research_public_web",
+      ),
+    ).toBe(false);
+  });
+
+  it.each([
+    ["new named target", true, false],
+    ["changed selected company", false, true],
+  ])(
+    "does not carry stale research into %s",
+    (_label, aboutNamedOther, selectedCompany) => {
+      const { asked, answer } = priorResearch();
+      expect(
+        publicResearchFollowUp({
+          history: [asked, answer],
+          question: "Compare their competitors",
+          aboutNamedOther,
+          selectedCompany,
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it("never promotes a source title that the person did not name", () => {
+    const { asked, answer } = priorResearch(["Unrelated Business"]);
+    expect(
+      publicResearchFollowUp({
+        history: [asked, answer],
+        question: "What are they doing?",
+        aboutNamedOther: false,
+        selectedCompany: false,
+      }),
+    ).toBeNull();
+  });
+
+  it("refuses ambiguous public names and intervening conversation", () => {
+    const { asked, answer } = priorResearch([
+      "Northstar Aviation",
+      "Other Business",
+    ]);
+    const input = {
+      question: "What are they doing?",
+      aboutNamedOther: false,
+      selectedCompany: false,
+    };
+    expect(
+      publicResearchFollowUp({
+        ...input,
+        history: [
+          {
+            ...asked,
+            content: `${asked.content} Also research Other Business.`,
+          },
+          answer,
+        ],
+      }),
+    ).toBeNull();
+    expect(
+      publicResearchFollowUp({
+        ...input,
+        history: [
+          asked,
+          answer,
+          {
+            ...asked,
+            runId: RUN as QConversationMessage["runId"],
+            content: "Different topic",
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it("requires an actual PUBLIC_SOURCE and the matching previous user run", () => {
+    const { asked, answer } = priorResearch();
+    const input = {
+      question: "What are they doing?",
+      aboutNamedOther: false,
+      selectedCompany: false,
+    };
+    expect(
+      publicResearchFollowUp({
+        ...input,
+        history: [asked, { ...answer, blocks: [] }],
+      }),
+    ).toBeNull();
+    expect(
+      publicResearchFollowUp({
+        ...input,
+        history: [
+          { ...asked, runId: RUN as QConversationMessage["runId"] },
+          answer,
+        ],
+      }),
+    ).toBeNull();
   });
 });

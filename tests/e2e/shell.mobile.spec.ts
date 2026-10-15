@@ -81,7 +81,7 @@ test.describe("mobile application shell", () => {
     );
 
     // Every tab is a comfortable touch target.
-    for (const name of ["Q", "Discover", "Capital", "Relationships"]) {
+    for (const name of ["Q", "Discover", "Capital", "CRM"]) {
       const box = await nav.getByRole("link", { name }).boundingBox();
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
       expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);

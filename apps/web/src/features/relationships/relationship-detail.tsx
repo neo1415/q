@@ -104,6 +104,8 @@ export function RelationshipDetail({
   media = null,
   diligence = null,
   brief = null,
+  fitAndInterest = null,
+  work = null,
 }: {
   readonly side: RelationshipSide;
   readonly counterpart: string;
@@ -129,6 +131,10 @@ export function RelationshipDetail({
   readonly diligence?: DiligenceDto | null | undefined;
   /** The Relationship Brief (R1): the same read Q answers from. */
   readonly brief?: RelationshipBrief | null | undefined;
+  /** An investor's fit and interest, kept apart (CRM record workspace). */
+  readonly fitAndInterest?: ReactNode;
+  /** Q's work with this counterpart; null when there is none to show. */
+  readonly work?: ReactNode;
 }) {
   // The match outlives CONNECTED (relationship-state.v2).
   const connected =
@@ -265,6 +271,12 @@ export function RelationshipDetail({
             </Card>
           )}
 
+          {work === null || work === undefined ? null : (
+            <Card title="Q Work" id="q-work">
+              {work}
+            </Card>
+          )}
+
           {relationship === null ? null : (
             <RelationshipMail
               relationshipId={relationship.relationshipId}
@@ -379,6 +391,12 @@ export function RelationshipDetail({
               )}
             </DockAvoidZone>
           </Card>
+
+          {fitAndInterest === null || fitAndInterest === undefined ? null : (
+            <Card title="Fit and interest" id="fit">
+              {fitAndInterest}
+            </Card>
+          )}
 
           <Card
             className="max-lg:order-last"

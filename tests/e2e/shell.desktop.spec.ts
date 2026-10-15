@@ -46,8 +46,8 @@ test.describe("desktop application shell", () => {
       page.getByRole("heading", { name: "Capital", level: 1 }),
     ).toBeVisible();
 
-    // Relationships is top-level (R27).
-    await nav.getByRole("link", { name: "Relationships" }).click();
+    // CRM (the relationship workspace) is top-level (R27; 2026-10-15).
+    await nav.getByRole("link", { name: "CRM" }).click();
     await expect(page).toHaveURL(/\/relationships$/);
     await expect(
       page.getByRole("heading", { name: "Relationships", level: 1 }),

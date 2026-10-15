@@ -508,7 +508,7 @@ export function triage(
           applicationId: item.applicationId,
           companyName: item.companyName,
           propose: "ASK_FOR_MORE" as const,
-          why: `${item.rules.unknown} of your rules ${item.rules.unknown === 1 ? "is" : "are"} unanswered; unknown is not a no.`,
+          why: `${item.rules.unknown} of your rules ${item.rules.unknown === 1 ? "is" : "are"} not yet established; an unclear rule is not a rejection.`,
           suggestedReason: null,
         };
       }

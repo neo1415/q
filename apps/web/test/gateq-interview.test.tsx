@@ -170,6 +170,55 @@ describe("founder interview and review", () => {
     ).toBeTruthy();
     expect(calls.submit).not.toHaveBeenCalled();
   });
+  it("shows what is recorded and still needed beside the interview, only from the server's coverage", async () => {
+    await mount();
+    const panel = screen.getByRole("complementary", {
+      name: "What we have, what's still needed",
+    });
+    expect(panel.textContent).toContain("Clinic billing");
+    expect(panel.textContent).toContain("Your answer");
+    expect(panel.textContent).toContain("Revenue");
+    expect(panel.textContent).toContain("Revenue figures differ");
+    expect(panel.textContent).toContain("Saved: 1 answered, 1 still needed");
+    // A sent answer is not shown as recorded until the server says so.
+    calls.turn.mockResolvedValueOnce({ ok: true, application, reply: null });
+    calls.progress.mockResolvedValueOnce({
+      ok: true,
+      application,
+      transcript: { turns },
+      coverage: {
+        ...coverage,
+        coverage: {
+          ...coverage.coverage,
+          answered: [
+            ...coverage.coverage.answered,
+            {
+              dimension: "REVENUE",
+              group: "TRACTION",
+              label: "Revenue",
+              summary: "40000 USD a month",
+              provenance: "APPLICANT_PROVIDED",
+            },
+          ],
+          missing: [],
+          contradictions: [],
+        },
+      },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Your answer" }), {
+      target: { value: "About 40k a month" },
+    });
+    await press("Send");
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(calls.progress).toHaveBeenCalledTimes(2);
+    expect(panel.textContent).toContain("40000 USD a month");
+    expect(panel.textContent).toContain("Saved: 2 answered, 0 still needed");
+    // Self-reported revenue is flagged for evidence, never shown as verified.
+    expect(panel.textContent).toContain("A document would support");
+    expect(panel.textContent).not.toMatch(/verified/i);
+  });
   it("retries the same answer with its original turn ID and blocks a changed answer", async () => {
     calls.turn
       .mockResolvedValueOnce({ ok: false, message: "Connection interrupted." })

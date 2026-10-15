@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { publicResearchFollowUp } from "./research-follow-up.js";
+
 import { z } from "zod";
 
 import {
@@ -120,6 +122,14 @@ import {
   type DiscoverAsk,
   type DiscoveryAnswer,
 } from "./discover-companies.js";
+import {
+  companyFactAskOf,
+  companyNameCandidates,
+  readNamedVisibleCompany,
+  runNamedCompanyFact,
+  type CompanyFactAnswer,
+  type CompanyFactAsk,
+} from "./named-company-fact.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
 import {
   runInvestorDiscovery,
@@ -2277,6 +2287,15 @@ export function createModelGatewayQAnswer(
             fitSweepAskOfReading(fitQuestion, shownBefore, namedComparison),
           )
         : Promise.resolve(null);
+    // S2b: one declared profile fact about a company named outright, read
+    // by code through the same tools and plan (search, then get).
+    const factFor = (ask: CompanyFactAsk): Promise<CompanyFactAnswer | null> =>
+      runNamedCompanyFact({
+        ask,
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+      }).catch(() => null);
     // K1: companies of a kind, from the catalog by code, through the same
     // tools and plan; fit only for an investor and only when asked for.
     const discoverFor = (ask: DiscoverAsk): Promise<DiscoveryAnswer | null> =>
@@ -2448,6 +2467,8 @@ export function createModelGatewayQAnswer(
      */
     const namedCompanies: AuthorisedFact[] = [];
     const namedCompanyCalls: QToolCallObservation[] = [];
+    /** Companies the own-records read above took, so none is read twice. */
+    const namedIds = new Set<string>();
     const namedRead = async (): Promise<void> => {
       const standingCall = standingOf();
       if (standingCall === null || !prefetchTools.has("get_company")) return;
@@ -2460,6 +2481,7 @@ export function createModelGatewayQAnswer(
         `${latest.content}\n${lastQ?.content.slice(0, 4_000) ?? ""}`,
         knownCompaniesOf(standing.result.data),
       ).filter((company) => company.companyId !== onScreen);
+      for (const company of named) namedIds.add(company.companyId);
       await Promise.all(
         named.map(async (company, index) => {
           const call = {
@@ -2483,6 +2505,53 @@ export function createModelGatewayQAnswer(
           if (fact !== null) namedCompanies.push(fact);
         }),
       );
+    };
+    /**
+     * S3a (lane S, live 2026-10-15): a company this turn names that is none
+     * of their own records ("tell me about Baridi", "risks with
+     * Ledgerfold") cost the model two tool rounds (company.search, then
+     * company.get, ~1.5-2.5 s each) before its first sentence. It is read
+     * here instead, through the same two tools and plan: only an exact,
+     * single visible match, after their own records (never twice), and
+     * only when no record is on screen, so "this company" stays the one
+     * they are looking at.
+     */
+    const visibleNamedRead = async (own: Promise<void>): Promise<void> => {
+      if (counterparty !== undefined) return;
+      const names = companyNameCandidates(latest.content);
+      if (names.length === 0) return;
+      const found = await Promise.all(
+        names.map((name, index) =>
+          readNamedVisibleCompany({
+            name,
+            exclude: new Set(),
+            tools,
+            context: toolContext,
+            available: prefetchTools,
+            callIndex: index,
+          }).catch(() => null),
+        ),
+      );
+      await own.catch(() => undefined);
+      for (const read of found) {
+        if (read === null) continue;
+        for (const { providerName, outcome } of read.calls) {
+          namedCompanyCalls.push({
+            toolName: outcome.toolName,
+            providerName,
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          });
+        }
+        if (namedIds.has(read.companyId)) continue;
+        namedIds.add(read.companyId);
+        const fact = onScreenCompanyFact(
+          read.data,
+          "A company on Capital Q this turn names",
+        );
+        if (fact !== null) namedCompanies.push(fact);
+      }
     };
     /**
      * The Q Daily on their screen, read for them (founder live
@@ -2787,11 +2856,13 @@ export function createModelGatewayQAnswer(
     const wide = (): Promise<WideReads> => {
       wideRead ??= (async (): Promise<WideReads> => {
         const wideStarted = Date.now();
+        const ownNamed = namedRead();
         await Promise.all([
           timed("standing", standingDone()),
           timed("index", indexDone()),
           timed("onboarding", onboardingRead()),
-          timed("named", namedRead()),
+          timed("named", ownNamed),
+          timed("named-visible", visibleNamedRead(ownNamed)),
           timed("day", dayRead()),
           timed("arrival", arrivalRead()),
         ]);
@@ -2853,6 +2924,7 @@ export function createModelGatewayQAnswer(
       fitSweep,
       sweptAtPrepare: sweepAsk !== null,
       discoverFor,
+      factFor,
       personFor,
       investorsFor,
       sweepForReading,
@@ -2957,12 +3029,20 @@ export function createModelGatewayQAnswer(
         fitSweep,
         sweptAtPrepare,
         discoverFor,
+        factFor,
         personFor,
         investorsFor,
         sweepForReading,
         attention,
         counterparty,
       } = prepared;
+      // S2b: one declared profile fact about a company named outright.
+      const companyFactAsk =
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+          ? companyFactAskOf(latest.content)
+          : null;
       // Grows only by what use_capability loads (lead 2026-10-04).
       let toolContext = preparedToolContext;
       took(warmed === undefined ? "prepare-reads" : "prepare-reads-warmed");
@@ -3060,7 +3140,8 @@ export function createModelGatewayQAnswer(
       // below before the model is asked.
       const personByCode =
         (request.personSearch !== undefined ||
-          request.discoverInvestors !== undefined) &&
+          request.discoverInvestors !== undefined ||
+          companyFactAsk !== null) &&
         request.writingDocument !== true &&
         request.askedAction === undefined &&
         (request.turnKind === undefined ||
@@ -3961,6 +4042,37 @@ export function createModelGatewayQAnswer(
               totalMs: Date.now() - startedAt,
             },
             "q answered a person search",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+      }
+      // S2b (live 2026-10-15: 8-13 s, 3-4 model calls for one field): a
+      // basic profile fact about a company named outright, from its own
+      // declared profile, said as declared. Null (not exactly one visible
+      // company, or not admitted): the full path answers.
+      if (companyFactAsk !== null) {
+        const factStarted = Date.now();
+        const fact = await factFor(companyFactAsk);
+        if (fact !== null) {
+          const message = await persistAnswer(fact.text, [
+            { kind: "COMPANY_REFERENCE", companyId: fact.companyId },
+          ]);
+          logger?.info(
+            {
+              qRunId: request.runId,
+              aspect: companyFactAsk.aspect,
+              toolCalls: fact.calls.length,
+              modelCalls: 0,
+              prepareMs: prepared.prepareMs,
+              factMs: Date.now() - factStarted,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered a company fact from its declared profile",
           );
           return {
             kind: "ANSWERED",
@@ -4893,12 +5005,20 @@ export function createModelGatewayQAnswer(
           ) {
             await stageShown(researchTool.visibleStage);
           }
+          const followUp = publicResearchFollowUp({
+            history: earlier,
+            question: latest.content,
+            aboutNamedOther: request.aboutNamedOther === true,
+            selectedCompany: request.subjects.some(
+              (subject) => subject.kind === "COMPANY",
+            ),
+          });
           const call = {
             callId: "q-research",
             name: "research_public_web",
             // The service plans further phrasings from the person's words.
             arguments: {
-              query: latest.content.trim().slice(0, 200),
+              ...(followUp ?? { query: latest.content.trim().slice(0, 200) }),
               // Enough pages to answer from, not only to compare.
               maxSources: prospectsThin ? 5 : 4,
             },

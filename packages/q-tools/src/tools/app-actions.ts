@@ -10,6 +10,7 @@ import {
   readOwn,
   resolveReference,
   type AnyAppAction,
+  type AppActionReading,
   type AppActionContext,
   type OwnReadKind,
   type OwnReadPorts,
@@ -65,6 +66,34 @@ export const AppToolOutputSchema = z
     status: z.enum(["DONE", "PREPARED", "ONE_PER_TURN", "NOT_DONE"]),
     /** What to tell the person, from the action's own words. */
     says: z.string().max(600),
+    /** Only a successful READ may provide this server-derived context. */
+    reading: z
+      .object({
+        v: z.literal(1),
+        subject: z
+          .object({
+            kind: z.literal("GATEQ_SUBMISSION"),
+            gatewayId: z.string().uuid(),
+            applicationId: z.string().uuid(),
+            reference: z.string().min(1).max(64),
+            submittedAt: z.string().datetime(),
+            dossierSchemaVersion: z.literal("gateq-dossier.v1").nullable(),
+          })
+          .strict(),
+        text: z.string().max(14_000),
+        sources: z
+          .array(
+            z
+              .object({
+                factId: z.string().uuid(),
+                transcriptSeq: z.number().int().min(1).nullable(),
+              })
+              .strict(),
+          )
+          .max(64),
+      })
+      .strict()
+      .optional(),
     /**
      * PREPARED: the card's own summary. The engine says the card's status
      * after the turn, so a caller can leave it to that one line.
@@ -332,12 +361,64 @@ function toolFor(
         };
       }
       const out = await action.run(own, grant.context, grant.canonical);
+      const succeeded = action.succeeded?.(out) ?? true;
+      const reading =
+        action.classification === "READ" && succeeded
+          ? action.reading?.(out, grant.canonical)
+          : undefined;
       return {
-        status: (action.succeeded?.(out) ?? true) ? "DONE" : "NOT_DONE",
+        status: succeeded ? "DONE" : "NOT_DONE",
         says: action.done(out, grant.canonical, grant.names),
+        ...(reading === undefined ? {} : { reading: boundedReading(reading) }),
       };
     },
   });
+}
+
+/** The output schema caps cited sources; a large dossier must not fail the whole read. */
+const MAX_READING_SOURCES = 64;
+
+function citedSources(
+  sources: AppActionReading["sources"],
+  text: string,
+): AppActionReading["sources"][number][] {
+  const seen = new Set<string>();
+  const kept: AppActionReading["sources"][number][] = [];
+  for (const source of sources) {
+    if (kept.length === MAX_READING_SOURCES) break;
+    if (seen.has(source.factId) || !text.includes(source.factId)) continue;
+    seen.add(source.factId);
+    kept.push(source);
+  }
+  return kept;
+}
+
+/** Keep complete evidence lines; disclose omissions instead of cutting a claim. */
+function boundedReading(
+  reading: AppActionReading,
+): NonNullable<z.infer<typeof AppToolOutputSchema>["reading"]> {
+  if (reading.text.length <= 14_000)
+    return { ...reading, sources: citedSources(reading.sources, reading.text) };
+  const lines: string[] = [];
+  let used = 0;
+  let omitted = 0;
+  for (const line of reading.text.split("\n")) {
+    if (used + line.length + 1 > 13_700) {
+      omitted++;
+      continue;
+    }
+    lines.push(line);
+    used += line.length + 1;
+  }
+  lines.push(
+    `${omitted} complete lines exceeded the reading budget. Consult the submitted dossier before answering about omitted information.`,
+  );
+  const text = lines.join("\n");
+  return {
+    ...reading,
+    text,
+    sources: citedSources(reading.sources, text),
+  };
 }
 
 export const READ_MY = "app.own.read" as const;

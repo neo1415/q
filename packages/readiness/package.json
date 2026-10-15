@@ -24,7 +24,8 @@
   "dependencies": {
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
-    "@capital-q/security": "workspace:*"
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@capital-q/config": "workspace:*",

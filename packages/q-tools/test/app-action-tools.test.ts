@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ownIndex } from "@capital-q/app-actions";
+import { ownIndex, type AppActionPorts } from "@capital-q/app-actions";
 import type { PermittedContextPlan } from "@capital-q/contracts";
 import type { InteractionSignalService } from "@capital-q/discovery";
 import type { MediaAsset } from "@capital-q/media";
@@ -128,10 +128,204 @@ function world(options: { refuse?: boolean } = {}) {
   return { executor, decided, prepared };
 }
 
+type GateqInboxPort = NonNullable<AppActionPorts["gateqInbox"]>;
+
 const call = (name: string, args: Record<string, unknown>) => ({
   callId: `c-${name}`,
   name,
   arguments: args,
+});
+
+describe("the selected GateQ application's authorized reading", () => {
+  function selectedContext(actor = actorA) {
+    const plan = ownPlan(actor);
+    return contextFor(actor, {
+      ...plan,
+      purpose: { ...plan.purpose, taskClass: "RELATIONSHIP_QUESTION" },
+    });
+  }
+  const applicationId = "55555555-0000-4000-8000-0000000000a2";
+  const gatewayId = "55555555-0000-4000-8000-0000000000a3";
+  const longFact = {
+    label: "Description",
+    summary: "Waterworks uses metered kiosks. ".repeat(30),
+    truthClass: "USER_CLAIM",
+    evidenceStatus: "SELF_REPORTED",
+    provenance: "APPLICANT_PROVIDED",
+    sourceFactId: applicationId,
+    sourceTurnSeq: 2,
+  };
+  function selected(refused = false, facts: readonly object[] = [longFact]) {
+    let revoked = false;
+    const reads: { actor: string; gatewayId: string; applicationId: string }[] =
+      [];
+    const gateqInbox = {
+      ownGatewayId: () => Promise.resolve(gatewayId),
+      detail: (actor, gateway, application) => {
+        reads.push({
+          actor: actor.userId,
+          gatewayId: gateway,
+          applicationId: application,
+        });
+        return Promise.resolve(
+          refused || revoked || actor.userId !== actorA.userId
+            ? { ok: false as const }
+            : ({
+                item: {
+                  applicationId,
+                  companyName: "Waterworks",
+                  reference: "ga_waterworks",
+                  submittedAt: "2026-10-14T13:12:00.000Z",
+                  oneLiner: "Water sold by the litre",
+                  fit: "FITS",
+                },
+                answers: [],
+                rules: [],
+                note: null,
+                shared: [],
+                notes: [],
+                messages: [],
+                dossier: {
+                  schemaVersion: "gateq-dossier.v1",
+                  application: {
+                    reference: "ga_waterworks",
+                    submittedAt: "2026-10-14T13:12:00.000Z",
+                  },
+                  dimensions: [
+                    {
+                      group: "COMPANY",
+                      facts,
+                    },
+                  ],
+                  unknowns: [],
+                  declined: [],
+                  missing: [{ label: "Revenue evidence" }],
+                  contradictions: [],
+                },
+              } as never),
+        );
+      },
+      findApplication: () =>
+        Promise.reject(new Error("Exact ids must not resolve by company name")),
+    } satisfies Pick<
+      GateqInboxPort,
+      "ownGatewayId" | "detail" | "findApplication"
+    >;
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({
+            appActions: { gateqInbox: gateqInbox as unknown as GateqInboxPort },
+          }),
+        ),
+      ),
+    });
+    return {
+      executor,
+      reads,
+      revoke: () => {
+        revoked = true;
+      },
+    };
+  }
+  it("keeps long source-linked findings outside the short receipt contract", async () => {
+    const { executor, reads } = selected();
+    const out = await executor.execute(
+      call("gateq_inbox_summarise", { applicationId }),
+      selectedContext(),
+    );
+    if (!out.result.ok) throw new Error(JSON.stringify(out.result.error));
+    expect(out.result).toMatchObject({
+      ok: true,
+      data: {
+        status: "DONE",
+        reading: {
+          v: 1,
+          subject: { applicationId, gatewayId, reference: "ga_waterworks" },
+        },
+      },
+    });
+    expect(reads).toEqual([{ actor: actorA.userId, gatewayId, applicationId }]);
+    if (!out.result.ok) throw new Error("Read failed");
+    const data = out.result.data as { says: string; reading: { text: string } };
+    expect(data.says.length).toBeLessThanOrEqual(600);
+    expect(data.reading.text.length).toBeGreaterThan(600);
+    expect(data.reading.text).toContain("sourceTurnSeq=2");
+    expect(data.reading.text).toContain(
+      "truth=USER_CLAIM; evidence=SELF_REPORTED",
+    );
+    expect(data.reading.text).toContain("Missing: Revenue evidence");
+    expect(out.result.data).toMatchObject({
+      reading: { sources: [{ factId: applicationId, transcriptSeq: 2 }] },
+    });
+  });
+  it("a dossier with more findings than the source cap still yields a valid bounded reading", async () => {
+    const many = Array.from({ length: 90 }, (_, index) => ({
+      label: `F${index}`,
+      summary: "ok",
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "SELF_REPORTED",
+      provenance: "APPLICANT_PROVIDED",
+      sourceFactId: `55555555-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      sourceTurnSeq: index + 1,
+    }));
+    const { executor } = selected(false, many);
+    const out = await executor.execute(
+      call("gateq_inbox_summarise", { applicationId }),
+      selectedContext(),
+    );
+    if (!out.result.ok) throw new Error(JSON.stringify(out.result.error));
+    const data = out.result.data as {
+      status: string;
+      reading: { sources: readonly { factId: string }[] };
+    };
+    expect(data.status).toBe("DONE");
+    expect(data.reading.sources.length).toBe(64);
+    expect(new Set(data.reading.sources.map((s) => s.factId)).size).toBe(64);
+  });
+  it("retains the inbox refusal and returns no reading", async () => {
+    const { executor } = selected(true);
+    const out = await executor.execute(
+      call("gateq_inbox_summarise", { applicationId }),
+      selectedContext(),
+    );
+    expect(out.result).toMatchObject({
+      ok: true,
+      data: { status: "NOT_DONE" },
+    });
+    if (!out.result.ok) throw new Error("Read failed");
+    expect(out.result.data).not.toHaveProperty("reading");
+  });
+  it("never keeps a source reading after membership is revoked or for another investor", async () => {
+    const world = selected();
+    const first = await world.executor.execute(
+      call("gateq_inbox_summarise", { applicationId }),
+      selectedContext(),
+    );
+    expect(first.result).toMatchObject({ ok: true, data: { status: "DONE" } });
+    world.revoke();
+    for (const actor of [actorA, actorB]) {
+      const out = await world.executor.execute(
+        call("gateq_inbox_summarise", { applicationId }),
+        selectedContext(actor),
+      );
+      expect(out.result).toMatchObject({
+        ok: true,
+        data: { status: "NOT_DONE" },
+      });
+      if (!out.result.ok) throw new Error("Unexpected tool failure");
+      expect(out.result.data).not.toHaveProperty("reading");
+    }
+  });
+  it("does not attach a different returned application's facts to the requested identity", async () => {
+    const { executor } = selected();
+    const out = await executor.execute(
+      call("gateq_inbox_summarise", { applicationId: TALUM }),
+      selectedContext(),
+    );
+    if (!out.result.ok) throw new Error("Unexpected tool failure");
+    expect(out.result.data).not.toHaveProperty("reading");
+  });
 });
 
 describe("the feed's decisions, generated from the registry", () => {

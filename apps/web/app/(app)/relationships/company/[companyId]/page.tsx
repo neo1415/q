@@ -8,6 +8,14 @@ import {
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
 import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
+import {
+  recordFitRead,
+  recordWorkRead,
+} from "@/features/relationships/record-workspace-data";
+import {
+  FitAndInterest,
+  recordWorkSlot,
+} from "@/features/relationships/record-workspace-sections";
 
 export const metadata: Metadata = { title: "Relationship" };
 export const dynamic = "force-dynamic";
@@ -27,7 +35,12 @@ export default async function InvestorRelationshipPage({
   readonly params: Promise<{ readonly companyId: string }>;
 }) {
   const { companyId } = await params;
-  const loaded = await loadInvestorSideRelationship(companyId);
+  // Fit and Q's work are their own reads, made beside the relationship's.
+  const [loaded, fit, work] = await Promise.all([
+    loadInvestorSideRelationship(companyId),
+    recordFitRead(companyId),
+    recordWorkRead(companyId),
+  ]);
   if (loaded.kind === "UNAVAILABLE") {
     return <RelationshipUnavailable sentence={loaded.sentence} />;
   }
@@ -69,6 +82,17 @@ export default async function InvestorRelationshipPage({
         diligence={loaded.diligence}
         brief={loaded.brief}
         basePath={`/relationships/company/${loaded.companyId}`}
+        fitAndInterest={
+          <FitAndInterest
+            fit={fit}
+            interest={
+              own === null
+                ? { kind: "UNAVAILABLE" }
+                : { kind: "READ", value: own.interest }
+            }
+          />
+        }
+        work={recordWorkSlot(work)}
         absentSentence={loaded.absentSentence}
         media={
           loaded.pitch === null ? null : <CompanyPitch company={loaded.pitch} />
