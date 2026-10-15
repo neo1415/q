@@ -2,34 +2,26 @@ import Link from "next/link";
 
 import type {
   FitProfileDto,
-  NotificationDto,
   RelationshipSummaryDto,
-  ReminderDto,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import type { RelationshipDigest } from "./relationship-data";
 import { RelationshipsBoard } from "./relationships-board";
-import {
-  cursorOf,
-  listOrder,
-  needsYouCards,
-  pageAfter,
-} from "./relationships-view";
+import { cursorOf, listOrder, pageAfter } from "./relationships-view";
 
 /**
  * The Relationships page body (R27; founder critique 2026-10-04). One row
  * per canonical relationship with its one next step (see
- * RelationshipsBoard), "Needs you" folded to one card per relationship and
- * action, or one sentence and one way forward when there is nothing to list.
+ * RelationshipsBoard), or one sentence and one way forward when there is
+ * nothing to list. The notices queue ("Needs you") is the CRM Overview's
+ * (research 2026-10-15 §3.3), so it is not repeated here.
  */
 export function RelationshipsIndex({
   side,
   items,
   unread,
   digests = {},
-  notices = [],
-  reminders = [],
   now = readClock(),
   fits,
 }: {
@@ -40,9 +32,6 @@ export function RelationshipsIndex({
   readonly items: readonly RelationshipSummaryDto[] | undefined;
   /** R34: unread chat messages per relationship id. */
   readonly unread?: ReadonlyMap<string, number> | undefined;
-  /** BIZ-008: the person's own notices and reminders, for Needs you. */
-  readonly notices?: readonly NotificationDto[] | undefined;
-  readonly reminders?: readonly ReminderDto[] | undefined;
   readonly now?: number | undefined;
 }) {
   if (side === "NONE") {
@@ -87,7 +76,6 @@ export function RelationshipsIndex({
       items={items}
       digests={digests}
       unread={Object.fromEntries(unread ?? new Map<string, number>())}
-      needsYou={needsYouCards({ notices, reminders, items, side, now })}
       firstCursor={
         first.next === null || last === undefined ? null : cursorOf(last)
       }

@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -21,6 +28,13 @@ const mocks = vi.hoisted(() => ({
   session: vi.fn(),
   results: vi.fn(),
   relationships: vi.fn(),
+  digests: vi.fn(),
+  notices: vi.fn(),
+  reminders: vi.fn(),
+}));
+vi.mock("next/navigation", async (load) => ({
+  ...(await load<typeof import("next/navigation")>()),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock("@/features/q/context", () => ({
   resolveOwnContext: mocks.context,
@@ -29,11 +43,13 @@ vi.mock("@/features/q/context", () => ({
 }));
 vi.mock("@/features/relationships/relationship-data", () => ({
   ownRelationships: mocks.relationships,
-  relationshipDigests: vi.fn(),
+  relationshipDigests: mocks.digests,
 }));
 vi.mock("@capital-q/api-client", async (load) => ({
   ...(await load<typeof import("@capital-q/api-client")>()),
   getResults: mocks.results,
+  listNotifications: mocks.notices,
+  listReminders: mocks.reminders,
 }));
 vi.mock("@/features/results/results-dashboard", () => ({
   ResultsDashboard: ({
@@ -61,6 +77,9 @@ beforeEach(() => {
     investorOrganisationId: "a0000000-0000-4000-8000-000000000001",
     label: "Fund",
   });
+  mocks.relationships.mockResolvedValue([]);
+  mocks.notices.mockResolvedValue({ items: [] });
+  mocks.reminders.mockResolvedValue({ items: [] });
 });
 
 async function overview() {
@@ -188,7 +207,9 @@ describe("Hub foundation", () => {
       screen.getByRole("heading", { name: "Investment Hub" }),
     ).toBeDefined();
     expect(screen.getByText("Authorized fund")).toBeDefined();
-    expect(mocks.relationships).not.toHaveBeenCalled();
+    // The queue reads the person's own list to name its rows; the list's
+    // per-row reads (digests) stay the Relationships tab's.
+    expect(mocks.digests).not.toHaveBeenCalled();
     expect(mocks.results).toHaveBeenCalledWith(
       expect.objectContaining({ accessToken: "fixture" }),
       { range: "30d" },
@@ -236,7 +257,7 @@ describe("Hub foundation", () => {
       pipeline: { rows: [], byState: [] },
     });
     await overview();
-    expect(screen.getByText("Overview couldn't load")).toBeDefined();
+    expect(screen.getByText("The period report couldn't load")).toBeDefined();
     expect(screen.queryByText("Private company")).toBeNull();
   });
   it("shows recoverable failure rather than fabricated zero counts", async () => {
@@ -257,7 +278,93 @@ describe("Hub foundation", () => {
   it("keeps unavailable context distinct from absent organisation", async () => {
     mocks.context.mockResolvedValue({ kind: "NONE", unavailable: true });
     await overview();
-    expect(screen.getByText("Overview couldn't load")).toBeDefined();
+    expect(screen.getByText("The period report couldn't load")).toBeDefined();
     expect(screen.queryByRole("link", { name: "Set up" })).toBeNull();
+  });
+});
+
+describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
+  const companyId = "c0000000-0000-4000-8000-000000000009";
+  const relationship = {
+    relationshipId: "d0000000-0000-4000-8000-000000000009",
+    counterpart: { kind: "COMPANY" as const, id: companyId, name: "Kivu" },
+    state: "CONNECTED" as const,
+    stateSince: "2026-10-10T10:00:00.000Z",
+    nextStep: "SCHEDULE_MEETING" as const,
+  };
+  const notice = (n: number) => ({
+    id: `e0000000-0000-4000-8000-00000000000${String(n)}`,
+    kind: "CHAT_MESSAGE" as const,
+    title: `Kivu sent message ${String(n)}`,
+    body: null,
+    linkPath: `/relationships/company/${companyId}/messages`,
+    read: false,
+    createdAt: `2026-10-1${String(n)}T10:00:00.000Z`,
+    priority: "NEEDS_YOU" as const,
+  });
+  beforeEach(() => {
+    mocks.results.mockResolvedValue({
+      side: "INVESTOR",
+      organisationName: "Fund",
+      pipelineFit: [],
+    });
+  });
+
+  it("leads with what needs the person, folded per relationship, before the period", async () => {
+    mocks.relationships.mockResolvedValue([relationship]);
+    mocks.notices.mockResolvedValue({ items: [notice(1), notice(2)] });
+    await overview();
+    const queue = screen.getByRole("region", { name: /Needs you/u });
+    const rows = within(queue).getAllByRole("listitem");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain("Kivu");
+    expect(rows[0]?.textContent).toContain("2 updates");
+    expect(
+      within(queue).getByRole("link", { name: "Reply" }).getAttribute("href"),
+    ).toBe(`/relationships/company/${companyId}/messages`);
+    // The queue comes before the period's figures in reading order.
+    const period = screen.getByText("Fund");
+    expect(
+      queue.compareDocumentPosition(period) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("says nothing needs them, not a blank area", async () => {
+    await overview();
+    expect(screen.getByText("Nothing needs you right now.")).toBeDefined();
+  });
+
+  it("is partial, never 'nothing', when the notices cannot be read", async () => {
+    mocks.notices.mockRejectedValue(new Error("down"));
+    await overview();
+    expect(
+      screen.getByText(/What needs you couldn't be read just now/u),
+    ).toBeDefined();
+    expect(screen.queryByText("Nothing needs you right now.")).toBeNull();
+  });
+
+  it("keeps the queue when only the period report fails", async () => {
+    mocks.relationships.mockResolvedValue([relationship]);
+    mocks.notices.mockResolvedValue({ items: [notice(1)] });
+    mocks.results.mockRejectedValue(new Error("down"));
+    await overview();
+    expect(screen.getByRole("region", { name: /Needs you/u })).toBeDefined();
+    expect(screen.getByText("The period report couldn't load")).toBeDefined();
+  });
+
+  it("caps the queue at five rows and opens the rest on request", async () => {
+    const many = Array.from({ length: 7 }, (_, n) => ({
+      ...notice(n),
+      id: `e0000000-0000-4000-8000-0000000000${String(10 + n)}`,
+      kind: "Q_WORK" as const,
+      title: `Review plan ${String(n)}`,
+      linkPath: null,
+    }));
+    mocks.notices.mockResolvedValue({ items: many });
+    await overview();
+    const queue = screen.getByRole("region", { name: /Needs you/u });
+    expect(within(queue).getAllByRole("listitem")).toHaveLength(5);
+    fireEvent.click(within(queue).getByRole("button", { name: "See all 7" }));
+    expect(within(queue).getAllByRole("listitem")).toHaveLength(7);
   });
 });
