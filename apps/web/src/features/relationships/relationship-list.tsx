@@ -78,7 +78,7 @@ function RelationshipRow({
           kind="company"
           name={item.counterpart.name}
           companyId={item.counterpart.id}
-          src={item.counterpart.photoUrl ?? undefined}
+          src={item.counterpart.photoUrl}
           size="sm"
           decorative
         />

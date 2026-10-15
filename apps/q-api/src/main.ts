@@ -691,6 +691,13 @@ import {
   createTavusKeyPool,
   tavusKeysFrom,
 } from "./composition/tavus/key-pool.js";
+import { createTavusClient } from "./composition/tavus/client.js";
+import {
+  createMeetingFace,
+  createPostgresMeetingFaceStore,
+  meetingFaceSecondsFrom,
+} from "./composition/meeting-face.js";
+import { qMeetingFaceBridgeBasePath } from "./http/meeting-face.js";
 import { ownRecordTerms } from "./voice/vocabulary.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
@@ -4393,7 +4400,38 @@ const meetingScreensOn = process.env.RECALL_SCREEN_VISION === "on";
 // RECALL_CAMERA_VISION=on; the greeting says so when on.
 const meetingCamerasOn =
   meetingScreensOn && process.env.RECALL_CAMERA_VISION === "on";
+// Owner decision 35 (2026-10-15): Q's face in Google Meet, a Tavus stock
+// replica on the Builder account (the one configured key). Off unless
+// CQ_MEETING_FACE=on with CQ_MEETING_FACE_ID set; the shared video ledger
+// bounds it (organiser's weekly allowance, monthly safeguard, one at a
+// time). Whenever it cannot start, Q keeps the Recall bot's own voice.
+const meetingFaceKey = tavusKeysFrom({
+  CQ_TAVUS_API_KEYS: process.env.CQ_TAVUS_API_KEYS,
+  TAVUS_API_KEY: process.env.TAVUS_API_KEY,
+})[0];
+const meetingFace = createMeetingFace({
+  enabled: process.env.CQ_MEETING_FACE === "on",
+  client:
+    meetingFaceKey === undefined
+      ? null
+      : createTavusClient({ apiKey: meetingFaceKey }),
+  faceId: process.env.CQ_MEETING_FACE_ID?.trim() || null,
+  maxSeconds: meetingFaceSecondsFrom(process.env.CQ_MEETING_FACE_MAX_SECONDS),
+  publicBaseUrl: process.env.Q_API_PUBLIC_URL?.trim() || null,
+  bridgePath: qMeetingFaceBridgeBasePath,
+  store: createPostgresMeetingFaceStore(database.sql),
+  logger,
+});
+void meetingFace.sweep({ atBoot: true }).catch((error: unknown) => {
+  logger.warn({ err: error }, "meeting face boot sweep failed");
+});
+setInterval(() => {
+  void meetingFace.sweep().catch((error: unknown) => {
+    logger.warn({ err: error }, "meeting face sweep failed");
+  });
+}, 60_000).unref();
 const meetingHost = createMeetingHostRuntime({
+  face: meetingFace,
   seesScreens: meetingScreensOn,
   seesCameras: meetingCamerasOn,
   // What Q can see in the call, for its answers (closures: the vision
@@ -6368,6 +6406,7 @@ const { app, logger: appLogger } = createApp(
     meetingAssistant,
     // MEET-HOST block (ADR 0037)
     meetingHost,
+    meetingFace,
     meetingScreens,
     recallStatus: createRecallStatusWebhook({
       secret: process.env.RECALL_WEBHOOK_SECRET,

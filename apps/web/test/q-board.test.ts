@@ -6,6 +6,7 @@ import {
   arrangeBoard,
   boardObjects,
   openQuestions,
+  referenceRowLabel,
 } from "../src/features/q/board";
 import type { QTurn } from "../src/features/q/conversation";
 
@@ -113,5 +114,15 @@ describe("open questions", () => {
     expect(openQuestions([...turns.slice(0, 2), person("p3", "Seed")])).toEqual(
       [],
     );
+  });
+});
+
+describe("board reference rows (15 Oct: 'Company 1' for Harbourline Cargo)", () => {
+  it("show the record's name when the reader may see it, a number only while unknown", () => {
+    expect(referenceRowLabel("COMPANIES", 0, "Harbourline Cargo")).toBe(
+      "Harbourline Cargo",
+    );
+    expect(referenceRowLabel("COMPANIES", 1, null)).toBe("Company 2");
+    expect(referenceRowLabel("INVESTORS", 0, null)).toBe("Investor 1");
   });
 });
