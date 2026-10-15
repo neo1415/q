@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { buttonClassName, IconButton } from "@capital-q/ui/button";
 import { Bell, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
@@ -9,6 +9,8 @@ import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
 import { EmptyState, ErrorState, Skeleton } from "@capital-q/ui/states";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
+import { useQControl } from "@/features/q/control/q-control";
+import { effectShown } from "@/features/q/control/perform";
 
 import { groupNotices, type NoticeGroup } from "./notice-groups";
 import { PushSetting } from "./push-setting";
@@ -134,6 +136,28 @@ function NoticeRow({
 
 export function NotificationCenter() {
   const [open, setOpen] = useState(false);
+  // Q Pitch (premiere v5) and Q's own UI acts: open or close this panel
+  // deterministically, DONE once it shows. Reading is not consequential.
+  const rootRef = useRef<HTMLSpanElement>(null);
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  });
+  useQControl({
+    id: "dialog.notifications",
+    kind: "DIALOG",
+    ref: rootRef,
+    onAct: async (intent) => {
+      if (intent.act !== "OPEN" && intent.act !== "CLOSE") {
+        return "NOT_APPLICABLE";
+      }
+      const want = intent.act === "OPEN";
+      setOpen(want);
+      return (await effectShown(() => openRef.current === want, 3_000))
+        ? "DONE"
+        : "FAILED";
+    },
+  });
   // Shared by both bells (phone header, desktop sidebar): one read.
   const { items, unread, failed, nextBefore } = useNotices();
   const load = () => refreshNotices(true);
@@ -163,120 +187,126 @@ export function NotificationCenter() {
   };
 
   return (
-    <SheetRoot open={open} onOpenChange={setOpen}>
-      <SheetTrigger>
-        <IconButton
-          aria-label={
-            unread === 0
-              ? "Notifications"
-              : `Notifications, ${String(unread)} new`
-          }
-          variant="quiet"
-          className="relative text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
-          data-notification-center
-        >
-          <Bell
-            aria-hidden="true"
-            size={ICON_SIZE.prominent}
-            strokeWidth={ICON_STROKE}
-          />
-          {unread === 0 ? null : (
-            <span
+    <span ref={rootRef} className="contents">
+      <SheetRoot open={open} onOpenChange={setOpen}>
+        <SheetTrigger>
+          <IconButton
+            aria-label={
+              unread === 0
+                ? "Notifications"
+                : `Notifications, ${String(unread)} new`
+            }
+            variant="quiet"
+            className="relative text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+            data-notification-center
+          >
+            <Bell
               aria-hidden="true"
-              className="cq-caption cq-numeric absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-(--cq-accent) px-1 text-center leading-4 text-(--cq-canvas)"
-            >
-              {unread > 9 ? "9+" : unread}
-            </span>
-          )}
-        </IconButton>
-      </SheetTrigger>
-      <SheetContent title="Notifications" side="side">
-        <div className="flex flex-col gap-5 pt-1">
-          {items === null && !failed ? (
-            <Skeleton lines={4} />
-          ) : failed && items === null ? (
-            <ErrorState
-              title="Notifications couldn't load"
-              description="What needs you is also on Q's work."
-              action={
-                <button
-                  type="button"
-                  className="cq-body-sm min-h-11 underline"
-                  onClick={() => void load()}
-                >
-                  Try again
-                </button>
-              }
-              compact
+              size={ICON_SIZE.prominent}
+              strokeWidth={ICON_STROKE}
             />
-          ) : (items ?? []).length === 0 ? (
-            <EmptyState
-              title="You're up to date"
-              description="What needs you shows first."
-              compact
-            />
-          ) : (
-            <>
-              {needsYou.length === 0 ? null : (
-                <section aria-labelledby="notices-needs-you">
-                  <h3
-                    id="notices-needs-you"
-                    className="cq-title-sm text-(--cq-text-primary)"
+            {unread === 0 ? null : (
+              <span
+                aria-hidden="true"
+                className="cq-caption cq-numeric absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-(--cq-accent) px-1 text-center leading-4 text-(--cq-canvas)"
+              >
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
+          </IconButton>
+        </SheetTrigger>
+        <SheetContent title="Notifications" side="side">
+          <div className="flex flex-col gap-5 pt-1">
+            {items === null && !failed ? (
+              <Skeleton lines={4} />
+            ) : failed && items === null ? (
+              <ErrorState
+                title="Notifications couldn't load"
+                description="What needs you is also on Q's work."
+                action={
+                  <button
+                    type="button"
+                    className="cq-body-sm min-h-11 underline"
+                    onClick={() => void load()}
                   >
-                    Needs you
-                  </h3>
-                  <ul>
-                    {needsYou.map((group) => (
-                      <NoticeRow
-                        key={group.key}
-                        group={group}
-                        onOpen={openNeed(group.ids)}
-                        needsYou
-                      />
-                    ))}
-                  </ul>
-                </section>
-              )}
-              {days.map((day) => (
-                <section
-                  key={day.label}
-                  aria-label={`Updates, ${day.label}`}
-                  data-notice-day={day.label}
-                >
-                  <h3 className="cq-label text-(--cq-text-secondary)">
-                    {day.label}
-                  </h3>
-                  <ul>
-                    {day.groups.map((group) => (
-                      <NoticeRow key={group.key} group={group} onOpen={close} />
-                    ))}
-                  </ul>
-                </section>
-              ))}
-              {nextBefore === undefined || nextBefore === null ? null : (
-                <button
-                  type="button"
-                  className="cq-body-sm inline-flex min-h-11 items-center self-start text-(--cq-text-secondary) underline underline-offset-4"
-                  onClick={() => void loadOlderNotices()}
-                  data-notices-older
-                >
-                  Show older
-                </button>
-              )}
-            </>
-          )}
-          <div className="border-t border-(--cq-border-subtle) pt-4">
-            <PushSetting compact />
-            <Link
-              href="/work"
-              onClick={close}
-              className="cq-body-sm mt-3 inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-4"
-            >
-              Open Q&rsquo;s work
-            </Link>
+                    Try again
+                  </button>
+                }
+                compact
+              />
+            ) : (items ?? []).length === 0 ? (
+              <EmptyState
+                title="You're up to date"
+                description="What needs you shows first."
+                compact
+              />
+            ) : (
+              <>
+                {needsYou.length === 0 ? null : (
+                  <section aria-labelledby="notices-needs-you">
+                    <h3
+                      id="notices-needs-you"
+                      className="cq-title-sm text-(--cq-text-primary)"
+                    >
+                      Needs you
+                    </h3>
+                    <ul>
+                      {needsYou.map((group) => (
+                        <NoticeRow
+                          key={group.key}
+                          group={group}
+                          onOpen={openNeed(group.ids)}
+                          needsYou
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {days.map((day) => (
+                  <section
+                    key={day.label}
+                    aria-label={`Updates, ${day.label}`}
+                    data-notice-day={day.label}
+                  >
+                    <h3 className="cq-label text-(--cq-text-secondary)">
+                      {day.label}
+                    </h3>
+                    <ul>
+                      {day.groups.map((group) => (
+                        <NoticeRow
+                          key={group.key}
+                          group={group}
+                          onOpen={close}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+                {nextBefore === undefined || nextBefore === null ? null : (
+                  <button
+                    type="button"
+                    className="cq-body-sm inline-flex min-h-11 items-center self-start text-(--cq-text-secondary) underline underline-offset-4"
+                    onClick={() => void loadOlderNotices()}
+                    data-notices-older
+                  >
+                    Show older
+                  </button>
+                )}
+              </>
+            )}
+            <div className="border-t border-(--cq-border-subtle) pt-4">
+              <PushSetting compact />
+              <Link
+                href="/work"
+                onClick={close}
+                className="cq-body-sm mt-3 inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-4"
+              >
+                Open Q&rsquo;s work
+              </Link>
+            </div>
           </div>
-        </div>
-      </SheetContent>
-    </SheetRoot>
+        </SheetContent>
+      </SheetRoot>
+    </span>
   );
 }

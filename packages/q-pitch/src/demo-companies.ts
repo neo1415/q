@@ -31,3 +31,20 @@ export function demoCompany(key: string): DemoCompany | null {
     ? (DEMO_COMPANIES[key] ?? null)
     : null;
 }
+
+/**
+ * Named demo records for `openRecord` (premiere v5, 16 Oct). GateQ: a
+ * genuinely submitted application in the tour investor's own inbox
+ * (fictional Maji Loop: qualified, interview transcript and dossier; read
+ * as Savanna on production, 16 Oct). Relationships are by company key.
+ */
+export const DEMO_APPLICATIONS: Readonly<Record<string, string>> = {
+  "maji-loop-application": "496a4f85-e9a7-49e7-8855-659fd62702a8",
+};
+
+/** The application id for a fixture key, or null. */
+export function demoApplication(key: string): string | null {
+  return Object.hasOwn(DEMO_APPLICATIONS, key)
+    ? (DEMO_APPLICATIONS[key] ?? null)
+    : null;
+}

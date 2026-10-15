@@ -66,6 +66,9 @@ export function fixtureKeysOf(actions: readonly TourAction[]): FixtureKey[] {
     if (action.kind === "buildComparison") {
       for (const company of action.companies) keys.add(company);
     }
+    if (action.kind === "openRecord" && action.record !== "GATEQ_APPLICATION") {
+      keys.add(action.key);
+    }
     if (action.kind === "askApprovedQuestion" && action.subject !== undefined) {
       keys.add(action.subject);
     }

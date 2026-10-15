@@ -12,6 +12,7 @@ import {
   type SceneScript,
   type TourAction,
   type TourActor,
+  demoApplication,
   type TourPorts,
   type TourScript,
 } from "@capital-q/q-pitch";
@@ -116,6 +117,42 @@ let actSequence = 0;
 function nextActId(): string {
   actSequence += 1;
   return `uia_qpitch${String(Date.now() % 1_000_000)}${String(actSequence)}`;
+}
+
+/**
+ * The questions the tour itself put to Q (by text), so the host tells a
+ * viewer's own question (an interruption) from the tour's scripted ones.
+ */
+const TOUR_ASKS = new Set<string>();
+
+export function isTourAsk(text: string): boolean {
+  return TOUR_ASKS.has(text.trim());
+}
+
+/** How long a uiAct waits for a just-opened page to register its control. */
+const UI_ACT_WAIT_MS = 6_000;
+
+/**
+ * The page for an `openRecord` key: a GateQ application in the actor's own
+ * inbox (named demo application), or the actor's relationship with a named
+ * company (the record page, or its call-booking dialog, which the page
+ * opens from its own hash). The pages authorise the viewer themselves.
+ */
+export function recordPath(
+  record: "GATEQ_APPLICATION" | "RELATIONSHIP" | "RELATIONSHIP_CALLS",
+  key: string,
+  companyOf: (key: string) => ResolvedCompany | null,
+): string | null {
+  if (record === "GATEQ_APPLICATION") {
+    const id = demoApplication(key);
+    return id === null
+      ? null
+      : `/gateq?tab=inbox&item=${encodeURIComponent(id)}`;
+  }
+  const company = companyOf(key);
+  if (company === null) return null;
+  const base = `/relationships/company/${encodeURIComponent(company.companyId.toLowerCase())}`;
+  return record === "RELATIONSHIP_CALLS" ? `${base}#calls` : base;
 }
 
 /** Where rehearsal transcript segments go: the host's runner and captions. */
@@ -266,6 +303,11 @@ export function useTourPorts(
       if (q.runId !== null) known.add(q.runId);
       if (q.state.runId !== null) known.add(q.state.runId);
       setOpen(true);
+      TOUR_ASKS.add(text.trim());
+      if (TOUR_ASKS.size > 64) {
+        const oldest = TOUR_ASKS.values().next().value;
+        if (oldest !== undefined) TOUR_ASKS.delete(oldest);
+      }
       await q.ask(text);
       const started = new AbortController();
       const stopWaiting = setTimeout(() => started.abort(), RUN_START_WAIT_MS);
@@ -355,6 +397,44 @@ export function useTourPorts(
                     ? "NOT_APPLICABLE"
                     : "FAILED",
               );
+        }
+        case "uiAct": {
+          // A page just opened may not have registered its control yet:
+          // retry a missing target briefly, never another act.
+          const until = Date.now() + UI_ACT_WAIT_MS;
+          for (;;) {
+            const receipt = await performUiAct({
+              kind: "UI_ACT",
+              actId: nextActId(),
+              act: action.act,
+              target: action.target,
+              ...(action.index === undefined ? {} : { index: action.index }),
+            });
+            if (receipt.status === "DONE") return outcome(true, null);
+            if (
+              receipt.status !== "TARGET_MISSING" ||
+              Date.now() > until ||
+              signal.aborted
+            ) {
+              return outcome(
+                false,
+                signal.aborted
+                  ? "CANCELLED"
+                  : receipt.status === "TARGET_MISSING"
+                    ? "TARGET_MISSING"
+                    : receipt.status === "NOT_APPLICABLE"
+                      ? "NOT_APPLICABLE"
+                      : "FAILED",
+              );
+            }
+            await sleep(400);
+          }
+        }
+        case "openRecord": {
+          const path = recordPath(action.record, action.key, companyOf);
+          return path === null
+            ? outcome(false, "FIXTURE_UNRESOLVED")
+            : navigate(path, signal);
         }
         case "askApprovedQuestion": {
           const text = questionText(action.question);
@@ -488,7 +568,9 @@ export function useTourPorts(
                         ? null
                         : `/company/${encodeURIComponent(company.companyId.toLowerCase())}`;
                     })()
-                  : null;
+                  : action.kind === "openRecord"
+                    ? recordPath(action.record, action.key, companyOf)
+                    : null;
             if (path !== null) router.prefetch(path);
           }
         }
