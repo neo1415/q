@@ -50,6 +50,9 @@ export function isTavusConnectivityCheck(
   );
 }
 
+/** What the applicant sees on the interviewer's tile in the room. */
+export const GATEQ_VIDEO_PARTICIPANT_NAME = "Q";
+
 export function createTavusGateqVideoProvider(deps: {
   readonly pool: TavusKeyPool;
   /** Absolute origin of this API, e.g. https://api.example. */
@@ -62,7 +65,9 @@ export function createTavusGateqVideoProvider(deps: {
     createRoom: async (input) => {
       const { value } = await deps.pool.withHealthyKey(async (client) => {
         const { palId } = await client.createPal({
-          name: `cq-gateq-${input.sessionId}`,
+          // The provider shows the PAL's name on the interviewer's tile: the
+          // applicant meets "Q", never an internal session id.
+          name: GATEQ_VIDEO_PARTICIPANT_NAME,
           systemPrompt:
             "You are the face and voice of Q, Capital Q's AI interviewer for an investment application. Speak exactly the lines you are given, naturally, and nothing else.",
           faceId: deps.faceId,
