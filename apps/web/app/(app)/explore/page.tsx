@@ -8,6 +8,7 @@ import { ExploreScreen } from "@/features/explore/explore-screen";
 import { authorisePostersAction } from "@/features/discover/feed/playback-source";
 import { apiSession } from "@/features/q/context";
 import { withTimeout } from "@/pwa/resilient";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Explore" };
 export const dynamic = "force-dynamic";
@@ -67,24 +68,26 @@ export default async function ExplorePage({
     return (
       <div className="flex w-full flex-col gap-4 px-4 pt-4 pb-[calc(var(--cq-bottom-nav-height)+88px)] sm:px-6 lg:px-8 lg:pt-7 lg:pb-16">
         <h1 className="cq-title-md lg:sr-only">Explore</h1>
-        <ExploreScreen
-          search={
-            search ?? {
-              query,
-              tab: searchTabOf(params.tab),
-              chips: [],
-              companies: [],
-              investors: [],
-              people: [],
-              pitches: [],
-              related: [],
+        <QSection id="explore" kind="EXPLORE" label="Explore">
+          <ExploreScreen
+            search={
+              search ?? {
+                query,
+                tab: searchTabOf(params.tab),
+                chips: [],
+                companies: [],
+                investors: [],
+                people: [],
+                pitches: [],
+                related: [],
+              }
             }
-          }
-          searchState={
-            search === undefined || search === null ? "error" : "ready"
-          }
-          sectors={sectors}
-        />
+            searchState={
+              search === undefined || search === null ? "error" : "ready"
+            }
+            sectors={sectors}
+          />
+        </QSection>
       </div>
     );
   }
@@ -109,11 +112,21 @@ export default async function ExplorePage({
   return (
     <div className="flex w-full flex-col gap-4 px-4 pt-4 pb-[calc(var(--cq-bottom-nav-height)+88px)] sm:px-6 lg:px-8 lg:pt-7 lg:pb-16">
       <h1 className="cq-title-md lg:sr-only">Explore</h1>
-      <ExploreScreen
-        initial={initial}
-        initialPosters={initialPosters}
-        sectors={sectors}
-      />
+      <QSection
+        id="explore"
+        kind="EXPLORE"
+        refs={(initial?.items ?? [])
+          .slice(0, 12)
+          .map((tile) => ({ kind: "COMPANY" as const, id: tile.companyId }))}
+        total={initial?.items.length ?? 0}
+        label="Explore"
+      >
+        <ExploreScreen
+          initial={initial}
+          initialPosters={initialPosters}
+          sectors={sectors}
+        />
+      </QSection>
     </div>
   );
 }

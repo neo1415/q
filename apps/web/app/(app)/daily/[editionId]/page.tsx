@@ -12,6 +12,7 @@ import {
 import { DailyAnchorFocus } from "@/features/daily/anchor-focus";
 import { Newspaper } from "@/features/daily/newspaper";
 import { qApiSession } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "The Q Daily" };
 export const dynamic = "force-dynamic";
@@ -42,26 +43,30 @@ export default async function DailyEditionPage({
   if (edition === null) {
     return (
       <PageContainer width="reading" className="flex flex-col gap-4">
-        <PageHeader title="The Q Daily" />
-        <p
-          className="cq-body text-(--cq-text-secondary)"
-          data-state="unavailable"
-        >
-          This edition couldn&apos;t load. Reload in a moment.
-        </p>
+        <QSection id="daily" kind="DAILY" label="The Q Daily">
+          <PageHeader title="The Q Daily" />
+          <p
+            className="cq-body text-(--cq-text-secondary)"
+            data-state="unavailable"
+          >
+            This edition couldn&apos;t load. Reload in a moment.
+          </p>
+        </QSection>
       </PageContainer>
     );
   }
   return (
     <PageContainer width="content" className="flex flex-col gap-8">
-      <Link
-        href="/daily"
-        className={buttonClassName("quiet", "compact", "self-start")}
-      >
-        Latest edition
-      </Link>
-      <DailyAnchorFocus />
-      <Newspaper edition={edition} />
+      <QSection id="daily" kind="DAILY" label="The Q Daily">
+        <Link
+          href="/daily"
+          className={buttonClassName("quiet", "compact", "self-start")}
+        >
+          Latest edition
+        </Link>
+        <DailyAnchorFocus />
+        <Newspaper edition={edition} />
+      </QSection>
     </PageContainer>
   );
 }

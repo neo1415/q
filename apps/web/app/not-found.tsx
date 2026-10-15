@@ -17,6 +17,7 @@ export default function NotFound() {
   return (
     <div data-q-not-found className="contents">
       <StatusPage
+        notice="ERROR:NOT_FOUND"
         title="This page isn't here."
         description="The address may be mistyped, or the page may have moved. Nothing is wrong with your account."
       >

@@ -24,6 +24,8 @@ import {
   Q_CONFIDENCE_LABELS,
   Q_MANIFEST_DIALOGS_MAX,
   Q_MANIFEST_DIALOG_REFS_MAX,
+  Q_MANIFEST_NOTICES_MAX,
+  Q_MANIFEST_VISIBLE_REFS_MAX,
   Q_MANIFEST_FILTER_KEYS,
   Q_MANIFEST_SECTIONS_MAX,
   Q_MANIFEST_SECTION_REFS_MAX,
@@ -151,6 +153,10 @@ describe("the wire's contracts, off the first paint (W7)", () => {
       contracts.Q_MANIFEST_SECTION_REFS_MAX,
     );
     expect(Q_MANIFEST_DIALOGS_MAX).toBe(contracts.Q_MANIFEST_DIALOGS_MAX);
+    expect(Q_MANIFEST_VISIBLE_REFS_MAX).toBe(
+      contracts.Q_MANIFEST_VISIBLE_REFS_MAX,
+    );
+    expect(Q_MANIFEST_NOTICES_MAX).toBe(contracts.Q_MANIFEST_NOTICES_MAX);
     expect(Q_MANIFEST_DIALOG_REFS_MAX).toBe(
       contracts.Q_MANIFEST_DIALOG_REFS_MAX,
     );

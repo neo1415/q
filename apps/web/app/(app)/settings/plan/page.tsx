@@ -25,6 +25,7 @@ import {
   usedPercent,
 } from "@/features/billing/plan-words";
 import { apiSession } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Your plan · Settings" };
 
@@ -51,32 +52,34 @@ export default async function PlanPage({
         ]);
   return (
     <PageContainer width="reading">
-      <PageHeader title="Plan" />
-      {plan === null ? (
-        <ErrorState
-          title="Your plan couldn't load"
-          description="Nothing changed and nothing was charged."
-          action={
-            <Link
-              href="/settings/plan"
-              className={buttonClassName("secondary", "compact")}
-            >
-              Try again
-            </Link>
-          }
-        />
-      ) : (
-        <div className="flex flex-col gap-10">
-          {checkout === "done" ? (
-            <InlineNotice tone="positive" title="Thank you">
-              Your payment went through. Your plan changes as soon as the
-              payment provider confirms it, usually within a minute.
-            </InlineNotice>
-          ) : null}
-          <CurrentPlan plan={plan} />
-          <Plans plan={plan} catalogue={catalogue} />
-        </div>
-      )}
+      <QSection id="plan" kind="BILLING" label="your plan">
+        <PageHeader title="Plan" />
+        {plan === null ? (
+          <ErrorState
+            title="Your plan couldn't load"
+            description="Nothing changed and nothing was charged."
+            action={
+              <Link
+                href="/settings/plan"
+                className={buttonClassName("secondary", "compact")}
+              >
+                Try again
+              </Link>
+            }
+          />
+        ) : (
+          <div className="flex flex-col gap-10">
+            {checkout === "done" ? (
+              <InlineNotice tone="positive" title="Thank you">
+                Your payment went through. Your plan changes as soon as the
+                payment provider confirms it, usually within a minute.
+              </InlineNotice>
+            ) : null}
+            <CurrentPlan plan={plan} />
+            <Plans plan={plan} catalogue={catalogue} />
+          </div>
+        )}
+      </QSection>
     </PageContainer>
   );
 }

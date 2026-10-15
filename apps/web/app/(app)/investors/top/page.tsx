@@ -10,6 +10,7 @@ import {
   qApiSession,
   resolveOwnContext,
 } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Your top three" };
 export const dynamic = "force-dynamic";
@@ -25,7 +26,9 @@ export default async function FitTopPage() {
   if (context.kind !== "INVESTOR") redirect("/investors");
   return (
     <PageContainer>
-      <FitTopView state={await topState(context.investorOrganisationId)} />
+      <QSection id="top" kind="COMPANY_LIST" label="your top companies">
+        <FitTopView state={await topState(context.investorOrganisationId)} />
+      </QSection>
     </PageContainer>
   );
 }

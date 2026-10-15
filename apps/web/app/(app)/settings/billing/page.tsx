@@ -23,6 +23,7 @@ import {
   SettingRow,
   SettingsCard,
 } from "@/features/settings/settings-ui";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Billing · Settings" };
 
@@ -45,146 +46,148 @@ export default async function BillingPage() {
   const currentTier = plan === null ? null : tierOfPlan(plan.plan.key);
   return (
     <PageContainer>
-      <PageHeader
-        title="Billing"
-        description="Your plan, the plans on offer, and how you pay."
-      />
-      <div className="flex flex-col gap-8">
-        {plan === null ? (
-          <ErrorState
-            title="Your plan couldn't load"
-            description="Nothing changed and nothing was charged."
-            action={
-              <Link
-                href="/settings/billing"
-                className={buttonClassName("secondary", "compact")}
-              >
-                Try again
-              </Link>
-            }
-          />
-        ) : (
-          <section
-            aria-labelledby="billing-current"
-            className="cq-panel flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="cq-label text-(--cq-text-secondary)">
-                Current plan
-              </span>
-              <h2
-                id="billing-current"
-                className="cq-title-lg text-(--cq-text-primary)"
-                data-billing-plan
-              >
-                {plan.plan.name}
-              </h2>
-              <p className="cq-body-sm text-(--cq-text-secondary)">
-                {plan.source === "LAUNCH_DEFAULT"
-                  ? "Free while Capital Q launches"
-                  : sourceLine({
-                      source: plan.source,
-                      planName: plan.plan.name,
-                      endsAt: plan.endsAt,
-                    })}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <RowLink href="/settings/plan">Allowances</RowLink>
-              <RowLink href="/settings/usage">Usage</RowLink>
-            </div>
-          </section>
-        )}
-
-        <section
-          aria-labelledby="billing-plans"
-          className="flex flex-col gap-3"
-        >
-          <div className="flex flex-wrap items-center gap-3">
-            <h2
-              id="billing-plans"
-              className="cq-title-md text-(--cq-text-primary)"
-            >
-              Plans
-            </h2>
-            {PLAN_TIERS.preview ? (
-              <span className="cq-caption inline-flex min-h-6 items-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 font-medium text-(--cq-text-secondary)">
-                Preview pricing
-              </span>
-            ) : null}
-          </div>
-          <ul className="grid gap-3 lg:grid-cols-3">
-            {PLAN_TIERS.tiers.map((tier) => (
-              <TierCard
-                key={tier.key}
-                tier={tier}
-                current={currentTier?.key === tier.key}
-                suits={
-                  currentTier === null &&
-                  context.kind !== "NONE" &&
-                  context.kind === tier.suits &&
-                  // Of the two investor tiers, the individual one suits by default.
-                  !(tier.key === "fund")
-                }
-              />
-            ))}
-          </ul>
-          {PLAN_TIERS.preview ? (
-            <p className="cq-caption text-(--cq-text-tertiary)">
-              Prices are a preview in {PLAN_TIERS.currency} a month and may
-              change before billing starts. Nothing is charged today.
-            </p>
-          ) : null}
-        </section>
-
-        <SettingsCard
-          id="payment"
-          title="Payment"
-          description={
-            plan?.hasBillingCustomer === true
-              ? "Handled securely by our payment provider."
-              : "Online payment isn't switched on yet."
-          }
-        >
-          {plan?.hasBillingCustomer === true && plan.canManage ? (
-            <SettingRow
-              term="Payment method and invoices"
-              hint="Opens our payment provider"
-            >
-              <ManageBillingButton />
-            </SettingRow>
+      <QSection id="billing" kind="BILLING" label="billing">
+        <PageHeader
+          title="Billing"
+          description="Your plan, the plans on offer, and how you pay."
+        />
+        <div className="flex flex-col gap-8">
+          {plan === null ? (
+            <ErrorState
+              title="Your plan couldn't load"
+              description="Nothing changed and nothing was charged."
+              action={
+                <Link
+                  href="/settings/billing"
+                  className={buttonClassName("secondary", "compact")}
+                >
+                  Try again
+                </Link>
+              }
+            />
           ) : (
-            <>
-              <SettingRow term="Payment method">
-                <span className="cq-body-sm text-(--cq-text-secondary)">
-                  None on file
+            <section
+              aria-labelledby="billing-current"
+              className="cq-panel flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="cq-label text-(--cq-text-secondary)">
+                  Current plan
                 </span>
-              </SettingRow>
-              <SettingRow term="Invoices">
-                <span className="cq-body-sm text-(--cq-text-secondary)">
-                  None yet
-                </span>
-              </SettingRow>
-            </>
+                <h2
+                  id="billing-current"
+                  className="cq-title-lg text-(--cq-text-primary)"
+                  data-billing-plan
+                >
+                  {plan.plan.name}
+                </h2>
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  {plan.source === "LAUNCH_DEFAULT"
+                    ? "Free while Capital Q launches"
+                    : sourceLine({
+                        source: plan.source,
+                        planName: plan.plan.name,
+                        endsAt: plan.endsAt,
+                      })}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <RowLink href="/settings/plan">Allowances</RowLink>
+                <RowLink href="/settings/usage">Usage</RowLink>
+              </div>
+            </section>
           )}
-          <SettingRow
-            term="Change plan"
-            hint={
-              plan?.canManage === false
-                ? "An admin of your organisation can change its plan"
-                : "Reply to any Capital Q email and the team changes it for you"
+
+          <section
+            aria-labelledby="billing-plans"
+            className="flex flex-col gap-3"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <h2
+                id="billing-plans"
+                className="cq-title-md text-(--cq-text-primary)"
+              >
+                Plans
+              </h2>
+              {PLAN_TIERS.preview ? (
+                <span className="cq-caption inline-flex min-h-6 items-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 font-medium text-(--cq-text-secondary)">
+                  Preview pricing
+                </span>
+              ) : null}
+            </div>
+            <ul className="grid gap-3 lg:grid-cols-3">
+              {PLAN_TIERS.tiers.map((tier) => (
+                <TierCard
+                  key={tier.key}
+                  tier={tier}
+                  current={currentTier?.key === tier.key}
+                  suits={
+                    currentTier === null &&
+                    context.kind !== "NONE" &&
+                    context.kind === tier.suits &&
+                    // Of the two investor tiers, the individual one suits by default.
+                    !(tier.key === "fund")
+                  }
+                />
+              ))}
+            </ul>
+            {PLAN_TIERS.preview ? (
+              <p className="cq-caption text-(--cq-text-tertiary)">
+                Prices are a preview in {PLAN_TIERS.currency} a month and may
+                change before billing starts. Nothing is charged today.
+              </p>
+            ) : null}
+          </section>
+
+          <SettingsCard
+            id="payment"
+            title="Payment"
+            description={
+              plan?.hasBillingCustomer === true
+                ? "Handled securely by our payment provider."
+                : "Online payment isn't switched on yet."
             }
           >
-            {plan?.checkoutAvailable === true && plan.canManage ? (
-              <RowLink href="/settings/plan">Choose a plan</RowLink>
+            {plan?.hasBillingCustomer === true && plan.canManage ? (
+              <SettingRow
+                term="Payment method and invoices"
+                hint="Opens our payment provider"
+              >
+                <ManageBillingButton />
+              </SettingRow>
             ) : (
-              <span className="cq-body-sm text-(--cq-text-secondary)">
-                Nothing is charged until you agree a price
-              </span>
+              <>
+                <SettingRow term="Payment method">
+                  <span className="cq-body-sm text-(--cq-text-secondary)">
+                    None on file
+                  </span>
+                </SettingRow>
+                <SettingRow term="Invoices">
+                  <span className="cq-body-sm text-(--cq-text-secondary)">
+                    None yet
+                  </span>
+                </SettingRow>
+              </>
             )}
-          </SettingRow>
-        </SettingsCard>
-      </div>
+            <SettingRow
+              term="Change plan"
+              hint={
+                plan?.canManage === false
+                  ? "An admin of your organisation can change its plan"
+                  : "Reply to any Capital Q email and the team changes it for you"
+              }
+            >
+              {plan?.checkoutAvailable === true && plan.canManage ? (
+                <RowLink href="/settings/plan">Choose a plan</RowLink>
+              ) : (
+                <span className="cq-body-sm text-(--cq-text-secondary)">
+                  Nothing is charged until you agree a price
+                </span>
+              )}
+            </SettingRow>
+          </SettingsCard>
+        </div>
+      </QSection>
     </PageContainer>
   );
 }

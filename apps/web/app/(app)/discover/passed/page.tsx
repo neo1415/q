@@ -15,6 +15,7 @@ import {
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { PassedCompanies } from "@/features/discover/passed-companies";
 import { apiSession } from "@/features/q/context";
+import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "Passed" };
 export const dynamic = "force-dynamic";
@@ -45,49 +46,60 @@ export default async function PassedPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Passed"
-        description="Passing only hides a company from your feed. The company isn't told, and your mandate doesn't change."
-      />
-      {passed === null ? (
-        <EmptyState
-          title="Passed couldn't load."
-          description="Nothing is lost. Capital Q didn't answer just now; try again in a moment."
-          action={
-            <Link
-              href="/discover/passed"
-              className={buttonClassName("secondary")}
-            >
-              Try again
-            </Link>
-          }
+      <QSection
+        id="passed"
+        kind="COMPANY_LIST"
+        refs={companies.slice(0, 12).map((company) => ({
+          kind: "COMPANY" as const,
+          id: company.companyId,
+        }))}
+        total={companies.length}
+        label="companies you passed"
+      >
+        <PageHeader
+          title="Passed"
+          description="Passing only hides a company from your feed. The company isn't told, and your mandate doesn't change."
         />
-      ) : companies.length === 0 ? (
-        <EmptyState
-          title="Nothing passed."
-          description="Companies you pass on in Discover are listed here, so you can bring any of them back."
-          action={
-            <Link href="/discover" className={buttonClassName("secondary")}>
-              Go to Discover
-            </Link>
-          }
-        />
-      ) : (
-        <PassedCompanies
-          companies={companies.map((company) => {
-            const facts = [
-              stageLabel(company.currentStageCode),
-              countryLabel(company.headquartersCountry),
-            ].filter((part): part is string => part !== null);
-            return {
-              companyId: company.companyId,
-              name: company.canonicalName,
-              facts: facts.length === 0 ? null : facts.join(" · "),
-              pitch: company.pitch,
-            };
-          })}
-        />
-      )}
+        {passed === null ? (
+          <EmptyState
+            title="Passed couldn't load."
+            description="Nothing is lost. Capital Q didn't answer just now; try again in a moment."
+            action={
+              <Link
+                href="/discover/passed"
+                className={buttonClassName("secondary")}
+              >
+                Try again
+              </Link>
+            }
+          />
+        ) : companies.length === 0 ? (
+          <EmptyState
+            title="Nothing passed."
+            description="Companies you pass on in Discover are listed here, so you can bring any of them back."
+            action={
+              <Link href="/discover" className={buttonClassName("secondary")}>
+                Go to Discover
+              </Link>
+            }
+          />
+        ) : (
+          <PassedCompanies
+            companies={companies.map((company) => {
+              const facts = [
+                stageLabel(company.currentStageCode),
+                countryLabel(company.headquartersCountry),
+              ].filter((part): part is string => part !== null);
+              return {
+                companyId: company.companyId,
+                name: company.canonicalName,
+                facts: facts.length === 0 ? null : facts.join(" · "),
+                pitch: company.pitch,
+              };
+            })}
+          />
+        )}
+      </QSection>
     </PageContainer>
   );
 }

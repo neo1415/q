@@ -47,6 +47,11 @@ export type AnswerPathInput = {
     readonly onScreenRecord: boolean;
     readonly qWork: boolean;
     readonly ownCompany: boolean;
+    /**
+     * The GateQ application selected on their screen: its submitted
+     * dossier was read for this turn, through the gateway's own authority.
+     */
+    readonly focusDossier?: boolean | undefined;
   };
 };
 
@@ -72,6 +77,26 @@ export function answerPathOf(input: AnswerPathInput): AnswerPathChoice {
       path: "APP_QUERY",
       because: input.discover ? "DISCOVER" : input.fit ? "FIT" : "ATTENTION",
     };
+  }
+  /**
+   * S6 (lane S, live 2026-10-15 runs f854c339 and ddf0738b): a review of
+   * the GateQ application selected on their screen ("explain this
+   * founder's business ... next review actions") reads as ADVICE, and
+   * advice takes research by default, so the turn went the full path:
+   * 109 tools, ~41k input tokens before the first word, and 6.9 s to first
+   * text. Its subject is the submitted dossier already read for them, so
+   * it is answered over it, with no tool round. Only advice and questions
+   * about the record on screen; a question that names the web (PUBLIC_FACTS,
+   * REAL_WORLD_EXAMPLE, a research request) or someone else keeps the
+   * full path, as does any request to act or write (above).
+   */
+  if (
+    input.prepared.focusDossier === true &&
+    !input.aboutNamedOther &&
+    (input.questionKind === "ADVICE" ||
+      input.preparedSubject === "ON_SCREEN_RECORD")
+  ) {
+    return { path: "PREPARED_CONTEXT", because: "GATEQ_DOSSIER" };
   }
   if (input.researchMode === "EXPLICIT") {
     return { path: "DEEP_ANALYSIS", because: "RESEARCH" };

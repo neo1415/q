@@ -182,6 +182,7 @@ import {
   controlBindingOf,
   focusFromHistory,
   listsFromHistory,
+  hereFromManifest,
   listsFromManifest,
   referenceAskOf,
   resolutionNote,
@@ -247,6 +248,7 @@ function pointedAt(
     const latestQ = [...history].reverse().find((one) => one.role === "Q");
     const resolved = resolveReference(ask, {
       page: listsFromManifest(manifest),
+      here: hereFromManifest(manifest),
       answers: listsFromHistory(history),
       answerIsNewest: (latestQ?.blocks ?? []).some(
         (block) => block.kind === "ANSWER_CARDS",
@@ -773,6 +775,10 @@ function askedIn(history: readonly QConversationMessage[]): string {
  * words voice speaks for the same destinations; the screen follows the
  * UI_INTENT the message carries, through its one route map.
  */
+/** Words that ask for the public web, so advice still researches (S7). */
+const NAMES_THE_WEB =
+  /\b(?:web|online|internet|news|press|google|public(?:ly)?\s+(?:sources?|information|record|reports?)|search(?:\s+for)?|look\s+(?:it|them|this|that)\s+up|in\s+the\s+media)\b/i;
+
 const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   HOME: "Taking you home now.",
   PROFILE: "Opening your profile.",
@@ -4442,6 +4448,26 @@ export function createSpecialistQAnswer(
     return outcome;
   };
 
+  /**
+   * S7 (lane S, live 2026-10-15 runs d3fdbd12 and f72d9994, "What are the
+   * main risks here?" on a company page): advice takes research by default
+   * (q-core), so every such ask about a company Capital Q holds searched the
+   * public web first -- 6.3 s before the synthesis started, first text at
+   * 11.3-11.7 s, a paid provider call each time. The specialist reads the
+   * web only for a turn that asks for public information: a research
+   * request, PUBLIC_FACTS or REAL_WORLD_EXAMPLE, or words that name the web.
+   * Advice alone is answered from Capital Q's records. A company known only
+   * publicly is still always researched (the specialist's own rule).
+   */
+  const adviceOnCapitalQRecord = (
+    request: QAnswerRequest,
+    text: string,
+  ): boolean =>
+    request.turnKind === "QUESTION_TO_Q" &&
+    request.questionKind === "ADVICE" &&
+    !NAMES_THE_WEB.test(text) &&
+    !namesWebAddress(text);
+
   const answerOnce = async (
     request: QAnswerRequest,
     route: {
@@ -4532,7 +4558,9 @@ export function createSpecialistQAnswer(
         company,
         question: latest.content,
         conversation: earlierTurns(history, latest.id),
-        publicResearch: directive?.mode === "EXPLICIT",
+        publicResearch:
+          directive?.mode === "EXPLICIT" &&
+          !adviceOnCapitalQRecord(request, latest.content),
         // A gap question changes what is emphasised, never what is read.
         ...(asksAboutGaps(latest.content) ? { focus: ["GAPS"] as const } : {}),
         // Their own conversation's most recent document, so a request

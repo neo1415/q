@@ -106,6 +106,31 @@ export type MemoryServiceDependencies = {
   readonly now?: (() => number) | undefined;
 };
 
+/**
+ * Lane S 2026-10-15 (memory audit, 7 days): a correction of which thing a
+ * turn meant ("The intended chat was Tensorgate, not Halyard Security",
+ * "The intended item to open was the Tensorgate rehearsal") was recalled
+ * into every later session, 80-448 times each, where "open the chat"
+ * means whatever is on screen then. Such a correction settles its own
+ * conversation; elsewhere it is stale context, so recall leaves it out
+ * there. It stays stored, with its history (nothing is overwritten). A
+ * correction of a name or its spelling ("Meditril, not Metru") is about
+ * the person's words and keeps applying everywhere.
+ */
+const TURN_REFERENT_KEY =
+  /^correction\.(?:[a-z_]*_target|open_item|item_to_open|intended_[a-z_]+|conversation_name|meeting_contact|chat|page|tab)$/u;
+
+function turnReferentElsewhere(
+  item: MemoryItem,
+  conversationId: string | undefined,
+): boolean {
+  if (item.memoryType !== "correction") return false;
+  if (!TURN_REFERENT_KEY.test(item.memoryKey)) return false;
+  return (
+    conversationId === undefined || item.sourceConversationId !== conversationId
+  );
+}
+
 export type RecallQuery = {
   readonly actor: ActorContext;
   /** The conversation the run belongs to, when known. */
@@ -262,7 +287,8 @@ export function createMemoryService(
       const person = items.filter(
         (item) =>
           item.memoryType !== "small_talk" &&
-          (item.subject === null || item.subject.subjectType === "PERSON"),
+          (item.subject === null || item.subject.subjectType === "PERSON") &&
+          !turnReferentElsewhere(item, query.conversationId),
       );
       const company = items.filter(
         (item) =>

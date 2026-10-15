@@ -375,6 +375,47 @@ describe("an arrival follow-up is answered by code, with no tool and no model ro
       arrivalFollowUpAnswer("what's the request from Halyard?", two)?.itemKey,
     ).toBe("other");
   });
+
+  it("lane S: a follow-up that names no one continues their own last turn", () => {
+    // Audit 10-11 20:24: "let me see what Spheros is saying", answered;
+    // then "open the chat, let me see it myself" asked which one.
+    const first = SNAPSHOT.items[0];
+    if (first === undefined) throw new Error("fixture");
+    const two = {
+      ...SNAPSHOT,
+      items: [
+        first,
+        {
+          ...first,
+          key: "other",
+          counterpart: { ...first.counterpart, id: REL, name: "Halyard" },
+        },
+      ],
+    } as ArrivalSnapshot;
+    expect(
+      arrivalFollowUpAnswer("what's the request?", two, [
+        "Tell me about my day",
+        "let me see what Halyard is saying",
+      ])?.itemKey,
+    ).toBe("other");
+    // Their latest naming wins; Q's own words are never passed in.
+    expect(
+      arrivalFollowUpAnswer("what's the request?", two, [
+        "let me see what Halyard is saying",
+        `and ${String(first.counterpart?.name)}?`,
+      ])?.itemKey,
+    ).toBe(first.key);
+    // Two named in that turn, or none at all: still asks.
+    for (const earlier of [
+      [`Halyard and ${String(first.counterpart?.name)}`],
+      ["good morning"],
+      [],
+    ]) {
+      expect(
+        arrivalFollowUpAnswer("what's the request?", two, earlier)?.text,
+      ).toContain("Which one");
+    }
+  });
 });
 
 describe("a named counterparty the arrival did not mention goes to the normal path (journey A2)", () => {
