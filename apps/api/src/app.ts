@@ -271,6 +271,8 @@ export type ApiModules = {
         readonly mayPlay?: DiscoveryRoutesDependencies["mayPlay"] | undefined;
         /** Explore (E1-E5, ADR 0055). Absent: no Explore route registers. */
         readonly explore?: ExploreRoutesDependencies["explore"] | undefined;
+        readonly exploreCompanies?:
+          ExploreRoutesDependencies["searchCompanies"] | undefined;
       })
     | undefined;
   readonly capital?: CapitalRoutesDependencies["capital"] | undefined;
@@ -572,6 +574,7 @@ export function createApp(
         authenticator: security.authenticator,
         resolver: security.resolver,
         explore: modules.discovery.explore,
+        searchCompanies: modules.discovery.exploreCompanies,
       });
     }
     if (modules.discovery.interactions !== undefined) {

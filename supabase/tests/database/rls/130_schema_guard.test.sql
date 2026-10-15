@@ -251,6 +251,10 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('billing', 'fee_schedules',              'INTERNAL_SERVER_ONLY', '{}'),
   ('billing', 'fee_entries',                'INTERNAL_SERVER_ONLY', '{}'),
   ('billing', 'credit_entries',             'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'video_allowance_config',     'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'video_allowance_testers',    'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'video_session_reservations', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('billing', 'video_usage_ledger',         'INTERNAL_SERVER_ONLY', '{}'),
   -- end BILLING block
   ('q_runtime', 'checkpoints',               'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'checkpoint_blobs',          'INTERNAL_SERVER_ONLY', '{}'),

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
+import { VideoAllowanceDtoSchema } from "../common/video-allowance.js";
 import { QRehearsalDtoSchema } from "./rehearsals.js";
 
 /**
@@ -67,6 +68,8 @@ export const RehearsalInterviewersDtoSchema = z
     videoAvailable: z.boolean(),
     maxSeconds: z.literal(REHEARSAL_VIDEO_MAX_SECONDS),
     interviewers: z.array(RehearsalInterviewerDtoSchema).max(12),
+    /** Video sessions left this week, shared with GateQ; optional for rollout. */
+    allowance: VideoAllowanceDtoSchema.nullable().optional(),
   })
   .strict();
 export type RehearsalInterviewersDto = z.infer<

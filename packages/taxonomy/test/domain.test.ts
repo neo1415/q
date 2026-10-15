@@ -81,12 +81,16 @@ describe("reference taxonomy (§110-120)", () => {
       Object.fromEntries(
         REFERENCE_TAXONOMY.vocabularies.map((v) => [v.code, v.version]),
       ),
-    ).toMatchObject({ geography: 2, industry: 1 });
+    ).toMatchObject({ geography: 3, industry: 1 });
     expect(
       REFERENCE_TAXONOMY.vocabularies
         .filter((v) => v.code !== "geography")
         .every((v) => v.version === 1),
     ).toBe(true);
+    expect(referenceNode("geography", "qatar").metadata).toEqual({
+      iso3166Alpha2: "QA",
+    });
+    expect(referenceNode("geography", "qatar").parentCode).toBe("middle_east");
     expect(referenceNode("geography", "cote_divoire").metadata).toEqual({
       iso3166Alpha2: "CI",
     });

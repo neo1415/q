@@ -555,8 +555,9 @@ const VOCABULARIES: readonly VocabularySpec[] = [
       "Operating and target markets: regions and countries. Regional containment is a pragmatic MVP grouping, not a political statement.",
     // v2 (CQ-ACCEPT-001): an investor named Côte d'Ivoire and only Ghana
     // could be recorded. More of the markets investors here name, and a
-    // Central Africa region.
-    version: 2,
+    // Central Africa region. v3 (2026-10-15): Qatar and the other GCC
+    // countries under the Middle East.
+    version: 3,
     nodes: [
       {
         code: "global",
@@ -614,6 +615,16 @@ const VOCABULARIES: readonly VocabularySpec[] = [
         "AE",
         "middle_east",
       ),
+      // v3 (2026-10-15): the Gulf. Qatar-based founders and investors had
+      // no node to name their own market.
+      withAliases(country("qatar", "Qatar", "QA", "middle_east"), ["Doha"]),
+      withAliases(
+        country("saudi_arabia", "Saudi Arabia", "SA", "middle_east"),
+        ["KSA", "Saudi"],
+      ),
+      country("kuwait", "Kuwait", "KW", "middle_east"),
+      country("bahrain", "Bahrain", "BH", "middle_east"),
+      country("oman", "Oman", "OM", "middle_east"),
       { code: "asia", name: "Asia" },
       country("india", "India", "IN", "asia"),
       country("singapore", "Singapore", "SG", "asia"),
