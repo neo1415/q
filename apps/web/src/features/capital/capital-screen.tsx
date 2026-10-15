@@ -245,7 +245,7 @@ export async function FounderTab({
       ]);
       return (
         <div className="flex flex-col gap-6" data-capital-overview>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
             <RaiseSummary ledger={ledger} />
             <StopYourRaise readiness={readiness} />
           </div>

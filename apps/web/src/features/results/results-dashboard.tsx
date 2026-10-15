@@ -587,7 +587,7 @@ function InvestorDashboard(
 
       <Activity activity={results.activity} first="Interest sent" />
 
-      <div className="grid gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
+      <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
         <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
           <Pipeline
             props={props}
@@ -874,7 +874,7 @@ function FounderDashboard(
 
       <Activity activity={results.activity} first="Interest received" />
 
-      <div className="grid gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
+      <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
         <Pipeline
           props={props}
           side="FOUNDER"

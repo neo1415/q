@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// The loading shape reads the address it is loading (the tab just chosen).
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams("view=pipeline"),
+}));
 
 import RecordCompanyLoading from "../app/(app)/relationships/company/[companyId]/loading";
 import RecordInvestorLoading from "../app/(app)/relationships/investor/[investorOrganisationId]/loading";
@@ -15,7 +20,13 @@ describe("CRM loading shapes", () => {
     expect(status.getAttribute("aria-busy")).toBe("true");
     expect(
       container.querySelectorAll("[data-loading-rows=queue] li"),
-    ).toHaveLength(5);
+    ).toHaveLength(3);
+    // The tab just chosen is underlined at once (owner 2026-10-16).
+    const chosen = within(status).getByText("Pipeline");
+    expect(chosen.className).toContain("border-(--cq-accent)");
+    expect(within(status).getByText("Overview").className).toContain(
+      "border-transparent",
+    );
     // No heading or text that would change when the page arrives.
     expect(screen.queryByRole("heading")).toBeNull();
   });

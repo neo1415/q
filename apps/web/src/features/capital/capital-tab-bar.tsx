@@ -129,7 +129,10 @@ export function CapitalTabBar({
       ref={listRef}
       role="tablist"
       aria-label="Capital"
-      className="-mx-4 flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+      // The second level under the CRM's tabs (owner 2026-10-16): a
+      // segmented strip, filled when selected, so it never reads as a
+      // second copy of the underlined row above it.
+      className="-mx-4 flex gap-1 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:w-fit sm:max-w-full sm:border sm:border-(--cq-border-subtle) sm:bg-(--cq-surface) sm:p-1 [&::-webkit-scrollbar]:hidden"
     >
       {CAPITAL_TABS.map((tab) => {
         const selected = tab.key === chosen;
@@ -146,7 +149,7 @@ export function CapitalTabBar({
             tabIndex={selected ? 0 : -1}
             onKeyDown={onKeyDown}
             onClick={() => setPick({ tab: tab.key, from: active })}
-            className={`cq-body-sm -mb-px inline-flex min-h-11 flex-none items-center gap-2 border-b-2 px-3 whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) ${selected ? "border-(--cq-accent) font-semibold text-(--cq-text-primary)" : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)"}`}
+            className={`cq-body-sm inline-flex min-h-11 flex-none items-center gap-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9 ${selected ? "bg-(--cq-surface-strong) font-semibold text-(--cq-text-primary)" : "font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"}`}
           >
             {tab.label}
             {badges[tab.key] ?? null}

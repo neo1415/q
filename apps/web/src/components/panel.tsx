@@ -48,7 +48,7 @@ export function Panel({
       )}
       {...rest}
     >
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-(--cq-border-subtle) px-4 py-3 sm:px-5">
+      <header className="flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-(--cq-border-subtle) px-4 py-2 sm:px-5">
         <div className="flex min-w-0 flex-col gap-0.5">
           <Heading
             id={`${id}-title`}
