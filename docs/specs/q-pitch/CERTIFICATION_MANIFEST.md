@@ -149,8 +149,14 @@ Recording of the full 8-scene premiere: `qpitch-review/41b3b4ee/premiere-cert2-4
 
 - **Fixture:** Duplo, Bumpa and MedTrail are still not fictional-world companies (see 242460c1). These scene receipts certify the **behaviour** (receipt-bound keys, honest fallback). They are not a licence to narrate these companies to an external audience.
 - **Rehearsal review:** it contains a score. Per `claimsForbidden`, never say the score before the review is read on screen.
-- **Ack timing:** scene 1's 20 s ack window is tight. One of the two runs missed it (ACK_TIMEOUT). Consider 30 s (an owner decision; not changed here).
-- **Machine ledger not changed:** `PREMIERE_CERTIFICATION_LEDGER` in `premiere.ts` still says CODE_VERIFIED for privacy and rehearsal. Promoting them for the audience gate is a lead decision.
+- **Ack timing (lead decision, applied):** one of the two top-three runs missed scene 1's 20 s ack window (ACK_TIMEOUT). The window is now 30 s in `pilot.ts`, with `tour-runner.test.ts` updated to match; 82/82 q-pitch tests pass. **Not deployed.**
+- **Privacy negative test (step 2) BLOCKED, 08:27 UTC, free:** there is no founder-private document to test against. Read-only GETs as the owning fictional founders found **zero documents**:
+  - `GET /v1/documents` as `founder.ledgerfold` and as `founder.maji-loop`;
+  - `GET /v1/companies/:id/data-room` for Ledgerfold `84b9641f…` and Maji Loop `01c554bf…`.
+
+  A refused read of an id that does not exist proves nothing, because the API returns the same not-found for both. Creating a document would be a write that has not been approved, and taking an id from another company would need a privileged read. **Unblock:** the lead approves seeding one founder-private document on a fictional company, or names an existing one. Then `GET /v1/companies/:companyId/data-room/documents/:documentId/open` returns 200 as the founder (positive) and 404 as `investor.savanna-seed` (negative).
+
+- **Machine ledger not changed:** per the lead, privacy is promoted only after the negative test passes, and Q-to-Q stays CODE_VERIFIED until the mic "skip" test runs. So `PREMIERE_CERTIFICATION_LEDGER` keeps both as CODE_VERIFIED.
 
 ## Lane P cost log (15 Oct)
 
