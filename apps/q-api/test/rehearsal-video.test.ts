@@ -1277,6 +1277,37 @@ describe("the routes", () => {
     await app.close();
   });
 
+  it("answers the provider's setup probe without making it a founder turn", async () => {
+    const { app, harness } = await server();
+    const started = await app.inject({
+      method: "POST",
+      url: `/v1/q/rehearsals/${REHEARSAL_ID}/video`,
+      payload: { interviewerId: "partner-steve" },
+    });
+    const body = StartRehearsalVideoResponseSchema.parse(started.json());
+    if (body.mode !== "VIDEO") throw new Error("expected video");
+    const probed = await app.inject({
+      method: "POST",
+      url: `${qRehearsalVideoBridgeBasePath(body.session.id)}/chat/completions`,
+      headers: { authorization: `Bearer ${bearerOf(harness.tavus.calls)}` },
+      payload: {
+        messages: [
+          { role: "system", content: "conduct" },
+          {
+            role: "user",
+            content:
+              "This is an automated connectivity check sent during custom LLM configuration. Confirm your streaming chat completions endpoint is working by responding with exactly: 'Custom LLM configuration test successful.'",
+          },
+        ],
+      },
+    });
+    expect(probed.statusCode).toBe(200);
+    expect(probed.body).toContain("Custom LLM configuration test successful.");
+    // Production 2026-10-13: the probe became the founder's first answer.
+    expect(harness.rehearsals.said).toHaveLength(0);
+    await app.close();
+  });
+
   it("canonical finish route cannot bypass failed provider termination", async () => {
     const { app, harness } = await server();
     await startVideo(harness);

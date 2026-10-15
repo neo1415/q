@@ -18,6 +18,11 @@ import {
   type GateqVideoSessionView,
 } from "@capital-q/gateq-intake";
 
+import {
+  isTavusConnectivityCheck,
+  TAVUS_CONNECTIVITY_REPLY,
+} from "../gateq/video-provider.js";
+
 /**
  * The GateQ video interview (directive C3). The applicant's routes take
  * their guest credential exactly as the typed interview's do; anything
@@ -195,20 +200,26 @@ export function registerGateqVideoRoutes(
         return problem(request, reply, "INVALID_REQUEST", "Invalid request.");
       const users = body.data.messages.filter((m) => m.role === "user");
       const last = users.at(-1);
+      // The provider's own setup probe: answered, never an applicant turn.
+      const probe = isTavusConnectivityCheck(
+        users.map((m) => contentText(m.content)),
+      );
       // The Nth thing the applicant said is the same line on redelivery.
       // A failed turn is spoken as a short retry, never a broken stream;
       // the line was not recorded, so saying it again is the same turn.
-      const result = await video
-        .bridgeTurn({
-          bearer,
-          utterance: last === undefined ? "" : contentText(last.content),
-          utteranceId: `user-${String(users.length)}`,
-          correlationId: randomUUID(),
-        })
-        .catch(() => ({
-          kind: "REPLY" as const,
-          reply: "Sorry, I lost that for a second. Could you say it again?",
-        }));
+      const result = probe
+        ? { kind: "REPLY" as const, reply: TAVUS_CONNECTIVITY_REPLY }
+        : await video
+            .bridgeTurn({
+              bearer,
+              utterance: last === undefined ? "" : contentText(last.content),
+              utteranceId: `user-${String(users.length)}`,
+              correlationId: randomUUID(),
+            })
+            .catch(() => ({
+              kind: "REPLY" as const,
+              reply: "Sorry, I lost that for a second. Could you say it again?",
+            }));
       if (result.kind === "UNKNOWN_SESSION")
         return problem(
           request,

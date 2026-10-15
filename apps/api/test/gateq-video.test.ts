@@ -162,6 +162,49 @@ describe("the provider bridge", () => {
     );
   });
 
+  it("answers the provider's setup probe without recording it as the applicant", async () => {
+    const { app, video } = build();
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/gateq/video/bridge/chat/completions",
+      headers: auth("b".repeat(43)),
+      payload: {
+        messages: [
+          {
+            role: "user",
+            content:
+              "This is an automated connectivity check sent during custom LLM configuration. Confirm your streaming chat completions endpoint is working by responding with exactly: 'Custom LLM configuration test successful.'",
+          },
+        ],
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain(
+      "Custom LLM configuration test successful.",
+    );
+    expect(video.bridgeTurn).not.toHaveBeenCalled();
+  });
+
+  it("hears the probe sentence as speech once the interview is under way", async () => {
+    const { app, video } = build();
+    const probe =
+      "This is an automated connectivity check sent during custom LLM configuration.";
+    await app.inject({
+      method: "POST",
+      url: "/v1/gateq/video/bridge/chat/completions",
+      headers: auth("b".repeat(43)),
+      payload: {
+        messages: [
+          { role: "user", content: "We sell water." },
+          { role: "user", content: probe },
+        ],
+      },
+    });
+    expect(video.bridgeTurn).toHaveBeenCalledWith(
+      expect.objectContaining({ utterance: probe, utteranceId: "user-2" }),
+    );
+  });
+
   it("refuses a missing or unknown bearer", async () => {
     const { app } = build();
     for (const headers of [{}, auth("x".repeat(43))]) {
