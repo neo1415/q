@@ -3,11 +3,17 @@ import {
   AGENT_REGISTRY,
   DEFAULT_REVIEW_POLICY,
   RUBRIC_VERSION,
+  EMPTY_SITUATION,
   boundPlan,
   executorRosterText,
+  groundReasoning,
+  groundStepEvidence,
   planIsValid,
   registeredExecutors,
+  reviewSignals,
   runJob,
+  situationText,
+  type JobSituation,
   type AgentExecutor,
   type BoundStep,
   type JobRecorder,
@@ -18,6 +24,7 @@ import {
   workforceCorrelationId,
   type QAgentRole,
   type WorkforceDocumentRequest,
+  type WorkforceJobReasoning,
 } from "@capital-q/contracts";
 import { stanceDeclines } from "@capital-q/q-core";
 import { z } from "zod";
@@ -354,7 +361,11 @@ export function createWorkforceExecutors(dependencies: {
                     : { companyId: result.companyId }),
                   ...(result.review === undefined
                     ? {}
-                    : { review: result.review }),
+                    : {
+                        review: result.review,
+                        // What the critic found that changes what comes next.
+                        signals: reviewSignals(result.review, step.key),
+                      }),
                 },
               };
             }
@@ -846,6 +857,10 @@ export type PlannedJob = {
     readonly reason: string;
   }[];
   readonly cannot: readonly string[];
+  /** wf: the lead's grounded reasoning; absent on older approved plans. */
+  readonly reasoning?: WorkforceJobReasoning | undefined;
+  /** Evidence references the planner gave that were not facts (dropped). */
+  readonly droppedRefs?: number | undefined;
 };
 
 export function createWorkforceJobs(dependencies: {
@@ -874,9 +889,12 @@ export function createWorkforceJobs(dependencies: {
         | { readonly companyId: string; readonly name: string }
         | null
         | undefined;
+      /** What code read from their records for this job (authorised). */
+      readonly situation?: JobSituation | undefined;
     },
     trace: { readonly jobId: string; readonly runId: string } | null,
   ): Promise<PlannedJob | null> {
+    const situation = input.situation ?? EMPTY_SITUATION;
     const permitted = new Set(input.permitted);
     // D1: the roster is what this deployment really runs, nothing more.
     const executors = registeredExecutors({
@@ -892,10 +910,28 @@ export function createWorkforceJobs(dependencies: {
           ? " The job names no single company on record, so a NAMED_COMPANY document cannot be planned."
           : ` The company the job names is on record${input.namedCompany.name === "" ? "" : `: ${input.namedCompany.name.slice(0, 120)}`}.`
       }`,
+      situation: situationText(situation).slice(0, 8_000),
     });
     if (planned === null) return null;
+    let droppedRefs = 0;
     const bound = boundPlan(
-      planned.steps.map((step) => ({ ...step, agentName: null })),
+      planned.steps.map((step) => {
+        // Only facts the lead was shown may stand behind a step.
+        const grounded = groundStepEvidence(step.evidence, situation);
+        droppedRefs += grounded.dropped;
+        return {
+          key: step.key,
+          role: step.role,
+          agentName: null,
+          goal: step.goal,
+          tools: step.tools,
+          dependsOn: step.dependsOn,
+          ...(step.document === undefined ? {} : { document: step.document }),
+          why: step.why,
+          evidence: grounded.evidence,
+          ...(step.fallbackFor === null ? {} : { fallbackFor: step.fallbackFor }),
+        };
+      }),
       {
         permitted,
         // The lead's own planning comes out of the same budget.
@@ -911,11 +947,14 @@ export function createWorkforceJobs(dependencies: {
         "workforce plan refused before approval",
       );
     }
+    const grounded = groundReasoning(planned, situation, bound.steps);
     return {
       summary: planned.summary,
       steps: bound.steps,
       refused: bound.refused,
       cannot: planned.cannot,
+      reasoning: grounded.reasoning,
+      droppedRefs: droppedRefs + grounded.droppedRefs,
     };
   }
 
@@ -1077,6 +1116,7 @@ export function createWorkforceJobs(dependencies: {
           | { readonly companyId: string; readonly name: string }
           | null
           | undefined;
+        readonly situation?: JobSituation | undefined;
       },
     ) => plan(owner, input, null),
 
@@ -1185,8 +1225,10 @@ export function workforceTracker(
 
 /** A job's status from its steps: DONE only when every step is done. */
 export function jobStatusOf(
-  steps: readonly { readonly status: string }[],
+  all: readonly { readonly status: string; readonly counts?: boolean | undefined }[],
 ): "DONE" | "HELD" | "FAILED" {
+  // A fallback not needed, or a step a fallback stood in for, does not count.
+  const steps = all.filter((step) => step.counts !== false);
   if (steps.length === 0) return "HELD";
   if (steps.every((step) => step.status === "DONE")) return "DONE";
   if (steps.some((step) => step.status === "HELD")) return "HELD";

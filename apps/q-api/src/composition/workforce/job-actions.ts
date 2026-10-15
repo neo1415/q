@@ -17,6 +17,7 @@ import {
   executorRoleOf,
   isAgentRole,
   registeredExecutors,
+  situationFrom,
   type BoundStep,
 } from "@capital-q/q-orchestrator";
 import type { QJobPlanView, QJobPort } from "@capital-q/q-tools";
@@ -98,6 +99,30 @@ export function needsYouFor(
   return needs;
 }
 
+/** What is missing or not known, in plain words (code's, from the plan). */
+export function missingLines(payload: WorkforceJobStartPayload): string[] {
+  return (payload.reasoning?.prerequisites ?? [])
+    .filter((one) => one.status !== "MET")
+    .map((one) => {
+      const by = payload.steps.find((step) => step.key === one.resolvedBy);
+      const state = one.status === "MISSING" ? "missing" : "not known yet";
+      return `${one.what} (${state}${one.blocking ? ", needed for the outcome" : ""}${by === undefined ? "" : `; ${who(by)} gets it`})`.slice(
+        0,
+        400,
+      );
+    });
+}
+
+/** What comes next, each saying whether it would need their approval. */
+export function nextLines(payload: WorkforceJobStartPayload): string[] {
+  return (payload.reasoning?.nextActions ?? []).map((one) =>
+    `${one.action}${one.needsApproval ? " (needs your approval)" : ""}`.slice(
+      0,
+      400,
+    ),
+  );
+}
+
 export function planView(
   payload: WorkforceJobStartPayload,
   calendarConnected: boolean | null = null,
@@ -106,11 +131,21 @@ export function planView(
     summary: payload.summary,
     steps: payload.steps.map((step) => ({
       who: who(step),
-      does: step.goal,
+      does:
+        step.fallbackFor === undefined
+          ? step.goal
+          : `${step.goal} (only if ${who(payload.steps.find((one) => one.key === step.fallbackFor) ?? step)} cannot)`,
     })),
     cannot: payload.cannot,
     budgetUsd: payload.budgetUsd,
     needsYou: needsYouFor(payload, calendarConnected),
+    ...(payload.reasoning === undefined
+      ? {}
+      : {
+          outcome: payload.reasoning.outcome,
+          missing: missingLines(payload),
+          next: nextLines(payload),
+        }),
   };
 }
 
@@ -217,10 +252,30 @@ export function relatedWaiting(
 
 /** The card's preview: the plan the person approves, step by step. */
 function preview(payload: WorkforceJobStartPayload): string {
-  const lines = payload.steps.map(
-    (step, index) =>
-      `${String(index + 1)}. ${who(step)}${step.spawned ? " (a helper for this step only)" : ""}: ${step.goal}`,
+  const lines: string[] = [];
+  if (payload.reasoning !== undefined) {
+    lines.push(`Outcome: ${payload.reasoning.outcome}`);
+  }
+  const facts = new Map(
+    (payload.reasoning?.situation ?? []).map((fact) => [fact.ref, fact.text]),
   );
+  lines.push(
+    ...payload.steps.map((step, index) => {
+      const covers =
+        step.fallbackFor === undefined
+          ? undefined
+          : payload.steps.find((one) => one.key === step.fallbackFor);
+      const because = (step.evidence ?? [])
+        .flatMap((ref) => {
+          const text = facts.get(ref);
+          return text === undefined ? [] : [text];
+        })
+        .slice(0, 2);
+      return `${String(index + 1)}. ${who(step)}${step.spawned ? " (a helper for this step only)" : ""}${covers === undefined ? "" : ` (only if ${who(covers)} cannot)`}: ${step.goal}${step.why === undefined ? "" : ` Why: ${step.why}`}${because.length === 0 ? "" : ` Based on: ${because.join(" ")}`}`;
+    }),
+  );
+  const missing = missingLines(payload);
+  if (missing.length > 0) lines.push(`Missing or not known: ${missing.join("; ")}.`);
   lines.push(
     "Every message to the other side is checked by the reviewer before it goes.",
   );
@@ -291,6 +346,11 @@ export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
         ),
         spawned: step.spawned,
         ...(step.document === undefined ? {} : { document: step.document }),
+        ...(step.why === undefined ? {} : { why: step.why }),
+        ...(step.evidence === undefined ? {} : { evidence: step.evidence }),
+        ...(step.fallbackFor === undefined
+          ? {}
+          : { fallbackFor: step.fallbackFor }),
       },
     ];
   });
@@ -299,6 +359,7 @@ export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
     steps,
     refused: [],
     cannot: payload.cannot,
+    ...(payload.reasoning === undefined ? {} : { reasoning: payload.reasoning }),
   };
 }
 
@@ -430,10 +491,14 @@ export function createWorkforceJobBoard(dependencies: {
           return { status: "ONE_PER_TURN", plan: planView(existing.payload) };
         }
         // R5: like a colleague, look at what is already waiting first.
+        const waitingNow =
+          dependencies.waiting === undefined
+            ? []
+            : await dependencies.waiting(actor).catch(() => []);
         if (options?.proceed !== true && dependencies.waiting !== undefined) {
           const related = relatedWaiting(
             goal,
-            await dependencies.waiting(actor).catch(() => []),
+            waitingNow,
             options?.subjects ?? [],
           );
           if (related.waiting.length > 0) {
@@ -469,6 +534,30 @@ export function createWorkforceJobBoard(dependencies: {
               companies.length === 1 && companies[0] !== undefined
                 ? { companyId: companies[0], name: "" }
                 : null,
+            // wf: what code read from their records, as them, before planning.
+            situation: situationFrom({
+              briefs: options?.reads?.briefs ?? [],
+              unreadable: options?.reads?.unreadable ?? [],
+              overview:
+                options?.reads?.overview === undefined
+                  ? undefined
+                  : options.reads.overview === null
+                    ? null
+                    : {
+                        items: options.reads.overview.items.map((item) => ({
+                          name: item.counterpart.name,
+                          state: item.state,
+                          stateSince: item.stateSince,
+                          nextStep: item.nextStep,
+                          lastFrom:
+                            item.lastMessageRead === "OK"
+                              ? (item.lastMessage?.from ?? null)
+                              : undefined,
+                          lastAt: item.lastMessage?.at ?? null,
+                        })),
+                      },
+              waiting: waitingNow,
+            }),
           })
           .catch(() => null);
         // Live 2026-10-12: the planner's provider refused (credit exhausted)
@@ -491,6 +580,13 @@ export function createWorkforceJobBoard(dependencies: {
           budgetUsd: usd(step.budgetUsd),
           spawned: step.spawned,
           ...(step.document === undefined ? {} : { document: step.document }),
+          ...(step.why === undefined ? {} : { why: step.why.slice(0, 300) }),
+          ...(step.evidence === undefined
+            ? {}
+            : { evidence: [...step.evidence].slice(0, 6) }),
+          ...(step.fallbackFor === undefined
+            ? {}
+            : { fallbackFor: step.fallbackFor.slice(0, 40) }),
         }));
         const parsed = WorkforceJobStartPayloadSchema.safeParse({
           ownerUserId: actor.userId,
@@ -503,6 +599,9 @@ export function createWorkforceJobBoard(dependencies: {
           ),
           budgetUsd: usd(budget),
           cannot: planned.cannot.slice(0, 5),
+          ...(planned.reasoning === undefined
+            ? {}
+            : { reasoning: planned.reasoning }),
         });
         if (!parsed.success) return { status: "NOT_PLANNED" };
         prepared.set(runId, {

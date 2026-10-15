@@ -1317,6 +1317,7 @@ export {
   JOB_PLAN_V1,
   JOB_PLAN_V2,
   JOB_PLAN_V3,
+  JOB_PLAN_V5,
   REPLY_READER_V1,
 } from "./prompts/tasks/workforce.v1.js";
 export {
@@ -1334,6 +1335,12 @@ export {
   JOB_PLAN_V3_SCHEMA_VERSION,
   JobPlanResultV4Schema,
   JOB_PLAN_V4_SCHEMA_VERSION,
+  JOB_PLAN_V5_SCHEMA_VERSION,
+  JOB_PLAN_V5_UNTRUSTED,
+  JobPlanResultV5Schema,
+  JobPlanVariablesV5Schema,
+  type JobPlanResultV5,
+  type JobPlanVariablesV5,
   PlannedNamedCompanyDocumentSchema,
   SUBSTANCE_CRITIQUE_SCHEMA_NAME,
   SUBSTANCE_CRITIQUE_SCHEMA_VERSION,

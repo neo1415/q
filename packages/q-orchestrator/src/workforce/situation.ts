@@ -59,8 +59,29 @@ const DECISION_WORDS: Readonly<Record<RelationshipBriefDecision["kind"], string>
     RESUME: "resume the paused conversation",
   };
 
+/**
+ * The person's relationships at a glance, when the goal names nobody (a
+ * founder preparing a round): their own side's list, folded by the
+ * Network context. Structural, so this package needs no tool types.
+ */
+export type RelationshipOverview = {
+  readonly items: readonly {
+    readonly name: string;
+    readonly state: string;
+    readonly stateSince: string;
+    readonly nextStep: string;
+    /** Who wrote last; undefined or null: not known or no messages. */
+    readonly lastFrom?: "THEM" | "YOU" | null | undefined;
+    readonly lastAt?: string | null | undefined;
+  }[];
+};
+
+const OVERVIEW_ITEMS_MAX = 6;
+
 export function situationFrom(input: {
   readonly briefs: readonly RelationshipBrief[];
+  /** Read only when the goal names no relationship of theirs. */
+  readonly overview?: RelationshipOverview | null | undefined;
   /** Briefs that were asked for and could not be read: names, or null. */
   readonly unreadable?: readonly (string | null)[] | undefined;
   readonly waiting?: readonly { readonly summary: string }[] | undefined;
@@ -179,6 +200,44 @@ export function situationFrom(input: {
         "DOCUMENT_SHARED",
         `${String(documents.items.length)} documents shared with ${name}: ${titles}.`,
       );
+    }
+  }
+  if (input.overview === null) {
+    add("UNKNOWN", "Your relationships: not known right now.");
+  } else if (input.overview !== undefined) {
+    const items = input.overview.items;
+    const byState = new Map<string, number>();
+    for (const item of items) {
+      byState.set(item.state, (byState.get(item.state) ?? 0) + 1);
+    }
+    add(
+      "RELATIONSHIP_STATE",
+      items.length === 0
+        ? "No relationships on record yet."
+        : `Your ${String(items.length)} relationships: ${[...byState.entries()]
+            .map(([state, count]) => `${String(count)} ${words(state)}`)
+            .join(", ")}.`,
+    );
+    const recent = [...items]
+      .sort((a, b) => b.stateSince.localeCompare(a.stateSince))
+      .slice(0, OVERVIEW_ITEMS_MAX);
+    for (const item of recent) {
+      const name = item.name.slice(0, 120);
+      add(
+        "RELATIONSHIP_STATE",
+        `With ${name}: ${words(item.state)} since ${day(item.stateSince)}; next step: ${words(item.nextStep)}.`,
+        item.stateSince,
+      );
+      if (item.lastFrom === "THEM") {
+        const ref = add(
+          "MESSAGE_WAITING",
+          `${name} wrote last${item.lastAt == null ? "" : `, on ${day(item.lastAt)}`}; not answered yet.`,
+          item.lastAt ?? null,
+        );
+        if (ref !== null) {
+          moves.push({ ref, owner: "YOU", kind: "REPLY_TO_MESSAGE", counterparty: name });
+        }
+      }
     }
   }
   for (const name of input.unreadable ?? []) {

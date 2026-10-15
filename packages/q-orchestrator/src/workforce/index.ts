@@ -71,6 +71,7 @@ export {
   situationFrom,
   situationText,
   type JobSituation,
+  type RelationshipOverview,
 } from "./situation.js";
 export {
   groundReasoning,
