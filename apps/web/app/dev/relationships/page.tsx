@@ -24,6 +24,7 @@ import { PipelineLayoutSwitch } from "@/features/relationships/pipeline-layout-s
 import { RelationshipPipeline } from "@/features/relationships/relationship-pipeline";
 import { RelationshipDetail } from "@/features/relationships/relationship-detail";
 import { DecisionRecord } from "@/features/relationships/decision-record";
+import { RecordLoading } from "@/features/relationships/crm-loading";
 import { RelationshipNotes } from "@/features/relationships/relationship-notes";
 import type { NeedsYouCard } from "@/features/relationships/relationships-view";
 import { ResultsDashboard } from "@/features/results/results-dashboard";
@@ -261,6 +262,7 @@ export default async function RelationshipsReviewPage({
       );
     }
     if (view === "record") {
+      if (state === "loading") return <RecordLoading />;
       const counterpart =
         state === "long"
           ? longName
