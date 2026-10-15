@@ -134,3 +134,20 @@ Core Seven remains the governing assessment framework. The new directive authori
     - concurrency 2;
     - a typed fallback that is always available.
     - Paid test runs are capped at 180 s.
+
+## Later on 15 October 2026
+
+30. **Full approval:** the owner has given full approval to proceed without asking for permission. Safety rules still bind: no secrets in Git or logs, no RLS weakening, no fabricated claims, and paid spend logged.
+31. **Tavus accounts:**
+    - Live GateQ and Rehearsal conversations use the owner's Tavus Builder key. It is configured on api and q-api, with fingerprint `b4a4e71d`; never record the key itself.
+    - The six owner-provided disposable keys are only for pitch-video generation. They are stored owner-only on the operator machine, never in the repository.
+    - Budget for this verification round: 10 Builder minutes. Never trigger overage.
+32. **Video allowance:**
+    - 5 Tavus sessions per user per week, shared across GateQ and Rehearsals, 180 s each.
+    - A global monthly cap, default 600 s.
+    - Testers are recorded in the ledger but don't use the weekly allowance.
+    - Every signed-in founder and investor gets access through the allowance.
+33. **Presenters:** variety comes first. Each stock replica id appears on at most 2 companies and each person on about 4, Black presenters are used wherever the catalogue allows (about 30%), and every video is labelled as an AI presenter.
+34. **Synthetic demo verification:** it is kept, but displayed as a distinct "Demo verified (synthetic)" badge. The gold badge is only for real operator or provider verification.
+35. **Q in Google Meet:** Q appears as a real Tavus presenter, a stock replica of a Black woman, rather than a letter tile.
+36. **Live voice:** the trial limits for the owner's test accounts are removed, and the daily caps are raised to $25 live and $15 realtime.
