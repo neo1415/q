@@ -134,7 +134,10 @@ describe("single-flight reads (K4)", () => {
         status: "FAILED",
         failureCode: "NOT_AVAILABLE",
         sensitivity: "CONFIDENTIAL",
-        result: { ok: false, error: { code: "NOT_AVAILABLE", message: "x" } },
+        result: {
+          ok: false,
+          error: { code: "NOT_AVAILABLE", safeMessage: "x" },
+        },
         latencyMs: 1,
       };
       return Promise.resolve(outcome);

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { GateqDossierV1Schema } from "@capital-q/contracts";
+import {
+  GateqDossierV1Schema,
+  type GateqDossierV1,
+} from "@capital-q/contracts";
 
 import { withDerivedAmountsMarked } from "../src/application/dossier.js";
 import {
@@ -33,7 +36,11 @@ describe("an amount is stated only when it is written in the person's words", ()
 });
 
 describe("a frozen dossier shows a derived amount as Q's inference", () => {
-  const fact = (summary: string, sourceTurnSeq: number | null) => ({
+  type DossierFact = GateqDossierV1["dimensions"][number]["facts"][number];
+  const fact = (
+    summary: string,
+    sourceTurnSeq: number | null,
+  ): DossierFact => ({
     dimension: "claims.revenue",
     label: "Revenue",
     summary,
