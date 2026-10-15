@@ -3440,6 +3440,36 @@ export function createModelGatewayQAnswer(
           ...(personality === null ? {} : { personality }),
           ...(asker === null ? {} : { asker }),
         });
+        // S3a (live 2026-10-15, #107): the named company read ahead of the
+        // model was looked up again (company.search, company.get: two
+        // NORMAL rounds, ~3.5 s) because the turn note told it to resolve
+        // the name. A named company whose complete authorised profile this
+        // run already holds is said to be among the facts, with its id.
+        const screenFocus =
+          plan.screen?.route === "COMPANY" || plan.screen?.route === "DISCOVER"
+            ? (plan.screen.companyId ?? null)
+            : null;
+        const namedAlreadyRead = [
+          ...runCompanies.read(request.runId).profiles,
+        ].filter(
+          ([companyId, name]) =>
+            companyId !== screenFocus &&
+            containsCompanyName(latest.content, name),
+        );
+        const alreadyReadNote =
+          namedAlreadyRead.length === 0
+            ? null
+            : `Already read for this turn through get_company, with complete authorized profiles among the facts: ${namedAlreadyRead
+                .map(([companyId, name]) => `${name} (company id ${companyId})`)
+                .join(
+                  "; ",
+                )}. Use those facts and ids without calling search_companies or get_company for them again. Resolve through search_companies and get_company only a named company not listed here.`;
+        if (request.aboutNamedOther !== true && alreadyReadNote !== null) {
+          noteParts = {
+            ...noteParts,
+            turn: [alreadyReadNote, noteParts.turn].join(" "),
+          };
+        }
         if (request.aboutNamedOther === true) {
           // A reader may call an investor's selected company "other" even
           // for "the risks for this company". Its complete profile was
@@ -3477,7 +3507,9 @@ export function createModelGatewayQAnswer(
             turn: [
               selectedTarget
                 ? "The current single-company question refers to the selected company whose complete, freshly read authorized profile is already among the facts. Use those facts without searching for its identity or reading the same profile again. If the question instead names a different target, resolve it through search_companies and get_company; never substitute the selected company's facts. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately."
-                : "Resolve the company named in the current question through search_companies and get_company before answering from its records. The company visible on screen is navigation context; do not substitute its facts for the named target. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately.",
+                : alreadyReadNote !== null
+                  ? `${alreadyReadNote} The company visible on screen is navigation context; do not substitute its facts for the named target. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately.`
+                  : "Resolve the company named in the current question through search_companies and get_company before answering from its records. The company visible on screen is navigation context; do not substitute its facts for the named target. A visible profile contains declared claims, not private founder onboarding responses. Missing authorised evidence stays unknown; public web material must be labelled separately.",
               noteParts.turn,
             ].join(" "),
           };
