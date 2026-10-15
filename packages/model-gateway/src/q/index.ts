@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import { publicResearchFollowUp } from "./research-follow-up.js";
+import {
+  publicResearchFollowUp,
+  type SelectedCompany,
+} from "./research-follow-up.js";
 
 import { z } from "zod";
 
@@ -2350,6 +2353,8 @@ export function createModelGatewayQAnswer(
     // K Part 4: a founder's own company from their Tier A snapshot, as a
     // fact, only where this run's plan holds that company's profile.
     let ownCompany: AuthorisedFact | null = null;
+    /** Their own company's id (a founder), whatever the plan admits. */
+    let ownCompanyId: string | null = null;
     const ownCompanyRead = (async (): Promise<void> => {
       if (ownInvestor !== null || dependencies.ownCompanySnapshot === undefined)
         return;
@@ -2357,6 +2362,7 @@ export function createModelGatewayQAnswer(
         .ownCompanySnapshot(request.actor)
         .catch(() => null);
       if (own === null) return;
+      ownCompanyId = own.companyId;
       ownCompany = ownCompanySnapshotFact(own, plan);
     })();
     const mandateRead = (async (): Promise<void> => {
@@ -2434,6 +2440,8 @@ export function createModelGatewayQAnswer(
      */
     let onScreenCompany: AuthorisedFact | null = null;
     let onScreenCompanyCall: QToolCallObservation | null = null;
+    /** Its canonical name, for who "they" is in a research follow-up. */
+    let onScreenCompanyName: string | null = null;
     const companyRead = (async (): Promise<void> => {
       if (
         counterparty?.kind !== "COMPANY" ||
@@ -2456,6 +2464,12 @@ export function createModelGatewayQAnswer(
       };
       if (outcome.result.ok) {
         onScreenCompany = onScreenCompanyFact(outcome.result.data);
+        const read: unknown = outcome.result.data;
+        const name =
+          typeof read === "object" && read !== null
+            ? (read as { readonly canonicalName?: unknown }).canonicalName
+            : undefined;
+        onScreenCompanyName = typeof name === "string" ? name : null;
       }
     })();
     /**
@@ -2899,11 +2913,13 @@ export function createModelGatewayQAnswer(
       ownProfileCall,
       ownMandateData: (): unknown => ownMandateData,
       ownCompany,
+      ownCompanyId,
       ownInvestor,
       relationship,
       relationshipCall,
       onScreenCompany,
       onScreenCompanyCall,
+      onScreenCompanyName,
       onScreenDaily,
       onScreenDailyCall,
       onScreenDocument,
@@ -3019,6 +3035,8 @@ export function createModelGatewayQAnswer(
         relationshipCall,
         onScreenCompany,
         onScreenCompanyCall,
+        onScreenCompanyName,
+        ownCompanyId,
         onScreenDaily,
         onScreenDailyCall,
         onScreenDocument,
@@ -3036,6 +3054,22 @@ export function createModelGatewayQAnswer(
         attention,
         counterparty,
       } = prepared;
+      /** The selected company, for who "they" is in a research follow-up. */
+      const selectedForResearch = (): SelectedCompany | null => {
+        const subject = request.subjects.find(
+          (candidate) => candidate.kind === "COMPANY",
+        );
+        if (subject?.kind !== "COMPANY") return null;
+        return {
+          companyId: subject.companyId,
+          name:
+            counterparty?.kind === "COMPANY" &&
+            counterparty.companyId === subject.companyId
+              ? onScreenCompanyName
+              : null,
+          own: ownCompanyId !== null && subject.companyId === ownCompanyId,
+        };
+      };
       // S2b: one declared profile fact about a company named outright.
       const companyFactAsk =
         request.writingDocument !== true &&
@@ -5009,9 +5043,7 @@ export function createModelGatewayQAnswer(
             history: earlier,
             question: latest.content,
             aboutNamedOther: request.aboutNamedOther === true,
-            selectedCompany: request.subjects.some(
-              (subject) => subject.kind === "COMPANY",
-            ),
+            selected: selectedForResearch(),
           });
           const call = {
             callId: "q-research",
