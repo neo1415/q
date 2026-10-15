@@ -1269,6 +1269,22 @@ function buildCompany(n, used, people) {
       mime: "text/csv",
     });
   }
+  if (!documents.some((d) => d.kind === "MANAGEMENT_ACCOUNTS")) {
+    // The founder's own summary even when most figures are not given: what
+    // is unknown is listed as unknown, never as zero.
+    documents.push({
+      kind: "FINANCIAL",
+      title: `${name} financial summary, founder claim (fictional)`,
+      filename: `${slug(name)}-financial-summary.txt`,
+      mime: "text/plain",
+    });
+  }
+  documents.push({
+    kind: "PRODUCT",
+    title: `${name} product brief (fictional)`,
+    filename: `${slug(name)}-product-brief.txt`,
+    mime: "text/plain",
+  });
   if (evidence === "strong") {
     documents.push({
       kind: "COMMERCIAL",
@@ -1980,6 +1996,41 @@ export function documentText(company, doc, preparedOn = "2026-10-15") {
       `Not yet known: ${s.unknowns.join("; ")}.`,
     ].join("\n");
   }
+  if (doc.kind === "FINANCIAL") {
+    const f = company.fin;
+    const cur = CURRENCY_CODE[f.currency] ?? null;
+    const line = (label, value) =>
+      `${label}: ${value === undefined ? "not provided (unknown)" : `${cur ?? ""} ${fmt(value)}`.trim()}`;
+    return [
+      ...head,
+      "",
+      `${company.name} — financial summary (founder claim, not audited)`,
+      `Truth class: USER_CLAIM. Evidence status: SELF_REPORTED.`,
+      `Reporting currency: ${cur ?? "not provided (unknown)"}`,
+      line("Monthly revenue (last month)", f.monthlyRevenue),
+      `Revenue trend: ${f.revenueTrend ?? "not provided (unknown)"}`,
+      `Gross margin: ${f.grossMargin === undefined ? "not provided (unknown)" : `${f.grossMargin}%`}`,
+      line("Monthly net burn", f.monthlyBurn),
+      line("Cash", f.cash),
+      `Runway: ${f.runwayMonths === undefined ? "not provided (unknown)" : `${f.runwayMonths} months`}`,
+      `Raise: ${company.raise.target.currency} ${fmt(company.raise.target.amount)} (${instrumentLabel(company.raise.instrument)}).`,
+      "Audited accounts: not available (unknown).",
+    ].join("\n");
+  }
+  if (doc.kind === "PRODUCT") {
+    const a = ARCHETYPES.find((x) => x.id === company.archetype);
+    return [
+      ...head,
+      "",
+      `${company.name} — product brief`,
+      `What it is: ${capitalise(a?.noun ?? "the product")} for ${a?.buyer ?? "its customers"}.`,
+      `How it works: ${company.story.solution}`,
+      `Who pays: ${a?.buyer ?? "not stated"}; categories ${company.categories.join(", ")}.`,
+      `Where: ${company.city}, ${countryLabel(company.countryOption)}.`,
+      `Traction so far: ${company.story.traction || "nothing measurable shared yet."}`,
+      `Not yet known: ${company.story.unknowns.join("; ")}.`,
+    ].join("\n");
+  }
   if (doc.kind === "MANAGEMENT_ACCOUNTS") {
     const f = company.fin;
     const cur = CURRENCY_CODE[f.currency];
@@ -2058,4 +2109,53 @@ export function storyText(company) {
     `The raise. ${s.raise}`,
     `Not yet known. ${s.unknowns.join("; ")}.`,
   ].join("\n\n");
+}
+
+/** Data room filing for each fictional document: folder and level. */
+export const DOCUMENT_FILING = {
+  COMPANY_PROFILE: { folderCode: "corporate", level: "PUBLIC" },
+  PRODUCT: { folderCode: "commercial", level: "PUBLIC" },
+  FINANCIAL: { folderCode: "financials", level: "ON_REQUEST" },
+  MANAGEMENT_ACCOUNTS: {
+    folderCode: "financials",
+    level: "ON_REQUEST",
+    checklistItemCode: "management_accounts",
+  },
+  COMMERCIAL: { folderCode: "commercial", level: "ON_REQUEST" },
+  PITCH_DECK: { folderCode: "fundraising", level: "PUBLIC" },
+};
+
+/** Deck findings from the company's seeded facts; an unknown is never a finding. */
+export function deckLines(company) {
+  const s = company.story;
+  const lines = [
+    { dimension: "DESCRIPTION", statement: company.shortDescription },
+    { dimension: "PRODUCT", statement: s.solution },
+    { dimension: "CUSTOMERS", statement: s.problem },
+    { dimension: "MARKET", statement: s.market, truthClass: "ESTIMATE" },
+    { dimension: "TEAM", statement: s.team },
+    {
+      dimension: "STRATEGY",
+      statement: `Risks the company names: ${s.risks}.`,
+    },
+    { dimension: "CAPITAL_OBJECTIVE", statement: s.raise },
+  ];
+  if (s.traction) lines.push({ dimension: "TRACTION", statement: s.traction });
+  const f = company.fin;
+  const cur = CURRENCY_CODE[f.currency];
+  if (f.monthlyBurn !== undefined)
+    lines.push({
+      dimension: "FINANCIAL",
+      statement: `Monthly net burn about ${cur} ${fmt(f.monthlyBurn)} (company-reported).`,
+    });
+  if (f.runwayMonths !== undefined)
+    lines.push({
+      dimension: "FINANCIAL",
+      statement: `About ${f.runwayMonths} months of runway (company-reported).`,
+    });
+  lines.push({
+    dimension: "STRATEGY",
+    statement: `Not yet known: ${s.unknowns.join("; ")}.`,
+  });
+  return lines;
 }

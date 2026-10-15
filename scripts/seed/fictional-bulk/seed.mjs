@@ -34,8 +34,11 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import * as lib from "../tavus20/lib.mjs";
+import { renderDeck } from "./deck.mjs";
 import {
   buildWorld,
+  deckLines,
+  DOCUMENT_FILING,
   currencyCode,
   documentText,
   SEED_MARKER,
@@ -170,7 +173,7 @@ function save() {
   );
   return saving;
 }
-const idem = (...parts) => {
+export const idem = (...parts) => {
   const h = createHash("sha256").update(parts.join("|")).digest("hex");
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
 };
@@ -188,12 +191,12 @@ async function admin(path, init = {}) {
 }
 
 /** Create, or adopt only when it carries this seed's markers. */
-async function ensureAccount(person, seedKey) {
+export async function ensureAccount(person, seedKey, marker = SEED_MARKER) {
   const rows = await lib.sql(
     `select id, raw_app_meta_data->>'cq_seed' as seed, raw_app_meta_data->>'fictional_demo' as fd from auth.users where lower(email)=lower('${person.email.replace(/'/g, "''")}')`,
   );
   if (rows[0]) {
-    if (rows[0].seed !== SEED_MARKER || rows[0].fd !== "true")
+    if (rows[0].seed !== marker || rows[0].fd !== "true")
       throw new Error(
         `${person.email} exists without this seed's markers; refusing to touch it`,
       );
@@ -215,7 +218,7 @@ async function ensureAccount(person, seedKey) {
       app_metadata: {
         synthetic: true,
         fictional_demo: true,
-        cq_seed: SEED_MARKER,
+        cq_seed: marker,
       },
     }),
   });
@@ -231,9 +234,19 @@ const tokens = new Map();
 async function tokenFor(email) {
   const hit = tokens.get(email);
   if (hit && hit.at > Date.now() - 40 * 60_000) return hit.token;
-  const token = await lib.accessToken(email);
-  tokens.set(email, { token, at: Date.now() });
-  return token;
+  // Supabase auth rate-limits token exchanges (429); back off and retry.
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const token = await lib.accessToken(email);
+      tokens.set(email, { token, at: Date.now() });
+      return token;
+    } catch (error) {
+      const msg = String(error?.message ?? error);
+      if (attempt >= 8 || !/429|fetch failed|ECONNRESET|5\d\d/.test(msg))
+        throw error;
+      await lib.sleep(Math.min(120_000, 10_000 * 2 ** attempt));
+    }
+  }
 }
 
 /** One call; 5xx and 429 are retried with backoff, anything else non-2xx throws. */
@@ -257,11 +270,11 @@ async function ok(base, email, method, path, body, key) {
     );
   }
 }
-const api = (email, method, path, body, key) =>
+export const api = (email, method, path, body, key) =>
   ok(lib.API, email, method, path, body, key);
-const qapi = (email, method, path, body, key) =>
+export const qapi = (email, method, path, body, key) =>
   ok(lib.QAPI, email, method, path, body, key);
-const get = async (base, email, path) =>
+export const get = async (base, email, path) =>
   lib.call(base, await tokenFor(email), "GET", path);
 
 let taxonomy = null;
@@ -382,6 +395,18 @@ async function driveJourney(email, journeyType, answerFor) {
 
 // ------------------------------------------------------------ founders
 
+/** File a document in the company's data room at its level (founder action). */
+export async function fileInDataRoom(email, documentId, kind) {
+  const filing = DOCUMENT_FILING[kind];
+  if (documentId === undefined || filing === undefined) return;
+  await api(
+    email,
+    "POST",
+    `/v1/data-room/documents/${documentId}/level`,
+    filing,
+  );
+}
+
 function founderAnswers(c, getMap) {
   const t = c.traction;
   const f = c.fin;
@@ -473,7 +498,7 @@ function founderAnswers(c, getMap) {
   };
 }
 
-async function ensureProfile(email, person) {
+export async function ensureProfile(email, person) {
   const p = await api(email, "GET", "/v1/me/profile");
   if (p.displayName === person.displayName && p.headline === person.headline)
     return;
@@ -506,6 +531,11 @@ const timeframeClose = {
 
 async function uploadDocument(email, companyId, c, doc) {
   const bytes = Buffer.from(documentText(c, doc), "utf8");
+  return uploadBytes(email, companyId, c.seedKey, doc, bytes);
+}
+
+/** One document through the upload boundary, as the browser sends it. */
+export async function uploadBytes(email, companyId, idemSeed, doc, bytes) {
   const created = await api(
     email,
     "POST",
@@ -518,7 +548,7 @@ async function uploadDocument(email, companyId, c, doc) {
       declaredMimeType: doc.mime,
       declaredSizeBytes: bytes.length,
     },
-    idem(c.seedKey, "doc", doc.filename),
+    idem(idemSeed, "doc", doc.filename),
   );
   if (created.upload) {
     const put = await fetch(created.upload.url, {
@@ -652,6 +682,50 @@ async function seedCompany(c) {
     }
     await done("documents");
   }
+  if (!s.steps.docsv2) {
+    // Owner direction 2026-10-15: every company has at least three data
+    // room documents and a pitch deck, filed in its data room.
+    s.documentIds = s.documentIds ?? {};
+    for (const doc of c.documents) {
+      if (s.documentIds[doc.filename]) continue;
+      s.documentIds[doc.filename] = await uploadDocument(
+        f,
+        s.companyId,
+        c,
+        doc,
+      );
+    }
+    if (!s.documentIds["deck.pdf"]) {
+      const deck = await renderDeck({
+        key: c.key,
+        companyId: s.companyId,
+        name: c.name,
+        shortDescription: c.shortDescription,
+        lines: deckLines(c),
+      });
+      if (deck === null)
+        throw new Error("the deck composer had too little to compose");
+      s.documentIds["deck.pdf"] = await uploadBytes(
+        f,
+        s.companyId,
+        c.seedKey,
+        {
+          kind: "PITCH_DECK",
+          title: `${c.name} investor deck (fictional)`,
+          filename: `${c.key}-deck.pdf`,
+          mime: "application/pdf",
+        },
+        Buffer.from(deck.pdf),
+      );
+    }
+    for (const doc of [
+      ...c.documents,
+      { kind: "PITCH_DECK", filename: "deck.pdf" },
+    ]) {
+      await fileInDataRoom(f, s.documentIds[doc.filename], doc.kind);
+    }
+    await done("docsv2");
+  }
   if (!s.steps.q) {
     await qapi(f, "PUT", "/v1/q/standing/personality", {
       personality: c.q.personality,
@@ -779,7 +853,10 @@ async function seedCompany(c) {
     }
     await done("round");
   }
-  if (!s.steps.verify) {
+  // Off by default (lead decision pending, 2026-10-15): on this deployment a
+  // request is decided at once by the synthetic-demo attestation and shows
+  // the gold "verified by Capital Q" badge on an invented company.
+  if (!s.steps.verify && args.includes("--request-verification")) {
     // Ask Capital Q to verify, as the founder would. The deployment decides
     // it under its own synthetic attestation, or leaves it pending.
     const standing = await api(f, "GET", `${base}/verification`);
