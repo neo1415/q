@@ -968,6 +968,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/company/visibility": cap("navigate.COMPANY_VISIBILITY"),
   "/company/interest": cap("navigate.COMPANY_INTEREST"),
   "/relationships": cap("navigate.RELATIONSHIPS"),
+  // CRM (2026-10-15): the alias of the Hub; it only redirects there.
+  "/crm": cap("navigate.RELATIONSHIPS"),
   "/settings": cap("navigate.SETTINGS"),
   "/settings/plan": cap("tool.get_my_plan"),
   // AUTO (ADR 0030): Q's work; Q reads the same with list_q_work.

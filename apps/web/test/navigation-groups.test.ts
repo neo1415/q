@@ -44,7 +44,6 @@ describe("the sidebar's groups", () => {
       "/rehearsals",
       "/daily",
       "/profile",
-      "/results",
       "/settings/usage",
       "/settings",
       "/admin",

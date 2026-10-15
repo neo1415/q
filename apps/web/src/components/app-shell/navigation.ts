@@ -1,7 +1,6 @@
 import type { ComponentType } from "react";
 
 import {
-  ChartColumn,
   CircleUser,
   FileText,
   Compass,
@@ -68,8 +67,12 @@ export const PRIMARY_NAVIGATION: readonly NavigationItem[] = [
   { href: "/explore", label: "Explore", icon: LayoutDashboard },
   { href: "/home", label: "Q", icon: QNavIcon },
   { href: "/capital", label: "Capital", icon: Landmark },
-  // Every canonical relationship of the person's side (R27).
-  { href: "/relationships", label: "Relationships", icon: Users },
+  // CRM (owner directive 2026-10-15 §D): the person's side's canonical
+  // relationships (R27), its pipeline and its reports in one workspace.
+  // Founders see it as their Fundraising Hub, investors as their
+  // Investment Hub. Results is now its Reports tab, so has no entry of its
+  // own; /results and /crm still mark this entry as current.
+  { href: "/relationships", label: "CRM", icon: Users },
 ];
 
 const byHref = (href: NavigationItem["href"]): NavigationItem => {
@@ -131,18 +134,6 @@ export const DOCUMENTS_NAVIGATION: NavigationItem = {
   label: "Documents",
   icon: FileText,
 };
-
-// ADMIN block
-/**
- * Results (spec docs/specs/2026-10/admin.md §5): what a person's activity
- * on Capital Q produced, with reports to download. Founders and investors.
- */
-export const RESULTS_NAVIGATION: NavigationItem = {
-  href: "/results",
-  label: "Results",
-  icon: ChartColumn,
-};
-// end ADMIN block
 
 /**
  * The Q Daily (DAILY): the person's own newspaper of news about their
@@ -258,12 +249,7 @@ export function navigationGroupsFor(
     },
     {
       label: "You",
-      items: [
-        PROFILE_NAVIGATION,
-        ...(founder || investor ? [RESULTS_NAVIGATION] : []),
-        USAGE_NAVIGATION,
-        SETTINGS_NAVIGATION,
-      ],
+      items: [PROFILE_NAVIGATION, USAGE_NAVIGATION, SETTINGS_NAVIGATION],
     },
     ...(options.admin === true
       ? [{ label: "Admin" as const, items: [ADMIN_NAVIGATION] }]
@@ -321,6 +307,16 @@ export function moreSectionsFor(
 /** The centre tab, drawn as Q's own mark rather than a plain icon. */
 export const MOBILE_CENTRE_HREF = "/home" satisfies NavigationItem["href"];
 
+/**
+ * Routes that belong to another entry's area: the CRM's Reports tab keeps
+ * the Results URL, and /crm is the CRM's alias.
+ */
+const AREA_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  "/relationships": ["/results", "/crm"],
+};
+
 export function isActiveRoute(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return [href, ...(AREA_ALIASES[href] ?? [])].some(
+    (root) => pathname === root || pathname.startsWith(`${root}/`),
+  );
 }

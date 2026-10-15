@@ -38,7 +38,9 @@ describe("every navigation screen is a screen Q can open", () => {
         ])
         .map((item) => item.href),
     );
-    expect(hrefs).toContain("/results");
+    // Results is the CRM's Reports tab now; the CRM entry is /relationships.
+    expect(hrefs).toContain("/relationships");
+    expect(hrefs).not.toContain("/results");
     const missing = [...hrefs].filter(
       (href) => !reachable.has(href) && (EXCLUDED[href] ?? "").length === 0,
     );

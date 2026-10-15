@@ -41,6 +41,7 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/capital",
   "/company/[companyId]",
   "/company/[companyId]/founder/[position]",
+  "/crm",
   "/company/interest",
   "/company/visibility",
   "/daily",
@@ -151,6 +152,8 @@ const startsWith =
 
 export const ROUTE_REDIRECTS: readonly Redirect[] = [
   { from: /^\/gateway$/u, to: startsWith("/gateq") },
+  // The CRM's alias forwards to the routes that own its views.
+  { from: /^\/crm$/u, to: startsWith("/relationships", "/results") },
   { from: /^\/discover\/yours$/u, to: startsWith("/discover") },
   {
     from: /^\/admin\/(?:verification|reviews)$/u,
