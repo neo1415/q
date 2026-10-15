@@ -59,6 +59,8 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
   WORK: "/work",
   WORK_NEEDS: "/work?view=needs",
   WORK_PROGRESS: "/work?view=progress",
+  OWN_DATA_ROOM: "/company/data-room",
+  OWN_DECK: "/company/data-room?tab=deck",
   WORK_DONE: "/work?view=done",
   WORK_TEAM: "/work?view=team",
   WORK_COST: "/work?view=cost",

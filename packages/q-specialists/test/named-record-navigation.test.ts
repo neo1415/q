@@ -19,6 +19,7 @@ import { ActorContextSchema } from "@capital-q/security";
 import { pendingPlaceOf } from "@capital-q/q-core/speech";
 
 import { createSpecialistQAnswer } from "../src/answer.js";
+import { pageRequestOf } from "../src/page-request.js";
 import { openingLine } from "../src/references.js";
 import {
   matchOwnCounterpart,
@@ -325,6 +326,44 @@ describe("the incident's four phrasings, read by code", () => {
   });
 });
 
+describe("a company's documents are its data room (owner 2026-10-15)", () => {
+  it("reads documents, docs and files of a named company as its data room", () => {
+    for (const said of [
+      "Open Tensorgate's documents",
+      "open the documents for Tensorgate",
+      "show me Tensorgate's files",
+      "open Tensorgate's docs",
+      "open the files of Tensorgate",
+    ]) {
+      expect(namedRecordRequestOf(said)).toEqual({
+        name: "Tensorgate",
+        facet: "DATA_ROOM",
+        explicit: true,
+      });
+      expect(pageRequestOf(said)).toBeNull();
+    }
+    expect(namedRecordRequestOf("open Tensorgate's pitch")).toMatchObject({
+      name: "Tensorgate",
+      facet: "ELEVATOR",
+    });
+    expect(namedRecordRequestOf("open Tensorgate's pitch deck")).toMatchObject({
+      name: "Tensorgate",
+      facet: "DECK",
+    });
+  });
+
+  it("keeps their own Documents page, and never makes a record of plain words", () => {
+    for (const said of ["open my documents", "open documents", "open files"]) {
+      expect(namedRecordRequestOf(said)).toBeNull();
+      expect(pageRequestOf(said)).toMatchObject({
+        kind: "PAGE",
+        target: { destination: "DOCUMENTS" },
+      });
+    }
+    expect(namedRecordRequestOf("open documents for my seed round")).toBeNull();
+  });
+});
+
 describe("the answer opens exactly that record (INC-1 regression)", () => {
   const own = ["Shiftwell Health", "Ledgerline", "Nixo"];
 
@@ -348,6 +387,16 @@ describe("the answer opens exactly that record (INC-1 regression)", () => {
       { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: SHIFTWELL },
     ]);
     expect(answer.content).not.toBe("Understood.");
+  });
+
+  it('"Open Shiftwell\'s documents." opens its data room, never its profile', async () => {
+    const q = conversation(own);
+    const answer = await q.say("Open Shiftwell's documents.");
+    // COMPANY_DATA_ROOM is /company/<id>?tab=dataroom (client-actions).
+    expect(intentOf(answer.blocks)).toEqual([
+      { kind: "OPEN_RECORD_PAGE", page: "COMPANY_DATA_ROOM", id: SHIFTWELL },
+    ]);
+    expect(answer.content).toBe("Opening Shiftwell Health's data room…");
   });
 
   it('"Show me the data room for Shiftwell." opens Shiftwell\'s data room', async () => {

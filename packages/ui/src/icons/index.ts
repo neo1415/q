@@ -40,6 +40,7 @@ export {
   EyeOff,
   FileText,
   Filter,
+  FolderLock,
   Gauge,
   Globe,
   Hand,

@@ -351,6 +351,20 @@ export function RelationshipDiligence({
 
   return (
     <div className="flex flex-col gap-3" data-diligence>
+      {founder ? (
+        // Owner 2026-10-15: when an investor asks for something, the
+        // founder's own data room and deck are one step away from here.
+        <p className="cq-body-sm flex flex-wrap items-center justify-between gap-x-3 text-(--cq-text-secondary)">
+          <span>Shares come from your data room.</span>
+          <Link
+            href="/company/data-room"
+            className="inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-2"
+            data-own-data-room
+          >
+            Edit data room & deck
+          </Link>
+        </p>
+      ) : null}
       {!founder && area.open ? (
         <AskForm
           busy={busy === "ask"}

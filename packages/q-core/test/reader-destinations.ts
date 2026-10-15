@@ -14,6 +14,9 @@ const OPENED_BY_CODE: ReadonlySet<string> = new Set([
   "WORK_DONE",
   "WORK_TEAM",
   "WORK_COST",
+  // Owner 2026-10-15: a founder's own data room and deck.
+  "OWN_DATA_ROOM",
+  "OWN_DECK",
   "GATEQ_INBOX",
   "GATEQ_FIND",
   "GATEQ_CLAIM",
