@@ -15,7 +15,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   DraftRedraftResultSchema,
   DraftReviewResultV2Schema,
-  JobPlanResultV4Schema,
+  JobPlanResultV5Schema,
   renderPrompt,
   SubstanceCritiqueResultSchema,
   type SubstanceCritiqueResult,
@@ -32,8 +32,8 @@ import {
   type DraftReviewResultV2,
   type DraftReviewV2Variables,
   type EtiquettePurpose,
-  type JobPlanResultV4,
-  type JobPlanVariables,
+  type JobPlanResultV5,
+  type JobPlanVariablesV5,
   type ReplyReaderResult,
   type ReplyReaderVariables,
 } from "@capital-q/q-core";
@@ -62,7 +62,7 @@ type Frame =
 export type ReviewVariables = Omit<DraftReviewV2Variables, Frame>;
 export type RedraftVariables = Omit<DraftRedraftVariables, Frame>;
 export type ReplyVariables = Omit<ReplyReaderVariables, Frame>;
-export type PlanVariables = Omit<JobPlanVariables, Frame>;
+export type PlanVariables = Omit<JobPlanVariablesV5, Frame>;
 export type CritiqueVariables = Omit<SubstanceCritiqueVariables, Frame>;
 export type DiligenceVariables = Omit<DiligenceQuestionsVariables, Frame>;
 export type ShortenQuestionsInput = {
@@ -90,10 +90,11 @@ const CRITIQUE = {
   maxOutputTokens: 1_600,
   attemptTimeoutMs: 60_000,
 } as const;
+/** v5 also writes the outcome, prerequisites, reasons and next actions. */
 const PLAN = {
   maxAttempts: 1,
   maxEstimatedCostUsd: 0.08,
-  maxOutputTokens: 2_000,
+  maxOutputTokens: 2_800,
   attemptTimeoutMs: 60_000,
 } as const;
 
@@ -117,7 +118,7 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     variables: PlanVariables,
-  ) => Promise<JobPlanResultV4 | null>;
+  ) => Promise<JobPlanResultV5 | null>;
   readonly critique: (
     who: Who,
     trace: Trace,
@@ -266,13 +267,13 @@ export function createWorkforceModels(dependencies: {
         etiquette: null,
       }),
     plan: (who, trace, variables) =>
-      call<PlanVariables, JobPlanResultV4>({
+      call<PlanVariables, JobPlanResultV5>({
         task: "JOB_PLAN",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: JobPlanResultV4Schema,
+        schema: JobPlanResultV5Schema,
         budget: PLAN,
         environmentNotes:
           "You are planning, not acting. Code checks every step against what they allowed before anything happens.",

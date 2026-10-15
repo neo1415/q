@@ -27,6 +27,7 @@ import type {
   Owner,
   WorkforceStore,
 } from "./store.js";
+import { progressOf } from "./progress.js";
 import type { AgentWorkQueue, WorkRow } from "./queue.js";
 
 /**
@@ -527,7 +528,9 @@ export function createWorkforcePage(dependencies: {
             index,
         );
 
+      const plan = progressOf(work, detail.runs);
       return {
+        ...(plan === undefined ? {} : { plan }),
         job: summary(
           detail.job,
           {

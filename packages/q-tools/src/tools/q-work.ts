@@ -99,6 +99,22 @@ export type QWorkJobResult = {
     /** Filed as their approval card (never sent by Q), or only kept. */
     readonly filedForApproval: boolean;
   } | null;
+  /**
+   * wf: the approved plan as it stands, in code's words: done of total,
+   * the steps not done (with why), what steps found (contradictions,
+   * missing information) and what is next. Null or absent: no plan on record.
+   */
+  readonly progress?:
+    | {
+        readonly outcome: string | null;
+        readonly done: number;
+        readonly total: number;
+        readonly open: readonly string[];
+        readonly found: readonly string[];
+        readonly next: readonly string[];
+      }
+    | null
+    | undefined;
 };
 
 /** What the work tools reach, composed by q-api over the work store. */
@@ -366,6 +382,18 @@ const WorkJobResultSchema = z
       })
       .strict()
       .nullable(),
+    /** wf: the plan as it stands (code's words). Absent: no plan on record. */
+    progress: z
+      .object({
+        outcome: z.string().max(400).nullable(),
+        done: z.number().int().min(0),
+        total: z.number().int().min(0),
+        open: z.array(z.string().max(400)).max(6),
+        found: z.array(z.string().max(400)).max(6),
+        next: z.array(z.string().max(400)).max(6),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -720,6 +748,21 @@ function jobView(job: QWorkJobResult): z.infer<typeof WorkJobResultSchema> {
               .map((question) => cut(question, 600)),
             filedForApproval: job.diligence.filedForApproval,
           },
+    ...(job.progress == null
+      ? {}
+      : {
+          progress: {
+            outcome:
+              job.progress.outcome === null
+                ? null
+                : cut(job.progress.outcome, 400),
+            done: job.progress.done,
+            total: job.progress.total,
+            open: job.progress.open.slice(0, 6).map((line) => cut(line, 400)),
+            found: job.progress.found.slice(0, 6).map((line) => cut(line, 400)),
+            next: job.progress.next.slice(0, 6).map((line) => cut(line, 400)),
+          },
+        }),
   };
 }
 
@@ -971,11 +1014,12 @@ export function createQWorkTools(
       id: LIST_Q_WORK,
       // v2: the latest jobs of Q's team, with the reviewer's changes and
       // the diligence questions as persisted (`jobs`).
-      version: 2,
+      // v3 (wf): each job's plan progress and next actions (`progress`).
+      version: 3,
       core: true,
       providerName: "list_q_work",
       description:
-        "Reads what Q is working on for them, as it really stands: each standing instruction, outreach or stand-in (per founder or investor the stage, the last step -- e.g. who Q is still waiting on to accept -- any times waiting for their choice, with ids to answer, and a report's verdict), each errand on one relationship with its last step, and the latest jobs of Q's team (jobs): what the reviewer found in the memo and changed in its revision (findings, revisionNote, sectionsChanged) and the founder diligence questions prepared, word for word. Call it for 'what are you working on', 'any news', 'did they accept', 'is my meeting set', 'what did the reviewer change', 'what were the diligence questions', or before answering or stopping work. Say only what this returns; a null review or diligence means it was not recorded, so say it is unknown.",
+        "Reads what Q is working on for them, as it really stands: each standing instruction, outreach or stand-in (per founder or investor the stage, the last step -- e.g. who Q is still waiting on to accept -- any times waiting for their choice, with ids to answer, and a report's verdict), each errand on one relationship with its last step, and the latest jobs of Q's team (jobs): what the reviewer found in the memo and changed in its revision (findings, revisionNote, sectionsChanged), the founder diligence questions, word for word, and each plan's progress (done of total, open steps, what was found, what is next). Call it for 'what are you working on', 'any news', 'did they accept', 'is my meeting set', 'what did the reviewer change', 'what were the diligence questions', or before answering or stopping work. Say only what this returns; a null review or diligence means it was not recorded, so say it is unknown.",
       classification: "READ_ONLY",
       riskClass: "SAFE_READ",
       approval: "NONE",
