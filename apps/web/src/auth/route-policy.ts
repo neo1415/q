@@ -35,6 +35,8 @@ export const PROTECTED_PATH_PREFIXES = [
   "/relationships",
   // CRM (2026-10-15): the alias of the relationship workspace.
   "/crm",
+  // Q Pitch (2026-10-15): the guided tour entry; signed in only.
+  "/q-pitch",
   "/settings",
   // AUTO (ADR 0030): Q's work.
   "/work",

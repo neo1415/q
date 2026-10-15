@@ -173,14 +173,14 @@ const shape = (
     readonly relationship: { readonly id: string };
     readonly counterpartName: string;
     readonly projection: { readonly state: string };
-    readonly visibleHistory: readonly unknown[];
+    readonly visibleHistory?: readonly unknown[] | undefined;
   }[],
 ) =>
   listings.map((l) => ({
     id: l.relationship.id,
     name: l.counterpartName,
     state: l.projection.state,
-    events: l.visibleHistory.length,
+    events: l.visibleHistory?.length ?? null,
   }));
 
 describe("S5: a relationship list read in batches", () => {
