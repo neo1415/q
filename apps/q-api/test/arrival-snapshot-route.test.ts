@@ -143,6 +143,36 @@ describe("GET /v1/q/arrival-snapshot", () => {
     expect(ended).toEqual([CONTEXT.userId]);
   });
 
+  it("S5: with refresh-ahead, their write rebuilds for the live actor of that request", async () => {
+    const refreshed: string[] = [];
+    const ended: string[] = [];
+    const bare = Fastify();
+    registerArrivalSnapshotInvalidation(bare, {
+      invalidateActor: (userId) => {
+        ended.push(userId);
+        return 1;
+      },
+      refreshAfterWrite: (actor) => {
+        refreshed.push(actor.userId);
+      },
+    });
+    bare.addHook("onRequest", (request, _reply, done) => {
+      Object.assign(request, { actorContext: CONTEXT });
+      done();
+    });
+    bare.post("/v1/q/runs", () => ({ ok: true }));
+    bare.post("/v1/q/approvals/:id/approve", () => ({ ok: true }));
+    await bare.inject({ method: "POST", url: "/v1/q/runs", payload: {} });
+    expect(refreshed).toEqual([]);
+    await bare.inject({
+      method: "POST",
+      url: "/v1/q/approvals/abc/approve",
+      payload: {},
+    });
+    expect(refreshed).toEqual([CONTEXT.userId]);
+    expect(ended).toEqual([]);
+  });
+
   it("only writes to the snapshot's sources count", () => {
     expect(touchesSnapshotSources("POST", "/v1/q/runs")).toBe(false);
     expect(touchesSnapshotSources("POST", "/v1/voice/live/delegate")).toBe(
