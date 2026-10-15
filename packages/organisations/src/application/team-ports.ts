@@ -118,6 +118,19 @@ export type TeamStore<Tx> = {
     tx: Tx,
     tokenHash: string,
   ) => Promise<InvitationRecord | null>;
+  /** By id alone, locked; across organisations (the invitee names none). */
+  readonly invitationById: (
+    tx: Tx,
+    invitationId: string,
+  ) => Promise<InvitationRecord | null>;
+  /**
+   * Pending invitations sent to this (normalised) address, across
+   * organisations. The caller passes only a verified sign-in email.
+   */
+  readonly pendingInvitationsForEmail: (
+    tx: Tx,
+    email: string,
+  ) => Promise<readonly InvitationRecord[]>;
   readonly insertInvitation: (
     tx: Tx,
     input: {
@@ -141,7 +154,7 @@ export type TeamStore<Tx> = {
     tx: Tx,
     invitationId: string,
     input: {
-      readonly status: "accepted" | "revoked";
+      readonly status: "accepted" | "revoked" | "declined";
       readonly decidedByUserId: string;
       readonly membershipId: string | null;
     },
@@ -252,6 +265,7 @@ export type TeamJournalEntry = {
     | "invitation.resent"
     | "invitation.revoked"
     | "invitation.accepted"
+    | "invitation.declined"
     | "membership.role_changed"
     | "membership.removed"
     | "membership.left"

@@ -5,6 +5,7 @@ import type { ReactElement, ReactNode } from "react";
 
 import { ICON_SIZE, ICON_STROKE, X } from "../icons/index.js";
 import { cx } from "../primitives/class-names.js";
+import { OverlayLayerContext } from "../primitives/overlay-layer.js";
 import { IconButton } from "./button.js";
 
 /**
@@ -61,43 +62,45 @@ export function SheetContent({
   readonly className?: string | undefined;
 }) {
   return (
-    <BaseDialog.Portal>
-      <BaseDialog.Backdrop className="fixed inset-0 z-(--cq-z-sheet) bg-(--cq-overlay) transition-opacity duration-(--cq-motion-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
-      <BaseDialog.Popup
-        className={cx(
-          "fixed z-(--cq-z-sheet) flex flex-col overflow-hidden bg-(--cq-surface-raised) pb-(--cq-safe-bottom) shadow-(--cq-shadow-overlay) outline-none transition-transform duration-(--cq-motion-slow) ease-(--cq-ease)",
-          sideClass[side],
-          className,
-        )}
-      >
-        <div className="flex items-start gap-3 px-4 pt-4 pb-2">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <BaseDialog.Title className="cq-title-md text-(--cq-text-primary)">
-              {title}
-            </BaseDialog.Title>
-            {description !== undefined ? (
-              <BaseDialog.Description className="cq-body-sm text-(--cq-text-secondary)">
-                {description}
-              </BaseDialog.Description>
-            ) : null}
+    <OverlayLayerContext.Provider value="modal">
+      <BaseDialog.Portal>
+        <BaseDialog.Backdrop className="fixed inset-0 z-(--cq-z-sheet) bg-(--cq-overlay) transition-opacity duration-(--cq-motion-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+        <BaseDialog.Popup
+          className={cx(
+            "fixed z-(--cq-z-sheet) flex flex-col overflow-hidden bg-(--cq-surface-raised) pb-(--cq-safe-bottom) shadow-(--cq-shadow-overlay) outline-none transition-transform duration-(--cq-motion-slow) ease-(--cq-ease)",
+            sideClass[side],
+            className,
+          )}
+        >
+          <div className="flex items-start gap-3 px-4 pt-4 pb-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <BaseDialog.Title className="cq-title-md text-(--cq-text-primary)">
+                {title}
+              </BaseDialog.Title>
+              {description !== undefined ? (
+                <BaseDialog.Description className="cq-body-sm text-(--cq-text-secondary)">
+                  {description}
+                </BaseDialog.Description>
+              ) : null}
+            </div>
+            <BaseDialog.Close
+              render={
+                <IconButton aria-label="Close" variant="quiet">
+                  <X
+                    aria-hidden="true"
+                    size={ICON_SIZE.prominent}
+                    strokeWidth={ICON_STROKE}
+                  />
+                </IconButton>
+              }
+            />
           </div>
-          <BaseDialog.Close
-            render={
-              <IconButton aria-label="Close" variant="quiet">
-                <X
-                  aria-hidden="true"
-                  size={ICON_SIZE.prominent}
-                  strokeWidth={ICON_STROKE}
-                />
-              </IconButton>
-            }
-          />
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-          {children}
-        </div>
-      </BaseDialog.Popup>
-    </BaseDialog.Portal>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+            {children}
+          </div>
+        </BaseDialog.Popup>
+      </BaseDialog.Portal>
+    </OverlayLayerContext.Provider>
   );
 }
 

@@ -26,6 +26,10 @@ import { OrganisationTypeSchema } from "./organisations.js";
  * - GET    /v1/invitations/preview                      what a link invites to
  *                                                       (token in a header)
  * - POST   /v1/invitations/accept                       accept, as the invited email
+ *                                                       (by link token, or by id
+ *                                                       from the invitee's list)
+ * - GET    /v1/me/invitations                           invitations to my verified email
+ * - POST   /v1/me/invitations/:invitationId/decline     decline one of those
  * - POST   /v1/join-requests                            ask to join
  */
 
@@ -49,6 +53,9 @@ export const MY_ORGANISATIONS_PATH = "/v1/me/organisations" as const;
 export const INVITATION_PREVIEW_PATH = "/v1/invitations/preview" as const;
 export const INVITATION_ACCEPT_PATH = "/v1/invitations/accept" as const;
 export const JOIN_REQUESTS_PATH = "/v1/join-requests" as const;
+export const MY_INVITATIONS_PATH = "/v1/me/invitations" as const;
+export const MY_INVITATION_DECLINE_PATH =
+  "/v1/me/invitations/:invitationId/decline" as const;
 
 /** The link token travels in this header for a preview, never in a URL the API logs. */
 export const INVITATION_TOKEN_HEADER = "x-invitation-token" as const;
@@ -272,7 +279,7 @@ export const InvitationTokenSchema = z
 
 export const InvitationPreviewDtoSchema = z
   .object({
-    state: z.enum(["PENDING", "EXPIRED", "ACCEPTED", "REVOKED"]),
+    state: z.enum(["PENDING", "EXPIRED", "ACCEPTED", "REVOKED", "DECLINED"]),
     organisationName: z.string().max(200),
     kind: TeamKindSchema,
     role: InvitableRoleSchema,
@@ -286,8 +293,36 @@ export const InvitationPreviewDtoSchema = z
   .strict();
 export type InvitationPreviewDto = z.infer<typeof InvitationPreviewDtoSchema>;
 
-export const AcceptInvitationRequestSchema = z
-  .object({ token: InvitationTokenSchema })
+/**
+ * By the emailed link's token, or by the id of an invitation in the
+ * invitee's own list. Either way the server accepts only for the person
+ * whose verified sign-in email the invitation was sent to.
+ */
+export const AcceptInvitationRequestSchema = z.union([
+  z.object({ token: InvitationTokenSchema }).strict(),
+  z.object({ invitationId: UuidSchema }).strict(),
+]);
+
+/** One invitation sent to the signed-in person's verified email. */
+export const MyInvitationDtoSchema = z
+  .object({
+    invitationId: UuidSchema,
+    organisationName: z.string().max(200),
+    kind: TeamKindSchema,
+    role: InvitableRoleSchema,
+    invitedByName: z.string().max(200).nullable(),
+    expiresAt: z.string(),
+  })
+  .strict();
+export type MyInvitationDto = z.infer<typeof MyInvitationDtoSchema>;
+
+export const MyInvitationsDtoSchema = z
+  .object({ items: z.array(MyInvitationDtoSchema).max(20) })
+  .strict();
+export type MyInvitationsDto = z.infer<typeof MyInvitationsDtoSchema>;
+
+export const DeclineInvitationResultDtoSchema = z
+  .object({ declined: z.literal(true) })
   .strict();
 
 export const AcceptInvitationResultDtoSchema = z

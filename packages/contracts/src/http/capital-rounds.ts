@@ -187,7 +187,8 @@ export const OpenCapitalRoundRequestSchema = z
   .object({
     name: RoundNameSchema,
     target: CapitalTargetSchema,
-    instrument: CapitalRoundInstrumentSchema,
+    /** null: not stated. Unknown stays unknown, never a default SAFE. */
+    instrument: CapitalRoundInstrumentSchema.nullable(),
     /**
      * PLANNED: not raising yet. OPEN (default): raising now; it becomes
      * current. CLOSED: a past round, recorded for the history, never current.
@@ -221,7 +222,8 @@ export const ReviseCapitalRoundRequestSchema = z
     expectedRevision: z.number().int().min(1),
     name: RoundNameSchema.optional(),
     target: CapitalTargetSchema.optional(),
-    instrument: CapitalRoundInstrumentSchema.optional(),
+    /** null: back to not stated. */
+    instrument: CapitalRoundInstrumentSchema.nullable().optional(),
     openedOn: LocalDateSchema.optional(),
     terms: CapitalRoundTermsInputSchema.optional(),
     note: roundText(500).optional(),
@@ -299,7 +301,8 @@ export const CapitalRoundDtoSchema = z
     id: UuidSchema,
     name: z.string(),
     target: z.object({ amount: z.string(), currency: CurrencyCodeSchema }),
-    instrument: CapitalRoundInstrumentSchema,
+    /** null: not stated. */
+    instrument: CapitalRoundInstrumentSchema.nullable(),
     status: CapitalRoundStatusSchema,
     isCurrent: z.boolean(),
     openedOn: LocalDateSchema.nullable(),
@@ -391,7 +394,8 @@ export const InvestorRoundViewDtoSchema = z
   .object({
     id: UuidSchema,
     name: z.string(),
-    instrument: CapitalRoundInstrumentSchema,
+    /** null: not stated. */
+    instrument: CapitalRoundInstrumentSchema.nullable(),
     status: CapitalRoundStatusSchema,
     valuation: z
       .object({ amount: z.string(), basis: ValuationBasisSchema })

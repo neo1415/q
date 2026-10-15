@@ -15,7 +15,7 @@ import { CommitmentCard } from "./commitment-card";
 import { money } from "./money";
 import { OpenRound, type RoundDraft } from "./open-round";
 import {
-  INSTRUMENT_LABELS,
+  instrumentLabel,
   RoundCard,
   RoundTimeline,
   TotalCard,
@@ -103,14 +103,15 @@ const INSTRUMENT_OF: Readonly<Record<string, RoundDraft["instrument"]>> = {
 
 export function draftFrom(objective: CapitalObjectiveDto | null): RoundDraft {
   return objective === null
-    ? { name: "", target: { amount: "", currency: "USD" }, instrument: "SAFE" }
+    ? { name: "", target: { amount: "", currency: "USD" }, instrument: null }
     : {
         name: stageName(objective.targetStage),
         target: {
           amount: objective.target.amount,
           currency: objective.target.currency,
         },
-        instrument: INSTRUMENT_OF[objective.instrumentCode ?? ""] ?? "SAFE",
+        // Only what they stated; otherwise not stated, never a default SAFE.
+        instrument: INSTRUMENT_OF[objective.instrumentCode ?? ""] ?? null,
       };
 }
 
@@ -345,7 +346,7 @@ function ByRound({
                   {item.counterpartName}: {round.name}
                 </span>
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  {INSTRUMENT_LABELS[round.instrument]},{" "}
+                  {instrumentLabel(round.instrument)},{" "}
                   {STATUS_WORDS[round.status].toLowerCase()}
                 </span>
               </div>

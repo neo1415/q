@@ -71,7 +71,7 @@ const InvitationRow = z.object({
   email: z.string(),
   role_code: z.string(),
   message: z.string().nullable(),
-  status: z.enum(["pending", "accepted", "revoked"]),
+  status: z.enum(["pending", "accepted", "revoked", "declined"]),
   invited_by_user_id: z.string(),
   invited_by_name: z.string().nullable(),
   sent_count: z.number(),
@@ -292,6 +292,35 @@ export function createPostgresTeamStore(options: {
          where i.token_hash = ${tokenHash}
          for update of i`;
       return rows.length === 0 ? null : toInvitation(rows[0]);
+    },
+
+    invitationById: async (tx, invitationId) => {
+      const rows = await tx.sql`
+        select i.id, i.tenant_id, i.organisation_id, i.email, i.role_code, i.message,
+               i.status, i.invited_by_user_id, i.sent_count, i.last_sent_at, i.expires_at,
+               i.accepted_membership_id,
+               coalesce(nullif(btrim(p.display_name), ''),
+                        nullif(btrim(concat_ws(' ', p.given_name, p.family_name)), '')) as invited_by_name
+          from identity.organisation_invitations i
+          join identity.user_profiles p on p.id = i.invited_by_user_id
+         where i.id = ${invitationId}
+         for update of i`;
+      return rows.length === 0 ? null : toInvitation(rows[0]);
+    },
+
+    pendingInvitationsForEmail: async (tx, email) => {
+      const rows = await tx.sql`
+        select i.id, i.tenant_id, i.organisation_id, i.email, i.role_code, i.message,
+               i.status, i.invited_by_user_id, i.sent_count, i.last_sent_at, i.expires_at,
+               i.accepted_membership_id,
+               coalesce(nullif(btrim(p.display_name), ''),
+                        nullif(btrim(concat_ws(' ', p.given_name, p.family_name)), '')) as invited_by_name
+          from identity.organisation_invitations i
+          join identity.user_profiles p on p.id = i.invited_by_user_id
+         where i.email = ${email} and i.status = 'pending' and i.expires_at > now()
+         order by i.last_sent_at desc
+         limit 20`;
+      return rows.map(toInvitation);
     },
 
     insertInvitation: async (tx, input) => {

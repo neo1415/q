@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { cx } from "../primitives/class-names.js";
+import { OverlayLayerContext } from "../primitives/overlay-layer.js";
 
 /**
  * Centred modal dialog on Base UI, for decisions that need the user's full
@@ -55,34 +56,38 @@ export function DialogContent({
   readonly className?: string | undefined;
 }) {
   return (
-    <BaseDialog.Portal>
-      <BaseDialog.Backdrop className="fixed inset-0 z-(--cq-z-modal) bg-(--cq-overlay) transition-opacity duration-(--cq-motion-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
-      <BaseDialog.Popup
-        className={cx(
-          "fixed top-1/2 left-1/2 z-(--cq-z-modal) flex w-[calc(100vw-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-base) data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0",
-          className,
-        )}
-      >
-        <div className="flex flex-col gap-1">
-          <BaseDialog.Title className="cq-title-md text-(--cq-text-primary)">
-            {title}
-          </BaseDialog.Title>
-          {description !== undefined ? (
-            <BaseDialog.Description className="cq-body-sm text-(--cq-text-secondary)">
-              {description}
-            </BaseDialog.Description>
-          ) : null}
-        </div>
-        {children !== undefined ? (
-          <div className="cq-body-sm text-(--cq-text-primary)">{children}</div>
-        ) : null}
-        {actions !== undefined ? (
-          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
-            {actions}
+    <OverlayLayerContext.Provider value="modal">
+      <BaseDialog.Portal>
+        <BaseDialog.Backdrop className="fixed inset-0 z-(--cq-z-modal) bg-(--cq-overlay) transition-opacity duration-(--cq-motion-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+        <BaseDialog.Popup
+          className={cx(
+            "fixed top-1/2 left-1/2 z-(--cq-z-modal) flex w-[calc(100vw-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-base) data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0",
+            className,
+          )}
+        >
+          <div className="flex flex-col gap-1">
+            <BaseDialog.Title className="cq-title-md text-(--cq-text-primary)">
+              {title}
+            </BaseDialog.Title>
+            {description !== undefined ? (
+              <BaseDialog.Description className="cq-body-sm text-(--cq-text-secondary)">
+                {description}
+              </BaseDialog.Description>
+            ) : null}
           </div>
-        ) : null}
-      </BaseDialog.Popup>
-    </BaseDialog.Portal>
+          {children !== undefined ? (
+            <div className="cq-body-sm text-(--cq-text-primary)">
+              {children}
+            </div>
+          ) : null}
+          {actions !== undefined ? (
+            <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+              {actions}
+            </div>
+          ) : null}
+        </BaseDialog.Popup>
+      </BaseDialog.Portal>
+    </OverlayLayerContext.Provider>
   );
 }
 
@@ -201,33 +206,35 @@ export function DialogViewerContent({
         };
 
   return (
-    <BaseDialog.Portal>
-      <BaseDialog.Backdrop className="fixed inset-0 z-(--cq-z-modal) bg-(--cq-overlay) transition-opacity duration-(--cq-motion-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
-      <BaseDialog.Popup
-        ref={popupRef}
-        {...swipe}
-        className={cx(
-          // Phone: the whole screen, rising from the bottom edge it can be
-          // pulled back down to.
-          "fixed inset-0 z-(--cq-z-modal) flex flex-col overflow-hidden bg-(--cq-surface-raised) outline-none transition-[opacity,transform,translate,scale] duration-(--cq-motion-emphasis) ease-(--cq-ease) data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",
-          // Larger screens: a centred reading modal.
-          "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-[calc(100dvh-64px)] sm:w-[calc(100vw-64px)] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:shadow-(--cq-shadow-overlay) sm:duration-(--cq-motion-base) sm:data-[ending-style]:-translate-y-1/2 sm:data-[ending-style]:scale-[0.98] sm:data-[ending-style]:opacity-0 sm:data-[starting-style]:-translate-y-1/2 sm:data-[starting-style]:scale-[0.98] sm:data-[starting-style]:opacity-0",
-          className,
-        )}
-      >
-        <BaseDialog.Title className="sr-only">{title}</BaseDialog.Title>
-        {onSwipeDismiss === undefined ? null : (
-          <div
-            aria-hidden="true"
-            data-cq-sheet-drag
-            className="flex h-5 shrink-0 touch-none items-center justify-center sm:hidden"
-          >
-            <span className="h-1 w-10 rounded-full bg-(--cq-border-strong)" />
-          </div>
-        )}
-        {children}
-      </BaseDialog.Popup>
-    </BaseDialog.Portal>
+    <OverlayLayerContext.Provider value="modal">
+      <BaseDialog.Portal>
+        <BaseDialog.Backdrop className="fixed inset-0 z-(--cq-z-modal) bg-(--cq-overlay) transition-opacity duration-(--cq-motion-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+        <BaseDialog.Popup
+          ref={popupRef}
+          {...swipe}
+          className={cx(
+            // Phone: the whole screen, rising from the bottom edge it can be
+            // pulled back down to.
+            "fixed inset-0 z-(--cq-z-modal) flex flex-col overflow-hidden bg-(--cq-surface-raised) outline-none transition-[opacity,transform,translate,scale] duration-(--cq-motion-emphasis) ease-(--cq-ease) data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",
+            // Larger screens: a centred reading modal.
+            "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-[calc(100dvh-64px)] sm:w-[calc(100vw-64px)] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:shadow-(--cq-shadow-overlay) sm:duration-(--cq-motion-base) sm:data-[ending-style]:-translate-y-1/2 sm:data-[ending-style]:scale-[0.98] sm:data-[ending-style]:opacity-0 sm:data-[starting-style]:-translate-y-1/2 sm:data-[starting-style]:scale-[0.98] sm:data-[starting-style]:opacity-0",
+            className,
+          )}
+        >
+          <BaseDialog.Title className="sr-only">{title}</BaseDialog.Title>
+          {onSwipeDismiss === undefined ? null : (
+            <div
+              aria-hidden="true"
+              data-cq-sheet-drag
+              className="flex h-5 shrink-0 touch-none items-center justify-center sm:hidden"
+            >
+              <span className="h-1 w-10 rounded-full bg-(--cq-border-strong)" />
+            </div>
+          )}
+          {children}
+        </BaseDialog.Popup>
+      </BaseDialog.Portal>
+    </OverlayLayerContext.Provider>
   );
 }
 

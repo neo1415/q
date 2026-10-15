@@ -11,7 +11,7 @@ import { QControl } from "@/features/q/control/q-control";
 
 import { capitalTabHref } from "./capital-tabs";
 import { money, percent, shareOf } from "./money";
-import { INSTRUMENT_LABELS } from "./round-labels";
+import { instrumentLabel } from "./round-labels";
 import { NOTICE_WORDS, STATUS_WORDS } from "./round-words";
 
 /**
@@ -138,8 +138,7 @@ export function RaiseSummary({
           {current.name}
         </h2>
         <span className="cq-caption text-(--cq-text-tertiary)">
-          {INSTRUMENT_LABELS[current.instrument]} ·{" "}
-          {STATUS_WORDS[current.status]}
+          {instrumentLabel(current.instrument)} · {STATUS_WORDS[current.status]}
         </span>
       </div>
       <div className="flex flex-col gap-1">

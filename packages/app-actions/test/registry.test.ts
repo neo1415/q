@@ -386,6 +386,7 @@ describe("person-scoped actions (onboarding)", () => {
       "person.name.set",
       "person.profile.edit",
       "team.invitation.accept",
+      "team.invitation.decline",
       "team.join_request.create",
       // F2 (2026-10-08): a newcomer claims before having an organisation.
       "company.claim.request",

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import {
   acceptInvitation,
+  acceptInvitationById,
+  declineInvitation,
   ApiProblemError,
   changeTeamRole,
   decideTeamJoinRequest,
@@ -174,6 +176,24 @@ export async function switchOrganisationAction(organisationId: string) {
 export async function acceptInvitationAction(token: string) {
   if (!InvitationTokenSchema.safeParse(token).success) return BAD;
   const out = await run((s) => acceptInvitation(s, token));
+  if (out.ok) revalidatePath("/", "layout");
+  return out;
+}
+
+/**
+ * F2: accept or decline from the invitee's own list. Only the id travels;
+ * the API matches the invitation to the signed-in person's verified email.
+ */
+export async function acceptInvitationByIdAction(invitationId: string) {
+  if (!id(invitationId)) return BAD;
+  const out = await run((s) => acceptInvitationById(s, invitationId));
+  if (out.ok) revalidatePath("/", "layout");
+  return out;
+}
+
+export async function declineInvitationAction(invitationId: string) {
+  if (!id(invitationId)) return BAD;
+  const out = await run((s) => declineInvitation(s, invitationId));
   if (out.ok) revalidatePath("/", "layout");
   return out;
 }
