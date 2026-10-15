@@ -167,6 +167,16 @@ export const SubmitApplicationRequestSchema = z
   .object({ clientRequestId: z.string().min(8).max(128) })
   .strict();
 
+/**
+ * The two Submit refusals a guest is told apart (409 RESOURCE_CONFLICT),
+ * because both are fixed on the same screen. The web tells them apart by
+ * this exact detail; every other refusal is still one 404.
+ */
+export const GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL =
+  "Confirm your contact email before submitting." as const;
+export const GATEQ_SUBMIT_NOT_READY_DETAIL =
+  "Your application isn't ready to submit yet. Answer what's still needed, then submit." as const;
+
 export const ApplicationFactDtoSchema = z
   .object({
     dimension: z.string().max(64),

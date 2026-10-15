@@ -12,6 +12,7 @@ import {
   GATEQ_APPLY_INTERVIEW_OPEN_PATH,
   GATEQ_APPLY_SUBMIT_PATH,
   GATEQ_APPLY_TRANSCRIPT_PATH,
+  GATEQ_SUBMIT_NOT_READY_DETAIL,
   type ApplicationContactResponse,
   type ApplicationCoverageDto,
 } from "@capital-q/contracts";
@@ -110,7 +111,12 @@ const COVERAGE: ApplicationCoverageDto = {
   transcriptTurns: 2,
 };
 
-function build(options: { readonly contactUnconfirmed?: boolean } = {}) {
+function build(
+  options: {
+    readonly contactUnconfirmed?: boolean;
+    readonly notReady?: boolean;
+  } = {},
+) {
   const recorded = {
     contacts: [] as { token: string; contact: ContactDetails }[],
     codes: [] as string[],
@@ -164,6 +170,9 @@ function build(options: { readonly contactUnconfirmed?: boolean } = {}) {
       if (input.token !== TOKEN) deny();
       if (options.contactUnconfirmed === true) {
         throw new IntakeRefusedError("CONTACT_NOT_CONFIRMED");
+      }
+      if (options.notReady === true) {
+        throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
       }
       return Promise.resolve({
         submittedAt: "2026-10-13T12:00:00.000Z",
@@ -353,6 +362,30 @@ describe("the applicant contact over HTTP (GateQ slice 1)", () => {
     });
     expect(response.statusCode).toBe(409);
     expect(response.json<{ code: string }>().code).toBe("RESOURCE_CONFLICT");
+  });
+
+  it("refuses a not-ready Submit with an honest 409, not a vanished 404", async () => {
+    // Live 2026-10-15: a required answer (stage) was still unknown and the
+    // applicant was told their application did not exist.
+    const { app } = build({ notReady: true });
+    const response = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_SUBMIT_PATH,
+      headers: bearer(TOKEN),
+      payload: { clientRequestId: "req-000000000001" },
+    });
+    expect(response.statusCode).toBe(409);
+    const body = response.json<{ code: string; detail: string }>();
+    expect(body.code).toBe("RESOURCE_CONFLICT");
+    expect(body.detail).toBe(GATEQ_SUBMIT_NOT_READY_DETAIL);
+    // A forged credential on the same route is still the one 404.
+    const forged = await app.inject({
+      method: "POST",
+      url: GATEQ_APPLY_SUBMIT_PATH,
+      headers: bearer("gq_forged-token-000000000000000000000000"),
+      payload: { clientRequestId: "req-000000000001" },
+    });
+    expect(forged.statusCode).toBe(404);
   });
 
   it("needs a signed-in account for the account-confirmed contact", async () => {
