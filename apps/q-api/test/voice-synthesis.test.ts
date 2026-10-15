@@ -21,8 +21,10 @@ import { createApp, type QApiSecurityDependencies } from "../src/app.js";
 import { createVoiceSessionBindings } from "../src/voice/bindings.js";
 import { createDeepgramSpeechSynthesis } from "../src/voice/providers/deepgram-speak.js";
 import {
+  SPEECH_QUOTA,
   SpeechSynthesisError,
   createSpeechThrottle,
+  speechQuotaFrom,
   type SpeechSynthesisPort,
 } from "../src/voice/synthesis.js";
 
@@ -186,6 +188,20 @@ describe("Q-FIRST-RUN-TTS-001 · Q reads a line aloud", () => {
     expect(throttle.charge("tenant:two")).toBe(true);
     now = 2_000;
     expect(throttle.charge("tenant:one")).toBe(true);
+  });
+
+  it("reads the allowance from CQ_SPEECH_LINES_PER_10MIN, bounded, else the default", () => {
+    expect(speechQuotaFrom({})).toEqual(SPEECH_QUOTA);
+    expect(speechQuotaFrom({ CQ_SPEECH_LINES_PER_10MIN: "300" })).toEqual({
+      limit: 300,
+      windowMs: 10 * 60_000,
+    });
+    // Never off, never unbounded, never a guess at a typo.
+    for (const raw of ["0", "1001", "-5", "30.5", "lots", " ", "1e3"]) {
+      expect(speechQuotaFrom({ CQ_SPEECH_LINES_PER_10MIN: raw })).toEqual(
+        SPEECH_QUOTA,
+      );
+    }
   });
 });
 
