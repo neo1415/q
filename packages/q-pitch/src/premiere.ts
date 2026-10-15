@@ -159,6 +159,31 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
       },
     ]),
     {
+      featureId: "DATAROOM-VIEW",
+      status: "PRODUCTION_LIVE_VERIFIED",
+      actorContext: PILOT_ACTOR,
+      fixture:
+        "Harbourline Cargo (fictional) data room as Savanna Seed Partners, connected through express interest + founder accept (q-pitch-demo-access.mjs, 15 Oct)",
+      appCommit: "web production a52754b1",
+      verifiedAt: "2026-10-15 14:40 UTC",
+      verifierType: "BROWSER",
+      receipt:
+        "scratchpad qpitch-review/fictional/harbourline-dataroom-savanna.png + harbourline-dataroom-read.txt (GET + tab click); demo-access-run.json",
+      claimsAllowed: [
+        {
+          claimId: "DATAROOM-VIEW.c1",
+          text: "Once connected, the investor sees the company's data room: each listed document shows its level, public ones open now and the others on request",
+        },
+      ],
+      claimsForbidden: [
+        "That documents marked shared-only or private are visible",
+        "That a document's content is verified",
+      ],
+      validUntil: {
+        invalidatedBy: "Next change to data-room access or levels",
+      },
+    },
+    {
       featureId: "INV-MANDATE-VIEW",
       status: "PRODUCTION_LIVE_VERIFIED",
       actorContext: PILOT_ACTOR,
@@ -645,15 +670,89 @@ const premiereTopThree = withLines("s.pilot.opening", (scene) => [
   lineOf(scene, "l.top3.fit"),
 ]);
 
-const premiereCompany = withLines("s.pilot.company", (scene) => [
-  line(
-    "l.company.open",
-    "Let's open the first one, and look at it the way an analyst would.",
-    "BEFORE_ACK",
-    "r4 transition",
+/**
+ * Owner decision 15 Oct: the two scenes after the top three open NAMED
+ * fictional companies with a playable pitch (DEMO_COMPANIES), presented as
+ * "a company with a pitch", never as a mandate rank. The ranking itself is
+ * untouched (scene 1 still shows whatever it returns).
+ */
+const pilotCompany = PILOT_SCRIPT.scenes.find(
+  (s) => s.sceneId === "s.pilot.company",
+);
+if (pilotCompany === undefined) throw new Error("missing s.pilot.company");
+const premiereCompany: SceneScript = {
+  ...pilotCompany,
+  title: "A company with a pitch, on the evidence",
+  featureIds: [...pilotCompany.featureIds, "DATAROOM-VIEW"],
+  approvedClaimIds: [...pilotCompany.approvedClaimIds, "DATAROOM-VIEW.c1"],
+  actions: [
+    {
+      actionId: "ta_open-harbourline",
+      kind: "openCompany",
+      company: "harbourline-cargo",
+    },
+    {
+      actionId: "ta_ask-profile",
+      kind: "askApprovedQuestion",
+      question: "q.company-profile",
+      subject: "harbourline-cargo",
+    },
+    {
+      actionId: "ta_ask-risks",
+      kind: "askApprovedQuestion",
+      question: "q.company-risks",
+      subject: "harbourline-cargo",
+    },
+    {
+      actionId: "ta_open-dataroom",
+      kind: "selectTab",
+      target: "tab.dataroom",
+    },
+  ],
+  lines: [
+    line(
+      "l.company.open",
+      "Now let's open a company with a pitch: Harbourline Cargo, a fictional demo company. I'll look at it the way an analyst would.",
+      "BEFORE_ACK",
+      "owner decision 15 Oct (named fictional company)",
+    ),
+    ...pilotCompany.lines,
+    line(
+      "l.company.dataroom",
+      "You're connected with this company, so its data room is open to you: each document shows its level, the public ones open now and the rest on request.",
+      "AFTER_ACK",
+      "CERTIFICATION DATAROOM-VIEW (r4 wording)",
+      ["DATAROOM-VIEW.c1"],
+    ),
+  ],
+};
+
+const pilotCompare = PILOT_SCRIPT.scenes.find(
+  (s) => s.sceneId === "s.pilot.compare",
+);
+if (pilotCompare === undefined) throw new Error("missing s.pilot.compare");
+const premiereCompare: SceneScript = {
+  ...pilotCompare,
+  title: "Two companies with pitches, side by side",
+  actions: [
+    {
+      actionId: "ta_compare-two",
+      kind: "buildComparison",
+      question: "q.compare-two",
+      companies: ["harbourline-cargo", "clinicrest"],
+    },
+  ],
+  lines: pilotCompare.lines.map((l) =>
+    l.lineId === "l.compare.intro"
+      ? line(
+          "l.compare.intro",
+          "Let me put Harbourline Cargo next to another company with a pitch, Clinicrest, against your mandate.",
+          "BEFORE_ACK",
+          "owner decision 15 Oct (named fictional companies)",
+        )
+      : l,
   ),
-  ...scene.lines,
-]);
+};
 
 /**
  * A first GateQ conversation, Q to Q (owner 15 Oct, item 5): Q as the
@@ -967,18 +1066,12 @@ function spoken<T extends { readonly chapterId: string }>(chapter: T): T {
     : { ...chapter, spokenNames: [...names] };
 }
 
-function pilotSceneOf(id: string): SceneScript {
-  const scene = PILOT_SCRIPT.scenes.find((s) => s.sceneId === id);
-  if (scene === undefined) throw new Error(`missing pilot scene ${id}`);
-  return scene;
-}
-
 const PREMIERE_SCENES: SceneScript[] = [
   intro,
   mandate,
   premiereTopThree,
   premiereCompany,
-  pilotSceneOf("s.pilot.compare"),
+  premiereCompare,
   ...candidates.flatMap((scene) =>
     scene.sceneId === "s.premiere.privacy"
       ? [scene, subjectScene, explore]

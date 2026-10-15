@@ -3,6 +3,7 @@ export * from "./scene-evidence.js";
 export * from "./script.js";
 export * from "./guide.js";
 export * from "./control-channel.js";
+export * from "./demo-companies.js";
 export {
   routeMatchesPattern,
   TourRunner,

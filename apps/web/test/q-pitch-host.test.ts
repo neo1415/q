@@ -294,6 +294,18 @@ describe("the voiced narrator (Q's own voice; captions stay)", () => {
   });
 });
 
+describe("named fictional demo companies (owner decision 15 Oct)", () => {
+  it("resolve by key from the package table only; unknown names never resolve", () => {
+    expect(resolveCompanyFixture("harbourline-cargo", [])).toEqual({
+      companyId: "ceb6ec2d-4a4a-41a2-9b71-377d72c26407",
+      name: "Harbourline Cargo",
+    });
+    expect(resolveCompanyFixture("clinicrest", [])?.name).toBe("Clinicrest");
+    expect(resolveCompanyFixture("duplo", [])).toBeNull();
+    expect(resolveCompanyFixture("constructor", [])).toBeNull();
+  });
+});
+
 describe("a Q-to-Q turn, spoken", () => {
   it("is cut at a sentence end to stay within the voice gateway's limit", () => {
     const sentence = "We serve SME lenders across the region. ";
