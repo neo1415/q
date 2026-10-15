@@ -46,6 +46,8 @@ import { rehearsalPorts } from "./rehearsal-ports";
 
 const VISIBLE_WAIT_MS = 4_000;
 const ABORT_GRACE_MS = 2_500;
+/** How long a question may take to become a run the Q API accepted. */
+const RUN_START_WAIT_MS = 15_000;
 
 type QRef = { current: QSessionValue | null };
 
@@ -204,12 +206,32 @@ export function useTourPorts(
     ): Promise<ActionOutcome> => {
       const q = qRef.current?.q;
       if (q === undefined) return outcome(false, "Q_RUN_FAILED");
-      const prior = q.state.runId;
+      // The receipt binds to the run THIS question starts: a run id the
+      // conversation did not already hold. A refused or failed ask leaves
+      // the id unchanged, so an older finished run (for example one read
+      // back when the conversation opened) can never acknowledge it
+      // (browser rehearsal 2026-10-15: exactly that false DONE).
+      const known = new Set<string>(messages().map((m) => m.runId));
+      if (q.runId !== null) known.add(q.runId);
+      if (q.state.runId !== null) known.add(q.state.runId);
       setOpen(true);
       await q.ask(text);
+      const started = new AbortController();
+      const stopWaiting = setTimeout(() => started.abort(), RUN_START_WAIT_MS);
+      signal.addEventListener("abort", () => started.abort(), { once: true });
+      let mine: string | null = null;
+      await waitFor(() => {
+        const id = qRef.current?.q.runId ?? null;
+        if (id !== null && !known.has(id)) mine = id;
+        return mine !== null;
+      }, started.signal);
+      clearTimeout(stopWaiting);
+      if (signal.aborted) return outcome(false, "CANCELLED");
+      const run = mine;
+      if (run === null) return outcome(false, "Q_RUN_FAILED");
       const finished = await waitFor(() => {
         const state = qRef.current?.q.state;
-        return state !== undefined && state.runId !== prior && state.terminal;
+        return state !== undefined && state.runId === run && state.terminal;
       }, signal);
       if (!finished) {
         // Interrupted mid-run: stop it rather than let it land unseen.
@@ -217,7 +239,11 @@ export function useTourPorts(
         return outcome(false, "CANCELLED");
       }
       const state = qRef.current?.q.state;
-      if (state?.runStatus !== "COMPLETED" || state.failure !== null) {
+      if (
+        state?.runId !== run ||
+        state.runStatus !== "COMPLETED" ||
+        state.failure !== null
+      ) {
         return outcome(false, "Q_RUN_FAILED");
       }
       const visible = await answerVisible();
