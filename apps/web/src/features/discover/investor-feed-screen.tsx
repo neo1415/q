@@ -91,6 +91,8 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
     "Companies are discoverable, but your hard rules exclude every one of them.",
   NONE_MATCH_MANDATE:
     "Companies are discoverable, but none matches your mandate yet.",
+  NONE_WITH_PLAYABLE_PITCH:
+    "Companies pass your hard rules, but none has a pitch video yet. Search and Explore still show them.",
   NONE_MATCH_FILTERS: "No companies match these filters.",
 };
 
@@ -502,6 +504,27 @@ function InvestorFeed({
                 className={buttonClassName("primary")}
               >
                 Review my hard rules
+              </Link>
+              <Button variant="secondary" onClick={() => setOpen(true)}>
+                Ask Q
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    ) : notes.includes("NONE_WITH_PLAYABLE_PITCH") ? (
+      <div className="flex flex-col gap-4">
+        {unverifiableLine}
+        <EmptyState
+          title={`${discoverableCompanies(discoverableCount)} discoverable. None has a pitch video yet.`}
+          description="This feed shows only companies with a pitch you can play. The others pass your hard rules and are in Search and Explore; they join the feed when they add a pitch."
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/explore" className={buttonClassName("secondary")}>
+                Open Explore
+              </Link>
+              <Link href="/search" className={buttonClassName("secondary")}>
+                Search companies
               </Link>
               <Button variant="secondary" onClick={() => setOpen(true)}>
                 Ask Q

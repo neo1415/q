@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 import { cx } from "@capital-q/ui";
+import { ArrowUpRight, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { useQControlGroup } from "@/features/q/control/q-control";
 import { QPageState } from "@/features/q/q-section";
@@ -16,22 +17,13 @@ import {
 } from "./hub-view";
 
 /**
- * The CRM workspace's tab strip. Links own the state, so refresh, back and
- * forward recover the same area. The workspace's own views come first as
- * tabs; the modules a relationship's work continues in (GateQ, Capital,
- * Q Work, Discover) follow as plainer links. On a phone the strip scrolls
- * sideways and keeps the open tab in view; the page itself never does.
- *
- * Q's ids are unchanged from the Hub (control catalog): Reports keeps
- * `button.hub-results`, so Q's existing moves to Results still resolve.
+ * The CRM workspace's own tabs. Links own the state, so refresh, back and
+ * forward recover the same area. Only the workspace's views are tabs; the
+ * modules a relationship's work continues in are HubRelated links beside
+ * the title (redesign 2026-10-15: they read as tabs and were not). On a
+ * phone the strip scrolls sideways and keeps the open tab in view.
  */
-export function HubNavigation({
-  side,
-  view,
-}: {
-  readonly side: HubSide;
-  readonly view: HubView;
-}) {
+export function HubNavigation({ view }: { readonly view: HubView }) {
   const ref = useRef<HTMLElement>(null);
   useQControlGroup({
     kind: "TAB",
@@ -40,17 +32,6 @@ export function HubNavigation({
       "tab.overview": '[data-hub-view="overview"]',
       "tab.pipeline": '[data-hub-view="pipeline"]',
       "tab.relationships": '[data-hub-view="relationships"]',
-    },
-  });
-  useQControlGroup({
-    kind: "BUTTON",
-    ref,
-    ids: {
-      "button.hub-discover": '[data-hub-link="discover"]',
-      "button.hub-gateq": '[data-hub-link="gateq"]',
-      "button.hub-capital": '[data-hub-link="capital"]',
-      "button.hub-work": '[data-hub-link="work"]',
-      "button.hub-results": '[data-hub-link="results"]',
     },
   });
 
@@ -65,7 +46,6 @@ export function HubNavigation({
       strip.scrollLeft = right - strip.clientWidth + 16;
   }, [view]);
 
-  const destinations = hubDestinations(side);
   return (
     <nav
       ref={ref}
@@ -76,16 +56,13 @@ export function HubNavigation({
         {...(view === "overview" ? { tab: "overview" as const } : {})}
         filters={{ view }}
       />
-      {hubTabs(side).map((entry) => {
+      {hubTabs().map((entry) => {
         const open = view === entry.view;
         return (
           <Link
             key={entry.view}
             href={entry.href}
             data-hub-view={entry.view}
-            {...(entry.view === "reports"
-              ? { "data-hub-link": "results" }
-              : {})}
             aria-current={open ? "page" : undefined}
             className={cx(
               "cq-body-sm -mb-px inline-flex min-h-11 flex-none items-center border-b-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
@@ -98,20 +75,45 @@ export function HubNavigation({
           </Link>
         );
       })}
-      {destinations.length === 0 ? null : (
-        <span
-          aria-hidden="true"
-          className="mx-2 my-3 w-px flex-none bg-(--cq-border-subtle)"
-        />
-      )}
+    </nav>
+  );
+}
+
+/**
+ * Where a relationship's work continues outside the CRM (GateQ): a quiet
+ * link beside the title, marked as leaving the workspace. Q keeps
+ * `button.hub-gateq`; the sidebar's own entries are not repeated here.
+ */
+export function HubRelated({ side }: { readonly side: HubSide }) {
+  const ref = useRef<HTMLElement>(null);
+  useQControlGroup({
+    kind: "BUTTON",
+    ref,
+    ids: {
+      "button.hub-gateq": '[data-hub-link="gateq"]',
+    },
+  });
+  const destinations = hubDestinations(side);
+  if (destinations.length === 0) return null;
+  return (
+    <nav
+      ref={ref}
+      aria-label="Related"
+      className="flex flex-wrap items-center gap-x-1"
+    >
       {destinations.map((entry) => (
         <Link
           key={entry.id}
           href={entry.href}
           data-hub-link={entry.id}
-          className="cq-body-sm -mb-px inline-flex min-h-11 flex-none items-center border-b-2 border-transparent px-3 whitespace-nowrap text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+          className="cq-body-sm inline-flex min-h-11 items-center gap-1 rounded-(--cq-radius-md) px-2 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
           {entry.label}
+          <ArrowUpRight
+            size={ICON_SIZE.compact}
+            aria-hidden="true"
+            className="text-(--cq-text-tertiary)"
+          />
         </Link>
       ))}
     </nav>

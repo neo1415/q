@@ -62,7 +62,7 @@ describe("tour entry model", () => {
       chapters.map((c) => [c.chapterId, c.standing]),
     );
     expect(standing["ch.premiere.gateq"]).toBe("CERTIFIED");
-    expect(standing["ch.premiere.privacy"]).toBe("INTERNAL_ONLY");
+    expect(standing["ch.premiere.privacy"]).toBe("CERTIFIED");
     expect(standing["ch.premiere.rehearsal"]).toBe("INTERNAL_ONLY");
     for (const chapter of chapters) {
       expect(chapter.href).toBe(

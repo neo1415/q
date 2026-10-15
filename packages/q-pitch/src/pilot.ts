@@ -248,7 +248,9 @@ export const PILOT_SCRIPT: TourScript = TourScriptSchema.parse({
       ],
       fallbackLines: [FALLBACK],
       fallbackSceneId: null,
-      ackTimeoutMs: 20_000,
+      // Lead decision 15 Oct: 20 s was too tight on production (one of two
+      // top-three runs settled after it; receipt 41b3b4ee attempt 1).
+      ackTimeoutMs: 30_000,
     },
     {
       sceneId: "s.pilot.company",

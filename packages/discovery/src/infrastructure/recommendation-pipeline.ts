@@ -46,6 +46,7 @@ import {
   type HybridCandidateService,
 } from "../hybrid/service.js";
 import { RANKING_CONFIG_CURRENT } from "../ranking/config.js";
+import type { PlayablePitchPort } from "../ranking/feed-eligibility.js";
 import { createDeterministicRanker } from "../ranking/ranker.js";
 import {
   createRankingService,
@@ -139,6 +140,12 @@ export type RecommendationPipelineDependencies = {
         }[]
       >)
     | undefined;
+  /**
+   * Discover feed eligibility (discover-feed-eligibility.v1): which
+   * companies have a playable pitch video, from the Media context's port.
+   * Absent while the policy requires a pitch: the feed admits nobody.
+   */
+  readonly playablePitches?: PlayablePitchPort | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -242,6 +249,8 @@ export type SlateReadPipelineDependencies = {
   readonly pitchTimes?: PublishablePitchTimesPort | undefined;
   /** Re-approach after a post-meeting pass (doc 19 §67). Absent: it stays closed. */
   readonly materialChanges?: MaterialChangePort | undefined;
+  /** Read-time re-check of the feed's playable-pitch rule. */
+  readonly playablePitches?: PlayablePitchPort | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -311,6 +320,7 @@ export function createSlateReadPipeline(
       ...createPostgresCompanySectorsPort({ sql }),
     },
     requester,
+    playablePitches: dependencies.playablePitches,
     policy,
     volume: dependencies.volume,
     clock,
@@ -469,6 +479,7 @@ export function createRecommendationPipeline(
     ranking,
     rerank,
     fitOrdering,
+    playablePitches: dependencies.playablePitches,
     snapshots,
     slates,
     transactions,

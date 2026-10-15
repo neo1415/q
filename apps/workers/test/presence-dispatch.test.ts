@@ -269,6 +269,83 @@ describe("presence research dispatch", () => {
     });
   });
 
+  it("never researches the open web for a fictional synthetic account's invented company", async () => {
+    const responseId = randomUUID();
+    const named: OnboardingResponse = {
+      ...textResponse({ stepKey: "F1.company_name", text: "Prumo" }),
+      id: OnboardingResponseIdSchema.parse(responseId),
+    };
+    const session = makeSession({
+      subject: { subjectType: "COMPANY", subjectId: randomUUID() },
+    });
+    const presence = fakePresence({
+      status: "COMPLETED",
+      buildId: "b",
+      sourceCount: 0,
+      understandingCount: 0,
+      understandings: [],
+      domains: [],
+    });
+    const asked: string[] = [];
+    const dispatch = createPresenceResearchDispatch(
+      dependencies({
+        presence: presence.service,
+        sessions: fakeSessions(session),
+        responses: fakeResponses([named]),
+        isFictionalAccount: (userId) => {
+          asked.push(userId);
+          return Promise.resolve(true);
+        },
+      }),
+    );
+
+    dispatch.onResponseCommitted({
+      sessionId: session.id,
+      stepKey: "F1.company_name",
+      responseId,
+    });
+    await flush();
+
+    expect(asked).toEqual([session.userId]);
+    expect(presence.builds).toHaveLength(0);
+  });
+
+  it("still researches a real account's company when the guard says it is not fictional", async () => {
+    const responseId = randomUUID();
+    const named: OnboardingResponse = {
+      ...textResponse({ stepKey: "F1.company_name", text: "Acme Robotics" }),
+      id: OnboardingResponseIdSchema.parse(responseId),
+    };
+    const session = makeSession({
+      subject: { subjectType: "COMPANY", subjectId: randomUUID() },
+    });
+    const presence = fakePresence({
+      status: "COMPLETED",
+      buildId: "b",
+      sourceCount: 0,
+      understandingCount: 0,
+      understandings: [],
+      domains: [],
+    });
+    const dispatch = createPresenceResearchDispatch(
+      dependencies({
+        presence: presence.service,
+        sessions: fakeSessions(session),
+        responses: fakeResponses([named]),
+        isFictionalAccount: () => Promise.resolve(false),
+      }),
+    );
+
+    dispatch.onResponseCommitted({
+      sessionId: session.id,
+      stepKey: "F1.company_name",
+      responseId,
+    });
+    await flush();
+
+    expect(presence.builds).toHaveLength(1);
+  });
+
   it("never proposes an investor mandate step, even when the research names an investment focus", async () => {
     const responseId = randomUUID();
     const organisationId = randomUUID();

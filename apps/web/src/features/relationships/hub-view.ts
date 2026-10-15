@@ -6,10 +6,10 @@ import type {
 
 /**
  * URL-owned Hub state: old relationship links still open the existing board.
- * "reports" is the Results page (`/results`), which stays at its own URL so
- * every report and download link keeps working; it sits in the CRM's tabs.
+ * Reports are part of the Overview (owner feedback 2026-10-15); `/results`
+ * and `/crm?view=reports` redirect there with their period.
  */
-export type HubView = "overview" | "relationships" | "pipeline" | "reports";
+export type HubView = "overview" | "relationships" | "pipeline";
 export type HubSide = "INVESTOR" | "COMPANY" | "NONE";
 
 export function hubViewOf(value: string | undefined): HubView {
@@ -18,10 +18,10 @@ export function hubViewOf(value: string | undefined): HubView {
 
 /**
  * The CRM workspace's own tabs (owner directive 2026-10-15 §D: the sidebar's
- * Results became CRM). Each is a real, server-read view; Reports is the
- * existing Results page. Nothing here is a placeholder tab.
+ * Results became CRM). Each is a real, server-read view; the period
+ * report lives in the Overview. Nothing here is a placeholder tab.
  */
-export function hubTabs(side: HubSide): readonly {
+export function hubTabs(): readonly {
   readonly view: HubView;
   readonly label: string;
   readonly href: string;
@@ -42,10 +42,6 @@ export function hubTabs(side: HubSide): readonly {
       label: "Relationships",
       href: "/relationships?view=relationships",
     },
-    // Results reads only a founder's or an investor's own side.
-    ...(side === "NONE"
-      ? []
-      : [{ view: "reports" as const, label: "Reports", href: "/results" }]),
   ];
 }
 
@@ -64,7 +60,7 @@ const CRM_FORWARDED = [
 /**
  * Where the `/crm` alias sends a link: the established route that owns the
  * view, with the view's own parameters kept. `/crm` alone opens the
- * overview, the CRM's front page; `view=reports` is the Results page.
+ * overview, the CRM's front page; `view=reports` is the Overview's period.
  */
 export function crmTarget(
   params: Readonly<Record<string, string | string[] | undefined>>,
@@ -81,14 +77,13 @@ export function crmTarget(
       kept.set(key, value);
   }
   if (view === "reports") {
-    const report = new URLSearchParams();
+    const report = new URLSearchParams({ view: "overview" });
     for (const key of ["range", "stage", "from", "to"]) {
       const value = one(key);
       if (value !== undefined && value.length > 0 && value.length <= 40)
         report.set(key, value);
     }
-    const query = report.toString();
-    return query === "" ? "/results" : `/results?${query}`;
+    return `/relationships?${report.toString()}`;
   }
   const target = view !== undefined && CRM_VIEWS.has(view) ? view : "overview";
   return `/relationships?${new URLSearchParams([["view", target], ...kept]).toString()}`;
@@ -102,27 +97,28 @@ export function hubTitle(side: HubSide): string {
       : "Relationships";
 }
 
-/** Only working, role-appropriate routes. A submission is not investor interest. */
+/**
+ * The one module a relationship's work continues in that the sidebar does
+ * not already name for this place: GateQ, opened at the side's own tab.
+ * Discover, Capital and Q Work are primary or workspace sidebar entries,
+ * so repeating them here was a third route to the same page (redesign
+ * 2026-10-15). A submission is not investor interest.
+ */
 export function hubDestinations(side: HubSide): readonly {
   readonly id: string;
   readonly label: string;
   readonly href: string;
 }[] {
   if (side === "NONE") return [];
-  return [
-    { id: "discover", label: "Discover", href: "/discover" },
-    ...(side === "INVESTOR"
-      ? [{ id: "gateq", label: "Investment inbox", href: "/gateq?tab=inbox" }]
-      : [
-          { id: "capital", label: "Capital", href: "/capital" },
-          {
-            id: "gateq",
-            label: "My applications",
-            href: "/gateq?tab=applications",
-          },
-        ]),
-    { id: "work", label: "Q Work", href: "/work" },
-  ];
+  return side === "INVESTOR"
+    ? [{ id: "gateq", label: "Investment inbox", href: "/gateq?tab=inbox" }]
+    : [
+        {
+          id: "gateq",
+          label: "My applications",
+          href: "/gateq?tab=applications",
+        },
+      ];
 }
 
 /** Only counterpart IDs returned by the authorised overview read enter Q context. */
