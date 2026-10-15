@@ -290,7 +290,7 @@ describe("TourRunner — interruption cancels speech and queued work", () => {
     await flush();
     expect(h.runner.state.sceneIndex).toBe(1);
     expect(h.actions[0]?.signal.aborted).toBe(true);
-    expect(h.log).toContain("act:ta_open-ledgerfold");
+    expect(h.log).toContain("act:ta_open-card-1");
   });
 
   it("jump goes to a chapter's first scene; an unknown chapter is refused", async () => {
