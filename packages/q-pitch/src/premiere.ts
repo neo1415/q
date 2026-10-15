@@ -563,6 +563,64 @@ const candidates: SceneScript[] = [
   },
 ];
 
+/**
+ * What the audience may call each chapter aloud (slice 6, owner 15 Oct:
+ * "show me GateQ", "go to the CRM part", "demo rehearsals").
+ */
+const SPOKEN_NAMES: Readonly<Record<string, readonly string[]>> = {
+  "ch.premiere.intro": ["introduction", "intro", "the beginning", "start"],
+  "ch.premiere.mandate": ["mandate", "my mandate", "investor mandate"],
+  "ch.pilot.discover": [
+    "top three",
+    "discover",
+    "discovery",
+    "best fits",
+    "recommendations",
+    "matches",
+  ],
+  "ch.pilot.company": [
+    "company",
+    "company analysis",
+    "analysis",
+    "findings",
+    "risks",
+    "evidence",
+  ],
+  "ch.pilot.compare": ["comparison", "compare", "side by side"],
+  "ch.premiere.privacy": ["privacy", "trust", "permissions", "private data"],
+  "ch.premiere.gateq": [
+    "gateq",
+    "gate q",
+    "gate",
+    "applications",
+    "inbox",
+    "front door",
+  ],
+  "ch.premiere.relationship": [
+    "crm",
+    "relationships",
+    "relationship",
+    "pipeline",
+    "investment hub",
+  ],
+  "ch.premiere.rehearsal": [
+    "rehearsal",
+    "rehearsals",
+    "rehearse",
+    "q to q",
+    "practice",
+    "meeting rehearsal",
+  ],
+  "ch.premiere.close": ["the end", "your move", "close", "wrap up"],
+};
+
+function spoken<T extends { readonly chapterId: string }>(chapter: T): T {
+  const names = SPOKEN_NAMES[chapter.chapterId];
+  return names === undefined
+    ? chapter
+    : { ...chapter, spokenNames: [...names] };
+}
+
 function pilotSceneOf(id: string): SceneScript {
   const scene = PILOT_SCRIPT.scenes.find((s) => s.sceneId === id);
   if (scene === undefined) throw new Error(`missing pilot scene ${id}`);
@@ -602,7 +660,7 @@ export const PREMIERE_SCRIPT: TourScript = TourScriptSchema.parse({
               : "INVESTOR",
       sceneIds: [scene.sceneId],
     })),
-  ],
+  ].map(spoken),
   questions: [
     ...PILOT_SCRIPT.questions,
     {

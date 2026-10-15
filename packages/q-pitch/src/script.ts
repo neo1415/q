@@ -135,6 +135,14 @@ export const ChapterSchema = z
       "ADMIN",
     ]),
     sceneIds: z.array(SceneIdSchema).min(1).max(16),
+    /**
+     * What the audience may call this chapter aloud ("show me GateQ", "go
+     * to the CRM part"). Lowercase words; the title also counts.
+     */
+    spokenNames: z
+      .array(z.string().regex(/^[a-z0-9][a-z0-9 ]{1,40}$/u))
+      .max(12)
+      .optional(),
   })
   .strict();
 export type Chapter = z.infer<typeof ChapterSchema>;

@@ -1,4 +1,5 @@
 import {
+  classifyAudienceJump,
   classifyAudienceSpeech,
   TourControlGate,
   type ControlDecision,
@@ -228,8 +229,27 @@ export class TourRunner {
   hearAudience(raw: unknown, duplex: DuplexState): ControlDecision | null {
     const segment = this.#gate.noteSegment(raw);
     if (segment === null) return null;
-    const kind = classifyAudienceSpeech(segment);
-    if (kind === null) return null;
+    const spoken = classifyAudienceSpeech(segment);
+    if (spoken === null) return null;
+    // "Show me GateQ": a jump, when it names one of this tour's chapters.
+    const chapterId =
+      spoken === "INTERRUPT"
+        ? classifyAudienceJump(segment, this.#state.chapters)
+        : null;
+    if (chapterId !== null) {
+      return this.control(
+        {
+          intentId: `voice-${segment.segmentId}`.slice(0, 128),
+          source: segment.source,
+          modality: "VOICE",
+          kind: "JUMP",
+          chapterId,
+          segmentId: segment.segmentId,
+        },
+        duplex,
+      );
+    }
+    const kind = spoken;
     const halted =
       this.#state.phase === "PAUSED" ||
       this.#state.phase === "INTERRUPTED" ||

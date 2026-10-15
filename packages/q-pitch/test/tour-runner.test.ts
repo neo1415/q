@@ -565,3 +565,54 @@ describe("TourRunner.hearAudience — mic transcript into the gate", () => {
     ).toBeNull();
   });
 });
+
+describe("TourRunner.hearAudience — spoken chapter jumps (slice 6)", () => {
+  const mic = (segmentId: string, text: string) => ({
+    segmentId,
+    source: "AUDIENCE_MIC" as const,
+    channelId: "mic",
+    text,
+    final: true,
+  });
+
+  it("'show me that comparison' jumps; Q saying it never does; echo gating still applies", async () => {
+    const h = harness();
+    h.runner.start();
+    await flush();
+    const quiet = {
+      narratorPlaying: false,
+      counterpartPlaying: false,
+      echoCancellation: false,
+    };
+    // Q's own narration naming a chapter: recorded, never control.
+    expect(
+      h.runner.hearAudience(
+        {
+          segmentId: "q-9",
+          source: "NARRATOR_Q",
+          channelId: "narrator",
+          text: "Let me show you the comparison",
+          final: true,
+        },
+        quiet,
+      ),
+    ).toBeNull();
+    // Spoken over Q's audio without echo cancellation: refused.
+    const echo = h.runner.hearAudience(mic("mic-9", "Go to the comparison"), {
+      ...quiet,
+      narratorPlaying: true,
+    });
+    expect(echo).toEqual({ admitted: false, reason: "ECHO_UNGUARDED" });
+    // The same words from the audience, with echo cancellation reported.
+    const jump = h.runner.hearAudience(mic("mic-10", "Go to the comparison"), {
+      ...quiet,
+      narratorPlaying: true,
+      echoCancellation: true,
+    });
+    expect(jump?.admitted).toBe(true);
+    expect(jump?.admitted === true ? jump.intent.kind : null).toBe("JUMP");
+    expect(jump?.admitted === true ? jump.intent.chapterId : null).toBe(
+      "ch.pilot.compare",
+    );
+  });
+});

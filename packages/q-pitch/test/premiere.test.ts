@@ -6,6 +6,7 @@ import {
   PREMIERE_SCRIPT,
   TourControlGate,
   certifyTour,
+  classifyAudienceJump,
   classifyAudienceSpeech,
   type TranscriptSegment,
 } from "../src/index.js";
@@ -165,5 +166,42 @@ describe("two-minute cut", () => {
     );
     expect(top?.actions).toEqual(pilotTop?.actions);
     expect(top?.approvedClaimIds).toEqual(pilotTop?.approvedClaimIds);
+  });
+});
+
+describe("spoken chapter jumps (slice 6)", () => {
+  const seg = (
+    text: string,
+    source: "AUDIENCE_MIC" | "NARRATOR_Q" = "AUDIENCE_MIC",
+  ) => ({
+    segmentId: "s-1",
+    source,
+    channelId: "mic",
+    text,
+    final: true,
+  });
+  const chapters = PREMIERE_SCRIPT.chapters;
+
+  it.each([
+    ["Show me GateQ.", "ch.premiere.gateq"],
+    ["Go to the CRM part", "ch.premiere.relationship"],
+    ["Demo rehearsals", "ch.premiere.rehearsal"],
+    ["Can you take me to the mandate?", "ch.premiere.mandate"],
+    ["rehearsals", "ch.premiere.rehearsal"],
+    ["Q, jump to privacy please", "ch.premiere.privacy"],
+  ])("%s -> %s", (text, chapterId) => {
+    expect(classifyAudienceJump(seg(text), chapters)).toBe(chapterId);
+  });
+
+  it("a question that mentions a chapter is not a jump; Q's narration never is", () => {
+    expect(
+      classifyAudienceJump(seg("What does GateQ cost?"), chapters),
+    ).toBeNull();
+    expect(
+      classifyAudienceJump(seg("Show me the weather"), chapters),
+    ).toBeNull();
+    expect(
+      classifyAudienceJump(seg("Show me GateQ", "NARRATOR_Q"), chapters),
+    ).toBeNull();
   });
 });
