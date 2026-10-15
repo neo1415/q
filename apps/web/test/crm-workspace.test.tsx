@@ -80,8 +80,9 @@ describe("CRM routes: one workspace, no broken links", () => {
     expect(crmTarget({ view: "pipeline", q: "acme", state: "CONNECTED" })).toBe(
       "/relationships?view=pipeline&q=acme&state=CONNECTED",
     );
+    // Relationships became the Pipeline's List layout (S2).
     expect(crmTarget({ view: "relationships" })).toBe(
-      "/relationships?view=relationships",
+      "/relationships?view=pipeline&layout=list",
     );
     expect(crmTarget({ view: "reports", range: "90d", q: "x" })).toBe(
       "/relationships?view=overview&range=90d",
@@ -148,12 +149,8 @@ describe("CRM routes: one workspace, no broken links", () => {
 });
 
 describe("CRM tabs", () => {
-  it("has one Overview and no separate Reports tab", () => {
-    expect(hubTabs().map((tab) => tab.view)).toEqual([
-      "overview",
-      "pipeline",
-      "relationships",
-    ]);
+  it("has one Overview and one Pipeline, no Reports or Relationships tab", () => {
+    expect(hubTabs().map((tab) => tab.view)).toEqual(["overview", "pipeline"]);
     for (const side of ["INVESTOR", "COMPANY"] as const) {
       expect(hubDestinations(side).map((entry) => entry.href)).not.toContain(
         "/results",

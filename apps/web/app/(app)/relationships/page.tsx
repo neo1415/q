@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import {
   getMyUsage,
@@ -26,7 +27,10 @@ import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
 import { getSessionUser } from "@/auth/session";
 import { RelationshipPipeline } from "@/features/relationships/relationship-pipeline";
 import { pipelinePresentedRows } from "@/features/relationships/pipeline-presentation";
-import { pipelineStorageKey } from "@/features/relationships/pipeline-preferences";
+import {
+  pipelineHref,
+  pipelineStorageKey,
+} from "@/features/relationships/pipeline-preferences";
 import { PageContainer } from "@/components/app-shell/page-container";
 import { QControl } from "@/features/q/control/q-control";
 import { QSection } from "@/features/q/q-section";
@@ -40,7 +44,13 @@ import {
   relationshipDigests,
 } from "@/features/relationships/relationship-data";
 import { HubHeader } from "@/features/relationships/hub-header";
-import { hubOverviewRefs, hubViewOf } from "@/features/relationships/hub-view";
+import {
+  hubOverviewRefs,
+  hubViewOf,
+  pipelineLayoutOf,
+  pipelineListHref,
+} from "@/features/relationships/hub-view";
+import { PipelineLayoutSwitch } from "@/features/relationships/pipeline-layout-switch";
 import { ResultsDashboard } from "@/features/results/results-dashboard";
 import { rangeOf } from "@/features/results/results-words";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
@@ -68,7 +78,11 @@ export default async function RelationshipsPage({
   readonly searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const params = await searchParams;
+  // An old Relationships link opens the Pipeline's List layout.
+  const listed = pipelineListHref(params);
+  if (listed !== null) redirect(listed);
   const view = hubViewOf(params["view"]);
+  const layout = pipelineLayoutOf(params["layout"]);
   const context = await resolveOwnContext();
   const side =
     context.kind === "FOUNDER"
@@ -76,7 +90,7 @@ export default async function RelationshipsPage({
       : context.kind === "INVESTOR"
         ? "INVESTOR"
         : "NONE";
-  if (view === "pipeline") {
+  if (view === "pipeline" && layout !== "list") {
     const [session, user] = await Promise.all([apiSession(), getSessionUser()]);
     const parsed = RelationshipPipelineQuerySchema.safeParse(
       Object.fromEntries(
@@ -128,10 +142,7 @@ export default async function RelationshipsPage({
           <QSection
             id="pipeline"
             kind="RELATIONSHIP_LIST"
-            refs={pipelinePresentedRows(
-              data.items,
-              params["layout"] === "board" ? "board" : "table",
-            )
+            refs={pipelinePresentedRows(data.items, layout)
               .slice(0, 12)
               .map((row) => ({
                 kind: row.counterpart.kind,
@@ -147,7 +158,7 @@ export default async function RelationshipsPage({
               data={data}
               views={views}
               query={parsed.data}
-              layout={params["layout"] === "board" ? "board" : "table"}
+              layout={layout}
             />
           </QSection>
         )}
@@ -277,6 +288,13 @@ export default async function RelationshipsPage({
     side === "INVESTOR" ? relationshipFits(items) : undefined,
   ]);
   const now = readClock();
+  // The search carries into Table and Board when it is a valid one.
+  const searched = RelationshipPipelineQuerySchema.safeParse(
+    typeof params["q"] === "string" ? { q: params["q"] } : {},
+  );
+  const listQuery = searched.success
+    ? searched.data
+    : RelationshipPipelineQuerySchema.parse({});
 
   return (
     <PageContainer className="flex flex-col gap-4">
@@ -309,6 +327,14 @@ export default async function RelationshipsPage({
             </>
           )
         }
+      />
+      <PipelineLayoutSwitch
+        layout="list"
+        hrefs={{
+          list: "/relationships?view=pipeline&layout=list",
+          table: pipelineHref(listQuery, "table"),
+          board: pipelineHref(listQuery, "board"),
+        }}
       />
       {/* Q room R1: every relationship on this page, by id, for Q. */}
       <QSection

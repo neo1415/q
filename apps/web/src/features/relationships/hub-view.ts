@@ -5,15 +5,44 @@ import type {
 } from "@capital-q/contracts";
 
 /**
- * URL-owned Hub state: old relationship links still open the existing board.
- * Reports are part of the Overview (owner feedback 2026-10-15); `/results`
- * and `/crm?view=reports` redirect there with their period.
+ * URL-owned Hub state. Two views (research 2026-10-15 §3.2): the Overview
+ * and the Pipeline, the one record list. "relationships" was the same
+ * records as a list; it is the Pipeline's List layout now, and its old
+ * links redirect there (`pipelineListHref`). A bare `/relationships`
+ * still opens that list, as it always has. Reports are part of the
+ * Overview; `/results` and `/crm?view=reports` redirect there.
  */
-export type HubView = "overview" | "relationships" | "pipeline";
+export type HubView = "overview" | "pipeline";
 export type HubSide = "INVESTOR" | "COMPANY" | "NONE";
+export type PipelineLayout = "list" | "table" | "board";
 
 export function hubViewOf(value: string | undefined): HubView {
-  return value === "overview" || value === "pipeline" ? value : "relationships";
+  return value === "overview" ? "overview" : "pipeline";
+}
+
+/** The Pipeline's layout: List unless the link names Table or Board. */
+export function pipelineLayoutOf(value: string | undefined): PipelineLayout {
+  return value === "table" || value === "board" ? value : "list";
+}
+
+/** Parameters an old `?view=relationships` link carries into the list. */
+const LIST_KEPT = ["q", "state"] as const;
+
+/**
+ * Where an old `?view=relationships` link goes: the Pipeline's List
+ * layout, with its search and state kept. Null: the link is not one.
+ */
+export function pipelineListHref(
+  params: Readonly<Record<string, string | string[] | undefined>>,
+): string | null {
+  if (params["view"] !== "relationships") return null;
+  const kept = new URLSearchParams({ view: "pipeline", layout: "list" });
+  for (const key of LIST_KEPT) {
+    const value = params[key];
+    if (typeof value === "string" && value.length > 0 && value.length <= 200)
+      kept.set(key, value);
+  }
+  return `/relationships?${kept.toString()}`;
 }
 
 /**
@@ -36,11 +65,6 @@ export function hubTabs(): readonly {
       view: "pipeline",
       label: "Pipeline",
       href: "/relationships?view=pipeline",
-    },
-    {
-      view: "relationships",
-      label: "Relationships",
-      href: "/relationships?view=relationships",
     },
   ];
 }
@@ -86,6 +110,10 @@ export function crmTarget(
     return `/relationships?${report.toString()}`;
   }
   const target = view !== undefined && CRM_VIEWS.has(view) ? view : "overview";
+  if (target === "relationships") {
+    kept.set("layout", "list");
+    return `/relationships?${new URLSearchParams([["view", "pipeline"], ...kept]).toString()}`;
+  }
   return `/relationships?${new URLSearchParams([["view", target], ...kept]).toString()}`;
 }
 
