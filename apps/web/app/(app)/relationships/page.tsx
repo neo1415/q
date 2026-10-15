@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import {
   getMyUsage,
+  getRelationshipCommitments,
   getResults,
   listRelationshipViews,
   queryRelationshipPipeline,
@@ -55,6 +56,11 @@ import { ResultsDashboard } from "@/features/results/results-dashboard";
 import { rangeOf } from "@/features/results/results-words";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
 import { NeedsYouQueue } from "@/features/relationships/needs-you-queue";
+import {
+  portfolioOf,
+  PORTFOLIO_READ_LIMIT,
+} from "@/features/relationships/portfolio";
+import { PortfolioSection } from "@/features/relationships/portfolio-section";
 import {
   listOrder,
   needsYouCards,
@@ -197,6 +203,30 @@ export default async function RelationshipsPage({
         : noticesAndReminders(),
     ]);
     const now = readClock();
+    // S4: the investor's portfolio, from the same list; each of the first
+    // rows reads its current commitment, side by side.
+    const portfolio =
+      side === "INVESTOR" && items !== undefined
+        ? portfolioOf(items)
+        : undefined;
+    const commitments = new Map(
+      session === null || portfolio === undefined
+        ? []
+        : await Promise.all(
+            portfolio
+              .slice(0, PORTFOLIO_READ_LIMIT)
+              .map(
+                async (item) =>
+                  [
+                    item.relationshipId,
+                    await getRelationshipCommitments(
+                      session,
+                      item.relationshipId,
+                    ).catch(() => undefined),
+                  ] as const,
+              ),
+          ),
+    );
     // The Results endpoint authorises each projection. A conflicting role read
     // is unavailable, never silently rendered as the other party's perspective.
     const available =
@@ -234,6 +264,9 @@ export default async function RelationshipsPage({
             unavailable={needs.unavailable}
           />
         )}
+        {side === "INVESTOR" ? (
+          <PortfolioSection items={portfolio} commitments={commitments} />
+        ) : null}
         {unset ? null : !available || results === null ? (
           // Partial: the queue above still stands when the period cannot.
           <ErrorState
