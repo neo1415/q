@@ -10,6 +10,7 @@ import {
   type RelationshipPipelineDto,
   type RelationshipPipelineQuery,
   type RelationshipSummaryDto,
+  type SavedRelationshipViewList,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
@@ -22,13 +23,13 @@ import { PIPELINE_NEXT_WORDS } from "./pipeline-presentation";
 import { STATE_WORDS } from "./relationship-words";
 import {
   DEFAULT_PIPELINE_PREFERENCES,
-  PipelineSavedViewSchema,
   pipelineHref,
   readPipelinePreferences,
   writePipelinePreferences,
   type PipelineColumn,
   type PipelinePreferences,
 } from "./pipeline-preferences";
+import { PipelineSavedViews, type AppliedView } from "./pipeline-saved-views";
 
 const inputClass =
   "cq-body-sm min-h-11 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary)";
@@ -49,7 +50,10 @@ export function RelationshipPipeline({
   scopeKey,
   layout: initialLayout,
   side,
+  views = null,
 }: {
+  /** The server's saved views; null when they could not be read. */
+  readonly views?: SavedRelationshipViewList | null;
   readonly data: RelationshipPipelineDto;
   readonly query: RelationshipPipelineQuery;
   readonly scopeKey: string;
@@ -61,14 +65,11 @@ export function RelationshipPipeline({
   const stateRef = useRef<HTMLSelectElement>(null);
   const sortRef = useRef<HTMLSelectElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const savedRef = useRef<HTMLSelectElement>(null);
   const [search, setSearch] = useState(query.q ?? "");
   const [preferences, setPreferences] = useState<PipelinePreferences>(
     DEFAULT_PIPELINE_PREFERENCES,
   );
   const [layout, setLayout] = useState(initialLayout);
-  const [viewName, setViewName] = useState("");
-  const [savedId, setSavedId] = useState("");
   const [selected, setSelected] = useState<readonly string[]>([]);
   const [preview, setPreview] = useState<RelationshipSummaryDto | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -189,29 +190,6 @@ export function RelationshipPipeline({
       return (await effectShown(() => shown(target, next))) ? "DONE" : "FAILED";
     },
   });
-  useQControl({
-    id: "filter.pipeline-view",
-    kind: "FILTER",
-    ref: savedRef,
-    onAct: async (intent) => {
-      if (typeof intent.value !== "string") return "NOT_APPLICABLE";
-      const matches = preferences.views.filter(
-        (entry) =>
-          entry.id === intent.value ||
-          entry.name.toLowerCase() ===
-            String(intent.value).trim().toLowerCase(),
-      );
-      const view = matches.length === 1 ? matches[0] : undefined;
-      if (view === undefined) return "NOT_APPLICABLE";
-      setSavedId(view.id);
-      persist({ ...preferences, columns: view.columns, layout: view.layout });
-      const target = pipelineHref(view.query, view.layout);
-      router.push(target);
-      return (await effectShown(() => shown(target, view.query)))
-        ? "DONE"
-        : "FAILED";
-    },
-  });
   useQDialog(
     preview !== null,
     "pipeline-preview",
@@ -224,27 +202,16 @@ export function RelationshipPipeline({
     event.preventDefault();
     move({ ...query, q: search, cursor: undefined });
   }
-  function saveView() {
-    const parsed = PipelineSavedViewSchema.safeParse({
-      id: crypto.randomUUID(),
-      name: viewName,
-      query: Object.fromEntries(
-        Object.entries(query).filter(([key]) => key !== "cursor"),
-      ),
-      layout,
-      columns: preferences.columns,
+  /** A saved view: its filters as the URL, its layout and columns here. */
+  async function applyView(view: AppliedView): Promise<boolean> {
+    persist({
+      ...preferences,
+      columns: [...view.columns],
+      layout: view.layout,
     });
-    if (!parsed.success) {
-      setNotice("Name this view first.");
-      return;
-    }
-    if (preferences.views.length >= 20) {
-      setNotice("Delete a saved view before adding another.");
-      return;
-    }
-    persist({ ...preferences, views: [...preferences.views, parsed.data] });
-    setSavedId(parsed.data.id);
-    setViewName("");
+    const target = pipelineHref(view.query, view.layout);
+    router.push(target);
+    return effectShown(() => shown(target, view.query));
   }
   function setColumn(column: PipelineColumn, checked: boolean) {
     persist({
@@ -349,86 +316,23 @@ export function RelationshipPipeline({
             : `Export ${String(selected.length)} selected`}
         </a>
       </form>
+      <PipelineSavedViews
+        initial={views}
+        device={preferences.views}
+        onDeviceChange={(next) => persist({ ...preferences, views: [...next] })}
+        current={{
+          query: RelationshipPipelineQuerySchema.omit({ cursor: true }).parse(
+            Object.fromEntries(
+              Object.entries(query).filter(([key]) => key !== "cursor"),
+            ),
+          ),
+          layout,
+          columns: preferences.columns,
+        }}
+        onApply={applyView}
+        onNotice={setNotice}
+      />
       <div className="flex flex-wrap items-center gap-2">
-        <select
-          ref={savedRef}
-          aria-label="Saved view"
-          className={inputClass}
-          value={savedId}
-          onChange={(event) => {
-            setSavedId(event.target.value);
-            const view = preferences.views.find(
-              (entry) => entry.id === event.target.value,
-            );
-            if (view !== undefined) {
-              persist({
-                ...preferences,
-                columns: view.columns,
-                layout: view.layout,
-              });
-              router.push(pipelineHref(view.query, view.layout));
-            }
-          }}
-        >
-          <option value="">Saved views on this device</option>
-          {preferences.views.map((view) => (
-            <option key={view.id} value={view.id}>
-              {view.name}
-            </option>
-          ))}
-        </select>
-        <input
-          aria-label="View name"
-          placeholder="View name"
-          className={inputClass}
-          value={viewName}
-          maxLength={64}
-          onChange={(event) => setViewName(event.target.value)}
-        />
-        <button
-          type="button"
-          className={buttonClassName("quiet")}
-          onClick={saveView}
-        >
-          Save view
-        </button>
-        {savedId === "" ? null : (
-          <button
-            type="button"
-            className={buttonClassName("quiet")}
-            onClick={() => {
-              const name = viewName.trim();
-              if (name.length === 0) {
-                setNotice("Name this view first.");
-                return;
-              }
-              persist({
-                ...preferences,
-                views: preferences.views.map((entry) =>
-                  entry.id === savedId ? { ...entry, name } : entry,
-                ),
-              });
-              setViewName("");
-            }}
-          >
-            Rename view
-          </button>
-        )}
-        {savedId === "" ? null : (
-          <button
-            className={buttonClassName("quiet")}
-            type="button"
-            onClick={() => {
-              persist({
-                ...preferences,
-                views: preferences.views.filter((view) => view.id !== savedId),
-              });
-              setSavedId("");
-            }}
-          >
-            Delete view
-          </button>
-        )}
         <Link
           href={pipelineHref(query, "table")}
           data-pipeline-layout="table"

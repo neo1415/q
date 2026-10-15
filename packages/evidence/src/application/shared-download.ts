@@ -205,7 +205,7 @@ export async function findActiveDocumentById(
       from evidence.documents d
       left join evidence.document_versions v
         on v.id = d.current_version_id and v.document_id = d.id
-     where d.id = ${id.data} and d.status = 'ACTIVE'`;
+     where d.id = ${id.data} and d.status = 'ACTIVE' and d.owner_kind = 'ORGANISATION'`;
   const row = rows[0];
   return row === undefined
     ? null

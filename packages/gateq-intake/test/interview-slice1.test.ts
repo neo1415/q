@@ -35,9 +35,11 @@ import {
 } from "../src/contracts/index.js";
 import { createConversationService } from "../src/application/conversation-service.js";
 import { coverageFor } from "../src/application/coverage.js";
+import { APPLICANT_TEXT_LINEAGE } from "../src/application/disclosure-projection.js";
 import {
   CONTACT_CODE_MAX_ATTEMPTS,
   createIntakeService,
+  type IntakeDependencies,
 } from "../src/application/intake-service.js";
 import type {
   InterviewTurnInput,
@@ -149,6 +151,7 @@ function world(
     contactRequiredFrom?: string;
     contactCodeSecret?: string;
     transcript?: false;
+    documentDisclosure?: IntakeDependencies["documentDisclosure"];
   } = {},
 ) {
   let now = NOW;
@@ -243,8 +246,13 @@ function world(
         turnId: input.clientTurnId,
         outcome: prior?.outcome ?? null,
       });
+      // As the Postgres repository: the applicant's words are text-only.
       if (input.recordPerson !== false)
-        await turns.append({ ...input, role: "PERSON" });
+        await turns.append({
+          ...input,
+          role: "PERSON",
+          disclosureLineage: APPLICANT_TEXT_LINEAGE,
+        });
       return id;
     },
     readOutcome: (applicationId: string) =>
@@ -307,6 +315,7 @@ function world(
         askingDimension?: StoredTurn["askingDimension"] | null | undefined;
         intent?: string | null | undefined;
         latencyMs?: number | null | undefined;
+        disclosureLineage?: StoredTurn["disclosureLineage"];
       }) =>
         transactions.run(async (tx) => {
           await lockRow(tx, input.applicationId);
@@ -337,6 +346,9 @@ function world(
             intent: input.intent ?? null,
             latencyMs: input.latencyMs ?? null,
             createdAt: now.toISOString(),
+            ...(input.disclosureLineage === undefined
+              ? {}
+              : { disclosureLineage: input.disclosureLineage }),
           });
           return { seq };
         }),
@@ -452,6 +464,9 @@ function world(
   };
 
   const intake = createIntakeService({
+    ...(options.documentDisclosure === undefined
+      ? {}
+      : { documentDisclosure: options.documentDisclosure }),
     applications: {
       create: (_tx, application) => {
         const row: Application = {
@@ -540,6 +555,9 @@ function world(
             recordedAt: input.at,
             supersededAt: null,
             sourceTurnSeq: input.sourceTurnSeq ?? null,
+            ...(input.disclosureLineage === undefined
+              ? {}
+              : { disclosureLineage: input.disclosureLineage }),
           };
           factRows.push(row);
           written.push(row);
@@ -835,6 +853,60 @@ describe("the interview transcript", () => {
       [1, "PERSON", "We build payment rails."],
       [2, "Q", "Who pays you?"],
     ]);
+  });
+
+  it("stamps every turn and fact with the lineage of what the model was shown", async () => {
+    const w = world();
+    const { token } = await w.start();
+    w.script.push({
+      reply: "Who pays you?",
+      asking: "company.customers",
+      facts: [
+        fact("company.description", { kind: "TEXT", text: "Payment rails" }),
+      ],
+    });
+    await w.conversation.turn({
+      token,
+      message: "We build payment rails.",
+      clientTurnId: "turn-000001",
+      correlationId: "c1",
+    });
+    const [person, q] = w.turnRows;
+    expect(person?.disclosureLineage).toEqual(APPLICANT_TEXT_LINEAGE);
+    // Q's reply depends on the utterance it answered; no document was shown.
+    expect(q?.disclosureLineage).toEqual({
+      state: "COMPLETE",
+      documents: [],
+      turnSeqs: [1],
+    });
+    const recorded = w.factRows.find(
+      (f) => f.dimension === "company.description",
+    );
+    expect(recorded?.sourceTurnSeq).toBe(1);
+    expect(recorded?.disclosureLineage).toEqual(q?.disclosureLineage);
+  });
+
+  it("stamps UNKNOWN, never text-only, when any context lacks recorded lineage", async () => {
+    const w = world();
+    const { token } = await w.start();
+    // A fact from before lineage existed is in the model's context.
+    await w.intake.recordFacts({
+      token,
+      facts: [fact("company.stage", { kind: "CODE", code: "seed" })],
+    });
+    w.script.push({
+      reply: "Tell me about customers.",
+      asking: "company.customers",
+    });
+    await w.conversation.turn({
+      token,
+      message: "Hello",
+      clientTurnId: "turn-000002",
+      correlationId: "c2",
+    });
+    expect(w.turnRows.find((t) => t.role === "Q")?.disclosureLineage).toEqual({
+      state: "UNKNOWN",
+    });
   });
 
   it("returns the stored reply on a retry, without a second model call or row", async () => {
@@ -1877,5 +1949,108 @@ describe("review: interview turn latency", () => {
     expect(
       w.logs.some((line) => JSON.stringify(line).includes('"latencyMs":75')),
     ).toBe(true);
+  });
+});
+
+describe("explicit document-informed submission", () => {
+  const chosen = {
+    documentId: "11111111-1111-4111-8111-111111111111",
+    versionId: "22222222-2222-4222-8222-222222222222",
+    sha256: "a".repeat(64),
+  };
+  const privateDoc = {
+    ...chosen,
+    documentId: "33333333-3333-4333-8333-333333333333",
+  };
+  const complete = (documents: (typeof chosen)[] = []) => ({
+    state: "COMPLETE" as const,
+    documents,
+    turnSeqs: [],
+  });
+  const port: NonNullable<IntakeDependencies["documentDisclosure"]> = {
+    freezeForSubmission: (_tx, input) =>
+      Promise.resolve({
+        documents: input.selectedDocuments.map((d) => ({
+          ...d,
+          title: "Selected pitch",
+        })),
+      }),
+  };
+  it("requires an explicit selection before any document-informed submission", async () => {
+    const w = world({ documentDisclosure: port });
+    const { token } = await readyToSubmit(w);
+    await expect(
+      w.intake.submit({ token, clientRequestId: "req-doc-00000001" }),
+    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    expect(w.submissions).toHaveLength(0);
+  });
+  it("uses selected-only facts, transcript and coverage throughout the frozen submission", async () => {
+    const w = world({ documentDisclosure: port });
+    const { token } = await readyToSubmit(w);
+    await w.intake.recordFacts({
+      token,
+      facts: [
+        fact(
+          "claims.traction",
+          { kind: "TEXT", text: "PRIVATE DOCUMENT METRIC" },
+          "DOCUMENT_SUPPORTED",
+        ),
+      ],
+    });
+    w.factRows.forEach((row, i) => {
+      w.factRows[i] = {
+        ...row,
+        disclosureLineage: complete(
+          row.dimension === "claims.traction" ? [privateDoc] : [],
+        ),
+      };
+    });
+    const app = [...w.applications.values()][0];
+    if (app === undefined) throw new Error("application fixture missing");
+    w.turnRows.push({
+      applicationId: app.id,
+      seq: 1,
+      role: "Q",
+      text: "PRIVATE DOCUMENT QUESTION",
+      clientTurnId: "doc-context",
+      askingDimension: null,
+      intent: null,
+      latencyMs: null,
+      createdAt: NOW.toISOString(),
+      disclosureLineage: complete([chosen, privateDoc]),
+    });
+    const result = await w.intake.submit({
+      token,
+      clientRequestId: "req-doc-00000002",
+      selectedDocuments: [chosen],
+    });
+    expect(result.deduplicated).toBe(false);
+    const frozen = JSON.stringify(w.submissions[0]);
+    expect(frozen).not.toContain("PRIVATE DOCUMENT");
+    expect(frozen).not.toContain(privateDoc.documentId);
+    expect(frozen).toContain(chosen.documentId);
+    expect(frozen).toContain(chosen.versionId);
+    expect(frozen).toContain(chosen.sha256);
+    expect(frozen).toContain('"turnCount":0');
+  });
+  it("requalifies from disclosed facts and refuses when required support is excluded", async () => {
+    const w = world({ documentDisclosure: port });
+    const { token } = await readyToSubmit(w);
+    w.factRows.forEach((row, i) => {
+      w.factRows[i] = {
+        ...row,
+        disclosureLineage: complete(
+          row.dimension === "company.country" ? [privateDoc] : [],
+        ),
+      };
+    });
+    await expect(
+      w.intake.submit({
+        token,
+        clientRequestId: "req-doc-00000003",
+        selectedDocuments: [],
+      }),
+    ).rejects.toMatchObject({ refusal: "NOT_READY_TO_SUBMIT" });
+    expect(w.submissions).toHaveLength(0);
   });
 });

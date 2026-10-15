@@ -56,6 +56,7 @@ import {
   InterestNotFoundError,
   RelationshipPipelineLimitError,
   RelationshipPipelineQueryError,
+  RelationshipViewLimitError,
   InterestNotPermittedError,
 } from "@capital-q/network";
 import {
@@ -401,7 +402,8 @@ function toProblem(
   // Describes the caller, never a company: safe to say plainly.
   if (
     error instanceof RelationshipPipelineLimitError ||
-    error instanceof RelationshipPipelineQueryError
+    error instanceof RelationshipPipelineQueryError ||
+    error instanceof RelationshipViewLimitError
   ) {
     return createProblemDetails({
       code: "INVALID_REQUEST",

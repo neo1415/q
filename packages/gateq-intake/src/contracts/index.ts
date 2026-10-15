@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { DisclosureLineageSchema } from "./disclosure-lineage.js";
+
 import { createUuidIdSchema } from "@capital-q/contracts";
 import { TenantIdSchema } from "@capital-q/security";
 
@@ -195,6 +197,8 @@ export const ApplicationFactSchema = z
      * in. Absent or null for the form, a document, or an older fact.
      */
     sourceTurnSeq: z.number().int().min(1).nullable().optional(),
+    /** Absent historical lineage is unknown, never text-only proof. */
+    disclosureLineage: DisclosureLineageSchema.optional(),
   })
   .strict();
 export type ApplicationFact = z.infer<typeof ApplicationFactSchema>;

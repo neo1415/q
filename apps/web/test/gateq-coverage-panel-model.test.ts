@@ -104,6 +104,32 @@ describe("the live coverage reading (C2)", () => {
       "Your estimate",
     ]);
     expect(model.evidenceFollowUps).toEqual(["Traction"]);
+    expect(model.have[0]?.sourceTurnSeq).toBeNull();
+  });
+
+  it("carries the recorded fact and transcript turn when the server sends them", () => {
+    const factId = "00000000-0000-4000-8000-0000000000f1";
+    const model = coveragePanelModel(
+      dto({
+        answered: [
+          {
+            dimension: "claims.revenue",
+            label: "Revenue",
+            group: "TRACTION",
+            summary: "40000 USD",
+            provenance: "APPLICANT_PROVIDED",
+            sourceFactId: factId,
+            sourceTurnSeq: 4,
+          },
+        ],
+      }),
+      "Sahel",
+    );
+    expect(model.have[0]).toMatchObject({
+      sourceFactId: factId,
+      sourceTurnSeq: 4,
+      source: "Your answer, said in the conversation",
+    });
   });
 
   it("never turns unknown or declined into a gap to chase or a no", () => {

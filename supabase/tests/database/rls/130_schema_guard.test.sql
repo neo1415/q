@@ -86,6 +86,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('core', 'kyb_submissions',               'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'identity_submissions',          'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'capital_objective_creation_requests', 'INTERNAL_SERVER_ONLY', '{}'),
+  -- CRM saved views (2026-10-15); suite 950.
+  ('network', 'relationship_views',       'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'relationships',            'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'relationship_events',      'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'interests',                'INTERNAL_SERVER_ONLY', '{}'),
@@ -129,6 +131,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('evidence', 'sources',                  'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'documents',                'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'document_versions',        'INTERNAL_SERVER_ONLY', '{}'),
+  ('evidence', 'gateq_application_document_disclosures', 'INTERNAL_SERVER_ONLY', '{}'),
   -- Overnight A3/A5: the data room and Q's reading of the deck.
   ('evidence', 'data_room_folders',              'INTERNAL_SERVER_ONLY', '{}'),
   ('evidence', 'data_room_checklist_items',      'INTERNAL_SERVER_ONLY', '{}'),

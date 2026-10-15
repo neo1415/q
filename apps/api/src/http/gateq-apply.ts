@@ -29,6 +29,7 @@ import {
   SubmitApplicationResponseSchema,
 } from "@capital-q/contracts";
 import {
+  APPLICANT_TEXT_LINEAGE,
   factsFromAnswers,
   IntakeRefusedError,
   type ApplicantTurnResult,
@@ -289,7 +290,12 @@ export function registerGateQApplyRoutes(
     const token = credential(request);
     try {
       await charge(token, "ANSWERS");
-      await intake.recordFacts({ token, facts: factsFromAnswers(input) });
+      // The applicant's own typed form answers: provably text-only.
+      await intake.recordFacts({
+        token,
+        facts: factsFromAnswers(input),
+        disclosureLineage: APPLICANT_TEXT_LINEAGE,
+      });
       const summary = await conversation.summary(token);
       void reply.header("Cache-Control", "no-store");
       return ApplicationAnswersResponseSchema.parse({

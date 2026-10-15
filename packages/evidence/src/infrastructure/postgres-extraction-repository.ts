@@ -39,7 +39,7 @@ const Timestamp = z
 const ExtractionRow = z.object({
   id: DocumentExtractionIdSchema,
   tenant_id: TenantIdSchema,
-  owner_organisation_id: OrganisationIdSchema,
+  owner_organisation_id: OrganisationIdSchema.nullable(),
   document_id: DocumentIdSchema,
   document_version_id: DocumentVersionIdSchema,
   processing_run_id: DocumentProcessingRunIdSchema,

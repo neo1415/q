@@ -17,7 +17,10 @@ import {
   type GateqContactChannel,
 } from "@capital-q/contracts";
 
-import type { TransactionManager } from "@capital-q/database";
+import type {
+  TransactionContext,
+  TransactionManager,
+} from "@capital-q/database";
 import { qualify, type QualificationResult } from "@capital-q/gateq";
 import type { Logger } from "@capital-q/observability";
 
@@ -44,6 +47,11 @@ import {
 } from "../domain/session-credential.js";
 import { coverageFor } from "./coverage.js";
 import { buildDossier } from "./dossier.js";
+import {
+  projectSelectedDisclosure,
+  type DisclosureDocumentIdentity,
+  type DisclosureLineage,
+} from "./disclosure-projection.js";
 import type {
   ApplicationContactRepository,
   ApplicationDocumentRepository,
@@ -75,6 +83,11 @@ import type {
  */
 
 export type IntakeDependencies = {
+  /**
+   * Send answered facts' source ids in the applicant's coverage. Off until
+   * every web replica parses the optional fields (strict schemas).
+   */
+  readonly coverageSources?: boolean | undefined;
   readonly applications: ApplicationRepository;
   readonly sessions: ApplicationSessionRepository;
   readonly facts: ApplicationFactRepository;
@@ -93,6 +106,23 @@ export type IntakeDependencies = {
   readonly turns?: ApplicationTurnRepository | undefined;
   readonly contacts?: ApplicationContactRepository | undefined;
   readonly documentTitles?: DocumentTitlesPort | undefined;
+  /** Trusted canonical Evidence port. Opt-in until durable lineage and native gates pass. */
+  readonly documentDisclosure?:
+    | {
+        readonly freezeForSubmission: (
+          tx: TransactionContext,
+          input: {
+            readonly tenantId: string;
+            readonly applicationId: string;
+            readonly selectedDocuments: readonly DisclosureDocumentIdentity[];
+          },
+        ) => Promise<{
+          readonly documents: readonly (DisclosureDocumentIdentity & {
+            readonly title: string;
+          })[];
+        }>;
+      }
+    | undefined;
   /** Sends the one-time code. False or a throw: it did not go. */
   readonly contactCodeMailer?: ContactCodeMailer | undefined;
   /**
@@ -198,6 +228,12 @@ export type IntakeService = {
     readonly token: string;
     readonly facts: readonly NewApplicationFact[];
     readonly sourceTurnSeq?: number | undefined;
+    /**
+     * What these facts were derived from, stamped by the server. Omitted
+     * means unknown (stored null), which a document-aware Submit withholds:
+     * a caller must never claim text-only it cannot prove.
+     */
+    readonly disclosureLineage?: DisclosureLineage | undefined;
   }) => Promise<ApplicationView>;
   readonly attachDocument: (input: {
     readonly token: string;
@@ -210,6 +246,8 @@ export type IntakeService = {
   readonly submit: (input: {
     readonly token: string;
     readonly clientRequestId: string;
+    readonly selectedDocuments?:
+      readonly DisclosureDocumentIdentity[] | undefined;
   }) => Promise<{
     readonly submittedAt: string;
     readonly qualification: QualificationResult;
@@ -244,6 +282,8 @@ export type IntakeService = {
     readonly facts: readonly NewApplicationFact[];
     readonly sourceTurnSeq?: number | undefined;
     readonly latencyMs?: number | undefined;
+    /** The model context this reply and its facts were produced from. */
+    readonly disclosureLineage?: DisclosureLineage | undefined;
   }) => Promise<void>;
 };
 
@@ -329,8 +369,11 @@ export function createIntakeService(
     });
   };
 
-  const projectionFor = async (application: Application) => {
-    const current = await facts.currentFor(application.id);
+  const projectionFor = async (
+    application: Application,
+    disclosedFacts?: readonly ApplicationFact[],
+  ) => {
+    const current = disclosedFacts ?? (await facts.currentFor(application.id));
     const phrases = current.find(
       (fact) =>
         fact.dimension === "company.sector_phrases" &&
@@ -355,6 +398,7 @@ export function createIntakeService(
 
   const qualificationFor = async (
     application: Application,
+    disclosedFacts?: readonly ApplicationFact[],
   ): Promise<QualificationResult> => {
     const policy = await policies.policyByVersionId({
       gatewayId: application.gatewayId,
@@ -365,7 +409,7 @@ export function createIntakeService(
     if (policy === null) throw new IntakeRefusedError("NOT_FOUND");
     return qualify({
       policy,
-      projection: await projectionFor(application),
+      projection: await projectionFor(application, disclosedFacts),
       evaluatedAt: clock().toISOString(),
     });
   };
@@ -433,6 +477,7 @@ export function createIntakeService(
             facts: proposed,
             at: clock().toISOString(),
             sourceTurnSeq: input.sourceTurnSeq,
+            disclosureLineage: input.disclosureLineage,
           });
           const name = proposed.find(
             (fact) => fact.dimension === "company.name",
@@ -453,6 +498,7 @@ export function createIntakeService(
           askingDimension: input.asking,
           intent: input.intent,
           latencyMs: input.latencyMs,
+          disclosureLineage: input.disclosureLineage,
         });
         await turns.finishExchange(tx, application.id, input.claimId);
       });
@@ -549,6 +595,7 @@ export function createIntakeService(
           facts: proposed,
           at,
           sourceTurnSeq: input.sourceTurnSeq,
+          disclosureLineage: input.disclosureLineage,
         });
         const name = proposed.find((fact) => fact.dimension === "company.name");
         if (name !== undefined && name.value.kind === "TEXT") {
@@ -606,14 +653,72 @@ export function createIntakeService(
           if (existing.clientRequestId !== input.clientRequestId) {
             throw new IntakeRefusedError("ALREADY_SUBMITTED");
           }
+          let retryFacts: readonly ApplicationFact[] | undefined;
+          if (dependencies.documentDisclosure !== undefined) {
+            if (input.selectedDocuments === undefined || turns === undefined) {
+              throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+            }
+            const frozen =
+              await dependencies.documentDisclosure.freezeForSubmission(tx, {
+                tenantId: application.tenantId,
+                applicationId: application.id,
+                selectedDocuments: input.selectedDocuments,
+              });
+            retryFacts = projectSelectedDisclosure({
+              selectedDocuments: frozen.documents.map(
+                ({ documentId, versionId, sha256 }) => ({
+                  documentId,
+                  versionId,
+                  sha256,
+                }),
+              ),
+              facts: await facts.currentFor(application.id),
+              turns: await turns.listFor(application.id),
+            }).facts;
+          }
           return {
             submittedAt: existing.submittedAt,
-            qualification: await qualificationFor(application),
+            qualification: await qualificationFor(application, retryFacts),
             deduplicated: true,
           };
         }
 
-        const qualification = await qualificationFor(application);
+        const disclosure = dependencies.documentDisclosure;
+        if (
+          disclosure !== undefined &&
+          (input.selectedDocuments === undefined || turns === undefined)
+        ) {
+          throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
+        }
+        const frozen =
+          disclosure === undefined
+            ? undefined
+            : await disclosure.freezeForSubmission(tx, {
+                tenantId: application.tenantId,
+                applicationId: application.id,
+                selectedDocuments: input.selectedDocuments ?? [],
+              });
+        const projected =
+          frozen === undefined
+            ? undefined
+            : projectSelectedDisclosure({
+                selectedDocuments: frozen.documents.map(
+                  ({ documentId, versionId, sha256 }) => ({
+                    documentId,
+                    versionId,
+                    sha256,
+                  }),
+                ),
+                facts: await facts.currentFor(application.id),
+                turns:
+                  turns === undefined
+                    ? []
+                    : await turns.listFor(application.id),
+              });
+        const qualification = await qualificationFor(
+          application,
+          projected?.facts,
+        );
         // Only an application the door would actually admit is submitted.
         // A QUALIFIED gateway that has already established a required
         // mismatch is not a form to finish (§26): the applicant is told
@@ -632,18 +737,38 @@ export function createIntakeService(
         }
 
         const submittedAt = clock().toISOString();
-        const snapshot = await viewOf(application);
-        const documentIds = await documents.listFor(application.id);
+        const documentIds =
+          frozen === undefined
+            ? await documents.listFor(application.id)
+            : frozen.documents.map((d) => d.documentId);
+        const snapshot =
+          projected === undefined
+            ? await viewOf(application)
+            : ApplicationViewSchema.parse({
+                reference: application.publicReference,
+                status: application.status,
+                declaredName: application.declaredName,
+                facts: projected.facts.map((fact) => ({
+                  dimension: fact.dimension,
+                  value: fact.value,
+                  provenance: fact.provenance,
+                })),
+                documentCount: documentIds.length,
+                submittedAt: application.submittedAt,
+              });
 
         // Snapshot v2 and the dossier, when the composition stores turns.
-        // Everything is read before the transaction and built
-        // deterministically; the transaction only writes the one row.
+        // Read under the application lock and build deterministically.
+        // Selected Evidence identities and the received snapshot commit together.
         let v2:
           { readonly snapshot: unknown; readonly dossier: unknown } | undefined;
         if (turns !== undefined) {
           const policy = await policyFor(application);
-          const current = await facts.currentFor(application.id);
-          const transcript = transcriptDto(await turns.listFor(application.id));
+          const current =
+            projected?.facts ?? (await facts.currentFor(application.id));
+          const transcript = transcriptDto(
+            projected?.turns ?? (await turns.listFor(application.id)),
+          );
           let budget = SNAPSHOT_TRANSCRIPT_CHARS;
           const kept = transcript.filter((turn) => {
             budget -= turn.text.length;
@@ -657,15 +782,20 @@ export function createIntakeService(
           const contact =
             standing.contact === null ? null : contactDto(standing.contact);
           const titles =
-            documentTitles === undefined || documentIds.length === 0
-              ? new Map<string, string>()
-              : await documentTitles
-                  .titles(documentIds)
-                  .catch(() => new Map<string, string>());
+            frozen !== undefined
+              ? new Map(frozen.documents.map((d) => [d.documentId, d.title]))
+              : documentTitles === undefined || documentIds.length === 0
+                ? new Map<string, string>()
+                : await documentTitles
+                    .titles(documentIds)
+                    .catch(() => new Map<string, string>());
           v2 = {
             snapshot: {
               ...snapshot,
               documentIds,
+              ...(frozen === undefined
+                ? {}
+                : { disclosedDocuments: frozen.documents }),
               snapshotVersion: 2,
               contact,
               transcript: kept,
@@ -876,7 +1006,12 @@ export function createIntakeService(
       const current = await facts.currentFor(application.id);
       const standing = await contactStanding(application);
       return ApplicationCoverageDtoSchema.parse({
-        coverage: coverageFor({ policy, qualification, facts: current }),
+        coverage: coverageFor({
+          policy,
+          qualification,
+          facts: current,
+          includeSources: dependencies.coverageSources === true,
+        }),
         contact: {
           required: standing.required,
           confirmed: standing.confirmed,

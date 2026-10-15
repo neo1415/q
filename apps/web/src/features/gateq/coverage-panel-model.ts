@@ -22,6 +22,9 @@ export type CoverageHave = {
   readonly summary: string;
   /** Where the answer came from, in words; never "verified". */
   readonly source: string;
+  /** The recorded fact and transcript turn behind it, when the server sent them. */
+  readonly sourceFactId: string | null;
+  readonly sourceTurnSeq: number | null;
 };
 
 export type CoverageNeed = {
@@ -76,7 +79,12 @@ export function coveragePanelModel(
     dimension: item.dimension,
     label: item.label,
     summary: item.summary,
-    source: SOURCE[item.provenance],
+    source:
+      typeof item.sourceTurnSeq === "number"
+        ? `${SOURCE[item.provenance]}, said in the conversation`
+        : SOURCE[item.provenance],
+    sourceFactId: item.sourceFactId ?? null,
+    sourceTurnSeq: item.sourceTurnSeq ?? null,
   }));
   const needed = [...coverage.missing]
     .sort((a, b) => RANK[a.reason] - RANK[b.reason])
