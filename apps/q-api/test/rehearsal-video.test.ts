@@ -180,8 +180,11 @@ function fakeRehearsals() {
 /** The session table, faked with the same rules as the migration. */
 function memoryStore(): RehearsalVideoStore & {
   rows: Map<string, VideoSessionRow & { tokenHash: string }>;
+  /** The database's shared weekly allowance and monthly safeguard. */
+  limits: { remaining: number; platformFull: boolean };
 } {
   const rows = new Map<string, VideoSessionRow & { tokenHash: string }>();
+  const limits = { remaining: 5, platformFull: false };
   const byRehearsal = (actor: ActorContext, rehearsalId: string) =>
     [...rows.values()].find(
       (row) =>
@@ -191,12 +194,26 @@ function memoryStore(): RehearsalVideoStore & {
     ) ?? null;
   return {
     rows,
+    limits,
+    allowance: () =>
+      Promise.resolve({
+        weeklySessions: 5,
+        remaining: limits.remaining,
+        resetsAt: "2026-10-19T00:00:00.000Z",
+      }),
     claim: (actor, input) => {
       const held = [...rows.values()].find(
         (row) => row.rehearsalId === input.rehearsalId,
       );
       if (held !== undefined)
         return Promise.resolve({ row: held, created: false });
+      // As the AFTER INSERT trigger: a recovery that finds its row reserves
+      // nothing; a new row must fit the week and the account's month.
+      if (limits.platformFull)
+        return Promise.reject(new Error("CQ_VIDEO_GLOBAL_CAP"));
+      if (limits.remaining <= 0)
+        return Promise.reject(new Error("CQ_VIDEO_WEEKLY_ALLOWANCE_EXHAUSTED"));
+      limits.remaining -= 1;
       const row = {
         id: input.id,
         tenantId: actor.tenantId,
@@ -699,6 +716,36 @@ describe("falling back to the voice room", () => {
     expect(harness.tavus.calls.conversations.map((call) => call.key)).toEqual([
       0,
     ]);
+  });
+});
+
+describe("the shared weekly allowance", () => {
+  it("shows what is left and withdraws the video offer once it is spent", async () => {
+    const harness = setup();
+    expect(await harness.service.interviewers(FOUNDER)).toMatchObject({
+      videoAvailable: true,
+      allowance: { weeklySessions: 5, remaining: 5 },
+    });
+    harness.store.limits.remaining = 0;
+    const spent = await harness.service.interviewers(FOUNDER);
+    expect(spent.videoAvailable).toBe(false);
+    expect(spent.allowance).toMatchObject({ remaining: 0 });
+  });
+
+  it("falls back to the voice room, before any provider call, when the week or the account's month is used up", async () => {
+    for (const [limit, reason] of [
+      ["week", "ALLOWANCE_EXHAUSTED"],
+      ["month", "PROVIDER_UNAVAILABLE"],
+    ] as const) {
+      const harness = setup();
+      if (limit === "week") harness.store.limits.remaining = 0;
+      else harness.store.limits.platformFull = true;
+      expect(
+        await harness.service.start(FOUNDER, REHEARSAL_ID, "partner-steve"),
+      ).toEqual({ kind: "OK", response: { mode: "VOICE_FALLBACK", reason } });
+      expect(harness.tavus.calls.pals).toEqual([]);
+      expect(harness.tavus.calls.conversations).toEqual([]);
+    }
   });
 });
 

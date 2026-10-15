@@ -74,6 +74,18 @@ describe("@capital-q/q-daily against PostgreSQL", () => {
           values (${tenant}, ${org}, ${profile.id}, 'active')`;
         users.push(profile.id);
       }
+      // A fictional synthetic demo account (the seed's markers) on the same team.
+      const fictionalAuth = randomUUID();
+      await sql`insert into auth.users (id, email, raw_app_meta_data)
+        values (${fictionalAuth}, ${`${fictionalAuth.slice(0, 8)}@fictional.capitalq.local`},
+                ${sql.json({ synthetic: true, fictional_demo: true, cq_seed: "fictional-bulk.v1" })})`;
+      const [fictional] = await sql<{ id: string }[]>`
+        select id from identity.user_profiles where auth_user_id = ${fictionalAuth}`;
+      if (fictional === undefined)
+        throw new Error("profile trigger did not run");
+      await sql`insert into identity.organisation_memberships (tenant_id, organisation_id, user_id, membership_status)
+        values (${ids.tenantCo}, ${ids.orgCo}, ${fictional.id}, 'active')`;
+      users.push(fictional.id);
       await sql`insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, headquarters_country, current_stage_code)
         values (${ids.company}, ${ids.tenantCo}, ${ids.orgCo}, 'Daily Pay', ${`daily-pay-${ids.company.slice(0, 8)}`}, 'NG', 'seed')`;
       await sql`insert into taxonomy.entity_assignments (tenant_id, entity_type, entity_id, node_id, assignment_source)
@@ -167,6 +179,28 @@ describe("@capital-q/q-daily against PostgreSQL", () => {
     expect(
       await readInterestProfile(db.sql, users[0] ?? "", ids.tenantInv),
     ).toBeNull();
+  });
+
+  it("a fictional synthetic account is enrolled off and never claimed, even when its row says due", async () => {
+    const worker = createPostgresDailyWorkerStore(db.sql);
+    const now = new Date();
+    await worker.ensureDefaults(now, 500);
+    const fictional = users[2] ?? "";
+    const [row] = await db.sql<
+      { frequency: string; email: boolean; next_due_at: Date | null }[]
+    >`
+      select frequency, email, next_due_at from q_runtime.daily_preferences where user_id = ${fictional}`;
+    expect(row).toEqual({ frequency: "OFF", email: false, next_due_at: null });
+    // A row written before the guard (weekly, emailed, due, even requested).
+    await db.sql`update q_runtime.daily_preferences
+       set frequency = 'WEEKLY', email = true, next_due_at = ${new Date(now.getTime() - 60_000)},
+           requested_at = ${now}
+     where user_id = ${fictional}`;
+    const due = await worker.claimDue(new Date(now.getTime() + 1_000), 500);
+    expect(due.some((item) => item.userId === fictional)).toBe(false);
+    await db.sql`update q_runtime.daily_preferences
+       set frequency = 'OFF', email = false, next_due_at = null, requested_at = null
+     where user_id = ${fictional}`;
   });
 
   it("gives defaults, claims a due reader once, stores and reads back editions by owner", async () => {

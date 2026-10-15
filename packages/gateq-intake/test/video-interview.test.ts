@@ -20,13 +20,23 @@ const OTHER_TOKEN = "gqs_applicant_token_000000000000002";
 
 function memoryStore(clock: () => number): GateqVideoSessionStore & {
   rows: GateqVideoSessionRow[];
+  /** Stands in for the database's shared allowance and monthly safeguard. */
+  limits: { remaining: number; platformFull: boolean };
 } {
   const rows: GateqVideoSessionRow[] = [];
+  const limits = { remaining: 5, platformFull: false };
   const hashes = new Map<string, string>();
   const open = (r: GateqVideoSessionRow) =>
     r.status !== "ENDED" && Date.parse(r.endsAt) > clock();
   return {
     rows,
+    limits,
+    allowanceFor: () =>
+      Promise.resolve({
+        weeklySessions: 5,
+        remaining: limits.remaining,
+        resetsAt: "2026-10-19T00:00:00.000Z",
+      }),
     reserve: (input) => {
       const existing = rows.find(
         (r) => r.applicationId === input.applicationId && open(r),
@@ -40,6 +50,11 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
         return Promise.resolve({ kind: "ALLOWANCE" as const });
       if (rows.filter(open).length >= input.concurrency)
         return Promise.resolve({ kind: "CONCURRENCY" as const });
+      if (limits.platformFull)
+        return Promise.resolve({ kind: "PLATFORM_LIMIT" as const });
+      if (limits.remaining <= 0)
+        return Promise.resolve({ kind: "WEEKLY_ALLOWANCE" as const });
+      limits.remaining -= 1;
       const now = clock();
       const row: GateqVideoSessionRow = {
         id: input.id,
@@ -75,7 +90,13 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
       const row = rows[i];
       if (row === undefined) return Promise.resolve(null);
       if (row.status !== "ENDED")
-        rows[i] = { ...row, status: "ENDED", endedReason: input.reason };
+        rows[i] = {
+          ...row,
+          status: "ENDED",
+          endedReason: input.reason,
+          providerConversationId:
+            row.providerConversationId ?? input.providerConversationId ?? null,
+        };
       return Promise.resolve(rows[i] ?? null);
     },
     openForApplication: (applicationId) =>
@@ -252,6 +273,26 @@ describe("the GateQ video interview session", () => {
     ).rejects.toMatchObject({ reason: "ALLOWANCE_EXHAUSTED" });
   });
 
+  it("offers no video once the person's shared weekly allowance is spent, and refuses a start", async () => {
+    const w = world();
+    w.store.limits.remaining = 0;
+    expect(await w.video.available(TOKEN)).toBe(false);
+    expect(await w.video.allowance(TOKEN)).toMatchObject({ remaining: 0 });
+    await expect(
+      w.video.start({ token: TOKEN, correlationId: "c" }),
+    ).rejects.toMatchObject({ reason: "ALLOWANCE_EXHAUSTED" });
+    expect(w.provider.createRoom).not.toHaveBeenCalled();
+  });
+
+  it("fails closed, before any provider call, when the account's monthly safeguard is reached", async () => {
+    const w = world();
+    w.store.limits.platformFull = true;
+    await expect(
+      w.video.start({ token: TOKEN, correlationId: "c" }),
+    ).rejects.toMatchObject({ reason: "PROVIDER_UNAVAILABLE" });
+    expect(w.provider.createRoom).not.toHaveBeenCalled();
+  });
+
   it("caps concurrent sessions across applications", async () => {
     const w = world({ concurrency: 1 });
     await w.video.start({ token: TOKEN, correlationId: "c" });
@@ -282,6 +323,32 @@ describe("the GateQ video interview session", () => {
       status: "ENDED",
       endedReason: "PROVIDER_FAILED",
     });
+  });
+
+  it("a room made but never saved as live is ended and recorded, so the ledger counts it in full", async () => {
+    const w = world();
+    vi.spyOn(w.store, "markLive").mockRejectedValueOnce(new Error("db blip"));
+    await expect(
+      w.video.start({ token: TOKEN, correlationId: "c" }),
+    ).rejects.toMatchObject({ reason: "PROVIDER_UNAVAILABLE" });
+    expect(w.provider.endRoom).toHaveBeenCalledWith("c1");
+    // The closed row names the room: the settle trigger then counts 180 s
+    // instead of releasing it (migration 20261226150000).
+    expect(w.store.rows[0]).toMatchObject({
+      status: "ENDED",
+      endedReason: "PROVIDER_FAILED",
+      providerConversationId: "c1",
+    });
+  });
+
+  it("a provider that made no room leaves nothing to end or count", async () => {
+    const w = world();
+    w.provider.createRoom.mockRejectedValueOnce(new Error("refused"));
+    await expect(
+      w.video.start({ token: TOKEN, correlationId: "c" }),
+    ).rejects.toMatchObject({ reason: "PROVIDER_UNAVAILABLE" });
+    expect(w.provider.endRoom).not.toHaveBeenCalled();
+    expect(w.store.rows[0]?.providerConversationId).toBeNull();
   });
 
   it("ends the provider room before recording the end, and typing continues the same interview", async () => {

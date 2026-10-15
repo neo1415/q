@@ -62,6 +62,39 @@ const SeedEntity = z
         topic: z.string().min(1).optional(),
         status: ExternalSourceStatusSchema.optional(),
         as_of: z.string().nullable().optional(),
+        // ADR-001's three independent axes, plus when the source was read
+        // and how sure Q may sound. Optional so an older seed still parses.
+        truth_class: z
+          .enum([
+            "VERIFIED",
+            "USER_CLAIM",
+            "ESTIMATE",
+            "Q_INFERENCE",
+            "UNKNOWN",
+          ])
+          .optional(),
+        evidence_status: z
+          .enum([
+            "NO_EVIDENCE",
+            "SELF_REPORTED",
+            "DOCUMENT_SUPPORTED",
+            "MULTI_SOURCE_SUPPORTED",
+            "EXTERNALLY_VERIFIED",
+            "PLATFORM_VERIFIED",
+          ])
+          .optional(),
+        lifecycle_status: z
+          .enum([
+            "CURRENT",
+            "HISTORICAL",
+            "SUPERSEDED",
+            "DISPUTED",
+            "CONTRADICTORY",
+            "STALE",
+          ])
+          .optional(),
+        retrieved_at: z.string().nullable().optional(),
+        uncertainty: z.string().max(300).optional(),
       }),
     ),
     source_ids: z.array(z.string()).optional(),
@@ -163,6 +196,44 @@ export function parsePreparedSeed(raw: unknown): PreparedSeed {
         throw new Error(`${entity.demo_id}: Arabic name without a source`);
       }
     }
+    for (const fact of entity.facts) {
+      const read = fact.source_ids.some(
+        (id) => seed.sources[id]?.access === "FETCHED",
+      );
+      if (
+        fact.truth_class === "VERIFIED" ||
+        fact.evidence_status === "PLATFORM_VERIFIED"
+      ) {
+        throw new Error(
+          `${entity.demo_id}: a public page never makes a fact platform-verified`,
+        );
+      }
+      if (
+        fact.verification.status === "PUBLICLY_REPORTED_UNCONFIRMED" &&
+        (fact.evidence_status === "DOCUMENT_SUPPORTED" ||
+          fact.evidence_status === "MULTI_SOURCE_SUPPORTED")
+      ) {
+        throw new Error(
+          `${entity.demo_id}: an unconfirmed report is at most SELF_REPORTED`,
+        );
+      }
+      if (
+        !read &&
+        fact.evidence_status !== undefined &&
+        fact.evidence_status !== "NO_EVIDENCE"
+      ) {
+        throw new Error(
+          `${entity.demo_id}: evidence claimed from sources nobody read`,
+        );
+      }
+    }
+    if (entity.short_public_quotes.length > 0) {
+      // Owner direction 2026-10-15: no quotes attributed to a real person
+      // or organisation in a prepared public profile.
+      throw new Error(
+        `${entity.demo_id}: a prepared public profile carries no quotes`,
+      );
+    }
     if (entity.entity_kind !== "PERSON" && entity.role !== null) {
       throw new Error(`${entity.demo_id}: an institution has no personal role`);
     }
@@ -180,6 +251,22 @@ export function parsePreparedSeed(raw: unknown): PreparedSeed {
     }
   }
   return seed;
+}
+
+type SeedFact = PreparedSeedEntity["facts"][number];
+
+/** The fact's ADR-001 evidence status, derived when the seed does not say. */
+export function evidenceStatusOf(seed: PreparedSeed, fact: SeedFact): string {
+  if (fact.evidence_status !== undefined) return fact.evidence_status;
+  const read = fact.source_ids.filter(
+    (id) => seed.sources[id]?.access === "FETCHED",
+  );
+  if (read.length === 0) return "NO_EVIDENCE";
+  if (fact.verification.status !== "VERIFIED") return "SELF_REPORTED";
+  const hosts = new Set(
+    read.map((id) => new URL(seed.sources[id]?.url ?? "https://x").hostname),
+  );
+  return hosts.size > 1 ? "MULTI_SOURCE_SUPPORTED" : "DOCUMENT_SUPPORTED";
 }
 
 /** W3's recognition aliases (Latin script only), by the seed's demo id. */
@@ -295,10 +382,12 @@ export function toPreparedUpsert(
       .map((fact) => ({
         claim: clip(spoken(fact.soft_wording, fact.claim), 600),
         sourceIds: fact.source_ids,
-        evidenceClass:
-          fact.verification.status === "VERIFIED"
-            ? "VERIFIED"
-            : "PUBLICLY_REPORTED_UNCONFIRMED: not independently checked",
+        // ADR-001's evidence axis, conservatively: a statement found on a
+        // read public page is DOCUMENT_SUPPORTED (MULTI_ when two hosts say
+        // it), a reported-but-unconfirmed one SELF_REPORTED, an unread one
+        // NO_EVIDENCE. Never "VERIFIED": Capital Q verified nothing. The
+        // per-source reading status stays on each source.
+        evidenceClass: evidenceStatusOf(seed, fact),
         topic: fact.topic ?? null,
         status: fact.status ?? ("LINK_DISCOVERED" as const),
         asOf: fact.as_of ?? null,
@@ -330,6 +419,17 @@ export function toPreparedUpsert(
         checkedAt: fact.verification.checkedAt,
         basis: clip(fact.verification.basis, 400),
         note: fact.verification.note,
+      })),
+      // ADR-001 axes per fact, by the same ordinal as `verification`.
+      // A public page is the entity's or a reporter's statement: never
+      // PLATFORM_VERIFIED, and an unread source is NO_EVIDENCE.
+      evidenceAxes: entity.facts.map((fact, ordinal) => ({
+        ordinal,
+        truthClass: fact.truth_class ?? "UNKNOWN",
+        evidenceStatus: fact.evidence_status ?? "NO_EVIDENCE",
+        lifecycleStatus: fact.lifecycle_status ?? "CURRENT",
+        retrievedAt: fact.retrieved_at ?? null,
+        uncertainty: fact.uncertainty ?? null,
       })),
       contradicted: entity.facts
         .filter((fact) => fact.verification.status === "CONTRADICTED")

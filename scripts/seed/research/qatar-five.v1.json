@@ -354,6 +354,32 @@
       "excerpt": "new three-pronged strategy for the business: investment banking, principal investment and asset management, all of it with a focus on Islamic finance … QInvest’s largest shareholder is Qatar Islamic Bank",
       "title": "Euromoney (2014): QInvest strategy",
       "read_at": "2026-10-11"
+    },
+    "S32": {
+      "url": "https://www.qia.qa/en/Newsroom/Pages/QIA-to-launch-new-venture-capital-programs.aspx",
+      "description": "QIA newsroom: QIA to launch new venture capital programs (26 Feb 2024)",
+      "access": "NOT_FETCHED",
+      "note": "Found by search on 2026-10-15; page not read (fetch failed or not attempted). Nothing is claimed from it alone.",
+      "fetchedAt": null,
+      "status": "LINK_DISCOVERED",
+      "status_note": "Search result only.",
+      "excerpt": null,
+      "title": "QIA newsroom: QIA to launch new venture capital programs (26 Feb 2024)",
+      "read_at": null,
+      "published_at": "2024-02-26"
+    },
+    "S38": {
+      "url": "https://www.alchemistaccelerator.com/doha",
+      "description": "Alchemist Doha programme page (re-read 15 Oct 2026)",
+      "access": "FETCHED",
+      "note": "Read 2026-10-15; excerpt verbatim.",
+      "fetchedAt": "2026-10-15",
+      "status": "VERIFIED_AGAINST_SOURCE",
+      "status_note": "Read 2026-10-15.",
+      "excerpt": "Alchemist Doha supports enterprise tech startups across Qatar, the MENA region, and emerging markets worldwide. … Deep integration with Qatar's innovation ecosystem through QRDI Council and Innolight.",
+      "title": "Alchemist Doha programme page (re-read 15 Oct 2026)",
+      "read_at": "2026-10-15",
+      "published_at": null
     }
   },
   "entities": [
@@ -379,7 +405,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "According to his LinkedIn, "
+          "soft_wording": "According to his LinkedIn, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "Midmac Contracting Company W.L.L. (Doha) appears in his experience; the visible entries carry no titles or dates.",
@@ -394,7 +425,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "According to his LinkedIn, "
+          "soft_wording": "According to his LinkedIn, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "the Qatari Lens congratulated him on a new appointment as CEO Business Ventures at Midmac Contracting Company W.L.L. This comes from a third-party post, not from his own profile, so the current title is not confirmed.",
@@ -409,7 +445,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "Reportedly, "
+          "soft_wording": "Reportedly, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "his earlier posts speak for Supercell, \"a telecom company\", and tag #Supercellnetwork.",
@@ -424,7 +465,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "According to his LinkedIn posts, "
+          "soft_wording": "According to his LinkedIn posts, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "on IFRS in Iraq he wrote that the Federal Board of Financial Supervision said adoption is optional for 2024 and mandatory from 2026, and argued it brings investor trust, clearer transparency and a chance to attract foreign investment. He says he has experience in auditing.",
@@ -439,7 +485,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "In his LinkedIn post, "
+          "soft_wording": "In his LinkedIn post, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "after a Nokia AI event in Dubai he listed four takeaways: AI is making telecom networks more intelligent, adaptive and efficient; it enables real-time decisions; its future depends on collaboration between operators, tech leaders and regulators; and continuous learning matters.",
@@ -454,7 +505,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "In his LinkedIn post, "
+          "soft_wording": "In his LinkedIn post, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "he caught up with the Snoonu team and its CEO at Web Summit Qatar, describing Snoonu as a leading tech-driven delivery platform shaping e-commerce and last-mile delivery in the region.",
@@ -469,7 +525,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "In his LinkedIn post, "
+          "soft_wording": "In his LinkedIn post, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "Across the three of his own posts I read, the recurring topics are financial-reporting transparency, AI in telecom networks and Qatar's technology-led commerce. That is a pattern in the posts, not a stated investment focus.",
@@ -484,7 +545,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": ""
+          "soft_wording": "",
+          "truth_class": "Q_INFERENCE",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "he emphasises consumer purchasing power as a real-world business indicator. I could not confirm this on a page I read.",
@@ -499,7 +565,12 @@
             "basis": "Cited page not read; not confirmed.",
             "note": null
           },
-          "soft_wording": "A previous research note says "
+          "soft_wording": "A previous research note says ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         }
       ],
       "rehearsal_topics": [
@@ -514,36 +585,7 @@
         "Where does AI create measurable value in your product rather than just a label?",
         "Which partner makes your market-entry plan executable in Qatar?"
       ],
-      "short_public_quotes": [
-        {
-          "quote": "As someone with experience in auditing, I see this as a great opportunity for professionals to upskill and stay ahead in a rapidly evolving financial landscape.",
-          "source_id": "S02",
-          "use": "SOURCE_QUOTE_ONLY; never present generated dialogue as a quote",
-          "verification": {
-            "status": "VERIFIED",
-            "checkedAt": "2026-10-11",
-            "basis": "Verbatim in the stored excerpt of a page read on 2026-10-11",
-            "note": null
-          },
-          "attributionOnly": true,
-          "label": "from his LinkedIn post on IFRS in Iraq",
-          "speaker": "Shadi Qishta"
-        },
-        {
-          "quote": "AI is redefining telecom networks, making them more intelligent, adaptive, and efficient.",
-          "source_id": "S04",
-          "use": "SOURCE_QUOTE_ONLY; never present generated dialogue as a quote",
-          "verification": {
-            "status": "VERIFIED",
-            "checkedAt": "2026-10-11",
-            "basis": "Verbatim in the stored excerpt of a page read on 2026-10-11",
-            "note": null
-          },
-          "attributionOnly": true,
-          "label": "from his LinkedIn post on AI in telecom",
-          "speaker": "Shadi Qishta"
-        }
-      ],
+      "short_public_quotes": [],
       "image": {
         "status": "NOT_ATTACHED",
         "preferred_source": "official website or public professional profile with permitted usage",
@@ -608,7 +650,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "According to its LinkedIn page, "
+          "soft_wording": "According to its LinkedIn page, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "It was incorporated in April 2007 and is licensed by the Qatar Financial Centre Authority; its shareholders include Qatar Islamic Bank, other institutions and high-net-worth individuals.",
@@ -623,7 +670,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "According to its LinkedIn page, "
+          "soft_wording": "According to its LinkedIn page, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "It has offices in Doha and Istanbul and affiliates in India and the UK.",
@@ -638,7 +690,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "According to its LinkedIn page, "
+          "soft_wording": "According to its LinkedIn page, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "QInvest was setting a strategy of investment banking, principal investment and asset management with an Islamic finance focus, and Qatar Islamic Bank was its largest shareholder. The article is dated; leadership and figures have not been re-read.",
@@ -653,7 +710,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "In 2014, Euromoney reported that "
+          "soft_wording": "In 2014, Euromoney reported that ",
+          "truth_class": "Q_INFERENCE",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "HISTORICAL",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "its credit strategy discusses capital preservation, structured and mezzanine transactions and risk-return assessment. I could not open that page to check.",
@@ -668,7 +730,12 @@
             "basis": "Cited page not read; not confirmed.",
             "note": null
           },
-          "soft_wording": "A previous research note says "
+          "soft_wording": "A previous research note says ",
+          "truth_class": "UNKNOWN",
+          "evidence_status": "NO_EVIDENCE",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": null,
+          "uncertainty": "Not read in full; treat as unconfirmed."
         },
         {
           "claim": "QInvest announced a USD 275 million sustainability-linked financing facility in March 2025. I could not open that page to check.",
@@ -683,7 +750,12 @@
             "basis": "Cited page not read; not confirmed.",
             "note": null
           },
-          "soft_wording": "A previous research note says "
+          "soft_wording": "A previous research note says ",
+          "truth_class": "UNKNOWN",
+          "evidence_status": "NO_EVIDENCE",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": null,
+          "uncertainty": "Not read in full; treat as unconfirmed."
         },
         {
           "claim": "QInvest described operational changes focused on Epicure Islamic Investment Management. I could not open that page to check.",
@@ -698,7 +770,12 @@
             "basis": "Cited page not read; not confirmed.",
             "note": null
           },
-          "soft_wording": "A previous research note says "
+          "soft_wording": "A previous research note says ",
+          "truth_class": "UNKNOWN",
+          "evidence_status": "NO_EVIDENCE",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": null,
+          "uncertainty": "Not read in full; treat as unconfirmed."
         }
       ],
       "rehearsal_topics": [
@@ -782,7 +859,12 @@
             "basis": "Stated on the official Alchemist Doha team page read 2026-10-11.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "Alchemist's team page says he has over 20 years of experience building startups, venture studios and angel networks, and that he leads founder sourcing, supports portfolio companies and connects investors. Alchemist Doha says he manages relationships with regional and global investors and brings founder, CEO, board and exit experience.",
@@ -797,7 +879,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "TASMU Accelerator lists him as a serial entrepreneur (Shefa Clinics), an angel investor, a mentor with Alchemist Accelerator in the Bay Area, and a board member of several MENA startups.",
@@ -812,7 +899,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "Alchemist Doha is a venture capital and investment platform for tech startups in Qatar and emerging markets, created by Alchemist Accelerator and the QRDI Council (per Gulf Times); it offers founder-friendly investment, structured fundraising support and networking events.",
@@ -827,7 +919,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "MULTI_SOURCE_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "At a Startup Grind Doha webinar (reported by Gulf Times, 28 March 2026) he said founders should keep building through a crisis rather than wait and see, outlined six rules (30-day sprints, one metric that matters, knowing the burn rate and \"date of death\"), and warned against raising at distressed valuations unless survival demands it.",
@@ -842,7 +939,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "In the same report he told founders to keep investor updates going even when the news is bad, to call their top 10 customers, to use AI to automate repetitive tasks before cutting headcount, and to protect their single most important revenue-generating activity.",
@@ -857,7 +959,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "In a LinkedIn post to founders he argues against pitching multiple startups at once: \"We’re here to back conviction.\" He says Alchemist Doha looks for founders obsessed with a single vision, and asks whether the founder is willing to go all-in on the idea and is the best person to execute it.",
@@ -872,7 +979,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": "In his LinkedIn post, "
+          "soft_wording": "In his LinkedIn post, ",
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on a public page that reports it; not confirmed by the page's owner or by Capital Q."
         },
         {
           "claim": "Priorities visible in his own words: a single committed idea, conviction and clarity, 30-day execution, cash discipline and honest investor communication.",
@@ -887,7 +999,32 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": ""
+          "soft_wording": "",
+          "truth_class": "Q_INFERENCE",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
+        },
+        {
+          "claim": "Alchemist Doha, where he is Director of Investments, describes itself as supporting enterprise technology startups across Qatar, the MENA region and emerging markets, integrated with Qatar's ecosystem through the QRDI Council and Innolight.",
+          "source_ids": ["S38"],
+          "evidence_class": "documented",
+          "topic": "ORGANISATION",
+          "status": "VERIFIED_AGAINST_SOURCE",
+          "as_of": null,
+          "verification": {
+            "status": "VERIFIED",
+            "checkedAt": "2026-10-15",
+            "basis": "Stated on a page read on 2026-10-15; the excerpt is stored with the source.",
+            "note": null
+          },
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-15",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         }
       ],
       "rehearsal_topics": [
@@ -904,50 +1041,7 @@
         "What will you ship in the next 30 days to validate demand?",
         "What is your plan if fundraising takes twice as long?"
       ],
-      "short_public_quotes": [
-        {
-          "quote": "We’re here to back conviction.",
-          "source_id": "S15",
-          "use": "SOURCE_QUOTE_ONLY; never present generated dialogue as a quote",
-          "verification": {
-            "status": "VERIFIED",
-            "checkedAt": "2026-10-11",
-            "basis": "Verbatim in the stored excerpt of a page read on 2026-10-11",
-            "note": null
-          },
-          "attributionOnly": true,
-          "label": "from his LinkedIn post to founders",
-          "speaker": "Muhannad Taslaq"
-        },
-        {
-          "quote": "Dilution taken in panic is a cost you would pay for years",
-          "source_id": "S16",
-          "use": "SOURCE_QUOTE_ONLY; never present generated dialogue as a quote",
-          "verification": {
-            "status": "VERIFIED",
-            "checkedAt": "2026-10-11",
-            "basis": "Verbatim in the stored excerpt of a page read on 2026-10-11",
-            "note": null
-          },
-          "attributionOnly": true,
-          "label": "as quoted by Gulf Times, 28 March 2026",
-          "speaker": "Muhannad Taslaq"
-        },
-        {
-          "quote": "Clarity is a competitive advantage.",
-          "source_id": "S16",
-          "use": "SOURCE_QUOTE_ONLY; never present generated dialogue as a quote",
-          "verification": {
-            "status": "VERIFIED",
-            "checkedAt": "2026-10-11",
-            "basis": "Verbatim in the stored excerpt of a page read on 2026-10-11",
-            "note": null
-          },
-          "attributionOnly": true,
-          "label": "as quoted by Gulf Times, 28 March 2026",
-          "speaker": "Muhannad Taslaq"
-        }
-      ],
+      "short_public_quotes": [],
       "image": {
         "status": "NOT_ATTACHED",
         "preferred_source": "official website or public professional profile with permitted usage",
@@ -1022,7 +1116,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "MULTI_SOURCE_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "What it does for investors: information on sectors and opportunities, introductions to government entities and key players, partner matching, business-service referrals, and business-setup support with the licensing platforms.",
@@ -1037,7 +1136,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "Its Chief Executive Officer is Sheikh Ali Alwaleed Al-Thani, as shown on its About page.",
@@ -1052,7 +1156,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "On 23 June 2026 it launched a Venture Capital Funding Module on the Invest Qatar Gateway with Qatar Investment Authority: startups can review participating QIA-backed funds, check their criteria and submit pitches to fund managers. The agency connects founders to funds; the funds decide.",
@@ -1067,7 +1176,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "On 23 September 2026 it announced a strategic engagement with Aurion Capital and LG NOVA covering innovation programmes and scale-up support in AI, digital health, fintech, digital infrastructure, sports, and media, plus a planned hub in Qatar Science & Technology Park.",
@@ -1082,7 +1196,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "Its technology-sector page promotes Startup Qatar, an Invest Qatar initiative that is a single resource for startup support, funding and incubation programmes, grants and networking events.",
@@ -1097,7 +1216,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "Priorities visible in its publications: attracting foreign investment, economic diversification, priority sectors such as AI, fintech and digital infrastructure, and a clear path from startups to QIA-backed funds.",
@@ -1112,7 +1236,12 @@
             "basis": "Reported by a page read on 2026-10-11 but not independently confirmed.",
             "note": null
           },
-          "soft_wording": ""
+          "soft_wording": "",
+          "truth_class": "Q_INFERENCE",
+          "evidence_status": "SELF_REPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         }
       ],
       "rehearsal_topics": [
@@ -1127,22 +1256,7 @@
         "What measurable benefit would your expansion bring to the local ecosystem?",
         "Which participating fund on the Gateway fits your stage and sector?"
       ],
-      "short_public_quotes": [
-        {
-          "quote": "Qatar offers international investors a gateway to the MENA region and a natural pathway for sustainable regional expansion.",
-          "source_id": "S20",
-          "use": "SOURCE_QUOTE_ONLY; never present generated dialogue as a quote",
-          "verification": {
-            "status": "VERIFIED",
-            "checkedAt": "2026-10-11",
-            "basis": "Verbatim in the stored excerpt of a page read on 2026-10-11",
-            "note": null
-          },
-          "attributionOnly": true,
-          "label": "from the Invest Qatar press release of 23 September 2026",
-          "speaker": "Sheikh Ali bin Alwaleed Al-Thani, CEO of Invest Qatar"
-        }
-      ],
+      "short_public_quotes": [],
       "image": {
         "status": "ATTACHED",
         "preferred_source": "official website or public professional profile with permitted usage",
@@ -1218,7 +1332,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "MULTI_SOURCE_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "Its stated purpose is to be the Gulf's leading Sharia-compliant asset manager and corporate advisory firm; its values are People, Trust, Excellence and Sharia.",
@@ -1233,7 +1352,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "Asset management: public equities (Qatar and the Gulf), global sukuk and money markets; customised solutions for institutional and high-net-worth investors, with a focus on the GCC and Turkey. It manages the AlRayan GCC Fund and the AlRayan Qatar ETF (QATR).",
@@ -1248,7 +1372,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "Financial advisory: equity capital markets (IPOs, secondary offerings), debt capital markets (sukuk), M&A (buy-side and sell-side) and corporate finance (capital structure, restructuring).",
@@ -1263,7 +1392,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "Its team page lists Akber Khan as Acting Chief Executive Officer, Zohaib Pervez as head of Asset Management (more than QAR5bn in client portfolios) and Hadi El Kadi as head of Financial Advisory.",
@@ -1278,7 +1412,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         },
         {
           "claim": "Its site warns that entities are impersonating ARI, and says ARI has no lending licence.",
@@ -1293,7 +1432,12 @@
             "basis": "Stated on a page read on 2026-10-11; the excerpt is stored with the source.",
             "note": null
           },
-          "soft_wording": null
+          "soft_wording": null,
+          "truth_class": "USER_CLAIM",
+          "evidence_status": "DOCUMENT_SUPPORTED",
+          "lifecycle_status": "CURRENT",
+          "retrieved_at": "2026-10-11",
+          "uncertainty": "Read on the cited page; not independently verified by Capital Q."
         }
       ],
       "rehearsal_topics": [
@@ -1308,22 +1452,7 @@
         "What valuation, financial statements and downside protections support this transaction?",
         "What advisory or partnership support are you actually seeking?"
       ],
-      "short_public_quotes": [
-        {
-          "quote": "To be the Gulf’s leading Sharia-compliant asset manager and corporate advisory firm.",
-          "source_id": "S23",
-          "use": "SOURCE_QUOTE_ONLY; never present generated dialogue as a quote",
-          "verification": {
-            "status": "VERIFIED",
-            "checkedAt": "2026-10-11",
-            "basis": "Verbatim in the stored excerpt of a page read on 2026-10-11",
-            "note": null
-          },
-          "attributionOnly": true,
-          "label": "from its own About page (stated purpose)",
-          "speaker": "AlRayan Investment LLC"
-        }
-      ],
+      "short_public_quotes": [],
       "image": {
         "status": "ATTACHED",
         "preferred_source": "official website or public professional profile with permitted usage",
@@ -1377,7 +1506,8 @@
       "source_ids": ["S23", "S24", "S25", "S26", "S27"]
     }
   ],
-  "seed_version": "1.1",
-  "verified_at": "2026-10-11",
-  "verification_method": "Pages fetched 2026-10-11 by a plain GET (or a page-fetch tool); excerpts are verbatim and stored with each source. LinkedIn profiles that returned HTTP 999 and qinvest.com pages that failed TLS or returned 503 are marked BLOCKED_OR_UNAVAILABLE; nothing is claimed from them."
+  "seed_version": "1.2",
+  "verified_at": "2026-10-15",
+  "verification_method": "Pages fetched 2026-10-11 by a plain GET (or a page-fetch tool); excerpts are verbatim and stored with each source. LinkedIn profiles that returned HTTP 999 and qinvest.com pages that failed TLS or returned 503 are marked BLOCKED_OR_UNAVAILABLE; nothing is claimed from them.",
+  "truth_axes_note": "truth_class / evidence_status / lifecycle_status are separate axes (ADR-001). A public page is the entity's own or a reporter's statement (USER_CLAIM), never VERIFIED by Capital Q. No quotes, mandates, decisions or endorsements are attributed to any real person or organisation."
 }

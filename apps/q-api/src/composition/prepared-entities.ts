@@ -240,7 +240,12 @@ export function answerFacts(record: KnownEntityRecord): readonly AnswerFact[] {
   return record.facts.map((fact) => ({
     claim: fact.claim,
     sourceIds: fact.sourceIds,
-    confirmed: fact.evidenceClass === "VERIFIED",
+    // Stated on a read public page (ADR-001 DOCUMENT_ or MULTI_SOURCE_
+    // SUPPORTED). Rows stored before 20261227100000 said "VERIFIED".
+    confirmed:
+      fact.evidenceClass === "DOCUMENT_SUPPORTED" ||
+      fact.evidenceClass === "MULTI_SOURCE_SUPPORTED" ||
+      fact.evidenceClass === "VERIFIED",
   }));
 }
 

@@ -8,6 +8,7 @@ import {
   type RehearsalInterviewersDto,
   type RehearsalVideoSessionDto,
   type StartRehearsalVideoResponse,
+  type VideoAllowanceDto,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import { SecretToken, type TokenCipher } from "@capital-q/integrations";
@@ -167,6 +168,14 @@ export type RehearsalVideoStore = {
       readonly endsAt: Date;
     },
   ) => Promise<{ readonly row: VideoSessionRow; readonly created: boolean }>;
+  /**
+   * The person's shared weekly video allowance (GateQ + Rehearsals). The
+   * database enforces it when a session row is inserted (migration
+   * 20261226150000); this read is only for telling them what is left.
+   */
+  readonly allowance: (
+    actor: ActorContext,
+  ) => Promise<VideoAllowanceDto | null>;
   /** The person's own session for a rehearsal, in their own tenant. */
   readonly ownByRehearsal: (
     actor: ActorContext,
@@ -296,6 +305,20 @@ export function createPostgresRehearsalVideoStore(
       return { row: held, created: false };
     },
     ownByRehearsal: own,
+    allowance: async (actor) => {
+      const rows = await sql<
+        { weekly_sessions: number; remaining: number; resets_at: Date }[]
+      >`select weekly_sessions, remaining, resets_at
+          from billing.video_allowance_status(${`user:${actor.userId}`})`;
+      const row = rows[0];
+      return row === undefined
+        ? null
+        : {
+            weeklySessions: Number(row.weekly_sessions),
+            remaining: Number(row.remaining),
+            resetsAt: new Date(row.resets_at).toISOString(),
+          };
+    },
     byToken: async (sessionId, tokenHash) => {
       if (!UUID.test(sessionId) || !/^[0-9a-f]{64}$/u.test(tokenHash)) {
         return null;
@@ -819,17 +842,24 @@ export function createRehearsalVideoService(dependencies: {
         actor.actorType === "HUMAN" &&
         admittedAccount(actor) &&
         (await dependencies.stillAllowed(actor).catch(() => false));
+      // Wording and the offer only; a failed read never blocks the voice room.
+      const allowance = admitted
+        ? await store.allowance(actor).catch(() => null)
+        : null;
+      const offered =
+        admitted && (allowance === null || allowance.remaining > 0);
       return {
         videoAvailable:
-          admitted &&
+          offered &&
           REHEARSAL_INTERVIEWERS.some((item) =>
             dependencies.enabledInterviewers.has(item.id),
           ),
         maxSeconds: REHEARSAL_VIDEO_MAX_SECONDS,
         interviewers: REHEARSAL_INTERVIEWERS.map((item) => ({
           ...interviewerDto(item.id),
-          available: admitted && dependencies.enabledInterviewers.has(item.id),
+          available: offered && dependencies.enabledInterviewers.has(item.id),
         })),
+        allowance,
       };
     },
 
@@ -927,20 +957,21 @@ export function createRehearsalVideoService(dependencies: {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "";
-        if (
-          message !== "CQ_VIDEO_ALLOWANCE_EXHAUSTED" &&
-          message !== "CQ_VIDEO_CONCURRENCY_LIMIT"
-        )
-          throw error;
+        // The shared weekly allowance and the account's monthly safeguard
+        // are enforced by the database on insert, like the lifetime cap.
+        const reason =
+          message === "CQ_VIDEO_ALLOWANCE_EXHAUSTED" ||
+          message === "CQ_VIDEO_WEEKLY_ALLOWANCE_EXHAUSTED"
+            ? ("ALLOWANCE_EXHAUSTED" as const)
+            : message === "CQ_VIDEO_CONCURRENCY_LIMIT"
+              ? ("CONCURRENCY_LIMIT" as const)
+              : message === "CQ_VIDEO_GLOBAL_CAP"
+                ? ("PROVIDER_UNAVAILABLE" as const)
+                : null;
+        if (reason === null) throw error;
         return {
           kind: "OK",
-          response: {
-            mode: "VOICE_FALLBACK",
-            reason:
-              message === "CQ_VIDEO_ALLOWANCE_EXHAUSTED"
-                ? "ALLOWANCE_EXHAUSTED"
-                : "CONCURRENCY_LIMIT",
-          },
+          response: { mode: "VOICE_FALLBACK", reason },
         };
       }
       if (!claimed.created) {

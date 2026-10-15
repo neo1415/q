@@ -45,16 +45,26 @@ const LIST_CLAIM =
   /\b(?:(?:listed |shown |laid out )?on(?:-| )screen|in the cards?|(?:are|is) (?:listed|shown) (?:below|above|here))\b/iu;
 
 export function claimsListOnScreen(sentence: string): boolean {
-  if (APPROVAL.test(sentence)) return false;
-  return LIST_CLAIM.test(sentence);
+  const plain = plainQuotes(sentence);
+  if (APPROVAL.test(plain)) return false;
+  return LIST_CLAIM.test(plain);
+}
+
+/**
+ * Lane A (live 2026-10-15: "I’ve opened the three company records" with
+ * nothing opened passed the guard): models write typographic apostrophes
+ * and quotes, the patterns are written with plain ones. Read the sentence
+ * as plain before testing it; what is said is never changed by this.
+ */
+export function plainQuotes(sentence: string): string {
+  return sentence.replace(/[\u2018\u2019\u02bc\u2032]/gu, "'");
 }
 
 /** True when the sentence tells the person something is on their screen. */
 export function claimsOnScreen(sentence: string): boolean {
-  if (APPROVAL.test(sentence)) return false;
-  return (
-    CLAIMS.some((claim) => claim.test(sentence)) || LIST_CLAIM.test(sentence)
-  );
+  const plain = plainQuotes(sentence);
+  if (APPROVAL.test(plain)) return false;
+  return CLAIMS.some((claim) => claim.test(plain)) || LIST_CLAIM.test(plain);
 }
 
 /**
@@ -72,7 +82,7 @@ export function createScreenClaimGuard(backed: () => boolean) {
       removed += 1;
       if (
         claimsListOnScreen(sentence) &&
-        !CLAIMS.some((claim) => claim.test(sentence))
+        !CLAIMS.some((claim) => claim.test(plainQuotes(sentence)))
       ) {
         return null;
       }

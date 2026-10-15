@@ -100,6 +100,12 @@ export type GateqVideoSessionRow = {
   readonly endsAt: string;
 };
 
+export type GateqVideoAllowance = {
+  readonly weeklySessions: number;
+  readonly remaining: number;
+  readonly resetsAt: string;
+};
+
 export type GateqVideoSessionStore = {
   /**
    * Reserve a session under the application's row lock and a global lock:
@@ -121,7 +127,16 @@ export type GateqVideoSessionStore = {
     | { readonly kind: "EXISTING"; readonly row: GateqVideoSessionRow }
     | { readonly kind: "ALLOWANCE" }
     | { readonly kind: "CONCURRENCY" }
+    /** The person's shared weekly allowance (GateQ + Rehearsals) is spent. */
+    | { readonly kind: "WEEKLY_ALLOWANCE" }
+    /** The provider account's monthly safeguard would be exceeded. */
+    | { readonly kind: "PLATFORM_LIMIT" }
   >;
+  /** The applying person's shared weekly video allowance, if known. */
+  readonly allowanceFor: (input: {
+    readonly applicationId: string;
+    readonly tenantId: string;
+  }) => Promise<GateqVideoAllowance | null>;
   readonly markLive: (input: {
     readonly id: string;
     readonly providerConversationId: string;
@@ -130,6 +145,8 @@ export type GateqVideoSessionStore = {
   readonly end: (input: {
     readonly id: string;
     readonly reason: NonNullable<GateqVideoSessionRow["endedReason"]>;
+    /** A room the provider made that was never marked live; recorded once. */
+    readonly providerConversationId?: string | null;
   }) => Promise<GateqVideoSessionRow | null>;
   readonly openForApplication: (
     applicationId: string,
@@ -236,10 +253,26 @@ export function createGateqVideoInterview(deps: {
       if (guest.application.status === "SUBMITTED") return false;
       // Live 2026-10-15: the offer stayed up after the allowance was spent,
       // so the button led only to a refusal. A used allowance is no offer.
-      return (
-        (await deps.store.countForApplication(guest.application.id)) <
+      if (
+        (await deps.store.countForApplication(guest.application.id)) >=
         deps.config.perApplication
-      );
+      )
+        return false;
+      const allowance = await deps.store.allowanceFor({
+        applicationId: guest.application.id,
+        tenantId: guest.application.tenantId,
+      });
+      return allowance === null || allowance.remaining > 0;
+    },
+
+    /** The person's shared weekly video allowance, for the offer's wording. */
+    allowance: async (token: string): Promise<GateqVideoAllowance | null> => {
+      if (!deps.config.enabled || deps.provider === null) return null;
+      const guest = await deps.intake.authorise(token);
+      return deps.store.allowanceFor({
+        applicationId: guest.application.id,
+        tenantId: guest.application.tenantId,
+      });
     },
 
     start: async (input: {
@@ -268,9 +301,16 @@ export function createGateqVideoInterview(deps: {
         throw new GateqVideoRefusedError("ALLOWANCE_EXHAUSTED");
       if (reserved.kind === "CONCURRENCY")
         throw new GateqVideoRefusedError("CONCURRENCY_LIMIT");
+      if (reserved.kind === "WEEKLY_ALLOWANCE")
+        throw new GateqVideoRefusedError("ALLOWANCE_EXHAUSTED");
+      // The account's monthly safeguard: fail closed, typing carries on.
+      if (reserved.kind === "PLATFORM_LIMIT")
+        throw new GateqVideoRefusedError("PROVIDER_UNAVAILABLE");
       // A reconnect or retry: the same session and clock, never a new room.
       if (reserved.kind === "EXISTING") return view(reserved.row);
       const row = reserved.row;
+      // Set once the provider has made a room: from then on it may be billed.
+      let createdConversationId: string | null = null;
       try {
         const greeting = await deps.conversation.openingFor({
           token: input.token,
@@ -284,6 +324,7 @@ export function createGateqVideoInterview(deps: {
           greeting,
           bridge: { path: deps.bridgePath, bearer },
         });
+        createdConversationId = room.conversationId;
         const joinUrlSealed =
           room.joinUrl === null ? null : deps.sealer.seal(room.joinUrl);
         await deps.store.markLive({
@@ -299,9 +340,20 @@ export function createGateqVideoInterview(deps: {
         });
       } catch {
         // The allowance is spent by the attempt (no retry-to-mint), the
-        // row is closed, and the applicant carries on by typing.
+        // row is closed, and the applicant carries on by typing. A room the
+        // provider made before saving failed is ended, and its id recorded
+        // on the closed row, so the usage ledger counts it in full rather
+        // than releasing it: the ledger must never under-count billing.
+        if (createdConversationId !== null)
+          await deps.provider
+            .endRoom(createdConversationId)
+            .catch(() => undefined);
         await deps.store
-          .end({ id: row.id, reason: "PROVIDER_FAILED" })
+          .end({
+            id: row.id,
+            reason: "PROVIDER_FAILED",
+            providerConversationId: createdConversationId,
+          })
           .catch(() => null);
         throw new GateqVideoRefusedError("PROVIDER_UNAVAILABLE");
       }
