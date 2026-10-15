@@ -7,8 +7,14 @@ import {
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
 import { loadCompanySideRelationship } from "@/features/relationships/relationship-page-data";
-import { recordWorkRead } from "@/features/relationships/record-workspace-data";
-import { recordWorkSlot } from "@/features/relationships/record-workspace-sections";
+import {
+  recordGateqRead,
+  recordWorkRead,
+} from "@/features/relationships/record-workspace-data";
+import {
+  recordGateqSlot,
+  recordWorkSlot,
+} from "@/features/relationships/record-workspace-sections";
 
 export const metadata: Metadata = { title: "Relationship" };
 export const dynamic = "force-dynamic";
@@ -37,6 +43,11 @@ export default async function CompanyRelationshipPage({
   if (loaded.kind === "UNAVAILABLE") {
     return <RelationshipUnavailable sentence={loaded.sentence} />;
   }
+  // GateQ applications on this relationship, by its canonical id (lane G).
+  const gateq =
+    loaded.relationship === null
+      ? null
+      : await recordGateqRead(loaded.relationship.relationshipId);
   const { relationship, pending, counterpart } = loaded;
 
   // The relationship itself is Q's subject here, not the investor
@@ -67,6 +78,7 @@ export default async function CompanyRelationshipPage({
         diligence={loaded.diligence}
         brief={loaded.brief}
         basePath={`/relationships/investor/${investorOrganisationId}`}
+        gateq={gateq === null ? null : recordGateqSlot(gateq)}
         work={recordWorkSlot(work)}
         absentSentence={loaded.absentSentence}
         actions={

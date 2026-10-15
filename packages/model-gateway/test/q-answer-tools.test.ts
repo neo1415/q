@@ -394,6 +394,11 @@ describe("fresh selected-company follow-ups reuse authorized identity", () => {
           "FRESH",
           false,
         ],
+        // S3 (live 69e50e45): words naming no other company.
+        ["What are the main risks here?", "FRESH", false],
+        ["What are Selected Company's main risks?", "FRESH", false],
+        ["What are the main risks here?", "REVOKED", true],
+        ["What are the risks of Different Target?", "FRESH", true],
         ["What does Different Target do?", "FRESH", true],
         ["Compare this company with Different Target", "FRESH", true],
         ["What are the risks for these companies?", "FRESH", true],
@@ -1587,6 +1592,88 @@ describe("compound fit questions retain the synthesis path", () => {
       ).toHaveLength(1);
       expect(alpha.calls).toHaveLength(compound ? 1 : 0);
       if (compound) expect(JSON.stringify(completed)).toContain(answer);
+    },
+  );
+});
+
+/**
+ * S3a (live 2026-10-15 on #107): a company the turn names, read ahead of
+ * the model, was looked up again because the note said to resolve it.
+ * Once its authorised profile is in hand, the note says so, with its id.
+ */
+describe("a named company read ahead of the model is not looked up again", () => {
+  const SEARCH: QOfferedTool = {
+    ...GET_COMPANY,
+    toolName: "company.search",
+    definition: { ...GET_COMPANY.definition, name: "search_companies" },
+  };
+  it.each([false, true])(
+    "aboutNamedOther=%s: the note names the read profile and drops the lookup instruction",
+    async (aboutNamedOther) => {
+      const target = randomUUID();
+      const tools = toolPort([SEARCH, GET_COMPANY], (p) =>
+        p.name === "search_companies"
+          ? {
+              ...succeeded(p, {
+                items: [
+                  {
+                    companyId: target,
+                    canonicalName: "Northwind Ledger",
+                    currentStageCode: "seed",
+                    headquartersCountry: null,
+                    shortDescription: null,
+                  },
+                ],
+                nextCursor: null,
+                truthClass: "USER_CLAIM",
+              }),
+              toolName: "company.search",
+            }
+          : succeeded(p, {
+              companyId: target,
+              canonicalName: "Northwind Ledger",
+              legalName: null,
+              websiteUrl: null,
+              foundedDate: null,
+              headquartersCountry: null,
+              headquartersCity: null,
+              currentStageCode: "seed",
+              shortDescription: "Declared company profile",
+              primaryDescription: null,
+              companyStatus: "active",
+              relationToYou: "SHARED",
+              truthClass: "USER_CLAIM",
+            }),
+      );
+      const { seam, request, messages, alpha } = build({
+        tools,
+        script: [
+          {
+            kind: "TEXT",
+            text: JSON.stringify(
+              analystResult("Northwind Ledger declares a seed stage."),
+            ),
+          },
+        ],
+      });
+      if (messages[0])
+        messages[0] = {
+          ...messages[0],
+          content: "What are the risks with Northwind Ledger?",
+        };
+      await seam.answer({ ...request, aboutNamedOther });
+      const prompt = JSON.stringify(alpha.calls[0]?.request);
+      expect(prompt).toContain(
+        "Already read for this turn through get_company",
+      );
+      expect(prompt).toContain(`Northwind Ledger (company id ${target})`);
+      expect(prompt).not.toContain(
+        "Resolve the company named in the current question through search_companies and get_company before answering",
+      );
+      // Read once, ahead of the model; the model was not asked to look again.
+      expect(
+        tools.executed.filter((p) => p.name === "get_company"),
+      ).toHaveLength(1);
     },
   );
 });

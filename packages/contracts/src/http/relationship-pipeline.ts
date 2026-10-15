@@ -26,6 +26,12 @@ export const RelationshipPipelineDtoSchema = z
   .object({
     items: z.array(RelationshipSummaryDtoSchema).max(50),
     total: z.number().int().min(0),
+    /**
+     * False: `total` is an upper bound, because some rows beyond this page
+     * have not yet been checked against the reader's current sight of the
+     * counterpart. Absent: exact (older servers).
+     */
+    totalExact: z.boolean().optional(),
     scope: z.string().regex(/^[a-f0-9]{64}$/),
     nextCursor: z.string().max(1024).nullable(),
   })

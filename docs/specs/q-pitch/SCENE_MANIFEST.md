@@ -43,3 +43,5 @@ Any intent from the narrator, the rehearsal counterpart or the script is refused
 ## Start
 
 `CQ_Q_PITCH_TOUR=1` on the web service, then open any app page with `?qpitch=pilot` while signed in as the fictional actor. A DRAFT script runs only as `INTERNAL_REHEARSAL`.
+
+`?qpitch=premiere` runs the r3 cut from `PREMIERE_SCRIPT` (privacy runs before GateQ, on the company page). It admits the CODE_VERIFIED candidates as `INTERNAL_REHEARSAL` only; the overlay says they have no browser receipt.
