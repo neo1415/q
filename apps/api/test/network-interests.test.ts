@@ -23,6 +23,7 @@ import {
   type Interest,
   type InterestService,
   type RelationshipStatus,
+  type RelationshipViewService,
   type RespondToInterestCommand,
 } from "@capital-q/network";
 import { CompanyIdSchema } from "@capital-q/companies";
@@ -164,6 +165,8 @@ function buildApp(
     readonly photos?: Readonly<Record<string, string>> | undefined;
     /** The brief the service answers; null: not a party (R1). */
     readonly brief?: RelationshipBrief | null | undefined;
+    /** CRM saved views; composed only when given. */
+    readonly views?: RelationshipViewService | undefined;
   } = {},
 ): {
   readonly app: FastifyInstance;
@@ -267,7 +270,10 @@ function buildApp(
     identities: { lookup: () => Promise.resolve(null) },
   };
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
-    interests,
+    interests:
+      options.views === undefined
+        ? interests
+        : { ...interests, relationshipViews: options.views },
     namedPhotos,
   });
   return { app, calls, answers, reads, asked };
@@ -809,5 +815,136 @@ describe("Hub pipeline HTTP boundary", () => {
         403,
       );
     }
+  });
+});
+
+describe("CRM saved views HTTP boundary", () => {
+  const VIEW = "f0000000-0000-4000-8000-000000000001";
+  const COMPANY = "c0000000-0000-4000-8000-000000000009";
+  function views() {
+    const seen: unknown[][] = [];
+    const service: RelationshipViewService = {
+      list: (...args) => {
+        seen.push(["list", ...args]);
+        return Promise.resolve({ items: [], teamEditable: false });
+      },
+      save: (actor, id, input, companyId) => {
+        seen.push(["save", actor, id, input, companyId]);
+        return Promise.resolve({
+          id,
+          name: "Connected",
+          query: { state: "CONNECTED" },
+          layout: "table",
+          columns: ["state"],
+          scope: "PERSONAL",
+          version: 1,
+          updatedAt: "2026-10-15T10:00:00.000Z",
+          editable: true,
+        });
+      },
+      remove: (...args) => {
+        seen.push(["remove", ...args]);
+        return Promise.resolve();
+      },
+    };
+    return { service, seen };
+  }
+  const body = {
+    name: "Connected",
+    query: { state: "CONNECTED" },
+    layout: "table",
+    columns: ["state"],
+    scope: "PERSONAL",
+    expectedVersion: 0,
+  };
+
+  it("lists the investor's views and a founder's company views under the actor", async () => {
+    const { service, seen } = views();
+    const { app } = buildApp({ views: service });
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/v1/network/relationship-views",
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "GET",
+          url: `/v1/network/companies/${COMPANY}/relationship-views`,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(seen).toEqual([
+      ["list", CONTEXT, undefined],
+      ["list", CONTEXT, COMPANY],
+    ]);
+  });
+
+  it("saves through the contract and refuses a cursor or selection", async () => {
+    const { service, seen } = views();
+    const { app } = buildApp({ views: service });
+    const saved = await app.inject({
+      method: "PUT",
+      url: `/v1/network/relationship-views/${VIEW}`,
+      payload: body,
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({ id: VIEW, version: 1 });
+    for (const bad of [
+      { ...body, query: { cursor: "x" } },
+      { ...body, selected: [VIEW] },
+    ]) {
+      const refused = await app.inject({
+        method: "PUT",
+        url: `/v1/network/relationship-views/${VIEW}`,
+        payload: bad,
+      });
+      expect(refused.statusCode).toBe(422);
+    }
+    expect(seen).toHaveLength(1);
+  });
+
+  it("deletes compare-and-swap at the version it names, and refuses a bad version or id", async () => {
+    const { service, seen } = views();
+    const { app } = buildApp({ views: service });
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: `/v1/network/relationship-views/${VIEW}/versions/2`,
+        })
+      ).json(),
+    ).toEqual({ deleted: true });
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: `/v1/network/relationship-views/${VIEW}/versions/0`,
+        })
+      ).statusCode,
+    ).toBe(422);
+    expect(
+      (
+        await app.inject({
+          method: "DELETE",
+          url: "/v1/network/relationship-views/not-a-uuid/versions/2",
+        })
+      ).statusCode,
+    ).toBe(422);
+    expect(seen).toEqual([["remove", CONTEXT, VIEW, 2, undefined]]);
+  });
+  it("routes a founder's save to their company's views", async () => {
+    const { service, seen } = views();
+    const { app } = buildApp({ views: service });
+    const saved = await app.inject({
+      method: "PUT",
+      url: `/v1/network/companies/${COMPANY}/relationship-views/${VIEW}`,
+      payload: body,
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(seen[0]?.[4]).toBe(COMPANY);
   });
 });

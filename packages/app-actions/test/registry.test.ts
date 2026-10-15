@@ -266,6 +266,11 @@ describe("the action registry", () => {
         "remove_my_speaking_guide",
         "CONSEQUENTIAL",
       ],
+      // CRM saved views (2026-10-15): the person's own view preferences.
+      ["crm.investor_view.save", "offer.crm_saved_views", "INSTANT"],
+      ["crm.company_view.save", "offer.crm_saved_views", "INSTANT"],
+      ["crm.investor_view.delete", "offer.crm_saved_views", "INSTANT"],
+      ["crm.company_view.delete", "offer.crm_saved_views", "INSTANT"],
       // WORK-58: Q's work page.
       ["q.work.pause", "legacy:stop_q_work", "INSTANT"],
       ["q.work.resume", "legacy:stop_q_work", "INSTANT"],

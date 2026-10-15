@@ -488,6 +488,16 @@ const OFFERS: readonly QCapability[] = [
     "RELATIONSHIPS",
     "A report is the person's own account of someone else's conduct; Q never files one on their behalf or on inference.",
   ),
+  // CRM saved views (2026-10-15): Q opens a saved view through the
+  // pipeline's own control; naming, sharing and deleting one is the
+  // person's choice of how they and their team see their own CRM.
+  offer(
+    "crm_saved_views",
+    "RELATIONSHIP",
+    "Save, rename, share with their team or delete a saved view of their CRM pipeline (CRM → Pipeline)",
+    "RELATIONSHIPS",
+    "A saved view is the person's own way of seeing their CRM, and a team view changes what their colleagues see first; they name and share it on the pipeline itself.",
+  ),
   // --- DOCS block: the person's own say over their brand ------------------
   offer(
     "confirm_brand",
@@ -602,6 +612,8 @@ export const APP_ACTION_GROUPS: Readonly<Record<string, QCapabilityGroup>> = {
   team: "SETTINGS",
   // Q.03/Q.04/Q.01: their readiness plan and Q's questions, beside the raise.
   readiness: "RECORDS",
+  // CRM saved views (2026-10-15): beside the relationships they show.
+  crm: "RELATIONSHIP",
 };
 
 export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([

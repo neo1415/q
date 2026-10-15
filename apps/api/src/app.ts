@@ -641,6 +641,9 @@ export function createApp(
       ...(modules.interests === undefined
         ? {}
         : { interests: modules.interests }),
+      ...(modules.interests?.relationshipViews === undefined
+        ? {}
+        : { relationshipViews: modules.interests.relationshipViews }),
       ...(modules.connections === undefined
         ? {}
         : { connections: modules.connections }),

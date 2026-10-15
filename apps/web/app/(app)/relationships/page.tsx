@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import {
   getResults,
+  listRelationshipViews,
   queryRelationshipPipeline,
   getChatUnread,
   getFitProfiles,
@@ -85,14 +86,19 @@ export default async function RelationshipsPage({
         ),
       ),
     );
-    const data =
+    const ownCompany =
+      context.kind === "FOUNDER" ? context.companyId : undefined;
+    // The saved views are their own read: a failure leaves the pipeline
+    // working and says the views couldn't load.
+    const [data, views] =
       session === null || side === "NONE" || !parsed.success
-        ? null
-        : await queryRelationshipPipeline(
-            session,
-            parsed.data,
-            context.kind === "FOUNDER" ? context.companyId : undefined,
-          ).catch(() => null);
+        ? [null, null]
+        : await Promise.all([
+            queryRelationshipPipeline(session, parsed.data, ownCompany).catch(
+              () => null,
+            ),
+            listRelationshipViews(session, ownCompany).catch(() => null),
+          ]);
     const subjectId =
       context.kind === "FOUNDER"
         ? context.companyId
@@ -143,6 +149,7 @@ export default async function RelationshipsPage({
               scopeKey={pipelineStorageKey(user.authUserId, side, subjectId)}
               side={side}
               data={data}
+              views={views}
               query={parsed.data}
               layout={params["layout"] === "board" ? "board" : "table"}
             />
