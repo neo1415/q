@@ -25,27 +25,6 @@ export type GateqVideoSession = {
   readonly disclosure: string;
 };
 
-/**
- * The room URL with the applicant's own name, so Daily Prebuilt joins them
- * directly instead of stopping on "Enter your name" (its `name` parameter;
- * `userName` is ignored, checked in a production test-mode room). Only the
- * provider's room is touched; a blank name leaves the URL as it was.
- */
-export function joinUrlWithName(
-  joinUrl: string | null,
-  name: string,
-): string | null {
-  const display = name.trim().slice(0, 60);
-  if (joinUrl === null || display === "") return joinUrl;
-  try {
-    const url = new URL(joinUrl);
-    url.searchParams.set("name", display);
-    return url.toString();
-  } catch {
-    return joinUrl;
-  }
-}
-
 export function GateqVideoRoom({
   fund,
   session,
@@ -65,12 +44,16 @@ export function GateqVideoRoom({
     <ProviderVideoRoom
       title={`Your interview for ${fund}`}
       disclosure={session.disclosure}
-      joinUrl={joinUrlWithName(session.joinUrl, participantName)}
+      joinUrl={session.joinUrl}
+      participantName={participantName}
       tileLabel={`Video interview for ${fund} (Q, an AI interviewer)`}
       endsAt={session.endsAt}
       maxSeconds={session.maxSeconds}
       endLabel="End and review my application"
       fallbackLabel="Continue by typing instead"
+      joiningNote={
+        "Q is joining the room. Its video can take up to 20 seconds to appear."
+      }
       closingNote="Time is up. Your answers so far are saved; you can continue by typing."
       closingSoonNote="We’re closing shortly. Finish your point; everything recorded so far is saved."
       unavailableNote={

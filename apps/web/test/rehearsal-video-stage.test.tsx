@@ -34,7 +34,8 @@ const REHEARSAL = {
     name: "Fund One",
   },
   status: "ACTIVE",
-} satisfies Pick<QRehearsalDto, "id" | "counterpart" | "status">;
+  userRole: "FOUNDER",
+} satisfies Pick<QRehearsalDto, "id" | "counterpart" | "status" | "userRole">;
 
 function session(
   overrides: Partial<RehearsalVideoSessionDto> = {},
@@ -69,10 +70,17 @@ describe("the video rehearsal stage", () => {
       />,
     );
     const frame = screen.getByTitle(/Video rehearsal with Fund One/u);
-    expect(frame.getAttribute("src")).toBe("https://tavus.daily.co/c1?t=tok");
+    // Named, so Daily joins directly instead of asking "Enter your name".
+    expect(frame.getAttribute("src")).toBe(
+      "https://tavus.daily.co/c1?t=tok&name=Founder",
+    );
     expect(frame.getAttribute("allow")).toContain("microphone");
     expect(screen.getByText(/Not the real person/u)).toBeTruthy();
     expect(screen.getByText(/^(3:00|2:59)$/u)).toBeTruthy();
+    // The face takes ~20 s to appear; the wait is explained, never blank.
+    expect(screen.getByRole("status").textContent).toMatch(
+      /Steve is joining the room/u,
+    );
   });
 
   it("ends the call and hands over to the existing review", async () => {
