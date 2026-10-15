@@ -798,3 +798,57 @@ describe("what they are looking at (lane W)", () => {
     ).toBeNull();
   });
 });
+
+/**
+ * Lane S 2026-10-15 (audit 10-14 21:55: "Open the first relationship in
+ * this pipeline." answered "Understood."): an ordinal over the page's list
+ * resolves in the manifest's list order, the in-view list first, and a
+ * relationship opens the relationship page.
+ */
+describe("ordinals over the pipeline on screen (lane S)", () => {
+  const PIPELINE: QPageManifest = {
+    v: 2,
+    seq: 3,
+    inView: ["pipeline"],
+    sections: [
+      {
+        id: "pipeline",
+        kind: "RELATIONSHIP_LIST",
+        refs: [AJOPOT, TENSORGATE, KORA].map((id) => ({
+          kind: "COMPANY" as const,
+          id,
+        })),
+        total: 3,
+      },
+    ],
+    dialogs: [],
+  };
+  const relationship = (id: string): QResultBlock => ({
+    kind: "UI_INTENT",
+    intent: { kind: "OPEN_RECORD_PAGE", page: "RELATIONSHIP_COMPANY", id },
+  });
+
+  it.each([
+    ["Open the first relationship in this pipeline.", AJOPOT],
+    ["open the second relationship", TENSORGATE],
+    ["open the last deal in the pipeline", KORA],
+  ])("%s", async (said, id) => {
+    const run = seam();
+    const last = await run.say(said, PIPELINE);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.blocks).toEqual([relationship(id)]);
+  });
+
+  it("'open the second one' there opens the second company in list order", async () => {
+    const run = seam();
+    const last = await run.say("open the second one", PIPELINE);
+    expect(last?.blocks).toEqual([opened("COMPANY", TENSORGATE)]);
+  });
+
+  it("'explain the second one' is bound to the second in list order for Q", async () => {
+    const run = seam();
+    await run.say("explain the second one", PIPELINE);
+    expect(run.delegatedWith).toHaveLength(1);
+    expect(run.delegatedWith[0]?.references).toContain(TENSORGATE);
+  });
+});
