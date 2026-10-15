@@ -391,15 +391,13 @@ describe("prepared research entities: publicly reported facts", () => {
     );
   });
 
-  it("shows a LinkedIn quote with its label but never gives it to a persona", async () => {
+  it("shows no quote for a real person, and gives none to a persona", async () => {
     const { entities } = await warmed();
     const shadi = entities
       .all()
       .find((r) => r.profileKey === "qa-demo-shadi-qishta");
     if (shadi === undefined) throw new Error("seed has Shadi");
-    const shown = shownQuotes(shadi);
-    expect(shown[0]?.line).toContain("from his LinkedIn post on IFRS");
-    expect(shown[0]?.line).toContain("As someone with experience in auditing");
+    expect(shownQuotes(shadi)).toEqual([]);
     expect(JSON.stringify(personaGrounding(shadi))).not.toContain(
       "As someone with experience in auditing",
     );

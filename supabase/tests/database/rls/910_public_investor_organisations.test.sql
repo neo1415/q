@@ -70,7 +70,7 @@ select is(
   (select count(*)::int from q_runtime.external_persons
     where tenant_id is null and research_status = 'PREPARED_PUBLIC_SEED'
       and investor_organisation_id is not null),
-  3, 'three prepared research records are linked to their investor organisation');
+  6, 'six prepared research records are linked to their investor organisation (three more from 20261227100000)');
 
 select is(
   (select investor_organisation_id::text from q_runtime.external_persons

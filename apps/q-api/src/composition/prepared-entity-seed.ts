@@ -62,6 +62,39 @@ const SeedEntity = z
         topic: z.string().min(1).optional(),
         status: ExternalSourceStatusSchema.optional(),
         as_of: z.string().nullable().optional(),
+        // ADR-001's three independent axes, plus when the source was read
+        // and how sure Q may sound. Optional so an older seed still parses.
+        truth_class: z
+          .enum([
+            "VERIFIED",
+            "USER_CLAIM",
+            "ESTIMATE",
+            "Q_INFERENCE",
+            "UNKNOWN",
+          ])
+          .optional(),
+        evidence_status: z
+          .enum([
+            "NO_EVIDENCE",
+            "SELF_REPORTED",
+            "DOCUMENT_SUPPORTED",
+            "MULTI_SOURCE_SUPPORTED",
+            "EXTERNALLY_VERIFIED",
+            "PLATFORM_VERIFIED",
+          ])
+          .optional(),
+        lifecycle_status: z
+          .enum([
+            "CURRENT",
+            "HISTORICAL",
+            "SUPERSEDED",
+            "DISPUTED",
+            "CONTRADICTORY",
+            "STALE",
+          ])
+          .optional(),
+        retrieved_at: z.string().nullable().optional(),
+        uncertainty: z.string().max(300).optional(),
       }),
     ),
     source_ids: z.array(z.string()).optional(),
@@ -162,6 +195,35 @@ export function parsePreparedSeed(raw: unknown): PreparedSeed {
       if (!sourced.has(name.sourceId)) {
         throw new Error(`${entity.demo_id}: Arabic name without a source`);
       }
+    }
+    for (const fact of entity.facts) {
+      const read = fact.source_ids.some(
+        (id) => seed.sources[id]?.access === "FETCHED",
+      );
+      if (
+        fact.truth_class === "VERIFIED" ||
+        fact.evidence_status === "PLATFORM_VERIFIED"
+      ) {
+        throw new Error(
+          `${entity.demo_id}: a public page never makes a fact platform-verified`,
+        );
+      }
+      if (
+        !read &&
+        fact.evidence_status !== undefined &&
+        fact.evidence_status !== "NO_EVIDENCE"
+      ) {
+        throw new Error(
+          `${entity.demo_id}: evidence claimed from sources nobody read`,
+        );
+      }
+    }
+    if (entity.short_public_quotes.length > 0) {
+      // Owner direction 2026-10-15: no quotes attributed to a real person
+      // or organisation in a prepared public profile.
+      throw new Error(
+        `${entity.demo_id}: a prepared public profile carries no quotes`,
+      );
     }
     if (entity.entity_kind !== "PERSON" && entity.role !== null) {
       throw new Error(`${entity.demo_id}: an institution has no personal role`);
@@ -330,6 +392,17 @@ export function toPreparedUpsert(
         checkedAt: fact.verification.checkedAt,
         basis: clip(fact.verification.basis, 400),
         note: fact.verification.note,
+      })),
+      // ADR-001 axes per fact, by the same ordinal as `verification`.
+      // A public page is the entity's or a reporter's statement: never
+      // PLATFORM_VERIFIED, and an unread source is NO_EVIDENCE.
+      evidenceAxes: entity.facts.map((fact, ordinal) => ({
+        ordinal,
+        truthClass: fact.truth_class ?? "UNKNOWN",
+        evidenceStatus: fact.evidence_status ?? "NO_EVIDENCE",
+        lifecycleStatus: fact.lifecycle_status ?? "CURRENT",
+        retrievedAt: fact.retrieved_at ?? null,
+        uncertainty: fact.uncertainty ?? null,
       })),
       contradicted: entity.facts
         .filter((fact) => fact.verification.status === "CONTRADICTED")
