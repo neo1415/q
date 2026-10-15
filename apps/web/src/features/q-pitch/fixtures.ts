@@ -1,51 +1,53 @@
 import type { QMessage } from "@capital-q/contracts";
-import type { FixtureKey, TourAction } from "@capital-q/q-pitch";
+import {
+  receiptCardIndex,
+  type FixtureKey,
+  type TourAction,
+} from "@capital-q/q-pitch";
 
 /**
- * Tour fixture keys → canonical records, resolved ONLY from what the
- * signed-in actor's own Q conversation already showed them (answer cards
- * with a resolved COMPANY subject). No lookup endpoint, no list of ids in
- * the bundle, no other actor's data: if the actor has not been shown the
- * company, the key does not resolve and the scene takes its fallback.
- *
- * The names are the existing fictional seeded companies the certified
- * runs used (CERTIFICATION_MANIFEST.md: Ledgerfold, F2).
+ * Tour record keys → canonical records, resolved ONLY from what the
+ * signed-in actor was actually shown (lead decision, 15 Oct): `card-N` is
+ * the Nth company card of the Q answer whose DONE receipt the tour
+ * acknowledged (snapshotted when the receipt arrives). No names are hard-coded, nothing is looked
+ * up, and no other actor's data is read. If the receipt has no such card,
+ * the key does not resolve and the scene takes its fallback.
  */
-const FIXTURE_NAMES: Readonly<Record<string, RegExp>> = {
-  ledgerfold: /^ledgerfold\b/iu,
-  f2: /^f2\b/iu,
-};
-
 export type ResolvedCompany = {
   readonly companyId: string;
   readonly name: string;
 };
 
-export function resolveCompanyFixture(
-  key: FixtureKey,
+/** The company cards of one acknowledged run, in the order shown. */
+export function receiptCompanies(
   messages: readonly QMessage[],
-): ResolvedCompany | null {
-  const pattern = FIXTURE_NAMES[key];
-  if (pattern === undefined) return null;
-  // Newest first: the most recent card the actor saw wins.
-  for (let m = messages.length - 1; m >= 0; m -= 1) {
-    const message = messages[m];
-    if (message === undefined || message.role === "USER") continue;
-    const blocks = message.blocks ?? [];
-    for (const block of blocks) {
+  runId: string,
+): ResolvedCompany[] {
+  const cards: ResolvedCompany[] = [];
+  for (const message of messages) {
+    if (message.role === "USER" || message.runId !== runId) continue;
+    for (const block of message.blocks ?? []) {
       if (block.kind !== "ANSWER_CARDS") continue;
       for (const card of block.cards) {
-        if (card.subject?.kind !== "COMPANY") continue;
-        if (pattern.test(card.name)) {
-          return { companyId: card.subject.companyId, name: card.name };
+        if (card.subject?.kind === "COMPANY") {
+          cards.push({ companyId: card.subject.companyId, name: card.name });
         }
       }
     }
   }
-  return null;
+  return cards;
 }
 
-/** Every fixture key a scene's actions name. */
+/** `card-N` from the acknowledged receipt; anything else never resolves. */
+export function resolveCompanyFixture(
+  key: FixtureKey,
+  receipt: readonly ResolvedCompany[],
+): ResolvedCompany | null {
+  const index = receiptCardIndex(key);
+  return index === null ? null : (receipt[index - 1] ?? null);
+}
+
+/** Every record key a scene's actions name. */
 export function fixtureKeysOf(actions: readonly TourAction[]): FixtureKey[] {
   const keys = new Set<FixtureKey>();
   for (const action of actions) {

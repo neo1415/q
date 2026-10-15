@@ -24,7 +24,12 @@ import {
 import { performUiAct, requestMove } from "@/features/q/ui-act-controller";
 import { destinationPath } from "@/features/voice/destinations";
 
-import { fixtureKeysOf, resolveCompanyFixture } from "./fixtures";
+import {
+  fixtureKeysOf,
+  receiptCompanies,
+  resolveCompanyFixture,
+  type ResolvedCompany,
+} from "./fixtures";
 import { captionSpeak } from "./narrator";
 import { rehearsalPorts } from "./rehearsal-ports";
 
@@ -117,9 +122,9 @@ export function useTourPorts(
   const router = useRouter();
   const qRef: QRef = useRef<QSessionValue | null>(null);
   const waiters = useRef(new Set<() => void>());
-  const companies = useRef(
-    new Map<string, { companyId: string; name: string }>(),
-  );
+  // The company cards of the last acknowledged Q answer that had any,
+  // snapshotted at its DONE receipt: `card-N` keys resolve from it alone.
+  const receipt = useRef<readonly ResolvedCompany[]>([]);
 
   // The latest session, and a nudge for whoever waits on a run.
   useEffect(() => {
@@ -134,13 +139,8 @@ export function useTourPorts(
     const messages = (): readonly QMessage[] =>
       qRef.current?.q.state.messages ?? [];
 
-    const companyOf = (key: string) => {
-      const known = companies.current.get(key);
-      if (known !== undefined) return known;
-      const found = resolveCompanyFixture(key, messages());
-      if (found !== null) companies.current.set(key, found);
-      return found;
-    };
+    const companyOf = (key: string) =>
+      resolveCompanyFixture(key, receipt.current);
 
     const waitFor = (
       ready: () => boolean,
@@ -247,9 +247,11 @@ export function useTourPorts(
         return outcome(false, "Q_RUN_FAILED");
       }
       const visible = await answerVisible();
-      return visible
-        ? outcome(true, null)
-        : outcome(false, "NOT_VISIBLE", false);
+      if (!visible) return outcome(false, "NOT_VISIBLE", false);
+      // This acknowledged answer becomes the receipt `card-N` keys use.
+      const cards = receiptCompanies(state.messages, run);
+      if (cards.length > 0) receipt.current = cards;
+      return outcome(true, null);
     };
 
     const questionText = (id: string): string | null =>
@@ -413,7 +415,7 @@ export function useTourPorts(
       execute,
       speak: captionSpeak,
       clearScoped: () => {
-        companies.current.clear();
+        receipt.current = [];
       },
       routeIntact: (pattern) => {
         const path = currentPath();
