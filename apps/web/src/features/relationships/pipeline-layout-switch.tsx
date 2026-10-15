@@ -43,7 +43,7 @@ export function PipelineLayoutSwitch({
       ref={ref}
       role="group"
       aria-label="Layout"
-      className="inline-flex rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
+      className="inline-flex self-start rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
       data-pipeline-layouts
     >
       {(["list", "table", "board"] as const).map((entry) => (
@@ -53,7 +53,7 @@ export function PipelineLayoutSwitch({
           data-pipeline-layout={entry}
           aria-current={layout === entry ? "page" : undefined}
           className={cx(
-            "cq-body-sm inline-flex min-h-10 items-center rounded-(--cq-radius-sm) px-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
+            "cq-body-sm inline-flex min-h-11 items-center rounded-(--cq-radius-sm) px-3 transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-10",
             layout === entry
               ? "bg-(--cq-surface-strong) font-semibold text-(--cq-text-primary)"
               : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",

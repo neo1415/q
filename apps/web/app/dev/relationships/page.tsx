@@ -17,7 +17,20 @@ import {
 import type { RelationshipDigest } from "@/features/relationships/relationship-data";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
 
+import { HubHeader } from "@/features/relationships/hub-header";
+import { NeedsYouQueue } from "@/features/relationships/needs-you-queue";
+import { PortfolioSection } from "@/features/relationships/portfolio-section";
+import { PipelineLayoutSwitch } from "@/features/relationships/pipeline-layout-switch";
+import { RelationshipPipeline } from "@/features/relationships/relationship-pipeline";
+import { RelationshipDetail } from "@/features/relationships/relationship-detail";
+import { DecisionRecord } from "@/features/relationships/decision-record";
+import { RelationshipNotes } from "@/features/relationships/relationship-notes";
+import type { NeedsYouCard } from "@/features/relationships/relationships-view";
+import { ResultsDashboard } from "@/features/results/results-dashboard";
+import { ErrorState } from "@capital-q/ui/states";
+
 import RelationshipsLoading from "../../(app)/relationships/loading";
+import { reviewResults } from "../results/fixtures";
 
 export const metadata: Metadata = {
   title: "Relationships (design review)",
@@ -30,8 +43,8 @@ export const metadata: Metadata = {
  * critique 2026-10-04). Development only: nothing here reads or writes;
  * every name is fictional.
  *
- * `?view=list|diligence`, `?side=founder|investor`,
- * `?state=many|few|empty|loading|error`.
+ * `?view=list|diligence|overview|table|board|record`,
+ * `?side=founder|investor`, `?state=many|few|empty|loading|error|long`.
  */
 function reviewClock(): number {
   return Date.now();
@@ -49,7 +62,9 @@ export default async function RelationshipsReviewPage({
     notFound();
   }
   const params = await searchParams;
-  const view = params["view"] === "diligence" ? "diligence" : "list";
+  const views = ["diligence", "overview", "table", "board", "record"] as const;
+  const view =
+    views.find((entry) => entry === params["view"]) ?? ("list" as const);
   const founder = params["side"] !== "investor";
   const state = typeof params["state"] === "string" ? params["state"] : "many";
   const now = reviewClock();
@@ -76,15 +91,29 @@ export default async function RelationshipsReviewPage({
         ["Kivu Freight", "CONNECTED", "SCHEDULE_MEETING", 20],
         ["Ledgerfold", "INTEREST_EXPRESSED", "AWAIT_ANSWER", 50],
         ["Talum Health", "MEETING_HELD", "DECIDE_NEXT_STEP", 80],
+        ["Maji Loop", "CONNECTED", "SCHEDULE_MEETING", 120],
+        ["Nsuo Labs", "INVESTED", "NONE", 400],
+        ["Clinicrest", "INVESTED", "NONE", 900],
+        ["Tallyloom", "DECLINED", "NONE", 300],
       ];
   const count = state === "few" ? 3 : funds.length;
+  const longName =
+    "Pan-African Agricultural Logistics and Cold-Chain Infrastructure Holdings";
   const items: RelationshipSummaryDto[] = funds
     .slice(0, count)
     .map(([name, relState, nextStep, hours], n) => ({
       relationshipId: id("a", n + 1),
       counterpart: founder
-        ? { kind: "INVESTOR_ORGANISATION", id: id("b", n + 1), name }
-        : { kind: "COMPANY", id: id("c", n + 1), name },
+        ? {
+            kind: "INVESTOR_ORGANISATION",
+            id: id("b", n + 1),
+            name: state === "long" && n === 0 ? longName : name,
+          }
+        : {
+            kind: "COMPANY",
+            id: id("c", n + 1),
+            name: state === "long" && n === 0 ? longName : name,
+          },
       state: relState,
       stateSince: ago(hours),
       nextStep,
@@ -135,14 +164,213 @@ export default async function RelationshipsReviewPage({
         }),
       };
 
+  const side = founder ? ("COMPANY" as const) : ("INVESTOR" as const);
+  const card = (
+    n: number,
+    title: string,
+    label: string,
+    hours: number,
+    count = 1,
+  ): NeedsYouCard => ({
+    key: `k${String(n)}`,
+    title,
+    relationship: items[n] ?? null,
+    latestAt: ago(hours),
+    count,
+    noticeIds: [],
+    reminderId: null,
+    action: { label, href: "/dev/relationships?view=record" },
+  });
+  const cards: NeedsYouCard[] = founder
+    ? [
+        card(0, "Asked for your cap table", "Upload & share", 1),
+        card(1, "Sent you a message", "Reply", 3, 2),
+        card(4, "Expressed interest in you", "Answer", 20),
+        card(3, "Follow-up reminder is due", "Open", 30),
+      ]
+    : [
+        card(0, "Shared 2 diligence files", "Review files", 1, 2),
+        card(1, "Sent you a message", "Reply", 4),
+        card(3, "A call took place: how did it go?", "Record outcome", 26),
+        card(2, "Accepted your interest", "Open", 50),
+        card(4, "Follow-up reminder is due", "Open", 70),
+        card(1, "Booked a call for Thursday", "Open", 90),
+      ];
+  const pipelineData = {
+    total: state === "empty" ? 0 : items.length,
+    scope: "1".repeat(64),
+    nextCursor: state === "many" ? "next" : null,
+    items: state === "empty" ? [] : items,
+  };
+  const results = reviewResults(now, "30d", state === "empty");
+
   const body = () => {
+    if (view === "overview") {
+      if (state === "loading") return <RelationshipsLoading />;
+      return (
+        <PageContainer className="flex flex-col gap-4">
+          <HubHeader side={side} view="overview" />
+          <NeedsYouQueue
+            cards={state === "empty" ? [] : cards}
+            now={now}
+            unavailable={state === "error"}
+          />
+          {founder ? null : (
+            <PortfolioSection
+              items={
+                state === "error"
+                  ? undefined
+                  : items.filter((item) => item.state === "INVESTED")
+              }
+              commitments={new Map()}
+            />
+          )}
+          {state === "error" ? (
+            <ErrorState
+              title="The period report couldn't load"
+              description="Your records are unchanged. Try again in a moment."
+            />
+          ) : (
+            <ResultsDashboard
+              heading={null}
+              basePath="/dev/relationships?view=overview"
+              range="30d"
+              stage={null}
+              download="range=30d"
+              usage={founder ? null : results.usage}
+              results={founder ? results.founderResults : results.investor}
+            />
+          )}
+        </PageContainer>
+      );
+    }
+    if (view === "table" || view === "board") {
+      return (
+        <PageContainer className="flex flex-col gap-4">
+          <HubHeader side={side} view="pipeline" />
+          <RelationshipPipeline
+            data={pipelineData}
+            query={{}}
+            scopeKey="dev:review"
+            layout={view}
+            side={side}
+            views={{ items: [], teamEditable: true }}
+          />
+        </PageContainer>
+      );
+    }
+    if (view === "record") {
+      const counterpart =
+        state === "long"
+          ? longName
+          : founder
+            ? "Savanna Seed Partners"
+            : "Tallyloom";
+      return (
+        <RelationshipDetail
+          side={side}
+          counterpart={counterpart}
+          relationship={{
+            relationshipId: id("a", 8),
+            companyId: id("c", 8),
+            investorOrganisationId: id("b", 8),
+            state: "DECLINED",
+            stateSince: ago(300),
+            nextStep: "NONE",
+            milestones: (
+              [
+                "INTEREST_EXPRESSED",
+                "CONNECTED",
+                "MEETING_HELD",
+                "DECLINED",
+              ] as const
+            ).map((milestone, n) => ({
+              state: milestone,
+              at: ago(900 - n * 200),
+            })),
+            projectorVersion: "relationship-state.v2",
+          }}
+          actions={null}
+          absentSentence=""
+          askQ={false}
+          profile={{
+            photoUrl: null,
+            about: "Inventory and invoicing for East African distributors.",
+            location: "Nairobi, Kenya",
+            websiteUrl: "https://tallyloom.example",
+            chips: ["Seed", "B2B SaaS"],
+            profileHref: null,
+          }}
+          readAt={now}
+          basePath={`/relationships/company/${id("c", 8)}`}
+          decision={
+            <DecisionRecord
+              decision={{
+                state: "PASSED",
+                title: "Passed",
+                at: ago(300),
+                details: [
+                  "Reason: Too early for our fund",
+                  "Note: Revisit after they pass $50k monthly revenue.",
+                ],
+                earlier: [{ title: "Diligence started", at: ago(500) }],
+              }}
+            />
+          }
+          notes={
+            <RelationshipNotes
+              relationshipId={id("a", 8)}
+              side={side}
+              now={now}
+              read={
+                state === "error"
+                  ? { kind: "UNAVAILABLE" }
+                  : {
+                      kind: "READ",
+                      value: {
+                        visibility: "organisation_private",
+                        items:
+                          state === "empty"
+                            ? []
+                            : [
+                                {
+                                  id: id("d", 1),
+                                  body: "Strong founder; churn in the SME tier worries me. Ask for cohort data next time.",
+                                  authorName: null,
+                                  authoredByMe: true,
+                                  createdAt: ago(5),
+                                  supersedesNoteId: null,
+                                },
+                                {
+                                  id: id("d", 2),
+                                  body: "Met at the Nairobi demo day.",
+                                  authorName: "Kofi Mensah",
+                                  authoredByMe: false,
+                                  createdAt: ago(400),
+                                  supersedesNoteId: null,
+                                },
+                              ],
+                      },
+                    }
+              }
+            />
+          }
+        />
+      );
+    }
     if (view === "list") {
       if (state === "loading") return <RelationshipsLoading />;
       return (
         <PageContainer className="flex flex-col gap-4">
-          <h1 className="cq-title-lg text-(--cq-text-primary)">
-            Relationships
-          </h1>
+          <HubHeader side={side} view="pipeline" />
+          <PipelineLayoutSwitch
+            layout="list"
+            hrefs={{
+              list: "/dev/relationships?view=list",
+              table: "/dev/relationships?view=table",
+              board: "/dev/relationships?view=board",
+            }}
+          />
           <RelationshipsIndex
             side={founder ? "COMPANY" : "INVESTOR"}
             items={
