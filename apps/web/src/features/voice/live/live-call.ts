@@ -120,6 +120,15 @@ export type LiveCall = {
   /** The session closed (or gave up waiting) and its usage was reported. */
   readonly finished: Promise<void>;
   readonly typed: (text: string) => void;
+  /** Q Pitch: say one approved line verbatim on this call (see bridge). */
+  readonly narrate: (text: string) => void;
+  /**
+   * Silence Q's output at once without touching the person's volume
+   * choice: a cancelled narration (Pause, Skip, Back) stops being heard
+   * immediately. The live protocol has no output cancel, so the rest of
+   * that line plays into silence; the caller lifts the hush once it ends.
+   */
+  readonly hush: (on: boolean) => void;
   readonly setMuted: (muted: boolean) => void;
   readonly setVolume: (volume: number) => void;
   /** 0..1 levels, sampled for the presence visual. */
@@ -1025,6 +1034,8 @@ export async function startLiveCall(
   if (stopRequested) void end("superseded");
 
   update();
+  let chosenVolume = 1;
+  let hushed = false;
   return {
     get voiceSessionId() {
       return id ?? "";
@@ -1036,11 +1047,19 @@ export async function startLiveCall(
     typed: (text) => {
       bridge.typed(text);
     },
+    narrate: (text) => {
+      bridge.narrate(text);
+    },
+    hush: (on) => {
+      hushed = on;
+      audio.volume = hushed ? 0 : chosenVolume;
+    },
     setMuted: (muted) => {
       for (const track of mic.getAudioTracks()) track.enabled = !muted;
     },
     setVolume: (volume) => {
-      audio.volume = Math.max(0, Math.min(1, volume));
+      chosenVolume = Math.max(0, Math.min(1, volume));
+      audio.volume = hushed ? 0 : chosenVolume;
     },
     inputLevel: () => Math.min(1, levelOf(input, inBuffer) * 4),
     outputLevel: () => Math.min(1, levelOf(output, outBuffer) * 4),

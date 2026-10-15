@@ -29,6 +29,7 @@ import {
 import { useQSessionOptional } from "@/features/q/q-session";
 
 import type { TourSubject } from "./subject-model";
+import { standardVoicePlaying } from "./narrator";
 import { useTourPorts, type TranscriptSink } from "./use-tour-ports";
 
 /**
@@ -227,7 +228,9 @@ export function QPitchHost({
             final: true,
           },
           {
-            narratorPlaying: qSpeaking,
+            // Q's live line (narration included) is Q_SPEAKING; a line read
+            // in the standard TTS voice is the narrator's own audio too.
+            narratorPlaying: qSpeaking || standardVoicePlaying(),
             counterpartPlaying: false,
             // The voice providers ask for echo cancellation but do not
             // report it back, so it is not assumed: spoken control while

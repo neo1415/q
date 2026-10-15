@@ -175,6 +175,14 @@ export type VoiceSessionClient = {
   readonly end: () => Promise<void>;
   /** Typed text while voice is active: the same Q turn, answered aloud (C §41). */
   readonly sendText: (text: string) => void;
+  /**
+   * Q Pitch: say one approved line verbatim in this line's own voice.
+   * Only a GPT-Live line has it; false when nothing could be sent (no open
+   * call). Absent everywhere else, so the tour uses Q's standard TTS.
+   */
+  readonly narrate?: ((text: string) => boolean) | undefined;
+  /** Q Pitch: silence (or restore) output at once; see LiveCall.hush. */
+  readonly hush?: ((on: boolean) => void) | undefined;
   readonly setMuted: (muted: boolean) => void;
   readonly setVolume: (volume: number) => void;
   /** 0..1 input level, sampled for the presence visual (D §47). */

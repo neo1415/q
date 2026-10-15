@@ -23,6 +23,7 @@ import {
 } from "@/features/q/q-session";
 import { performUiAct, requestMove } from "@/features/q/ui-act-controller";
 import { destinationPath } from "@/features/voice/destinations";
+import { isLineLive } from "@/features/voice/session";
 
 import {
   fixtureKeysOf,
@@ -30,7 +31,12 @@ import {
   resolveCompanyFixture,
   type ResolvedCompany,
 } from "./fixtures";
-import { captionSpeak } from "./narrator";
+import {
+  abortableWait,
+  createNarrator,
+  standardVoiceLine,
+  type Narrator,
+} from "./narrator";
 import { rehearsalPorts } from "./rehearsal-ports";
 
 /**
@@ -113,6 +119,38 @@ export type TranscriptSink = {
   current: ((segment: TranscriptSegment) => void) | null;
 };
 
+/**
+ * The tour's narrator over the person's own Q voice session (owner 15 Oct):
+ * the open GPT-Live line when there is one, else Q's standard TTS voice.
+ * It reads the session at speaking time, never during render.
+ */
+function sessionNarrator(current: () => QSessionValue | null): Narrator {
+  return createNarrator({
+    live: () => {
+      const voice = current()?.voice;
+      const client = voice?.client;
+      if (
+        voice === undefined ||
+        client === undefined ||
+        !voice.active ||
+        !isLineLive(client) ||
+        client.narrate === undefined
+      ) {
+        return null;
+      }
+      return {
+        say: (text) => client.narrate?.(text) ?? false,
+        speaking: () => current()?.voice.client.state === "Q_SPEAKING",
+        hush: (on) => client.hush?.(on),
+      };
+    },
+    tts: (text, signal) =>
+      standardVoiceLine(text, current()?.voice.voice ?? "FEMALE", signal),
+    now: () => performance.now(),
+    wait: abortableWait,
+  });
+}
+
 export function useTourPorts(
   script: TourScript,
   transcript: TranscriptSink,
@@ -136,6 +174,9 @@ export function useTourPorts(
   const hasSession = session !== null;
   return useMemo<TourPorts | null>(() => {
     if (!hasSession) return null;
+    // Q's own voice for the tour's lines (owner 15 Oct); captions stay.
+    // Built on the first line, so the session is read only when speaking.
+    let narrator: Narrator | null = null;
 
     const messages = (): readonly QMessage[] =>
       qRef.current?.q.state.messages ?? [];
@@ -414,7 +455,10 @@ export function useTourPorts(
         }
       },
       execute,
-      speak: captionSpeak,
+      speak: (lines, signal) => {
+        narrator ??= sessionNarrator(() => qRef.current);
+        return narrator.speak(lines, signal);
+      },
       clearScoped: () => {
         receipt.current = [];
       },
