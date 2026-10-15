@@ -241,6 +241,8 @@ const SCRIPTED_INPUTS: Readonly<Record<string, unknown>> = {
   discover_companies: { sectors: ["fintech"], countries: ["NG"], limit: 3 },
   // "A company id or name is required" (Explore, ADR 0055).
   explore_pitches_like: { companyName: "Kora Health" },
+  // "Provide a company name or an exact application id, not both."
+  gateq_inbox_summarise: { applicationId: UUID },
   // Deal close: a checklist item code (a pattern, not free text).
   deal_checklist: { relationship: "Kora Health", item: "CAP_TABLE_UPDATED" },
   // Q.02: a suggestion id from thesis_reading (a pattern, not free text).
