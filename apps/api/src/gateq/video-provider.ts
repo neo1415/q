@@ -26,6 +26,30 @@ export function bridgeBaseUrl(
   return `${publicBaseUrl.replace(/\/+$/u, "")}${bridgePath.slice(0, -CHAT_COMPLETIONS.length)}`;
 }
 
+/**
+ * Tavus probes a custom LLM when a PAL is created by sending this one line
+ * as the first user message and expecting a fixed answer. It is the
+ * provider's own check, never something the person said: answering it
+ * through the interview recorded it as a turn (production rehearsal,
+ * 2026-10-13) and Q replied to it as an evasion. Only a lone first message
+ * matches, so a person who repeats the sentence mid-call is heard as usual.
+ */
+export const TAVUS_CONNECTIVITY_REPLY =
+  "Custom LLM configuration test successful.";
+
+export function isTavusConnectivityCheck(
+  userMessages: readonly string[],
+): boolean {
+  return (
+    userMessages.length === 1 &&
+    (userMessages[0] ?? "")
+      .trim()
+      .startsWith(
+        "This is an automated connectivity check sent during custom LLM configuration.",
+      )
+  );
+}
+
 export function createTavusGateqVideoProvider(deps: {
   readonly pool: TavusKeyPool;
   /** Absolute origin of this API, e.g. https://api.example. */

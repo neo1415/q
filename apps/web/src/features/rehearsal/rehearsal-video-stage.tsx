@@ -22,7 +22,7 @@ export function RehearsalVideoStage({
   session,
   onContinueByVoice,
 }: {
-  readonly rehearsal: Pick<QRehearsalDto, "id" | "counterpart">;
+  readonly rehearsal: Pick<QRehearsalDto, "id" | "counterpart" | "userRole">;
   readonly session: RehearsalVideoSessionDto;
   readonly onContinueByVoice: (rehearsal: QRehearsalDto) => void;
 }) {
@@ -33,11 +33,16 @@ export function RehearsalVideoStage({
       title={`Rehearsing with ${name}`}
       disclosure={session.disclosure}
       joinUrl={session.joinUrl}
+      // The room asks for a name otherwise; the interviewer needs no more.
+      participantName={
+        rehearsal.userRole === "INVESTOR" ? "Investor" : "Founder"
+      }
       tileLabel={`Video rehearsal with ${name} (AI interviewer)`}
       endsAt={session.endsAt}
       maxSeconds={session.maxSeconds}
       endLabel="End and see my review"
       fallbackLabel="Carry on by voice instead"
+      joiningNote={`${session.interviewer.name} is joining the room. Their video can take up to 20 seconds to appear.`}
       closingNote="Time is up. Q is saving your transcript and review."
       closingSoonNote="We’re closing shortly. Finish your last point; Q will save your transcript and review."
       unavailableNote={

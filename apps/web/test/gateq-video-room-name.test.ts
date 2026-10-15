@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { joinUrlWithName } from "@/features/gateq/gateq-video-room";
+import { joinUrlWithName } from "@/features/video-room/provider-video-room";
 
 const room = "https://tavus.daily.co/c123?t=meeting-token";
 

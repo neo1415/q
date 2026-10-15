@@ -131,7 +131,7 @@ describe("durable authorized browser recovery", () => {
     render(<RehearsalLive initialRehearsal={rehearsal} initialVideo={video} />);
     expect(
       screen.getByTitle(/Video rehearsal with Fund One/u).getAttribute("src"),
-    ).toBe(video.joinUrl);
+    ).toBe(`${video.joinUrl}&name=Founder`);
     cleanup();
     render(
       <RehearsalLive
@@ -186,7 +186,7 @@ describe("durable authorized browser recovery", () => {
     expect(recovery.read).toHaveBeenCalledWith(ID);
     expect(
       screen.getByTitle(/Video rehearsal with Fund One/u).getAttribute("src"),
-    ).toBe(video.joinUrl);
+    ).toBe(`${video.joinUrl}&name=Founder`);
     expect(api.start).not.toHaveBeenCalled();
     expect(api.finish).not.toHaveBeenCalled();
   });
@@ -210,7 +210,7 @@ describe("durable authorized browser recovery", () => {
     expect(recovery.read).toHaveBeenCalledTimes(2);
     expect(
       screen.getByTitle(/Video rehearsal with Fund One/u).getAttribute("src"),
-    ).toBe(video.joinUrl);
+    ).toBe(`${video.joinUrl}&name=Founder`);
     expect(api.start).not.toHaveBeenCalled();
   });
 
