@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { RESUME_KEY } from "./resume";
+import { markQPitchRunning } from "./tour-presence";
 import type { TourSubject } from "./subject-model";
 import type { TourChoice } from "./tour-host";
 
@@ -89,6 +90,11 @@ export function QPitchEntry({
   const [started, setStarted] = useState<Start | null>(null);
   const [ended, setEnded] = useState(false);
   if (asked !== null && started === null) setStarted(asked);
+  const holding = started !== null && !ended;
+  useEffect(() => {
+    markQPitchRunning(holding);
+    return () => markQPitchRunning(false);
+  }, [holding]);
   if (started === null || ended) return null;
   return (
     <QPitchHost

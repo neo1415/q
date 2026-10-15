@@ -613,7 +613,7 @@ export function RelationshipHero({
             name={counterpart}
             // No signed picture on the read: the gated photo route by id
             // (the name's scope) rather than initials.
-            src={profile.photoUrl ?? undefined}
+            src={profile.photoUrl}
             companyId={profile.companyId}
             investorOrganisationId={profile.investorOrganisationId}
             size="lg"
