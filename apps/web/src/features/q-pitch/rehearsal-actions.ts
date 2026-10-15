@@ -18,6 +18,8 @@ const FIXTURE_NAMES: Readonly<Record<string, RegExp>> = {
   ledgerfold: /^ledgerfold\b/iu,
   f2: /^f2\b/iu,
   "savanna-seed": /^savanna seed\b/iu,
+  // The fictional GateQ applicant (founder.maji-loop@fictional...).
+  "maji-loop": /^maji loop\b/iu,
 };
 
 const FixtureKey = z.string().regex(/^[a-z][a-z0-9-]{1,62}$/u);

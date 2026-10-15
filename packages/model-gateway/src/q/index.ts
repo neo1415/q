@@ -195,6 +195,7 @@ export type { QOwnIndex } from "./own-standing.js";
 export { companiesInOutcome } from "./card-subjects.js";
 export { fitAnswerCardsBlock, fitsInOutcome } from "./fit-cards.js";
 export { readinessLeadLines } from "./own-readiness.js";
+export { reRenderAskOf } from "./re-render.js";
 // RECOVERY B1 on voice (workstream A): the voice line says this answer from
 // the attention report, for the same question.
 export { asksWhatNeedsThem } from "./attention-answer.js";
@@ -226,6 +227,7 @@ import type { QTurnSkimmer } from "./turn-skim.js";
 export { arrivalSnapshotFact };
 import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
+import { reRenderAskOf } from "./re-render.js";
 import {
   manifestFacts,
   manifestReads,
@@ -397,6 +399,13 @@ export type QAuthorisedContextPort = {
     readonly institutionalNotes?: string | undefined;
   }>;
 };
+
+/** The tools that reach the public web; a re-render ask is offered none. */
+const PUBLIC_WEB_TOOLS: ReadonlySet<string> = new Set([
+  "research_public_web",
+  "extract_public_web",
+  "lookup_public_profile",
+]);
 
 export const noAuthorisedContext: QAuthorisedContextPort = {
   assemble: () =>
@@ -3230,16 +3239,28 @@ export function createModelGatewayQAnswer(
        * in the sentence is not one either. Absent (no reader composed):
        * the model keeps the tool and nothing is forced.
        */
-      const research =
-        request.research === undefined ? undefined : await request.research;
+      // Lane S: "put those three in a table" re-renders what was shown; it
+      // never reaches the public web (re-render.ts).
+      const reRender = reRenderAskOf(
+        latest.content,
+        earlier.some((message) => message.role === "Q"),
+      );
+      const research: Awaited<QAnswerRequest["research"]> = reRender
+        ? { mode: "NEVER", announceSourceChange: false }
+        : request.research === undefined
+          ? undefined
+          : await request.research;
       took("reading");
       // A question to Q (fallback) keeps the web in the model's hands even
       // when nothing forces a search (web search 2026-10-06: "three
       // YC-backed companies that fit my mandate" was read as a question
       // about options, the tool was taken away, and Q answered from what
       // little it held). Only a turn that asks nothing loses it.
-      let offered =
-        research?.mode === "NEVER" && research.fallback !== true
+      let offered = reRender
+        ? offeredForRun.filter(
+            (tool) => !PUBLIC_WEB_TOOLS.has(tool.definition.name),
+          )
+        : research?.mode === "NEVER" && research.fallback !== true
           ? offeredForRun.filter(
               (tool) => tool.definition.name !== "research_public_web",
             )

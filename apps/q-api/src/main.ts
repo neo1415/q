@@ -229,6 +229,7 @@ import {
   createInstructionEngine,
   instructionPeople,
   type InstructionEngine,
+  type MeetingEvidence,
 } from "./composition/instructions/engine.js";
 import { createInstructionTriggers } from "./composition/instructions/triggers.js";
 import { createSendGuard } from "./composition/instructions/send-guard.js";
@@ -292,6 +293,7 @@ import {
   QApprovalIdSchema,
   QRunIdSchema,
   qRehearsalVideoBridgeBasePath,
+  qRehearsalVideoEventsBasePath,
   createEventRegistry,
   type ModelDataPosture,
   type QViewingMoment,
@@ -4949,6 +4951,36 @@ const instructionMaterial = createInstructionMaterialReader({
   },
 });
 instructionEngine.current = createInstructionEngine({
+  // Lane N: booked calls and open proposals per relationship, read as the
+  // person (scoped in SQL to relationships their organisation is party to).
+  meetingEvidence: async (actor, relationshipIds) => {
+    const calls = await schedule.listMeetingsForRelationships(
+      actor,
+      relationshipIds,
+    );
+    const service = appActionPorts.proposals?.forActor(
+      actor,
+      `cor_${randomUUID()}`,
+    );
+    const out = new Map<string, MeetingEvidence>();
+    for (const relationshipId of relationshipIds) {
+      const listed = await service
+        ?.list({ actorUserId: actor.userId, relationshipId })
+        .catch(() => null);
+      out.set(relationshipId, {
+        calls: calls.get(relationshipId) ?? [],
+        proposals:
+          listed?.outcome === "OK"
+            ? listed.proposals.map((proposal) => ({
+                id: proposal.id,
+                state: proposal.state,
+                options: proposal.options,
+              }))
+            : [],
+      });
+    }
+    return out;
+  },
   sendGuard: qSendGuard,
   review: outwardReview,
   track: workforceTracker(workforceStore, "INSTRUCTION"),
@@ -5896,6 +5928,17 @@ const presenceTrigger =
         // The name to look a person up by, read from their own profile
         // row. Their own only: the query is keyed on the acting user.
         people: { displayNameFor },
+        // Same markers as the workers' typed-onboarding guard.
+        isFictionalAccount: async (userId) => {
+          const rows = await database.sql<{ fictional: boolean }[]>`
+            select coalesce(u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb
+                        and u.raw_app_meta_data -> 'fictional_demo' = 'true'::jsonb,
+                        false) as fictional
+              from identity.user_profiles p
+              join auth.users u on u.id = p.auth_user_id
+             where p.id = ${userId}::uuid`;
+          return rows[0]?.fictional === true;
+        },
         logger,
       });
 
@@ -6038,6 +6081,7 @@ const rehearsalVideo = createRehearsalVideoService({
         }),
   publicBaseUrl: process.env.Q_API_PUBLIC_URL?.trim() || null,
   bridgePath: qRehearsalVideoBridgeBasePath,
+  eventsPath: qRehearsalVideoEventsBasePath,
   enabledInterviewers: enabledInterviewersFrom(
     process.env.CQ_REHEARSAL_VIDEO_INTERVIEWERS,
   ),

@@ -169,6 +169,9 @@ const REMIND: InstructionPlanStep = {
 
 const REPLY =
   "Thank you, Tobenna, and thanks for accepting. Checking each invoice the moment it is created is a smart place to sit. I would be glad to read the deck you offered whenever it suits you.";
+/** Lane N: a reply that names commercial terms (always the owner's). */
+const TERMS_REPLY =
+  "Tobenna, checking each invoice the moment it is created is a smart place to sit. What valuation are you raising at?";
 
 function chat(
   body: string,
@@ -265,10 +268,18 @@ describe("delegated vs asks first (the matrix)", () => {
       "ASK:MEETING_OUTSIDE_HOURS",
     ],
     [
-      "anything about money or terms",
+      // Lane N: the planner's flag on words with no terms in them is the
+      // reviewer's (it must still pass the draft before it goes).
+      "the planner's terms flag on a routine reply",
       chat(REPLY, { touchesTermsOrMoney: true }),
       {},
-      "ASK:TERMS_OR_MONEY",
+      "AUTO+delegated",
+    ],
+    [
+      "a reply that names terms",
+      chat(TERMS_REPLY, { touchesTermsOrMoney: true }),
+      {},
+      "ASK:COMMERCIAL_TERMS",
     ],
     [
       "a reply where they raised terms",
@@ -792,7 +803,7 @@ describe("approvals a typical delegated job asks for, before and after (founder 
   ][] = [
     ["reply in a live chat", chat(REPLY), {}],
     ["reminder for themselves", REMIND, {}],
-    ["reply about terms", chat(REPLY, { touchesTermsOrMoney: true }), {}],
+    ["reply about terms", chat(TERMS_REPLY, { touchesTermsOrMoney: true }), {}],
   ];
   it("asks only for the outward, out-of-scope step (terms); the routine ones run", () => {
     const after = steps.map(([label, step, options]) => [
@@ -803,7 +814,7 @@ describe("approvals a typical delegated job asks for, before and after (founder 
       ["reply in a live chat", "AUTO+delegated"],
       // Before this change: "ASK" -- a card for every reminder, delegated or not.
       ["reminder for themselves", "AUTO+delegated"],
-      ["reply about terms", "ASK:TERMS_OR_MONEY"],
+      ["reply about terms", "ASK:COMMERCIAL_TERMS"],
     ]);
     // Without the delegation every one of them is the person's card.
     expect(

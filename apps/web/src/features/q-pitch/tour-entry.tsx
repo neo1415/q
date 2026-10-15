@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState, useSyncExternalStore } from "react";
 
+import { RESUME_KEY } from "./resume";
 import type { TourSubject } from "./subject-model";
 import type { TourChoice } from "./tour-host";
 
@@ -16,6 +17,25 @@ const CHAPTER = /^ch\.[a-z0-9][a-z0-9.-]{1,62}$/u;
 
 let lastRead: { readonly search: string; readonly start: Start | null } | null =
   null;
+
+function readResume(): Start | null {
+  try {
+    const raw = window.sessionStorage.getItem(RESUME_KEY);
+    if (raw === null) return null;
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== "object" || value === null) return null;
+    const record = value as { tour?: unknown; chapter?: unknown };
+    const tour = choiceOf(typeof record.tour === "string" ? record.tour : null);
+    if (tour === null) return null;
+    const chapter =
+      typeof record.chapter === "string" && CHAPTER.test(record.chapter)
+        ? record.chapter
+        : null;
+    return { tour, chapter };
+  } catch {
+    return null;
+  }
+}
 /** Parsed once per address, so the snapshot is stable between renders. */
 function readStart(): Start | null {
   const search = window.location.search;
@@ -30,8 +50,9 @@ function readStart(): Start | null {
           tour,
           chapter: chapter !== null && CHAPTER.test(chapter) ? chapter : null,
         };
-  lastRead = { search, start };
-  return start;
+  const resumed = start ?? readResume();
+  lastRead = { search, start: resumed };
+  return resumed;
 }
 
 /**
@@ -76,7 +97,14 @@ export function QPitchEntry({
       tour={started.tour}
       chapter={started.chapter}
       subject={subject}
-      onExit={() => setEnded(true)}
+      onExit={() => {
+        try {
+          window.sessionStorage.removeItem(RESUME_KEY);
+        } catch {
+          // Nothing kept, nothing to clear.
+        }
+        setEnded(true);
+      }}
     />
   );
 }

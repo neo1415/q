@@ -208,11 +208,11 @@ function reply(body: string, asks: "MEETING" | "QUESTION" | "NONE" = "NONE") {
 }
 
 const WITH_CALL = reply(
-  "Thank you, Zino. Regulated firms evaluate the gateway with a pilot on one sensitive workload, checking each enclave attestation. Two of our 4 design partners converted to $180k contracts. Would a 20 minute call this week suit you?",
+  "Zino, regulated firms evaluate the gateway with a pilot on one sensitive workload, checking each enclave attestation. Two of our 4 design partners converted to $180k contracts. Would a 20 minute call this week suit you?",
   "MEETING",
 );
 const NO_CALL = reply(
-  "Thank you, Zino. Regulated firms evaluate the gateway with a pilot on one sensitive workload, checking each enclave attestation before rollout; two design partners converted to $180k contracts. Happy to share the deck if useful.",
+  "Zino, regulated firms evaluate the gateway with a pilot on one sensitive workload, checking each enclave attestation before rollout; two design partners converted to $180k contracts. Happy to share the deck if useful.",
 );
 
 function world(
@@ -533,9 +533,9 @@ describe("wake on message: a new investor message runs the founder's instruction
 });
 
 describe("a reply the reviewer holds just under the bar (11:01 kick, job 6a3fae2d)", () => {
-  // Draft d369ae2e, word for word.
+  // Draft d369ae2e, without its opening thanks (Lane N: thanks twice in a row is refused).
   const DRAFT_1 =
-    "Thanks for the thoughtful note, and for sharing your focus on B2B SaaS and enterprise software. Tensorgate is a policy gateway for LLM traffic in regulated industries: we have four design partners, two converted to $180k contracts, and 31m requests served. We’re raising a $4m seed. Happy to share the deck, and Daniel can come back on anything I can’t answer here. Would 20 minutes this week be useful?";
+    "Given your focus on B2B SaaS and enterprise software: Tensorgate is a policy gateway for LLM traffic in regulated industries: we have four design partners, two converted to $180k contracts, and 31m requests served. We’re raising a $4m seed. Happy to share the deck, and Daniel can come back on anything I can’t answer here. Would 20 minutes this week be useful?";
   const held = (nearMiss: boolean): OutwardReview => ({
     prepare: () => Promise.resolve(null),
     abandon: () => Promise.resolve(),

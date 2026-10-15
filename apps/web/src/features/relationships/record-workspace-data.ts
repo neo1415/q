@@ -2,14 +2,24 @@ import {
   getFitProfiles,
   getRelationshipGateqApplications,
   listQWork,
+  listRelationshipNotes,
+  getRelationshipCommitments,
+  getRelationshipPass,
 } from "@capital-q/api-client";
 import type {
   FitProfileDto,
   RelationshipGateqApplicationsDto,
+  RelationshipNoteList,
+  RelationshipStatusDto,
 } from "@capital-q/contracts";
 
-import { apiSession, qApiSession } from "@/features/q/context";
+import {
+  apiSession,
+  qApiSession,
+  resolveOwnContext,
+} from "@/features/q/context";
 
+import { decided, decisionOf, type Decision } from "./decision";
 import { recordWork, type Read, type RecordWorkRow } from "./record-workspace";
 
 /**
@@ -62,4 +72,56 @@ export async function recordGateqRead(
   } catch {
     return { kind: "UNAVAILABLE" };
   }
+}
+
+/**
+ * The side's own private notes on this relationship (CRM S3). The side is
+ * the person's own active context (a founder's company, else their firm),
+ * never the URL; the API answers only that side's notes.
+ */
+export async function recordNotesRead(
+  relationshipId: string,
+): Promise<Read<RelationshipNoteList>> {
+  const [session, context] = await Promise.all([
+    apiSession(),
+    resolveOwnContext(),
+  ]);
+  if (session === null) return { kind: "UNAVAILABLE" };
+  if (context.kind !== "FOUNDER" && context.kind !== "INVESTOR")
+    return { kind: "UNAVAILABLE" };
+  try {
+    return {
+      kind: "READ",
+      value: await listRelationshipNotes(
+        session,
+        relationshipId,
+        context.kind === "FOUNDER" ? context.companyId : undefined,
+      ),
+    };
+  } catch {
+    return { kind: "UNAVAILABLE" };
+  }
+}
+
+/**
+ * The record's decision (CRM S5), when its state is one: the pass as this
+ * side may see it, or the current commitment, read beside the record's
+ * other reads. Null when the state is no decision.
+ */
+export async function recordDecisionRead(
+  relationship: RelationshipStatusDto | null,
+  side: "INVESTOR" | "COMPANY",
+): Promise<Decision | null> {
+  if (relationship === null || !decided(relationship)) return null;
+  const session = await apiSession();
+  const id = relationship.relationshipId;
+  const [pass, commitments] = await Promise.all([
+    session === null || relationship.state !== "PASSED"
+      ? undefined
+      : getRelationshipPass(session, id).catch(() => undefined),
+    session === null || relationship.state !== "INVESTED"
+      ? undefined
+      : getRelationshipCommitments(session, id).catch(() => undefined),
+  ]);
+  return decisionOf({ relationship, side, pass, commitments });
 }

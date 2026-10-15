@@ -75,6 +75,9 @@ const VoiceListSchema = z
   })
   .passthrough();
 
+/** The most a caller may add to the 180 s cap for the interviewer to join. */
+export const TAVUS_MAX_JOIN_GRACE_SECONDS = 30;
+
 export type TavusConversation = {
   readonly conversationId: string;
   readonly conversationUrl: string | null;
@@ -189,6 +192,13 @@ export type TavusClient = {
     readonly greeting: string | null;
     readonly context: string | null;
     readonly maxCallSeconds: number;
+    /**
+     * Seconds the provider's backstop adds for its interviewer to join
+     * (0-30, default 0). The caller's own clock then starts when the
+     * interviewer is in the room and still stops at maxCallSeconds; the
+     * provider's cap is the sum, which is what may be billed.
+     */
+    readonly joinGraceSeconds?: number | undefined;
     readonly testMode: boolean;
     /** A private room: only the holder of the returned token joins. */
     readonly requireAuth?: boolean | undefined;
@@ -295,6 +305,14 @@ export function createTavusClient(dependencies: {
       ) {
         throw new TavusError("conversation duration", 400);
       }
+      const grace = input.joinGraceSeconds ?? 0;
+      if (
+        !Number.isInteger(grace) ||
+        grace < 0 ||
+        grace > TAVUS_MAX_JOIN_GRACE_SECONDS
+      ) {
+        throw new TavusError("conversation duration", 400);
+      }
       const raw = await call(
         "create conversation",
         "POST",
@@ -318,7 +336,7 @@ export function createTavusClient(dependencies: {
             : {}),
           properties: {
             // The provider's own backstop: the call cannot outlive this.
-            max_call_duration: input.maxCallSeconds,
+            max_call_duration: input.maxCallSeconds + grace,
             participant_left_timeout: 10,
             participant_absent_timeout: 90,
             enable_closed_captions: true,

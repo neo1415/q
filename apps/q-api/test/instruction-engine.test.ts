@@ -711,9 +711,8 @@ describe("a firing", () => {
     expect(words).toContain(
       "Can't negotiate the terms: terms are always yours to agree. Instead: I can prepare the points for you to send",
     );
-    expect(words.some((line) => line.includes("touches terms or money"))).toBe(
-      true,
-    );
+    // Lane N: a message naming terms says so in the policy's own words.
+    expect(words.some((line) => line.includes("it mentions terms"))).toBe(true);
 
     // The same firing again runs nothing twice.
     await engine.fire(row.id, "run-0001");

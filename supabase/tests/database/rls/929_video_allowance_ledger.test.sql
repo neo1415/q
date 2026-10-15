@@ -84,7 +84,7 @@ select is((select status from billing.video_session_reservations where session_i
   'SETTLED', 'a GateQ room made but never live is never released');
 select is((select billed_minutes from billing.video_usage_ledger
             where session_id = '00000000-0000-4000-8000-0000000929f5' and event = 'SETTLED'),
-  3, 'it is counted as the full 180 seconds, never under-counted');
+  4, 'it is counted as the full cap plus join grace (210 seconds), never under-counted');
 
 -- Append-only and forward-only.
 select throws_ok($$update billing.video_usage_ledger set seconds = 0$$, '23514', null, 'the ledger is never rewritten');

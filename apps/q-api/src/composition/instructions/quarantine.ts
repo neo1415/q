@@ -15,6 +15,8 @@ import {
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
 
+import { readNegotiation, type Negotiation } from "./meeting-goal.js";
+
 /**
  * The quarantined extractor (ADR 0043 §6, S6). What a counterpart wrote is
  * untrusted: it reaches the planner only as typed fields from a tool-less
@@ -187,6 +189,12 @@ export type ThreadRead = {
    */
   readonly transcript?: string | undefined;
   readonly theirLatest?: string | undefined;
+  /**
+   * Lane N: the conversation's scheduling state, read by CODE from the
+   * messages (meeting-goal.ts), never by a model and never given to the
+   * planner as words. Absent when the thread was not read.
+   */
+  readonly negotiation?: Negotiation | undefined;
 };
 
 /** The thread in the reviewer's words: sides and times, oldest first. */
@@ -219,6 +227,8 @@ export type QuarantinedThreadReader = (input: {
   readonly topics: readonly string[];
   readonly now: Date;
   readonly maxCostUsd: number;
+  /** The person's zone, for times said without one (Lane N). */
+  readonly timeZone?: string | undefined;
 }) => Promise<ThreadRead>;
 
 export function createQuarantinedThreadReader(dependencies: {
@@ -246,8 +256,30 @@ export function createQuarantinedThreadReader(dependencies: {
     // known pace, and code then falls back to the typed facts.
     const pace = read === null ? undefined : threadPace(messages);
     const theirLatest = theirUnanswered(messages);
+    const negotiation =
+      read === null
+        ? undefined
+        : readNegotiation(
+            messages.flatMap((message) => {
+              const sentAt = new Date(message.sentAt);
+              return message.text === null || Number.isNaN(sentAt.getTime())
+                ? []
+                : [
+                    {
+                      from:
+                        message.from === "OTHER_SIDE"
+                          ? ("THEM" as const)
+                          : ("US" as const),
+                      sentAt,
+                      text: message.text,
+                    },
+                  ];
+            }),
+            input.timeZone ?? "UTC",
+          );
     const paced = {
       ...(pace === undefined ? {} : { pace }),
+      ...(negotiation === undefined ? {} : { negotiation }),
       ...(messages.length === 0 ? {} : { transcript: transcriptOf(messages) }),
       ...(theirLatest === "" ? {} : { theirLatest }),
     };

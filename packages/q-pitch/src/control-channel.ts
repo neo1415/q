@@ -245,19 +245,67 @@ const AUDIENCE_PHRASES: readonly (readonly [TourControlKind, RegExp])[] = [
  * boundary: the boundary is `TourControlGate` (source and segment ledger,
  * echo gating).
  */
-export function classifyAudienceSpeech(
-  segment: TranscriptSegment,
-): TourControlKind | null {
-  if (segment.source !== "AUDIENCE_MIC" || !segment.final) return null;
-  const said = segment.text
+function normalised(text: string): string {
+  return text
     .toLowerCase()
     .normalize("NFKC")
     .replace(/[^\p{L}\p{N}\s,]/gu, "")
     .replace(/\s+/gu, " ")
     .trim();
+}
+
+export function classifyAudienceSpeech(
+  segment: TranscriptSegment,
+): TourControlKind | null {
+  if (segment.source !== "AUDIENCE_MIC" || !segment.final) return null;
+  const said = normalised(segment.text);
   if (said.length === 0) return null;
   for (const [kind, pattern] of AUDIENCE_PHRASES) {
     if (pattern.test(said)) return kind;
   }
   return "INTERRUPT";
+}
+
+const JUMP_PHRASE =
+  /^(?:q,? )?(?:(?:can you|could you|please|now|ok|okay) )*(?:show me|go to|take me to|jump to|skip to|lets see|lets go to|demo|open|i want to see|id like to see)(?: the| your| my)? (.+?)(?: (?:part|section|bit|chapter|demo|please|now))*$/u;
+
+/** Words of `name`, in order, inside `said` (whole words). */
+function containsWords(said: string, name: string): boolean {
+  return ` ${said} `.includes(` ${name} `);
+}
+
+/**
+ * A spoken chapter jump ("show me GateQ", "go to the CRM part", "demo
+ * rehearsals", or a chapter's name alone). Only AUDIENCE_MIC final
+ * segments; the chapter must be one the tour actually has (after the
+ * certification gate), named by its title or its `spokenNames`. Returns
+ * the chapter id, or null when nothing names a chapter. The gate still
+ * decides whether the intent is admitted.
+ */
+export function classifyAudienceJump(
+  segment: TranscriptSegment,
+  chapters: readonly {
+    readonly chapterId: string;
+    readonly title: string;
+    readonly spokenNames?: readonly string[] | undefined;
+  }[],
+): string | null {
+  if (segment.source !== "AUDIENCE_MIC" || !segment.final) return null;
+  const said = normalised(segment.text).replace(/,/gu, "");
+  if (said.length === 0) return null;
+  const asked = JUMP_PHRASE.exec(said)?.[1];
+  let best: { chapterId: string; length: number } | null = null;
+  for (const chapter of chapters) {
+    const names = [normalised(chapter.title), ...(chapter.spokenNames ?? [])];
+    for (const name of names) {
+      const hit =
+        asked === undefined
+          ? said === name
+          : asked === name || containsWords(asked, name);
+      if (hit && (best === null || name.length > best.length)) {
+        best = { chapterId: chapter.chapterId, length: name.length };
+      }
+    }
+  }
+  return best?.chapterId ?? null;
 }

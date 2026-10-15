@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PILOT_SCRIPT,
   PREMIERE_CERTIFICATION_LEDGER,
   PREMIERE_SCRIPT,
   TourControlGate,
   certifyTour,
+  classifyAudienceJump,
+  demoCompany,
   classifyAudienceSpeech,
   type TranscriptSegment,
 } from "../src/index.js";
@@ -19,17 +22,27 @@ describe("r3 premiere and the certification gate", () => {
       audience: "INTERNAL_REHEARSAL",
     });
     expect(gate.scenes.map((s) => s.sceneId)).toEqual([
+      "s.premiere.intro",
+      "s.premiere.mandate",
       "s.pilot.opening",
       "s.pilot.company",
       "s.pilot.compare",
       "s.premiere.privacy",
+      "s.premiere.explore",
       "s.premiere.gateq",
       "s.premiere.relationship",
+      "s.premiere.work",
+      "s.premiere.documents",
+      "s.premiere.daily",
       "s.premiere.close",
     ]);
     // Q-to-Q stays CODE_VERIFIED until the microphone "skip" test runs.
     const suppressed = gate.decisions.filter((d) => d.verdict === "SUPPRESSED");
-    expect(suppressed.map((d) => d.sceneId)).toEqual(["s.premiere.rehearsal"]);
+    expect(suppressed.map((d) => d.sceneId)).toEqual([
+      "s.premiere.subject",
+      "s.premiere.gateq-interview",
+      "s.premiere.rehearsal",
+    ]);
   });
 
   it("a rehearsal that opts into CODE_VERIFIED runs the full cut", () => {
@@ -39,7 +52,7 @@ describe("r3 premiere and the certification gate", () => {
       audience: "INTERNAL_REHEARSAL",
       acceptedStatuses: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
     });
-    expect(gate.scenes).toHaveLength(8);
+    expect(gate.scenes).toHaveLength(16);
     expect(gate.rejectedLines).toEqual([]);
   });
 
@@ -131,5 +144,139 @@ describe("two-minute cut", () => {
       "s.short.risks",
       "s.premiere.close",
     ]);
+  });
+
+  it("r4: Q introduces itself first, then the real mandate, and every scene opens with a spoken line", () => {
+    const ids = PREMIERE_SCRIPT.scenes.map((s) => s.sceneId);
+    expect(ids.slice(0, 3)).toEqual([
+      "s.premiere.intro",
+      "s.premiere.mandate",
+      "s.pilot.opening",
+    ]);
+    const intro = PREMIERE_SCRIPT.scenes[0];
+    expect(intro?.lines.map((l) => l.kind)).toEqual([
+      "CONNECTIVE",
+      "CONNECTIVE",
+      "CONNECTIVE",
+      "CONNECTIVE",
+    ]);
+    expect(intro?.lines[0]?.text).toMatch(/^Hello, I'm Q/u);
+    // A transition before anything happens on screen, in every scene but
+    // the intro (which speaks once Home is open) and the close.
+    for (const scene of PREMIERE_SCRIPT.scenes.slice(1, -1)) {
+      expect(scene.lines[0]?.timing, scene.sceneId).toBe("BEFORE_ACK");
+    }
+    // Premiere copies keep the pilot's actions and claims.
+    const top = PREMIERE_SCRIPT.scenes.find(
+      (s) => s.sceneId === "s.pilot.opening",
+    );
+    const pilotTop = PILOT_SCRIPT.scenes.find(
+      (s) => s.sceneId === "s.pilot.opening",
+    );
+    expect(top?.actions).toEqual(pilotTop?.actions);
+    expect(top?.approvedClaimIds).toEqual(pilotTop?.approvedClaimIds);
+  });
+});
+
+describe("spoken chapter jumps (slice 6)", () => {
+  const seg = (
+    text: string,
+    source: "AUDIENCE_MIC" | "NARRATOR_Q" = "AUDIENCE_MIC",
+  ) => ({
+    segmentId: "s-1",
+    source,
+    channelId: "mic",
+    text,
+    final: true,
+  });
+  const chapters = PREMIERE_SCRIPT.chapters;
+
+  it.each([
+    ["Show me GateQ.", "ch.premiere.gateq"],
+    ["Go to the CRM part", "ch.premiere.relationship"],
+    ["Demo rehearsals", "ch.premiere.rehearsal"],
+    ["Can you take me to the mandate?", "ch.premiere.mandate"],
+    ["rehearsals", "ch.premiere.rehearsal"],
+    ["Q, jump to privacy please", "ch.premiere.privacy"],
+  ])("%s -> %s", (text, chapterId) => {
+    expect(classifyAudienceJump(seg(text), chapters)).toBe(chapterId);
+  });
+
+  it("a question that mentions a chapter is not a jump; Q's narration never is", () => {
+    expect(
+      classifyAudienceJump(seg("What does GateQ cost?"), chapters),
+    ).toBeNull();
+    expect(
+      classifyAudienceJump(seg("Show me the weather"), chapters),
+    ).toBeNull();
+    expect(
+      classifyAudienceJump(seg("Show me GateQ", "NARRATOR_Q"), chapters),
+    ).toBeNull();
+  });
+});
+
+describe("coverage (slice 7)", () => {
+  it("every premiere chapter can be named aloud, and every major area has one", () => {
+    for (const chapter of PREMIERE_SCRIPT.chapters) {
+      expect(
+        chapter.spokenNames?.length ?? 0,
+        chapter.chapterId,
+      ).toBeGreaterThan(0);
+    }
+    const said = (text: string) =>
+      classifyAudienceJump(
+        {
+          segmentId: "c-1",
+          source: "AUDIENCE_MIC",
+          channelId: "mic",
+          text,
+          final: true,
+        },
+        PREMIERE_SCRIPT.chapters,
+      );
+    for (const [text, chapterId] of [
+      ["show me the mandate", "ch.premiere.mandate"],
+      ["go to discover", "ch.pilot.discover"],
+      ["show me explore", "ch.premiere.explore"],
+      ["show me gateq", "ch.premiere.gateq"],
+      ["go to the crm part", "ch.premiere.relationship"],
+      ["show me q work", "ch.premiere.work"],
+      ["show me documents", "ch.premiere.documents"],
+      ["show me the q daily", "ch.premiere.daily"],
+      ["demo rehearsals", "ch.premiere.rehearsal"],
+      ["show me privacy", "ch.premiere.privacy"],
+      ["show me capital q", "ch.premiere.subject"],
+      ["show me the gateq interview", "ch.premiere.gateq-interview"],
+    ] as const) {
+      expect(said(text), text).toBe(chapterId);
+    }
+  });
+});
+
+describe("named fictional companies after the top three (owner decision 15 Oct)", () => {
+  it("open Harbourline Cargo (and its data room) and compare it with Clinicrest, never a ranked card", () => {
+    const company = PREMIERE_SCRIPT.scenes.find(
+      (s) => s.sceneId === "s.pilot.company",
+    );
+    const compare = PREMIERE_SCRIPT.scenes.find(
+      (s) => s.sceneId === "s.pilot.compare",
+    );
+    expect(company?.actions[0]).toMatchObject({
+      kind: "openCompany",
+      company: "harbourline-cargo",
+    });
+    expect(company?.actions.at(-1)).toMatchObject({
+      kind: "selectTab",
+      target: "tab.dataroom",
+    });
+    expect(compare?.actions[0]).toMatchObject({
+      kind: "buildComparison",
+      companies: ["harbourline-cargo", "clinicrest"],
+    });
+    const keys = JSON.stringify([company?.actions, compare?.actions]);
+    expect(keys).not.toMatch(/card-[0-9]/u);
+    for (const key of ["harbourline-cargo", "clinicrest"]) {
+      expect(demoCompany(key)).not.toBeNull();
+    }
   });
 });

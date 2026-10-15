@@ -20,11 +20,19 @@ import { IntakeRefusedError } from "../contracts/index.js";
  *   maxSeconds 480 (8 minutes) · perApplication 1 · concurrency 2 ·
  *   paidRunCapSeconds 180, the existing hard cap for our own paid test
  *   runs, which stays the effective ceiling until the owner raises it.
- * The end time is fixed when the session row is written and never moves;
- * a retry or reconnect returns the same session. The provider's own
- * max_call_duration, a sweep for sessions past ends_at, and the bridge
- * refusing every line after ends_at all enforce the same deadline.
+ * The clock (live run 2026-10-15, migration 20261227150000): when the
+ * provider answers, the room is joinable and its end is provisional, ready
+ * + a 30 s join grace + the cap, which is also the hard stop. The cap then
+ * runs from the moment Q is in the room (the provider's replica-joined
+ * callback, or Q's first heard line, whichever comes first), so the end
+ * only ever moves earlier and never past the stop. A retry or reconnect
+ * returns the same session and clock. The provider's own
+ * max_call_duration (cap + grace), a sweep for sessions past ends_at, and
+ * the bridge refusing every line after ends_at enforce the deadline.
  */
+
+/** Seconds the interviewer has to join before the clock starts anyway. */
+export const GATEQ_VIDEO_JOIN_GRACE_SECONDS = 30;
 
 export type GateqVideoConfig = {
   /** Off by default: no room is ever created unless switched on. */
@@ -98,6 +106,10 @@ export type GateqVideoSessionRow = {
   readonly maxSeconds: number;
   readonly createdAt: string;
   readonly endsAt: string;
+  /** The provider answered and the room is joinable; null before. */
+  readonly roomReadyAt: string | null;
+  /** Q is in the room and the cap is running; null before. */
+  readonly liveAt: string | null;
 };
 
 export type GateqVideoAllowance = {
@@ -118,6 +130,8 @@ export type GateqVideoSessionStore = {
     readonly tenantId: string;
     readonly applicationId: string;
     readonly bridgeTokenHash: string;
+    /** SHA-256 of the secret in the provider's callback URL. */
+    readonly eventsTokenHash: string;
     readonly guestCredentialSealed: string;
     readonly maxSeconds: number;
     readonly perApplication: number;
@@ -138,15 +152,23 @@ export type GateqVideoSessionStore = {
     readonly tenantId: string;
   }) => Promise<GateqVideoAllowance | null>;
   /**
-   * The room is ready: the session goes live and its clock starts now, so
-   * the applicant's full time begins when they can use it. Returns the live
-   * row (with its new end), or null when it was no longer starting.
+   * The room is joinable: the session goes LIVE with its provisional end
+   * (ready + join grace + cap, the hard stop) and no clock yet. Returns the
+   * live row, or null when it was no longer starting.
    */
   readonly markLive: (input: {
     readonly id: string;
     readonly providerConversationId: string;
     readonly joinUrlSealed: string | null;
   }) => Promise<GateqVideoSessionRow | null>;
+  /**
+   * Q is in the room: the cap runs from now (at most ready + grace), once.
+   * Null when the session is not live, already running, or past its end.
+   */
+  readonly markInRoom: (id: string) => Promise<GateqVideoSessionRow | null>;
+  readonly byEventsTokenHash: (
+    hash: string,
+  ) => Promise<GateqVideoSessionRow | null>;
   readonly end: (input: {
     readonly id: string;
     readonly reason: NonNullable<GateqVideoSessionRow["endedReason"]>;
@@ -175,6 +197,10 @@ export type GateqVideoProvider = {
     readonly greeting: string;
     /** Where the provider sends each heard line, and the bearer it presents. */
     readonly bridge: { readonly path: string; readonly bearer: string };
+    /** Added to the provider's own cap for the interviewer to join. */
+    readonly joinGraceSeconds: number;
+    /** Where the provider reports room events; the token is the proof. */
+    readonly events: { readonly path: string; readonly token: string };
   }) => Promise<{
     readonly conversationId: string;
     readonly joinUrl: string | null;
@@ -207,6 +233,8 @@ export type GateqVideoSessionView = {
   readonly status: GateqVideoSessionRow["status"];
   readonly joinUrl: string | null;
   readonly endsAt: string;
+  /** When Q joined and the cap began; null while Q is still joining. */
+  readonly liveAt: string | null;
   readonly maxSeconds: number;
   readonly endedReason: GateqVideoSessionRow["endedReason"];
 };
@@ -222,6 +250,7 @@ export function createGateqVideoInterview(deps: {
   readonly intake: Pick<IntakeService, "authorise" | "assertInterviewReady">;
   readonly conversation: Pick<ConversationService, "turn" | "openingFor">;
   readonly bridgePath: string;
+  readonly eventsPath: string;
   readonly now?: (() => number) | undefined;
 }) {
   const now = deps.now ?? (() => Date.now());
@@ -235,9 +264,18 @@ export function createGateqVideoInterview(deps: {
         ? deps.sealer.open(row.joinUrlSealed)
         : null,
     endsAt: row.endsAt,
+    liveAt: row.liveAt,
     maxSeconds: row.maxSeconds,
     endedReason: row.endedReason,
   });
+
+  /** Start the cap now if it has not started; the row as it then stands. */
+  const inRoom = async (
+    row: GateqVideoSessionRow,
+  ): Promise<GateqVideoSessionRow> => {
+    if (row.status !== "LIVE" || row.liveAt !== null) return row;
+    return (await deps.store.markInRoom(row.id)) ?? row;
+  };
 
   const endRow = async (
     row: GateqVideoSessionRow,
@@ -292,11 +330,13 @@ export function createGateqVideoInterview(deps: {
       // Contact confirmation and recovery rules are the typed interview's.
       await deps.intake.assertInterviewReady(input.token);
       const bearer = randomBytes(32).toString("base64url");
+      const eventsToken = randomBytes(32).toString("base64url");
       const reserved = await deps.store.reserve({
         id: randomUUID(),
         tenantId: guest.application.tenantId,
         applicationId: guest.application.id,
         bridgeTokenHash: sha256(bearer),
+        eventsTokenHash: sha256(eventsToken),
         guestCredentialSealed: deps.sealer.seal(input.token),
         maxSeconds: effectiveMaxSeconds(deps.config),
         perApplication: deps.config.perApplication,
@@ -328,6 +368,8 @@ export function createGateqVideoInterview(deps: {
           testMode: deps.config.testMode,
           greeting,
           bridge: { path: deps.bridgePath, bearer },
+          joinGraceSeconds: GATEQ_VIDEO_JOIN_GRACE_SECONDS,
+          events: { path: deps.eventsPath, token: eventsToken },
         });
         createdConversationId = room.conversationId;
         const joinUrlSealed =
@@ -401,6 +443,9 @@ export function createGateqVideoInterview(deps: {
       if (row === null) return { kind: "UNKNOWN_SESSION" };
       if (row.status !== "LIVE" || Date.parse(row.endsAt) <= now())
         return { kind: "CLOSED" };
+      // Q heard a line, so Q is in the room: the clock runs, whether or
+      // not the provider's joined event arrived first.
+      await inRoom(row).catch(() => row);
       const text = input.utterance.trim().slice(0, 4000);
       if (text === "") return { kind: "REPLY", reply: "" };
       const id = sha256(`${row.id}:${input.utteranceId}`).slice(0, 40);
@@ -412,6 +457,33 @@ export function createGateqVideoInterview(deps: {
         correlationId: input.correlationId,
       });
       return { kind: "REPLY", reply: result.reply };
+    },
+
+    /**
+     * One room event from the provider (its callback). The token in the
+     * callback URL proves the session; only "the replica joined" means
+     * anything, and it can only start the clock (the end moves earlier,
+     * never later). Everything else is acknowledged and ignored.
+     */
+    providerEvent: async (input: {
+      readonly token: string;
+      readonly eventType: string;
+      readonly conversationId: string | null;
+    }): Promise<
+      | { readonly kind: "ACCEPTED"; readonly liveAt: string | null }
+      | { readonly kind: "UNKNOWN_SESSION" }
+    > => {
+      if (input.token.length < 32) return { kind: "UNKNOWN_SESSION" };
+      const row = await deps.store.byEventsTokenHash(sha256(input.token));
+      if (row === null) return { kind: "UNKNOWN_SESSION" };
+      if (
+        input.eventType !== "system.replica_joined" ||
+        (input.conversationId !== null &&
+          input.conversationId !== row.providerConversationId)
+      )
+        return { kind: "ACCEPTED", liveAt: row.liveAt };
+      const after = await inRoom(row);
+      return { kind: "ACCEPTED", liveAt: after.liveAt };
     },
 
     /** Ends sessions past their end; safe to run on every replica. */

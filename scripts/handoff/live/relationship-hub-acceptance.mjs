@@ -144,13 +144,11 @@ try {
         fullPage: true,
       });
       await closeBriefing();
-      await nav
-        .getByRole("link", { name: "Relationships", exact: true })
-        .click();
-      await page.waitForURL(/view=relationships/, { timeout: 45000 });
+      await nav.getByRole("link", { name: "Pipeline", exact: true }).click();
+      await page.waitForURL(/view=pipeline/, { timeout: 45000 });
       if (
         (await nav
-          .getByRole("link", { name: "Relationships", exact: true })
+          .getByRole("link", { name: "Pipeline", exact: true })
           .getAttribute("aria-current")) !== "page"
       )
         throw new Error(`${role}/${size}: tab not settled`);
@@ -168,10 +166,8 @@ try {
         .waitFor({ timeout: 45000 });
       let qNavigation = null;
       if (process.env.CQ_HUB_VERIFY_Q === "1" && size === "desktop") {
-        await nav
-          .getByRole("link", { name: "Relationships", exact: true })
-          .click();
-        await page.waitForURL(/view=relationships/, { timeout: 45000 });
+        await nav.getByRole("link", { name: "Pipeline", exact: true }).click();
+        await page.waitForURL(/view=pipeline/, { timeout: 45000 });
         await page.evaluate(() => {
           window.__cqHubNavigation = [];
           window.__cqHubNavigationReceipts = [];

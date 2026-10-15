@@ -89,6 +89,29 @@ export function RehearsalLive({
     };
   }, [pending, rehearsal.id, pendingEndsAt, recoveryAttempt]);
 
+  // The interviewer is still joining: the server starts the founder's
+  // three minutes when they are in the room, so re-read until it says when
+  // (the hard stop still bounds the room either way).
+  const joining =
+    video?.status === "LIVE" && video.joinUrl !== null && video.liveAt === null;
+  useEffect(() => {
+    if (!joining) return;
+    let live = true;
+    const timer = setInterval(() => {
+      void readRehearsalRoomAction(rehearsal.id)
+        .catch(() => null)
+        .then((result) => {
+          const next = result?.ok ? result.value.video : null;
+          if (live && next?.status === "LIVE" && next.liveAt != null)
+            setVideo(next);
+        });
+    }, 3_000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [joining, rehearsal.id]);
+
   if (pending)
     return (
       <section className="flex flex-col gap-4" aria-busy={!gaveUp}>

@@ -69,3 +69,15 @@ export function pipelineHref(
     if (value !== undefined && value !== "") params.set(key, String(value));
   return `/relationships?${params.toString()}`;
 }
+
+/**
+ * The List layout of the same records: the relationships with their next
+ * step. It filters in place, so only the search travels with the link.
+ */
+export function pipelineListLayoutHref(
+  query: Pick<z.infer<typeof RelationshipPipelineQuerySchema>, "q">,
+): string {
+  const params = new URLSearchParams({ view: "pipeline", layout: "list" });
+  if (query.q !== undefined && query.q !== "") params.set("q", query.q);
+  return `/relationships?${params.toString()}`;
+}

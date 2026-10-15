@@ -41,6 +41,16 @@ export type RehearsalPorts = {
   /** Milliseconds, monotonic. */
   readonly now: () => number;
   readonly wait: (ms: number) => Promise<void>;
+  /**
+   * Optional: speak new turns aloud, in order, before the next exchange
+   * (owner 15 Oct: Q plays both sides in distinct voices). Resolves when
+   * spoken or when `signal` aborts. Speech is never control: the segments
+   * keep their owner tags.
+   */
+  readonly speakTurns?: (
+    segments: readonly TranscriptSegment[],
+    signal: AbortSignal,
+  ) => Promise<void>;
 };
 
 export type ShortRehearsalPlan = {
@@ -80,22 +90,27 @@ export async function runShortRehearsal(
     SHORT_REHEARSAL_MAX_MS,
     Math.max(SHORT_REHEARSAL_MIN_MS, plan.maxMs),
   );
-  const begun = ports.now();
   let seen = 0;
-  const publish = (read: RehearsalRead) => {
+  const publish = async (read: RehearsalRead) => {
+    const fresh: TranscriptSegment[] = [];
     for (const [index, turn] of read.turns.entries()) {
       if (index < seen) continue;
       const text = turn.text.trim().slice(0, 2000);
       if (text.length === 0) continue;
-      onSegment({
+      const segment: TranscriptSegment = {
         segmentId: `reh-${read.rehearsalId.slice(0, 36)}-${String(index)}`,
         source: turn.from === "THEM" ? "REHEARSAL_COUNTERPART" : "NARRATOR_Q",
         channelId: turn.from === "THEM" ? "rehearsal-counterpart" : "narrator",
         text,
         final: true,
-      });
+      };
+      onSegment(segment);
+      fresh.push(segment);
     }
     seen = Math.max(seen, read.turns.length);
+    if (fresh.length > 0 && !signal.aborted) {
+      await ports.speakTurns?.(fresh, signal).catch(() => undefined);
+    }
   };
 
   const started = await ports.start().catch(() => null);
@@ -103,16 +118,20 @@ export async function runShortRehearsal(
     return { ok: false, reason: "START_FAILED", rehearsalId: null };
   }
   const id = started.rehearsalId;
-  publish(started);
+  // The budget is for the exchange, not for opening the session (production
+  // 15 Oct: a start took 21 s, which used to leave no time for any turn).
+  const begun = ports.now();
+  await publish(started);
 
   let endedBy: "TIME" | "LINES" | "ABORTED" = "LINES";
   let turnFailed = false;
-  for (const line of plan.narratorLines) {
+  for (const [index, line] of plan.narratorLines.entries()) {
     if (signal.aborted) {
       endedBy = "ABORTED";
       break;
     }
-    if (ports.now() - begun >= maxMs) {
+    // At least one exchange, so there is something to review.
+    if (index > 0 && ports.now() - begun >= maxMs) {
       endedBy = "TIME";
       break;
     }
@@ -121,7 +140,7 @@ export async function runShortRehearsal(
       turnFailed = true;
       break;
     }
-    publish(said);
+    await publish(said);
   }
   if (signal.aborted) endedBy = "ABORTED";
 
@@ -130,7 +149,7 @@ export async function runShortRehearsal(
   if (finished === null) {
     return { ok: false, reason: "FINISH_FAILED", rehearsalId: id };
   }
-  publish(finished);
+  await publish(finished);
   if (turnFailed) return { ok: false, reason: "TURN_FAILED", rehearsalId: id };
 
   let latest = finished;

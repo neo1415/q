@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { GATEQ_VIDEO_BRIDGE_PATH } from "@capital-q/contracts";
+import {
+  GATEQ_VIDEO_BRIDGE_PATH,
+  GATEQ_VIDEO_EVENTS_PATH,
+} from "@capital-q/contracts";
 import { createTavusClient, createTavusKeyPool } from "@capital-q/integrations";
 
 import {
@@ -52,6 +55,8 @@ describe("GateQ video provider bridge URL", () => {
       testMode: false,
       greeting: "Hello",
       bridge: { path: GATEQ_VIDEO_BRIDGE_PATH, bearer: "b".repeat(43) },
+      joinGraceSeconds: 30,
+      events: { path: GATEQ_VIDEO_EVENTS_PATH, token: "e".repeat(43) },
     });
     const pal = bodies.find((b) => b.url.endsWith("/v2/pals"));
     const baseUrl = (pal?.body as { layers: { llm: { base_url: string } } })
@@ -66,6 +71,16 @@ describe("GateQ video provider bridge URL", () => {
     expect(
       (conversation?.body as { conversation_name: string }).conversation_name,
     ).toBe("cq-gateq-s1");
+    // Room events come back to the route the api serves, with the
+    // session's secret; the provider's own cap includes the join grace.
+    const created = conversation?.body as {
+      callback_url: string;
+      properties: { max_call_duration: number };
+    };
+    expect(created.callback_url).toBe(
+      `https://api.example${GATEQ_VIDEO_EVENTS_PATH}/${"e".repeat(43)}`,
+    );
+    expect(created.properties.max_call_duration).toBe(210);
     // What Tavus will call is exactly the route the api serves.
     expect(`${baseUrl}/chat/completions`).toBe(
       `https://api.example${GATEQ_VIDEO_BRIDGE_PATH}`,
