@@ -48,7 +48,9 @@ export function WorkforcePlan({
       <div className="pb-3">
         {plan.outcome === null ? null : (
           <p className="cq-body-sm m-0 mb-3">
-            <span className="text-(--cq-text-secondary)">Working towards: </span>
+            <span className="text-(--cq-text-secondary)">
+              Working towards:{" "}
+            </span>
             {plan.outcome}
           </p>
         )}
@@ -109,7 +111,9 @@ export function WorkforcePlan({
         )}
         {plan.signals.length === 0 ? null : (
           <section aria-label="What the team found" className="mb-3">
-            <h5 className="cq-label m-0 mb-1 font-medium">What the team found</h5>
+            <h5 className="cq-label m-0 mb-1 font-medium">
+              What the team found
+            </h5>
             <ul className="cq-body-sm m-0 list-disc space-y-1 pl-5">
               {plan.signals.map((one) => (
                 <li key={`${one.stepKey}:${one.note}`}>

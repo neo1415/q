@@ -557,29 +557,31 @@ THE JOB
 
 Respond with a single JSON object matching the JobPlanResult schema.`;
 
-export const JOB_PLAN_V5: PromptDefinition<JobPlanVariablesV5, JobPlanResultV5> =
-  {
-    id: "JOB_PLAN",
-    version: 5,
-    status: "ACTIVE",
-    kind: "TASK",
-    taskClass: "STRUCTURED_EXTRACTION",
-    owner: "q-core",
-    changeDescription:
-      "Workforce intelligence (wf 2026-10-16): the lead reads the situation code wrote from the person's records, states the outcome and prerequisites (MET / MISSING / UNKNOWN with evidence), gives each step a reason and evidence, may add contingency steps (fallbackFor), and recommends next actions. Code grounds every reference and decides approval.",
-    effectiveFrom: "2026-10-16",
-    variables: {
-      schema: JobPlanVariablesV5Schema,
-      untrusted: [...JOB_PLAN_V5_UNTRUSTED],
-    },
-    output: {
-      kind: "STRUCTURED",
-      schemaName: JOB_PLAN_SCHEMA_NAME,
-      schemaVersion: JOB_PLAN_V5_SCHEMA_VERSION,
-      schema: JobPlanResultV5Schema,
-    },
-    template: JOB_PLAN_TEMPLATE_V5,
-  };
+export const JOB_PLAN_V5: PromptDefinition<
+  JobPlanVariablesV5,
+  JobPlanResultV5
+> = {
+  id: "JOB_PLAN",
+  version: 5,
+  status: "ACTIVE",
+  kind: "TASK",
+  taskClass: "STRUCTURED_EXTRACTION",
+  owner: "q-core",
+  changeDescription:
+    "Workforce intelligence (wf 2026-10-16): the lead reads the situation code wrote from the person's records, states the outcome and prerequisites (MET / MISSING / UNKNOWN with evidence), gives each step a reason and evidence, may add contingency steps (fallbackFor), and recommends next actions. Code grounds every reference and decides approval.",
+  effectiveFrom: "2026-10-16",
+  variables: {
+    schema: JobPlanVariablesV5Schema,
+    untrusted: [...JOB_PLAN_V5_UNTRUSTED],
+  },
+  output: {
+    kind: "STRUCTURED",
+    schemaName: JOB_PLAN_SCHEMA_NAME,
+    schemaVersion: JOB_PLAN_V5_SCHEMA_VERSION,
+    schema: JobPlanResultV5Schema,
+  },
+  template: JOB_PLAN_TEMPLATE_V5,
+};
 
 const SUBSTANCE_CRITIQUE_TEMPLATE = `TASK: SUBSTANCE_CRITIQUE
 You are a second, independent specialist reviewing a {{documentKind}} another agent prepared for {{principalName}} about {{companyName}}. You did not write it. Your job is to find what is wrong with it, not to praise it. Code decides from your verdict whether it is revised.

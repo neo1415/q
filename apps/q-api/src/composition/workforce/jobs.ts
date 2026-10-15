@@ -929,7 +929,9 @@ export function createWorkforceJobs(dependencies: {
           ...(step.document === undefined ? {} : { document: step.document }),
           why: step.why,
           evidence: grounded.evidence,
-          ...(step.fallbackFor === null ? {} : { fallbackFor: step.fallbackFor }),
+          ...(step.fallbackFor === null
+            ? {}
+            : { fallbackFor: step.fallbackFor }),
         };
       }),
       {
@@ -1225,7 +1227,10 @@ export function workforceTracker(
 
 /** A job's status from its steps: DONE only when every step is done. */
 export function jobStatusOf(
-  all: readonly { readonly status: string; readonly counts?: boolean | undefined }[],
+  all: readonly {
+    readonly status: string;
+    readonly counts?: boolean | undefined;
+  }[],
 ): "DONE" | "HELD" | "FAILED" {
   // A fallback not needed, or a step a fallback stood in for, does not count.
   const steps = all.filter((step) => step.counts !== false);

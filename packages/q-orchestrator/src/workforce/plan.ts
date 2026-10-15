@@ -276,7 +276,9 @@ export function boundPlan(
       ...(step.evidence === undefined || step.evidence.length === 0
         ? {}
         : { evidence: [...step.evidence] }),
-      ...(step.fallbackFor === undefined ? {} : { fallbackFor: step.fallbackFor }),
+      ...(step.fallbackFor === undefined
+        ? {}
+        : { fallbackFor: step.fallbackFor }),
     });
   }
   return { steps: kept, refused, budgetUsd: spent };
@@ -291,7 +293,11 @@ function fallbackIsValid(
   step: ProposedStep,
   kept: readonly BoundStep[],
 ): boolean {
-  if (step.dependsOn.some((key) => kept.some((one) => one.key === key && one.fallbackFor !== undefined))) {
+  if (
+    step.dependsOn.some((key) =>
+      kept.some((one) => one.key === key && one.fallbackFor !== undefined),
+    )
+  ) {
     return false;
   }
   const target = step.fallbackFor;

@@ -46,18 +46,19 @@ function words(code: string): string {
   return code.toLowerCase().replaceAll("_", " ");
 }
 
-const DECISION_WORDS: Readonly<Record<RelationshipBriefDecision["kind"], string>> =
-  {
-    ANSWER_INTEREST: "answer their interest",
-    AWAIT_ANSWER: "answer the interest expressed",
-    EXPRESS_INTEREST: "express interest",
-    REPLY_TO_MESSAGE: "reply to their message",
-    SCHEDULE_MEETING: "set up a call",
-    ATTEND_MEETING: "attend the booked call",
-    DECIDE_NEXT_STEP: "decide the next step after the call",
-    FOLLOW_UP: "follow up",
-    RESUME: "resume the paused conversation",
-  };
+const DECISION_WORDS: Readonly<
+  Record<RelationshipBriefDecision["kind"], string>
+> = {
+  ANSWER_INTEREST: "answer their interest",
+  AWAIT_ANSWER: "answer the interest expressed",
+  EXPRESS_INTEREST: "express interest",
+  REPLY_TO_MESSAGE: "reply to their message",
+  SCHEDULE_MEETING: "set up a call",
+  ATTEND_MEETING: "attend the booked call",
+  DECIDE_NEXT_STEP: "decide the next step after the call",
+  FOLLOW_UP: "follow up",
+  RESUME: "resume the paused conversation",
+};
 
 /**
  * The person's relationships at a glance, when the goal names nobody (a
@@ -168,18 +169,31 @@ export function situationFrom(input: {
       }
     }
     for (const noShow of brief.noShows.slice(0, 2)) {
-      add("NO_SHOW", `A call with ${name} did not take place (${day(noShow.at)}).`, noShow.at);
+      add(
+        "NO_SHOW",
+        `A call with ${name} did not take place (${day(noShow.at)}).`,
+        noShow.at,
+      );
     }
     const obligations = brief.obligations;
     if (obligations.status === "UNAVAILABLE") {
       add("UNKNOWN", `Diligence requests with ${name}: not known right now.`);
     } else {
-      for (const request of obligations.openRequests.slice(0, OPEN_REQUESTS_MAX)) {
-        add("OPEN_REQUEST", `Open diligence request with ${name}: ${request.title}.`);
+      for (const request of obligations.openRequests.slice(
+        0,
+        OPEN_REQUESTS_MAX,
+      )) {
+        add(
+          "OPEN_REQUEST",
+          `Open diligence request with ${name}: ${request.title}.`,
+        );
       }
       const more = obligations.openRequests.length - OPEN_REQUESTS_MAX;
       if (more > 0) {
-        add("OPEN_REQUEST", `${String(more)} more open diligence requests with ${name}.`);
+        add(
+          "OPEN_REQUEST",
+          `${String(more)} more open diligence requests with ${name}.`,
+        );
       }
       if (obligations.answeredCount > 0) {
         add(
@@ -235,7 +249,12 @@ export function situationFrom(input: {
           item.lastAt ?? null,
         );
         if (ref !== null) {
-          moves.push({ ref, owner: "YOU", kind: "REPLY_TO_MESSAGE", counterparty: name });
+          moves.push({
+            ref,
+            owner: "YOU",
+            kind: "REPLY_TO_MESSAGE",
+            counterparty: name,
+          });
         }
       }
     }
@@ -247,7 +266,10 @@ export function situationFrom(input: {
     );
   }
   for (const item of (input.waiting ?? []).slice(0, WAITING_MAX)) {
-    add("WAITING_APPROVAL", `Waiting for your approval: ${item.summary.slice(0, 200)}`);
+    add(
+      "WAITING_APPROVAL",
+      `Waiting for your approval: ${item.summary.slice(0, 200)}`,
+    );
   }
   return { facts, moves };
 }
@@ -266,18 +288,19 @@ export function situationText(situation: JobSituation): string {
  * The tool the person's own move would use, when Q could prepare it.
  * Null: only the person can do it (attend a call, decide).
  */
-const MOVE_TOOL: Readonly<Record<RelationshipBriefDecision["kind"], string | null>> =
-  {
-    ANSWER_INTEREST: "relationship.interest.respond",
-    AWAIT_ANSWER: "relationship.interest.respond",
-    EXPRESS_INTEREST: "relationship.interest.express",
-    REPLY_TO_MESSAGE: "chat.message.send",
-    SCHEDULE_MEETING: "schedule.meeting.book",
-    ATTEND_MEETING: null,
-    DECIDE_NEXT_STEP: null,
-    FOLLOW_UP: "chat.message.send",
-    RESUME: "chat.message.send",
-  };
+const MOVE_TOOL: Readonly<
+  Record<RelationshipBriefDecision["kind"], string | null>
+> = {
+  ANSWER_INTEREST: "relationship.interest.respond",
+  AWAIT_ANSWER: "relationship.interest.respond",
+  EXPRESS_INTEREST: "relationship.interest.express",
+  REPLY_TO_MESSAGE: "chat.message.send",
+  SCHEDULE_MEETING: "schedule.meeting.book",
+  ATTEND_MEETING: null,
+  DECIDE_NEXT_STEP: null,
+  FOLLOW_UP: "chat.message.send",
+  RESUME: "chat.message.send",
+};
 
 /**
  * Tools Q may use without asking (reads). Anything else Q would do is

@@ -104,14 +104,17 @@ export type QWorkJobResult = {
    * the steps not done (with why), what steps found (contradictions,
    * missing information) and what is next. Null or absent: no plan on record.
    */
-  readonly progress?: {
-    readonly outcome: string | null;
-    readonly done: number;
-    readonly total: number;
-    readonly open: readonly string[];
-    readonly found: readonly string[];
-    readonly next: readonly string[];
-  } | null | undefined;
+  readonly progress?:
+    | {
+        readonly outcome: string | null;
+        readonly done: number;
+        readonly total: number;
+        readonly open: readonly string[];
+        readonly found: readonly string[];
+        readonly next: readonly string[];
+      }
+    | null
+    | undefined;
 };
 
 /** What the work tools reach, composed by q-api over the work store. */
@@ -750,7 +753,9 @@ function jobView(job: QWorkJobResult): z.infer<typeof WorkJobResultSchema> {
       : {
           progress: {
             outcome:
-              job.progress.outcome === null ? null : cut(job.progress.outcome, 400),
+              job.progress.outcome === null
+                ? null
+                : cut(job.progress.outcome, 400),
             done: job.progress.done,
             total: job.progress.total,
             open: job.progress.open.slice(0, 6).map((line) => cut(line, 400)),

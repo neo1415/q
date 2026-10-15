@@ -291,11 +291,21 @@ export function progressLine(
     total: plan.total,
     open: plan.steps
       .filter((step) => step.status !== "DONE" && step.status !== "NOT_NEEDED")
-      .map((step) => `${step.who}: ${step.does} (${step.status.toLowerCase()}${step.summary === null ? "" : `: ${step.summary}`})`)
+      .map(
+        (step) =>
+          `${step.who}: ${step.does} (${step.status.toLowerCase()}${step.summary === null ? "" : `: ${step.summary}`})`,
+      )
       .slice(0, 6),
-    found: plan.signals.map((one) => `${one.kind.toLowerCase().replaceAll("_", " ")}: ${one.note}`).slice(0, 6),
+    found: plan.signals
+      .map(
+        (one) => `${one.kind.toLowerCase().replaceAll("_", " ")}: ${one.note}`,
+      )
+      .slice(0, 6),
     next: plan.nextActions
-      .map((one) => `${one.action}${one.needsApproval ? " (needs their approval)" : ""}`)
+      .map(
+        (one) =>
+          `${one.action}${one.needsApproval ? " (needs their approval)" : ""}`,
+      )
       .slice(0, 6),
   };
 }

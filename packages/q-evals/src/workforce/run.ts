@@ -58,16 +58,30 @@ export type PlanUnderTest = {
 export type WorkforceScenarioRun = {
   readonly plan: PlanUnderTest;
   readonly progress: WorkforcePlanProgress;
-  readonly outward: readonly { readonly key: string; readonly status: string; readonly summary: string }[];
+  readonly outward: readonly {
+    readonly key: string;
+    readonly status: string;
+    readonly summary: string;
+  }[];
   readonly jobStatus: "DONE" | "HELD";
   readonly fallbackStoodIn: boolean;
 };
 
-const OUTWARD = new Set(["chat.message.send", "schedule.meeting.book", "relationship.interest.express"]);
+const OUTWARD = new Set([
+  "chat.message.send",
+  "schedule.meeting.book",
+  "relationship.interest.express",
+]);
 
-export function plannerVariables(scenario: WorkforceScenario): PlannerVariables {
+export function plannerVariables(
+  scenario: WorkforceScenario,
+): PlannerVariables {
   const permitted = new Set(scenario.permitted);
-  const executors = registeredExecutors({ research: true, documents: true, diligence: true });
+  const executors = registeredExecutors({
+    research: true,
+    documents: true,
+    diligence: true,
+  });
   const situation = situationFrom({
     briefs: scenario.briefs,
     overview: scenario.overview,
@@ -108,7 +122,11 @@ export async function runWorkforceScenario(
   });
   const planned = await planner(plannerVariables(scenario));
   if (planned === null) return null;
-  const executors = registeredExecutors({ research: true, documents: true, diligence: true });
+  const executors = registeredExecutors({
+    research: true,
+    documents: true,
+    diligence: true,
+  });
   let dropped = 0;
   const bound = boundPlan(
     planned.steps.map((step) => {
@@ -141,7 +159,12 @@ export async function runWorkforceScenario(
       status: "DONE",
       summary: "Done.",
       ...(step.document?.operation === "PREPARE"
-        ? { outputs: { artifactId: `artifact-${step.key}`, companyId: "company" } }
+        ? {
+            outputs: {
+              artifactId: `artifact-${step.key}`,
+              companyId: "company",
+            },
+          }
         : {}),
     };
     outputs.set(step.key, result);
@@ -203,8 +226,9 @@ export async function runWorkforceScenario(
       droppedRefs: dropped + grounded.droppedRefs,
     },
     progress,
-    outward: result.steps.filter((step) =>
-      bound.steps.find((one) => one.key === step.key)?.outward === true,
+    outward: result.steps.filter(
+      (step) =>
+        bound.steps.find((one) => one.key === step.key)?.outward === true,
     ),
     jobStatus:
       counted.length > 0 && counted.every((step) => step.status === "DONE")
@@ -213,20 +237,22 @@ export async function runWorkforceScenario(
     fallbackStoodIn: result.steps.some(
       (step) =>
         step.status === "DONE" &&
-        bound.steps.find((one) => one.key === step.key)?.fallbackFor !== undefined,
+        bound.steps.find((one) => one.key === step.key)?.fallbackFor !==
+          undefined,
     ),
   };
 }
 
 /** The plan on an approval card (a live run), as the grader reads it. */
-export function planFromPayload(payload: WorkforceJobStartPayload): PlanUnderTest {
+export function planFromPayload(
+  payload: WorkforceJobStartPayload,
+): PlanUnderTest {
   return {
     steps: payload.steps.map((step) => ({
       key: step.key,
-      role:
-        step.tools.includes("diligence.questions.prepare")
-          ? "DILIGENCE"
-          : (executorRoleOf(step.role) ?? step.role),
+      role: step.tools.includes("diligence.questions.prepare")
+        ? "DILIGENCE"
+        : (executorRoleOf(step.role) ?? step.role),
       dependsOn: step.dependsOn,
       fallbackFor: step.fallbackFor ?? null,
       evidence: step.evidence ?? [],

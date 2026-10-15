@@ -84,11 +84,16 @@ export function groundReasoning(
         what: one.what.slice(0, 300),
         // Met is a claim about the record: without a fact behind it, it is
         // not known (never presented as verified).
-        status: one.status === "MET" && evidence.length === 0 ? "UNKNOWN" : one.status,
+        status:
+          one.status === "MET" && evidence.length === 0
+            ? "UNKNOWN"
+            : one.status,
         blocking: one.blocking,
         evidence,
         resolvedBy:
-          one.resolvedBy !== null && keys.has(one.resolvedBy) ? one.resolvedBy : null,
+          one.resolvedBy !== null && keys.has(one.resolvedBy)
+            ? one.resolvedBy
+            : null,
       };
     });
   const planned: WorkforceNextAction[] = proposed.nextActions
@@ -128,7 +133,10 @@ export function groundStepEvidence(
 ): { readonly evidence: readonly string[]; readonly dropped: number } {
   const known = new Set(situation.facts.map((fact) => fact.ref));
   const dropped = { count: 0 };
-  return { evidence: refsIn(evidence ?? [], known, dropped), dropped: dropped.count };
+  return {
+    evidence: refsIn(evidence ?? [], known, dropped),
+    dropped: dropped.count,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +227,9 @@ export function nextSteps(input: {
 }): readonly WorkforceNextAction[] {
   const { steps, outcomes } = input;
   const out: WorkforceNextAction[] = [];
-  const signals = steps.flatMap((step) => signalsOf(outcomes.get(step.key)?.outputs));
+  const signals = steps.flatMap((step) =>
+    signalsOf(outcomes.get(step.key)?.outputs),
+  );
   const asked = steps.some(
     (step) =>
       step.tools.includes("diligence.questions.prepare") &&

@@ -275,7 +275,8 @@ function preview(payload: WorkforceJobStartPayload): string {
     }),
   );
   const missing = missingLines(payload);
-  if (missing.length > 0) lines.push(`Missing or not known: ${missing.join("; ")}.`);
+  if (missing.length > 0)
+    lines.push(`Missing or not known: ${missing.join("; ")}.`);
   lines.push(
     "Every message to the other side is checked by the reviewer before it goes.",
   );
@@ -359,7 +360,9 @@ export function plannedFrom(payload: WorkforceJobStartPayload): PlannedJob {
     steps,
     refused: [],
     cannot: payload.cannot,
-    ...(payload.reasoning === undefined ? {} : { reasoning: payload.reasoning }),
+    ...(payload.reasoning === undefined
+      ? {}
+      : { reasoning: payload.reasoning }),
   };
 }
 

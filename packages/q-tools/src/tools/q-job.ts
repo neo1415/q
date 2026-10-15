@@ -200,9 +200,7 @@ export async function situationReads(
       briefs: [],
       unreadable: [],
       overview:
-        own === undefined
-          ? undefined
-          : await own(actor).catch(() => null),
+        own === undefined ? undefined : await own(actor).catch(() => null),
     };
   }
   const read = await Promise.all(

@@ -92,10 +92,7 @@ function recorder(): JobRecorder & {
   };
 }
 
-function step(
-  key: string,
-  overrides: Partial<BoundStep> = {},
-): BoundStep {
+function step(key: string, overrides: Partial<BoundStep> = {}): BoundStep {
   return {
     key,
     role: "RESEARCH",
@@ -135,7 +132,9 @@ describe("the situation the lead reads", () => {
     expect(texts).toContain(
       "UNKNOWN Calls with Harbourline Cargo: not known right now.",
     );
-    expect(texts.some((text) => /no (calls|messages)/iu.test(text))).toBe(false);
+    expect(texts.some((text) => /no (calls|messages)/iu.test(text))).toBe(
+      false,
+    );
     expect(texts).toContain(
       "OPEN_REQUEST Open diligence request with Harbourline Cargo: Unit economics by lane.",
     );
@@ -248,8 +247,16 @@ describe("fallback steps (replanning inside the approval)", () => {
     for (const plan of [
       [research, proposed("research", ["research"])],
       [research, proposed("missing")],
-      [research, proposed("research"), { ...proposed("research"), key: "alt_two" }],
-      [research, proposed("research"), { ...proposed(), key: "reads", dependsOn: ["alt_0"] }],
+      [
+        research,
+        proposed("research"),
+        { ...proposed("research"), key: "alt_two" },
+      ],
+      [
+        research,
+        proposed("research"),
+        { ...proposed(), key: "reads", dependsOn: ["alt_0"] },
+      ],
     ]) {
       const bound = boundPlan(plan, { permitted, budgetUsd: 1, executors });
       expect(bound.refused.map((one) => one.reason)).toContain(
@@ -265,7 +272,10 @@ describe("fallback steps (replanning inside the approval)", () => {
       const exec: AgentExecutor = (one, context) => {
         seen.push(one.key);
         if (one.key === "research" && failResearch) {
-          return Promise.resolve({ status: "FAILED", summary: "Nothing found." });
+          return Promise.resolve({
+            status: "FAILED",
+            summary: "Nothing found.",
+          });
         }
         if (one.key === "memo") {
           const input = context.results.get("research");
@@ -285,7 +295,11 @@ describe("fallback steps (replanning inside the approval)", () => {
         goal: "Prepare",
         steps: [
           step("research"),
-          step("catalog", { fallbackFor: "research", role: "MANDATE_WATCHER", executor: "DISCOVERY" }),
+          step("catalog", {
+            fallbackFor: "research",
+            role: "MANDATE_WATCHER",
+            executor: "DISCOVERY",
+          }),
           step("memo", { dependsOn: ["research"] }),
         ],
         executors: { RESEARCH: exec, DISCOVERY: exec },
@@ -296,8 +310,13 @@ describe("fallback steps (replanning inside the approval)", () => {
 
     const failed = await run(true);
     const memo = failed.result.steps.find((one) => one.key === "memo");
-    expect(memo).toMatchObject({ status: "DONE", summary: "Memo from catalog." });
-    expect(failed.result.steps.find((one) => one.key === "research")?.counts).toBe(false);
+    expect(memo).toMatchObject({
+      status: "DONE",
+      summary: "Memo from catalog.",
+    });
+    expect(
+      failed.result.steps.find((one) => one.key === "research")?.counts,
+    ).toBe(false);
     // The research failed, the fallback stood in: the job is done.
     expect([...failed.rec.ended.values()].at(-1)).toEqual({
       status: "DONE",
@@ -307,7 +326,9 @@ describe("fallback steps (replanning inside the approval)", () => {
     seen.length = 0;
     const fine = await run(false);
     expect(seen).not.toContain("catalog");
-    expect(fine.result.steps.find((one) => one.key === "catalog")).toMatchObject({
+    expect(
+      fine.result.steps.find((one) => one.key === "catalog"),
+    ).toMatchObject({
       status: "SKIPPED",
       counts: false,
     });
@@ -367,7 +388,11 @@ describe("a contradiction found mid-task", () => {
           outward: true,
           dependsOn: ["critique"],
         }),
-        step("other", { role: "CONVERSATION", executor: "CONVERSATION", outward: true }),
+        step("other", {
+          role: "CONVERSATION",
+          executor: "CONVERSATION",
+          outward: true,
+        }),
       ],
       executors: { DOCUMENTS: critique, CONVERSATION: send },
       recorder: recorder(),
@@ -384,9 +409,29 @@ describe("a contradiction found mid-task", () => {
 
 describe("next steps and progress after the job", () => {
   const steps = [
-    { key: "memo", who: "Documents", goal: "Prepare a memo", tools: ["documents.own.prepare"], dependsOn: [], evidence: ["F2"] },
-    { key: "research", who: "Research", goal: "Research the market", tools: ["public_web.search"], dependsOn: [] },
-    { key: "alt", who: "Discovery", goal: "Use the catalog", tools: ["search_companies"], dependsOn: [], fallbackFor: "memo" },
+    {
+      key: "memo",
+      who: "Documents",
+      goal: "Prepare a memo",
+      tools: ["documents.own.prepare"],
+      dependsOn: [],
+      evidence: ["F2"],
+    },
+    {
+      key: "research",
+      who: "Research",
+      goal: "Research the market",
+      tools: ["public_web.search"],
+      dependsOn: [],
+    },
+    {
+      key: "alt",
+      who: "Discovery",
+      goal: "Use the catalog",
+      tools: ["search_companies"],
+      dependsOn: [],
+      fallbackFor: "memo",
+    },
   ];
 
   it("reconciles contradictions, asks for what is missing, retries what failed, and drops moves a finished step took up", () => {
@@ -400,7 +445,10 @@ describe("next steps and progress after the job", () => {
       reasoning: {
         ...reasoning,
         // The move rests on F2 (pretend), which the memo step took up.
-        nextActions: reasoning.nextActions.map((one) => ({ ...one, evidence: ["F2"] })),
+        nextActions: reasoning.nextActions.map((one) => ({
+          ...one,
+          evidence: ["F2"],
+        })),
       },
       steps,
       outcomes: new Map([
@@ -412,7 +460,11 @@ describe("next steps and progress after the job", () => {
             outputs: {
               signals: [
                 { kind: "CONTRADICTION", note: "ARR differs", stepKey: "memo" },
-                { kind: "MISSING_INFORMATION", note: "Churn is not known", stepKey: "memo" },
+                {
+                  kind: "MISSING_INFORMATION",
+                  note: "Churn is not known",
+                  stepKey: "memo",
+                },
               ],
             },
           },
@@ -432,7 +484,9 @@ describe("next steps and progress after the job", () => {
     const progress = planProgress({
       reasoning: undefined,
       steps,
-      outcomes: new Map([["memo", { status: "DONE" as const, summary: "Prepared." }]]),
+      outcomes: new Map([
+        ["memo", { status: "DONE" as const, summary: "Prepared." }],
+      ]),
       finished: true,
     });
     expect(progress.steps.map((one) => one.status)).toEqual([
@@ -440,6 +494,9 @@ describe("next steps and progress after the job", () => {
       "SKIPPED",
       "NOT_NEEDED",
     ]);
-    expect({ done: progress.done, total: progress.total }).toEqual({ done: 1, total: 2 });
+    expect({ done: progress.done, total: progress.total }).toEqual({
+      done: 1,
+      total: 2,
+    });
   });
 });

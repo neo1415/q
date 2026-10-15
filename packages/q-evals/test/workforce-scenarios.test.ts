@@ -30,7 +30,9 @@ describe("workforce scenarios (scripted planner, real engine)", () => {
   for (const scenario of WORKFORCE_SCENARIOS) {
     it(`${scenario.id}: ${scenario.title}`, async () => {
       // The scripted plan is a valid JOB_PLAN v5 answer.
-      expect(JobPlanResultV5Schema.safeParse(scenario.scripted).success).toBe(true);
+      expect(JobPlanResultV5Schema.safeParse(scenario.scripted).success).toBe(
+        true,
+      );
       const run = await runWorkforceScenario(scenario, () =>
         Promise.resolve(scenario.scripted),
       );
@@ -50,15 +52,46 @@ describe("workforce scenarios (scripted planner, real engine)", () => {
       ...scenario.scripted,
       outcome: "Do it.",
       prerequisites: [
-        { what: "Everything is in place", status: "MET", blocking: false, evidence: [], resolvedBy: null },
+        {
+          what: "Everything is in place",
+          status: "MET",
+          blocking: false,
+          evidence: [],
+          resolvedBy: null,
+        },
       ],
       nextActions: [],
       steps: [
-        { key: "market", role: "RESEARCH", goal: "Research", tools: ["public_web.search"], dependsOn: [], why: "Research.", evidence: ["F42"], fallbackFor: null },
-        { key: "memo", role: "DOCUMENTS", goal: "Memo", tools: ["documents.own.prepare"], dependsOn: ["market"], document: { operation: "PREPARE", kind: "MEMO", scope: "NAMED_COMPANY" }, why: "Memo.", evidence: ["F77"], fallbackFor: null },
+        {
+          key: "market",
+          role: "RESEARCH",
+          goal: "Research",
+          tools: ["public_web.search"],
+          dependsOn: [],
+          why: "Research.",
+          evidence: ["F42"],
+          fallbackFor: null,
+        },
+        {
+          key: "memo",
+          role: "DOCUMENTS",
+          goal: "Memo",
+          tools: ["documents.own.prepare"],
+          dependsOn: ["market"],
+          document: {
+            operation: "PREPARE",
+            kind: "MEMO",
+            scope: "NAMED_COMPANY",
+          },
+          why: "Memo.",
+          evidence: ["F77"],
+          fallbackFor: null,
+        },
       ],
     };
-    const run = await runWorkforceScenario(scenario, () => Promise.resolve(weak));
+    const run = await runWorkforceScenario(scenario, () =>
+      Promise.resolve(weak),
+    );
     if (run === null) throw new Error("not planned");
     const grade = gradeWorkforce(scenario, run.plan, run);
     expect(grade.planScore).toBeLessThan(50);
@@ -78,7 +111,9 @@ describe("workforce scenarios (scripted planner, real engine)", () => {
       variables: plannerVariables(scenario),
     });
     const text = JSON.stringify(rendered.messages);
-    expect(text).toContain("F4 [OPEN_REQUEST] Open diligence request with Harbourline Cargo: Unit economics by lane.");
+    expect(text).toContain(
+      "F4 [OPEN_REQUEST] Open diligence request with Harbourline Cargo: Unit economics by lane.",
+    );
     expect(text).toMatch(/THINK IN THIS ORDER/u);
     // The situation is fenced as untrusted data, never instructions.
     expect(text).toContain('UNTRUSTED_CONTENT source=\\"situation\\"');

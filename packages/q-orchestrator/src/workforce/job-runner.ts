@@ -305,7 +305,10 @@ export async function runJob(input: {
   // order: two sends or bookings never race on the same thread. A step
   // also waits on the fallbacks of what it waits on, and a fallback on the
   // step it covers, so recovery is settled before anything reads it.
-  const settled = new Map<string, { promise: Promise<void>; resolve: () => void }>();
+  const settled = new Map<
+    string,
+    { promise: Promise<void>; resolve: () => void }
+  >();
   for (const step of input.steps) {
     let resolve: () => void = () => undefined;
     const promise = new Promise<void>((done) => {
@@ -313,7 +316,8 @@ export async function runJob(input: {
     });
     settled.set(step.key, { promise, resolve });
   }
-  const waitOn = (key: string) => settled.get(key)?.promise ?? Promise.resolve();
+  const waitOn = (key: string) =>
+    settled.get(key)?.promise ?? Promise.resolve();
   const all: Promise<void>[] = [];
   let outwardTail: Promise<void> = Promise.resolve();
   for (const [index, step] of input.steps.entries()) {

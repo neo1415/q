@@ -35,7 +35,8 @@ export type WorkforceGrade = {
 function upstream(plan: PlanUnderTest, key: string): ReadonlySet<string> {
   const seen = new Set<string>();
   const visit = (one: string) => {
-    for (const dep of plan.steps.find((step) => step.key === one)?.dependsOn ?? []) {
+    for (const dep of plan.steps.find((step) => step.key === one)?.dependsOn ??
+      []) {
       if (seen.has(dep)) continue;
       seen.add(dep);
       visit(dep);
@@ -71,21 +72,44 @@ export function gradePlan(
     ok: boolean,
     detail?: string,
   ) => {
-    checks.push({ name, kind: "PLAN", weight, ok, ...(detail === undefined ? {} : { detail }) });
+    checks.push({
+      name,
+      kind: "PLAN",
+      weight,
+      ok,
+      ...(detail === undefined ? {} : { detail }),
+    });
   };
   const outcome = plan.reasoning?.outcome ?? "";
-  check("states the outcome", 2, outcome.trim().length >= 20, outcome || "none");
+  check(
+    "states the outcome",
+    2,
+    outcome.trim().length >= 20,
+    outcome || "none",
+  );
   check("no step refused by code", 3, plan.refused === 0, String(plan.refused));
   if (plan.droppedRefs !== null) {
-    check("no invented evidence", 2, plan.droppedRefs === 0, String(plan.droppedRefs));
+    check(
+      "no invented evidence",
+      2,
+      plan.droppedRefs === 0,
+      String(plan.droppedRefs),
+    );
   }
   const missingRoles = expect.roles.filter((role) => !roles.has(role));
-  check("the right specialists", 2, missingRoles.length === 0, missingRoles.join(", ") || undefined);
+  check(
+    "the right specialists",
+    2,
+    missingRoles.length === 0,
+    missingRoles.join(", ") || undefined,
+  );
   for (const [before, after] of expect.order) {
     const ok = plan.steps
       .filter((step) => step.role === after)
       .some((step) =>
-        [...upstream(plan, step.key)].some((key) => roleOf(plan, key) === before),
+        [...upstream(plan, step.key)].some(
+          (key) => roleOf(plan, key) === before,
+        ),
       );
     check(`${after} waits on ${before}`, 2, ok);
   }
@@ -96,12 +120,19 @@ export function gradePlan(
         plan.steps.some(
           (two) =>
             two.role === b &&
-            (upstream(plan, two.key).has(one.key) || upstream(plan, one.key).has(two.key)),
+            (upstream(plan, two.key).has(one.key) ||
+              upstream(plan, one.key).has(two.key)),
         ),
     );
-    check(`${a} and ${b} run side by side`, 1, roles.has(a) && roles.has(b) && !tied);
+    check(
+      `${a} and ${b} run side by side`,
+      1,
+      roles.has(a) && roles.has(b) && !tied,
+    );
   }
-  const gaps = (plan.reasoning?.prerequisites ?? []).filter((one) => one.status !== "MET");
+  const gaps = (plan.reasoning?.prerequisites ?? []).filter(
+    (one) => one.status !== "MET",
+  );
   for (const pattern of expect.gaps) {
     check(
       `names the gap ${pattern.source}`,
@@ -131,15 +162,33 @@ export function gradeRun(
 ): readonly WorkforceCheck[] {
   const expect = scenario.expect;
   const checks: WorkforceCheck[] = [];
-  const check = (name: string, weight: number, ok: boolean, detail?: string) => {
-    checks.push({ name, kind: "COMPLETION", weight, ok, ...(detail === undefined ? {} : { detail }) });
+  const check = (
+    name: string,
+    weight: number,
+    ok: boolean,
+    detail?: string,
+  ) => {
+    checks.push({
+      name,
+      kind: "COMPLETION",
+      weight,
+      ok,
+      ...(detail === undefined ? {} : { detail }),
+    });
   };
-  check(`job ends ${expect.jobStatus}`, 2, run.jobStatus === expect.jobStatus, run.jobStatus);
+  check(
+    `job ends ${expect.jobStatus}`,
+    2,
+    run.jobStatus === expect.jobStatus,
+    run.jobStatus,
+  );
   const held = run.outward.some(
     (step) => step.status === "HELD" && /contradiction/iu.test(step.summary),
   );
   check(
-    expect.holdsOutward ? "holds outward work on a contradiction" : "sends nothing it should hold",
+    expect.holdsOutward
+      ? "holds outward work on a contradiction"
+      : "sends nothing it should hold",
     2,
     held === expect.holdsOutward,
   );
@@ -162,7 +211,12 @@ export function gradeRun(
   check(
     "reads never need approval",
     1,
-    next.every((one) => one.tool === null || one.needsApproval || /^(list_|search_|find_|public_web)/u.test(one.tool)),
+    next.every(
+      (one) =>
+        one.tool === null ||
+        one.needsApproval ||
+        /^(list_|search_|find_|public_web)/u.test(one.tool),
+    ),
   );
   return checks;
 }

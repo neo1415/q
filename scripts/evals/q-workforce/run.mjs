@@ -26,11 +26,8 @@
  */
 import { randomUUID } from "node:crypto";
 
-const {
-  WORKFORCE_SCENARIOS,
-  gradeWorkforce,
-  planFromPayload,
-} = await import("../../../packages/q-evals/dist/index.js");
+const { WORKFORCE_SCENARIOS, gradeWorkforce, planFromPayload } =
+  await import("../../../packages/q-evals/dist/index.js");
 
 const DRY = process.argv.includes("--dry-run");
 const APPROVE = process.argv.includes("--approve");
@@ -57,7 +54,8 @@ if (DRY) {
 
 const env = (name) => {
   const value = process.env[name];
-  if (value === undefined || value.length === 0) throw new Error(`${name} is required`);
+  if (value === undefined || value.length === 0)
+    throw new Error(`${name} is required`);
   return value;
 };
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -80,14 +78,25 @@ const sql = async (query) => {
 
 async function signIn(email) {
   const started = Date.now();
-  const r = await fetch(`${env("SUPABASE_URL")}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: { apikey: env("SUPABASE_ANON_KEY"), "content-type": "application/json" },
-    body: JSON.stringify({ email, password: env("CQ_SEED_ACCOUNT_PASSWORD") }),
-  });
+  const r = await fetch(
+    `${env("SUPABASE_URL")}/auth/v1/token?grant_type=password`,
+    {
+      method: "POST",
+      headers: {
+        apikey: env("SUPABASE_ANON_KEY"),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        password: env("CQ_SEED_ACCOUNT_PASSWORD"),
+      }),
+    },
+  );
   const body = await r.json();
-  if (Date.now() - started > 5_000) throw new Error("sign-in took over 5 s: stopping");
-  if (typeof body.access_token !== "string") throw new Error(`sign-in failed for ${email}`);
+  if (Date.now() - started > 5_000)
+    throw new Error("sign-in took over 5 s: stopping");
+  if (typeof body.access_token !== "string")
+    throw new Error(`sign-in failed for ${email}`);
   return body.access_token;
 }
 
@@ -101,14 +110,20 @@ async function qApi(token, method, path, body) {
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (r.status >= 500) throw new Error(`q-api ${String(r.status)} on ${path}: back off`);
+  if (r.status >= 500)
+    throw new Error(`q-api ${String(r.status)} on ${path}: back off`);
   return { status: r.status, body: await r.json().catch(() => null) };
 }
 
 async function settled(runId) {
   for (let i = 0; i < 45; i++) {
-    const row = (await sql(`select status from q_runtime.runs where id = ${quote(runId)}`))[0];
-    if (row !== undefined && /COMPLETED|FAILED|CANCELLED|AWAITING_APPROVAL/u.test(row.status))
+    const row = (
+      await sql(`select status from q_runtime.runs where id = ${quote(runId)}`)
+    )[0];
+    if (
+      row !== undefined &&
+      /COMPLETED|FAILED|CANCELLED|AWAITING_APPROVAL/u.test(row.status)
+    )
       return row.status;
     await sleep(2_000);
   }
@@ -148,9 +163,13 @@ const results = [];
 for (const scenario of cases) {
   const since = new Date().toISOString();
   const token = await signIn(scenario.account);
-  const userId = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString()).sub;
+  const userId = JSON.parse(
+    Buffer.from(token.split(".")[1], "base64url").toString(),
+  ).sub;
   const profile = (
-    await sql(`select id from identity.user_profiles where auth_user_id = ${quote(userId)} limit 1`)
+    await sql(
+      `select id from identity.user_profiles where auth_user_id = ${quote(userId)} limit 1`,
+    )
   )[0]?.id;
   await sleep(2_000);
   const asked = await qApi(token, "POST", "/v1/q/runs", {
@@ -160,20 +179,33 @@ for (const scenario of cases) {
   });
   const runId = asked.body?.runId ?? asked.body?.id ?? null;
   if (runId === null) {
-    results.push({ id: scenario.id, error: `no run (${String(asked.status)})` });
+    results.push({
+      id: scenario.id,
+      error: `no run (${String(asked.status)})`,
+    });
     continue;
   }
   const status = await settled(runId);
   const card = await jobCardOf(runId);
-  const grade = card === null ? null : gradeWorkforce(scenario, planFromPayload(card.payload));
+  const grade =
+    card === null
+      ? null
+      : gradeWorkforce(scenario, planFromPayload(card.payload));
   let progress = null;
   if (APPROVE && card?.approval_id) {
     await sleep(2_000);
-    await qApi(token, "POST", `/v1/q/approvals/${card.approval_id}/approve`, {});
+    await qApi(
+      token,
+      "POST",
+      `/v1/q/approvals/${card.approval_id}/approve`,
+      {},
+    );
     for (let i = 0; i < 40 && progress?.done !== progress?.total; i++) {
       await sleep(6_000);
       const jobs = await qApi(token, "GET", "/v1/q/workforce/jobs?limit=5");
-      const job = jobs.body?.items?.find((one) => one.trace?.runId === runId) ?? jobs.body?.items?.[0];
+      const job =
+        jobs.body?.items?.find((one) => one.trace?.runId === runId) ??
+        jobs.body?.items?.[0];
       if (job === undefined) continue;
       const detail = await qApi(token, "GET", `/v1/q/workforce/jobs/${job.id}`);
       progress = detail.body?.plan ?? null;
@@ -189,14 +221,35 @@ for (const scenario of cases) {
     runStatus: status,
     card: card !== null,
     score: grade?.score ?? null,
-    failed: grade?.checks.filter((check) => !check.ok).map((check) => `${check.name}${check.detail === undefined ? "" : ` (${check.detail})`}`) ?? [],
+    failed:
+      grade?.checks
+        .filter((check) => !check.ok)
+        .map(
+          (check) =>
+            `${check.name}${check.detail === undefined ? "" : ` (${check.detail})`}`,
+        ) ?? [],
     outcome: card?.payload.reasoning?.outcome ?? null,
-    steps: card?.payload.steps.map((step) => `${step.key}:${step.role}${step.fallbackFor ? ` (fallback for ${step.fallbackFor})` : ""} <- [${step.dependsOn.join(",")}] ${step.why ?? ""}`) ?? [],
-    missing: card?.payload.reasoning?.prerequisites.filter((one) => one.status !== "MET").map((one) => `${one.status}: ${one.what}`) ?? [],
-    next: card?.payload.reasoning?.nextActions.map((one) => `${one.action}${one.needsApproval ? " [approval]" : ""}`) ?? [],
+    steps:
+      card?.payload.steps.map(
+        (step) =>
+          `${step.key}:${step.role}${step.fallbackFor ? ` (fallback for ${step.fallbackFor})` : ""} <- [${step.dependsOn.join(",")}] ${step.why ?? ""}`,
+      ) ?? [],
+    missing:
+      card?.payload.reasoning?.prerequisites
+        .filter((one) => one.status !== "MET")
+        .map((one) => `${one.status}: ${one.what}`) ?? [],
+    next:
+      card?.payload.reasoning?.nextActions.map(
+        (one) => `${one.action}${one.needsApproval ? " [approval]" : ""}`,
+      ) ?? [],
     progress,
-    modelCalls: used.map((row) => `${row.task_class}/${row.model_id} $${row.usd ?? "?"}${row.success ? "" : " failed"}`),
+    modelCalls: used.map(
+      (row) =>
+        `${row.task_class}/${row.model_id} $${row.usd ?? "?"}${row.success ? "" : " failed"}`,
+    ),
   });
   if (calls >= MAX_CALLS) break;
 }
-console.log(JSON.stringify({ results, calls, usd: Number(usd.toFixed(4)) }, null, 2));
+console.log(
+  JSON.stringify({ results, calls, usd: Number(usd.toFixed(4)) }, null, 2),
+);
