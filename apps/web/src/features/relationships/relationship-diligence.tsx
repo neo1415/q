@@ -383,14 +383,14 @@ export function RelationshipDiligence({
       {error === null ? null : (
         <p
           role="alert"
-          className="cq-body-sm rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) px-3 py-2 text-(--cq-text-primary)"
+          className="cq-body-sm border border-(--cq-border) bg-(--cq-surface-raised) px-3 py-2 text-(--cq-text-primary)"
         >
           {error}
         </p>
       )}
 
       {requests.length === 0 ? (
-        <section className="flex flex-col items-start gap-2 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4">
+        <section className="flex flex-col items-start gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4">
           <h2 className="cq-title-sm text-(--cq-text-primary)">
             {founder ? "No requests yet" : "Nothing asked yet"}
           </h2>
@@ -409,7 +409,7 @@ export function RelationshipDiligence({
               <li key={request.requestId}>
                 <article
                   aria-label={request.title}
-                  className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-xs)"
+                  className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-xs)"
                   data-request={status.words}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -429,7 +429,7 @@ export function RelationshipDiligence({
                     </div>
                     <span
                       className={cx(
-                        "cq-caption shrink-0 rounded-full px-2.5 py-1",
+                        "cq-caption shrink-0 px-2.5 py-1",
                         TONES[status.tone],
                       )}
                     >
@@ -584,12 +584,12 @@ function FileRow({
 }) {
   return (
     <div
-      className="grid grid-cols-[36px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-lg bg-(--cq-surface-subtle) p-3 sm:grid-cols-[36px_minmax(0,1fr)_auto]"
+      className="grid grid-cols-[36px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 bg-(--cq-surface-subtle) p-3 sm:grid-cols-[36px_minmax(0,1fr)_auto]"
       data-shared-file
     >
       <span
         aria-hidden="true"
-        className="flex h-11 w-9 items-center justify-center rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-secondary)"
+        className="flex h-11 w-9 items-center justify-center border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-secondary)"
       >
         <FileText size={ICON_SIZE.compact} />
       </span>
@@ -714,7 +714,7 @@ function UploadProgress({
       </span>
       <span
         aria-hidden="true"
-        className="h-1 overflow-hidden rounded-full bg-(--cq-surface-strong)"
+        className="h-1 overflow-hidden bg-(--cq-surface-strong)"
       >
         <span
           className="block h-full bg-(--cq-accent) transition-[width] duration-(--cq-motion-base)"
@@ -776,7 +776,7 @@ function SharePicker({
               {[0, 1, 2].map((n) => (
                 <li
                   key={n}
-                  className="h-12 animate-pulse rounded-lg bg-(--cq-surface-subtle) motion-reduce:animate-none"
+                  className="h-12 animate-pulse bg-(--cq-surface-subtle) motion-reduce:animate-none"
                 />
               ))}
             </ul>
@@ -791,7 +791,7 @@ function SharePicker({
                 <label
                   key={document.id}
                   className={cx(
-                    "cq-body-sm flex min-h-12 cursor-pointer items-center gap-3 rounded-lg px-3",
+                    "cq-body-sm flex min-h-12 cursor-pointer items-center gap-3 px-3",
                     chosen === document.id
                       ? "bg-(--cq-accent-soft)"
                       : "hover:bg-(--cq-surface-subtle)",
@@ -860,7 +860,7 @@ function AskForm({
   const [withNote, setWithNote] = useState(false);
   return (
     <form
-      className="flex flex-col gap-2 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-3 shadow-(--cq-shadow-xs)"
+      className="flex flex-col gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-3 shadow-(--cq-shadow-xs)"
       onSubmit={(event) => {
         event.preventDefault();
         if (title.trim().length === 0) return;
@@ -884,7 +884,7 @@ function AskForm({
           maxLength={200}
           onChange={(event) => setTitle(event.target.value)}
           placeholder="Ask for a document"
-          className="cq-body min-h-11 min-w-0 flex-1 rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)"
+          className="cq-body min-h-11 min-w-0 flex-1 border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)"
         />
         <Button
           variant="primary"
@@ -906,7 +906,7 @@ function AskForm({
             rows={2}
             onChange={(event) => setNote(event.target.value)}
             placeholder="A note for them"
-            className="cq-body min-h-11 w-full resize-y rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)"
+            className="cq-body min-h-11 w-full resize-y border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)"
           />
         </>
       ) : (
@@ -927,7 +927,7 @@ export function DiligenceUnavailable({ href }: { readonly href: string }) {
   return (
     <section
       role="alert"
-      className="flex items-center justify-between gap-3 rounded-xl border border-(--cq-border) bg-(--cq-surface-raised) p-4"
+      className="flex items-center justify-between gap-3 border border-(--cq-border) bg-(--cq-surface-raised) p-4"
       data-state="unavailable"
     >
       <span className="flex flex-col gap-0.5">

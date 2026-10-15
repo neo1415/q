@@ -32,6 +32,8 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
     ids: {
       "tab.overview": '[data-hub-view="overview"]',
       "tab.pipeline": '[data-hub-view="pipeline"]',
+      // Capital is the CRM's own tab (owner 2026-10-16).
+      "tab.capital": '[data-hub-view="capital"]',
       // Kept for Q (catalog-stable): the Relationships tab became the
       // Pipeline's List layout, so its id selects the Pipeline tab.
       "tab.relationships": '[data-hub-view="pipeline"]',
@@ -60,6 +62,8 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
         filters={{ view }}
       />
       {hubTabs().map((entry) => {
+        // The tapped tab's pending mark is LinkPending (perf lane): one
+        // mechanism for instant tab feedback across the CRM.
         const open = view === entry.view;
         return (
           <Link
@@ -110,7 +114,7 @@ export function HubRelated({ side }: { readonly side: HubSide }) {
           key={entry.id}
           href={entry.href}
           data-hub-link={entry.id}
-          className="cq-body-sm inline-flex min-h-11 items-center gap-1 rounded-(--cq-radius-md) px-2 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="cq-body-sm inline-flex min-h-11 items-center gap-1 px-2 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
           {entry.label}
           <ArrowUpRight

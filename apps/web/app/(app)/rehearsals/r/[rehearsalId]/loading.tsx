@@ -8,7 +8,7 @@ export default function Loading() {
         aria-busy="true"
         className="mx-auto flex w-full max-w-3xl flex-col gap-6"
       >
-        <div className="h-4 w-64 animate-pulse rounded-(--cq-radius-sm) bg-(--cq-surface-subtle) motion-reduce:animate-none" />
+        <div className="h-4 w-64 animate-pulse bg-(--cq-surface-subtle) motion-reduce:animate-none" />
         <p className="cq-title-lg text-(--cq-text-primary)">
           Q is reviewing your rehearsal…
         </p>
@@ -16,7 +16,7 @@ export default function Loading() {
           {[0, 1, 2, 3].map((key) => (
             <div
               key={key}
-              className="h-20 animate-pulse rounded-(--cq-radius-md) bg-(--cq-surface-subtle) motion-reduce:animate-none"
+              className="h-20 animate-pulse bg-(--cq-surface-subtle) motion-reduce:animate-none"
             />
           ))}
         </div>

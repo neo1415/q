@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WorkforceJobStartPayloadSchema } from "@capital-q/contracts";
 import type { AnyQActionDefinition } from "@capital-q/q-actions";
-import type { JobPlanResultV2 } from "@capital-q/q-core";
+import type { JobPlanResultV2, JobPlanResultV5 } from "@capital-q/q-core";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import {
@@ -81,6 +81,22 @@ const UNRUNNABLE: JobPlanResultV2 = {
   cannot: [],
 };
 
+/** A v2-shaped plan as JOB_PLAN v5 returns it: reasons, no evidence. */
+function asPlanV5(plan: JobPlanResultV2): JobPlanResultV5 {
+  return {
+    ...plan,
+    outcome: plan.summary,
+    prerequisites: [],
+    nextActions: [],
+    steps: plan.steps.map((step) => ({
+      ...step,
+      why: "It moves the job towards its outcome.",
+      evidence: [],
+      fallbackFor: null,
+    })),
+  };
+}
+
 function world(
   withinLimit: boolean | (() => Promise<boolean>) = true,
   plan: JobPlanResultV2 | null = PLAN,
@@ -113,7 +129,7 @@ function world(
       models: {
         plan: () => {
           plans += 1;
-          return Promise.resolve(plan);
+          return Promise.resolve(plan === null ? null : asPlanV5(plan));
         },
         readReply: () => Promise.resolve(null),
       },

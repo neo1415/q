@@ -13,7 +13,7 @@ import { cx } from "../primitives/class-names.js";
 
 /** Control styling without a width, for composed rows (e.g. currency + amount). */
 export const fieldControlBaseClassName =
-  "rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) disabled:opacity-50 aria-invalid:border-(--cq-danger)";
+  "border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) disabled:opacity-50 aria-invalid:border-(--cq-danger)";
 
 export const fieldControlClassName = `w-full ${fieldControlBaseClassName}`;
 

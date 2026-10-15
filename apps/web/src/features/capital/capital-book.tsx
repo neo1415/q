@@ -136,7 +136,7 @@ export function FounderBook({
     <div className="flex flex-col gap-10">
       {current === null ? (
         <section className="flex flex-col gap-4" aria-label="Rounds">
-          <div className="flex max-w-(--cq-layout-narrow) flex-col gap-3 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 sm:p-6">
+          <div className="flex max-w-(--cq-layout-narrow) flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 sm:p-6">
             <h3 className="cq-title-sm text-(--cq-text-primary)">
               No round open
             </h3>
@@ -246,7 +246,7 @@ export function InvestorBook({ mine }: { readonly mine: MyCommitmentsDto }) {
   ).size;
   return (
     <div className="flex flex-col gap-6">
-      <article className="cq-glow-card flex max-w-(--cq-layout-reading) flex-col gap-2 rounded-2xl p-5 sm:p-6">
+      <article className="cq-glow-card flex max-w-(--cq-layout-reading) flex-col gap-2 p-5 sm:p-6">
         <h3 className="cq-body-sm text-(--cq-text-secondary)">Invested</h3>
         <p className="cq-display cq-numeric text-(--cq-text-primary)">
           {first === undefined
@@ -339,7 +339,7 @@ function ByRound({
           return (
             <li
               key={item.id}
-              className="flex flex-col gap-2 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-4 sm:px-5"
+              className="flex flex-col gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-4 sm:px-5"
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="cq-body font-semibold text-(--cq-text-primary)">
@@ -378,12 +378,12 @@ export function CapitalSkeleton() {
       aria-busy="true"
       aria-label="Loading capital"
     >
-      <div className="flex flex-col gap-4 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-6">
-        <div className="h-5 w-24 rounded-md bg-(--cq-surface-strong)" />
-        <div className="h-10 w-2/3 rounded-md bg-(--cq-surface-strong)" />
-        <div className="h-3 rounded-full bg-(--cq-surface-strong)" />
+      <div className="flex flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-6">
+        <div className="h-5 w-24 bg-(--cq-surface-strong)" />
+        <div className="h-10 w-2/3 bg-(--cq-surface-strong)" />
+        <div className="h-3 bg-(--cq-surface-strong)" />
       </div>
-      <div className="h-40 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised)" />
+      <div className="h-40 border border-(--cq-border-subtle) bg-(--cq-surface-raised)" />
     </div>
   );
 }

@@ -437,7 +437,7 @@ export function QPresenceStage({
       {shown === null || canvas !== null ? null : (
         <section
           aria-labelledby={`${listId}-shown-title`}
-          className="flex max-h-[60dvh] w-full flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
+          className="flex max-h-[60dvh] w-full flex-col overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)"
           data-q-shown={shown.id}
         >
           {/* Its title and Dismiss stay in view while the object scrolls. */}

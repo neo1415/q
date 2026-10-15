@@ -23,7 +23,7 @@ export function GateFit({
 }) {
   return (
     <div className="flex flex-col gap-2" data-gate-fit={gate.publicId}>
-      <span className="cq-label inline-flex w-fit items-center gap-1.5 rounded-full border border-(--cq-accent) px-2 py-0.5 text-(--cq-accent)">
+      <span className="cq-label inline-flex w-fit items-center gap-1.5 border border-(--cq-accent) px-2 py-0.5 text-(--cq-accent)">
         {gate.criteria.length === 0
           ? "Has a gate · no published criteria yet"
           : `Has a gate · ${String(gate.criteria.length)} ${gate.criteria.length === 1 ? "criterion" : "criteria"}`}
@@ -34,18 +34,23 @@ export function GateFit({
           aria-label="Their published criteria"
         >
           {gate.criteria.map((criterion) => (
+            // Standing, then the criterion with its weight under it: a
+            // narrow card no longer wraps "Required" onto a line of its own
+            // between rows (redesign 2026-10-16).
             <li
               key={criterion.label}
-              className="flex flex-wrap items-center gap-2"
+              className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-start gap-x-2 [&>:first-child]:justify-self-start"
             >
               <GateStandingBadge standing={criterion.standing} />
-              <span className="cq-body-sm text-(--cq-text-primary)">
-                {criterion.label}
-              </span>
-              <span className="cq-caption text-(--cq-text-tertiary)">
-                {criterion.requiredness === "REQUIRED"
-                  ? "Required"
-                  : "Preferred"}
+              <span className="flex min-w-0 flex-col">
+                <span className="cq-body-sm text-(--cq-text-primary)">
+                  {criterion.label}
+                </span>
+                <span className="cq-caption text-(--cq-text-tertiary)">
+                  {criterion.requiredness === "REQUIRED"
+                    ? "Required"
+                    : "Preferred"}
+                </span>
               </span>
             </li>
           ))}

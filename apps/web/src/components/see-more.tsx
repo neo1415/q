@@ -58,7 +58,7 @@ export function SeeMore({
           aria-expanded={open}
           aria-controls={id}
           onClick={() => setOpen((value) => !value)}
-          className="cq-body-sm -mx-2 inline-flex min-h-11 items-center rounded-md px-2 font-semibold text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="cq-body-sm -mx-2 inline-flex min-h-11 items-center px-2 font-semibold text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
           {open ? "See less" : "See more"}
         </button>

@@ -28,10 +28,7 @@ export default function AuthLayout({
     <div className="cq-auth">
       <PublicBrandStyle />
       <header className="cq-auth-header">
-        <Link
-          href="/"
-          className="cq-title-md rounded-xs text-(--cq-text-primary)"
-        >
+        <Link href="/" className="cq-title-md text-(--cq-text-primary)">
           Capital Q
         </Link>
         {/* The appearance choice is the visitor's before they sign in

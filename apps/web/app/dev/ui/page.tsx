@@ -74,7 +74,7 @@ export default function UiPreviewPage() {
                 {group.map((token) => (
                   <div key={token} className="flex items-center gap-2">
                     <span
-                      className="size-8 rounded-sm border border-(--cq-border-subtle)"
+                      className="size-8 border border-(--cq-border-subtle)"
                       style={{ background: `var(--cq-${token})` }}
                     />
                     <code className="cq-caption font-mono text-(--cq-text-secondary)">

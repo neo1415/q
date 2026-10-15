@@ -52,7 +52,7 @@ export function FileViewer({
           description={file.downloadable ? undefined : "View only"}
         >
           <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4">
-            <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border border-(--cq-border-subtle) bg-(--cq-surface)">
+            <div className="relative min-h-0 flex-1 overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
               <iframe
                 src={
                   file.downloadable

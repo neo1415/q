@@ -312,7 +312,7 @@ function PassDialog({
               {reasons.map((option) => (
                 <label
                   key={option.code}
-                  className="flex min-h-11 cursor-pointer items-center gap-2 rounded-sm px-2 hover:bg-(--cq-surface-subtle)"
+                  className="flex min-h-11 cursor-pointer items-center gap-2 px-2 hover:bg-(--cq-surface-subtle)"
                 >
                   <input
                     type="radio"
@@ -360,7 +360,7 @@ function PassDialog({
             maxLength={1000}
             rows={3}
             onChange={(event) => setNote(event.target.value)}
-            className="cq-body mt-1 min-h-11 w-full resize-y rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)"
+            className="cq-body mt-1 min-h-11 w-full resize-y border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)"
           />
           <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-3">
             <input

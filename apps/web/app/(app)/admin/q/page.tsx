@@ -69,7 +69,7 @@ export default async function AdminQPage({
             key={option.value}
             href={`/admin/q?window=${option.value}`}
             aria-current={option.value === window ? "page" : undefined}
-            className={`cq-body-sm inline-flex min-h-11 items-center rounded-md border px-3 ${
+            className={`cq-body-sm inline-flex min-h-11 items-center border px-3 ${
               option.value === window
                 ? "border-(--cq-text-primary) text-(--cq-text-primary)"
                 : "border-(--cq-border-subtle) text-(--cq-text-secondary)"
@@ -153,10 +153,10 @@ export default async function AdminQPage({
                 </span>
                 <span
                   aria-hidden="true"
-                  className="h-2 rounded-full bg-(--cq-surface-subtle)"
+                  className="h-2 bg-(--cq-surface-subtle)"
                 >
                   <span
-                    className="block h-2 rounded-full bg-(--cq-text-secondary)"
+                    className="block h-2 bg-(--cq-text-secondary)"
                     style={{
                       width: `${peak === 0 ? 0 : Math.max(2, (Number(day.costUsd) / peak) * 100)}%`,
                     }}

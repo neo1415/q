@@ -326,7 +326,7 @@ export function ConnectionRequestsInbox({
               type="button"
               aria-pressed={sort === value}
               onClick={() => setSort(value)}
-              className="inline-flex min-h-11 items-center rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-sm whitespace-nowrap text-(--cq-text-secondary) aria-pressed:border-(--cq-text-primary) aria-pressed:bg-(--cq-text-primary) aria-pressed:text-(--cq-canvas) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+              className="inline-flex min-h-11 items-center border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-sm whitespace-nowrap text-(--cq-text-secondary) aria-pressed:border-(--cq-text-primary) aria-pressed:bg-(--cq-text-primary) aria-pressed:text-(--cq-canvas) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
             >
               {label}
             </button>

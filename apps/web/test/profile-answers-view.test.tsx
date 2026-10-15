@@ -120,7 +120,7 @@ describe("ProfileAnswers", () => {
     );
     expect(
       screen.getByRole("link", { name: "Edit raise" }).getAttribute("href"),
-    ).toBe("/capital");
+    ).toBe("/relationships?view=capital&tab=raise");
   });
 
   it("points to setup when nothing was answered", () => {

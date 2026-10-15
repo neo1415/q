@@ -36,6 +36,12 @@ function build(overrides: Partial<GateqVideoInterview> = {}) {
     available: vi.fn((token: string) =>
       token === TOKEN ? Promise.resolve(true) : forged(),
     ),
+    perApplication: 2,
+    availability: vi.fn((token: string) =>
+      token === TOKEN
+        ? Promise.resolve({ available: true, reason: null })
+        : forged(),
+    ),
     current: vi.fn((token: string) =>
       token === TOKEN ? Promise.resolve(SESSION) : forged(),
     ),
@@ -135,6 +141,27 @@ describe("the provider's room events", () => {
 });
 
 describe("the GateQ video interview routes", () => {
+  it("says why video is not offered when this application's sessions are used", async () => {
+    const { app } = build({
+      availability: vi.fn(() =>
+        Promise.resolve({
+          available: false,
+          reason: "APPLICATION_SESSIONS_USED" as const,
+        }),
+      ),
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/gateq/apply/video",
+      headers: auth(TOKEN),
+    });
+    expect(response.json()).toMatchObject({
+      available: false,
+      unavailableReason: "APPLICATION_SESSIONS_USED",
+      perApplication: 2,
+    });
+  });
+
   it("reads the applicant's own session, with the AI disclosure", async () => {
     const { app } = build();
     const response = await app.inject({
@@ -151,6 +178,8 @@ describe("the GateQ video interview routes", () => {
       },
       // The shared weekly allowance, for "3 video sessions left this week".
       allowance: { weeklySessions: 5, remaining: 3 },
+      unavailableReason: null,
+      perApplication: 2,
     });
     expect(response.body).toMatch(/AI interviewer/);
   });

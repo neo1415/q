@@ -236,7 +236,7 @@ export function PresencePlayground({
       <div className="grid gap-8 lg:grid-cols-[1fr_minmax(0,22rem)]">
         <div
           ref={stageRef}
-          className="flex min-h-96 items-center justify-center rounded-(--cq-radius-lg) bg-(--cq-surface-raised) p-6"
+          className="flex min-h-96 items-center justify-center bg-(--cq-surface-raised) p-6"
         >
           <QAperture
             state={state}

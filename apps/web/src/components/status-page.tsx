@@ -30,7 +30,7 @@ export function StatusPage({
     >
       <a
         href="/home"
-        className="-mx-2 flex min-h-11 w-fit items-center gap-2 rounded-md px-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+        className="-mx-2 flex min-h-11 w-fit items-center gap-2 px-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
       >
         <QNavIcon
           size={18}

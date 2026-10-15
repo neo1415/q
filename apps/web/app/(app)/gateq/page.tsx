@@ -278,7 +278,7 @@ export default async function GateqPage({ searchParams }: Props) {
         {missingItem ? (
           <p
             role="alert"
-            className="cq-body-sm mb-4 rounded-(--cq-radius-md) border border-(--cq-border-subtle) px-4 py-3 text-(--cq-text-primary)"
+            className="cq-body-sm mb-4 border border-(--cq-border-subtle) px-4 py-3 text-(--cq-text-primary)"
             data-gateq-item-missing
           >
             That application isn&apos;t in your GateQ inbox, or you don&apos;t

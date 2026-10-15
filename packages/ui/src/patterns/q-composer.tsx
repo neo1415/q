@@ -158,7 +158,7 @@ export function QComposer({
       onSubmit={handleSubmit}
       aria-labelledby={`${inputId}-title`}
       className={cx(
-        "flex flex-col gap-2 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) px-2 py-1 shadow-(--cq-shadow-xs) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong)",
+        "flex flex-col gap-2 border border-(--cq-border) bg-(--cq-surface-raised) px-2 py-1 shadow-(--cq-shadow-xs) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong)",
         className,
       )}
     >
@@ -283,7 +283,7 @@ export function QComposer({
           {attachments.map((attachment) => (
             <li
               key={attachment}
-              className="cq-caption rounded-md bg-(--cq-surface-sunken) px-2 py-1 text-(--cq-text-secondary)"
+              className="cq-caption bg-(--cq-surface-sunken) px-2 py-1 text-(--cq-text-secondary)"
             >
               {attachment}
             </li>

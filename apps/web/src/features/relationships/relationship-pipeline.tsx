@@ -41,7 +41,7 @@ import {
 import { PipelineSavedViews, type AppliedView } from "./pipeline-saved-views";
 
 const inputClass =
-  "cq-body-sm min-h-11 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
+  "cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
 /** A select reads as a quiet control in the view bar, not a form field. */
 const selectClass = `${inputClass} max-w-full pr-8`;
 const href = (row: RelationshipSummaryDto) =>
@@ -313,7 +313,7 @@ export function RelationshipPipeline({
         className="group md:[&::details-content]:[content-visibility:visible]"
         data-pipeline-options
       >
-        <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) md:hidden [&::-webkit-details-marker]:hidden">
+        <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) md:hidden [&::-webkit-details-marker]:hidden">
           <span className="font-medium">View options</span>
           <span className="truncate text-(--cq-text-secondary)">
             {optionsSummary === "" ? "All · latest first" : optionsSummary}
@@ -369,7 +369,7 @@ export function RelationshipPipeline({
             </select>
             {layout === "table" ? (
               <details className="cq-body-sm relative">
-                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-(--cq-radius-md) px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
+                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
                   Columns
                 </summary>
                 <div className="flex flex-col px-3 pb-1">
@@ -590,7 +590,7 @@ export function RelationshipPipeline({
               <section
                 key={state}
                 aria-labelledby={`board-${state}`}
-                className="flex w-[80%] flex-none snap-start flex-col gap-2 rounded-(--cq-radius-lg) bg-(--cq-surface-subtle) p-2 sm:w-64"
+                className="flex w-[80%] flex-none snap-start flex-col gap-2 bg-(--cq-surface-subtle) p-2 sm:w-64"
                 data-board-column={state}
               >
                 <h2
@@ -610,13 +610,13 @@ export function RelationshipPipeline({
                   {column.map((row) => (
                     <li
                       key={row.relationshipId}
-                      className="relative flex items-start justify-between gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2.5 pr-1.5 pl-3 transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border)"
+                      className="relative flex items-start justify-between gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2.5 pr-1.5 pl-3 transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border)"
                     >
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <Link
                           href={href(row)}
                           data-q-item
-                          className="cq-body-sm line-clamp-2 font-medium break-words text-(--cq-text-primary) after:absolute after:inset-0 after:rounded-(--cq-radius-md) focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-(--cq-focus-ring)"
+                          className="cq-body-sm line-clamp-2 font-medium break-words text-(--cq-text-primary) after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-(--cq-focus-ring)"
                         >
                           {row.counterpart.name}
                         </Link>

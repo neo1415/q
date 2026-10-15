@@ -154,7 +154,7 @@ function QFrame({
       <main className="flex flex-col gap-3.5 overflow-auto px-4 pt-1 pb-3 sm:px-6 sm:pt-2">
         {children}
       </main>
-      <div className="mx-3 mb-4 grid grid-cols-[1fr_44px] items-center rounded-[22px] border border-(--cq-border) bg-(--cq-surface-raised) py-1 pr-1 pl-4 sm:mx-6">
+      <div className="mx-3 mb-4 grid grid-cols-[1fr_44px] items-center border border-(--cq-border) bg-(--cq-surface-raised) py-1 pr-1 pl-4 sm:mx-6">
         <span className="text-(--cq-text-tertiary)">Ask Q anything</span>
         <span
           className="h-11 w-11 rounded-full bg-(--cq-accent)"
@@ -205,7 +205,7 @@ export function CanvasPreview({
     return (
       <div className="min-h-dvh bg-(--cq-canvas) p-4 sm:p-6">
         <h1 className="m-0 mb-4 text-2xl font-medium">Discover</h1>
-        <div className="aspect-[9/13] max-w-[760px] rounded-[18px] bg-(--cq-surface-strong) sm:aspect-[16/10]" />
+        <div className="aspect-[9/13] max-w-[760px] bg-(--cq-surface-strong) sm:aspect-[16/10]" />
         <AnswerChipView
           chip={{
             answerId: "a2",

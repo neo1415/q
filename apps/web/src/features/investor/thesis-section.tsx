@@ -119,10 +119,10 @@ export function ThesisSection({
                   </span>
                   <span
                     aria-hidden="true"
-                    className="h-2 overflow-hidden rounded-full bg-(--cq-surface-subtle)"
+                    className="h-2 overflow-hidden bg-(--cq-surface-subtle)"
                   >
                     <span
-                      className="block h-full rounded-full bg-(--cq-border-strong)"
+                      className="block h-full bg-(--cq-border-strong)"
                       style={{
                         width: `${String((count.count / widest) * 100)}%`,
                       }}
@@ -140,7 +140,7 @@ export function ThesisSection({
         <div className="flex flex-col gap-2" data-thesis-inferred>
           <h3 className="cq-title-sm flex flex-wrap items-center gap-2 text-(--cq-text-primary)">
             What Q reads from it
-            <span className="cq-caption rounded-md border border-dashed border-(--cq-border) px-1.5 text-(--cq-text-secondary)">
+            <span className="cq-caption border border-dashed border-(--cq-border) px-1.5 text-(--cq-text-secondary)">
               Q&rsquo;s inference
             </span>
           </h3>
@@ -168,7 +168,7 @@ export function ThesisSection({
           {suggestions.map((suggestion) => (
             <div
               key={suggestion.id}
-              className="flex flex-col gap-2 rounded-xl border border-(--cq-accent) bg-(--cq-accent-soft) p-4"
+              className="flex flex-col gap-2 border border-(--cq-accent) bg-(--cq-accent-soft) p-4"
             >
               <p className="cq-body font-medium text-(--cq-text-primary)">
                 {suggestion.title}

@@ -5,6 +5,7 @@ import type { QWorkJobResult } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
 import { REVIEWER_REVISION_PREFIX } from "./documents.js";
+import { progressOf } from "./progress.js";
 import type { AgentWorkQueue, WorkRow } from "./queue.js";
 import type { Owner, WorkforceStore } from "./store.js";
 
@@ -258,6 +259,7 @@ export function createWorkforceJobResults(dependencies: {
     return Promise.all(
       chosen.map(async ({ job, row, inThisConversation }) => {
         const outputs = doneOutputs(row);
+        const progress = progressLine(row);
         return {
           jobId: job.id,
           goal: job.goal,
@@ -266,8 +268,44 @@ export function createWorkforceJobResults(dependencies: {
           inThisConversation,
           review: await review(actor, outputs),
           diligence: diligence(outputs),
+          ...(progress === null ? {} : { progress }),
         };
       }),
     );
+  };
+}
+
+/**
+ * wf: where the plan stands for Q to say back -- done of total, what is
+ * still running or waiting, what was found, and what is next (code's words
+ * from the recorded plan). Null: no approved plan is on record.
+ */
+export function progressLine(
+  row: WorkRow | undefined,
+): QWorkJobResult["progress"] {
+  const plan = progressOf(row);
+  if (plan === undefined) return null;
+  return {
+    outcome: plan.outcome,
+    done: plan.done,
+    total: plan.total,
+    open: plan.steps
+      .filter((step) => step.status !== "DONE" && step.status !== "NOT_NEEDED")
+      .map(
+        (step) =>
+          `${step.who}: ${step.does} (${step.status.toLowerCase()}${step.summary === null ? "" : `: ${step.summary}`})`,
+      )
+      .slice(0, 6),
+    found: plan.signals
+      .map(
+        (one) => `${one.kind.toLowerCase().replaceAll("_", " ")}: ${one.note}`,
+      )
+      .slice(0, 6),
+    next: plan.nextActions
+      .map(
+        (one) =>
+          `${one.action}${one.needsApproval ? " (needs their approval)" : ""}`,
+      )
+      .slice(0, 6),
   };
 }

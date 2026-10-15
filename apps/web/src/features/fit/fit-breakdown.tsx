@@ -56,7 +56,7 @@ export function FitScoreButton({
       onClick={onOpen}
       aria-label={fitSummaryLabel(profile)}
       data-fit-band={profile.band}
-      className="relative inline-flex min-h-11 items-center gap-2.5 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-1 pr-3 pl-2.5 text-left hover:border-(--cq-border) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+      className="relative inline-flex min-h-11 items-center gap-2.5 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-1 pr-3 pl-2.5 text-left hover:border-(--cq-border) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
     >
       <span className="flex flex-col gap-1">
         <span className="text-[15px] font-semibold whitespace-nowrap text-(--cq-text-primary)">
@@ -158,7 +158,7 @@ export function FitBreakdownSheet({
             Unknown never counts against a company; it only lowers confidence.
           </p>
           {profile.hardRule === null ? null : (
-            <p className="cq-body-sm rounded-(--cq-radius-md) bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)">
+            <p className="cq-body-sm bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)">
               {profile.hardRule.label}
             </p>
           )}

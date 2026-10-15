@@ -47,6 +47,23 @@ type Call = {
   readonly prompt: string;
 };
 
+/** A v4-shaped scripted plan in the v5 shape: reasons, no evidence. */
+function asPlanV5(value: unknown): unknown {
+  const plan = value as { steps: Record<string, unknown>[] };
+  return {
+    ...plan,
+    outcome: "Calls booked with founders who fit the mandate.",
+    prerequisites: [],
+    nextActions: [],
+    steps: plan.steps.map((step) => ({
+      ...step,
+      why: "It moves the job towards its outcome.",
+      evidence: [],
+      fallbackFor: null,
+    })),
+  };
+}
+
 /** A scripted model: answers by the task the rendered prompt names. */
 function scriptedGateway(calls: Call[], legacyPlan = false): ModelGateway {
   const gateway = {
@@ -121,6 +138,8 @@ function scriptedGateway(calls: Call[], legacyPlan = false): ModelGateway {
                 ],
             cannot: [],
           };
+          // JOB_PLAN v5 (wf): the lead's reasoning beside the steps.
+          value = asPlanV5(value);
           break;
         case "REPLY_READER":
           value = latest("sit this one out")

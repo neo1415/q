@@ -42,13 +42,13 @@ export async function FounderNext() {
               {next.length === 1 ? "action" : `${String(next.length)} actions`}
             </h2>
             <Link
-              href="/capital?tab=action-plan"
+              href="/relationships?view=capital&tab=action-plan"
               className="cq-label text-(--cq-accent) underline-offset-2 hover:underline"
             >
               Action plan
             </Link>
           </div>
-          <ol className="overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)">
+          <ol className="overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
             {next.map((action, index) => (
               <li
                 key={action.key}
@@ -56,7 +56,7 @@ export async function FounderNext() {
               >
                 <span
                   aria-hidden="true"
-                  className="cq-caption grid size-6 place-items-center rounded-full border border-(--cq-border-strong) text-(--cq-text-secondary)"
+                  className="cq-caption grid size-6 place-items-center border border-(--cq-border-strong) text-(--cq-text-secondary)"
                 >
                   {index + 1}
                 </span>
@@ -88,7 +88,7 @@ export async function FounderNext() {
             What could stop your raise
           </h2>
           <Link
-            href="/capital?tab=readiness"
+            href="/relationships?view=capital&tab=readiness"
             className="cq-label text-(--cq-accent) underline-offset-2 hover:underline"
           >
             Readiness

@@ -85,7 +85,7 @@ export function QRoomDocument({
 
   return (
     <section
-      className="flex w-full flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
+      className="flex w-full flex-col overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)"
       aria-label={title}
       data-q-room-document
       data-q-section="q-room-document"
@@ -187,7 +187,7 @@ export function QRoomDocument({
           className="flex flex-wrap items-center gap-2 px-4 pt-2"
           data-q-room-document-reading
         >
-          <span className="cq-caption inline-flex items-center gap-1.5 rounded-(--cq-radius-md) bg-(--cq-accent-soft) px-2 py-1 text-(--cq-text-primary)">
+          <span className="cq-caption inline-flex items-center gap-1.5 bg-(--cq-accent-soft) px-2 py-1 text-(--cq-text-primary)">
             <Volume2 aria-hidden="true" size={ICON_SIZE.compact} />
             Reading aloud · page {String(page)}
           </span>
@@ -206,12 +206,12 @@ export function QRoomDocument({
       <div className="flex min-h-0 flex-col max-sm:flex-col-reverse sm:flex-row">
         <div className="relative max-h-[62dvh] min-h-[40dvh] min-w-0 flex-1 overflow-auto bg-(--cq-surface-subtle) p-3">
           {file === null && failed ? (
-            <div className="mx-auto flex h-[50dvh] w-full max-w-[36rem] items-center justify-center rounded bg-(--cq-surface)">
+            <div className="mx-auto flex h-[50dvh] w-full max-w-[36rem] items-center justify-center bg-(--cq-surface)">
               <RoomLoadFailed onRetry={onRetry} className="items-center" />
             </div>
           ) : file === null ? (
             <div
-              className="mx-auto h-[50dvh] w-full max-w-[36rem] rounded bg-(--cq-surface)"
+              className="mx-auto h-[50dvh] w-full max-w-[36rem] bg-(--cq-surface)"
               aria-busy="true"
               data-q-room-document-loading
             />
@@ -243,7 +243,7 @@ export function QRoomDocument({
                     <li key={index} className="flex gap-2">
                       <button
                         type="button"
-                        className="cq-caption min-h-11 flex-none self-start rounded-(--cq-radius-sm) px-1.5 text-(--cq-accent) underline-offset-2 hover:underline"
+                        className="cq-caption min-h-11 flex-none self-start px-1.5 text-(--cq-accent) underline-offset-2 hover:underline"
                         onClick={() => onPage(line.pages[0] ?? 1)}
                         aria-label={`Go to page ${String(line.pages[0] ?? 1)}`}
                         data-q-room-document-cite={line.pages[0]}
@@ -277,7 +277,7 @@ export function QRoomDocument({
                     }}
                     className={
                       index === highlighted
-                        ? "cq-body-sm rounded-(--cq-radius-sm) bg-(--cq-accent-soft) text-(--cq-text-primary)"
+                        ? "cq-body-sm bg-(--cq-accent-soft) text-(--cq-text-primary)"
                         : "cq-body-sm text-(--cq-text-secondary)"
                     }
                     aria-current={index === highlighted ? "true" : undefined}
@@ -315,7 +315,7 @@ function DocumentPage({
   }, [count, onPageCount]);
   if (pdf.kind === "unreachable") {
     return (
-      <div className="mx-auto flex h-[50dvh] w-full max-w-[36rem] items-center justify-center rounded bg-(--cq-surface)">
+      <div className="mx-auto flex h-[50dvh] w-full max-w-[36rem] items-center justify-center bg-(--cq-surface)">
         <RoomLoadFailed onRetry={retry} className="items-center" />
       </div>
     );
@@ -323,7 +323,7 @@ function DocumentPage({
   if (pdf.kind === "loading") {
     return (
       <div
-        className="mx-auto h-[50dvh] w-full max-w-[36rem] rounded bg-(--cq-surface)"
+        className="mx-auto h-[50dvh] w-full max-w-[36rem] bg-(--cq-surface)"
         aria-busy="true"
         data-q-room-document-loading
       />

@@ -47,7 +47,7 @@ export function StandingBadge({
 }) {
   return (
     <span
-      className={`cq-label inline-flex shrink-0 items-center gap-1.5 rounded-full py-0.5 ps-2 pe-2.5 whitespace-nowrap ${TONE[standing]}`}
+      className={`cq-label inline-flex shrink-0 items-center gap-1.5 py-0.5 ps-2 pe-2.5 whitespace-nowrap ${TONE[standing]}`}
       data-standing={standing}
     >
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
@@ -112,7 +112,7 @@ async function readProfileRows(
 
 function Rows({ rows }: { readonly rows: readonly LooksForRow[] }) {
   return (
-    <ul className="flex flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)">
+    <ul className="flex flex-col overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
       {rows.map((row) => (
         <li
           key={`${row.label}-${row.words}`}
@@ -159,7 +159,9 @@ export async function LooksForSection({
       <section
         id="looks-for"
         aria-labelledby="investor-looks-for"
-        className="flex flex-col gap-3"
+        // The profile's section frame (ProfileSectionShell's), so the
+        // investor reads the same to a founder as on their own profile.
+        className="flex scroll-mt-4 flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-5"
       >
         <div className="flex flex-col gap-1">
           <h2
@@ -202,10 +204,28 @@ export async function LooksForSection({
           not a promise of interest.
         </p>
       </section>
-      {href === null ? null : (
+      {href === null ? (
         <section
+          id="apply"
           aria-labelledby="investor-draft"
-          className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
+          className="flex scroll-mt-4 flex-col gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-5"
+        >
+          <h2
+            id="investor-draft"
+            className="cq-title-md text-(--cq-text-primary)"
+          >
+            Apply via GateQ
+          </h2>
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {investorName} has no open GateQ form yet. A Connection Request is
+            the way to reach them.
+          </p>
+        </section>
+      ) : (
+        <section
+          id="apply"
+          aria-labelledby="investor-draft"
+          className="flex scroll-mt-4 flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-5"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2

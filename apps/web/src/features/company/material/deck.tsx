@@ -93,7 +93,7 @@ function DeckViewer({
     <div className="flex flex-col gap-3" data-deck-viewer>
       <div
         ref={frame}
-        className="relative aspect-video w-full overflow-hidden rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
+        className="relative aspect-video w-full overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
       >
         {file === null ? (
           <button
@@ -135,7 +135,7 @@ function DeckViewer({
           onClick={() => move(-1)}
           disabled={file === null || slide === 1}
           aria-label="Previous slide"
-          className="flex size-11 items-center justify-center rounded-full border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
+          className="flex size-11 items-center justify-center border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
         >
           <ChevronLeft size={ICON_SIZE.regular} aria-hidden="true" />
         </button>
@@ -151,7 +151,7 @@ function DeckViewer({
             onClick={() =>
               void frame.current?.requestFullscreen?.().catch(() => undefined)
             }
-            className="flex size-11 items-center justify-center rounded-full text-(--cq-text-primary) disabled:opacity-40"
+            className="flex size-11 items-center justify-center text-(--cq-text-primary) disabled:opacity-40"
           >
             <Move size={ICON_SIZE.regular} aria-hidden="true" />
           </button>
@@ -160,7 +160,7 @@ function DeckViewer({
             onClick={() => move(1)}
             disabled={file === null || (total !== null && slide >= total)}
             aria-label="Next slide"
-            className="flex size-11 items-center justify-center rounded-full border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
+            className="flex size-11 items-center justify-center border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
           >
             <ChevronRight size={ICON_SIZE.regular} aria-hidden="true" />
           </button>
@@ -241,7 +241,7 @@ export function DeckForReaders({
           {deck.pageCount === null ? "" : `${String(deck.pageCount)} slides · `}
           Updated {longDay(deck.uploadedAt)}
         </p>
-        <p className="cq-caption mt-1 inline-flex w-fit items-center gap-1.5 rounded-full border border-(--cq-border) px-3 py-1 text-(--cq-text-primary)">
+        <p className="cq-caption mt-1 inline-flex w-fit items-center gap-1.5 border border-(--cq-border) px-3 py-1 text-(--cq-text-primary)">
           {deck.downloadable ? (
             <>
               <Download size={ICON_SIZE.compact} aria-hidden="true" /> Can be
@@ -266,7 +266,7 @@ export function DeckForReaders({
         autoOpen={autoOpen}
       />
       {extraction === null ? (
-        <p className="cq-body-sm rounded-lg bg-(--cq-surface-subtle) p-4 text-(--cq-text-secondary)">
+        <p className="cq-body-sm bg-(--cq-surface-subtle) p-4 text-(--cq-text-secondary)">
           {owner
             ? "Q hasn't read this version yet. Its twelve sections appear here when it has."
             : `Q's read of the deck appears once ${companyName} confirms it.`}
@@ -423,7 +423,7 @@ export function DeckCoach({
 
         {view.extraction !== null && !confirmed ? (
           <div
-            className="flex flex-col gap-3 rounded-lg border border-(--cq-border) p-4 sm:flex-row sm:items-center"
+            className="flex flex-col gap-3 border border-(--cq-border) p-4 sm:flex-row sm:items-center"
             data-confirm-reading
           >
             <p className="cq-body-sm flex-1 text-(--cq-text-primary)">
@@ -457,7 +457,7 @@ export function DeckCoach({
         )}
 
         <div
-          className="flex flex-col gap-4 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+          className="flex flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
           data-standard
         >
           <div className="flex flex-col gap-1">
@@ -480,7 +480,7 @@ export function DeckCoach({
             {coaching.sections.map((section) => (
               <span
                 key={section.section}
-                className={`h-1.5 flex-1 rounded-full ${section.atStandard ? "bg-(--cq-positive)" : "bg-(--cq-border-subtle)"}`}
+                className={`h-1.5 flex-1 ${section.atStandard ? "bg-(--cq-positive)" : "bg-(--cq-border-subtle)"}`}
               />
             ))}
           </div>
@@ -629,7 +629,7 @@ export function DeckCoach({
         className="flex flex-col gap-4 lg:sticky lg:top-6"
         aria-label="Who can see your deck"
       >
-        <div className="flex aspect-video flex-col justify-center gap-1 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5">
+        <div className="flex aspect-video flex-col justify-center gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5">
           <p className="cq-caption text-(--cq-text-tertiary)">Your deck</p>
           <p className="cq-title-sm text-(--cq-text-primary)">{deck.title}</p>
         </div>

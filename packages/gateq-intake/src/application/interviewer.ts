@@ -37,6 +37,7 @@ import {
   questionNeedsFor,
   type QuestionNeed,
 } from "./question-needs.js";
+import { amountStatedIn } from "./stated-amount.js";
 
 /**
  * Q interviewing a GateQ applicant (CQ-GATE-002 §4, §5, §36, §39).
@@ -415,6 +416,32 @@ export function createGateQInterviewer(
           provenance: candidate.provenance,
         });
         if (!parsed.success) {
+          rejected += 1;
+          continue;
+        }
+        // An amount must be one the person said, not one Q worked out
+        // ("two pay $180,000 each" is not "revenue 360000"). Their own
+        // sentence is kept by the phrases it came in; the computed figure
+        // is never recorded as their claim.
+        if (
+          parsed.data.value.kind === "AMOUNT" &&
+          !amountStatedIn(parsed.data.value.amount, input.utterance)
+        ) {
+          rejected += 1;
+          continue;
+        }
+        // Contact details belong to the contact step the person confirmed:
+        // "I'm Laura" fills a missing name, it never replaces "Laura Mensah".
+        if (
+          (parsed.data.dimension === "contact.name" ||
+            parsed.data.dimension === "contact.email") &&
+          input.application?.facts.some(
+            (fact) =>
+              fact.dimension === parsed.data.dimension &&
+              fact.supersededAt === null &&
+              fact.value.kind !== "NONE",
+          ) === true
+        ) {
           rejected += 1;
           continue;
         }

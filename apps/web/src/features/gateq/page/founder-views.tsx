@@ -78,7 +78,7 @@ export function FounderApplications({
     return (
       <div className="flex flex-col gap-3" aria-busy="true">
         {[1, 2, 3].map((n) => (
-          <Skeleton key={n} width="100%" height={64} radius={12} />
+          <Skeleton key={n} width="100%" height={64} />
         ))}
       </div>
     );
@@ -256,8 +256,8 @@ export function ClaimView({
       )}
       {showLoading ? (
         <div className="flex flex-col gap-3" aria-busy="true">
-          <Skeleton width="100%" height={64} radius={12} />
-          <Skeleton width="100%" height={64} radius={12} />
+          <Skeleton width="100%" height={64} />
+          <Skeleton width="100%" height={64} />
         </div>
       ) : showError ? (
         <ErrorBlock what="Search" retryHref="/gateq?tab=claim" />

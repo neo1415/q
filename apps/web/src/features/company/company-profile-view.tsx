@@ -371,7 +371,7 @@ export function CompanyProfileView({
       <div className="flex min-w-0 flex-col gap-6 [grid-area:head]">
         {typeof profile.coverUrl === "string" ? (
           // Only a cover the card's own scope shows this reader.
-          <EntityCover src={profile.coverUrl} className="rounded-xl" />
+          <EntityCover src={profile.coverUrl} />
         ) : null}
         <header className="flex items-start gap-4">
           <CompanyAvatar

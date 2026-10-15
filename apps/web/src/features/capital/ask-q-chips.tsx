@@ -19,7 +19,7 @@ export function AskQChips({
           <button
             type="button"
             onClick={() => askNow(ask.prompt)}
-            className="cq-body-sm inline-flex min-h-11 items-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface) px-4 text-(--cq-text-primary) hover:bg-(--cq-surface-raised) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+            className="cq-body-sm inline-flex min-h-11 items-center border border-(--cq-border-subtle) bg-(--cq-surface) px-4 text-(--cq-text-primary) hover:bg-(--cq-surface-raised) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           >
             {ask.label}
           </button>

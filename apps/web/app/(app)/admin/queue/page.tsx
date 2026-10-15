@@ -78,14 +78,14 @@ export default async function AdminQueuePage({
       </h2>
       <nav
         aria-label="Queues"
-        className="inline-flex gap-1 self-start rounded-(--cq-radius-md) bg-(--cq-surface-subtle) p-1"
+        className="inline-flex gap-1 self-start bg-(--cq-surface-subtle) p-1"
       >
         {tabs.map((entry) => (
           <Link
             key={entry.key}
             href={`/admin/queue?tab=${entry.key}`}
             aria-current={entry.key === tab ? "page" : undefined}
-            className={`cq-body-sm inline-flex min-h-11 items-center gap-2 rounded-(--cq-radius-sm) px-3 ${
+            className={`cq-body-sm inline-flex min-h-11 items-center gap-2 px-3 ${
               entry.key === tab
                 ? "bg-(--cq-surface-raised) font-medium text-(--cq-text-primary) shadow-(--cq-shadow-xs)"
                 : "text-(--cq-text-secondary)"

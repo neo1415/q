@@ -30,9 +30,13 @@ const investor = (coverUrl: string | null) =>
   });
 
 describe("investor cards (demo audit 2026-10-03)", () => {
-  it("draws no empty grey band when the investor set no cover", () => {
+  it("draws a quiet horizon, never an empty grey band, when the investor set no cover", () => {
+    // Owner 2026-10-16: every investor card carries a banner.
     const { container } = render(<InvestorCards items={[investor(null)]} />);
-    expect(container.querySelector(".aspect-\\[4\\/1\\]")).toBeNull();
+    const band = container.querySelector<HTMLElement>("[data-cover-band]");
+    expect(band?.getAttribute("aria-hidden")).toBe("true");
+    expect(band?.style.backgroundImage).toContain("var(--cq-accent)");
+    expect(container.querySelector("img")).toBeNull();
   });
 
   it("offers Ask Q about fit as a draft, outside the card's link", () => {

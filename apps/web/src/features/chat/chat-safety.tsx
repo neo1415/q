@@ -258,7 +258,7 @@ export function ChatSafetyDialogs({
             {CHAT_REPORT_REASONS.map((option) => (
               <label
                 key={option.code}
-                className="flex min-h-11 cursor-pointer items-center gap-3 rounded-sm px-2 hover:bg-(--cq-surface-subtle)"
+                className="flex min-h-11 cursor-pointer items-center gap-3 px-2 hover:bg-(--cq-surface-subtle)"
               >
                 <input
                   type="radio"
@@ -284,7 +284,7 @@ export function ChatSafetyDialogs({
             maxLength={CHAT_REPORT_NOTE_MAX_LENGTH}
             rows={3}
             onChange={(event) => setNote(event.target.value)}
-            className="cq-body mt-1 min-h-11 w-full resize-y rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)"
+            className="cq-body mt-1 min-h-11 w-full resize-y border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)"
           />
           {error === null ? null : (
             <p role="alert" className="mt-2">

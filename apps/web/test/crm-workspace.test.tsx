@@ -149,8 +149,13 @@ describe("CRM routes: one workspace, no broken links", () => {
 });
 
 describe("CRM tabs", () => {
-  it("has one Overview and one Pipeline, no Reports or Relationships tab", () => {
-    expect(hubTabs().map((tab) => tab.view)).toEqual(["overview", "pipeline"]);
+  it("has Overview, Pipeline and Capital, no Reports or Relationships tab", () => {
+    // Capital is a CRM tab (owner 2026-10-16).
+    expect(hubTabs().map((tab) => tab.view)).toEqual([
+      "overview",
+      "pipeline",
+      "capital",
+    ]);
     for (const side of ["INVESTOR", "COMPANY"] as const) {
       expect(hubDestinations(side).map((entry) => entry.href)).not.toContain(
         "/results",

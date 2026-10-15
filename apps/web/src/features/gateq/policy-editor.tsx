@@ -232,7 +232,7 @@ export function PolicyEditor({
             rows={7}
             maxLength={20_000}
             placeholder="We invest $250k to $1.5m in pre-seed to Series A fintech in West Africa and Kenya. We don't invest in online betting."
-            className="cq-body w-full resize-y rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+            className="cq-body w-full resize-y border border-(--cq-border-subtle) bg-(--cq-surface) p-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           />
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -292,7 +292,7 @@ export function PolicyEditor({
               return (
                 <li
                   key={proposal.key}
-                  className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-3"
+                  className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-3"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <input
@@ -304,12 +304,12 @@ export function PolicyEditor({
                         }))
                       }
                       aria-label={`Name founders see for the ${DIMENSION_WORDS[proposal.dimension]} rule`}
-                      className="cq-label min-h-11 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 text-(--cq-text-primary) hover:border-(--cq-border-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                      className="cq-label min-h-11 min-w-0 flex-1 border border-transparent bg-transparent px-2 text-(--cq-text-primary) hover:border-(--cq-border-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                     />
                     <div
                       role="group"
                       aria-label="How strict"
-                      className="flex rounded-lg border border-(--cq-border-subtle) p-0.5"
+                      className="flex border border-(--cq-border-subtle) p-0.5"
                     >
                       {(["REQUIRED", "PREFERRED"] as const).map((level) => (
                         <button
@@ -322,7 +322,7 @@ export function PolicyEditor({
                               requiredness: level,
                             }))
                           }
-                          className="cq-caption min-h-10 rounded-md px-3 text-(--cq-text-secondary) aria-pressed:bg-(--cq-surface-strong) aria-pressed:text-(--cq-text-primary)"
+                          className="cq-caption min-h-10 px-3 text-(--cq-text-secondary) aria-pressed:bg-(--cq-surface-strong) aria-pressed:text-(--cq-text-primary)"
                         >
                           {level === "REQUIRED" ? "Required" : "Preferred"}
                         </button>
@@ -347,7 +347,7 @@ export function PolicyEditor({
                       {proposal.valueLabels.map((value, index) => (
                         <li
                           key={`${value}-${index}`}
-                          className="cq-caption flex items-center gap-1 rounded-full bg-(--cq-surface-subtle) py-0.5 pr-0.5 pl-2.5 text-(--cq-text-primary)"
+                          className="cq-caption flex items-center gap-1 bg-(--cq-surface-subtle) py-0.5 pr-0.5 pl-2.5 text-(--cq-text-primary)"
                         >
                           {proposal.config.type === "EXCLUDED_TAXONOMY"
                             ? `Not ${value}`
@@ -360,7 +360,7 @@ export function PolicyEditor({
                                 withoutValue(p, index),
                               )
                             }
-                            className="flex size-7 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-strong)"
+                            className="flex size-7 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-strong)"
                           >
                             <X
                               size={ICON_SIZE.compact}
@@ -457,7 +457,7 @@ function ChequeFields({
   readonly onChange: (config: Proposal["config"]) => void;
 }) {
   const field =
-    "cq-body-sm min-h-11 w-32 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
+    "cq-body-sm min-h-11 w-32 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="cq-caption text-(--cq-text-secondary)">
