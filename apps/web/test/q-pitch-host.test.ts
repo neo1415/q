@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { QMessageSchema, type QMessage } from "@capital-q/contracts";
+import type { SceneLine } from "@capital-q/q-pitch";
 
 import { demoTop } from "@/features/q/answer-canvas-fixtures";
 import {
@@ -8,7 +9,13 @@ import {
   receiptCompanies,
   resolveCompanyFixture,
 } from "@/features/q-pitch/fixtures";
-import { captionSpeak, readingMs } from "@/features/q-pitch/narrator";
+import {
+  captionSpeak,
+  createNarrator,
+  LIVE_LATE_START_MS,
+  readingMs,
+  type LiveNarration,
+} from "@/features/q-pitch/narrator";
 
 const LEDGERFOLD = "0b9a8c3e-4f61-4d2a-9c1e-5a7b3d2e1f00";
 const F2 = "1c9a8c3e-4f61-4d2a-9c1e-5a7b3d2e1f01";
@@ -147,6 +154,142 @@ describe("caption narrator", () => {
     controller.abort();
     await speaking;
     expect(Date.now() - started).toBeLessThan(500);
+  });
+});
+
+const LINE = (text: string): SceneLine => ({
+  lineId: "l.test",
+  kind: "CONNECTIVE",
+  text,
+  claimIds: [],
+  timing: "AFTER_ACK",
+  source: "test",
+});
+
+async function until(done: () => boolean): Promise<void> {
+  for (let i = 0; i < 10_000 && !done(); i++) await Promise.resolve();
+  expect(done()).toBe(true);
+}
+
+/** A narrator on a virtual clock; `speakingAt` scripts the live voice. */
+function voiced(options: {
+  live: boolean;
+  speakingAt?: (ms: number) => boolean;
+  tts?: boolean;
+}) {
+  let clock = 0;
+  const said: string[] = [];
+  const hush: boolean[] = [];
+  const tts: string[] = [];
+  const live: LiveNarration = {
+    say: (text) => {
+      said.push(text);
+      return true;
+    },
+    speaking: () => options.speakingAt?.(clock) ?? false,
+    hush: (on) => hush.push(on),
+  };
+  const narrator = createNarrator({
+    live: () => (options.live ? live : null),
+    tts: (text) => {
+      tts.push(text);
+      return Promise.resolve(options.tts ?? true);
+    },
+    now: () => clock,
+    wait: (ms, signal) => {
+      if (!signal.aborted) clock += Math.max(0, ms);
+      return Promise.resolve();
+    },
+  });
+  return { narrator, said, hush, tts, at: () => clock };
+}
+
+describe("the voiced narrator (Q's own voice; captions stay)", () => {
+  it("says the line on the open live line and waits until it has been heard", async () => {
+    const h = voiced({ live: true, speakingAt: (t) => t >= 400 && t < 3_000 });
+    await h.narrator.speak(
+      [LINE("One place for everything.")],
+      new AbortController().signal,
+    );
+    expect(h.said).toEqual(["One place for everything."]);
+    expect(h.tts).toEqual([]);
+    expect(h.narrator.lastChannel()).toBe("LIVE");
+    // Not before the voice finished (plus the quiet window).
+    expect(h.at()).toBeGreaterThanOrEqual(3_000);
+    expect(h.hush).toEqual([]);
+  });
+
+  it("falls back to Q's standard TTS voice when no live line is open", async () => {
+    const h = voiced({ live: false });
+    await h.narrator.speak([LINE("Hello.")], new AbortController().signal);
+    expect(h.said).toEqual([]);
+    expect(h.tts).toEqual(["Hello."]);
+    expect(h.narrator.lastChannel()).toBe("TTS");
+  });
+
+  it("keeps the caption's reading time when no audio can play", async () => {
+    const h = voiced({ live: false, tts: false });
+    const text = Array.from({ length: 25 }, () => "word").join(" ");
+    await h.narrator.speak([LINE(text)], new AbortController().signal);
+    expect(h.narrator.lastChannel()).toBe("CAPTION");
+    expect(h.at()).toBeGreaterThanOrEqual(readingMs(text));
+  });
+
+  it("Pause/Skip/Back: silences the live line at once, then restores it", async () => {
+    const controller = new AbortController();
+    const h = voiced({ live: true, speakingAt: (t) => t >= 200 && t < 6_000 });
+    const speaking = h.narrator.speak(
+      [LINE("A long line.")],
+      controller.signal,
+    );
+    await Promise.resolve();
+    // Cancel while Q is audible.
+    await until(() => h.at() >= 1_000);
+    controller.abort();
+    await speaking;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(h.hush[0]).toBe(true);
+    expect(h.hush.at(-1)).toBe(false);
+  });
+
+  it("an audience barge-in (provider already cut Q off) hushes nothing", async () => {
+    const controller = new AbortController();
+    // Q spoke, the provider cut it off when the person started talking,
+    // and their words arrive (the tour pauses) a moment later.
+    const stopped = LIVE_LATE_START_MS + 500;
+    const h = voiced({
+      live: true,
+      speakingAt: (t) => t >= 200 && t < stopped,
+    });
+    const speaking = h.narrator.speak(
+      [LINE("A long line.")],
+      controller.signal,
+    );
+    await until(() => h.at() >= stopped + 200);
+    controller.abort();
+    await speaking;
+    expect(h.hush).toEqual([]);
+  });
+
+  it("a live line that plays nothing: the standard voice reads it, and after two misses the live line is no longer used", async () => {
+    const h = voiced({ live: true, speakingAt: () => false });
+    const signal = new AbortController().signal;
+    await h.narrator.speak([LINE("One.")], signal);
+    expect(h.tts).toEqual(["One."]);
+    expect(h.hush).toEqual([true, false]);
+    await h.narrator.speak([LINE("Two.")], signal);
+    await h.narrator.speak([LINE("Three.")], signal);
+    expect(h.said).toEqual(["One.", "Two."]);
+    expect(h.tts).toEqual(["One.", "Two.", "Three."]);
+  });
+
+  it("speaks nothing once aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const h = voiced({ live: true });
+    await h.narrator.speak([LINE("Hello.")], controller.signal);
+    expect(h.said).toEqual([]);
+    expect(h.tts).toEqual([]);
   });
 });
 
