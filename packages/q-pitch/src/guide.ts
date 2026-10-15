@@ -103,6 +103,10 @@ export const GuideEventSchema = z.discriminatedUnion("type", [
   /** `routeIntact`: the screen is still where the cursor expects. */
   z.object({ type: z.literal("RESUME"), routeIntact: z.boolean() }).strict(),
   z.object({ type: z.literal("GO_BACK") }).strict(),
+  /** Leave this scene for the next one (blueprint §3 controls: skip). */
+  z.object({ type: z.literal("SKIP") }).strict(),
+  /** "Show me that again": replay the scene just shown, from its start. */
+  z.object({ type: z.literal("REPEAT") }).strict(),
   z
     .object({ type: z.literal("JUMP_TO_CHAPTER"), chapterId: ChapterIdSchema })
     .strict(),

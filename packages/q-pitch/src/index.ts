@@ -2,6 +2,17 @@ export * from "./tour-action.js";
 export * from "./scene-evidence.js";
 export * from "./script.js";
 export * from "./guide.js";
+export * from "./control-channel.js";
+export {
+  routeMatchesPattern,
+  TourRunner,
+  type ActionOutcome,
+  type PrepareOutcome,
+  type TourNotice,
+  type TourPorts,
+  type TourRunnerOptions,
+  type TourSnapshot,
+} from "./tour-runner.js";
 export {
   cursorOf,
   startTour,
