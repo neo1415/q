@@ -344,12 +344,16 @@ export function createPostgresRehearsalVideoStore(
       return rows[0] === undefined ? null : fromRaw(rows[0]);
     },
     markLive: async (row, input) => {
+      // The clock starts when the room is ready (migration 20261226160000).
       const rows = await sql<RawRow[]>`
         update q_runtime.rehearsal_video_sessions
            set status = 'LIVE', provider_key_index = ${input.keyIndex},
                provider_pal_id = ${input.palId},
                provider_conversation_id = ${input.conversationId},
-               sealed_join_url = ${input.sealedJoinUrl}
+               sealed_join_url = ${input.sealedJoinUrl},
+               -- One instant for both: the guard accepts exactly ready + cap.
+               live_at = now(),
+               ends_at = now() + interval '180 seconds'
          where id = ${row.id} and tenant_id = ${row.tenantId}
            and user_id = ${row.userId} and status = 'STARTING'
         returning ${columns}`;
@@ -484,6 +488,14 @@ export function isTavusConnectivityCheck(
         "This is an automated connectivity check sent during custom LLM configuration.",
       )
   );
+}
+
+/** The interviewer's name on their tile in the room, e.g. "Steve, Fund One". */
+export function rehearsalParticipantName(
+  interviewer: string,
+  counterpart: string,
+): string {
+  return `${interviewer}, ${counterpart}`.slice(0, 100);
 }
 
 /** Only a private room on the provider's own video host is ever embedded. */
@@ -989,7 +1001,12 @@ export function createRehearsalVideoService(dependencies: {
         const { value, keyIndex } = await pool.withHealthyKey(
           async (client, providerKeyIndex) => {
             const { palId } = await client.createPal({
-              name: `cq-rehearsal-${row.id}`,
+              // The provider shows the PAL's name on the interviewer's tile:
+              // the founder meets "Steve, <fund>", never an internal id.
+              name: rehearsalParticipantName(
+                interviewer.name,
+                rehearsal.counterpart.name,
+              ),
               // Conduct and disclosure only: what is said comes from Q.
               systemPrompt:
                 "You are the face and voice of a practice meeting run by Capital Q. Speak exactly the lines you are given, naturally, and nothing else.",
@@ -1032,14 +1049,14 @@ export function createRehearsalVideoService(dependencies: {
               const conversation = await client.createConversation({
                 palId,
                 faceId: interviewer.faceId,
-                name: "Capital Q rehearsal",
+                // Traceable on the provider's side, not shown to the founder.
+                name: `cq-rehearsal-${row.id}`,
                 callbackUrl: null,
                 greeting,
                 context: null,
-                maxCallSeconds: Math.max(
-                  1,
-                  Math.min(REHEARSAL_VIDEO_MAX_SECONDS, remaining),
-                ),
+                // The founder's three minutes start when the room is ready
+                // (migration 20261226160000), so the provider gets the full cap.
+                maxCallSeconds: REHEARSAL_VIDEO_MAX_SECONDS,
                 testMode: dependencies.testMode === true,
                 requireAuth: true,
               });
