@@ -49,6 +49,7 @@ for (const c of lib.companies()) {
   const page = await ctx.newPage();
   page.setDefaultTimeout(30000);
   const failed = [];
+  let backoff = false;
   for (const step of STEPS) {
     if (steps && !steps.includes(step.name)) continue;
     try {
@@ -58,19 +59,23 @@ for (const c of lib.companies()) {
         .split("\n")[0]
         .slice(0, 300);
       console.log(`[${c.n} ${c.company}] ${step.name} FAILED: ${msg}`);
+      if (/\b(504|544)\b|upstream request timeout/i.test(msg)) backoff = true;
       await page
         .screenshot({
           path: `${process.env.CQ_SEED_SHOTS ?? "/tmp"}/fail-${c.n}-${step.name}.png`,
         })
         .catch(() => {});
       failed.push(step.name);
-      if (step.name === "stepOnboarding") break;
+      if (step.name === "stepOnboarding" || backoff) break;
     }
   }
   summary.push(
     `${c.n} ${c.company}: ${failed.length ? `FAILED ${failed.join(",")}` : "ok"}`,
   );
   await ctx.close();
+  // Throttle between companies (CQ_SEED_PAUSE_MS); back off 5 min after auth/DB timeouts.
+  const pause = backoff ? 300000 : Number(process.env.CQ_SEED_PAUSE_MS ?? 0);
+  if (pause) await new Promise((r) => setTimeout(r, pause));
 }
 console.log("\nSUMMARY\n" + summary.join("\n"));
 await browser.close();

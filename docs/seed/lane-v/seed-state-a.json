@@ -2,7 +2,37 @@
   "companies": {
     "102": {
       "company": "Dawaledger",
-      "founderUserId": "a1500533-4dc0-49d8-86ac-8860e9d7a0d8"
+      "founderUserId": "a1500533-4dc0-49d8-86ac-8860e9d7a0d8",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "1d9ea10b-d039-4528-a3b4-eb1e2b2722e2",
+      "organisationId": "98b1eb97-1bde-48ef-b648-3f1c1ed1d0ee",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Otieno Achieng",
+          "userId": "b2d22201-6fab-4428-b543-d5b05ff0254c",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Faith Wanjala",
+          "userId": "ac7dd010-7d55-488c-9771-3ce50336b50e",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "28fde1a8-4162-47da-8431-83c8708ce76c",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
     },
     "103": {
       "company": "Harbourline Cargo",
@@ -37,6 +67,217 @@
       "pitchId": "1218b83c-2cbe-4943-a2bc-3b54f61c20d9",
       "visibility": "network_visible",
       "readiness": "marketplace_ready"
+    },
+    "104": {
+      "company": "Shambasense",
+      "founderUserId": "546ad152-b238-4a92-af10-f91b14aaa673",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "04d7038a-4467-4022-9781-61bbe396e755",
+      "organisationId": "8e59e3f3-e69b-4ee8-9f3b-96ecdfc0a618",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "photos": true,
+        "capital": true,
+        "q": true,
+        "team": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Jean-Paul Habimana",
+          "userId": "3d4f9879-aa55-4835-97a3-d5fd3c6d61f1",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Claudine Mukamana",
+          "userId": "06bf137f-158b-4054-afd8-2027b36d7724",
+          "role": "MEMBER"
+        }
+      ],
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "105": {
+      "company": "Xam Xam Learn",
+      "founderUserId": "1312ca37-3fb2-47a6-9714-80b493afa44b",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "4e2a9673-5faa-43d7-a6fe-7e0d9d847107",
+      "organisationId": "f81e058d-03c7-466f-9abf-9d2fec967754",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Awa Ndiaye",
+          "userId": "bfca769f-b1aa-453c-96bd-8255f6bc1cc2",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Ousmane Sarr",
+          "userId": "9850ec2c-d0da-4bb7-99cc-602cf9188f01",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "92dc4738-85a3-4f35-a5fc-5f9439cc14e1",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "109": {
+      "company": "Afyascan",
+      "founderUserId": "2a595c7c-34db-4e72-b4b6-500e21b2d6ee",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "8daf6221-16bf-42e6-96b7-cf62403935d3",
+      "organisationId": "af0bf75f-73b9-4085-9f94-a59ea5d26cef",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Ivan Ssemakula",
+          "userId": "89a6dee6-5b07-485f-9cc5-b27ff3286170",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Patience Akello",
+          "userId": "003b863f-d36f-4445-8450-6fcb4fd909fe",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "6acffc7c-e415-4fa6-88d3-4bcee4cbc1e8",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "112": {
+      "company": "Sahel Pumps",
+      "founderUserId": "72616e4a-ca0a-4e11-a41c-fde188e82327",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "9e95c9b6-49ff-4563-a563-db0a0021c232",
+      "organisationId": "971dead0-5472-44a4-9f62-d96b70c026a2",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Ibrahim Keita",
+          "userId": "9489e092-a42e-40f2-af0d-a31fa1dac6e6",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Aminata Coulibaly",
+          "userId": "08436b8b-2995-4d26-a868-c5305f3e7393",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "4869a403-6510-47a9-b658-46403d93f593",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "114": {
+      "company": "Clausekind",
+      "founderUserId": "5bb4589d-82b1-41b9-bd3c-dd3cff0b766b",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "6b89033a-5436-4079-a69b-cf5ef349ad64",
+      "organisationId": "947de575-9f80-4666-a865-b85115d17eb7",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Segun Adebisi",
+          "userId": "8687dad8-d81a-45a5-a758-b25627292339",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Ireti Coker",
+          "userId": "1463d1de-bcca-412c-a142-6a5ebd794d33",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "b6bb5da6-077d-47d6-ae1c-995cc4047650",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "115": {
+      "company": "Kivu Traceworks",
+      "founderUserId": "60a726c2-e1e5-4348-abd8-70771ec8b0bd",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "51d644d0-887a-400d-9ea7-98a92d28d84a",
+      "organisationId": "a458fac0-f895-44ab-a5d9-b79f890545ef",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Patrick Mulumba",
+          "userId": "83699de0-3832-4eb5-8b94-51b8fd21863f",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Sophie Lambert",
+          "userId": "d10bd7b4-3d1a-4da1-891e-471c15fb2060",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "fd9d9490-e61e-420f-a1f2-1caa82f14e40",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "117": {
+      "company": "Kefet Rx",
+      "founderUserId": "0f763750-68be-465b-ac0b-397644961250",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "f4c50366-282e-497e-bddf-644721362eb9",
+      "organisationId": "119876eb-fe88-404c-aaac-a8bda8cb5215",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "photos": true
+      }
     }
   }
 }

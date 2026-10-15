@@ -128,6 +128,10 @@ for (const job of jobs) {
   }
   console.log(summary.at(-1));
   await ctx.close();
+  // Production DB was overloaded (15 Oct): one job at a time, 20 s apart,
+  // and a 5-minute back-off after any auth/DB timeout.
+  const pause = /504|544|timeout|Timeout/.test(summary.at(-1)) ? 300000 : 20000;
+  await new Promise((r) => setTimeout(r, pause));
 }
 console.log("\nSUMMARY\n" + summary.join("\n"));
 await browser.close();

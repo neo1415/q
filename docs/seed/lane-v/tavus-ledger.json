@@ -1,5 +1,5 @@
 {
- "activeKey": 3,
+ "activeKey": 6,
  "keys": {
   "key#1": {
    "videos": 13,
@@ -19,7 +19,17 @@
   "key#4": {
    "videos": 26,
    "seconds": 843.7,
-   "refusal": null
+   "refusal": "HTTP 402 {\"message\":\"Payment required\"}"
+  },
+  "key#5": {
+   "videos": 17,
+   "seconds": 611.9,
+   "refusal": "HTTP 402 {\"message\":\"Payment required\"}"
+  },
+  "key#6": {
+   "videos": 20,
+   "seconds": 733.4,
+   "refusal": "HTTP 402 {\"message\":\"Payment required\"}"
   }
  },
  "videos": {
@@ -533,7 +543,311 @@
    "replica": "r862e3a3c5e0",
    "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/nf-110-naija-reels-v2.mp4",
    "seconds": 32.7
-  }
+  },
+  "fb-fb0038": {
+   "estimate": 37,
+   "videoId": "9bb1410459",
+   "key": "key#5",
+   "replica": "r79996137c01",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0038.mp4",
+   "seconds": 40.4
+  },
+  "fb-fb0055": {
+   "estimate": 37,
+   "videoId": "8f07e7012f",
+   "key": "key#5",
+   "replica": "r158ac53345d",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0055.mp4",
+   "seconds": 39.1
+  },
+  "fb-fb0069": {
+   "estimate": 31,
+   "videoId": "2254526013",
+   "key": "key#5",
+   "replica": "r90e7a409fac",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0069.mp4",
+   "seconds": 32.5
+  },
+  "fb-fb0086": {
+   "estimate": 31,
+   "videoId": "c779f272b1",
+   "key": "key#5",
+   "replica": "rc4492899eda",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0086.mp4",
+   "seconds": 34.9
+  },
+  "fb-fb0089": {
+   "estimate": 31,
+   "videoId": "aec7299bcc",
+   "key": "key#5",
+   "replica": "rec4a4153a78",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0089.mp4",
+   "seconds": 36.4
+  },
+  "fb-fb0090": {
+   "estimate": 31,
+   "videoId": "743afff237",
+   "key": "key#5",
+   "replica": "r24efb3b9bef",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0090.mp4",
+   "seconds": 28
+  },
+  "fb-fb0102": {
+   "estimate": 32,
+   "videoId": "5b9bc18dd6",
+   "key": "key#5",
+   "replica": "r0004b1b95e1",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0102.mp4",
+   "seconds": 34.7
+  },
+  "fb-fb0122": {
+   "estimate": 37,
+   "videoId": "d515db0de0",
+   "key": "key#5",
+   "replica": "r0a8102ab353",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0122.mp4",
+   "seconds": 41.8
+  },
+  "fb-fb0128": {
+   "estimate": 34,
+   "videoId": "3207540d96",
+   "key": "key#5",
+   "replica": "r35d9fc7a674",
+   "failed": "error \"An error occurred while generating this request. Please check your inputs or try your request again.\""
+  },
+  "fb-fb0130": {
+   "estimate": 34,
+   "videoId": "cff62d2932",
+   "key": "key#5",
+   "replica": "r5f0577fc829",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0130.mp4",
+   "seconds": 35.1
+  },
+  "fb-fb0141": {
+   "estimate": 33,
+   "videoId": "c0bc74772e",
+   "key": "key#5",
+   "replica": "r1af76e94d00",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0141.mp4",
+   "seconds": 32.3
+  },
+  "fb-fb0173": {
+   "estimate": 32,
+   "videoId": "a0f7b87e41",
+   "key": "key#5",
+   "replica": "r291e545fd67",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0173.mp4",
+   "seconds": 33.4
+  },
+  "fb-fb0183": {
+   "estimate": 37,
+   "videoId": "1461cba90c",
+   "key": "key#5",
+   "replica": "r347a65434bb",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0183.mp4",
+   "seconds": 35.5
+  },
+  "fb-fb0198": {
+   "estimate": 32,
+   "videoId": "d58ebd664c",
+   "key": "key#5",
+   "replica": "r38e4c3bc562",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0198.mp4",
+   "seconds": 33.4
+  },
+  "fb-fb0209": {
+   "estimate": 36,
+   "videoId": "bbff8a8214",
+   "key": "key#5",
+   "replica": "r3cb75621574",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0209.mp4",
+   "seconds": 39.3
+  },
+  "fb-fb0226": {
+   "estimate": 36,
+   "videoId": "d523718000",
+   "key": "key#5",
+   "replica": "r4067604db72",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0226.mp4",
+   "seconds": 35.6
+  },
+  "fb-fb0239": {
+   "estimate": 32,
+   "videoId": "36a41beca2",
+   "key": "key#5",
+   "replica": "r4dcf31b60e1",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0239.mp4",
+   "seconds": 38.5
+  },
+  "fb-fb0241": {
+   "estimate": 35,
+   "videoId": "b0ddbd50a0",
+   "key": "key#5",
+   "replica": "r5791c5ab229",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0241.mp4",
+   "seconds": 41
+  },
+  "fb-fb0034": {
+   "estimate": 32,
+   "videoId": "97b605a32d",
+   "key": "key#6",
+   "replica": "rb68659d2f28",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0034.mp4",
+   "seconds": 34.5
+  },
+  "fb-fb0039": {
+   "estimate": 35,
+   "videoId": "4bde7b42e0",
+   "key": "key#6",
+   "replica": "r63f1fb11353",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0039.mp4",
+   "seconds": 33.7
+  },
+  "fb-fb0040": {
+   "estimate": 36,
+   "videoId": "6afca67ec9",
+   "key": "key#6",
+   "replica": "r51b323e761e",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0040.mp4",
+   "seconds": 39.6
+  },
+  "fb-fb0052": {
+   "estimate": 35,
+   "videoId": "a9a04b0d7a",
+   "key": "key#6",
+   "replica": "r873e4707689",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0052.mp4",
+   "seconds": 34.7
+  },
+  "fb-fb0085": {
+   "estimate": 37,
+   "videoId": "941b48855b",
+   "key": "key#6",
+   "replica": "r67d1c9cac37",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0085.mp4",
+   "seconds": 39.3
+  },
+  "fb-fb0100": {
+   "estimate": 34,
+   "videoId": "7ba1df7411",
+   "key": "key#6",
+   "replica": "r6c4e43b78b1",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0100.mp4",
+   "seconds": 33.6
+  },
+  "fb-fb0103": {
+   "estimate": 33,
+   "videoId": "439bfad0e7",
+   "key": "key#6",
+   "replica": "r9458111c64a",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0103.mp4",
+   "seconds": 34.9
+  },
+  "fb-fb0131": {
+   "estimate": 37,
+   "videoId": "e3b3251261",
+   "key": "key#6",
+   "replica": "r800fc6ba80d",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0131.mp4",
+   "seconds": 34.1
+  },
+  "fb-fb0168": {
+   "estimate": 34,
+   "videoId": "a1c1ac404e",
+   "key": "key#6",
+   "replica": "rb07f6f67b52",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0168.mp4",
+   "seconds": 33.5
+  },
+  "fb-fb0217": {
+   "estimate": 37,
+   "videoId": "3b6c8406e3",
+   "key": "key#6",
+   "replica": "re22cfdd52e0",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0217.mp4",
+   "seconds": 39.2
+  },
+  "fb-fb0235": {
+   "estimate": 36,
+   "videoId": "4c696cf6d6",
+   "key": "key#6",
+   "replica": "rcea962f9f9b",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0235.mp4",
+   "seconds": 38.3
+  },
+  "fb-fb0250": {
+   "estimate": 35,
+   "videoId": "22af608a90",
+   "key": "key#6",
+   "replica": "rdd4c86e5e1a",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0250.mp4",
+   "seconds": 38.8
+  },
+  "fb-fb0003": {
+   "estimate": 35,
+   "videoId": "0c7313a456",
+   "key": "key#6",
+   "replica": "r1a4e22fa0d9",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0003.mp4",
+   "seconds": 34.2
+  },
+  "fb-fb0005": {
+   "estimate": 38,
+   "videoId": "01a349236b",
+   "key": "key#6",
+   "replica": "r042bf0ddb46",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0005.mp4",
+   "seconds": 43.6
+  },
+  "fb-fb0010": {
+   "estimate": 35,
+   "videoId": "a0ef080244",
+   "key": "key#6",
+   "replica": "r1ce7f5b22d4",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0010.mp4",
+   "seconds": 35.1
+  },
+  "fb-fb0037": {
+   "estimate": 40,
+   "videoId": "d25b1d15cf",
+   "key": "key#6",
+   "replica": "r31e11adf1d3",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0037.mp4",
+   "seconds": 38.8
+  },
+  "fb-fb0059": {
+   "estimate": 36,
+   "videoId": "c98ba58fd6",
+   "key": "key#6",
+   "replica": "r78c9b897fbc",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0059.mp4",
+   "seconds": 35.9
+  },
+  "fb-fb0063": {
+   "estimate": 36,
+   "videoId": "2e34ff8a88",
+   "key": "key#6",
+   "replica": "r862e3a3c5e0",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0063.mp4",
+   "seconds": 35.3
+  },
+  "fb-fb0076": {
+   "estimate": 35,
+   "videoId": "2f012e38c0",
+   "key": "key#6",
+   "replica": "r340d93adc9b",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0076.mp4",
+   "seconds": 38.2
+  },
+  "fb-fb0079": {
+   "estimate": 37,
+   "videoId": "1e728f5b0f",
+   "key": "key#6",
+   "replica": "r5fb46c843a8",
+   "file": "/tmp/claude-0/-home-user-q/36a4bcfb-949b-538e-957a-f912051e5af6/scratchpad/seed-v/videos/fb-fb0079.mp4",
+   "seconds": 38.1
+  },
+  "fb-fb0081": {}
  },
  "excluded": [],
  "notes": {

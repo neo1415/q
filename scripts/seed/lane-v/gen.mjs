@@ -58,7 +58,9 @@ for (const job of jobs) {
     throw new Error(`${job.slug}: ${n} words is outside 60–150`);
 }
 
+let exhausted = false;
 for (const job of jobs) {
+  if (exhausted) break;
   const v = (ledger.videos[job.slug] ??= {});
   if ((v.file && fs.existsSync(v.file)) || v.videoId) continue;
   for (;;) {
@@ -75,18 +77,29 @@ for (const job of jobs) {
     );
     {
       const t = tag(ledger.activeKey);
-      const used = ledger.keys[t]?.seconds ?? 0;
+      // Finished seconds plus an estimate for jobs queued but not yet ready.
+      const used = Object.values(ledger.videos).reduce(
+        (sum, v) =>
+          v.key === t
+            ? sum + (v.seconds ?? (v.file || v.failed ? 0 : (v.estimate ?? 35)))
+            : sum,
+        0,
+      );
       if (cap[t] && used + 45 > Number(cap[t])) {
-        ledger.keys[t] = { ...(ledger.keys[t] ?? {}), refusal: `lead cap ${cap[t]} s` };
+        ledger.keys[t] = {
+          ...(ledger.keys[t] ?? {}),
+          refusal: `lead cap ${cap[t]} s`,
+        };
         ledger.activeKey += 1;
         continue;
       }
     }
     const i = ledger.activeKey;
     if (i >= keys().length) {
+      // Stop submitting, but still collect every job already queued.
       console.log("ALL KEYS EXHAUSTED");
-      save();
-      process.exit(3);
+      exhausted = true;
+      break;
     }
     const r = await tv(i, "POST", "/v2/videos", {
       replica_id: job.replica_id,
@@ -101,6 +114,7 @@ for (const job of jobs) {
     if (r.status < 300 && r.body?.video_id) {
       delete v.error;
       Object.assign(v, {
+        estimate: Math.round(words(job.script) / 2.6),
         videoId: r.body.video_id,
         key: tag(i),
         replica: job.replica_id,

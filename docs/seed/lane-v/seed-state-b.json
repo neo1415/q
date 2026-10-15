@@ -2,7 +2,255 @@
   "companies": {
     "101": {
       "company": "Laterra Bricks",
-      "founderUserId": "6e422596-2d9c-44f4-9b77-f064a1f27bea"
+      "founderUserId": "6e422596-2d9c-44f4-9b77-f064a1f27bea",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "90d98174-e80b-4786-9d07-0662af939cf1",
+      "organisationId": "f2bbfeae-ea6f-4f7b-998c-0d49f5e52534",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "photos": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Yaw Darko",
+          "userId": "23cfd6cf-43fe-461c-b1ba-9d8222726227",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Efua Quaye",
+          "userId": "c2fde1a2-1d00-48d8-ab50-b80a06596b55",
+          "role": "MEMBER"
+        }
+      ],
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready",
+      "pitchId": "93c3c4ef-7b6d-46dc-9474-bed466fb4ed2"
+    },
+    "106": {
+      "company": "Mavuno Cold",
+      "founderUserId": "58804f45-ffde-411f-8c68-67590eb79236",
+      "deckViaOnboarding": true,
+      "founderCount": 1
+    },
+    "107": {
+      "company": "Bursary Bridge",
+      "founderUserId": "764789fc-0f21-414f-b281-b49c17af605d",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "5300da51-bb17-4d7a-bee9-6bccbd8c717e",
+      "organisationId": "deaab209-bb72-49a5-aba6-1b6a110b8010",
+      "done": {
+        "onboarding": true,
+        "photos": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Emeka Nwosu",
+          "userId": "84d79e5a-34bd-4715-822c-1e0405dd7db8",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Zainab Lawal",
+          "userId": "f883e30d-5b72-4c3d-a546-ab82cdfc57d5",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "cf987838-6bfd-4920-b740-457b8fe9ef10",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "108": {
+      "company": "Karoo Gridworks",
+      "founderUserId": "055361a7-4716-44c4-8fa6-c88609483d44",
+      "deckViaOnboarding": true,
+      "founderCount": 2,
+      "companyId": "ffa05337-f616-4796-a321-19495e052d36",
+      "organisationId": "25f17488-b58f-43e0-b0ab-885e31aeed9c",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Lerato Khumalo",
+          "userId": "4651b648-d1c2-4baa-b091-8835726e0e59",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Pieter van Wyk",
+          "userId": "2a9468b1-5647-412e-83a2-4c23b45670ee",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "40702af3-f50b-449c-ab88-ebfe14f74a98",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "110": {
+      "company": "Studio Ekun",
+      "founderUserId": "22b4b80a-a5ca-445c-9180-7e3124a5d381",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "95684111-f066-4904-8c3f-564eaa7419e5",
+      "organisationId": "059ad7e1-7c10-4587-98c0-2e8e2fb2231b",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Kunle Bakare",
+          "userId": "600f88e5-693e-49e0-b3d5-d642d7fd6bba",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Ama Owusu",
+          "userId": "5d699d1c-3e72-473c-b087-2f61b2a42946",
+          "role": "MEMBER"
+        }
+      ],
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "111": {
+      "company": "Kliniqa",
+      "founderUserId": "f4b2743e-9fb6-4544-81f5-17313866d1bd",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "9a1cc42c-9a09-4be4-8fe0-af9e08f62396",
+      "organisationId": "9f7ff861-3224-4309-876f-cb68ad4b2702",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Abena Asare",
+          "userId": "3818a4b9-d7a4-4b79-afe3-7334faa76ee8",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Nana Yeboah",
+          "userId": "48cb5c52-99ed-444e-b918-c854e265491e",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "64623a00-9cda-4285-9d6f-2943e1904eac",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "113": {
+      "company": "Umoja Cover",
+      "founderUserId": "04b988e5-3590-4e51-a117-2d061ed69e9d",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "07612108-ad98-411d-9a3e-b223bc36ebb5",
+      "organisationId": "b7c095fb-4e90-475e-ad55-4cb99f218e94",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true
+      },
+      "team": [
+        {
+          "name": "Mercy Chebet",
+          "userId": "c1e96024-d1ae-4c77-be86-696edf2c6f24",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Daniel Kiprop",
+          "userId": "f5ea21d5-04ba-475b-939f-c173d4217268",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "26775a11-0294-4f54-9e85-59c11951f689",
+      "visibility": "network_visible",
+      "readiness": "requirements_outstanding"
+    },
+    "116": {
+      "company": "Rankpay",
+      "founderUserId": "68a89125-9597-4ae6-8b4e-2e1c9c69ee12",
+      "deckViaOnboarding": true,
+      "founderCount": 1,
+      "companyId": "cd7e3b16-2cdd-4352-9baf-5b0048606608",
+      "organisationId": "6c414de1-52c4-4533-b0c1-6e7f72233bbc",
+      "done": {
+        "onboarding": true,
+        "profile": true,
+        "capital": true,
+        "documents": true,
+        "q": true,
+        "team": true,
+        "pitch": true,
+        "photos": true,
+        "visible": true
+      },
+      "team": [
+        {
+          "name": "Nomsa Zulu",
+          "userId": "cfda8663-0226-4849-b6d1-53eb2fe20780",
+          "role": "ADMIN"
+        },
+        {
+          "name": "Ravi Pillay",
+          "userId": "305cf82d-4cdb-4608-8f8d-181fe3e40e28",
+          "role": "MEMBER"
+        }
+      ],
+      "pitchId": "f22f453d-d90b-417c-a4b4-1b38781a86d0",
+      "visibility": "network_visible",
+      "readiness": "marketplace_ready"
+    },
+    "120": {
+      "company": "Aïna Care",
+      "founderUserId": "d16a9c41-8cd3-497e-9331-88f8d1ce83c0",
+      "deckViaOnboarding": true,
+      "founderCount": 1
+    },
+    "121": {
+      "company": "Landfall Credit",
+      "founderUserId": "e1b4c8bc-13c7-464a-86b6-ed967ad2bc8a"
+    },
+    "127": {
+      "company": "Pinlane",
+      "founderUserId": "c6c78ffb-818c-4158-9026-d037687ab287"
     }
   }
 }
