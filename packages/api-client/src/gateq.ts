@@ -16,6 +16,9 @@ import {
   GATEQ_APPLY_CONTACT_CONFIRM_PATH,
   GATEQ_APPLY_TRANSCRIPT_PATH,
   GATEQ_APPLY_COVERAGE_PATH,
+  GATEQ_APPLY_VIDEO_END_PATH,
+  GATEQ_APPLY_VIDEO_PATH,
+  GateqVideoStateDtoSchema,
   GATEQ_APPLY_SESSION_PATH,
   type ApplicationContactRequest,
   ApplicationAnswersResponseSchema,
@@ -283,6 +286,38 @@ export function getApplicationCoverage(baseUrl: string, sessionToken: string) {
     "GET",
     GATEQ_APPLY_COVERAGE_PATH,
     ApplicationCoverageDtoSchema,
+  );
+}
+/** C3: the applicant's video interview state (offered? live session?). */
+export function getApplicationVideo(baseUrl: string, sessionToken: string) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "GET",
+    GATEQ_APPLY_VIDEO_PATH,
+    GateqVideoStateDtoSchema,
+  );
+}
+/** Start, or return the same, video interview session. */
+export function startApplicationVideo(baseUrl: string, sessionToken: string) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "POST",
+    GATEQ_APPLY_VIDEO_PATH,
+    GateqVideoStateDtoSchema,
+  );
+}
+/** End it; `continueByTyping` keeps the same interview going by text. */
+export function endApplicationVideo(
+  baseUrl: string,
+  sessionToken: string,
+  continueByTyping: boolean,
+) {
+  return call(
+    { baseUrl, accessToken: sessionToken },
+    "POST",
+    GATEQ_APPLY_VIDEO_END_PATH,
+    GateqVideoStateDtoSchema,
+    { body: { continueByTyping } },
   );
 }
 export function resumeApplication(baseUrl: string, sessionToken: string) {

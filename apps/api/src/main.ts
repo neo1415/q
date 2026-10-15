@@ -27,7 +27,12 @@ import {
   unavailableAppEmailSender,
   createGoogleKeySource,
   platformGoogleHttp,
+  createTavusKeyPool,
+  createTokenCipher,
+  SecretToken,
+  tavusKeysFrom,
 } from "@capital-q/integrations";
+import { createTavusGateqVideoProvider } from "./gateq/video-provider.js";
 import { requireSupabaseAuthConfig } from "@capital-q/config/supabase-auth";
 import { loadWebPushConfig } from "@capital-q/config/web-push";
 import {
@@ -39,6 +44,7 @@ import {
   createRequestDatabaseClient,
 } from "@capital-q/database";
 import {
+  GATEQ_VIDEO_BRIDGE_PATH,
   CorrelationIdSchema,
   type AdminUsageDto,
   NO_RAISE_VIEW,
@@ -188,6 +194,9 @@ import {
   createPostgresApplicationFounders,
   gateqInboxActionsPort,
   ownGatewayIdFrom,
+  createGateqVideoInterview,
+  createPostgresGateqVideoSessions,
+  gateqVideoConfigFrom,
 } from "@capital-q/gateq-intake";
 import {
   createDailySpendCap,
@@ -718,6 +727,86 @@ function gateqContactRequiredFrom(): string | undefined {
   if (Number.isNaN(Date.parse(raw)))
     throw new Error("Invalid GateQ contact confirmation boundary");
   return raw;
+}
+
+/**
+ * C3: the GateQ video interview. Off unless CQ_GATEQ_VIDEO_INTERVIEW=1,
+ * a Tavus key, this API's public URL and a 32-byte seal key are all
+ * configured; otherwise the service answers "not available" and typing is
+ * the interview. Limits come from CQ_GATEQ_VIDEO_* (lead defaults).
+ */
+function composeGateqVideo(apply: {
+  readonly intake: Parameters<typeof createGateqVideoInterview>[0]["intake"];
+  readonly conversation: Parameters<
+    typeof createGateqVideoInterview
+  >[0]["conversation"];
+}) {
+  const config = gateqVideoConfigFrom(process.env);
+  const keys = tavusKeysFrom({
+    CQ_TAVUS_API_KEYS: process.env["CQ_TAVUS_API_KEYS"],
+    TAVUS_API_KEY: process.env["TAVUS_API_KEY"],
+  });
+  // This API's own public origin (the provider calls the bridge here).
+  const publicBaseUrl = (process.env["API_PUBLIC_URL"]?.trim() ?? "").replace(
+    /\/+$/u,
+    "",
+  );
+  const sealKey = process.env["CQ_GATEQ_VIDEO_SEAL_KEY"]?.trim() ?? "";
+  const cipher = (() => {
+    try {
+      return sealKey === "" ? null : createTokenCipher(sealKey);
+    } catch {
+      return null;
+    }
+  })();
+  const provider =
+    config.enabled && keys.length > 0 && publicBaseUrl !== "" && cipher !== null
+      ? createTavusGateqVideoProvider({
+          pool: createTavusKeyPool({
+            keys,
+            onKeyFailure: ({ keyIndex, kind, status }) => {
+              teamLogger.warn(
+                { keyIndex, kind, status },
+                "gateq video: Tavus account refused",
+              );
+            },
+          }),
+          publicBaseUrl,
+          faceId:
+            process.env["CQ_GATEQ_VIDEO_FACE_ID"]?.trim() || "rdd4c86e5e1a",
+          keyCount: keys.length,
+        })
+      : null;
+  const BOUND = "gateq-video.v1";
+  const interview = createGateqVideoInterview({
+    config,
+    store: createPostgresGateqVideoSessions({
+      sql: database.sql,
+      transactions: database.transactions,
+    }),
+    provider,
+    sealer: {
+      seal: (plain) => {
+        if (cipher === null) throw new Error("gateq video seal key missing");
+        return cipher.encrypt(new SecretToken(plain), BOUND).toString("base64");
+      },
+      open: (sealed) => {
+        if (cipher === null) throw new Error("gateq video seal key missing");
+        return cipher.decrypt(Buffer.from(sealed, "base64"), BOUND).reveal();
+      },
+    },
+    intake: apply.intake,
+    conversation: apply.conversation,
+    bridgePath: GATEQ_VIDEO_BRIDGE_PATH,
+  });
+  // Rooms past their deadline are ended even after a restart; the
+  // provider's own max_call_duration is the backstop behind this.
+  if (provider !== null) {
+    setInterval(() => {
+      void interview.sweep().catch(() => undefined);
+    }, 30_000).unref();
+  }
+  return interview;
 }
 
 const gateqApply =
@@ -2544,6 +2633,10 @@ const { app, logger } = createApp(config, security, {
       audience: "PUBLIC",
     });
   },
+  gateqVideo:
+    gateqApply === undefined
+      ? undefined
+      : { video: composeGateqVideo(gateqApply) },
   gateqApply,
   // GateQ slice 1: a signed-in founder's contact; their own verified
   // account email confirms a matching address without a code.

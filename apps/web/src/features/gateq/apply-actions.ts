@@ -12,12 +12,18 @@ import {
   confirmApplicationContact,
   getApplicationTranscript,
   getApplicationCoverage,
+  getApplicationVideo,
+  startApplicationVideo,
+  endApplicationVideo,
   resumeApplication,
   saveApplicationAnswers,
   startApplication,
   submitApplication,
 } from "@capital-q/api-client";
-import type { ApplicationSummaryDto } from "@capital-q/contracts";
+import type {
+  ApplicationSummaryDto,
+  GateqVideoStateDto,
+} from "@capital-q/contracts";
 import {
   ApplicationAnswersRequestSchema,
   ApplicationContactRequestSchema,
@@ -385,5 +391,73 @@ export async function coverageAction(sessionToken: string) {
     };
   } catch (error: unknown) {
     return formFailure(error);
+  }
+}
+
+/**
+ * C3: the GateQ video interview, by the applicant's own credential. Every
+ * failure is a plain message; typing always remains the interview.
+ */
+export type VideoResult =
+  | { readonly ok: true; readonly state: GateqVideoStateDto }
+  | { readonly ok: false; readonly message: string };
+
+const videoFailure = (error: unknown): VideoResult => {
+  const failed = failure(error);
+  return {
+    ok: false,
+    message: failed.ok
+      ? "Video isn't available right now. You can continue by typing."
+      : failed.message,
+  };
+};
+
+export async function videoStateAction(
+  sessionToken: string,
+): Promise<VideoResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false, message: "Please try again." };
+  try {
+    return { ok: true, state: await getApplicationVideo(url, token.data) };
+  } catch (error: unknown) {
+    return videoFailure(error);
+  }
+}
+
+export async function startVideoAction(
+  sessionToken: string,
+): Promise<VideoResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false, message: "Please try again." };
+  try {
+    return { ok: true, state: await startApplicationVideo(url, token.data) };
+  } catch (error: unknown) {
+    return videoFailure(error);
+  }
+}
+
+export async function endVideoAction(
+  sessionToken: string,
+  continueByTyping: boolean,
+): Promise<VideoResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false, message: "Please try again." };
+  try {
+    return {
+      ok: true,
+      state: await endApplicationVideo(
+        url,
+        token.data,
+        continueByTyping === true,
+      ),
+    };
+  } catch (error: unknown) {
+    return videoFailure(error);
   }
 }

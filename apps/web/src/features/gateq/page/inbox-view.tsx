@@ -117,6 +117,11 @@ export type InboxViewProps = {
   readonly inbox: GateqInboxDto | null;
   readonly state: "full" | "loading" | "empty" | "error";
   readonly initialDetail: GateqInboxDetailDto | null;
+  /**
+   * A deep link (?item=) named an application this investor cannot see (or
+   * none at all): say so, and open nothing in its place.
+   */
+  readonly missingItem?: boolean | undefined;
   readonly gateLink: string;
   readonly fund: string;
   /** Where a view chip goes; the view's name is appended. */
@@ -166,6 +171,7 @@ export function InboxView({
   inbox,
   state,
   initialDetail,
+  missingItem = false,
   gateLink,
   fund,
   viewBase = "/gateq?tab=inbox&view=",
@@ -186,8 +192,7 @@ export function InboxView({
   const [selected, setSelected] = useState<string | null>(
     demo?.selected ??
       initialDetail?.item.applicationId ??
-      inbox?.items[0]?.applicationId ??
-      null,
+      (missingItem ? null : (inbox?.items[0]?.applicationId ?? null)),
   );
   const [details, setDetails] = useState<
     Readonly<Record<string, GateqInboxDetailDto>>
@@ -239,7 +244,7 @@ export function InboxView({
   );
   const current =
     visible.find((item) => item.applicationId === selected) ??
-    visible[0] ??
+    (missingItem && selected === null ? null : visible[0]) ??
     null;
   const detail =
     current === null ? null : (details[current.applicationId] ?? null);
