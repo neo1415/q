@@ -132,6 +132,7 @@ export class TourRunner {
   #caption: SceneLine | null = null;
   #notice: TourNotice | null = null;
   #started = false;
+  #snapshot: TourSnapshot | null = null;
   #disposed = false;
   readonly #initialEffects: readonly GuideEffect[];
 
@@ -159,7 +160,13 @@ export class TourRunner {
     return this.#state;
   }
 
+  /** Stable between changes, so a UI store can compare by identity. */
   snapshot(): TourSnapshot {
+    this.#snapshot ??= this.#compute();
+    return this.#snapshot;
+  }
+
+  #compute(): TourSnapshot {
     const scene = this.#state.scenes[this.#state.sceneIndex] ?? null;
     const pending = this.#state.pending;
     return {
@@ -241,7 +248,8 @@ export class TourRunner {
   }
 
   #emit(): void {
-    const snapshot = this.snapshot();
+    this.#snapshot = this.#compute();
+    const snapshot = this.#snapshot;
     for (const listener of [...this.#listeners]) listener(snapshot);
   }
 
