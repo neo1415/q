@@ -5,6 +5,7 @@ import { useRef } from "react";
 
 import { cx } from "@capital-q/ui";
 
+import { LinkPending } from "@/components/link-pending";
 import { useQControlGroup } from "@/features/q/control/q-control";
 
 import type { PipelineLayout } from "./hub-view";
@@ -53,13 +54,14 @@ export function PipelineLayoutSwitch({
           data-pipeline-layout={entry}
           aria-current={layout === entry ? "page" : undefined}
           className={cx(
-            "cq-body-sm inline-flex min-h-11 items-center rounded-(--cq-radius-sm) px-3 transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-10",
+            "cq-body-sm relative inline-flex min-h-11 items-center rounded-(--cq-radius-sm) px-3 transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-10",
             layout === entry
               ? "bg-(--cq-surface-strong) font-semibold text-(--cq-text-primary)"
               : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
           )}
         >
           {LABELS[entry]}
+          <LinkPending />
         </Link>
       ))}
     </div>
