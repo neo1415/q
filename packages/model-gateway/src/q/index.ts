@@ -3010,6 +3010,18 @@ export function createModelGatewayQAnswer(
       // Never an unhandled rejection: the answer that takes it re-awaits
       // the same promise and sees the failure there.
       started.catch(() => undefined);
+      /**
+       * S3 (lane S, live 2026-10-15 run f854c339, a GateQ dossier
+       * question): the wide reads (standing, work, schedule, named
+       * companies; ~1 s) started only after the turn was read, on the
+       * critical path before the model. On a screen focused on one record
+       * the answer almost always takes them, so they start here, beside
+       * the readers: the same memoised read, the same tools and plan, read
+       * only; a turn answered by code simply never uses them.
+       */
+      if (request.plan.screen?.manifest?.focus !== undefined) {
+        started.then((prepared) => prepared?.wide()).catch(() => undefined);
+      }
       warming.set(request.runId, started);
       while (warming.size > WARMING_MAX) {
         const oldest = warming.keys().next().value;
