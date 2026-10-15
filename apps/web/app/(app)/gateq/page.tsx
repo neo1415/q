@@ -213,24 +213,44 @@ export default async function GateqPage({ searchParams }: Props) {
     );
   }
 
-  const view = GateqInboxViewSchema.catch("INBOX").parse(one(params["view"]));
+  // Q room R2 / CRM record links: a deep link opens one application
+  // (?item=) in WHICHEVER folder holds it (inbox, archived or passed), read
+  // through the inbox's own authority. One they may not see is a clear "not
+  // found", never the newest application opened silently in its place.
+  const wantedRaw = one(params["item"]);
+  const wanted =
+    wantedRaw !== undefined &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(
+      wantedRaw,
+    )
+      ? wantedRaw.toLowerCase()
+      : undefined;
+  const wantedDetail: GateqInboxDetailDto | null =
+    wanted === undefined
+      ? null
+      : await getGateqInboxItem(session, gatewayId, wanted).catch(() => null);
+  const missingItem = wantedRaw !== undefined && wantedDetail === null;
+  const explicitView = one(params["view"]);
+  // The linked application's own folder wins, so the list holds it.
+  const view = GateqInboxViewSchema.catch("INBOX").parse(
+    wantedDetail?.item.folder ?? explicitView,
+  );
   const inbox: GateqInboxDto | null = await getGateqInbox(
     session,
     gatewayId,
     view,
   ).catch(() => null);
-  // Q room R2: a deep link opens one application (?item=); otherwise the
-  // newest. Only an item this inbox lists for them can be opened.
-  const wanted = one(params["item"]);
-  const first =
-    inbox?.items.find((item) => item.applicationId === wanted) ??
-    inbox?.items[0];
+  const first = wantedRaw === undefined ? inbox?.items[0] : undefined;
   const detail: GateqInboxDetailDto | null =
-    first === undefined
-      ? null
-      : await getGateqInboxItem(session, gatewayId, first.applicationId).catch(
-          () => null,
-        );
+    wantedRaw !== undefined
+      ? wantedDetail
+      : first === undefined
+        ? null
+        : await getGateqInboxItem(
+            session,
+            gatewayId,
+            first.applicationId,
+          ).catch(() => null);
   return (
     <PageContainer>
       <GateqChrome
@@ -255,6 +275,16 @@ export default async function GateqPage({ searchParams }: Props) {
             focus={{ kind: "GATEQ_APPLICATION", id: detail.item.applicationId }}
           />
         )}
+        {missingItem ? (
+          <p
+            role="alert"
+            className="cq-body-sm mb-4 rounded-(--cq-radius-md) border border-(--cq-border-subtle) px-4 py-3 text-(--cq-text-primary)"
+            data-gateq-item-missing
+          >
+            That application isn&apos;t in your GateQ inbox, or you don&apos;t
+            have access to it. Nothing else has been opened in its place.
+          </p>
+        ) : null}
         <InboxView
           inbox={inbox}
           state={
@@ -265,6 +295,7 @@ export default async function GateqPage({ searchParams }: Props) {
                 : "full"
           }
           initialDetail={detail}
+          missingItem={missingItem}
           gateLink={link}
           fund={context.label ?? "your firm"}
         />

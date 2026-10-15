@@ -110,3 +110,27 @@ Core Seven remains the governing assessment framework. The new directive authori
 20. Do not buy new infrastructure or subscriptions without the founder's approval. Founder provider credits (OpenAI, Gemini, ElevenLabs, Deepgram, Recall, Serper, Tavily, etc.) are for product use. Tests use disabled keys (`disabled-locally-000000000000`).
 21. Deploy fast and incrementally, but never with destructive migrations, failing required CI, authorization bypasses, or success claims that haven't been verified.
 22. Secrets never go into Git, logs or handoff files. Record credential **names** only.
+
+## Four-lane round (2026-10-15)
+
+23. **Paid tests:**
+    - The owner approved paid live testing.
+    - Lead caps per round: Tavus about $10 (stop at an $8 estimate), OpenAI baselines about $3, Q Pitch voice about $2.
+    - Every paid session is logged with its estimated cost. Unit, e2e and eval tests still use disabled keys.
+24. **InvestIQ naming:** InvestIQ is FDN's proprietary methodology and the canonical name. The Capital Q engine implements FDN InvestIQ.
+25. **InvestIQ v1 method:**
+    - The owner delegated the weights, rules and bands to the lead, who set them from cited research. The method awaits calibration on 3–5 real FDN companies and runs in shadow mode only.
+    - Locked rules still bind:
+      - Investor Fit stays outside readiness;
+      - Q gives no advice on capital form (PADL #74);
+      - valuation stays outside the grade;
+      - an unknown value never becomes zero.
+26. **Credit top-up:** the owner tops up credits 08:00–09:00 WAT. If a paid test hits a provider limit before then, pause it and retry after 09:00 WAT; all other work continues.
+27. **GateQ guest uploads:** investors may only ever be shown files with a CLEAN malware scan. Each gateway has a storage cap, 5 GiB by default.
+28. **Q Pitch demo company:** Option A. Capital Q stays organisation-private and never appears in Discover. Investor questions about it are answered from the knowledge pack, and unknown figures stay unknown.
+29. **GateQ video limits:** each limit is configurable, with these defaults:
+    - 480 s per session;
+    - 1 session per application;
+    - concurrency 2;
+    - a typed fallback that is always available.
+    - Paid test runs are capped at 180 s.
