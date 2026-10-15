@@ -458,7 +458,7 @@ function RelationshipRow({
           kind="investor"
           name={name}
           investorOrganisationId={item.counterpart.id}
-          src={photoUrl}
+          src={photoUrl ?? undefined}
           size={40}
           decorative
         />
@@ -558,7 +558,7 @@ export function CounterpartAvatar({
       kind="investor"
       name={name}
       investorOrganisationId={item.counterpart.id}
-      src={item.counterpart.photoUrl}
+      src={item.counterpart.photoUrl ?? undefined}
       size={size}
       decorative
     />

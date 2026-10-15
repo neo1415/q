@@ -611,9 +611,13 @@ export function RelationshipHero({
           <EntityAvatar
             kind={profile.companyId === undefined ? "investor" : "company"}
             name={counterpart}
-            // No signed picture on the read: the gated photo route by id
-            // (the name's scope) rather than initials.
-            src={profile.photoUrl}
+            // An investor without a signed picture: the gated photo route by
+            // id (the name's scope). A company's null means "no photo".
+            src={
+              profile.investorOrganisationId
+                ? (profile.photoUrl ?? undefined)
+                : profile.photoUrl
+            }
             companyId={profile.companyId}
             investorOrganisationId={profile.investorOrganisationId}
             size="lg"
