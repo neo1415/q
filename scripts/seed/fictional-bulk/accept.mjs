@@ -103,16 +103,25 @@ if (args.includes("--logins-only")) {
   const keys = opt("--logins-only", "").split(",").filter(Boolean);
   for (const key of keys) {
     const c = world.companies.find((x) => x.key === key);
-    for (const email of [c.founder.email, c.members[0]?.email].filter(Boolean)) {
+    for (const email of [c.founder.email, c.members[0]?.email].filter(
+      Boolean,
+    )) {
       const { ctx, page } = await signIn(email);
       const landed = new URL(page.url()).pathname;
-      check("login", email, !landed.startsWith("/auth") && !landed.startsWith("/onboarding"), `landed ${landed}`);
+      check(
+        "login",
+        email,
+        !landed.startsWith("/auth") && !landed.startsWith("/onboarding"),
+        `landed ${landed}`,
+      );
       await ctx.close();
     }
   }
   await browser.close();
   const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+  console.log(
+    `\n${results.length - failed.length}/${results.length} checks passed`,
+  );
   process.exit(failed.length === 0 ? 0 : 1);
 }
 

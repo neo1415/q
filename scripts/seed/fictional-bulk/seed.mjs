@@ -862,6 +862,12 @@ async function seedCompany(c) {
     const standing = await api(f, "GET", `${base}/verification`);
     if (standing.requestable === true)
       await api(f, "POST", `${base}/verification/requests`, undefined);
+    // The decision lands asynchronously; readiness is assessed again once
+    // it has, so a verified company is marketplace-ready on this run.
+    await lib.sleep(4000);
+    await api(f, "POST", `${base}/marketplace-readiness/assess`, {}).catch(
+      () => null,
+    );
     await done("verify");
   }
   return s;
