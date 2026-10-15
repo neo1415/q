@@ -52,7 +52,7 @@ export type AccessTarget =
     };
 
 const selectClass =
-  "cq-body-sm min-h-11 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)";
+  "cq-body-sm min-h-11 w-full border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)";
 
 const HISTORY_WORDS = {
   SHARED: "shared with",
@@ -210,7 +210,7 @@ function ScopeChoices({
         return (
           <label
             key={choice.level}
-            className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border p-3 ${on ? "border-(--cq-accent) bg-(--cq-accent-soft)" : "border-(--cq-border-subtle)"}`}
+            className={`flex min-h-11 cursor-pointer items-start gap-3 border p-3 ${on ? "border-(--cq-accent) bg-(--cq-accent-soft)" : "border-(--cq-border-subtle)"}`}
             data-scope-choice={choice.level}
           >
             <input

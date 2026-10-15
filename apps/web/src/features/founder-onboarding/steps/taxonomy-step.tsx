@@ -181,7 +181,7 @@ export function TaxonomyStep({
                 value={query}
                 maxLength={200}
                 placeholder="For example: fintech, tax, insurance"
-                className="min-h-11 flex-1 rounded-[10px] border border-(--cq-border-strong) bg-(--cq-surface) px-3 cq-body-sm text-(--cq-text-primary)"
+                className="min-h-11 flex-1 border border-(--cq-border-strong) bg-(--cq-surface) px-3 cq-body-sm text-(--cq-text-primary)"
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
                   // Enter searches; it never submits the step.

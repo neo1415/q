@@ -484,11 +484,11 @@ export function InboxView({
                 key={n}
                 className="flex gap-2.5 border-b border-(--cq-border-subtle) px-3 py-3.5"
               >
-                <Skeleton width="24px" height={24} radius={6} />
+                <Skeleton width="24px" height={24} />
                 <div className="flex flex-1 flex-col gap-1.5">
                   <Skeleton width="50%" height={15} />
                   <Skeleton width="80%" height={12} />
-                  <Skeleton width="60%" height={18} radius={9} />
+                  <Skeleton width="60%" height={18} />
                 </div>
               </div>
             ))}
@@ -496,8 +496,8 @@ export function InboxView({
           <div className="gq-detail">
             <div className="gq-dt">
               <Skeleton width="60%" height={28} />
-              <Skeleton width="100%" height={40} radius={10} />
-              <Skeleton width="100%" height={200} radius={14} />
+              <Skeleton width="100%" height={40} />
+              <Skeleton width="100%" height={200} />
             </div>
           </div>
         </div>
@@ -671,7 +671,7 @@ export function InboxView({
       <div className="gq-listhead">
         <button
           type="button"
-          className="grid size-11 place-items-center rounded-lg text-(--cq-text-tertiary) lg:size-9"
+          className="grid size-11 place-items-center text-(--cq-text-tertiary) lg:size-9"
           role="checkbox"
           aria-checked={allChecked}
           aria-label="Select all"
@@ -1310,7 +1310,7 @@ function Detail({
       {detail === null ? (
         <div className="flex flex-col gap-3">
           <Skeleton width="40%" height={20} />
-          <Skeleton width="100%" height={120} radius={12} />
+          <Skeleton width="100%" height={120} />
         </div>
       ) : (
         <>

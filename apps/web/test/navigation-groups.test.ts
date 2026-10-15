@@ -34,7 +34,7 @@ describe("the sidebar's groups", () => {
       "/discover",
       "/explore",
       "/home",
-      "/capital",
+      // Capital is the CRM's Capital tab (owner 2026-10-16).
       "/relationships",
       // F2: GateQ, its own page, first in Workspace.
       "/gateq",

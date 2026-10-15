@@ -58,7 +58,7 @@ export function ActivityBars({
                 className="flex h-full min-w-0 flex-1 items-end"
               >
                 <span
-                  className={`block w-full rounded-t-[3px] ${
+                  className={`block w-full ${
                     active === index
                       ? "bg-(--cq-accent-hover)"
                       : "bg-(--cq-accent)"
@@ -76,7 +76,7 @@ export function ActivityBars({
           {shown === null || shown === undefined ? null : (
             <span
               role="status"
-              className="cq-caption pointer-events-none absolute -top-2 right-0 -translate-y-full rounded-(--cq-radius-sm) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-2 py-1 text-(--cq-text-primary) shadow-(--cq-shadow-sm)"
+              className="cq-caption pointer-events-none absolute -top-2 right-0 -translate-y-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-2 py-1 text-(--cq-text-primary) shadow-(--cq-shadow-sm)"
             >
               {label(shown.start)} · {shown.value}
             </span>

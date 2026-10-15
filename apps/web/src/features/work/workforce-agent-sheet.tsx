@@ -90,7 +90,7 @@ export function AgentSheet({
             <Callout node={node} />
 
             {draft === undefined ? null : (
-              <div className="rounded-[12px] border border-(--cq-border) bg-(--cq-surface) px-3.5 py-3 text-[14px] whitespace-pre-line">
+              <div className="border border-(--cq-border) bg-(--cq-surface) px-3.5 py-3 text-[14px] whitespace-pre-line">
                 {draft.counterpartName === null ? null : (
                   <span className="mb-1 block text-[12.5px] text-(--cq-text-tertiary)">
                     To {draft.counterpartName} · draft {draft.attempt}
@@ -227,7 +227,7 @@ function Callout({ node }: { readonly node: AgentNode }) {
       break;
   }
   return (
-    <p className={cx("m-0 rounded-[12px] px-3.5 py-3 text-[14px]", tone)}>
+    <p className={cx("m-0 px-3.5 py-3 text-[14px]", tone)}>
       {lead === null ? null : <b className="font-semibold">{lead} </b>}
       {node.now}
     </p>

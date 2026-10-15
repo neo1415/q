@@ -382,7 +382,7 @@ function GroupView({
 function Card({ children }: { readonly children: ReactNode }) {
   return (
     <article
-      className="mb-2.5 flex flex-col gap-2.5 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-3.5"
+      className="mb-2.5 flex flex-col gap-2.5 border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-3.5"
       data-decision
     >
       {children}
@@ -392,7 +392,7 @@ function Card({ children }: { readonly children: ReactNode }) {
 
 function Quote({ children }: { readonly children: ReactNode }) {
   return (
-    <blockquote className="m-0 rounded-(--cq-radius-md) bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)">
+    <blockquote className="m-0 bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)">
       {children}
     </blockquote>
   );
@@ -785,7 +785,7 @@ function EditAndSend({
         onChange={(event) => setText(event.target.value)}
         rows={Math.min(10, Math.max(4, text.split("\n").length + 1))}
         maxLength={4000}
-        className="w-full rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) px-3 py-2.5 cq-body-sm text-(--cq-text-primary) outline-none focus:border-(--cq-border-strong)"
+        className="w-full border border-(--cq-border) bg-(--cq-surface) px-3 py-2.5 cq-body-sm text-(--cq-text-primary) outline-none focus:border-(--cq-border-strong)"
       />
       <div className="flex flex-wrap items-center gap-1">
         <Button variant="primary" disabled={pending} onClick={send}>
@@ -901,7 +901,7 @@ export function ThreadPanel({
   });
   return (
     <div
-      className="mb-3 flex flex-col gap-3 rounded-(--cq-radius-lg) bg-(--cq-surface) p-3"
+      className="mb-3 flex flex-col gap-3 bg-(--cq-surface) p-3"
       data-thread={relationshipId}
     >
       {lines.length === 0 ? (
@@ -929,7 +929,7 @@ export function ThreadPanel({
             </p>
             <p
               className={cx(
-                "m-0 rounded-(--cq-radius-md) border border-(--cq-border-subtle) px-3 py-2 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)",
+                "m-0 border border-(--cq-border-subtle) px-3 py-2 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)",
                 line.side === "US"
                   ? "bg-(--cq-surface-subtle)"
                   : "bg-(--cq-surface-raised)",

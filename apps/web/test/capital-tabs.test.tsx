@@ -135,11 +135,14 @@ describe("which tab a URL opens", () => {
     );
   });
 
-  it("builds each tab's address; Overview is the page itself", () => {
-    expect(capitalTabHref("overview")).toBe("/capital");
-    expect(capitalTabHref("action-plan")).toBe("/capital?tab=action-plan");
+  it("builds each tab's address inside the CRM's Capital tab", () => {
+    // Owner 2026-10-16: Capital is a CRM tab; /capital forwards there.
+    expect(capitalTabHref("overview")).toBe("/relationships?view=capital");
+    expect(capitalTabHref("action-plan")).toBe(
+      "/relationships?view=capital&tab=action-plan",
+    );
     expect(capitalTabHref("plan", { horizon: "12" })).toBe(
-      "/capital?tab=plan&horizon=12",
+      "/relationships?view=capital&tab=plan&horizon=12",
     );
   });
 
@@ -168,7 +171,9 @@ describe("the tab bar", () => {
     const selected = screen.getByRole("tab", { selected: true });
     expect(selected.textContent).toBe("Readiness");
     expect(selected.getAttribute("tabindex")).toBe("0");
-    expect(selected.getAttribute("href")).toBe("/capital?tab=readiness");
+    expect(selected.getAttribute("href")).toBe(
+      "/relationships?view=capital&tab=readiness",
+    );
     expect(
       tabs.filter((tab) => tab.getAttribute("tabindex") === "-1"),
     ).toHaveLength(5);
@@ -209,7 +214,7 @@ describe("the tab bar", () => {
     window.location.hash = "#action-plan";
     render(<CapitalTabBar active="overview" hadTabParam={false} />);
     expect(replace).toHaveBeenCalledWith(
-      "/capital?tab=action-plan#action-plan",
+      "/relationships?view=capital&tab=action-plan#action-plan",
       { scroll: false },
     );
   });
@@ -236,7 +241,7 @@ describe("Overview", () => {
     expect(screen.getByText("Step now", { exact: false })).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Open the action plan" }),
-    ).toHaveProperty("pathname", "/capital");
+    ).toHaveProperty("pathname", "/relationships");
   });
 
   it("says so in one sentence when the raise could not load", () => {

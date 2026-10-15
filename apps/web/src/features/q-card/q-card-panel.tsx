@@ -132,7 +132,7 @@ export function QCardPanel(props: QCardPanelProps) {
           </div>
           {/* The card and its actions first; editing it is one step away. */}
           <details
-            className="group flex flex-col gap-4 rounded-lg border border-(--cq-border-subtle) px-4 py-2 open:pb-4"
+            className="group flex flex-col gap-4 border border-(--cq-border-subtle) px-4 py-2 open:pb-4"
             data-q-card-customize
           >
             <summary className="cq-body-sm flex min-h-11 cursor-pointer items-center font-medium text-(--cq-text-primary)">
@@ -424,7 +424,7 @@ function ScopeForm({
                         : null,
                     );
                   }}
-                  className="cq-body-sm min-h-11 shrink-0 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                  className="cq-body-sm min-h-11 shrink-0 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                   data-card-audience={field.key}
                 >
                   <option value="hidden">Nobody</option>

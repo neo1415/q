@@ -94,8 +94,7 @@ describe("MobileNavigation", () => {
   it("treats nested routes as active without cross-matching prefixes", () => {
     expect(isActiveRoute("/capital/objectives/1", "/capital")).toBe(true);
     expect(isActiveRoute("/capitalisation", "/capital")).toBe(false);
-    // Explore takes Capital's place on the phone (ADR 0055); Capital
-    // stays in the sidebar and the More sheet.
+    // Explore on the phone (ADR 0055); Capital is the CRM's tab.
     expect(MOBILE_NAVIGATION.map((item) => item.href)).toEqual([
       "/discover",
       "/explore",

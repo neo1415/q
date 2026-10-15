@@ -370,7 +370,7 @@ function Editor({
         onChange={(event) => setText(event.target.value)}
         rows={Math.min(10, Math.max(4, text.split("\n").length + 1))}
         maxLength={4000}
-        className="w-full rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) px-3 py-2.5 cq-body-sm text-(--cq-text-primary) outline-none focus:border-(--cq-border-strong)"
+        className="w-full border border-(--cq-border) bg-(--cq-surface) px-3 py-2.5 cq-body-sm text-(--cq-text-primary) outline-none focus:border-(--cq-border-strong)"
         data-arrival-editor
       />
       <div className="flex flex-wrap items-center gap-1">
@@ -421,7 +421,7 @@ function FocusCard({
     <article
       aria-label={`${card.title}${card.counterpart === null ? "" : `, ${card.counterpart}`}${place}`}
       className={cx(
-        "relative flex flex-col rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised)",
+        "relative flex flex-col border border-(--cq-border) bg-(--cq-surface-raised)",
         compact ? "gap-2 p-3" : "gap-3 p-4",
       )}
       data-arrival-card={card.key}
@@ -466,7 +466,7 @@ function FocusCard({
               : "Here's your version. Send this exact message?"}
           </p>
           <blockquote
-            className="m-0 rounded-(--cq-radius-md) bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)"
+            className="m-0 bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)"
             data-arrival-confirm
           >
             <span className="sr-only">What will be sent: </span>
@@ -518,7 +518,7 @@ function FocusCard({
               </p>
               <blockquote
                 className={cx(
-                  "m-0 rounded-(--cq-radius-md) bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)",
+                  "m-0 bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)",
                   compact && "max-h-32 overflow-y-auto",
                 )}
               >
@@ -635,7 +635,7 @@ function CardLine({
     <button
       type="button"
       onClick={onFocus}
-      className="flex min-h-13 w-full items-center gap-2.5 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-left transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+      className="flex min-h-13 w-full items-center gap-2.5 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-left transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
       data-arrival-line={card.key}
     >
       <Mark card={card} size={28} />
@@ -663,7 +663,7 @@ function CommandBar({
   const [text, setText] = useState("");
   return (
     <form
-      className="flex w-full items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) py-1 pr-1 pl-4 focus-within:border-(--cq-border-strong)"
+      className="flex w-full items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) py-1 pr-1 pl-4 focus-within:border-(--cq-border-strong)"
       onSubmit={(event) => {
         event.preventDefault();
         const words = text.trim();
@@ -689,7 +689,6 @@ function CommandBar({
         type="submit"
         variant="secondary"
         disabled={busy || text.trim().length === 0}
-        className="rounded-full"
       >
         {busy ? "Reading…" : "Do it"}
       </Button>
@@ -1004,7 +1003,7 @@ export function Sequence({
           {left > 0 ? (
             <div
               aria-hidden="true"
-              className="absolute inset-x-3 -bottom-1.5 h-full rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
+              className="absolute inset-x-3 -bottom-1.5 h-full border border-(--cq-border-subtle) bg-(--cq-surface)"
             />
           ) : null}
           {focusCard}

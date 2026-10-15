@@ -47,7 +47,7 @@ export function StandingBadge({
 }) {
   return (
     <span
-      className={`cq-label inline-flex shrink-0 items-center gap-1.5 rounded-full py-0.5 ps-2 pe-2.5 whitespace-nowrap ${TONE[standing]}`}
+      className={`cq-label inline-flex shrink-0 items-center gap-1.5 py-0.5 ps-2 pe-2.5 whitespace-nowrap ${TONE[standing]}`}
       data-standing={standing}
     >
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
@@ -112,7 +112,7 @@ async function readProfileRows(
 
 function Rows({ rows }: { readonly rows: readonly LooksForRow[] }) {
   return (
-    <ul className="flex flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)">
+    <ul className="flex flex-col overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
       {rows.map((row) => (
         <li
           key={`${row.label}-${row.words}`}
@@ -205,7 +205,7 @@ export async function LooksForSection({
       {href === null ? null : (
         <section
           aria-labelledby="investor-draft"
-          className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
+          className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2

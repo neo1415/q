@@ -6,7 +6,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
  * no text that changes; the pulse stops under reduced motion.
  */
 const bar =
-  "block animate-pulse rounded-(--cq-radius-sm) bg-(--cq-surface-strong) motion-reduce:animate-none";
+  "block animate-pulse bg-(--cq-surface-strong) motion-reduce:animate-none";
 
 function Rows({
   count,
@@ -23,9 +23,7 @@ function Rows({
     >
       {Array.from({ length: count }, (_, n) => (
         <li key={n} className="flex min-h-16 items-center gap-3 py-3">
-          <span
-            className={`${bar} size-8 flex-none rounded-(--cq-radius-full)`}
-          />
+          <span className={`${bar} size-8 flex-none rounded-full`} />
           <span className="flex flex-1 flex-col gap-2">
             <span className={`${bar} h-3.5 w-2/5`} />
             <span className={`${bar} h-3 w-3/5`} />
@@ -78,9 +76,7 @@ export function RecordLoading() {
           <span className={`${bar} h-4 w-36`} />
         </span>
         <div className="flex items-center gap-4">
-          <span
-            className={`${bar} size-14 flex-none rounded-(--cq-radius-lg)`}
-          />
+          <span className={`${bar} size-14 flex-none`} />
           <span className="flex flex-1 flex-col gap-2.5">
             <span className={`${bar} h-7 w-1/2`} />
             <span className={`${bar} h-3.5 w-1/3`} />

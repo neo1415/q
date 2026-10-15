@@ -164,7 +164,7 @@ export function NeedsYouQueue({
                 type="button"
                 onClick={() => clear(card)}
                 aria-label={`Dismiss ${card.title}`}
-                className="inline-flex size-11 flex-none items-center justify-center rounded-(--cq-radius-md) text-(--cq-text-tertiary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                className="inline-flex size-11 flex-none items-center justify-center text-(--cq-text-tertiary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
               >
                 <X size={ICON_SIZE.compact} aria-hidden="true" />
               </button>

@@ -106,7 +106,7 @@ export function QControlRuntime({
       className={
         notice === null
           ? "sr-only"
-          : "fixed inset-x-4 bottom-24 z-(--cq-z-toast) mx-auto w-fit max-w-[min(32rem,calc(100vw-2rem))] rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-2 cq-caption text-(--cq-text-secondary) shadow-(--cq-shadow-overlay)"
+          : "fixed inset-x-4 bottom-24 z-(--cq-z-toast) mx-auto w-fit max-w-[min(32rem,calc(100vw-2rem))] border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-2 cq-caption text-(--cq-text-secondary) shadow-(--cq-shadow-overlay)"
       }
     >
       {notice}

@@ -52,13 +52,13 @@ export function ProfileHero({
   readonly facts: readonly ReactNode[];
   readonly images: HeaderImages;
   readonly actions?: ReactNode | undefined;
-  /** Organisations get a rounded-square logo, people a circle. */
+  /** Organisations get a square logo, people a circle. */
   readonly square?: boolean | undefined;
 }) {
-  const shape = square ? "rounded-2xl" : "rounded-full";
+  const shape = square ? "" : "rounded-full";
   return (
     <div
-      className="overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface)"
+      className="overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)"
       data-profile-hero
     >
       <div className="relative aspect-[4/1] min-h-24 w-full bg-(--cq-surface-strong)">

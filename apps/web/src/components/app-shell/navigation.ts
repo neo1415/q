@@ -10,7 +10,6 @@ import {
   Handshake,
   LayoutDashboard,
   ListChecks,
-  Landmark,
   Newspaper,
   Play,
   Presentation,
@@ -69,9 +68,10 @@ export const PRIMARY_NAVIGATION: readonly NavigationItem[] = [
   // network, with search at its top.
   { href: "/explore", label: "Explore", icon: LayoutDashboard },
   { href: "/home", label: "Q", icon: QNavIcon },
-  { href: "/capital", label: "Capital", icon: Landmark },
   // CRM (owner directive 2026-10-15 §D): the person's side's canonical
-  // relationships (R27), its pipeline and its reports in one workspace.
+  // relationships (R27), its pipeline, its reports and Capital (owner
+  // 2026-10-16: Capital is a CRM tab; /capital forwards there) in one
+  // workspace.
   // Founders see it as their Fundraising Hub, investors as their
   // Investment Hub. Results is now its Reports tab, so has no entry of its
   // own; /results and /crm still mark this entry as current.
@@ -222,8 +222,7 @@ export const FIND_NAVIGATION: NavigationItem = {
 /**
  * The phone's tab bar (founder directive, 2026-09-27; Explore design
  * 2026-10-06): Discover, Explore, Q in the centre, Relationships, then
- * More. Explore takes Capital's place; Capital stays in the sidebar and
- * the More sheet. There is no separate Chats area. More (founder report,
+ * More. Capital is the CRM's Capital tab (owner 2026-10-16). There is no separate Chats area. More (founder report,
  * 2026-10-01) opens every other section, Profile first.
  */
 export const MOBILE_NAVIGATION: readonly NavigationItem[] = [
@@ -348,7 +347,7 @@ export const MOBILE_CENTRE_HREF = "/home" satisfies NavigationItem["href"];
  * the Results URL, and /crm is the CRM's alias.
  */
 const AREA_ALIASES: Readonly<Record<string, readonly string[]>> = {
-  "/relationships": ["/results", "/crm"],
+  "/relationships": ["/results", "/crm", "/capital"],
 };
 
 export function isActiveRoute(pathname: string, href: string): boolean {

@@ -110,7 +110,7 @@ export default async function BillingPage() {
                 Plans
               </h2>
               {PLAN_TIERS.preview ? (
-                <span className="cq-caption inline-flex min-h-6 items-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 font-medium text-(--cq-text-secondary)">
+                <span className="cq-caption inline-flex min-h-6 items-center border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 font-medium text-(--cq-text-secondary)">
                   Preview pricing
                 </span>
               ) : null}
@@ -213,11 +213,11 @@ function TierCard({
       <div className="flex items-center justify-between gap-3">
         <h3 className="cq-title-sm text-(--cq-text-primary)">{tier.name}</h3>
         {current ? (
-          <span className="cq-caption inline-flex min-h-6 items-center rounded-full bg-(--cq-accent-soft) px-2.5 font-medium text-(--cq-text-primary)">
+          <span className="cq-caption inline-flex min-h-6 items-center bg-(--cq-accent-soft) px-2.5 font-medium text-(--cq-text-primary)">
             Your plan
           </span>
         ) : suits ? (
-          <span className="cq-caption inline-flex min-h-6 items-center rounded-full border border-(--cq-border-subtle) px-2.5 font-medium text-(--cq-text-secondary)">
+          <span className="cq-caption inline-flex min-h-6 items-center border border-(--cq-border-subtle) px-2.5 font-medium text-(--cq-text-secondary)">
             Suits you
           </span>
         ) : null}

@@ -393,14 +393,14 @@ function CategoryField({
         {ids.map((id) => (
           <span
             key={id}
-            className="cq-body-sm inline-flex min-h-8 items-center gap-1 rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) py-1 pr-1 pl-3 text-(--cq-text-primary)"
+            className="cq-body-sm inline-flex min-h-8 items-center gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) py-1 pr-1 pl-3 text-(--cq-text-primary)"
           >
             {nameOf(id)}
             <button
               type="button"
               onClick={() => onChange(ids.filter((known) => known !== id))}
               aria-label={`Remove ${nameOf(id)}`}
-              className="inline-flex size-7 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-strong)"
+              className="inline-flex size-7 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-strong)"
             >
               <X size={ICON_SIZE.compact} aria-hidden="true" />
             </button>

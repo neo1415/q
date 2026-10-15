@@ -121,7 +121,7 @@ export async function ReadinessBlueprintSection({
         <PrivateNote />
         <nav
           aria-label="Plan horizon"
-          className="inline-flex self-start rounded-(--cq-radius-md) border border-(--cq-border) p-1"
+          className="inline-flex self-start border border-(--cq-border) p-1"
         >
           {BLUEPRINT_HORIZONS.map((months) => (
             <Link
@@ -129,7 +129,7 @@ export async function ReadinessBlueprintSection({
               href={`/capital?tab=plan&horizon=${String(months)}`}
               aria-current={months === horizon ? "page" : undefined}
               scroll={false}
-              className={`cq-body-sm inline-flex min-h-11 min-w-20 items-center justify-center rounded-(--cq-radius-sm) px-3 ${
+              className={`cq-body-sm inline-flex min-h-11 min-w-20 items-center justify-center px-3 ${
                 months === horizon
                   ? "bg-(--cq-surface-raised) font-semibold text-(--cq-text-primary) ring-1 ring-(--cq-border)"
                   : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
@@ -178,7 +178,7 @@ function BlueprintBody({
           {phases.map((phase) => (
             <li
               key={phase.label}
-              className="flex flex-col gap-1 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
+              className="flex flex-col gap-1 border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
             >
               <div className="flex items-baseline justify-between gap-2">
                 <h3 className="cq-title-sm text-(--cq-text-primary)">
@@ -214,7 +214,7 @@ function BlueprintBody({
         </ol>
       )}
       {blueprint.uncertainty.length === 0 ? null : (
-        <div className="rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-4">
+        <div className="border border-(--cq-border-subtle) bg-(--cq-surface) p-4">
           <h3 className="cq-title-sm text-(--cq-text-primary)">
             What Q could not assess
           </h3>

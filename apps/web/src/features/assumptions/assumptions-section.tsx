@@ -188,7 +188,7 @@ export function AssumptionsSection({
                     {assumptionLabels(assumption).map((label) => (
                       <span
                         key={label}
-                        className="cq-caption rounded-md border border-(--cq-border) px-1.5 text-(--cq-text-secondary)"
+                        className="cq-caption border border-(--cq-border) px-1.5 text-(--cq-text-secondary)"
                       >
                         {label}
                       </span>
@@ -259,7 +259,7 @@ export function AssumptionsSection({
                 </p>
               ) : (
                 <div
-                  className="flex flex-col gap-1 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-3"
+                  className="flex flex-col gap-1 border border-(--cq-border-subtle) bg-(--cq-surface) p-3"
                   data-assumption-asked="ANSWERED"
                 >
                   <p className="cq-caption text-(--cq-text-tertiary)">
@@ -341,7 +341,7 @@ export function AssumptionsSection({
                   : "It in your chat, from you"}
               </dd>
             </dl>
-            <ol className="cq-body-sm flex list-decimal flex-col gap-1.5 rounded-xl border border-(--cq-border-subtle) bg-(--cq-canvas) py-3 ps-8 pe-4 text-(--cq-text-primary)">
+            <ol className="cq-body-sm flex list-decimal flex-col gap-1.5 border border-(--cq-border-subtle) bg-(--cq-canvas) py-3 ps-8 pe-4 text-(--cq-text-primary)">
               {questions.map((question) => (
                 <li key={question}>{question}</li>
               ))}

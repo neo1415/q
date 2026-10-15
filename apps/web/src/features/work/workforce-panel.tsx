@@ -339,7 +339,7 @@ function JobCard({
   const shown = all ? lines : lines.slice(-JOB_LINES_PREVIEW);
   return (
     <article
-      className="mb-3 overflow-hidden rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) [contain-intrinsic-size:auto_160px] [content-visibility:auto]"
+      className="mb-3 overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-raised) [contain-intrinsic-size:auto_160px] [content-visibility:auto]"
       data-job={job.job.id}
       data-work-state={workStateOf(job.job)}
     >
@@ -354,7 +354,7 @@ function JobCard({
         </div>
         <span
           className={cx(
-            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-medium whitespace-nowrap",
+            "inline-flex items-center gap-1.5 px-2.5 py-1 text-[13px] font-medium whitespace-nowrap",
             status.tone === "needs"
               ? "bg-(--cq-accent-soft) text-(--cq-accent)"
               : "bg-(--cq-surface-subtle)",
@@ -553,7 +553,7 @@ function Mono({
     <span
       aria-hidden="true"
       className={cx(
-        "grid h-[30px] w-[30px] place-items-center rounded-[10px] text-[11.5px] font-semibold tracking-[0.01em] lg:h-[34px] lg:w-[34px] lg:text-[12.5px]",
+        "grid h-[30px] w-[30px] place-items-center text-[11.5px] font-semibold tracking-[0.01em] lg:h-[34px] lg:w-[34px] lg:text-[12.5px]",
         tone === "lead"
           ? "bg-(--cq-stage-canvas) text-(--cq-stage-q-core)"
           : tone === "you"
@@ -613,7 +613,7 @@ function Step({
           </div>
         )}
         {line.feedback === undefined || line.feedback.length === 0 ? null : (
-          <p className="mt-1.5 mb-0 rounded-[10px] bg-(--cq-surface-subtle) px-2.5 py-2 text-[13.5px] text-(--cq-text-secondary)">
+          <p className="mt-1.5 mb-0 bg-(--cq-surface-subtle) px-2.5 py-2 text-[13.5px] text-(--cq-text-secondary)">
             {line.feedback}
           </p>
         )}
@@ -721,7 +721,7 @@ function Team({ overview }: { readonly overview: WorkforceOverviewDto }) {
       <h3 id="workforce-team" className="mb-2.5 text-[15px] font-semibold">
         Who’s on it
       </h3>
-      <ul className="m-0 list-none rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-0 py-1">
+      <ul className="m-0 list-none border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-0 py-1">
         {members.map((member) => (
           <li
             key={member.role}
@@ -776,7 +776,7 @@ function Cost({
     <section
       aria-labelledby="workforce-cost"
       className={cx(
-        "rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-3.5",
+        "border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-3.5",
         first ? "mt-0 lg:mt-4" : "mt-4",
       )}
     >
@@ -795,7 +795,7 @@ function Cost({
                 <td className="w-[120px] py-[5px] align-middle">{row.name}</td>
                 <td className="py-[5px] align-middle">
                   <div
-                    className="h-2 min-w-0.5 rounded-[4px] bg-(--cq-accent) opacity-85"
+                    className="h-2 min-w-0.5 bg-(--cq-accent) opacity-85"
                     style={{ width: `${String(row.share)}%` }}
                   />
                 </td>
@@ -846,7 +846,7 @@ function DraftCard({
   const rules = gradeRules(draft.grade);
   return (
     <div
-      className="rounded-[14px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-3.5 py-3"
+      className="border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-3.5 py-3"
       data-work-draft={draft.id}
       data-work-draft-outcome={draft.outcome?.outcome ?? "NONE"}
     >
@@ -873,7 +873,7 @@ function DraftCard({
             <mark
               key={index}
               className={cx(
-                "rounded-[3px] text-inherit",
+                "text-inherit",
                 part.mark === "cut"
                   ? "bg-[color-mix(in_oklab,var(--cq-warning)_18%,transparent)] line-through decoration-(--cq-warning)"
                   : "bg-[color-mix(in_oklab,var(--cq-positive)_18%,transparent)]",
@@ -955,7 +955,7 @@ export function DraftSheet({
               ? "From you."
               : `To ${draft.counterpartName}. From you.`
           }
-          className="lg:inset-x-auto lg:top-1/2 lg:bottom-auto lg:left-1/2 lg:w-[520px] lg:-translate-x-1/2 lg:-translate-y-1/2 lg:rounded-[20px]"
+          className="lg:inset-x-auto lg:top-1/2 lg:bottom-auto lg:left-1/2 lg:w-[520px] lg:-translate-x-1/2 lg:-translate-y-1/2"
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {chain.map((one, index) => (

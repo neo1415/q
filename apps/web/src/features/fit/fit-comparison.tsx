@@ -58,7 +58,7 @@ function Rank({ n }: { readonly n: number }) {
   return (
     <span
       aria-hidden="true"
-      className="grid size-[26px] shrink-0 place-items-center rounded-full bg-(--cq-text-primary) text-[13px] font-semibold text-(--cq-canvas)"
+      className="grid size-[26px] shrink-0 place-items-center bg-(--cq-text-primary) text-[13px] font-semibold text-(--cq-canvas)"
     >
       {n}
     </span>
@@ -67,7 +67,7 @@ function Rank({ n }: { readonly n: number }) {
 
 function Best({ of }: { readonly of: number }) {
   return (
-    <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-(--cq-border) px-[7px] py-px text-[11.5px] whitespace-nowrap text-(--cq-text-secondary)">
+    <span className="ml-auto inline-flex shrink-0 items-center gap-1 border border-(--cq-border) px-[7px] py-px text-[11.5px] whitespace-nowrap text-(--cq-text-secondary)">
       <Check size={11} aria-hidden="true" />
       {of > 3 ? "Best" : `Best${of === 3 ? " of 3" : ""}`}
     </span>
@@ -184,7 +184,7 @@ export function FitComparisonView({
   return (
     <div data-fit-comparison={n}>
       {/* Desktop: one table, rows aligned across columns. */}
-      <div className="hidden overflow-x-auto rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) lg:block">
+      <div className="hidden overflow-x-auto border border-(--cq-border-subtle) bg-(--cq-surface-raised) lg:block">
         <div
           role="table"
           aria-label={`Top ${String(n)} side by side`}
@@ -281,7 +281,7 @@ export function FitComparisonView({
             <article
               key={e.companyId}
               className={cx(
-                "overflow-hidden rounded-(--cq-radius-lg) border bg-(--cq-surface-raised)",
+                "overflow-hidden border bg-(--cq-surface-raised)",
                 isOpen
                   ? "border-(--cq-border-strong)"
                   : "border-(--cq-border-subtle)",
@@ -348,7 +348,7 @@ export function FitComparisonView({
                     ))}
                   </div>
                   {view === null || view.status !== "READY" ? null : (
-                    <div className="flex items-start gap-2.5 rounded-xl bg-(--cq-surface-subtle) px-3 py-2.5 text-sm">
+                    <div className="flex items-start gap-2.5 bg-(--cq-surface-subtle) px-3 py-2.5 text-sm">
                       <span className="mt-px">
                         <QViewMark />
                       </span>

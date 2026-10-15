@@ -217,7 +217,7 @@ export function CompanyVideos({
               <button
                 type="button"
                 onClick={() => setActive(video.mediaAssetId)}
-                className="flex aspect-[9/16] w-full max-w-xs flex-col items-center justify-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-subtle) text-(--cq-text-primary) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+                className="flex aspect-[9/16] w-full max-w-xs flex-col items-center justify-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) text-(--cq-text-primary) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
                 aria-label={`Play ${label}`}
               >
                 <Play size={ICON_SIZE.prominent} aria-hidden="true" />

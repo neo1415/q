@@ -126,6 +126,7 @@ export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
   { id: "section.yours", kind: "SECTION" },
   { id: "tab.action-plan", kind: "TAB" },
   { id: "tab.applications", kind: "TAB" },
+  { id: "tab.capital", kind: "TAB" },
   { id: "tab.claim", kind: "TAB" },
   { id: "tab.data-room", kind: "TAB" },
   { id: "tab.dataroom", kind: "TAB" },

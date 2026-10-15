@@ -98,13 +98,15 @@ async function overview() {
 }
 
 describe("Hub foundation", () => {
-  it("preserves old record-list links and fails unknown views to the existing list", () => {
-    // A bare /relationships still opens the record list: the Pipeline's
-    // List layout (S2).
-    expect(hubViewOf(undefined)).toBe("pipeline");
-    expect(hubViewOf("invalid")).toBe("pipeline");
+  it("opens the Overview by default and keeps old record-list links on the Pipeline", () => {
+    // Owner 2026-10-16: a bare /relationships (the sidebar's CRM) opens the
+    // Overview, as /crm does; unknown views fail to it too.
+    expect(hubViewOf(undefined)).toBe("overview");
+    expect(hubViewOf("invalid")).toBe("overview");
     expect(hubViewOf("relationships")).toBe("pipeline");
+    expect(hubViewOf("pipeline")).toBe("pipeline");
     expect(hubViewOf("overview")).toBe("overview");
+    expect(hubViewOf("capital")).toBe("capital");
     expect(pipelineLayoutOf(undefined)).toBe("list");
     expect(pipelineLayoutOf("table")).toBe("table");
     expect(pipelineLayoutOf("board")).toBe("board");
@@ -114,7 +116,7 @@ describe("Hub foundation", () => {
     ).toBe("/relationships?view=pipeline&layout=list&q=kivu");
     expect(pipelineListHref({ view: "pipeline" })).toBeNull();
   });
-  it("offers investor inbox without founder-only Capital or application links", () => {
+  it("offers investor inbox without founder-only application links", () => {
     render(
       <>
         <HubRelated side="INVESTOR" />
@@ -126,7 +128,10 @@ describe("Hub foundation", () => {
         .getByRole("link", { name: "Investment inbox" })
         .getAttribute("href"),
     ).toBe("/gateq?tab=inbox");
-    expect(screen.queryByRole("link", { name: "Capital" })).toBeNull();
+    // Capital is the CRM's own tab now (owner 2026-10-16), not a link out.
+    expect(
+      screen.getByRole("link", { name: "Capital" }).getAttribute("href"),
+    ).toBe("/relationships?view=capital");
     expect(screen.queryByRole("link", { name: "My applications" })).toBeNull();
     expect(
       manifestControls().find((entry) => entry.id === "tab.overview")?.state,
@@ -145,9 +150,11 @@ describe("Hub foundation", () => {
         .getByRole("link", { name: "My applications" })
         .getAttribute("href"),
     ).toBe("/gateq?tab=applications");
-    // Capital, Q Work and Discover are sidebar entries: not repeated here.
-    for (const name of ["Capital", "Q Work", "Discover"])
+    // Q Work and Discover are sidebar entries: not repeated here. Capital
+    // is one of the CRM's own tabs (owner 2026-10-16), exactly once.
+    for (const name of ["Q Work", "Discover"])
       expect(screen.queryByRole("link", { name })).toBeNull();
+    expect(screen.getAllByRole("link", { name: "Capital" })).toHaveLength(1);
     expect(screen.queryByRole("link", { name: "Investment inbox" })).toBeNull();
     // Q's old id stays stable: it names the Pipeline tab now.
     for (const id of ["tab.pipeline", "tab.relationships"])
@@ -427,10 +434,20 @@ describe("S2: the Pipeline is the one record list", () => {
     ).toBe(true);
   });
 
-  it("keeps a bare /relationships on the list, never a redirect loop", async () => {
-    mocks.digests.mockResolvedValue({});
+  it("opens a bare /relationships on the Overview, never a redirect loop", async () => {
+    // Owner 2026-10-16: the CRM's front page is the Overview.
+    mocks.results.mockResolvedValue({
+      side: "INVESTOR",
+      organisationName: "Fund",
+      pipelineFit: [],
+    });
     render(await RelationshipsPage({ searchParams: Promise.resolve({}) }));
-    expect(screen.getByRole("group", { name: "Layout" })).toBeDefined();
+    expect(
+      screen
+        .getByRole("link", { name: "Overview" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(screen.queryByRole("group", { name: "Layout" })).toBeNull();
   });
 });
 

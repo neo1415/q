@@ -189,7 +189,7 @@ export function OwnerPitchNotice({
         : "Your raise itself isn't shared with investors, so investors who can watch the video see this on your overview, labelled as said in your pitch.";
   return (
     <section
-      className="flex flex-col gap-2 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised) p-4"
+      className="flex flex-col gap-2 border border-(--cq-border) bg-(--cq-surface-raised) p-4"
       aria-labelledby="pitch-raise-notice"
       data-pitch-raise-notice={notice.state}
     >

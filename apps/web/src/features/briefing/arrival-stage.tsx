@@ -115,7 +115,7 @@ function browserZone(): string | null {
 const REVEAL_SETTLE_MS = 12_000;
 
 const CARD =
-  "flex flex-col gap-2 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised) p-4";
+  "flex flex-col gap-2 border border-(--cq-border) bg-(--cq-surface-raised) p-4";
 
 function GroupHead({
   title,
@@ -202,7 +202,7 @@ export function AttentionList({
       {lines.slice(0, 6).map((item) => (
         <li
           key={item.key}
-          className="flex min-h-11 items-center gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-1.5"
+          className="flex min-h-11 items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-1.5"
           data-arrival-attention-item={item.source}
           data-q-attention-item={item.source}
         >
@@ -360,7 +360,7 @@ function MatchesGroup({
             key={match.companyId}
             type="button"
             onClick={() => setShown(match.companyId)}
-            className="flex min-h-11 w-full items-center gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-left transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            className="flex min-h-11 w-full items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-left transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
             data-arrival-match-line={match.companyId}
             data-q-control-item
           >

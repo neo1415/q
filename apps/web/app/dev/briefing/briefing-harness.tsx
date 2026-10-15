@@ -204,7 +204,7 @@ export function BriefingHarness({
       {dock ? (
         <aside
           aria-label="Q's briefing"
-          className="fixed right-4 bottom-6 z-(--cq-z-presence) flex w-[min(380px,calc(100vw-32px))] flex-col rounded-(--cq-radius-xl) border border-(--cq-border) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-overlay) empty:hidden"
+          className="fixed right-4 bottom-6 z-(--cq-z-presence) flex w-[min(380px,calc(100vw-32px))] flex-col border border-(--cq-border) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-overlay) empty:hidden"
           data-arrival-dock
         >
           <ArrivalBriefing
@@ -245,7 +245,7 @@ export function BriefingHarness({
           id="harness-say"
           value={said}
           onChange={(event) => setSaid(event.target.value)}
-          className="flex-1 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) px-3"
+          className="flex-1 border border-(--cq-border) bg-(--cq-surface) px-3"
           data-harness-say
         />
         <button type="submit" className="min-h-11 px-3" data-harness-say-send>

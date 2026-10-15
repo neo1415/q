@@ -159,7 +159,7 @@ export function CalendarConnectCard({
     return (
       <section
         aria-label="Google Calendar"
-        className="flex flex-col gap-1 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+        className="flex flex-col gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
         data-q-calendar-connect="connected"
       >
         <p
@@ -180,7 +180,7 @@ export function CalendarConnectCard({
       {intent.suggested.length === 0 ? null : (
         <section
           aria-label="Suggested times"
-          className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+          className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
         >
           <div className="flex flex-col gap-1">
             <span className="cq-label text-(--cq-text-tertiary)">
@@ -196,7 +196,7 @@ export function CalendarConnectCard({
             {intent.suggested.map((slot) => (
               <li
                 key={slot.startsAt}
-                className="flex flex-col gap-0.5 rounded-md border border-(--cq-border-subtle) px-3 py-2"
+                className="flex flex-col gap-0.5 border border-(--cq-border-subtle) px-3 py-2"
               >
                 <span className="cq-body text-(--cq-text-primary) tabular-nums">
                   {slot.local}
@@ -211,7 +211,7 @@ export function CalendarConnectCard({
       )}
       <section
         aria-label="Connect Google Calendar"
-        className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+        className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
       >
         <div className="flex flex-col gap-1">
           <p className="cq-body font-medium text-(--cq-text-primary)">

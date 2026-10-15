@@ -56,7 +56,7 @@ function Swatch({
     <li className="flex items-center gap-2" data-brand-swatch={label}>
       <span
         aria-hidden="true"
-        className="size-6 shrink-0 rounded-sm border border-(--cq-border-subtle)"
+        className="size-6 shrink-0 border border-(--cq-border-subtle)"
         // Content about their company, drawn only as a sample.
         style={{ background: hex }}
       />
@@ -183,7 +183,7 @@ function BrandForm({
           aria-label={`${label} colour picker`}
           value={HEX.test(value) ? value : "#ffffff"}
           onChange={(event) => set(event.target.value)}
-          className="h-11 w-11 shrink-0 cursor-pointer rounded-md border border-(--cq-border-subtle) bg-transparent"
+          className="h-11 w-11 shrink-0 cursor-pointer border border-(--cq-border-subtle) bg-transparent"
         />
         <input
           id={`${id}-${label}`}
@@ -384,7 +384,7 @@ export function BrandKitPanel({
         <>
           {suggestion === undefined ? null : (
             <div
-              className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) p-4"
+              className="flex flex-col gap-3 border border-(--cq-border-subtle) p-4"
               data-brand-suggestion={suggestion.version}
             >
               <p className="cq-body-sm text-(--cq-text-secondary)">

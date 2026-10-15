@@ -314,7 +314,7 @@ export function SignalsAndVerification({
   return (
     <section
       aria-labelledby="signals-heading"
-      className="flex flex-col gap-4 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
+      className="flex flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
       data-profile-signals
     >
       <h2
@@ -502,7 +502,7 @@ function SignalsPart({
   return (
     <section
       aria-labelledby={id}
-      className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3"
+      className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3"
       data-signals-part={data}
     >
       <div className="flex flex-col gap-1">
@@ -532,7 +532,7 @@ function InnerEmpty({
   readonly hint: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) p-3">
+    <div className="flex items-start gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-3">
       <span className="mt-0.5 text-(--cq-text-tertiary)">{icon}</span>
       <div className="flex flex-col gap-0.5">
         <p className="cq-body-sm text-(--cq-text-primary)">{title}</p>

@@ -53,7 +53,7 @@ export function OnboardingProgress({
               <span
                 aria-hidden="true"
                 className={cx(
-                  "h-1 rounded-full",
+                  "h-1",
                   active
                     ? "bg-(--cq-accent)"
                     : done

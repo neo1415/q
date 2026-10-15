@@ -501,7 +501,7 @@ function TourOverlay({
     <section
       aria-label="Q Pitch tour"
       data-q-pitch
-      className="fixed inset-x-4 bottom-24 z-(--cq-z-presence) mx-auto flex max-w-2xl items-end gap-3 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) px-4 py-3 shadow-(--cq-shadow-overlay) lg:bottom-6"
+      className="fixed inset-x-4 bottom-24 z-(--cq-z-presence) mx-auto flex max-w-2xl items-end gap-3 border border-(--cq-border) bg-(--cq-surface-raised) px-4 py-3 shadow-(--cq-shadow-overlay) lg:bottom-6"
     >
       {panelControls}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -577,7 +577,7 @@ function TourMenu({
     onControl(kind, chapterId);
   };
   const item =
-    "flex min-h-11 w-full items-center rounded-md px-3 text-left cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)";
+    "flex min-h-11 w-full items-center px-3 text-left cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)";
   return (
     <div className="relative shrink-0">
       <button
@@ -585,7 +585,7 @@ function TourMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => onOpenChange(!open)}
-        className="inline-flex min-h-11 items-center rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"
+        className="inline-flex min-h-11 items-center border border-(--cq-border) bg-(--cq-surface) px-3 cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"
       >
         Tour
       </button>
@@ -593,7 +593,7 @@ function TourMenu({
         <div
           role="menu"
           aria-label="Tour"
-          className={`absolute right-0 z-(--cq-z-popover) flex max-h-96 w-72 flex-col gap-1 overflow-y-auto rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) p-2 shadow-(--cq-shadow-overlay) ${placement === "up" ? "bottom-full mb-2" : "top-full mt-2"}`}
+          className={`absolute right-0 z-(--cq-z-popover) flex max-h-96 w-72 flex-col gap-1 overflow-y-auto border border-(--cq-border) bg-(--cq-surface-raised) p-2 shadow-(--cq-shadow-overlay) ${placement === "up" ? "bottom-full mb-2" : "top-full mt-2"}`}
         >
           <p className="px-3 py-1 cq-body-sm text-(--cq-text-secondary)">
             {label}
@@ -685,7 +685,7 @@ function TourFrame({
     <section
       aria-label="Q Pitch tour"
       data-q-pitch
-      className="fixed inset-x-4 bottom-24 z-(--cq-z-presence) mx-auto flex max-w-xl flex-col gap-3 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
+      className="fixed inset-x-4 bottom-24 z-(--cq-z-presence) mx-auto flex max-w-xl flex-col gap-3 border border-(--cq-border) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
     >
       <div className="flex items-center justify-between gap-3">
         <p className="cq-body-sm text-(--cq-text-secondary)">{label}</p>
@@ -714,8 +714,8 @@ function TourButton({
       aria-expanded={expanded}
       className={
         primary
-          ? "inline-flex min-h-11 items-center rounded-md bg-(--cq-accent) px-4 cq-body-sm font-medium text-(--cq-text-inverse) hover:bg-(--cq-accent-hover)"
-          : "inline-flex min-h-11 items-center rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"
+          ? "inline-flex min-h-11 items-center bg-(--cq-accent) px-4 cq-body-sm font-medium text-(--cq-text-inverse) hover:bg-(--cq-accent-hover)"
+          : "inline-flex min-h-11 items-center border border-(--cq-border) bg-(--cq-surface) px-3 cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"
       }
     >
       {label}

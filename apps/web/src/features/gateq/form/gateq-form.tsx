@@ -466,24 +466,12 @@ export function GateQForm({
   if (preview?.loading === true || recovering) {
     return (
       <div className={shell} aria-busy="true">
-        <div
-          className="gq-sk"
-          style={{ width: "100%", height: 300, borderRadius: 14 }}
-        />
+        <div className="gq-sk" style={{ width: "100%", height: 300 }} />
         <div className="flex flex-col gap-3.5">
           <div className="gq-sk" style={{ width: "40%", height: 24 }} />
-          <div
-            className="gq-sk"
-            style={{ width: "100%", height: 44, borderRadius: 22 }}
-          />
-          <div
-            className="gq-sk"
-            style={{ width: "100%", height: 44, borderRadius: 22 }}
-          />
-          <div
-            className="gq-sk"
-            style={{ width: "70%", height: 44, borderRadius: 22 }}
-          />
+          <div className="gq-sk" style={{ width: "100%", height: 44 }} />
+          <div className="gq-sk" style={{ width: "100%", height: 44 }} />
+          <div className="gq-sk" style={{ width: "70%", height: 44 }} />
         </div>
       </div>
     );

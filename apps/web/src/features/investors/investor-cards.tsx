@@ -51,7 +51,7 @@ function InvestorCard({
   const cover = item.coverUrl ?? null;
   return (
     <div
-      className="flex h-full flex-col overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) transition-colors duration-(--cq-motion-base) hover:border-(--cq-border-strong)"
+      className="flex h-full flex-col overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface) transition-colors duration-(--cq-motion-base) hover:border-(--cq-border-strong)"
       data-investor-card={item.investorOrganisationId}
     >
       <Link
@@ -74,7 +74,7 @@ function InvestorCard({
           className={`flex flex-1 flex-col gap-2 px-4 pb-2 ${cover === null ? "pt-4" : ""}`}
         >
           <div
-            className={`w-fit rounded-lg bg-(--cq-surface) p-0.5 ${cover === null ? "" : "-mt-7"}`}
+            className={`w-fit bg-(--cq-surface) p-0.5 ${cover === null ? "" : "-mt-7"}`}
           >
             <EntityAvatar
               kind="investor"
@@ -105,7 +105,7 @@ function InvestorCard({
           )}
           {footer}
           {inboundLabel(item.inboundPreference) === null ? null : (
-            <span className="cq-caption mt-auto self-start rounded-full border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)">
+            <span className="cq-caption mt-auto self-start border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)">
               {inboundLabel(item.inboundPreference)}
             </span>
           )}

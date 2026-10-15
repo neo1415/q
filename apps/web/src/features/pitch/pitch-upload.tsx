@@ -800,7 +800,7 @@ export function PitchUpload({
               {preview.reason}
             </InlineNotice>
           ) : (
-            <div className="mx-auto w-full max-w-(--cq-layout-narrow) overflow-hidden rounded-(--cq-radius-lg) bg-(--cq-stage-canvas)">
+            <div className="mx-auto w-full max-w-(--cq-layout-narrow) overflow-hidden bg-(--cq-stage-canvas)">
               <PitchPlayer
                 company={asDiscovered(company, flow.pitch)}
                 policy="ACTIVE"

@@ -176,7 +176,7 @@ export default async function InvestorPage({
         <QControl id="section.connect" kind="SECTION">
           <section
             aria-labelledby="investor-reach"
-            className="flex flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
+            className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
           >
             <h2
               id="investor-reach"
@@ -205,7 +205,7 @@ export default async function InvestorPage({
           <QControl id="section.about" kind="SECTION">
             <section
               aria-labelledby="investor-about"
-              className="flex flex-col gap-2 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
+              className="flex flex-col gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-6"
             >
               <h2
                 id="investor-about"

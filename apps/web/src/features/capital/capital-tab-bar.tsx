@@ -66,10 +66,13 @@ export function CapitalTabBar({
     const wanted = tabForHash(window.location.hash);
     if (wanted === null || wanted === active) return;
     const search = new URLSearchParams(window.location.search);
+    // Capital lives in the CRM's Capital tab (owner 2026-10-16).
+    search.set("view", "capital");
     search.set("tab", wanted);
-    router.replace(`/capital?${search.toString()}${window.location.hash}`, {
-      scroll: false,
-    });
+    router.replace(
+      `/relationships?${search.toString()}${window.location.hash}`,
+      { scroll: false },
+    );
   }, [active, hadTabParam, router]);
 
   // Keep the open tab in view on a narrow, scrolling bar.
@@ -163,7 +166,7 @@ export function TabBadge({
   readonly spoken: string;
 }) {
   return (
-    <span className="cq-caption cq-numeric rounded-full bg-(--cq-surface-subtle) px-2 py-0.5 font-medium text-(--cq-text-secondary)">
+    <span className="cq-caption cq-numeric bg-(--cq-surface-subtle) px-2 py-0.5 font-medium text-(--cq-text-secondary)">
       <span aria-hidden="true">{text}</span>
       <span className="sr-only">{`, ${spoken}`}</span>
     </span>
