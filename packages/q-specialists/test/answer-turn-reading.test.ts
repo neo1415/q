@@ -1085,6 +1085,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "WORK_DONE",
           "WORK_TEAM",
           "WORK_COST",
+          "OWN_DATA_ROOM",
+          "OWN_DECK",
           "GATEQ_INBOX",
           "GATEQ_FIND",
           "GATEQ_CLAIM",
