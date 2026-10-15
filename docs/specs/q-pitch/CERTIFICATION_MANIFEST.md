@@ -96,4 +96,24 @@ Timing if all five are promoted: P1–P4 3:10 + P6 0:35 + P5 0:55 + P7 0:40 + P8
 
 The four original investor entries remain due for re-certification on the deployed SHA (blueprint §16) before any audience run.
 
+## Browser receipts — production `04a322ae`, 15 Oct 2026 05:25–05:33 UTC (Lane P, unpaid)
+
+- **Method:** Playwright (Chromium 1194, 1440×900, recorded video), signed in through the product's own form as `investor.savanna-seed@fictional.capitalq.local`.
+- **No-cost guard:** after sign-in, **every server-action POST and every non-GET to q-api was aborted** (logged), so no writes and no model calls were made. Receipts are private scratchpad files (`qpitch-review/`), not committed.
+
+| Entry                                        | Result                                                                                                                                                                                                                                                                                                                                                                                     | Receipt                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| `GATEQ-INBOX-VIEW` (new)                     | **PRODUCTION_LIVE_VERIFIED.** `/gateq?tab=inbox` 200, Inbox tab selected; 4 applications listed against the firm's rules; the fictional Maji Loop brief reads "Frozen from the founder's submission. Investment decisions remain with your team."                                                                                                                                          | `gateq-inbox-savanna.png`, `features-log.json` |
+| `CRM-RELATIONSHIP-VIEW` (new)                | **PRODUCTION_LIVE_VERIFIED.** `/relationships?view=overview` 200, "Investment Hub" showing the firm's interest, connections, pipeline and commitments                                                                                                                                                                                                                                      | `relationships-savanna.png`                    |
+| `GATEQ-INBOX-DOSSIER` (cross-firm isolation) | **Stays CODE_VERIFIED.** The application id is not exposed in the DOM, so the foreign-investor deep link could not be built without a privileged read, which was not done                                                                                                                                                                                                                  | —                                              |
+| `QP-HOME-HANDOFF`                            | **Stays CODE_VERIFIED.** `/home` renders, but the premiere (and its close scene) is not deployed on `04a322ae`                                                                                                                                                                                                                                                                             | `home-savanna.png`                             |
+| Tour host (QP-F08) `?qpitch=pilot`           | Overlay appeared; the Discover navigation DONE receipt was observed; FIXTURE_UNRESOLVED fallback said "won't describe it" and paused. **DEFECT:** with run creation blocked, scene 1 advanced: an older finished run was taken as the top-three DONE. Fixed in `20abe295` (`claude/p-cert-oct15`), **not deployed. Do not run the pilot for an audience until it is deployed and re-run.** | `pilot-log.json`, `pilot-0*.png`, video        |
+
+**Flags:**
+
+- The savanna inbox also lists Spheros and Tensorgate, which are not fictional-world records (see QP-F03). The GateQ scene must stay on Maji Loop.
+- The Investment Hub shows figures (for example "Commitments 1 · USD 250,000"). These are fictional seed data and must never be narrated as Capital Q results.
+
+**Default-gate cut now:** pilot P1–P4 (3:10) + GateQ (0:55) + relationship (0:40) = **4:45**. With the Home close certified after deploy, about 5:05. With privacy and Q-to-Q (paid, after 09:00), about 6:30.
+
 Every other atlas feature currently has no certification entry and must not be presented as live.

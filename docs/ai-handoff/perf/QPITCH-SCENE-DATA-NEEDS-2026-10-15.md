@@ -31,3 +31,20 @@ This is Lane P's input to the prefetch contract. Lane S owns `packages/model-gat
 ## Proposed interface (for S to accept, change or reject)
 
 `prefetchSceneCapsule({ sceneId, actor, subjects: companyIds[], intent: "PROFILE" | "RISKS" | "COMPARE" | "INBOX" | "RELATIONSHIPS" | "ARRIVAL" })` returns `{ capsuleId, expiresAt }`. It is fire-and-forget from the browser. A later Q run may carry `capsuleId`, and the server re-authorises it before use.
+
+## Answer to the contract question: which scenes carry a Q ask (Lane P, 15 Oct)
+
+S's contract is accepted (`PREFETCH-CONTRACT-2026-10-15.md`), and `QAnswerCapsule` lives in `packages/contracts/src/q/answer-capsule.ts`.
+
+| Scene (script)                      | Status on 15 Oct                            | Q ask                                  | Code lane S can map it to                                                                      |
+| ----------------------------------- | ------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `s.pilot.opening` (pilot, premiere) | browser-certified (re-cert due)             | `q.top-three`                          | computed fit ranking: the best capsule candidate                                               |
+| `s.pilot.company`                   | browser-certified (re-cert due)             | `q.company-profile`, `q.company-risks` | profile: declared company facts (partly); risks: generation, so no capsule beyond evidence ids |
+| `s.pilot.compare`                   | browser-certified (re-cert due)             | `q.compare-two`                        | generation; warm both companies' reads only                                                    |
+| `s.premiere.privacy`                | CODE_VERIFIED                               | `q.private-runway`                     | ideally a code-only scope refusal; never a capsule holding private ids                         |
+| `s.premiere.gateq`                  | browser-certified (`GATEQ-INBOX-VIEW`)      | none                                   | page reads only                                                                                |
+| `s.premiere.relationship`           | browser-certified (`CRM-RELATIONSHIP-VIEW`) | none                                   | page reads only                                                                                |
+| `s.premiere.rehearsal`              | CODE_VERIFIED                               | none (rehearsal turns, not a Q run)    | n/a                                                                                            |
+| `s.premiere.close`                  | CODE_VERIFIED                               | none                                   | warm the arrival snapshot two scenes ahead                                                     |
+
+Lane P will call `GET /v1/q/arrival-snapshot` (in the actor's own session) from `TourPorts.prefetch` when a scene with a Q ask is two scenes ahead. Done in the next P slice.

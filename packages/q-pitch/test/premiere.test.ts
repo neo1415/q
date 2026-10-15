@@ -12,7 +12,7 @@ import {
 const NOW = "2026-10-15T12:00:00Z";
 
 describe("r3 premiere and the certification gate", () => {
-  it("an audience run admits only the browser-certified scenes", () => {
+  it("the default gate admits only the browser-certified scenes", () => {
     const gate = certifyTour(PREMIERE_SCRIPT, PREMIERE_CERTIFICATION_LEDGER, {
       now: NOW,
       staleFeatureIds: [],
@@ -22,9 +22,15 @@ describe("r3 premiere and the certification gate", () => {
       "s.pilot.opening",
       "s.pilot.company",
       "s.pilot.compare",
+      "s.premiere.gateq",
+      "s.premiere.relationship",
     ]);
     const suppressed = gate.decisions.filter((d) => d.verdict === "SUPPRESSED");
-    expect(suppressed.map((d) => d.sceneId)).toContain("s.premiere.gateq");
+    expect(suppressed.map((d) => d.sceneId)).toEqual([
+      "s.premiere.privacy",
+      "s.premiere.rehearsal",
+      "s.premiere.close",
+    ]);
   });
 
   it("a rehearsal that opts into CODE_VERIFIED runs the full cut", () => {

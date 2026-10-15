@@ -1,6 +1,6 @@
 # Capital Q as a demo founder — PROPOSED (owner + integration owner decision)
 
-Directive 2026-10-15 §E; lead request 15 Oct. Status: **proposal with an exact seed plan, for the lead to decide.** No account, company, seed or migration has been created.
+Directive 2026-10-15 §E; lead request 15 Oct. **DECIDED 15 Oct by the lead: Option A.** Capital Q stays `organisation_private` and never appears in Discover. Investors' questions about Capital Q are answered from the knowledge pack (`CAPITAL_Q_KNOWLEDGE_PACK`), with every unknown figure stated as unknown. **No seeder changes.** The seed plan in §3 is kept only as a record of what was considered; it is not to be built.
 
 ## 1. What exists today (fixture review, 15 Oct)
 

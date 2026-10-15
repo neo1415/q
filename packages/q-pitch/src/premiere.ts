@@ -48,6 +48,56 @@ function codeEntry(
 export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
   CertificationLedgerSchema.parse([
     ...PILOT_CERTIFICATION_LEDGER,
+    {
+      featureId: "GATEQ-INBOX-VIEW",
+      status: "PRODUCTION_LIVE_VERIFIED",
+      actorContext: PILOT_ACTOR,
+      fixture:
+        "Savanna Seed Partners' own gateway inbox; selected item: fictional Maji Loop (founder.maji-loop@fictional.capitalq.local)",
+      appCommit: "web production 04a322ae",
+      verifiedAt: "2026-10-15 05:31 UTC",
+      verifierType: "BROWSER",
+      receipt:
+        "scratchpad qpitch-review/gateq-inbox-savanna.png + features-log.json (Playwright, server actions blocked: no writes, no model calls)",
+      claimsAllowed: [
+        {
+          claimId: "GATEQ-INBOX-VIEW.c1",
+          text: "The firm's GateQ inbox lists applications through its own gateway, each shown against the firm's rules",
+        },
+        {
+          claimId: "GATEQ-INBOX-VIEW.c2",
+          text: "A submitted brief is frozen from the founder's submission, and investment decisions remain with the firm",
+        },
+      ],
+      claimsForbidden: [
+        "Selecting Spheros or Tensorgate (not fictional-world records)",
+        "A live interview",
+        "Investor Q reading the dossier",
+      ],
+      validUntil: { invalidatedBy: "Next GateQ inbox/dossier release" },
+    },
+    {
+      featureId: "CRM-RELATIONSHIP-VIEW",
+      status: "PRODUCTION_LIVE_VERIFIED",
+      actorContext: PILOT_ACTOR,
+      fixture: "Savanna Seed Partners' own relationship records (fictional)",
+      appCommit: "web production 04a322ae",
+      verifiedAt: "2026-10-15 05:31 UTC",
+      verifierType: "BROWSER",
+      receipt:
+        "scratchpad qpitch-review/relationships-savanna.png + features-log.json (Playwright, writes blocked)",
+      claimsAllowed: [
+        {
+          claimId: "CRM-RELATIONSHIP-VIEW.c1",
+          text: "The investment hub shows the firm's interest, connections, pipeline and commitments from its own relationship records",
+        },
+      ],
+      claimsForbidden: [
+        "Any figure on screen as a Capital Q result",
+        "Team or server-backed views",
+      ],
+      validUntil: { invalidatedBy: "Next relationship hub release" },
+    },
     codeEntry({
       featureId: "GATEQ-INBOX-DOSSIER",
       fixture:
@@ -214,8 +264,8 @@ const candidates: SceneScript[] = [
     sceneId: "s.premiere.gateq",
     chapterId: "ch.premiere.gateq",
     title: "GateQ: the front door you control",
-    featureIds: ["GATEQ-INBOX-DOSSIER"],
-    approvedClaimIds: ["GATEQ-INBOX-DOSSIER.c1", "GATEQ-INBOX-DOSSIER.c2"],
+    featureIds: ["GATEQ-INBOX-VIEW"],
+    approvedClaimIds: ["GATEQ-INBOX-VIEW.c1", "GATEQ-INBOX-VIEW.c2"],
     actor: PILOT_ACTOR,
     expectedRoute: "/gateq",
     actions: [
@@ -231,17 +281,17 @@ const candidates: SceneScript[] = [
       ),
       line(
         "l.gateq.inbox",
-        "This is your gateway's inbox. Another firm can't open it, or anything in it.",
+        "These are applications through your own gateway, each shown against your rules.",
         "AFTER_ACK",
-        "CERTIFICATION GATEQ-INBOX-DOSSIER (r3 wording)",
-        ["GATEQ-INBOX-DOSSIER.c1"],
+        "CERTIFICATION GATEQ-INBOX-VIEW (r3 wording)",
+        ["GATEQ-INBOX-VIEW.c1"],
       ),
       line(
         "l.gateq.dossier",
-        "When a founder submits, you receive what they chose to send—not their private conversation with me, and never your own team's notes.",
+        "A submitted brief is frozen from what the founder sent. The decision stays with your team.",
         "AFTER_ACK",
-        "Blueprint §6 06:25, narrowed to GATEQ-INBOX-DOSSIER.c2",
-        ["GATEQ-INBOX-DOSSIER.c2"],
+        "CERTIFICATION GATEQ-INBOX-VIEW (r3 wording)",
+        ["GATEQ-INBOX-VIEW.c2"],
       ),
     ],
     fallbackLines: [FALLBACK],
@@ -252,8 +302,8 @@ const candidates: SceneScript[] = [
     sceneId: "s.premiere.relationship",
     chapterId: "ch.premiere.relationship",
     title: "One relationship record",
-    featureIds: ["CRM-RELATIONSHIP-RECORD"],
-    approvedClaimIds: ["CRM-RELATIONSHIP-RECORD.c1"],
+    featureIds: ["CRM-RELATIONSHIP-VIEW"],
+    approvedClaimIds: ["CRM-RELATIONSHIP-VIEW.c1"],
     actor: PILOT_ACTOR,
     expectedRoute: "/relationships",
     actions: [
@@ -272,10 +322,10 @@ const candidates: SceneScript[] = [
       ),
       line(
         "l.rel.derived",
-        "Each relationship's state here is derived from what was actually recorded—not typed in by hand.",
+        "One place for interest, connections, pipeline and commitments—from your own relationship records.",
         "AFTER_ACK",
-        "CERTIFICATION CRM-RELATIONSHIP-RECORD (r3 wording)",
-        ["CRM-RELATIONSHIP-RECORD.c1"],
+        "CERTIFICATION CRM-RELATIONSHIP-VIEW (r3 wording)",
+        ["CRM-RELATIONSHIP-VIEW.c1"],
       ),
     ],
     fallbackLines: [FALLBACK],
