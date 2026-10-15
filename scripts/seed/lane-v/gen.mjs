@@ -66,6 +66,22 @@ for (const job of jobs) {
     // used by the live app): never used for new seeding jobs.
     while ((ledger.excluded ?? []).includes(tag(ledger.activeKey)))
       ledger.activeKey += 1;
+    // Lead's per-key ceiling (e.g. CQ_TAVUS_KEY_CAP="key#4=1500"): stop at it.
+    const cap = Object.fromEntries(
+      (process.env.CQ_TAVUS_KEY_CAP ?? "")
+        .split(",")
+        .filter(Boolean)
+        .map((x) => x.split("=")),
+    );
+    {
+      const t = tag(ledger.activeKey);
+      const used = ledger.keys[t]?.seconds ?? 0;
+      if (cap[t] && used + 45 > Number(cap[t])) {
+        ledger.keys[t] = { ...(ledger.keys[t] ?? {}), refusal: `lead cap ${cap[t]} s` };
+        ledger.activeKey += 1;
+        continue;
+      }
+    }
     const i = ledger.activeKey;
     if (i >= keys().length) {
       console.log("ALL KEYS EXHAUSTED");

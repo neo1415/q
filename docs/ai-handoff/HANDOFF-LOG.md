@@ -714,3 +714,13 @@ PR99 exactefd2 protectedCI38617987342 allPASS; normalproductionmerge48c6. Web/AP
   - OpenAI about $0.46: lane S $0.41, lane G about $0.05;
   - Tavus $0.
 - Next: batch D (#113), the paid Tavus test after 09:00 WAT, the dossier-Q re-acceptance, the Q Pitch pilot re-run, CRM screenshots and walkthroughs, and the S3 after-deploy measures.
+
+## 15 October 2026, 12:10 WAT — Lane V (pitch-video seeding through real flows)
+
+- Fixed and released in batch H: the web refused every new founder from 2026-10-07 ("Founder setup isn't available right now") because founder definition v4 was published but the screen accepted v2–v3 only. PR #120 (`claude/v-fix-founder-v4-oct15@6c7080cd`) decides support by the session's steps, not a version list, so v5 renders without a code change.
+- Capital Q seeded through the founder flow as `founder.capitalq@fictional.capitalq.local`: company `ee75a7d8-d457-4b59-9ad8-0d64b3026a3d`, raise USD 2,000,000 (founder claim), unknowns stay unknown, deck drafted by Q and uploaded, pitch READY/NETWORK (AI presenter, labelled).
+- Bugs found, not yet fixed (open for an owner):
+  1. **Team invitations reach the invitee only by email.** `identity.organisation_invitations` keeps only `token_hash`; the invitee's home shows no pending invitation (only "Joining your team? Find your company"); an address that cannot receive mail (e.g. `.local`) has no way in. Seeding uses the join-request path instead (member signs in, asks to join, owner lets in and sets the role).
+  2. **"Add a round" forces an instrument.** The form pre-selects SAFE and offers no "not stated", so a founder whose instrument is undecided must state a false one (the Terms form beside it does offer "Not stated"). Capital Q opened no round for this reason.
+  3. **Q deck Download menu sits under the Q sheet.** On `/capital` → "Make my pitch deck", the PDF/PPTX menu items render beneath the sheet overlay, which intercepts pointer clicks; only keyboard selection works.
+- Tavus (owner's disposable keys, never the Railway key): key#1 463.5 s, key#2 426 s, key#3 678.8 s (each refused 402), key#4 in use (lead cap 1,500 s). Ledger: `docs/seed/lane-v/tavus-ledger.json`.
