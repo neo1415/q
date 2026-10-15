@@ -1,5 +1,6 @@
 import { cachedInRun, type DatabaseExecutor } from "@capital-q/database";
 import type { InterestService } from "@capital-q/network";
+import type { DiligenceService } from "@capital-q/permissions";
 import type { QRuntimeRepositories } from "@capital-q/q-runtime";
 
 /**
@@ -122,6 +123,52 @@ export function withRunCachedRelationshipLists(
           fingerprint: query.companyId,
         },
         () => service.listRelationshipsForCompany(query),
+      ),
+  };
+}
+
+/**
+ * S5 (lane S, live 2026-10-15: one get_relationship took 55 round trips):
+ * a relationship's diligence view, read once per run or request. The
+ * relationship tool reads it for its own area and again through the
+ * Relationship Brief, and the arrival snapshot reads it from the
+ * attention report and the briefs. The key carries the full actor and
+ * the relationship, so another person or relationship never reaches the
+ * entry; a write this run sends to any of the tables drops it.
+ */
+const DILIGENCE_VIEW_TABLES = [
+  "network.relationships",
+  "network.diligence_requests",
+  "network.diligence_fulfilments",
+  "network.diligence_request_declines",
+  "network.diligence_document_views",
+  "network.diligence_document_summaries",
+  "network.diligence_questions",
+  "network.diligence_question_answers",
+  "permissions.disclosure_policies",
+  "evidence.documents",
+  "evidence.document_versions",
+] as const;
+
+export function withRunCachedDiligenceViews(
+  service: DiligenceService,
+): DiligenceService {
+  return {
+    ...service,
+    view: (query) =>
+      cachedInRun(
+        {
+          aggregate: "diligence-view",
+          tables: DILIGENCE_VIEW_TABLES,
+          actor: [
+            query.actor.tenantId,
+            query.actor.userId,
+            query.actor.organisationId ?? "",
+            query.actor.membershipId ?? "",
+          ].join("/"),
+          fingerprint: query.relationshipId,
+        },
+        () => service.view(query),
       ),
   };
 }

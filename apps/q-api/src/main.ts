@@ -301,6 +301,7 @@ import {
   createRequestDatabaseClient,
 } from "@capital-q/database";
 import {
+  withRunCachedDiligenceViews,
   withRunCachedRelationshipLists,
   withRunReadCache,
 } from "./composition/run-read-cache.js";
@@ -1996,57 +1997,63 @@ const profileMaterial = createProfileMaterial({
  * the same service as the relationship page, approved on a card first. Q
  * never downloads a document.
  */
-const diligenceService = createDiligenceService({
-  sql: database.sql,
-  transactions: database.transactions,
-  relationships: interestService,
-  policies: permissionsService.policies,
-  policyRepository: createPostgresDisclosurePolicyRepository(),
-  access: disclosure,
-  documents: {
-    ownDocument: async (actor, documentId) => {
-      const document = await researchComposition.evidence
-        .getDocument({ actor, documentId: DocumentIdSchema.parse(documentId) })
-        .catch(() => null);
-      return document === null
-        ? null
-        : {
-            id: document.id,
-            tenantId: document.tenantId,
-            companyId: document.companyId,
-            title: document.title,
-            documentType: document.documentType,
-            currentVersionId: document.currentVersionId,
-          };
+const diligenceService = withRunCachedDiligenceViews(
+  createDiligenceService({
+    sql: database.sql,
+    transactions: database.transactions,
+    relationships: interestService,
+    policies: permissionsService.policies,
+    policyRepository: createPostgresDisclosurePolicyRepository(),
+    access: disclosure,
+    documents: {
+      ownDocument: async (actor, documentId) => {
+        const document = await researchComposition.evidence
+          .getDocument({
+            actor,
+            documentId: DocumentIdSchema.parse(documentId),
+          })
+          .catch(() => null);
+        return document === null
+          ? null
+          : {
+              id: document.id,
+              tenantId: document.tenantId,
+              companyId: document.companyId,
+              title: document.title,
+              documentType: document.documentType,
+              currentVersionId: document.currentVersionId,
+            };
+      },
+      canonical: (documentId) =>
+        findActiveDocumentById(database.sql, documentId),
+      signedDownload: () => Promise.reject(new Error("Q_NEVER_DOWNLOADS")),
     },
-    canonical: (documentId) => findActiveDocumentById(database.sql, documentId),
-    signedDownload: () => Promise.reject(new Error("Q_NEVER_DOWNLOADS")),
-  },
-  requests: createPostgresDiligenceRequests(),
-  // The questions a request carried, so its state comes from their answers.
-  questions: createPostgresDiligenceQuestions(),
-  appender: createRelationshipEventAppender({
-    registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
-    repositories: {
-      relationships: createPostgresRelationshipRepository(),
-      events: createPostgresRelationshipEventRepository(),
-    },
-  }),
-  audit: createPostgresMaterialActionAuditWriter(),
-  notify: (input) =>
-    createCounterpartNotices(database.sql).notify({
-      relationshipId: input.relationshipId,
-      actingSide: input.actingSide,
-      kind: "DILIGENCE",
-      title: input.title,
-      body: null,
-      // A request opens the founder's inbox at it (2026-10-08).
-      target: input.actingSide === "INVESTOR" ? "DOCUMENTS" : "RELATIONSHIP",
-      key: input.key,
-      priority: input.actingSide === "INVESTOR" ? "NEEDS_YOU" : "UPDATE",
+    requests: createPostgresDiligenceRequests(),
+    // The questions a request carried, so its state comes from their answers.
+    questions: createPostgresDiligenceQuestions(),
+    appender: createRelationshipEventAppender({
+      registry: createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+      repositories: {
+        relationships: createPostgresRelationshipRepository(),
+        events: createPostgresRelationshipEventRepository(),
+      },
     }),
-  newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
-});
+    audit: createPostgresMaterialActionAuditWriter(),
+    notify: (input) =>
+      createCounterpartNotices(database.sql).notify({
+        relationshipId: input.relationshipId,
+        actingSide: input.actingSide,
+        kind: "DILIGENCE",
+        title: input.title,
+        body: null,
+        // A request opens the founder's inbox at it (2026-10-08).
+        target: input.actingSide === "INVESTOR" ? "DOCUMENTS" : "RELATIONSHIP",
+        key: input.key,
+        priority: input.actingSide === "INVESTOR" ? "NEEDS_YOU" : "UPDATE",
+      }),
+    newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+  }),
+);
 
 /**
  * R1 batching: the brief's batch readers over the chat and schedule
