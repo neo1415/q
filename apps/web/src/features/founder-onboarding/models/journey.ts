@@ -8,7 +8,6 @@ import {
   CURRENCY_OPTIONS,
   FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V2_VERSION,
-  FOUNDER_DEFINITION_V3_VERSION,
   FOUNDER_DEFINITION_V4_VERSION,
   FOUNDER_FINANCIAL_STEPS,
   FOUNDER_STEPS,
@@ -360,24 +359,20 @@ export function runtimeState(view: OnboardingSessionView): RuntimeState {
   };
 }
 
-/**
- * The versions this screen renders: v2, v3 (v2 plus two options) and v4
- * (v3 plus the optional financials block and the smallest cheque).
- */
-const SUPPORTED_VERSIONS: ReadonlySet<number> = new Set([
-  FOUNDER_DEFINITION_V2_VERSION,
-  FOUNDER_DEFINITION_V3_VERSION,
-  FOUNDER_DEFINITION_V4_VERSION,
-]);
-
 export function isSupportedVersion(view: OnboardingSessionView): boolean {
-  // v2 and its strict superset v3. A session pinned to v1 still runs v1's
-  // journey on the server; this screen would render its F2 as an upload
-  // it never collected, so it says plainly that it cannot render rather
-  // than misrepresenting it (§82). Live 2026-10-01: v3 was published and
-  // this check refused every new founder until it named v3 too. Live
-  // 2026-10-15: the same for v4 (published 2026-10-07), until this change.
-  return SUPPORTED_VERSIONS.has(view.session.definitionVersion);
+  // Decided by what the session asks, not by a list of version numbers:
+  // v2 onward, as long as every step on its path is one this screen draws.
+  // A session pinned to v1 still runs v1's journey on the server; this
+  // screen would render its F2 as an upload it never collected, so it says
+  // plainly that it cannot render rather than misrepresenting it (§82).
+  // Live 2026-10-01 (v3) and again 2026-10-15 (v4, published 2026-10-07):
+  // a hard-coded version list refused every new founder until it was edited.
+  // A later version that only adds options (v5: Gulf countries) renders as
+  // is; one that adds a step this build does not know is refused honestly.
+  return (
+    view.session.definitionVersion >= FOUNDER_DEFINITION_V2_VERSION &&
+    view.progress.eligibleSteps.every((step) => GROUP_BY_STEP.has(step.stepKey))
+  );
 }
 
 function single(state: RuntimeState, key: string): string | undefined {
@@ -830,7 +825,9 @@ function buildCapitalObjective(
   const minCheque = range(state, F.minCheque);
   return {
     ...base(group, "capital_objective", state),
+    // Introduced in v4 and kept by every later version (a floor, not a list).
     asksMinCheque:
+      state.eligible.has(F.minCheque) ||
       state.view.session.definitionVersion >= FOUNDER_DEFINITION_V4_VERSION,
     help: "Your raise is kept separate from your company profile. You can change it any time.",
     raisingOptions: optionsOf(S.raising),
