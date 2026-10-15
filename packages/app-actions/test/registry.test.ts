@@ -271,6 +271,9 @@ describe("the action registry", () => {
       ["crm.company_view.save", "offer.crm_saved_views", "INSTANT"],
       ["crm.investor_view.delete", "offer.crm_saved_views", "INSTANT"],
       ["crm.company_view.delete", "offer.crm_saved_views", "INSTANT"],
+      // CRM S3: the person's own side's private notes.
+      ["crm.investor_note.add", "offer.crm_notes", "INSTANT"],
+      ["crm.company_note.add", "offer.crm_notes", "INSTANT"],
       // WORK-58: Q's work page.
       ["q.work.pause", "legacy:stop_q_work", "INSTANT"],
       ["q.work.resume", "legacy:stop_q_work", "INSTANT"],

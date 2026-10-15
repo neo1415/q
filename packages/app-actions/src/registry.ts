@@ -23,6 +23,7 @@ import { SCHEDULE_PROPOSAL_ACTIONS } from "./actions/schedule-proposals.js";
 import { SETTINGS_ACTIONS } from "./actions/settings.js";
 import { ETIQUETTE_ACTIONS } from "./actions/etiquette.js";
 import { RELATIONSHIP_VIEW_ACTIONS } from "./actions/relationship-views.js";
+import { RELATIONSHIP_NOTE_ACTIONS } from "./actions/relationship-notes.js";
 import { VISIBILITY_ACTIONS } from "./actions/visibility.js";
 import { WORK_ACTIONS } from "./actions/work.js";
 import { GATEQ_ACTIONS } from "./actions/gateq.js";
@@ -63,6 +64,7 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...SETTINGS_ACTIONS,
   ...ETIQUETTE_ACTIONS,
   ...RELATIONSHIP_VIEW_ACTIONS,
+  ...RELATIONSHIP_NOTE_ACTIONS,
   ...WORK_ACTIONS,
   ...GATEQ_ACTIONS,
   ...DATA_ROOM_ACTIONS,

@@ -6,9 +6,11 @@ import {
   RelationshipDetail,
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
+import { RelationshipNotes } from "@/features/relationships/relationship-notes";
 import { loadCompanySideRelationship } from "@/features/relationships/relationship-page-data";
 import {
   recordGateqRead,
+  recordNotesRead,
   recordWorkRead,
 } from "@/features/relationships/record-workspace-data";
 import {
@@ -44,10 +46,14 @@ export default async function CompanyRelationshipPage({
     return <RelationshipUnavailable sentence={loaded.sentence} />;
   }
   // GateQ applications on this relationship, by its canonical id (lane G).
-  const gateq =
+  // GateQ and this side's private notes: their own reads, side by side.
+  const [gateq, notes] =
     loaded.relationship === null
-      ? null
-      : await recordGateqRead(loaded.relationship.relationshipId);
+      ? [null, null]
+      : await Promise.all([
+          recordGateqRead(loaded.relationship.relationshipId),
+          recordNotesRead(loaded.relationship.relationshipId),
+        ]);
   const { relationship, pending, counterpart } = loaded;
 
   // The relationship itself is Q's subject here, not the investor
@@ -79,6 +85,16 @@ export default async function CompanyRelationshipPage({
         brief={loaded.brief}
         basePath={`/relationships/investor/${investorOrganisationId}`}
         gateq={gateq === null ? null : recordGateqSlot(gateq)}
+        notes={
+          notes === null || relationship === null ? null : (
+            <RelationshipNotes
+              relationshipId={relationship.relationshipId}
+              side="COMPANY"
+              read={notes}
+              now={loaded.readAt}
+            />
+          )
+        }
         work={recordWorkSlot(work)}
         absentSentence={loaded.absentSentence}
         actions={

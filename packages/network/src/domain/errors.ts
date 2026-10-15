@@ -165,3 +165,11 @@ export class RelationshipViewLimitError extends Error {
     this.name = "RelationshipViewLimitError";
   }
 }
+
+/** The note named as replaced was already corrected by another note. */
+export class RelationshipNoteSupersededError extends Error {
+  constructor() {
+    super("That note was already corrected. Reload to see the latest.");
+    this.name = "RelationshipNoteSupersededError";
+  }
+}

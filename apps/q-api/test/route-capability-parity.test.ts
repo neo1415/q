@@ -514,6 +514,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // CRM saved views (2026-10-15): both sides' list read, shown on the
   // pipeline Q opens; writes are app actions (offer.crm_saved_views).
   "api/http/network-interests.ts GET listPath": cap("navigate.RELATIONSHIPS"),
+  // CRM S3 private notes: the read, shown on the relationship record Q
+  // opens. Q itself never reads notes (they are not Q context); adding
+  // one is an app action (offer.crm_notes).
+  "api/http/network-interests.ts GET notesPath": cap("navigate.RELATIONSHIPS"),
   "api/http/network-interests.ts GET `${NETWORK_INVESTOR_PIPELINE_PATH}/export`":
     DOWNLOAD,
   "api/http/network-interests.ts GET `${NETWORK_COMPANY_PIPELINE_PATH}/export`":

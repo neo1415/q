@@ -36,6 +36,7 @@ import type {
   DealCloseService,
   RelationshipOutcomeService,
   RelationshipViewService,
+  RelationshipNoteService,
 } from "@capital-q/network";
 import type {
   CompanyDeckService,
@@ -222,6 +223,8 @@ export type AppActionPorts = {
   /** CRM saved views (2026-10-15): the network service's own. */
   readonly relationshipViews?:
     Pick<RelationshipViewService, "save" | "remove"> | undefined;
+  /** CRM private notes (S3, 2026-10-15): the network service's own. */
+  readonly relationshipNotes?: Pick<RelationshipNoteService, "add"> | undefined;
   /** Interest and connection requests: the network services. */
   readonly interests?:
     | Pick<
