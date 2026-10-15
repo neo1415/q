@@ -1,6 +1,6 @@
 # Prefetch contract: lane P (Q Pitch) × lane S (Q speed), 2026-10-15
 
-**Status: PROPOSED.** The lead must approve it before anything is built against the S side. It was read against `claude/p-artifacts-oct15`: `packages/q-pitch/src/{director,tour-runner,guide,scene-evidence}.ts` and `apps/web/src/features/q-pitch/use-tour-ports.ts`.
+**Status: ACCEPTED** by the lead on 2026-10-15. It was read against `claude/p-artifacts-oct15`: `packages/q-pitch/src/{director,tour-runner,guide,scene-evidence}.ts` and `apps/web/src/features/q-pitch/use-tour-ports.ts`.
 
 ## What lane P already does (keep it)
 
@@ -47,7 +47,13 @@
   - A scripted Q Pitch line stays labelled scripted. A capsule is labelled live-computed with its `builtAt`.
 - **Q stays visible across routes.** No navigation path makes a model call (S2 removed the speculative reads on navigation words).
 
-## Open (owner: lead)
+## Where `QAnswerCapsule` lives (lane S decision, for lane P)
 
-- Approve the `QAnswerCapsule` contract and where it lives (`packages/contracts/src/q/`).
+**Decision: `packages/contracts/src/q/answer-capsule.ts`** (Zod and TypeScript).
+
+- **Why not model-gateway.** The capsule crosses a trust boundary: q-api serves it to the web host and the q-pitch tour. Both sides must validate it, and neither the web nor `packages/q-pitch` may import model-gateway.
+- **Scope.** It ships in the S5 capsule slice together with its first consumer, not before. It is one file and one schema. No existing contract changes.
+
+## Open
+
 - P confirms which certified scenes carry a Q ask, so S can mark the code lane each one maps to.

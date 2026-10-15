@@ -37,7 +37,11 @@ import {
   type CompanyEditableField,
   type CorrelationId,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
+import {
+  withRoundTripPhase,
+  type DatabaseExecutor,
+  type TransactionManager,
+} from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 import {
@@ -128,6 +132,7 @@ import {
 import {
   companyFactAskOf,
   companyNameCandidates,
+  namesOnlyCompany,
   readNamedVisibleCompany,
   runNamedCompanyFact,
   type CompanyFactAnswer,
@@ -1821,6 +1826,11 @@ async function recordUserStatements(
   return recorded;
 }
 
+/** S3: a read's round trips counted under `answer.<label>` (diagnosis only). */
+function phased<T>(label: string, work: () => Promise<T>): Promise<T> {
+  return withRoundTripPhase(`answer.${label}`, work);
+}
+
 export function createModelGatewayQAnswer(
   dependencies: ModelGatewayQAnswerDependencies,
 ): ModelGatewayQAnswer {
@@ -1875,7 +1885,12 @@ export function createModelGatewayQAnswer(
         toolContext.runId,
         proposal,
         readOnlyByRun.get(toolContext.runId)?.has(proposal.name) === true,
-        () => baseTools.execute(proposal, toolContext),
+        // S3: each tool's round trips under its own phase, so the run's
+        // dbRoundTripsByPhase says which reads the answer spends them on.
+        () =>
+          withRoundTripPhase(`tool.${proposal.name}`, () =>
+            baseTools.execute(proposal, toolContext),
+          ),
       );
       runCompanies.note(toolContext.runId, outcome);
       runFits.note(toolContext.runId, outcome);
@@ -2171,16 +2186,36 @@ export function createModelGatewayQAnswer(
     const arrivalDecision = decideArrival().catch(() => null);
     const [assembled, profile, offeredForRun, availableForRun, memory] =
       await Promise.all([
-        timed("assemble", context.assemble(request)),
-        timed("profile", communication.profileFor(request)),
-        timed("offer", tools.offer(toolContext)),
+        timed(
+          "assemble",
+          phased("assemble", () => context.assemble(request)),
+        ),
+        timed(
+          "profile",
+          phased("profile", () => communication.profileFor(request)),
+        ),
+        timed(
+          "offer",
+          phased("offer", () => tools.offer(toolContext)),
+        ),
         // The facts read for every turn are read by code, so a turn's
         // focus (which narrows only what the model is offered) never
         // removes them.
         tools.available === undefined
           ? Promise.resolve(null)
-          : timed("available", tools.available(toolContext)),
-        timed("memory", recallMemory(request, conversationId, latest.content)),
+          : timed(
+              "available",
+              phased(
+                "available",
+                () => tools.available?.(toolContext) ?? Promise.resolve(null),
+              ),
+            ),
+        timed(
+          "memory",
+          phased("memory", () =>
+            recallMemory(request, conversationId, latest.content),
+          ),
+        ),
       ]);
     // The prefetch below reads only tools the run may use; the research
     // filter decided later never touches them.
@@ -2872,13 +2907,13 @@ export function createModelGatewayQAnswer(
         const wideStarted = Date.now();
         const ownNamed = namedRead();
         await Promise.all([
-          timed("standing", standingDone()),
-          timed("index", indexDone()),
-          timed("onboarding", onboardingRead()),
+          timed("standing", phased("standing", standingDone)),
+          timed("index", phased("index", indexDone)),
+          timed("onboarding", phased("onboarding", onboardingRead)),
           timed("named", ownNamed),
           timed("named-visible", visibleNamedRead(ownNamed)),
-          timed("day", dayRead()),
-          timed("arrival", arrivalRead()),
+          timed("day", phased("day", dayRead)),
+          timed("arrival", phased("arrival", arrivalRead)),
         ]);
         prepareMs["wide"] = Date.now() - wideStarted;
         return {
@@ -3429,7 +3464,11 @@ export function createModelGatewayQAnswer(
                 subject.kind === "COMPANY" &&
                 subject.companyId === screenCompanyId,
             ) &&
-            isSingleCompanyQuestion(latest.content) &&
+            (isSingleCompanyQuestion(latest.content) ||
+              namesOnlyCompany(
+                latest.content,
+                read.profiles.get(screenCompanyId) ?? null,
+              )) &&
             !/\b(?:compar(?:e|ed|ing|ison)|versus|vs|against|alongside|relative to)\b/iu.test(
               latest.content,
             );
@@ -5531,7 +5570,12 @@ export function createModelGatewayQAnswer(
             : null;
         const selectedCompanySubjects =
           !mentionsReadName &&
-          isSingleCompanyQuestion(latest.content) &&
+          (isSingleCompanyQuestion(latest.content) ||
+            (screenCompanyId !== null &&
+              namesOnlyCompany(
+                latest.content,
+                companiesRead.profiles.get(screenCompanyId) ?? null,
+              ))) &&
           !/\b(?:compar(?:e|ed|ing|ison)|versus|vs|against|alongside|relative to)\b/iu.test(
             latest.content,
           ) &&

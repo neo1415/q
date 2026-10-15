@@ -409,3 +409,36 @@ export async function readNamedVisibleCompany(input: {
   if (profileOf(got)?.companyId !== companyId) return null;
   return { companyId, data: got.result.data, calls };
 }
+
+/**
+ * S3 (live 2026-10-15, run 69e50e45): "what are the main risks here?" on a
+ * company's page was read as about someone else, and the model searched
+ * for and re-read the company already on screen (two tool rounds, ~3.6 s
+ * before its first sentence). True when the words name no company but,
+ * at most, the selected one (no capitalised name other than its own). The
+ * caller still requires a single authorised profile of the selected
+ * company and no comparison words; a different named target keeps the
+ * search-and-read rule. A name typed in lower case is not seen here.
+ */
+export function namesOnlyCompany(
+  text: string,
+  selected: string | null,
+): boolean {
+  if (selected === null) return false;
+  // A set ("these companies", "the others") is not the selected one.
+  if (
+    /\b(?:companies|startups|businesses|them|those|these|others|another|each|both)\b/iu.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  const own = nameKey(selected);
+  return companyNameCandidates(text, 4).every((name) => {
+    const key = nameKey(name);
+    return (
+      key === own ||
+      (key.length >= 4 && (own.startsWith(key) || key.startsWith(own)))
+    );
+  });
+}

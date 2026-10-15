@@ -394,6 +394,11 @@ describe("fresh selected-company follow-ups reuse authorized identity", () => {
           "FRESH",
           false,
         ],
+        // S3 (live 69e50e45): words naming no other company.
+        ["What are the main risks here?", "FRESH", false],
+        ["What are Selected Company's main risks?", "FRESH", false],
+        ["What are the main risks here?", "REVOKED", true],
+        ["What are the risks of Different Target?", "FRESH", true],
         ["What does Different Target do?", "FRESH", true],
         ["Compare this company with Different Target", "FRESH", true],
         ["What are the risks for these companies?", "FRESH", true],
