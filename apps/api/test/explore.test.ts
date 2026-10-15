@@ -21,7 +21,10 @@ import {
 } from "@capital-q/security";
 
 import { createApp, type ApiSecurityDependencies } from "../src/app.js";
-import type { ExploreRow } from "../src/http/explore.js";
+import type {
+  ExploreRoutesDependencies,
+  ExploreRow,
+} from "../src/http/explore.js";
 
 /**
  * Explore routes (E1-E5, ADR 0055): a signed-in read over the pool the
@@ -68,7 +71,10 @@ const discovery: DiscoveryService = {
 };
 const slates: SlateReadService = { pageCompanies: notUnderTest };
 
-function buildApp(signedIn = true) {
+function buildApp(
+  signedIn = true,
+  searchCompanies?: ExploreRoutesDependencies["searchCompanies"],
+) {
   const security: ApiSecurityDependencies = {
     authenticator: {
       authenticate: () =>
@@ -107,7 +113,12 @@ function buildApp(signedIn = true) {
     clock: () => Date.parse("2026-10-06T12:00:00.000Z"),
   });
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
-    discovery: { discovery, slates, explore },
+    discovery: {
+      discovery,
+      slates,
+      explore,
+      exploreCompanies: searchCompanies,
+    },
   });
   return app;
 }
@@ -183,6 +194,48 @@ describe("GET /v1/discovery/explore/related/:mediaAssetId", () => {
 });
 
 describe("GET /v1/discovery/explore/search", () => {
+  it("finds a company without a pitch by name, after the pitch matches and without duplicates", async () => {
+    const NO_PITCH = "c0000000-0000-4000-8000-0000000000aa";
+    const asked: string[] = [];
+    const response = await buildApp(true, (_actor, text) => {
+      asked.push(text);
+      return Promise.resolve([
+        {
+          companyId: VISIBLE,
+          canonicalName: "Kora Health",
+          shortDescription: "Clinic payments",
+          headquartersCountry: "NG",
+          currentStageCode: "seed",
+        },
+        {
+          companyId: NO_PITCH,
+          canonicalName: "Clinicway",
+          shortDescription: "Clinic records, no video yet",
+          headquartersCountry: "KE",
+          currentStageCode: "pre_seed",
+        },
+      ]);
+    }).inject({ method: "GET", url: "/v1/discovery/explore/search?q=clinic" });
+    const result = ExploreSearchDtoSchema.parse(response.json());
+    expect(asked).toEqual(["clinic"]);
+    const ids = result.companies.map((c) => c.companyId);
+    expect(ids).toContain(NO_PITCH);
+    expect(ids.filter((id) => id === VISIBLE)).toHaveLength(1);
+    expect(ids.indexOf(NO_PITCH)).toBeGreaterThan(ids.indexOf(VISIBLE));
+    expect(result.pitches.some((p) => p.companyId === NO_PITCH)).toBe(false);
+  });
+
+  it("a failed name search leaves the pitch matches", async () => {
+    const response = await buildApp(true, () =>
+      Promise.reject(new Error("db down")),
+    ).inject({ method: "GET", url: "/v1/discovery/explore/search?q=clinic" });
+    expect(response.statusCode).toBe(200);
+    const result = ExploreSearchDtoSchema.parse(response.json());
+    expect(result.companies.map((c) => c.companyId).sort()).toEqual(
+      [VISIBLE, PEER].sort(),
+    );
+  });
+
   it("matches only what disclosure shows", async () => {
     const response = await buildApp().inject({
       method: "GET",
