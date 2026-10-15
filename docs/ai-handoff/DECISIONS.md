@@ -118,3 +118,14 @@ Core Seven remains the governing assessment framework. The new directive authori
     - OpenAI live baselines about $3.
     - Q Pitch voice runs about $2.
     Every paid session is logged with its estimated cost in the lane report and `HANDOFF-LOG.md`. Unit, e2e and eval tests still use disabled keys.
+
+## InvestIQ (2026-10-15)
+
+24. **InvestIQ is FDN's proprietary methodology and the canonical name.** The Capital Q assessment engine implements FDN InvestIQ.
+25. **The owner delegated the InvestIQ v1 weights, rules and bands to the lead.** The lead sets them from cited research and they await calibration on real companies.
+26. **Locked rules still bind:**
+    - Investor Fit stays separate from readiness.
+    - Q gives no capital-form advice (PADL #74).
+    - Valuation stays outside the grade.
+    - Unknown never becomes zero.
+27. **Provider credits are topped up 08:00–09:00 owner time.** If a provider limit is hit before then, pause the paid tests and retry after 09:00; don't stop the other work.
