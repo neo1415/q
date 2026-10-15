@@ -5,7 +5,7 @@ import type {
 } from "@capital-q/contracts";
 
 import type { QTurn } from "./conversation";
-import { cardsReferredBy } from "./spotlight";
+import { shownItems, stageOf } from "./shown";
 
 /**
  * The answer canvas's rules, as plain functions (C1-C4).
@@ -291,31 +291,17 @@ export function answerCardsOf(
 
 /**
  * Whether the conversation has moved on from the cards that answer
- * `answerId` showed (C4). It has when a later answer, now complete,
- * either brings cards of its own (they replace these) or names none of
- * these cards. A later answer that names one of them is a follow-up on
- * the same cards, and they stay. Decided by names, never by phrases.
+ * `answerId` showed (C4). Lane A: the stage's one rule (shown.ts
+ * stageOf) -- replaced by a later answer's own object, kept while an
+ * answer or its question is about them, back when the subject returns.
  */
 export function topicMovedOn(
   turns: readonly QTurn[],
   answerId: string,
 ): boolean {
-  const at = turns.findIndex((turn) => turn.id === answerId);
-  const first = turns[at];
-  const own = answerCardsOf(first);
-  if (at < 0 || own === null || first?.kind !== "Q") return false;
-  // INC-1: the same run reaching the thread again (room feed, read-back)
-  // is not a later answer; it never moves its own cards off the stage.
-  const run = first.runId ?? first.id;
-  for (const turn of turns.slice(at + 1)) {
-    if (turn.kind !== "Q" || turn.streaming) continue;
-    if ((turn.runId ?? turn.id) === run) continue;
-    if (answerCardsOf(turn) !== null) return true;
-    // Still on these cards when the answer is about one of them: its own
-    // subject references (structured) or, failing those, their names.
-    if (cardsReferredBy(turn, own.cards).length === 0) return true;
-  }
-  return false;
+  const first = turns.find((turn) => turn.id === answerId);
+  if (answerCardsOf(first) === null) return false;
+  return stageOf(shownItems(turns), turns).item?.id !== answerId;
 }
 
 const NUMBER_WORDS = [

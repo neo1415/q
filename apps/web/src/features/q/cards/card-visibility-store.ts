@@ -29,6 +29,21 @@ export type CardsState = {
   readonly shownCategories: readonly QCardCategory[];
   /** Card key -> tick it was first seen. */
   readonly seen: Readonly<Record<string, number>>;
+  /**
+   * Lane A: cards (and stage objects) put away one by one by their key --
+   * the X on an object Q showed, a single answer card's X.
+   */
+  readonly keys: readonly string[];
+  /** Exceptions to a clear, by key: brought back from "Shown recently". */
+  readonly shownKeys: readonly string[];
+  /**
+   * The object the person brought back onto the Q stage, and after which
+   * answer (shown.ts StageReopened). Presentation only, like the rest.
+   */
+  readonly reopened: {
+    readonly run: string;
+    readonly after: string | null;
+  } | null;
 };
 
 export const EMPTY: CardsState = {
@@ -39,6 +54,9 @@ export const EMPTY: CardsState = {
   shownNames: [],
   shownCategories: [],
   seen: {},
+  keys: [],
+  shownKeys: [],
+  reopened: null,
 };
 
 export const CARDS_STORAGE_KEY = "cq:q-cards:v1";
@@ -50,7 +68,27 @@ function load(): CardsState {
     if (raw === null) return EMPTY;
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) return EMPTY;
-    return { ...EMPTY, ...(parsed as Partial<CardsState>) };
+    const loaded = { ...EMPTY, ...(parsed as Partial<CardsState>) };
+    // Storage is input: the lane A fields are checked, not trusted.
+    const strings = (value: unknown): readonly string[] =>
+      Array.isArray(value)
+        ? value.filter((one): one is string => typeof one === "string")
+        : [];
+    const reopened: unknown = loaded.reopened;
+    return {
+      ...loaded,
+      keys: strings(loaded.keys),
+      shownKeys: strings(loaded.shownKeys),
+      reopened:
+        typeof reopened === "object" &&
+        reopened !== null &&
+        "run" in reopened &&
+        typeof reopened.run === "string" &&
+        "after" in reopened &&
+        (reopened.after === null || typeof reopened.after === "string")
+          ? { run: reopened.run, after: reopened.after }
+          : null,
+    };
   } catch {
     return EMPTY;
   }
@@ -108,6 +146,8 @@ export type CardRef = {
 };
 
 export function isHiddenIn(s: CardsState, card: CardRef): boolean {
+  if (s.shownKeys.includes(card.key)) return false;
+  if (s.keys.includes(card.key)) return true;
   if (s.shownNames.some((n) => card.names.some((c) => nameMatches(n, c)))) {
     return false;
   }
@@ -155,6 +195,43 @@ export function hideAllCards(): void {
     clearedAt: state.tick,
     shownNames: [],
     shownCategories: [],
+    shownKeys: [],
+    reopened: null,
+  });
+}
+
+const KEYS_MAX = 200;
+
+/** Put one card or stage object away by its key (its own X). */
+export function hideKey(key: string): void {
+  if (key.length === 0) return;
+  commit({
+    ...state,
+    keys: state.keys.includes(key)
+      ? state.keys
+      : [...state.keys, key].slice(-KEYS_MAX),
+    shownKeys: state.shownKeys.filter((one) => one !== key),
+    reopened:
+      state.reopened !== null && `stage:${state.reopened.run}` === key
+        ? null
+        : state.reopened,
+  });
+}
+
+/**
+ * Bring a stage object back ("Shown recently", "Show again"): shown
+ * again even after a clear, and on the stage from now until the
+ * conversation moves on from it. `after` is the latest answer's run.
+ */
+export function reopenStaged(run: string, after: string | null): void {
+  const key = `stage:${run}`;
+  commit({
+    ...state,
+    keys: state.keys.filter((one) => one !== key),
+    shownKeys: state.shownKeys.includes(key)
+      ? state.shownKeys
+      : [...state.shownKeys, key].slice(-KEYS_MAX),
+    reopened: { run, after },
   });
 }
 
@@ -180,11 +257,23 @@ export function hideOne(name: string): void {
 
 export function restoreAllCards(category?: QCardCategory): void {
   if (category === undefined) {
-    commit({ ...EMPTY, tick: state.tick, seen: state.seen });
+    commit({
+      ...EMPTY,
+      tick: state.tick,
+      seen: state.seen,
+      reopened: state.reopened,
+    });
     return;
   }
+  // Objects of that family put away one by one come back too.
+  const family = new Set(
+    [...mounted.values()]
+      .filter((card) => card.category === category)
+      .map((card) => card.key),
+  );
   commit({
     ...state,
+    keys: state.keys.filter((key) => !family.has(key)),
     categories: state.categories.filter((c) => c !== category),
     shownCategories: state.shownCategories.includes(category)
       ? state.shownCategories
