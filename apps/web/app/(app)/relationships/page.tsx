@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
+  getMyUsage,
   getResults,
   listRelationshipViews,
   queryRelationshipPipeline,
@@ -38,12 +39,8 @@ import {
   ownRelationships,
   relationshipDigests,
 } from "@/features/relationships/relationship-data";
-import { HubNavigation } from "@/features/relationships/hub-navigation";
-import {
-  hubOverviewRefs,
-  hubTitle,
-  hubViewOf,
-} from "@/features/relationships/hub-view";
+import { HubHeader } from "@/features/relationships/hub-header";
+import { hubOverviewRefs, hubViewOf } from "@/features/relationships/hub-view";
 import { ResultsDashboard } from "@/features/results/results-dashboard";
 import { rangeOf } from "@/features/results/results-words";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
@@ -107,10 +104,7 @@ export default async function RelationshipsPage({
           : null;
     return (
       <PageContainer className="flex flex-col gap-4">
-        <h1 className="cq-title-lg text-(--cq-text-primary)">
-          {hubTitle(side)}
-        </h1>
-        <HubNavigation side={side} view={view} />
+        <HubHeader side={side} view={view} />
         {data === null ||
         user === null ||
         subjectId === null ||
@@ -164,11 +158,26 @@ export default async function RelationshipsPage({
       params["stage"] !== undefined && /^[A-Z_]{2,40}$/.test(params["stage"])
         ? params["stage"]
         : null;
-    const session = side === "NONE" ? null : await apiSession();
-    const results =
-      session === null
+    // One Overview (owner feedback 2026-10-15: Overview and Reports were
+    // the same page): the period, the report downloads and an older
+    // custom-period link (from/to, inclusive) all live here now.
+    const day = /^\d{4}-\d{2}-\d{2}$/;
+    const from = params["from"];
+    const to = params["to"];
+    const period =
+      from !== undefined && day.test(from)
+        ? { from, ...(to !== undefined && day.test(to) ? { to } : {}) }
+        : { range };
+    const [session, qSession] =
+      side === "NONE"
+        ? [null, null]
+        : await Promise.all([apiSession(), qApiSession()]);
+    const [results, usage] = await Promise.all([
+      session === null ? null : getResults(session, period).catch(() => null),
+      qSession === null || side !== "INVESTOR"
         ? null
-        : await getResults(session, { range }).catch(() => null);
+        : getMyUsage(qSession).catch(() => null),
+    ]);
     // The Results endpoint authorises each projection. A conflicting role read
     // is unavailable, never silently rendered as the other party's perspective.
     const available =
@@ -177,10 +186,7 @@ export default async function RelationshipsPage({
         (side === "COMPANY" && results.side === "FOUNDER"));
     return (
       <PageContainer className="flex flex-col gap-4">
-        <h1 className="cq-title-lg text-(--cq-text-primary)">
-          {hubTitle(side)}
-        </h1>
-        <HubNavigation side={side} view={view} />
+        <HubHeader side={side} view={view} />
         {side === "NONE" &&
         context.kind === "NONE" &&
         context.unavailable !== true ? (
@@ -216,14 +222,12 @@ export default async function RelationshipsPage({
           >
             <QControl id="section.hub-overview" kind="SECTION">
               <ResultsDashboard
-                heading="Overview"
-                headingLevel={2}
-                showReports={false}
+                heading={null}
                 basePath="/relationships?view=overview"
                 range={range}
                 stage={stage}
-                download={new URLSearchParams({ range }).toString()}
-                usage={null}
+                download={new URLSearchParams(period).toString()}
+                usage={usage}
                 results={results}
               />
             </QControl>
@@ -252,36 +256,36 @@ export default async function RelationshipsPage({
 
   return (
     <PageContainer className="flex flex-col gap-4">
-      {/* Search comes straight after the name (founder critique
-          2026-10-04); adding one is a small control beside the title. */}
-      <div className="flex items-center gap-2">
-        <h1 className="cq-title-lg min-w-0 flex-1 text-(--cq-text-primary)">
-          {hubTitle(side)}
-        </h1>
-        {side === "INVESTOR" ? (
-          // ADR 0023: founders' Connection Requests wait on the investor here.
-          <Link
-            href="/investors"
-            className={buttonClassName("quiet", "compact")}
-            data-company-requests-link
-          >
-            Company requests
-          </Link>
-        ) : null}
-        {side === "NONE" ? null : (
-          // A relationship starts where its first step is taken: interest
-          // from Discover, or a request from Investors.
-          <Link
-            href={side === "INVESTOR" ? "/discover" : "/investors"}
-            className={buttonClassName("secondary", "compact")}
-            data-add-relationship
-          >
-            <Plus size={ICON_SIZE.compact} aria-hidden="true" />
-            Add
-          </Link>
-        )}
-      </div>
-      <HubNavigation side={side} view={view} />
+      <HubHeader
+        side={side}
+        view={view}
+        actions={
+          side === "NONE" ? null : (
+            <>
+              {side === "INVESTOR" ? (
+                // ADR 0023: founders' Connection Requests wait on the investor here.
+                <Link
+                  href="/investors"
+                  className={buttonClassName("quiet", "compact")}
+                  data-company-requests-link
+                >
+                  Company requests
+                </Link>
+              ) : null}
+              {/* A relationship starts where its first step is taken:
+                  interest from Discover, or a request from Investors. */}
+              <Link
+                href={side === "INVESTOR" ? "/discover" : "/investors"}
+                className={buttonClassName("secondary", "compact")}
+                data-add-relationship
+              >
+                <Plus size={ICON_SIZE.compact} aria-hidden="true" />
+                Add
+              </Link>
+            </>
+          )
+        }
+      />
       {/* Q room R1: every relationship on this page, by id, for Q. */}
       <QSection
         id="relationships"

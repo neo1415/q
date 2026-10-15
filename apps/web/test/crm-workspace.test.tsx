@@ -6,7 +6,10 @@ import { classifyRoute } from "@/auth/route-policy";
 import { isActiveRoute } from "@/components/app-shell/navigation";
 import { isAppRoute, redirectedTo } from "@/features/q/control/app-routes";
 import { manifestControls, resetControls } from "@/features/q/control/registry";
-import { HubNavigation } from "@/features/relationships/hub-navigation";
+import {
+  HubNavigation,
+  HubRelated,
+} from "@/features/relationships/hub-navigation";
 import {
   crmTarget,
   hubDestinations,
@@ -81,9 +84,9 @@ describe("CRM routes: one workspace, no broken links", () => {
       "/relationships?view=relationships",
     );
     expect(crmTarget({ view: "reports", range: "90d", q: "x" })).toBe(
-      "/results?range=90d",
+      "/relationships?view=overview&range=90d",
     );
-    expect(crmTarget({ view: "reports" })).toBe("/results");
+    expect(crmTarget({ view: "reports" })).toBe("/relationships?view=overview");
   });
 
   it("/crm fails an unknown view to the overview and drops malformed input", () => {
@@ -128,7 +131,10 @@ describe("CRM routes: one workspace, no broken links", () => {
 
   it("Q's moves to /crm are verified where the alias sent them", () => {
     expect(redirectedTo("/crm", "/relationships?view=overview")).toBe(true);
-    expect(redirectedTo("/crm?view=reports", "/results")).toBe(true);
+    expect(
+      redirectedTo("/crm?view=reports", "/relationships?view=overview"),
+    ).toBe(true);
+    expect(redirectedTo("/results", "/relationships?view=overview")).toBe(true);
     expect(redirectedTo("/crm", "/discover")).toBe(false);
   });
 
@@ -142,17 +148,12 @@ describe("CRM routes: one workspace, no broken links", () => {
 });
 
 describe("CRM tabs", () => {
-  it("shows Reports only to a side that has reports, never as a duplicate link", () => {
-    expect(hubTabs("NONE").map((tab) => tab.view)).toEqual([
+  it("has one Overview and no separate Reports tab", () => {
+    expect(hubTabs().map((tab) => tab.view)).toEqual([
       "overview",
       "pipeline",
       "relationships",
     ]);
-    expect(hubTabs("INVESTOR").at(-1)).toEqual({
-      view: "reports",
-      label: "Reports",
-      href: "/results",
-    });
     for (const side of ["INVESTOR", "COMPANY"] as const) {
       expect(hubDestinations(side).map((entry) => entry.href)).not.toContain(
         "/results",
@@ -160,72 +161,57 @@ describe("CRM tabs", () => {
     }
   });
 
-  it("marks Reports current and keeps Q's existing Results control id", () => {
-    render(<HubNavigation side="COMPANY" view="reports" />);
-    const nav = screen.getByRole("navigation", { name: "CRM" });
-    const reports = within(nav).getByRole("link", { name: "Reports" });
-    expect(reports.getAttribute("href")).toBe("/results");
-    expect(reports.getAttribute("aria-current")).toBe("page");
-    expect(
-      within(nav)
-        .getByRole("link", { name: "Overview" })
-        .hasAttribute("aria-current"),
-    ).toBe(false);
-    expect(within(nav).getAllByRole("link", { name: "Reports" })).toHaveLength(
-      1,
+  it("keeps modules out of the tabs and Q's control ids on the links", () => {
+    render(
+      <>
+        <HubRelated side="INVESTOR" />
+        <HubNavigation view="overview" />
+      </>,
     );
+    const tabs = screen.getByRole("navigation", { name: "CRM" });
+    expect(within(tabs).queryByRole("link", { name: /inbox/ })).toBeNull();
+    expect(within(tabs).queryByRole("link", { name: "Reports" })).toBeNull();
+    const related = screen.getByRole("navigation", { name: "Related" });
     expect(
-      manifestControls().some((entry) => entry.id === "button.hub-results"),
+      within(related)
+        .getByRole("link", { name: "Investment inbox" })
+        .getAttribute("href"),
+    ).toBe("/gateq?tab=inbox");
+    expect(
+      manifestControls().some((entry) => entry.id === "button.hub-gateq"),
     ).toBe(true);
+    // Retired with the links they named (Reports merged into Overview;
+    // Discover, Capital and Q Work stay reachable from the sidebar and
+    // through open_page). The catalog no longer lists them.
+    for (const id of [
+      "button.hub-results",
+      "button.hub-discover",
+      "button.hub-capital",
+      "button.hub-work",
+    ])
+      expect(manifestControls().some((entry) => entry.id === id)).toBe(false);
   });
 });
 
-describe("Results inside the CRM", () => {
-  it("renders the investor's Investment Hub with Reports open and downloads kept", async () => {
-    mocks.results.mockResolvedValue({ side: "INVESTOR", pipelineFit: [] });
-    render(await ResultsPage({ searchParams: Promise.resolve({}) }));
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Investment Hub" }),
-    ).toBeDefined();
-    expect(
-      screen
-        .getByRole("link", { name: "Reports" })
-        .getAttribute("aria-current"),
-    ).toBe("page");
-    expect(screen.getByTestId("dashboard").getAttribute("data-base")).toBe(
-      "/results",
+describe("Results is the Overview now", () => {
+  it("redirects with its period and stage kept", async () => {
+    await expect(
+      ResultsPage({
+        searchParams: Promise.resolve({
+          range: "90d",
+          stage: "CONNECTED",
+          q: "dropped",
+        }),
+      }),
+    ).rejects.toThrow(
+      "NEXT_REDIRECT /relationships?view=overview&range=90d&stage=CONNECTED",
     );
-    expect(screen.getByTestId("dashboard").textContent).toBe("Reports");
-  });
-
-  it("renders the founder's Fundraising Hub and keeps an older custom period link", async () => {
-    mocks.context.mockResolvedValue({
-      kind: "FOUNDER",
-      companyId: "c0000000-0000-4000-8000-000000000001",
-      label: "Company",
-    });
-    mocks.results.mockResolvedValue({
-      side: "FOUNDER",
-      pipeline: { rows: [], byState: [] },
-    });
-    render(
-      await ResultsPage({
+    await expect(
+      ResultsPage({
         searchParams: Promise.resolve({ from: "2026-09-01", to: "2026-09-30" }),
       }),
+    ).rejects.toThrow(
+      "NEXT_REDIRECT /relationships?view=overview&from=2026-09-01&to=2026-09-30",
     );
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Fundraising Hub" }),
-    ).toBeDefined();
-    expect(mocks.results).toHaveBeenCalledWith(expect.anything(), {
-      from: "2026-09-01",
-      to: "2026-09-30",
-    });
-  });
-
-  it("says Reports couldn't load rather than inventing a zero report", async () => {
-    mocks.results.mockRejectedValue(new Error("Unavailable"));
-    render(await ResultsPage({ searchParams: Promise.resolve({}) }));
-    expect(screen.getByText("Reports couldn't load")).toBeDefined();
-    expect(screen.queryByTestId("dashboard")).toBeNull();
   });
 });

@@ -59,3 +59,48 @@ export function RelationshipFitChips({
     </span>
   );
 }
+
+/**
+ * The same facts as one quiet line, for a dense list row (redesign
+ * 2026-10-15: four chips a row read as badge spam). The band and
+ * confidence lead; what matches and the first unknown follow in words.
+ */
+export function RelationshipFitLine({
+  profile,
+}: {
+  readonly profile: FitProfileDto | null;
+}) {
+  if (profile === null) {
+    return (
+      <p className="cq-caption text-(--cq-text-tertiary)" data-fit-line="none">
+        Fit not set up
+      </p>
+    );
+  }
+  const { strong, unknown } = chipParameters(profile);
+  const matches =
+    strong.length === 0
+      ? null
+      : `matches ${strong
+          .map((p) => FIT_PARAMETER_LABELS[p.parameter].toLowerCase())
+          .join(", ")}`;
+  const gap =
+    unknown === null
+      ? null
+      : `${FIT_PARAMETER_LABELS[unknown.parameter].toLowerCase()} unknown`;
+  return (
+    <p
+      className="cq-caption truncate text-(--cq-text-secondary)"
+      data-fit-line={profile.band}
+    >
+      <span className="font-medium text-(--cq-text-primary)">
+        {FIT_BAND_LABELS[profile.band]}
+      </span>
+      {` · ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}`}
+      {[matches, gap]
+        .filter((part): part is string => part !== null)
+        .map((part) => ` · ${part}`)
+        .join("")}
+    </p>
+  );
+}
