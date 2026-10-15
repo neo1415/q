@@ -3,6 +3,7 @@ import type {
   QNavigateDestination,
   QSettingsSection,
 } from "@capital-q/contracts";
+import { asksForDrawing, isDrawingObject } from "@capital-q/q-core/speech";
 import type { QConversationMessage } from "@capital-q/q-runtime";
 
 /**
@@ -388,6 +389,9 @@ export function pageRequestOf(text: string): PageRequest | null {
   const verb = PAGE_VERB.exec(said);
   const object = verb?.[1]?.trim();
   if (object === undefined || object.length === 0) return null;
+  // Owner 2026-10-15: "show me a map of where Tensorgate is" asks for a
+  // drawing, answered where they are; it names no page to go to.
+  if (isDrawingObject(object) || asksForDrawing(said)) return null;
   const key = normalise(object);
   if (key.length === 0) return null;
   // "the files of Tensorgate" is that company's data room, a record
@@ -425,11 +429,16 @@ export function pageRequestOf(text: string): PageRequest | null {
  * nothing).
  */
 export function asksToGo(text: string): boolean {
-  return text
-    .split(/(?<=[.!?])\s+/u)
-    .some((sentence) =>
-      PAGE_VERB.test(withoutLeadIn(sentence).replace(/[.!?]+$/u, "")),
+  return text.split(/(?<=[.!?])\s+/u).some((sentence) => {
+    const said = withoutLeadIn(sentence).replace(/[.!?]+$/u, "");
+    const object = PAGE_VERB.exec(said)?.[1];
+    // A map or a chart asked for is drawn here, never a move.
+    return (
+      object !== undefined &&
+      !isDrawingObject(object.trim()) &&
+      !asksForDrawing(said)
     );
+  });
 }
 
 /** A sentence that says no, or says what they already see. */

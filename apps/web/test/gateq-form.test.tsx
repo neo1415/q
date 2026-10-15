@@ -36,6 +36,11 @@ const calls = {
   progress: vi.fn<Action>(),
   transcript: vi.fn<Action>(),
 };
+const video = {
+  state: vi.fn<Action>(),
+  start: vi.fn<Action>(),
+  end: vi.fn<Action>(),
+};
 /** Every server call, in order, by name: the flow's order is the assertion. */
 const order: string[] = [];
 const tracked =
@@ -57,6 +62,10 @@ vi.mock("../src/features/gateq/apply-actions", () => ({
   applicationTurnAction: tracked("turn"),
   coverageAction: tracked("coverage"),
   startApplicationAction: vi.fn(),
+  // Video is untracked: whether it is offered never changes the form's order.
+  videoStateAction: (...args: unknown[]) => video.state(...args),
+  startVideoAction: (...args: unknown[]) => video.start(...args),
+  endVideoAction: (...args: unknown[]) => video.end(...args),
 }));
 vi.mock("../src/features/gateq/materials-actions", () => ({
   shareMaterialsAction: tracked("share"),
@@ -172,6 +181,12 @@ beforeEach(() => {
   sessionStorage.clear();
   order.length = 0;
   for (const fn of Object.values(calls)) fn.mockReset();
+  for (const fn of Object.values(video)) fn.mockReset();
+  // By default video is not offered, so the typed interview is the step.
+  video.state.mockResolvedValue({
+    ok: true,
+    state: { available: false, session: null, allowance: null },
+  });
   calls.start.mockResolvedValue({
     ok: true,
     sessionToken: TOKEN,
@@ -879,5 +894,192 @@ describe("the interview step", () => {
     await flush();
     await press("I'd rather not say");
     expect(calls.turn.mock.calls[1]?.[1]).toBe(model.QUICK_REPLIES.DECLINED);
+  });
+});
+
+describe("the interview step, video first", () => {
+  const ref = { current: null };
+  const offered = {
+    ok: true,
+    state: {
+      available: true,
+      session: null,
+      allowance: {
+        weeklySessions: 5,
+        remaining: 4,
+        resetsAt: "2026-10-19T00:00:00.000Z",
+      },
+    },
+  };
+  const live = {
+    id: "8b0c2a4e-1f6d-4c3b-9a8e-2d7f5e6a1b3c",
+    status: "LIVE",
+    joinUrl: "https://tavus.daily.co/c123",
+    endsAt: new Date(Date.now() + 180_000).toISOString(),
+    liveAt: new Date().toISOString(),
+    maxSeconds: 180,
+    endedReason: null,
+    disclosure: "Q is an AI interviewer.",
+  };
+  const step = (onFinish: () => void = () => undefined) =>
+    render(
+      <InterviewStep
+        headingRef={ref}
+        fund="Sahel Capital"
+        companyName="Kora Health"
+        sessionToken={TOKEN}
+        participantName="Ada Obi"
+        onFinish={onFinish}
+      />,
+    );
+
+  it("offers the video interview as the default, typing as the choice", async () => {
+    video.state.mockResolvedValue(offered);
+    step();
+    await flush();
+    expect(video.state).toHaveBeenCalledWith(TOKEN);
+    expect(
+      screen.getByRole("button", { name: "Start the video interview" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("4 of 5 video sessions left this week."),
+    ).toBeTruthy();
+    // No composer while video is the way in.
+    expect(screen.queryByLabelText("Your answer")).toBeNull();
+    await press("Type my answers instead");
+    expect(screen.getByLabelText("Your answer")).toBeTruthy();
+    // The person can change their mind.
+    await press("Talk with Q on video instead");
+    expect(
+      screen.getByRole("button", { name: "Start the video interview" }),
+    ).toBeTruthy();
+  });
+
+  it("types when video is not offered, saying why when the cap is reached", async () => {
+    video.state.mockResolvedValue({
+      ok: true,
+      state: {
+        available: false,
+        session: null,
+        allowance: {
+          weeklySessions: 5,
+          remaining: 0,
+          resetsAt: "2026-10-19T00:00:00.000Z",
+        },
+      },
+    });
+    step();
+    await flush();
+    expect(screen.getByLabelText("Your answer")).toBeTruthy();
+    expect(screen.getByText(/used this week’s 5 video sessions/)).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Start the video interview" }),
+    ).toBeNull();
+  });
+
+  it("says plainly when this application's video sessions are used", async () => {
+    video.state.mockResolvedValue({
+      ok: true,
+      state: {
+        available: false,
+        session: null,
+        allowance: {
+          weeklySessions: 5,
+          remaining: 3,
+          resetsAt: "2026-10-19T00:00:00.000Z",
+        },
+        unavailableReason: "APPLICATION_SESSIONS_USED",
+        perApplication: 2,
+      },
+    });
+    step();
+    await flush();
+    expect(screen.getByLabelText("Your answer")).toBeTruthy();
+    expect(
+      screen.getByText(/used the 2 video sessions this application allows/),
+    ).toBeTruthy();
+  });
+
+  it("re-offers video after the person chose to continue by typing", async () => {
+    video.state.mockResolvedValue(offered);
+    video.start.mockResolvedValue({
+      ok: true,
+      state: { available: false, session: live, allowance: null },
+    });
+    video.end.mockResolvedValue({
+      ok: true,
+      state: { available: false, session: null, allowance: null },
+    });
+    step();
+    await flush();
+    fireEvent.click(screen.getByRole("checkbox"));
+    await press("Start the video interview");
+    await flush();
+    await press("Continue by typing instead");
+    await flush();
+    expect(video.end).toHaveBeenCalledWith(TOKEN, true);
+    expect(screen.getByLabelText("Your answer")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Talk with Q on video instead" }),
+    ).toBeTruthy();
+  });
+
+  it("falls back to typing when the start is refused", async () => {
+    video.state.mockResolvedValue(offered);
+    video.start.mockResolvedValue({
+      ok: false,
+      message: "Video isn't available right now. You can continue by typing.",
+    });
+    step();
+    await flush();
+    fireEvent.click(screen.getByRole("checkbox"));
+    await press("Start the video interview");
+    await flush();
+    expect(screen.getByLabelText("Your answer")).toBeTruthy();
+    expect(screen.getByText(/Video isn't available right now/)).toBeTruthy();
+  });
+
+  it("opens the shared room, then ends into the review with the spoken transcript", async () => {
+    video.state.mockResolvedValue(offered);
+    video.start.mockResolvedValue({
+      ok: true,
+      state: { available: false, session: live, allowance: null },
+    });
+    video.end.mockResolvedValue({
+      ok: true,
+      state: { available: false, session: null, allowance: null },
+    });
+    const onFinish = vi.fn();
+    step(onFinish);
+    await flush();
+    fireEvent.click(screen.getByRole("checkbox"));
+    await press("Start the video interview");
+    await flush();
+    // The room's own way out replaces the step's bar while it is open.
+    expect(
+      screen.queryByRole("button", {
+        name: /Skip to review|Finish and review/,
+      }),
+    ).toBeNull();
+    expect(calls.coverage).toHaveBeenCalledWith(TOKEN);
+    const before = calls.transcript.mock.calls.length;
+    await press("End and review my application");
+    await flush();
+    expect(video.end).toHaveBeenCalledWith(TOKEN, false);
+    expect(calls.transcript.mock.calls.length).toBe(before + 1);
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it("reopens a live session after a refresh instead of starting another", async () => {
+    video.state.mockResolvedValue({
+      ok: true,
+      state: { available: false, session: live, allowance: null },
+    });
+    step();
+    await flush();
+    expect(video.start).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Continue by typing instead" }),
+    ).toBeTruthy();
   });
 });

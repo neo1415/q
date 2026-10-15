@@ -14,6 +14,7 @@ import {
   PILOT_CERTIFICATION_LEDGER,
   PILOT_SCRIPT,
   PREMIERE_CERTIFICATION_LEDGER,
+  ATLAS_SCRIPT,
   PREMIERE_SCRIPT,
   SHORT_SCRIPT,
   TourActorSchema,
@@ -32,7 +33,7 @@ import type { TourSubject } from "./subject-model";
 import { setNarrationVoice, standardVoicePlaying } from "./narrator";
 import { RESUME_KEY } from "./resume";
 import { openTourVoice } from "./tour-voice";
-import { useTourPorts, type TranscriptSink } from "./use-tour-ports";
+import { isTourAsk, useTourPorts, type TranscriptSink } from "./use-tour-ports";
 
 /**
  * Q Pitch host (QP-F08/F09): Q narrates the real app. Mounted once in the
@@ -74,21 +75,23 @@ function actionWords(snapshot: TourSnapshot): string | null {
   switch (action.kind) {
     case "openRoute":
     case "openCompany":
+    case "openRecord":
     case "showReview":
     case "showQJob":
       return "Waiting for the page to open";
     case "selectTab":
     case "scrollTo":
+    case "uiAct":
       return "Waiting for the page to show it";
     case "askApprovedQuestion":
     case "buildComparison":
       return "Q is answering. Waiting for the answer on screen";
     case "runShortRehearsal":
-      return "Simulation running. It ends on its own in about half a minute";
+      return "Simulation running. It ends on its own in under a minute";
   }
 }
 
-export type TourChoice = "pilot" | "premiere" | "short";
+export type TourChoice = "pilot" | "premiere" | "short" | "atlas";
 
 /**
  * Which script, and what the gate may admit. The premiere opts into
@@ -108,14 +111,27 @@ const TOURS = {
     accepted: ["PRODUCTION_LIVE_VERIFIED"],
     label: "Internal rehearsal · two-minute draft · demonstration data",
   },
+  atlas: {
+    script: ATLAS_SCRIPT,
+    ledger: PREMIERE_CERTIFICATION_LEDGER,
+    accepted: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
+    label:
+      "Internal rehearsal · Feature Atlas · includes code-verified scenes without a browser receipt · demonstration data",
+  },
   premiere: {
     script: PREMIERE_SCRIPT,
     ledger: PREMIERE_CERTIFICATION_LEDGER,
     accepted: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
     label:
-      "Internal rehearsal · draft r4 · includes code-verified scenes without a browser receipt · demonstration data",
+      "Internal rehearsal · premiere v5 · includes code-verified scenes without a browser receipt · demonstration data",
   },
 } as const;
+
+/** How long "Tour complete" shows before normal Q takes over. */
+const HANDOVER_MS = 4_000;
+
+/** The beat between Q's answer to a live question and the tour resuming. */
+const RESUME_AFTER_ANSWER_MS = 3_000;
 
 /** A spoken line id as a segment id (the gate's opaque id grammar). */
 function segmentIdOf(prefix: string, id: string): string {
@@ -219,6 +235,57 @@ export function QPitchHost({
     };
   }, [actor, ports, slot, heard, choice, transcript, chapter, phase]);
 
+  // A live question (owner 16 Oct): the viewer's own question to Q, typed
+  // or spoken, pauses the tour; once Q's answer has landed (typed) or Q
+  // has finished saying it (spoken), the tour resumes by itself. The
+  // tour's scripted questions never count (isTourAsk).
+  const turns = session?.turns;
+  const working = session?.q.working ?? false;
+  const seenTurns = useRef<Set<string> | null>(null);
+  const answering = useRef(false);
+  const answeringAloud = useRef(false);
+  useEffect(() => {
+    if (runner === null || turns === undefined) return;
+    if (seenTurns.current === null) {
+      seenTurns.current = new Set(turns.map((turn) => turn.id));
+      return;
+    }
+    for (const turn of turns) {
+      if (seenTurns.current.has(turn.id)) continue;
+      if (turn.kind === "PERSON" && turn.unconfirmed) continue;
+      seenTurns.current.add(turn.id);
+      if (turn.kind !== "PERSON" || isTourAsk(turn.text)) continue;
+      const decision = runner.control(
+        {
+          intentId: `qp-ask-${turn.id}`.slice(0, 128),
+          source: "AUDIENCE_MIC",
+          modality: "KEYBOARD",
+          kind: "INTERRUPT",
+        },
+        NO_AUDIO,
+      );
+      if (decision.admitted) answering.current = true;
+    }
+  }, [runner, turns]);
+  useEffect(() => {
+    if (runner === null || !answering.current || working) return;
+    if (turns?.at(-1)?.kind !== "Q") return;
+    const timer = window.setTimeout(() => {
+      answering.current = false;
+      if (runner.state.phase !== "INTERRUPTED") return;
+      runner.control(
+        {
+          intentId: `qp-resume-${String(Date.now())}`,
+          source: "AUDIENCE_MIC",
+          modality: "POINTER",
+          kind: "RESUME",
+        },
+        NO_AUDIO,
+      );
+    }, RESUME_AFTER_ANSWER_MS);
+    return () => window.clearTimeout(timer);
+  }, [runner, working, turns]);
+
   // The voice line's transcript. The person's lines are AUDIENCE_MIC and
   // offered to the gate; Q's own spoken lines are recorded as NARRATOR_Q
   // and can never steer. Lines said before the tour started are ignored.
@@ -236,7 +303,7 @@ export function QPitchHost({
       const text = line.text.trim().slice(0, 2000);
       if (text.length === 0) continue;
       if (line.role === "user") {
-        runner.hearAudience(
+        const decision = runner.hearAudience(
           {
             segmentId: segmentIdOf("mic", line.id),
             source: "AUDIENCE_MIC",
@@ -256,6 +323,12 @@ export function QPitchHost({
               sessionRef.current?.voice.client.echoCancelled?.() ?? false,
           },
         );
+        if (
+          decision?.admitted === true &&
+          decision.intent.kind === "INTERRUPT"
+        ) {
+          answeringAloud.current = true;
+        }
       } else {
         runner.noteTranscript({
           segmentId: segmentIdOf("q", line.id),
@@ -267,6 +340,26 @@ export function QPitchHost({
       }
     }
   }, [runner, spoken, qSpeaking]);
+
+  // A spoken question: resume once Q has answered aloud and gone quiet.
+  useEffect(() => {
+    if (runner === null || !answeringAloud.current || qSpeaking) return;
+    if (spoken?.at(-1)?.role === "user") return;
+    const timer = window.setTimeout(() => {
+      answeringAloud.current = false;
+      if (runner.state.phase !== "INTERRUPTED") return;
+      runner.control(
+        {
+          intentId: `qp-resume-voice-${String(Date.now())}`,
+          source: "AUDIENCE_MIC",
+          modality: "POINTER",
+          kind: "RESUME",
+        },
+        NO_AUDIO,
+      );
+    }, RESUME_AFTER_ANSWER_MS);
+    return () => window.clearTimeout(timer);
+  }, [runner, qSpeaking, spoken]);
 
   if (actor === null) {
     return (
@@ -389,6 +482,14 @@ function TourOverlay({
 }) {
   const snapshot = useSnapshot(runner);
   const [menuOpen, setMenuOpen] = useState(false);
+  // After the finale, normal Q (owner 16 Oct): the tour hands over and ends
+  // itself, so nothing of the tour stays on screen or holds the voice.
+  const complete = snapshot.phase === "COMPLETE";
+  useEffect(() => {
+    if (!complete) return;
+    const timer = window.setTimeout(onExit, HANDOVER_MS);
+    return () => window.clearTimeout(timer);
+  }, [complete, onExit]);
   const chapterNow = snapshot.scene?.chapterId ?? null;
   useEffect(() => {
     if (chapterNow === null) return;

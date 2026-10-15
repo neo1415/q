@@ -599,3 +599,90 @@ it("retains the historical variable contract for an explicitly pinned interviewe
   expect((await service.turn(turn())).facts).toHaveLength(1);
   expect(captured.prompt).not.toContain("RECORDABLE DIMENSIONS");
 });
+
+describe("what the founder said, not what Q worked out (live 2026-10-15)", () => {
+  const amount = (value: string) => ({
+    dimension: "claims.revenue" as const,
+    value: { kind: "AMOUNT" as const, amount: value, currency: "USD" },
+    provenance: "APPLICANT_PROVIDED" as const,
+    correction: false,
+  });
+  const traction = {
+    dimension: "claims.traction" as const,
+    value: {
+      kind: "PHRASES" as const,
+      phrases: ["Two design partners pay annual contracts of $180,000 each"],
+    },
+    provenance: "APPLICANT_PROVIDED" as const,
+    correction: false,
+  };
+  const said =
+    "We have 4 design partners. Two of them pay us on annual contracts of $180,000 each.";
+
+  it("never records a figure Q computed as the founder's claim; their words stay", async () => {
+    const { service } = interviewer({
+      ...RESULT,
+      facts: [amount("360000"), traction] as never,
+    });
+    const outcome = await service.turn(turn({ utterance: said }));
+    expect(outcome.facts.map((f) => f.dimension)).toEqual(["claims.traction"]);
+    expect(outcome.rejectedFacts).toBe(1);
+  });
+
+  it("records an amount that was actually said, in any common written form", async () => {
+    for (const [utterance, value] of [
+      [said, "180000"],
+      ["Revenue is about 1.5 million dollars a year.", "1500000"],
+      ["We're at $80k MRR.", "80000"],
+    ] as const) {
+      const { service } = interviewer({
+        ...RESULT,
+        facts: [amount(value)] as never,
+      });
+      const outcome = await service.turn(turn({ utterance }));
+      expect(outcome.facts).toHaveLength(1);
+    }
+  });
+
+  it("a spoken first name never replaces the confirmed contact name", async () => {
+    const confirmed: ApplicationFact = {
+      id: randomUUID(),
+      applicationId: randomUUID(),
+      dimension: "contact.name",
+      value: { kind: "TEXT", text: "Laura Mensah" },
+      provenance: "APPLICANT_PROVIDED",
+      recordedAt: "2026-10-15T20:00:00.000Z",
+      supersededAt: null,
+    } as ApplicationFact;
+    const spoken = {
+      dimension: "contact.name" as const,
+      value: { kind: "TEXT" as const, text: "Laura" },
+      provenance: "APPLICANT_PROVIDED" as const,
+      correction: false,
+    };
+    const application = (facts: ApplicationFact[]) => ({
+      policy: {
+        gateway: { id: randomUUID() },
+        version: { id: randomUUID() },
+        criteria: [],
+      } as unknown as GatewayPolicy,
+      qualification: {
+        criteria: [],
+        unknowns: [],
+        principalMismatches: [],
+      } as unknown as QualificationResult,
+      facts,
+      documentProposals: [],
+    });
+    const { service } = interviewer({ ...RESULT, facts: [spoken] as never });
+    const kept = await service.turn(
+      turn({ utterance: "I'm Laura.", application: application([confirmed]) }),
+    );
+    expect(kept.facts).toEqual([]);
+    // With no name on record yet, what they say fills it.
+    const filled = await service.turn(
+      turn({ utterance: "I'm Laura.", application: application([]) }),
+    );
+    expect(filled.facts.map((f) => f.dimension)).toEqual(["contact.name"]);
+  });
+});

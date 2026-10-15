@@ -1064,16 +1064,6 @@
     text-underline-offset: 2px;
     cursor: pointer;
   }
-  /*
-   * The CRM while a tab's view is read (owner 2026-10-16): the header and
-   * the chosen tab stay crisp, the page under them dims after a beat, so a
-   * fast switch never flashes and a slow one answers at once.
-   */
-  [data-hub-pending] > :not(header) {
-    opacity: 0.55;
-    transition: opacity var(--cq-motion-fast) ease-out 80ms;
-  }
-
   .cq-q-board-slide-button {
     display: block;
     padding: 0;

@@ -20,6 +20,7 @@ type Row = {
   snapshot: unknown;
   qualification: unknown;
   dossier: unknown;
+  synthesis: unknown;
   folder: string | null;
   assignee_user_id: string | null;
   starred: boolean | null;
@@ -38,6 +39,7 @@ function toRow(row: Row): InboxRow {
     snapshot: row.snapshot,
     qualification: row.qualification,
     dossier: row.dossier,
+    synthesis: row.synthesis,
     folder: folderOf(row.folder),
     assigneeUserId: row.assignee_user_id,
     starred: row.starred === true,
@@ -59,6 +61,15 @@ export function createPostgresInboxRepository(options: {
     applicationId?: string | undefined;
   }) => sql<Row[]>`
     select s.application_id, s.submitted_at, s.snapshot, s.qualification, s.dossier,
+           ${
+             // Q's reading, only for one application (never the list).
+             input.applicationId === undefined
+               ? sql`null::jsonb`
+               : sql`(select y.synthesis from gateq.application_syntheses y
+                       where y.application_id = s.application_id
+                         and y.tenant_id = s.tenant_id
+                         and y.status = 'READY')`
+           } as synthesis,
            i.folder, i.assignee_user_id, u.starred, u.read_at,
            (select coalesce(array_agg(l.name order by l.name), '{}')
               from gateq.inbox_item_labels il

@@ -3,8 +3,27 @@ import type {
   QNavigateDestination,
 } from "@capital-q/contracts";
 
+import { asksForMove } from "@capital-q/q-core/speech";
+
 import type { QTurn } from "./conversation";
 import { wireNow } from "./wire";
+
+/** What Q draws where the person is: the answer is the object itself. */
+const DRAWN_IN_PLACE: ReadonlySet<string> = new Set([
+  "MAP",
+  "CHART",
+  "TABLE",
+  "TIMELINE",
+]);
+
+/** Intents that take the person off the page they are on. */
+const MOVES: ReadonlySet<string> = new Set([
+  "NAVIGATE",
+  "OPEN_COMPANY",
+  "OPEN_RECORD_PAGE",
+  "OPEN_SETTINGS",
+  "OPEN_SETUP",
+]);
 
 /**
  * Which navigation a typed conversation should follow now (CQ-QACT-001).
@@ -44,11 +63,23 @@ export function followOfTurns(
   // contracts are in; the caller looks again once they are (useWire).
   const schema = wireNow()?.QClientActionIntentSchema;
   if (schema === undefined) return { navigate, actions };
+  let asked: string | null = null;
   for (const turn of turns) {
+    if (turn.kind === "PERSON") {
+      asked = turn.text;
+      continue;
+    }
     if (turn.kind !== "Q" || turn.streaming || seen.has(turn.id)) continue;
     seen.add(turn.id);
+    // Owner 2026-10-15: a map Q drew is never replaced, the moment it lands,
+    // by a page the person did not ask for (the server drops such a move
+    // too; this is the screen's own second check).
+    const keepsDrawing =
+      turn.blocks.some((block) => DRAWN_IN_PLACE.has(block.kind)) &&
+      (asked === null || !asksForMove(asked));
     for (const block of turn.blocks) {
       if (block.kind !== "UI_INTENT") continue;
+      if (keepsDrawing && MOVES.has(block.intent.kind)) continue;
       if (block.intent.kind === "NAVIGATE") {
         // The latest one wins: two in one render is a conversation that
         // moved on, and the person should land where it ended.

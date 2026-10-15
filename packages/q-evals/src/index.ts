@@ -47,3 +47,25 @@ export {
 } from "./fixtures/world.js";
 
 export const PACKAGE_NAME = "@capital-q/q-evals" as const;
+// wf 2026-10-16: workforce intelligence scenarios, scored on plan quality
+// and task completion (deterministic graders; scripted or live planner).
+export {
+  WORKFORCE_SCENARIOS,
+  type WorkforceScenario,
+  type WorkforceScenarioExpectation,
+} from "./workforce/scenarios.js";
+export {
+  planFromPayload,
+  plannerVariables,
+  runWorkforceScenario,
+  type PlanUnderTest,
+  type PlannerVariables,
+  type WorkforceScenarioRun,
+} from "./workforce/run.js";
+export {
+  gradePlan,
+  gradeRun,
+  gradeWorkforce,
+  type WorkforceCheck,
+  type WorkforceGrade,
+} from "./workforce/grade.js";

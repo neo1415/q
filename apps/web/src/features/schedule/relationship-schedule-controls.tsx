@@ -123,7 +123,16 @@ export function RelationshipScheduleControls({
   const findTimes = () =>
     startTransition(async () => {
       setMessage(null);
-      const found = await findSlotsAction(relationshipId, 30, localZone());
+      // Opening the dialog runs this by itself: a dropped request shows a
+      // message, never the page's error screen (v5 look, 15 Oct).
+      const found = await findSlotsAction(
+        relationshipId,
+        30,
+        localZone(),
+      ).catch(() => ({
+        ok: false as const,
+        message: "Couldn't find times. Try again.",
+      }));
       if (!found.ok) {
         setMessage(found.message);
         return;

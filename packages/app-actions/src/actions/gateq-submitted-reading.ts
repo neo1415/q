@@ -19,7 +19,7 @@ export function submittedReading(
   let omitted = 0;
   for (const group of dossier.dimensions) {
     for (const fact of group.facts) {
-      const line = `${fact.label}: ${fact.summary} [truth=${fact.truthClass}; evidence=${fact.evidenceStatus}; provenance=${fact.provenance}; sourceFactId=${fact.sourceFactId}; sourceTurnSeq=${fact.sourceTurnSeq ?? "not recorded"}]`;
+      const line = `${fact.label}: ${fact.summary} [truth=${fact.truthClass}; evidence=${fact.evidenceStatus}; provenance=${fact.provenance}; sourceFactId=${fact.sourceFactId}; sourceTurnSeq=${fact.sourceTurnSeq ?? "not recorded"}]${fact.derivation === undefined ? "" : ` (${fact.derivation})`}`;
       if (line.length > remaining) {
         omitted++;
         continue;
@@ -44,6 +44,9 @@ export function submittedReading(
     lines.push(
       `${omitted} additional findings exceed this reading's context budget; consult the submitted dossier before answering about them.`,
     );
+  lines.push(
+    "truth=Q_INFERENCE is a figure Q computed from what the founder said, not something the founder stated: never attribute it to them; give what they actually said and how it was derived.",
+  );
   lines.push(
     "Document-supported means supported by submitted evidence, not independently verified. No document contents were read by this action.",
   );

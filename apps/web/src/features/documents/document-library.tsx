@@ -372,6 +372,11 @@ const Q_LIBRARY_LIST: Readonly<Record<string, string>> = {
 const Q_LIBRARY_SEARCH: Readonly<Record<string, string>> = {
   "input.document-search": "[data-documents-search]",
 };
+// Q Pitch (premiere v5): show what Q made before opening one, so the
+// opened item is a Q memo shown in place, never a file in a new tab.
+const Q_LIBRARY_FILTERS: Readonly<Record<string, string>> = {
+  "button.documents-by-q": '[data-documents-filter="BY_Q"]',
+};
 
 export function DocumentLibrary({
   initial,
@@ -394,6 +399,11 @@ export function DocumentLibrary({
   const libraryRef = useRef<HTMLElement>(null);
   useQControlGroup({ kind: "LIST", ref: libraryRef, ids: Q_LIBRARY_LIST });
   useQControlGroup({ kind: "INPUT", ref: libraryRef, ids: Q_LIBRARY_SEARCH });
+  useQControlGroup({
+    kind: "BUTTON",
+    ref: libraryRef,
+    ids: Q_LIBRARY_FILTERS,
+  });
   const [items, setItems] = useState<readonly LibraryItem[]>(
     initial?.items ?? [],
   );

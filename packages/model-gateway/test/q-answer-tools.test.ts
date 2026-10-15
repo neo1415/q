@@ -1152,8 +1152,9 @@ describe("answer seam tool loop", () => {
     const perRound = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
     const rounds = build({
       script: [
+        // Distinct reads: a read this run already made is kept (2026-10-16).
         ...Array.from({ length: Q_TOOL_LOOP_MAX_ROUNDS }, (_v, i) =>
-          call(`r${String(i)}`),
+          call(`r${String(i)}`, { companyId: `r-${String(i)}` }),
         ),
         { kind: "JSON", value: analystResult("rounds") },
       ],

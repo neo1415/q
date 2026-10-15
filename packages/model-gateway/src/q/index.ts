@@ -7,6 +7,20 @@ import {
 
 import { z } from "zod";
 
+import { withoutUnaskedMoves } from "./unasked-moves.js";
+import {
+  asksForComparison,
+  asksForPipelineSummary,
+  comparisonLead,
+  pipelineLead,
+} from "./early-lead.js";
+import {
+  companiesMapAskOf,
+  runCompaniesMap,
+  type CompaniesMapAnswer,
+  type CompaniesMapAsk,
+} from "./companies-map.js";
+
 import {
   MODEL_TOOLS_MAX,
   isCalendarBlock,
@@ -133,6 +147,7 @@ import {
   companyFactAskOf,
   companyNameCandidates,
   namesOnlyCompany,
+  profileOf,
   readNamedVisibleCompany,
   runNamedCompanyFact,
   type CompanyFactAnswer,
@@ -2466,6 +2481,28 @@ export function createModelGatewayQAnswer(
         context: toolContext,
         available: prefetchTools,
       }).catch(() => null);
+    // Lead 2026-10-16: a map of companies, drawn by code from their declared
+    // locations (companies-map.ts); "my top companies" is the fit ranking.
+    const mapFor = (ask: CompaniesMapAsk): Promise<CompaniesMapAnswer | null> =>
+      runCompaniesMap({
+        ask,
+        asked: latest.content,
+        shownBefore,
+        sweep:
+          sweepAsk !== null
+            ? fitSweep
+            : sweepable
+              ? sweepFor({
+                  scope: "CANDIDATES",
+                  place: null,
+                  fitAsked: true,
+                  count: null,
+                })
+              : Promise.resolve(null),
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+      }).catch(() => null);
     // K1: companies of a kind, from the catalog by code, through the same
     // tools and plan; fit only for an investor and only when asked for.
     const discoverFor = (ask: DiscoverAsk): Promise<DiscoveryAnswer | null> =>
@@ -3039,6 +3076,9 @@ export function createModelGatewayQAnswer(
       sweptAtPrepare: sweepAsk !== null,
       discoverFor,
       factFor,
+      mapFor,
+      shownBefore,
+      standingOf,
       personFor,
       investorsFor,
       sweepForReading,
@@ -3096,6 +3136,12 @@ export function createModelGatewayQAnswer(
       const startedAt = Date.now();
       let mark = startedAt;
       const phases: Record<string, number> = {};
+      /**
+       * Code's opening lines for this answer: the caller's (readiness), or
+       * an early grounded line this answer composes from its own reads
+       * (early-lead.ts), said the moment the model is asked.
+       */
+      let leadLines: string | undefined = request.leadLines;
       const took = (phase: string): void => {
         const now = Date.now();
         phases[phase] = now - mark;
@@ -3159,6 +3205,9 @@ export function createModelGatewayQAnswer(
         sweptAtPrepare,
         discoverFor,
         factFor,
+        mapFor,
+        shownBefore,
+        standingOf,
         personFor,
         investorsFor,
         sweepForReading,
@@ -3421,6 +3470,41 @@ export function createModelGatewayQAnswer(
        * under this plan, only for advice and own-record questions; a person
        * with no company of their own gets nothing here.
        */
+      const composeEarlyLead = async (): Promise<string | null> => {
+        if (asksForPipelineSummary(latest.content)) {
+          const outcome = await (standingOf() ?? Promise.resolve(null));
+          return outcome !== null && outcome.result.ok
+            ? pipelineLead(outcome.result.data, latest.content)
+            : null;
+        }
+        if (!asksForComparison(latest.content)) return null;
+        // The named companies this run already read in full (prepare's
+        // named-visible reads): read again from the run's own kept reads.
+        const named = [...runCompanies.read(request.runId).profiles].filter(
+          ([, name]) => containsCompanyName(latest.content, name),
+        );
+        if (named.length < 2) return null;
+        const read = await Promise.all(
+          named.slice(0, 4).map(([companyId], index) =>
+            tools
+              .execute(
+                {
+                  callId: `q-early-lead-${String(index)}`,
+                  name: "get_company",
+                  arguments: { companyId },
+                },
+                toolContext,
+              )
+              .catch(() => null),
+          ),
+        );
+        return comparisonLead(
+          read.flatMap((outcome) => {
+            const profile = profileOf(outcome);
+            return profile === null ? [] : [profile];
+          }),
+        );
+      };
       let ownReadiness: AuthorisedFact | null = null;
       const prefetchable = new Set(
         offeredForRun.map((tool) => tool.definition.name),
@@ -3428,7 +3512,11 @@ export function createModelGatewayQAnswer(
       if (
         (request.questionKind === "ADVICE" ||
           request.questionKind === "THEIR_OWN_RECORDS") &&
-        prefetchable.has("read_my_record")
+        prefetchable.has("read_my_record") &&
+        // Lead 2026-10-16: a company's marketplace readiness, never an
+        // investor's (live: ~600 ms spent before every investor's
+        // own-records answer on a read that has nothing for them).
+        !(ownInvestorOrganisationIn(plan) !== null && ownCompanyId === null)
       ) {
         const outcome = await callTool(
           {
@@ -3455,7 +3543,7 @@ export function createModelGatewayQAnswer(
             );
           ownReadiness = ownReadinessFact(outcome.result.data, {
             lead: request.questionKind === "ADVICE" && !aboutSomeoneElse,
-            alreadySaid: request.leadLines !== undefined,
+            alreadySaid: leadLines !== undefined,
           });
         }
         took("own-readiness");
@@ -3463,6 +3551,17 @@ export function createModelGatewayQAnswer(
       // Read beside the readiness read above, not before it (L1).
       await nudgeRead;
       took("nudge");
+      // Lead 2026-10-16: one grounded opening line for an analysis answer,
+      // from reads this run already holds (early-lead.ts); said when the
+      // model is asked, and the model is told it was said.
+      const earlyLead: string | null =
+        leadLines !== undefined ||
+        request.writingDocument === true ||
+        request.askedAction !== undefined ||
+        (request.turnKind !== undefined && request.turnKind !== "QUESTION_TO_Q")
+          ? null
+          : await composeEarlyLead().catch(() => null);
+      took("early-lead");
       // S2: the prompt is assembled from the facts in hand and can be
       // assembled again once the wide reads land (a turn that skipped them
       // and was not, after all, answered by code).
@@ -3554,6 +3653,15 @@ export function createModelGatewayQAnswer(
                 .join(
                   "; ",
                 )}. Use those facts and ids without calling search_companies or get_company for them again. Resolve through search_companies and get_company only a named company not listed here.`;
+        if (earlyLead !== null) {
+          noteParts = {
+            ...noteParts,
+            turn: [
+              noteParts.turn,
+              `This answer already opens with this line, said to them by code from their records: "${earlyLead}" Continue after it with the analysis; do not repeat it or restate its counts.`,
+            ].join(" "),
+          };
+        }
         if (request.aboutNamedOther !== true && alreadyReadNote !== null) {
           noteParts = {
             ...noteParts,
@@ -3720,7 +3828,7 @@ export function createModelGatewayQAnswer(
        */
       let heldPromise: string | null = null;
       /** Code's lead list was the last thing said (see publish below). */
-      let leadListOpen = request.leadLines !== undefined;
+      let leadListOpen = leadLines !== undefined;
       /** When the person got the first sentence, from the seam's start. */
       let firstPublishedMs: number | null = null;
       /** Out now, or held with the speculation until it is adopted. */
@@ -3728,25 +3836,28 @@ export function createModelGatewayQAnswer(
         if (gate === null) deltas?.publish(delta);
         else gate.emit(() => deltas?.publish(delta));
       };
+      /** Code's opening lines, once, before anything else is said. */
+      const sayLeadLines = (): void => {
+        if (firstPublishedMs !== null || leadLines === undefined) return;
+        firstPublishedMs = Date.now() - startedAt;
+        for (const line of leadLines.split("\n")) {
+          const said = line.trim();
+          if (said.length === 0) continue;
+          streamedText += `${said} `;
+          send({
+            runId: request.runId,
+            tenantId: request.tenantId,
+            messageId,
+            text: `${said} `,
+          });
+        }
+      };
       const publish = (text: string): void => {
         // Code's opening lines come first on every surface that listens to
         // the stream (voice parity, lead 2026-10-03: a spoken "what should
         // I do next?" heard the model's words and never the readiness
         // lines the stored answer opens with).
-        if (firstPublishedMs === null && request.leadLines !== undefined) {
-          firstPublishedMs = Date.now() - startedAt;
-          for (const line of request.leadLines.split("\n")) {
-            const said = line.trim();
-            if (said.length === 0) continue;
-            streamedText += `${said} `;
-            send({
-              runId: request.runId,
-              tenantId: request.tenantId,
-              messageId,
-              text: `${said} `,
-            });
-          }
-        }
+        sayLeadLines();
         firstPublishedMs ??= Date.now() - startedAt;
         streamedText += `${text} `;
         send({
@@ -3811,8 +3922,8 @@ export function createModelGatewayQAnswer(
         // again (lead 2026-10-03; the stored answer drops it the same
         // way, afterLeadLines).
         let said = caveated;
-        if (leadListOpen && request.leadLines !== undefined) {
-          said = afterLeadLines(caveated, request.leadLines).trim();
+        if (leadListOpen && leadLines !== undefined) {
+          said = afterLeadLines(caveated, leadLines).trim();
           // A bare item number cut off as its own sentence ("1.").
           if (said.length === 0 || /^\d+[.)]$/u.test(said)) return;
           leadListOpen = false;
@@ -4015,19 +4126,23 @@ export function createModelGatewayQAnswer(
         // INC-1: one card per canonical record across every block, exactly
         // the count asked for, "them" held to the set just shown, and every
         // score labelled mandate fit with how it was made.
-        const carried = withFitIntegrity(
-          [
-            ...(given ?? []),
-            ...publicSources.map((source) => ({
-              kind: "PUBLIC_SOURCE" as const,
-              ...publicSourceBlockFields(source),
-            })),
-            ...clientActionBlocks,
-          ],
-          {
-            asked: latest.content,
-            previous: previousCardCompanyIds(earlier),
-          },
+        const carried = withoutUnaskedMoves(
+          withFitIntegrity(
+            [
+              ...(given ?? []),
+              ...publicSources.map((source) => ({
+                kind: "PUBLIC_SOURCE" as const,
+                ...publicSourceBlockFields(source),
+              })),
+              ...clientActionBlocks,
+            ],
+            {
+              asked: latest.content,
+              previous: previousCardCompanyIds(earlier),
+            },
+          ),
+          // A map they asked to see is not replaced by a page they did not.
+          latest.content,
         );
         const blocks = carried.length === 0 ? undefined : carried;
         // A tie is said as a tie, with why (INC-1: three cards at 8.8 read
@@ -4111,9 +4226,7 @@ export function createModelGatewayQAnswer(
       ) {
         const text = attentionAnswerText(attentionReport);
         const message = await persistAnswer(
-          request.leadLines === undefined
-            ? text
-            : `${request.leadLines}\n\n${text}`,
+          leadLines === undefined ? text : `${leadLines}\n\n${text}`,
           // G-R4: the report itself, for the screen (items and unread).
           [{ kind: "ATTENTION", report: attentionReport }],
         );
@@ -4147,9 +4260,7 @@ export function createModelGatewayQAnswer(
         const recall = ownMandateAnswer(prepared.ownMandateData());
         if (recall !== null) {
           const message = await persistAnswer(
-            request.leadLines === undefined
-              ? recall
-              : `${request.leadLines}\n\n${recall}`,
+            leadLines === undefined ? recall : `${leadLines}\n\n${recall}`,
           );
           logger?.info(
             {
@@ -4182,9 +4293,9 @@ export function createModelGatewayQAnswer(
             ));
       if (followUp !== null) {
         const message = await persistAnswer(
-          request.leadLines === undefined
+          leadLines === undefined
             ? followUp.text
-            : `${request.leadLines}\n\n${followUp.text}`,
+            : `${leadLines}\n\n${followUp.text}`,
           followUp.open === undefined
             ? undefined
             : [
@@ -4253,6 +4364,41 @@ export function createModelGatewayQAnswer(
               totalMs: Date.now() - startedAt,
             },
             "q answered a person search",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+      }
+      // Lead 2026-10-16 (live: a map of known companies took 22 s through a
+      // public web search, or came back as cards with no map): drawn by
+      // code from what the companies declare, before any model is asked.
+      const companiesMapAsk =
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+          ? companiesMapAskOf(latest.content, shownBefore)
+          : null;
+      if (companiesMapAsk !== null) {
+        const mapStarted = Date.now();
+        const drawn = await mapFor(companiesMapAsk);
+        if (drawn !== null) {
+          const message = await persistAnswer(drawn.text, [...drawn.blocks]);
+          logger?.info(
+            {
+              qRunId: request.runId,
+              scope: companiesMapAsk.scope,
+              places: drawn.blocks.length,
+              toolCalls: drawn.calls.length,
+              modelCalls: 0,
+              prepareMs: prepared.prepareMs,
+              mapMs: Date.now() - mapStarted,
+              totalMs: Date.now() - startedAt,
+            },
+            "q drew a map of companies from their declared locations",
           );
           return {
             kind: "ANSWERED",
@@ -4706,6 +4852,13 @@ export function createModelGatewayQAnswer(
       try {
         let final: AnswerResult | undefined;
         let analyst: CompanyAnalystV22Result | undefined;
+        // Lead 2026-10-16: the early grounded line is said now, as the
+        // model is asked, not after its tool round (first text 6-8 s).
+        if (earlyLead !== null && leadLines === undefined) {
+          leadLines = earlyLead;
+          leadListOpen = true;
+          sayLeadLines();
+        }
 
         if (offered.length > 0) {
           took("prepare");
@@ -5572,7 +5725,7 @@ export function createModelGatewayQAnswer(
             : [
                 ...(approvalLine === null ? [] : [approvalLine]),
                 // Code's opening lines for this answer, before the model's.
-                ...(request.leadLines === undefined ? [] : [request.leadLines]),
+                ...(leadLines === undefined ? [] : [leadLines]),
                 // Nothing was done: a model line that says it was is
                 // false, and is not said beside the could-not line
                 // (follow-55, Zino run 50159909: "Your investment stages
@@ -5581,11 +5734,11 @@ export function createModelGatewayQAnswer(
                 claimsDone(statusTalk?.text ?? guarded.text)
                   ? []
                   : [
-                      request.leadLines === undefined
+                      leadLines === undefined
                         ? (statusTalk?.text ?? guarded.text)
                         : afterLeadLines(
                             statusTalk?.text ?? guarded.text,
-                            request.leadLines,
+                            leadLines,
                           ),
                     ]),
                 ...(couldNot === null ? [] : [couldNot]),

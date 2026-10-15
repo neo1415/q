@@ -1396,7 +1396,10 @@ function Detail({
               </section>
             </>
           ) : (
-            <SubmittedBrief dossier={detail.dossier} />
+            <SubmittedBrief
+              dossier={detail.dossier}
+              synthesis={detail.synthesis ?? null}
+            />
           )}
           {detail.transcript != null || detail.dossier != null ? (
             <SubmittedTranscript

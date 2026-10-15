@@ -61,12 +61,14 @@ describe("tour entry model", () => {
     const standing = Object.fromEntries(
       chapters.map((c) => [c.chapterId, c.standing]),
     );
-    expect(standing["ch.premiere.gateq"]).toBe("CERTIFIED");
+    // The Atlas lists every chapter, the deeper ones included.
     expect(standing["ch.premiere.privacy"]).toBe("CERTIFIED");
+    expect(standing["ch.premiere.mandate"]).toBe("CERTIFIED");
     expect(standing["ch.premiere.rehearsal"]).toBe("INTERNAL_ONLY");
+    expect(standing["ch.atlas.risks"]).toBe("CERTIFIED");
     for (const chapter of chapters) {
       expect(chapter.href).toBe(
-        `/home?qpitch=premiere&chapter=${encodeURIComponent(chapter.chapterId)}`,
+        `/home?qpitch=atlas&chapter=${encodeURIComponent(chapter.chapterId)}`,
       );
     }
   });

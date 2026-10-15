@@ -642,6 +642,9 @@ export {
   type QJobNamePorts,
   type QJobPlanView,
   type QJobPort,
+  type QJobSituationReads,
+  situationReads,
+  JOB_BRIEFS_MAX,
 } from "./tools/q-job.js";
 // MATCH block (ADR 0052): fit with the investor's own mandate, by Q.
 export {

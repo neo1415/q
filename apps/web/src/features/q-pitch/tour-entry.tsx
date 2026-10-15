@@ -10,7 +10,10 @@ import type { TourChoice } from "./tour-host";
 
 type Start = { readonly tour: TourChoice; readonly chapter: string | null };
 function choiceOf(value: string | null): TourChoice | null {
-  return value === "pilot" || value === "premiere" || value === "short"
+  return value === "pilot" ||
+    value === "premiere" ||
+    value === "short" ||
+    value === "atlas"
     ? value
     : null;
 }

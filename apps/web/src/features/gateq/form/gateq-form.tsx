@@ -712,6 +712,7 @@ export function GateQForm({
             companyName={answers.companyName}
             sessionToken={credential}
             gatewayPublicId={gateway.publicId}
+            participantName={contact?.name ?? ""}
             onFinish={() => setStep("review")}
             onApplication={setApplication}
             preview={

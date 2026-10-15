@@ -303,6 +303,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('gateq', 'application_founders', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'application_sessions', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'application_submissions', 'INTERNAL_SERVER_ONLY', '{}'),
+  ('gateq', 'application_syntheses', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'application_turns', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'application_video_sessions', 'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'applications', 'INTERNAL_SERVER_ONLY', '{}'),

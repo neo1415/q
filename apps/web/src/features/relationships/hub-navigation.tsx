@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import { cx } from "@capital-q/ui";
 import { ArrowUpRight, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { useQControlGroup } from "@/features/q/control/q-control";
 import { QPageState } from "@/features/q/q-section";
+import { LinkPending } from "@/components/link-pending";
 
 import {
   hubDestinations,
@@ -39,24 +40,6 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
     },
   });
 
-  // A tab answers its click at once (owner 2026-10-16: switching felt
-  // slow): the chosen tab is underlined and the page under the header
-  // dims while the server reads the view. The pick is tied to the view it
-  // was made from, so arriving (or going back) clears it with no effect.
-  const [pick, setPick] = useState<{
-    readonly to: HubView;
-    readonly from: HubView;
-  } | null>(null);
-  const shown = pick !== null && pick.from === view ? pick.to : view;
-  const pending = shown !== view;
-  useEffect(() => {
-    const root = ref.current?.closest("header")?.parentElement;
-    if (root === null || root === undefined) return;
-    if (pending) root.setAttribute("data-hub-pending", "");
-    else root.removeAttribute("data-hub-pending");
-    return () => root.removeAttribute("data-hub-pending");
-  }, [pending]);
-
   // Keep the open tab in view on a narrow, scrolling strip.
   useEffect(() => {
     const strip = ref.current;
@@ -79,26 +62,24 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
         filters={{ view }}
       />
       {hubTabs().map((entry) => {
-        const open = shown === entry.view;
+        // The tapped tab's pending mark is LinkPending (perf lane): one
+        // mechanism for instant tab feedback across the CRM.
+        const open = view === entry.view;
         return (
           <Link
             key={entry.view}
             href={entry.href}
             data-hub-view={entry.view}
-            aria-current={view === entry.view ? "page" : undefined}
-            onClick={(event) => {
-              // A new-tab or modified click is the browser's, not a switch.
-              if (event.metaKey || event.ctrlKey || event.shiftKey) return;
-              if (entry.view !== view) setPick({ to: entry.view, from: view });
-            }}
+            aria-current={open ? "page" : undefined}
             className={cx(
-              "cq-body-sm -mb-px inline-flex min-h-11 flex-none items-center border-b-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
+              "cq-body-sm relative -mb-px inline-flex min-h-11 flex-none items-center border-b-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
               open
                 ? "border-(--cq-accent) font-semibold text-(--cq-text-primary)"
                 : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
             )}
           >
             {entry.label}
+            <LinkPending />
           </Link>
         );
       })}

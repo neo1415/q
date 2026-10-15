@@ -452,6 +452,17 @@ describe("GPT-Live config", () => {
     expect(liveConfigFrom({ CQ_VOICE_LIVE: "on" }, "local").allowedUsers).toBe(
       null,
     );
+    // "*": every signed-in account, deployed too (owner 2026-10-15).
+    const everyone = liveConfigFrom(
+      {
+        CQ_VOICE_LIVE: "on",
+        CQ_VOICE_PREVIEW: "on",
+        CQ_VOICE_LIVE_USERS: " * ",
+      },
+      "staging",
+    );
+    expect(everyone.allowedUsers).toBe(null);
+    expect(everyone.preview).toBe(true);
   });
 });
 
