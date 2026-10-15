@@ -16,7 +16,6 @@ import { splitSentences } from "@capital-q/q-core/speech";
 
 import { History, ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
 
-import { topicMovedOn } from "./answer-canvas-logic";
 import type { QTurn } from "./conversation";
 import { firstWords } from "./board-timeline";
 import { plainFromMarkdown } from "./markdown";
@@ -30,17 +29,41 @@ import type { DeckLoaders } from "./room/q-room-deck";
 import { whenIdle } from "./room/room-read";
 import { roomStage } from "./room/room-stage";
 import { useWire } from "./use-wire";
+import { RenderedMark } from "./artifact-rendered";
 
 /** W7: how long after the stage mounts its likely next code is fetched. */
 const PREFETCH_AFTER_MS = 800;
+import {
+  hideKey,
+  isHiddenIn,
+  reopenStaged,
+  useCardsState,
+  useVisibleCards,
+  type CardRef,
+} from "./cards/card-visibility";
 import { rememberResults, useResultShelf } from "./result-shelf";
 import {
-  answersIn,
-  onStage,
+  latestAnswerRun,
   shownItems,
   shownRecently,
+  stageNoteOf,
+  stageOf,
+  subjectOf,
   type ShownItem,
 } from "./shown";
+
+/**
+ * Lane A: a stage object as a card of the one presentation controller, so
+ * its X, "clear all cards", "show them again" and "Shown recently" are one
+ * state that holds across pages and a reload (card-visibility-store).
+ */
+export function stageCardRef(item: ShownItem): CardRef {
+  return {
+    category: "ANSWER",
+    key: `stage:${item.run}`,
+    names: [item.title, ...subjectOf(item).names],
+  };
+}
 
 const SHOW_ON_STAGE = "cq:q-show-answer";
 
@@ -166,23 +189,23 @@ export function QPresenceStage({
       .map((item) => ({ ...item, answer: 0 }));
     return [...elsewhere, ...own];
   }, [own, shelf]);
-  const answers = answersIn(turns);
-  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
-  const [reopened, setReopened] = useState<{
-    readonly id: string;
-    readonly atAnswer: number;
-  } | null>(null);
+  const cards = useCardsState();
   const [listOpen, setListOpen] = useState(false);
-  const staged = onStage(items, answers, dismissed, reopened);
-  // C4: cards whose topic the conversation has left are not on the stage.
-  const movedOn =
-    staged !== null &&
-    reopened?.id !== staged.id &&
-    topicMovedOn(turns, staged.id);
-  const shown = movedOn ? null : staged;
+  // Lane A: one rule (shown.ts stageOf) for every kind of object -- shown
+  // by the answer that made it, kept while the conversation is on it,
+  // replaced or put away out loud (the note below), never by a count.
+  const pick = stageOf(items, turns, cards.reopened);
+  const visible = useVisibleCards(
+    pick.item === null ? [] : [pick.item],
+    stageCardRef,
+  );
+  const shown = visible[0] ?? null;
+  const note = stageNoteOf(items, turns, pick, (item) =>
+    isHiddenIn(cards, stageCardRef(item)),
+  );
   const recent = shownRecently(items);
+  const reopen = (item: ShownItem) =>
+    reopenStaged(item.run, latestAnswerRun(turns));
   // Q room R4: the card Q brought into the room, open while the
   // conversation stays on its subject (room-stage), or until closed here.
   // W7: the room's cards are checked against the wire's contracts, and
@@ -192,31 +215,18 @@ export function QPresenceStage({
     () => (wire === null ? roomStage([]) : roomStage(turns)),
     [turns, wire],
   );
-  const [closedByHand, setClosedByHand] = useState<{
-    readonly key: string;
-    readonly at: number;
-  } | null>(null);
+  // Closed by hand: the same controller, so it stays closed on the way
+  // back from another page; the subject coming back reopens it (a new
+  // openedAt is a new key).
   const roomOpen =
-    room.open !== null &&
-    !(
-      closedByHand !== null &&
-      closedByHand.key === room.open.key &&
-      closedByHand.at >= room.open.openedAt
-    )
+    room.open !== null && !cards.keys.includes(roomCardKey(room.open))
       ? room.open
       : null;
   const latestQ = turns.findLast(
     (turn): turn is Extract<QTurn, { kind: "Q" }> => turn.kind === "Q",
   );
 
-  const dismiss = (item: ShownItem) => {
-    const key =
-      reopened !== null && reopened.id === item.id
-        ? `${item.id}@${String(reopened.atAnswer)}`
-        : item.id;
-    setDismissed((current) => new Set([...current, key]));
-    if (reopened?.id === item.id) setReopened(null);
-  };
+  const dismiss = (item: ShownItem) => hideKey(stageCardRef(item).key);
 
   // The answer on the stage as cards, and one leaving for the Board.
   const canvas =
@@ -231,7 +241,14 @@ export function QPresenceStage({
             shown.blocks.find(
               (one): one is QAnswerCardsBlock => one.kind === "ANSWER_CARDS",
             ) ?? null;
-          return block === null ? null : { item: shown, block, turn };
+          return block === null
+            ? null
+            : {
+                item: shown,
+                block,
+                turn,
+                rest: shown.blocks.filter((one) => one !== block),
+              };
         })();
   const [leaving, setLeaving] = useState<{
     readonly id: string;
@@ -276,12 +293,13 @@ export function QPresenceStage({
         "id" in detail &&
         typeof detail.id === "string"
       ) {
-        setReopened({ id: detail.id, atAnswer: answers });
+        const item = items.find((one) => one.id === detail.id);
+        if (item !== undefined) reopenStaged(item.run, latestAnswerRun(turns));
       }
     };
     window.addEventListener(SHOW_ON_STAGE, onShow);
     return () => window.removeEventListener(SHOW_ON_STAGE, onShow);
-  }, [answers]);
+  }, [items, turns]);
 
   // Q room W3: a data-room document open in the room's centre panel.
   const documentOpen = useRoomDocumentOpen();
@@ -379,7 +397,41 @@ export function QPresenceStage({
               onPin === undefined ? undefined : () => onPin(canvas.item.id)
             }
           />
+          {/* The rest of the same answer's set (a table, a map beside
+              the cards) is part of what was shown, never dropped. */}
+          <RenderedMark
+            run={canvas.item.run}
+            kinds={canvas.item.blocks.map((one) => one.kind)}
+          />
+          {canvas.rest.length === 0 ? null : (
+            <div className="w-full" data-q-canvas-rest={canvas.item.id}>
+              <QResultBlocks
+                blocks={canvas.rest}
+                onAsk={onAsk}
+                onOpenArtifact={onOpenArtifact}
+              />
+            </div>
+          )}
         </Suspense>
+      )}
+
+      {/* Lane A: a stage object never leaves silently. */}
+      {note === null ? null : (
+        <p
+          className="cq-caption flex w-full flex-wrap items-center justify-center gap-2 text-(--cq-text-secondary)"
+          role="status"
+          data-q-stage-note={note.id}
+        >
+          <span>{note.text}</span>
+          <button
+            type="button"
+            className="cq-stage-quiet min-h-11"
+            onClick={() => reopen(note.item)}
+            data-q-stage-note-reopen={note.item.id}
+          >
+            Show again
+          </button>
+        </p>
       )}
 
       {shown === null || canvas !== null ? null : (
@@ -420,6 +472,10 @@ export function QPresenceStage({
                 onAsk={onAsk}
                 onOpenArtifact={onOpenArtifact}
               />
+              <RenderedMark
+                run={shown.run}
+                kinds={shown.blocks.map((one) => one.kind)}
+              />
             </Suspense>
           </div>
         </section>
@@ -430,9 +486,7 @@ export function QPresenceStage({
           <QRoomStage
             open={roomOpen}
             note={room.note}
-            onClose={(card) =>
-              setClosedByHand({ key: card.key, at: card.openedAt })
-            }
+            onClose={(card) => hideKey(roomCardKey(card))}
             load={loadRoomCard}
             turns={turns}
             deckLoaders={deckLoaders}
@@ -490,7 +544,7 @@ export function QPresenceStage({
                     type="button"
                     className="cq-stage-quiet w-full justify-start"
                     onClick={() => {
-                      setReopened({ id: item.id, atAnswer: answers });
+                      reopen(item);
                       setListOpen(false);
                     }}
                     data-q-shown-reopen={item.id}
@@ -505,6 +559,14 @@ export function QPresenceStage({
       )}
     </div>
   );
+}
+
+/** A room card's key in the presentation controller: one per opening. */
+function roomCardKey(card: {
+  readonly key: string;
+  readonly openedAt: number;
+}): string {
+  return `room:${card.key}@${String(card.openedAt)}`;
 }
 
 /** What the person asked just before an answer, for the line above Q's. */

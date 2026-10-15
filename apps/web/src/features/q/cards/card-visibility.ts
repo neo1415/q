@@ -24,6 +24,11 @@ function useCardsVersion(): CardsState {
   return useSyncExternalStore(subscribeCards, cardsState, () => EMPTY);
 }
 
+/** The whole presentation state, for a surface that decides with it. */
+export function useCardsState(): CardsState {
+  return useCardsVersion();
+}
+
 /**
  * The cards of one family that this tab should draw. Every card is
  * registered (so "Show again" knows they exist), the hidden ones are left
