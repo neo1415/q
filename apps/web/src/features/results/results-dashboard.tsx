@@ -130,8 +130,10 @@ function Tile({
     </>
   );
   // One cell of the stat strip; the strip, not each figure, is the surface.
+  // Hairlines between cells, none around them: two by two on a phone, one
+  // row of four from large screens.
   const frame =
-    "flex min-w-0 flex-col gap-1 bg-(--cq-surface-raised) p-4 sm:p-5";
+    "flex min-w-0 flex-col gap-1 border-(--cq-border-subtle) py-4 odd:pr-4 even:border-l even:pl-4 sm:py-5 [&:nth-child(n+3)]:border-t lg:border-l lg:px-5 lg:first:border-l-0 lg:first:pl-0 lg:[&:nth-child(n+3)]:border-t-0";
   return href === undefined ? (
     <div className={frame}>{body}</div>
   ) : (
@@ -161,7 +163,7 @@ function Header({
         {props.heading === null ? null : (
           <Heading
             className={cx(
-              props.headingLevel === 2 ? "cq-title-md" : "cq-title-xl",
+              props.headingLevel === 2 ? "cq-title-sm" : "cq-title-xl",
               "text-(--cq-text-primary)",
             )}
           >
@@ -185,7 +187,7 @@ function Header({
                 href={pageHref(props.basePath, { range: period.value })}
                 aria-current={active ? "page" : undefined}
                 className={cx(
-                  "cq-body-sm inline-flex min-h-10 items-center rounded-(--cq-radius-sm) px-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
+                  "cq-body-sm inline-flex min-h-11 items-center rounded-(--cq-radius-sm) px-3 transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-10",
                   active
                     ? "bg-(--cq-surface-strong) font-semibold text-(--cq-text-primary)"
                     : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
@@ -310,7 +312,7 @@ function Pipeline({
         picked === null ? null : (
           <Link
             href={stageHref(props.basePath, props.range, null)}
-            className="cq-body-sm text-(--cq-accent) underline-offset-2 hover:underline"
+            className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-accent) underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-0"
           >
             Show everyone
           </Link>
@@ -538,7 +540,7 @@ function InvestorDashboard(
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       <Header props={props} name={results.organisationName} />
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-border-subtle) lg:grid-cols-4">
+      <div className="grid grid-cols-2 border-t border-(--cq-border-subtle) lg:grid-cols-4">
         <Tile
           label="Interest sent"
           value={String(interest?.sent ?? f.interest)}
@@ -611,7 +613,7 @@ function InvestorDashboard(
             action={
               <Link
                 href="/capital"
-                className="cq-body-sm text-(--cq-accent) underline-offset-2 hover:underline"
+                className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-accent) underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-0"
               >
                 Open Capital
               </Link>
@@ -639,7 +641,7 @@ function InvestorDashboard(
             action={
               <Link
                 href="/settings/usage"
-                className="cq-body-sm text-(--cq-accent) underline-offset-2 hover:underline"
+                className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-accent) underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-0"
               >
                 Usage
               </Link>
@@ -726,7 +728,7 @@ function RaisePanel({ results }: { readonly results: FounderResults }) {
       action={
         <Link
           href="/capital"
-          className="cq-body-sm text-(--cq-accent) underline-offset-2 hover:underline"
+          className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-accent) underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-0"
         >
           Open Capital
         </Link>
@@ -827,7 +829,7 @@ function FounderDashboard(
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       <Header props={props} name={results.organisationName} />
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-border-subtle) lg:grid-cols-4">
+      <div className="grid grid-cols-2 border-t border-(--cq-border-subtle) lg:grid-cols-4">
         <Tile
           label="Investors engaged"
           value={
@@ -878,7 +880,7 @@ function FounderDashboard(
             action={
               <Link
                 href="/rehearsals"
-                className="cq-body-sm text-(--cq-accent) underline-offset-2 hover:underline"
+                className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-accent) underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-0"
               >
                 Rehearse
               </Link>

@@ -10,12 +10,16 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushSync } from "react-dom";
-import type {
-  RelationshipPipelineDto,
-  RelationshipPipelineQuery,
+import {
+  RELATIONSHIP_STATES_V2,
+  type RelationshipPipelineDto,
+  type RelationshipPipelineQuery,
 } from "@capital-q/contracts";
 import { RelationshipPipeline } from "@/features/relationships/relationship-pipeline";
-import { pipelinePresentedRows } from "@/features/relationships/pipeline-presentation";
+import {
+  BOARD_STATES,
+  pipelinePresentedRows,
+} from "@/features/relationships/pipeline-presentation";
 import {
   controlOf,
   listItems,
@@ -342,6 +346,46 @@ describe("real pipeline controls", () => {
         true,
       );
     }
+  });
+  it("orders Board columns forward path first, every state once", () => {
+    expect([...BOARD_STATES].toSorted()).toEqual(
+      [...RELATIONSHIP_STATES_V2].toSorted(),
+    );
+    expect(BOARD_STATES.indexOf("DECLINED")).toBeGreaterThan(
+      BOARD_STATES.indexOf("INVESTED"),
+    );
+    const { container } = render(
+      <RelationshipPipeline {...props} layout="board" />,
+    );
+    expect(
+      [...container.querySelectorAll("[data-board-column]")].map((column) =>
+        column.getAttribute("data-board-column"),
+      ),
+    ).toEqual(["CONNECTED", "IN_DILIGENCE"]);
+    expect(
+      screen.getByRole("heading", { name: "In diligence 1" }),
+    ).toBeDefined();
+  });
+  it("an empty view says why and offers the one way out", () => {
+    const empty = { ...data, total: 0, items: [], nextCursor: null };
+    const page = render(
+      <RelationshipPipeline
+        {...props}
+        data={empty}
+        query={{ state: "CONNECTED", sort: "name" }}
+      />,
+    );
+    expect(screen.getByText("No relationships match this view.")).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "Clear filters" }).getAttribute("href"),
+    ).toBe("/relationships?view=pipeline&layout=table&sort=name");
+    page.rerender(<RelationshipPipeline {...props} data={empty} />);
+    expect(screen.getByText("No relationships yet.")).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "Open Discover" }).getAttribute("href"),
+    ).toBe("/discover");
+    // Nothing to page through: no pagination at all.
+    expect(screen.queryByRole("navigation", { name: "Pages" })).toBeNull();
   });
   it("says an upper-bound total as one", () => {
     render(

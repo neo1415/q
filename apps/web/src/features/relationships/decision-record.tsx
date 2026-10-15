@@ -9,15 +9,17 @@ import type { Decision } from "./decision";
 export function DecisionRecord({ decision }: { readonly decision: Decision }) {
   return (
     <div className="flex flex-col gap-2" data-decision={decision.state}>
-      <p className="cq-body-sm text-(--cq-text-primary)">
-        <span className="font-semibold">{decision.title}</span>
-        {" · "}
-        <time dateTime={decision.at} className="cq-numeric">
+      <p className="flex flex-wrap items-baseline gap-x-2 text-(--cq-text-primary)">
+        <span className="cq-body font-semibold">{decision.title}</span>
+        <time
+          dateTime={decision.at}
+          className="cq-body-sm cq-numeric text-(--cq-text-secondary)"
+        >
           {dealDay(decision.at)}
         </time>
       </p>
       {decision.details.length === 0 ? null : (
-        <ul className="cq-body-sm flex flex-col gap-1 text-(--cq-text-secondary)">
+        <ul className="cq-body-sm flex max-w-(--cq-layout-reading) flex-col gap-1 border-l-2 border-(--cq-border) pl-3 text-(--cq-text-secondary)">
           {decision.details.map((line) => (
             <li key={line} className="whitespace-pre-wrap">
               {line}
