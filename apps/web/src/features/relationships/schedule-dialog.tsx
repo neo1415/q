@@ -1,10 +1,19 @@
 "use client";
 
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 import { buttonClassName } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot, DialogTrigger } from "@capital-q/ui/dialog";
 import { Bell, CalendarDays, ICON_SIZE, Video } from "@capital-q/ui/icons";
+
+import { effectShown } from "@/features/q/control/perform";
+import { useQControl } from "@/features/q/control/q-control";
 
 function subscribeHash(onChange: () => void): () => void {
   window.addEventListener("hashchange", onChange);
@@ -12,10 +21,25 @@ function subscribeHash(onChange: () => void): () => void {
 }
 
 const KINDS = {
-  call: { hash: "#calls", title: "Book a call", Icon: CalendarDays },
-  reminder: { hash: "#reminders", title: "Set a reminder", Icon: Bell },
+  call: {
+    hash: "#calls",
+    title: "Book a call",
+    Icon: CalendarDays,
+    control: "dialog.book-call",
+  },
+  reminder: {
+    hash: "#reminders",
+    title: "Set a reminder",
+    Icon: Bell,
+    control: "dialog.reminder",
+  },
   // QA 390 px: only reachable behind Book a call, so nobody found it.
-  join: { hash: "#join-call", title: "Have Q join a call", Icon: Video },
+  join: {
+    hash: "#join-call",
+    title: "Have Q join a call",
+    Icon: Video,
+    control: "dialog.join-call",
+  },
 } as const;
 
 /**
@@ -34,7 +58,7 @@ export function ScheduleDialog({
   readonly primary?: boolean;
   readonly children: ReactNode;
 }) {
-  const { hash, title, Icon } = KINDS[kind];
+  const { hash, title, Icon, control } = KINDS[kind];
   const asked = useSyncExternalStore(
     subscribeHash,
     () => window.location.hash === hash,
@@ -52,23 +76,49 @@ export function ScheduleDialog({
     }
     setChosen(next);
   };
+  // Q's UI acts (premiere v5): open or close this dialog deterministically.
+  // A same-page #calls link is a hash-only move that fires no hashchange,
+  // so the tour opens it here instead. Opening books nothing: booking
+  // still needs the person's own click on a time and Send.
+  const rootRef = useRef<HTMLSpanElement>(null);
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  });
+  useQControl({
+    id: control,
+    kind: "DIALOG",
+    ref: rootRef,
+    onAct: async (intent) => {
+      if (intent.act !== "OPEN" && intent.act !== "CLOSE") {
+        return "NOT_APPLICABLE";
+      }
+      const want = intent.act === "OPEN";
+      onOpenChange(want);
+      return (await effectShown(() => openRef.current === want, 3_000))
+        ? "DONE"
+        : "FAILED";
+    },
+  });
   return (
-    <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger>
-        <button
-          type="button"
-          className={buttonClassName(primary ? "primary" : "secondary")}
+    <span ref={rootRef} className="contents">
+      <DialogRoot open={open} onOpenChange={onOpenChange}>
+        <DialogTrigger>
+          <button
+            type="button"
+            className={buttonClassName(primary ? "primary" : "secondary")}
+          >
+            <Icon size={ICON_SIZE.regular} aria-hidden="true" />
+            {title}
+          </button>
+        </DialogTrigger>
+        <DialogContent
+          title={title}
+          className="max-h-[85vh] max-w-lg overflow-y-auto"
         >
-          <Icon size={ICON_SIZE.regular} aria-hidden="true" />
-          {title}
-        </button>
-      </DialogTrigger>
-      <DialogContent
-        title={title}
-        className="max-h-[85vh] max-w-lg overflow-y-auto"
-      >
-        {children}
-      </DialogContent>
-    </DialogRoot>
+          {children}
+        </DialogContent>
+      </DialogRoot>
+    </span>
   );
 }
