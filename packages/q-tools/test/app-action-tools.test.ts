@@ -137,11 +137,17 @@ const call = (name: string, args: Record<string, unknown>) => ({
 });
 
 describe("the selected GateQ application's authorized reading", () => {
-  function selectedContext(actor = actorA) {
+  function selectedContext(
+    actor = actorA,
+    taskClass:
+      | "RELATIONSHIP_QUESTION"
+      | "INVESTOR_QUESTION"
+      | "GENERAL_QUESTION" = "RELATIONSHIP_QUESTION",
+  ) {
     const plan = ownPlan(actor);
     return contextFor(actor, {
       ...plan,
-      purpose: { ...plan.purpose, taskClass: "RELATIONSHIP_QUESTION" },
+      purpose: { ...plan.purpose, taskClass },
     });
   }
   const applicationId = "55555555-0000-4000-8000-0000000000a2";
@@ -282,6 +288,24 @@ describe("the selected GateQ application's authorized reading", () => {
     expect(data.status).toBe("DONE");
     expect(data.reading.sources.length).toBe(64);
     expect(new Set(data.reading.sources.map((s) => s.factId)).size).toBe(64);
+  });
+  it("reads the selected dossier when the turn is classified as the investor's own or a general question", async () => {
+    // Live 2026-10-15: an INVESTOR_QUESTION turn was not offered the read.
+    for (const taskClass of [
+      "INVESTOR_QUESTION",
+      "GENERAL_QUESTION",
+    ] as const) {
+      const { executor } = selected();
+      const out = await executor.execute(
+        call("gateq_inbox_summarise", { applicationId }),
+        selectedContext(actorA, taskClass),
+      );
+      if (!out.result.ok) throw new Error(JSON.stringify(out.result.error));
+      expect(out.result.data).toMatchObject({
+        status: "DONE",
+        reading: { subject: { applicationId } },
+      });
+    }
   });
   it("retains the inbox refusal and returns no reading", async () => {
     const { executor } = selected(true);

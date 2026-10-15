@@ -35,7 +35,12 @@ export default async function RehearsalVideoHarnessPage({
     notFound();
   }
   const params = await searchParams;
-  const view = params["view"] === "room" ? "room" : "stage";
+  const view =
+    params["view"] === "room"
+      ? "room"
+      : params["view"] === "gateq"
+        ? "gateq"
+        : "stage";
   return (
     <AppShell
       context={{

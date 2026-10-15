@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef } from "react";
 import type { QMessage } from "@capital-q/contracts";
 import {
   routeMatchesPattern,
+  runShortRehearsal,
+  type TranscriptSegment,
   type ActionOutcome,
   type SceneScript,
   type TourAction,
@@ -24,6 +26,7 @@ import { destinationPath } from "@/features/voice/destinations";
 
 import { fixtureKeysOf, resolveCompanyFixture } from "./fixtures";
 import { captionSpeak } from "./narrator";
+import { rehearsalPorts } from "./rehearsal-ports";
 
 /**
  * The tour's ports onto the real app (blueprint §5 "No per-click LLM
@@ -43,6 +46,8 @@ import { captionSpeak } from "./narrator";
 
 const VISIBLE_WAIT_MS = 4_000;
 const ABORT_GRACE_MS = 2_500;
+/** How long a question may take to become a run the Q API accepted. */
+const RUN_START_WAIT_MS = 15_000;
 
 type QRef = { current: QSessionValue | null };
 
@@ -98,7 +103,15 @@ function nextActId(): string {
   return `uia_qpitch${String(Date.now() % 1_000_000)}${String(actSequence)}`;
 }
 
-export function useTourPorts(script: TourScript): TourPorts | null {
+/** Where rehearsal transcript segments go: the host's runner and captions. */
+export type TranscriptSink = {
+  current: ((segment: TranscriptSegment) => void) | null;
+};
+
+export function useTourPorts(
+  script: TourScript,
+  transcript: TranscriptSink,
+): TourPorts | null {
   const session = useQSessionOptional();
   const { setOpen } = useGlobalQ();
   const router = useRouter();
@@ -193,12 +206,32 @@ export function useTourPorts(script: TourScript): TourPorts | null {
     ): Promise<ActionOutcome> => {
       const q = qRef.current?.q;
       if (q === undefined) return outcome(false, "Q_RUN_FAILED");
-      const prior = q.state.runId;
+      // The receipt binds to the run THIS question starts: a run id the
+      // conversation did not already hold. A refused or failed ask leaves
+      // the id unchanged, so an older finished run (for example one read
+      // back when the conversation opened) can never acknowledge it
+      // (browser rehearsal 2026-10-15: exactly that false DONE).
+      const known = new Set<string>(messages().map((m) => m.runId));
+      if (q.runId !== null) known.add(q.runId);
+      if (q.state.runId !== null) known.add(q.state.runId);
       setOpen(true);
       await q.ask(text);
+      const started = new AbortController();
+      const stopWaiting = setTimeout(() => started.abort(), RUN_START_WAIT_MS);
+      signal.addEventListener("abort", () => started.abort(), { once: true });
+      let mine: string | null = null;
+      await waitFor(() => {
+        const id = qRef.current?.q.runId ?? null;
+        if (id !== null && !known.has(id)) mine = id;
+        return mine !== null;
+      }, started.signal);
+      clearTimeout(stopWaiting);
+      if (signal.aborted) return outcome(false, "CANCELLED");
+      const run = mine;
+      if (run === null) return outcome(false, "Q_RUN_FAILED");
       const finished = await waitFor(() => {
         const state = qRef.current?.q.state;
-        return state !== undefined && state.runId !== prior && state.terminal;
+        return state !== undefined && state.runId === run && state.terminal;
       }, signal);
       if (!finished) {
         // Interrupted mid-run: stop it rather than let it land unseen.
@@ -206,7 +239,11 @@ export function useTourPorts(script: TourScript): TourPorts | null {
         return outcome(false, "CANCELLED");
       }
       const state = qRef.current?.q.state;
-      if (state?.runStatus !== "COMPLETED" || state.failure !== null) {
+      if (
+        state?.runId !== run ||
+        state.runStatus !== "COMPLETED" ||
+        state.failure !== null
+      ) {
         return outcome(false, "Q_RUN_FAILED");
       }
       const visible = await answerVisible();
@@ -270,6 +307,42 @@ export function useTourPorts(script: TourScript): TourPorts | null {
           const text = questionText(action.question);
           if (text === null) return outcome(false, "FIXTURE_UNRESOLVED");
           return ask(text, signal);
+        }
+        case "runShortRehearsal": {
+          const lines = action.lines.flatMap((id) => {
+            const text = questionText(id);
+            return text === null ? [] : [text];
+          });
+          if (lines.length !== action.lines.length) {
+            return outcome(false, "FIXTURE_UNRESOLVED");
+          }
+          // Real model turns: only in an approved live run (owner cap).
+          const result = await runShortRehearsal(
+            rehearsalPorts(action.counterpart),
+            {
+              narratorLines: lines,
+              maxMs: action.maxMs,
+              reviewReads: 6,
+              reviewReadGapMs: 1_500,
+            },
+            signal,
+            (segment) => transcript.current?.(segment),
+          );
+          if (signal.aborted) return outcome(false, "CANCELLED");
+          if (!result.ok) {
+            return outcome(
+              false,
+              result.reason === "START_FAILED"
+                ? "FIXTURE_UNRESOLVED"
+                : "FAILED",
+            );
+          }
+          // The review must exist before Q says it is saved.
+          if (!result.reviewReady) return outcome(false, "NOT_VISIBLE", false);
+          return navigate(
+            `/rehearsals/r/${encodeURIComponent(result.rehearsalId)}`,
+            signal,
+          );
         }
         case "buildComparison": {
           const template = questionText(action.question);
@@ -353,5 +426,5 @@ export function useTourPorts(script: TourScript): TourPorts | null {
     };
     // The ports read the session through a ref; they are rebuilt only
     // when Q itself appears or goes.
-  }, [hasSession, script, router, setOpen]);
+  }, [hasSession, script, router, setOpen, transcript]);
 }

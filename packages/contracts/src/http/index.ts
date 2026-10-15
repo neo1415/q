@@ -370,6 +370,9 @@ export {
   MEETING_OUTCOMES,
   NETWORK_PASS_REASONS_PATH,
   NETWORK_RELATIONSHIP_BRIEF_PATH,
+  NETWORK_RELATIONSHIP_GATEQ_APPLICATIONS_PATH,
+  RelationshipGateqApplicationsDtoSchema,
+  type RelationshipGateqApplicationsDto,
   NETWORK_RELATIONSHIP_DILIGENCE_PATH,
   NETWORK_DILIGENCE_SHARES_PATH,
   NETWORK_DILIGENCE_SHARE_REVOKE_PATH,
@@ -1447,3 +1450,4 @@ export * from "./gateq-find.js";
 export * from "./deal-close.js";
 
 export * from "./relationship-pipeline.js";
+export * from "./relationship-views.js";

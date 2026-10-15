@@ -108,6 +108,35 @@ for (const size of SIZES) {
       expect(outside).toEqual([]);
     });
 
+    test("the GateQ video room shows the tile and the durable coverage, with typing as the way back", async ({
+      page,
+    }) => {
+      const outside = await guardOffline(page);
+      await page.goto("/dev/rehearsal-video?view=gateq");
+      const tile = page.locator('iframe[title^="Video interview for"]');
+      await expect(tile).toBeVisible();
+      const allow = (await tile.getAttribute("allow")) ?? "";
+      expect(allow).toContain("camera");
+      expect(allow).toContain("microphone");
+      const covered = await tile.evaluate((frame) => {
+        const box = frame.getBoundingClientRect();
+        const top = document.elementFromPoint(
+          box.x + box.width / 2,
+          box.y + box.height / 2,
+        );
+        return top !== frame;
+      });
+      expect(covered).toBe(false);
+      await expect(
+        page.getByRole("complementary", {
+          name: "What we have, what's still needed",
+        }),
+      ).toBeAttached();
+      await inViewport(page, "Continue by typing instead");
+      await noHorizontalOverflow(page);
+      expect(outside).toEqual([]);
+    });
+
     test("the voice room keeps every call control on screen, Leave included", async ({
       page,
     }) => {

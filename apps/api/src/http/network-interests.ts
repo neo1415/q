@@ -1,6 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import {
+  NETWORK_COMPANY_RELATIONSHIP_VIEWS_PATH,
+  NETWORK_RELATIONSHIP_VIEWS_PATH,
+  SavedRelationshipViewListSchema,
   CompanyInterestStatusDtoSchema,
   ConnectionStatusDtoSchema,
   IncomingConnectionRequestListDtoSchema,
@@ -16,6 +19,8 @@ import {
   NETWORK_PASS_REASONS_PATH,
   NETWORK_RELATIONSHIP_BRIEF_PATH,
   NETWORK_RELATIONSHIP_BRIEFS_PATH,
+  NETWORK_RELATIONSHIP_GATEQ_APPLICATIONS_PATH,
+  RelationshipGateqApplicationsDtoSchema,
   RelationshipBriefListQuerySchema,
   RelationshipBriefListSchema,
   NETWORK_RELATIONSHIP_DILIGENCE_PATH,
@@ -41,6 +46,7 @@ import {
   InterestNotFoundError,
   selectRelationshipPipeline,
   relationshipPipelineScopeBinding,
+  RelationshipPipelineLimitError,
   RelationshipPipelineQueryError,
   relationshipPipelineExportRows,
   toConnectionRequestDto,
@@ -57,6 +63,8 @@ import {
 } from "@capital-q/network";
 import { reportCsvRows } from "@capital-q/results";
 import type { DiligenceService } from "@capital-q/permissions";
+
+import type { ActorContext } from "@capital-q/security";
 
 import { photoLookup, type NamedPhotos } from "./named-photos.js";
 
@@ -106,6 +114,26 @@ export type NetworkInterestRoutesDependencies = ActorContextDependencies & {
   readonly briefSources?: RelationshipBriefSources | undefined;
   /** The batch readers for the list's briefs (R1). Absent: those sources UNAVAILABLE. */
   readonly briefBatchSources?: RelationshipBriefBatchSources | undefined;
+  /**
+   * GateQ applications on a relationship (CRM record). The route proves the
+   * party and side first; this narrows by side. Absent: route not registered.
+   */
+  readonly gateqApplications?:
+    | ((input: {
+        readonly actor: ActorContext;
+        readonly relationshipId: string;
+        readonly side: "COMPANY" | "INVESTOR";
+      }) => Promise<
+        readonly {
+          readonly applicationId: string;
+          readonly reference: string;
+          readonly gatewayName: string | null;
+          readonly status: "IN_PROGRESS" | "READY_TO_SUBMIT" | "SUBMITTED";
+          readonly startedAt: string;
+          readonly submittedAt: string | null;
+        }[]
+      >)
+    | undefined;
 };
 
 function investorIdOf(request: FastifyRequest): string {
@@ -248,6 +276,35 @@ export function registerNetworkInterestRoutes(
     },
   );
 
+  const gateqApplications = dependencies.gateqApplications;
+  if (gateqApplications !== undefined) {
+    app.get(
+      NETWORK_RELATIONSHIP_GATEQ_APPLICATIONS_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const raw = (request.params as { relationshipId?: unknown })
+          .relationshipId;
+        const relationshipId = typeof raw === "string" ? raw : "";
+        const actor = getActorContext(request);
+        // Party and side from the actor's own membership; a relationship
+        // they are not party to is the same 404 as one that does not exist.
+        const view = await service.relationshipById({ actor, relationshipId });
+        if (view === null) throw new InterestNotFoundError();
+        const items = await gateqApplications({
+          actor,
+          relationshipId,
+          side: view.side,
+        });
+        void reply.header("Cache-Control", "no-store");
+        return RelationshipGateqApplicationsDtoSchema.parse({
+          relationshipId,
+          side: view.side,
+          items,
+        });
+      },
+    );
+  }
+
   // Every brief on one page of the viewer's own list (R1 batching): one
   // call instead of a thread, calls and diligence read per relationship.
   // A malformed query is the same not-found as a list that is not theirs.
@@ -351,6 +408,35 @@ export function registerNetworkInterestRoutes(
       company ? companyIdOf(request) : "INVESTOR",
     ].join(":");
   };
+  // Slice 3b: the read model when it is ready for this party; null keeps
+  // the bounded in-memory path (never a page missing relationships).
+  const pipelineFromReadModel = async (
+    request: FastifyRequest,
+    query: Parameters<typeof selectRelationshipPipeline>[1],
+    company: boolean,
+  ) => {
+    try {
+      return (
+        (await service.relationshipPipeline?.page({
+          actor: getActorContext(request),
+          companyId: company ? companyIdOf(request) : undefined,
+          query,
+          actorScope: pipelineScope(request, company),
+        })) ?? null
+      );
+    } catch (error: unknown) {
+      // A refusal or a bad cursor is the caller's answer, as before.
+      if (
+        error instanceof RelationshipPipelineQueryError ||
+        error instanceof RelationshipPipelineLimitError
+      )
+        throw error;
+      // Otherwise (e.g. the read model's migration not yet applied) the
+      // bounded path answers, which re-runs every authorisation itself.
+      request.log.warn({ err: error }, "pipeline read model unavailable");
+      return null;
+    }
+  };
   app.get(
     NETWORK_INVESTOR_PIPELINE_PATH,
     { onRequest: withContext },
@@ -359,11 +445,13 @@ export function registerNetworkInterestRoutes(
         RelationshipPipelineQuerySchema,
         request.query,
       );
-      const page = selectRelationshipPipeline(
-        await pipelineRows(request, false),
-        query,
-        pipelineScope(request, false),
-      );
+      const page =
+        (await pipelineFromReadModel(request, query, false)) ??
+        selectRelationshipPipeline(
+          await pipelineRows(request, false),
+          query,
+          pipelineScope(request, false),
+        );
       void reply.header("Cache-Control", "no-store");
       return RelationshipPipelineDtoSchema.parse({
         ...page,
@@ -379,11 +467,13 @@ export function registerNetworkInterestRoutes(
         RelationshipPipelineQuerySchema,
         request.query,
       );
-      const page = selectRelationshipPipeline(
-        await pipelineRows(request, true),
-        query,
-        pipelineScope(request, true),
-      );
+      const page =
+        (await pipelineFromReadModel(request, query, true)) ??
+        selectRelationshipPipeline(
+          await pipelineRows(request, true),
+          query,
+          pipelineScope(request, true),
+        );
       void reply.header("Cache-Control", "no-store");
       return RelationshipPipelineDtoSchema.parse({
         ...page,
@@ -400,7 +490,19 @@ export function registerNetworkInterestRoutes(
       RelationshipPipelineExportQuerySchema,
       request.query,
     );
-    const authorisedRows = await pipelineRows(request, company);
+    const fromReadModel = await service.relationshipPipeline
+      ?.all({
+        actor: getActorContext(request),
+        companyId: company ? companyIdOf(request) : undefined,
+        query,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof RelationshipPipelineLimitError) throw error;
+        request.log.warn({ err: error }, "pipeline read model unavailable");
+        return null;
+      });
+    const authorisedRows =
+      fromReadModel ?? (await pipelineRows(request, company));
     if (
       query.scope !==
       relationshipPipelineScopeBinding(query, pipelineScope(request, company))
@@ -444,6 +546,25 @@ export function registerNetworkInterestRoutes(
     { onRequest: withContext },
     (request, reply) => exportPipeline(request, reply, true),
   );
+
+  // CRM saved views (2026-10-15): the list read. Saving and deleting are
+  // app actions (ADR 0040; @capital-q/app-actions relationship-views).
+  const views = service.relationshipViews;
+  if (views !== undefined) {
+    for (const [listPath, company] of [
+      [NETWORK_RELATIONSHIP_VIEWS_PATH, false],
+      [NETWORK_COMPANY_RELATIONSHIP_VIEWS_PATH, true],
+    ] as const) {
+      const party = (request: FastifyRequest) =>
+        company ? companyIdOf(request) : undefined;
+      app.get(listPath, { onRequest: withContext }, async (request, reply) => {
+        void reply.header("Cache-Control", "no-store");
+        return SavedRelationshipViewListSchema.parse(
+          await views.list(getActorContext(request), party(request)),
+        );
+      });
+    }
+  }
 
   // Each side's own relationships (CQ-WEB-030), each row the per-party fold.
   app.get(

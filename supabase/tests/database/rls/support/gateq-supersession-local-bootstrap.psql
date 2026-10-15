@@ -21,6 +21,9 @@ create table gateq.gateway_versions(id uuid primary key, gateway_id uuid, tenant
 \ir ../../../../migrations/20261003090000_gateq_turn_idempotency.sql
 \ir ../../../../migrations/20261223090000_gateq_interview_turns_contacts_dossier.sql
 \ir ../../../../migrations/20261223100000_gateq_exchange_claims.sql
+-- The real repository writes lineage even when it is unknown (NULL).
+-- Keep its canonical columns, validation and immutability in this thin fixture.
+\ir ../../../../migrations/20261223160000_gateq_document_disclosure_lineage.sql
 \ir ../../../../migrations/20261224100000_gateq_fact_supersession.sql
 insert into identity.tenants values ('00000000-0000-4000-8000-0000000000a3'), ('00000000-0000-4000-8000-0000000000b3');
 insert into core.investor_organisations (id, tenant_id, organisation_id, investor_type, display_name) values

@@ -5,6 +5,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,8 +24,30 @@ import {
 } from "@/features/q/control/registry";
 import { performOnControl } from "@/features/q/control/perform";
 import { noteRoute, resetRouteState } from "@/features/q/control/route-state";
-const mock = vi.hoisted(() => ({ push: vi.fn() }));
+const mock = vi.hoisted(() => ({
+  push: vi.fn(),
+  save: vi.fn(),
+  remove: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mock.push }) }));
+vi.mock("@/features/relationships/pipeline-view-actions", () => ({
+  savePipelineViewAction: mock.save,
+  deletePipelineViewAction: mock.remove,
+}));
+const saved = (input: Record<string, unknown>, id: string, version = 1) => ({
+  ok: true as const,
+  value: {
+    id,
+    name: input["name"],
+    query: input["query"],
+    layout: input["layout"],
+    columns: input["columns"],
+    scope: input["scope"],
+    version,
+    updatedAt: "2026-10-15T10:00:00.000Z",
+    editable: true,
+  },
+});
 const data: RelationshipPipelineDto = {
   total: 2,
   scope: "1".repeat(64),
@@ -64,6 +87,12 @@ const props = {
 beforeEach(() => {
   window.localStorage.clear();
   mock.push.mockReset();
+  mock.save.mockReset();
+  mock.remove.mockReset();
+  mock.save.mockImplementation((id: string, input: Record<string, unknown>) =>
+    Promise.resolve(saved(input, id, Number(input["expectedVersion"]) + 1)),
+  );
+  mock.remove.mockResolvedValue({ ok: true, value: true });
 });
 afterEach(() => {
   cleanup();
@@ -148,45 +177,148 @@ describe("real pipeline controls", () => {
         .getAttribute("href"),
     ).toContain(`selected=${data.items[0]?.relationshipId}`);
   });
-  it("saves, restores, renames and deletes view preferences without cursor authority", () => {
-    const page = render(
+  it("saves, renames, opens and deletes server views without cursor authority", async () => {
+    render(
       <RelationshipPipeline
         {...props}
+        views={{ items: [], teamEditable: false }}
         query={{ state: "CONNECTED", cursor: "page" }}
       />,
     );
+    // Only an organisation admin may share with the team.
+    expect(
+      screen.queryByRole("combobox", { name: "Who sees this view" }),
+    ).toBeNull();
     fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
       target: { value: "Connected" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save view" }));
-    expect(
-      within(screen.getByRole("combobox", { name: "Saved view" })).getByRole(
-        "option",
-        { name: "Connected" },
-      ),
-    ).toBeDefined();
+    const option = await within(
+      screen.getByRole("combobox", { name: "Saved view" }),
+    ).findByRole<HTMLOptionElement>("option", { name: "Connected" });
+    const [id, body] = (mock.save.mock.calls[0] ?? []) as [string, unknown];
+    expect(body).toEqual({
+      name: "Connected",
+      query: { state: "CONNECTED" },
+      layout: "table",
+      columns: ["state", "since", "next"],
+      scope: "PERSONAL",
+      expectedVersion: 0,
+    });
+    expect(option.value).toBe(id);
+    expect(option.parentElement?.getAttribute("label")).toBe("Mine");
     fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
       target: { value: "Conversations" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Rename view" }));
-    expect(screen.getByRole("option", { name: "Conversations" })).toBeDefined();
-    const id = screen.getByRole<HTMLOptionElement>("option", {
+    expect(
+      await screen.findByRole("option", { name: "Conversations" }),
+    ).toBeDefined();
+    expect(
+      (mock.save.mock.calls[1] as unknown[] | undefined)?.[1],
+    ).toMatchObject({
       name: "Conversations",
-    }).value;
+      expectedVersion: 1,
+    });
     fireEvent.change(screen.getByRole("combobox", { name: "Saved view" }), {
       target: { value: id },
     });
     expect(mock.push).toHaveBeenLastCalledWith(
       "/relationships?view=pipeline&layout=table&state=CONNECTED",
     );
-    page.unmount();
-    render(<RelationshipPipeline {...props} />);
-    expect(screen.getByRole("option", { name: "Conversations" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Delete view" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("option", { name: "Conversations" }),
+      ).toBeNull(),
+    );
+    expect(mock.remove).toHaveBeenCalledWith(id, 2);
+  });
+  it("shows team views read-only to members and lets admins share", async () => {
+    const team = {
+      id: "f0000000-0000-4000-8000-000000000001",
+      name: "Team diligence",
+      query: { state: "IN_DILIGENCE" as const },
+      layout: "board" as const,
+      columns: ["state" as const],
+      scope: "ORGANISATION" as const,
+      version: 3,
+      updatedAt: "2026-10-15T10:00:00.000Z",
+      editable: false,
+    };
+    const member = render(
+      <RelationshipPipeline
+        {...props}
+        views={{ items: [team], teamEditable: false }}
+      />,
+    );
     fireEvent.change(screen.getByRole("combobox", { name: "Saved view" }), {
-      target: { value: id },
+      target: { value: team.id },
+    });
+    expect(mock.push).toHaveBeenLastCalledWith(
+      "/relationships?view=pipeline&layout=board&state=IN_DILIGENCE",
+    );
+    expect(screen.queryByRole("button", { name: "Delete view" })).toBeNull();
+    member.unmount();
+    render(
+      <RelationshipPipeline
+        {...props}
+        views={{ items: [], teamEditable: true }}
+      />,
+    );
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Who sees this view" }),
+      { target: { value: "ORGANISATION" } },
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
+      target: { value: "Shared" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save view" }));
+    const option = await screen.findByRole("option", { name: "Shared" });
+    expect(option.parentElement?.getAttribute("label")).toBe("Team");
+  });
+  it("says views couldn't load and keeps older device views removable", () => {
+    window.localStorage.setItem(
+      props.scopeKey,
+      JSON.stringify({
+        views: [
+          {
+            id: "e0000000-0000-4000-8000-000000000001",
+            name: "Old device view",
+            query: {},
+            layout: "table",
+            columns: ["state"],
+          },
+        ],
+        columns: ["state", "since", "next"],
+        layout: "table",
+      }),
+    );
+    render(<RelationshipPipeline {...props} views={null} />);
+    expect(
+      screen.getByRole("option", { name: "Saved views couldn't load" }),
+    ).toBeDefined();
+    expect(
+      screen
+        .getByRole<HTMLButtonElement>("button", { name: "Save view" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    const old = screen.getByRole("option", { name: "Old device view" });
+    expect(old.parentElement?.getAttribute("label")).toBe("On this device");
+    fireEvent.change(screen.getByRole("combobox", { name: "Saved view" }), {
+      target: { value: "e0000000-0000-4000-8000-000000000001" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Delete view" }));
-    expect(screen.queryByRole("option", { name: "Conversations" })).toBeNull();
+    expect(
+      screen.queryByRole("option", { name: "Old device view" }),
+    ).toBeNull();
+    expect(mock.remove).not.toHaveBeenCalled();
+  });
+  it("says an upper-bound total as one", () => {
+    render(
+      <RelationshipPipeline {...props} data={{ ...data, totalExact: false }} />,
+    );
+    expect(screen.getByText(/up to 2 matching relationships/)).toBeDefined();
   });
   it("isolates another user's preferences and persists columns", () => {
     const page = render(<RelationshipPipeline {...props} />);

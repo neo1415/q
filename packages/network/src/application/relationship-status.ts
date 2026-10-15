@@ -33,7 +33,7 @@ import {
   RELATIONSHIP_EVENT_RELATIONSHIP_PAUSED,
 } from "../domain/event-registry.js";
 import type { ExpressInterestDependencies } from "./express-interest.js";
-import { readHistories, readHistory } from "./relationship-projection.js";
+import { readHistories, readHistory } from "./relationship-history.js";
 import { COMPANY_INTEREST_VIEW } from "./respond-to-interest.js";
 
 const INVESTOR_VIEW = capability("investor.view");
@@ -92,6 +92,36 @@ function viewOf(
         relationship,
         projection,
         visibleHistory: visible,
+        nextStep: nextStepFor(
+          projection.state,
+          party,
+          lastExpresser(visible),
+          lastPauser(visible),
+        ),
+      };
+}
+
+/**
+ * One party's fold, as the pipeline read model stores it (CRM slice 3b):
+ * the same visibility filter, projector and next-step rule as `viewOf`,
+ * so a stored row and a fresh read can never disagree. Null: nothing on
+ * record this party may see.
+ */
+export function partyView(
+  history: Parameters<typeof visibleToParty>[0],
+  party: RelationshipParty,
+): {
+  readonly state: RelationshipStatus["projection"]["state"];
+  readonly stateSince: string;
+  readonly nextStep: RelationshipStatus["nextStep"];
+} | null {
+  const visible = visibleToParty(history, party);
+  const projection = projectRelationshipState(visible);
+  return projection === null
+    ? null
+    : {
+        state: projection.state,
+        stateSince: projection.stateSince,
         nextStep: nextStepFor(
           projection.state,
           party,
@@ -165,6 +195,66 @@ export async function inBatches<T, R>(
   return out;
 }
 
+export type RelationshipViewPartyScope = {
+  readonly party: "COMPANY" | "INVESTOR";
+  readonly partyId: string;
+};
+/** Same canonical party/capability authorization for lists and saved preferences. */
+export async function requireRelationshipListingScope(
+  dependencies: Pick<
+    ExpressInterestDependencies,
+    "authorization" | "companies" | "investorSubject"
+  >,
+  actor: ActorContext,
+  requestedCompanyId?: string,
+): Promise<RelationshipViewPartyScope> {
+  if (actor.organisationId === undefined) throw new ActorContextRequiredError();
+  if (requestedCompanyId !== undefined) {
+    const companyId = CompanyIdSchema.safeParse(requestedCompanyId);
+    if (!companyId.success) throw new InterestCompanyNotFoundError();
+    const company = await dependencies.companies.findCanonicalCompany(
+      companyId.data,
+    );
+    if (
+      company === null ||
+      company.tenantId !== actor.tenantId ||
+      company.organisationId !== actor.organisationId
+    ) {
+      throw new InterestCompanyNotFoundError();
+    }
+    await dependencies.authorization.requireCapability({
+      actor,
+      capability: COMPANY_INTEREST_VIEW,
+      resource: {
+        kind: "RESOURCE",
+        tenantId: company.tenantId,
+        organisationId: company.organisationId,
+        resourceType: "company",
+        resourceId: company.id,
+      },
+    });
+    return { party: "COMPANY", partyId: company.id };
+  }
+  const subject =
+    await dependencies.investorSubject.investorOrganisationFor(actor);
+  if (subject === null) throw new InterestNotPermittedError();
+  const investorOrganisationId = InvestorOrganisationIdSchema.parse(
+    subject.investorOrganisationId,
+  );
+  await dependencies.authorization.requireCapability({
+    actor,
+    capability: INVESTOR_VIEW,
+    resource: {
+      kind: "RESOURCE",
+      tenantId: actor.tenantId,
+      organisationId: actor.organisationId,
+      resourceType: "investor_organisation",
+      resourceId: investorOrganisationId,
+    },
+  });
+  return { party: "INVESTOR", partyId: investorOrganisationId };
+}
+
 /** An investor organisation's own relationships, each folded for its side. */
 export function createListRelationshipsForInvestor(
   dependencies: ExpressInterestDependencies,
@@ -174,26 +264,10 @@ export function createListRelationshipsForInvestor(
     readonly scanLimit?: number;
   }): Promise<readonly RelationshipListing[]> => {
     const { actor } = query;
-    if (actor.organisationId === undefined) {
-      throw new ActorContextRequiredError();
-    }
-    const subject =
-      await dependencies.investorSubject.investorOrganisationFor(actor);
-    if (subject === null) throw new InterestNotPermittedError();
+    const scope = await requireRelationshipListingScope(dependencies, actor);
     const investorOrganisationId = InvestorOrganisationIdSchema.parse(
-      subject.investorOrganisationId,
+      scope.partyId,
     );
-    await dependencies.authorization.requireCapability({
-      actor,
-      capability: INVESTOR_VIEW,
-      resource: {
-        kind: "RESOURCE",
-        tenantId: actor.tenantId,
-        organisationId: actor.organisationId,
-        resourceType: "investor_organisation",
-        resourceId: investorOrganisationId,
-      },
-    });
     const relationships =
       await dependencies.repositories.relationships.listByInvestorOrganisation(
         dependencies.sql,
@@ -272,36 +346,16 @@ export function createListRelationshipsForCompany(
     readonly scanLimit?: number;
   }): Promise<readonly RelationshipListing[]> => {
     const { actor } = query;
-    if (actor.organisationId === undefined) {
-      throw new ActorContextRequiredError();
-    }
-    const companyId = CompanyIdSchema.safeParse(query.companyId);
-    if (!companyId.success) throw new InterestCompanyNotFoundError();
-    const company = await dependencies.companies.findCanonicalCompany(
-      companyId.data,
-    );
-    if (
-      company === null ||
-      company.tenantId !== actor.tenantId ||
-      company.organisationId !== actor.organisationId
-    ) {
-      throw new InterestCompanyNotFoundError();
-    }
-    await dependencies.authorization.requireCapability({
+    const scope = await requireRelationshipListingScope(
+      dependencies,
       actor,
-      capability: COMPANY_INTEREST_VIEW,
-      resource: {
-        kind: "RESOURCE",
-        tenantId: company.tenantId,
-        organisationId: company.organisationId,
-        resourceType: "company",
-        resourceId: company.id,
-      },
-    });
+      query.companyId,
+    );
+    const companyId = CompanyIdSchema.parse(scope.partyId);
     const relationships =
       await dependencies.repositories.relationships.listByCompany(
         dependencies.sql,
-        company.id,
+        companyId,
         Math.min(query.scanLimit ?? LIST_LIMIT, 1001),
       );
     if (query.scanLimit !== undefined && relationships.length >= 1001)

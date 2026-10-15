@@ -35,6 +35,7 @@ import type {
   InterestService,
   DealCloseService,
   RelationshipOutcomeService,
+  RelationshipViewService,
 } from "@capital-q/network";
 import type {
   CompanyDeckService,
@@ -218,6 +219,9 @@ export type AppActionPorts = {
    * proposal service that books as that actor once an acceptance is recorded.
    */
   readonly proposals?: MeetingProposalPort | undefined;
+  /** CRM saved views (2026-10-15): the network service's own. */
+  readonly relationshipViews?:
+    Pick<RelationshipViewService, "save" | "remove"> | undefined;
   /** Interest and connection requests: the network services. */
   readonly interests?:
     | Pick<

@@ -229,6 +229,7 @@ export {
   expressInterest,
   getOwnInterest,
   getRelationshipBrief,
+  getRelationshipGateqApplications,
   listRelationshipBriefs,
   getRelationshipWithCompany,
   getRelationshipWithInvestor,
@@ -509,3 +510,9 @@ export {
   recordDealTerms,
   tickDealChecklist,
 } from "./deal-close.js";
+// CRM saved views (2026-10-15).
+export {
+  deleteRelationshipView,
+  listRelationshipViews,
+  saveRelationshipView,
+} from "./relationship-views.js";

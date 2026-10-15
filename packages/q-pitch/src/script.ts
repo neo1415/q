@@ -165,7 +165,12 @@ export const TourScriptSchema = z
     (t) => {
       const asked = new Set(t.questions.map((q) => q.questionId));
       return t.scenes.every((s) =>
-        s.actions.every((a) => !hasQuestion(a) || asked.has(a.question)),
+        s.actions.every(
+          (a) =>
+            (!hasQuestion(a) || asked.has(a.question)) &&
+            (a.kind !== "runShortRehearsal" ||
+              a.lines.every((line) => asked.has(line))),
+        ),
       );
     },
     { message: "every asked question is in the approved question table" },

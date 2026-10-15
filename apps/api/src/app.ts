@@ -336,6 +336,8 @@ export type ApiModules = {
     NetworkInterestRoutesDependencies["connections"] | undefined;
   /** A gateway's submitted applications, for its organisation. */
   readonly gateqInbox?: GateQRoutesDependencies["inbox"] | undefined;
+  /** CRM record: GateQ applications linked to one canonical relationship. */
+  readonly gateqRelationshipApplications?: NetworkInterestRoutesDependencies["gateqApplications"];
   readonly gateqMaterials?: GateQRoutesDependencies["materials"] | undefined;
   /** GateQ slice 1: a signed-in founder's application contact. */
   readonly gateqApplicationContact?:
@@ -641,6 +643,9 @@ export function createApp(
       ...(modules.interests === undefined
         ? {}
         : { interests: modules.interests }),
+      ...(modules.interests?.relationshipViews === undefined
+        ? {}
+        : { relationshipViews: modules.interests.relationshipViews }),
       ...(modules.connections === undefined
         ? {}
         : { connections: modules.connections }),
@@ -875,6 +880,7 @@ export function createApp(
       outcomes: modules.outcomes,
       diligence: modules.diligence,
       namedPhotos: modules.namedPhotos,
+      gateqApplications: modules.gateqRelationshipApplications,
       // R1: the Relationship Brief over the same services as the screens.
       // Without chat or schedule composed, those sources read UNAVAILABLE.
       briefSources:

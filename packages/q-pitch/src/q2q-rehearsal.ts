@@ -2,13 +2,13 @@ import type { TranscriptSegment } from "./control-channel.js";
 
 /**
  * Short Q-to-Q rehearsal (blueprint §16.1 P8, §16.4). The narrator plays
- * the founder side with owner-approved lines. The counterpart is the
+ * the actor's side with owner-approved lines. The counterpart is the
  * existing rehearsal persona, answering through the existing rehearsal
  * session contracts (start → say → finish → read). There is no second
  * rehearsal engine and no new persona.
  *
  * - Every turn becomes a transcript segment tagged by who OWNS it: the
- *   founder side as NARRATOR_Q, the counterpart as REHEARSAL_COUNTERPART.
+ *   narrator's side as NARRATOR_Q, the counterpart as REHEARSAL_COUNTERPART.
  *   Segments go to the tour's control gate as transcript only, so nothing
  *   either voice says can steer the tour.
  * - Bounded: about 30 s or the approved lines, whichever comes first. The
@@ -44,8 +44,8 @@ export type RehearsalPorts = {
 };
 
 export type ShortRehearsalPlan = {
-  /** Approved founder-side lines, spoken by the narrator in order. */
-  readonly founderLines: readonly string[];
+  /** Approved lines for the narrator's side, spoken in order. */
+  readonly narratorLines: readonly string[];
   /** Target length; clamped to 15–45 s. */
   readonly maxMs: number;
   /** How many reads to wait for the review after finishing. */
@@ -107,7 +107,7 @@ export async function runShortRehearsal(
 
   let endedBy: "TIME" | "LINES" | "ABORTED" = "LINES";
   let turnFailed = false;
-  for (const line of plan.founderLines) {
+  for (const line of plan.narratorLines) {
     if (signal.aborted) {
       endedBy = "ABORTED";
       break;

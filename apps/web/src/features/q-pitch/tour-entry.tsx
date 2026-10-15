@@ -3,8 +3,11 @@
 import dynamic from "next/dynamic";
 import { useState, useSyncExternalStore } from "react";
 
+import type { TourChoice } from "./tour-host";
+
 /**
- * Starts a Q Pitch rehearsal when the page is opened with `?qpitch=pilot`.
+ * Starts a Q Pitch rehearsal when the page is opened with `?qpitch=pilot`
+ * (the certified pilot) or `?qpitch=premiere` (the r3 cut, internal only).
  * The host's code loads only then. Once started, the tour lives in the
  * application layout, so it survives route changes until "End tour".
  *
@@ -28,17 +31,24 @@ export function QPitchEntry({
   // Read once from the address the page was opened with; false on the server.
   const asked = useSyncExternalStore(
     noSubscription,
-    () => new URLSearchParams(window.location.search).get("qpitch") === "pilot",
-    () => false,
+    (): TourChoice | null => {
+      const asked = new URLSearchParams(window.location.search).get("qpitch");
+      return asked === "pilot" || asked === "premiere" ? asked : null;
+    },
+    () => null,
   );
   // Latched: the tour must outlive the first route change, whose address no
   // longer carries the parameter.
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState<TourChoice | null>(null);
   const [ended, setEnded] = useState(false);
-  if (asked && !started) setStarted(true);
-  const active = started && !ended;
-  if (!active) return null;
+  if (asked !== null && started === null) setStarted(asked);
+  if (started === null || ended) return null;
   return (
-    <QPitchHost account={account} role={role} onExit={() => setEnded(true)} />
+    <QPitchHost
+      account={account}
+      role={role}
+      tour={started}
+      onExit={() => setEnded(true)}
+    />
   );
 }

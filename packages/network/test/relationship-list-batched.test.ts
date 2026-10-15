@@ -235,4 +235,51 @@ describe("S5: a relationship list read in batches", () => {
     expect(w.calls.histories).toBe(1);
     expect(w.calls.pages).toBe(2);
   });
+
+  it("puts each history in sequence order whatever order the rows arrive in", async () => {
+    const w = world({ batched: true });
+    const ids = w.relationships.map((r) => r.id);
+    const shuffled = {
+      ...w.dependencies,
+      repositories: {
+        ...w.dependencies.repositories,
+        events: {
+          ...w.dependencies.repositories.events,
+          listFirstByRelationships: (_sql: unknown, asked: readonly string[]) =>
+            Promise.resolve(
+              asked.flatMap((id) => w.histories.get(id) ?? []).reverse(),
+            ),
+        },
+      },
+    };
+    const out = await readHistories(shuffled as never, ids as never);
+    for (const id of ids) {
+      expect(out.get(id as never)?.map((e) => e.sequence)).toEqual([1, 2]);
+    }
+  });
+
+  it("a duplicate id never doubles a history", async () => {
+    const w = world({ batched: true });
+    const id = w.relationships[0]?.id ?? "";
+    const asked: string[][] = [];
+    const doubled = {
+      ...w.dependencies,
+      repositories: {
+        ...w.dependencies.repositories,
+        events: {
+          ...w.dependencies.repositories.events,
+          listFirstByRelationships: (_sql: unknown, ids: readonly string[]) => {
+            asked.push([...ids]);
+            // A store that answers per id asked, duplicates included.
+            return Promise.resolve(
+              ids.flatMap((one) => w.histories.get(one) ?? []),
+            );
+          },
+        },
+      },
+    };
+    const out = await readHistories(doubled as never, [id, id] as never);
+    expect(asked).toEqual([[id]]);
+    expect(out.get(id as never)?.map((e) => e.sequence)).toEqual([1, 2]);
+  });
 });
