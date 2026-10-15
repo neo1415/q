@@ -2155,7 +2155,16 @@ export function createModelGatewayQAnswer(
       await arrivalRead();
       const snapshot = arrivalData;
       if (snapshot === null) return null;
-      if (quick) return arrivalFollowUpAnswer(latest.content, snapshot);
+      if (quick) {
+        return arrivalFollowUpAnswer(
+          latest.content,
+          snapshot,
+          earlier
+            .filter((message) => message.role === "USER")
+            .slice(-2)
+            .map((message) => message.content),
+        );
+      }
       const named = snapshot.items.filter((item) => item.counterpart !== null);
       if (named.length === 0 || dependencies.arrivalSkim === undefined) {
         return null;

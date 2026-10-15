@@ -195,7 +195,11 @@ type Target =
   | { readonly kind: "AMBIGUOUS"; readonly names: readonly string[] }
   | { readonly kind: "NONE" };
 
-function target(text: string, snapshot: ArrivalSnapshot): Target {
+function target(
+  text: string,
+  snapshot: ArrivalSnapshot,
+  earlierUserText: readonly string[] = [],
+): Target {
   const lower = text.toLowerCase();
   const groups = sameCounterpart(snapshot.items);
   const named = groups.filter((group) => {
@@ -207,6 +211,27 @@ function target(text: string, snapshot: ArrivalSnapshot): Target {
   // about them, not about whoever Q mentioned: the normal path reads
   // their own brief (R1, int-rc 05e1265f journey A2).
   if (named.length === 0 && namesSomeoneElse(text)) return { kind: "NONE" };
+  /**
+   * Lane S 2026-10-15 (audit, 10-11 20:24): "let me see what Spheros is
+   * saying" was answered, then "open the chat, let me see it myself" was
+   * asked "Which one do you mean: Spheros or Shiftwell or ...?". A turn
+   * that names no one continues the person's own last turns: the latest of
+   * them that names exactly one counterpart here is the one meant. Their
+   * own words only, never Q's; two named there still asks.
+   */
+  if (named.length === 0 && groups.length > 1) {
+    for (const said of [...earlierUserText].reverse()) {
+      const before = said.toLowerCase();
+      const meant = groups.filter((group) => {
+        const name = group[0]?.counterpart?.name?.toLowerCase();
+        return name !== undefined && name.length > 1 && before.includes(name);
+      });
+      if (meant.length === 1) {
+        return { kind: "ONE", item: mergeCounterpartItems(meant[0] ?? []) };
+      }
+      if (meant.length > 1) break;
+    }
+  }
   const pool = named.length > 0 ? named : groups;
   if (pool.length === 1) {
     return { kind: "ONE", item: mergeCounterpartItems(pool[0] ?? []) };
@@ -306,11 +331,13 @@ function unavailable(item: ArrivalSnapshotItem) {
 export function arrivalFollowUpAnswer(
   text: string,
   snapshot: ArrivalSnapshot | null,
+  /** Their own last turns, oldest first, for a turn that names no one. */
+  earlierUserText: readonly string[] = [],
 ): ArrivalReply | null {
   if (snapshot === null) return null;
   const kind = arrivalFollowUpKind(text);
   if (kind === null) return null;
-  const picked = target(text, snapshot);
+  const picked = target(text, snapshot, earlierUserText);
   if (picked.kind === "NONE") return null;
   if (picked.kind === "AMBIGUOUS") {
     // Different counterparts: ask, never guess which one.
