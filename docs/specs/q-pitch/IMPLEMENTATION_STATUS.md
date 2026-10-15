@@ -73,6 +73,37 @@ Audited what `packages/q-pitch/src/` actually implements, against the rows above
 - Lane V creates the company. No scene uses `subject` yet; Lane P adds subject scenes once the lead passes on V's company id.
 - The USD 2,000,000 raise is owner-stated. Lane V records it in the knowledge pack as USER_CLAIM / SELF_REPORTED; other figures stay unknown.
 
+## Premiere r4 and coverage (15 Oct, Lane P, owner feedback slices 3–7)
+
+`PREMIERE_SCRIPT` 0.3.0-draft has 15 scenes in 14 chapters. Every chapter has `spokenNames`, so each one can be reached by voice ("show me GateQ", "go to the CRM part") as well as from the Tour menu and the Feature Atlas.
+
+| Area (owner list / landing promise)                | Premiere scene(s)                                                            | Status                                                                                    |
+| -------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Q introduces itself                                | `s.premiere.intro` (Home)                                                    | Connective lines only                                                                     |
+| Mandate (LP-03, LP-15)                             | `s.premiere.mandate` (/capital)                                              | `INV-MANDATE-VIEW` PRODUCTION_LIVE_VERIFIED (GET receipt)                                 |
+| Discover: mandate top three (LP-01, LP-17, LP-26)  | `s.pilot.opening`                                                            | PRODUCTION_LIVE_VERIFIED                                                                  |
+| Company analysis, risks (LP-19, LP-27, LP-42)      | `s.pilot.company`                                                            | PRODUCTION_LIVE_VERIFIED                                                                  |
+| Compare (LP-10, LP-24)                             | `s.pilot.compare`                                                            | PRODUCTION_LIVE_VERIFIED                                                                  |
+| Privacy / Context Firewall                         | `s.premiere.privacy`                                                         | PRODUCTION_LIVE_VERIFIED                                                                  |
+| Explore / search (LP-08, LP-37)                    | `s.premiere.explore`                                                         | `EXPLORE-VIEW` PRODUCTION_LIVE_VERIFIED (GET receipt)                                     |
+| GateQ inbox (LP-18, LP-43)                         | `s.premiere.gateq`                                                           | PRODUCTION_LIVE_VERIFIED                                                                  |
+| GateQ-style first conversation, Q plays both sides | `s.premiere.gateq-interview`                                                 | CODE_VERIFIED (`REH-Q2Q-SHORT`); suppressed by the default gate                           |
+| CRM / relationships (LP-13)                        | `s.premiere.relationship`                                                    | PRODUCTION_LIVE_VERIFIED                                                                  |
+| Q Work                                             | `s.premiere.work`                                                            | `QWORK-VIEW` PRODUCTION_LIVE_VERIFIED (GET receipt)                                       |
+| Documents                                          | `s.premiere.documents`                                                       | `DOCUMENTS-VIEW` PRODUCTION_LIVE_VERIFIED (GET receipt)                                   |
+| Q Daily (LP-32)                                    | `s.premiere.daily`                                                           | `DAILY-VIEW` PRODUCTION_LIVE_VERIFIED (GET receipt)                                       |
+| Rehearsals, Q plays both sides (LP-33)             | `s.premiere.rehearsal`                                                       | CODE_VERIFIED; suppressed by the default gate                                             |
+| Voice agent                                        | The tour itself (live line or standard voice); `s.premiere.close` hands over | Narration voice verified locally (standard voice); GPT-Live media not testable in sandbox |
+
+**Gaps (no scene yet):**
+
+- **Meetings** (LP-20, LP-34–36): no live meeting with Q has been verified.
+- **Company data room** (LP-31): needs a `tab.data-room` scene on a company with shared documents.
+- **InvestIQ / readiness** (LP-12, LP-16, LP-25): founder-side, plus the naming conflict.
+- **Founder journeys:** the onboarding interview (LP-30), the deck, and investor discovery for founders (LP-33). These need a founder edition.
+- **Saved and passed** (LP-44), **Q Card**, and **notifications and approvals**.
+- **Subject company** (Capital Q, `ee75a7d8…`): slice 8.
+
 ## Dependencies
 
 | Depends on                                                      | Status                                                            | Notes                                                                           |

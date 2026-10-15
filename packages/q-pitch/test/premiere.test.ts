@@ -27,8 +27,12 @@ describe("r3 premiere and the certification gate", () => {
       "s.pilot.company",
       "s.pilot.compare",
       "s.premiere.privacy",
+      "s.premiere.explore",
       "s.premiere.gateq",
       "s.premiere.relationship",
+      "s.premiere.work",
+      "s.premiere.documents",
+      "s.premiere.daily",
       "s.premiere.close",
     ]);
     // Q-to-Q stays CODE_VERIFIED until the microphone "skip" test runs.
@@ -46,7 +50,7 @@ describe("r3 premiere and the certification gate", () => {
       audience: "INTERNAL_REHEARSAL",
       acceptedStatuses: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
     });
-    expect(gate.scenes).toHaveLength(11);
+    expect(gate.scenes).toHaveLength(15);
     expect(gate.rejectedLines).toEqual([]);
   });
 
@@ -206,5 +210,41 @@ describe("spoken chapter jumps (slice 6)", () => {
     expect(
       classifyAudienceJump(seg("Show me GateQ", "NARRATOR_Q"), chapters),
     ).toBeNull();
+  });
+});
+
+describe("coverage (slice 7)", () => {
+  it("every premiere chapter can be named aloud, and every major area has one", () => {
+    for (const chapter of PREMIERE_SCRIPT.chapters) {
+      expect(
+        chapter.spokenNames?.length ?? 0,
+        chapter.chapterId,
+      ).toBeGreaterThan(0);
+    }
+    const said = (text: string) =>
+      classifyAudienceJump(
+        {
+          segmentId: "c-1",
+          source: "AUDIENCE_MIC",
+          channelId: "mic",
+          text,
+          final: true,
+        },
+        PREMIERE_SCRIPT.chapters,
+      );
+    for (const [text, chapterId] of [
+      ["show me the mandate", "ch.premiere.mandate"],
+      ["go to discover", "ch.pilot.discover"],
+      ["show me explore", "ch.premiere.explore"],
+      ["show me gateq", "ch.premiere.gateq"],
+      ["go to the crm part", "ch.premiere.relationship"],
+      ["show me q work", "ch.premiere.work"],
+      ["show me documents", "ch.premiere.documents"],
+      ["show me the q daily", "ch.premiere.daily"],
+      ["demo rehearsals", "ch.premiere.rehearsal"],
+      ["show me privacy", "ch.premiere.privacy"],
+    ] as const) {
+      expect(said(text), text).toBe(chapterId);
+    }
   });
 });
