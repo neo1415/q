@@ -57,6 +57,7 @@ export function recordAudienceTool(utterance: string): string | null {
   return null;
 }
 import {
+  QMessageIdSchema,
   type QNavigateDestination,
   type QPageManifest,
   type QResponseMessage,
@@ -98,6 +99,7 @@ import {
 import {
   asksForOwnMandate,
   ownInvestorOrganisationIn,
+  withoutStatusTalk,
 } from "@capital-q/model-gateway/q";
 import {
   cardsLaneOf,
@@ -131,6 +133,7 @@ import {
   type QPrereadInput,
   type QCapabilityManifest,
   type QConversationMessage,
+  type QLiveDeltaBus,
   type QResearchDirective,
   type QRuntimeRepositories,
   type QToolFocus,
@@ -537,6 +540,12 @@ export type SpecialistQAnswerDependencies = {
    * app query before the full reading lands. Absent: no fast lane.
    */
   readonly turnSkim?: QTurnSkimmer | undefined;
+  /**
+   * S3 (lane S): the live delta bus the run stream publishes from, so the
+   * company specialist's answer reaches a person sentence by sentence.
+   * Absent: the specialist's answer arrives whole, as before.
+   */
+  readonly deltas?: QLiveDeltaBus | undefined;
   /**
    * The wall clock of the one extra reading tried after the gateway's own
    * attempts failed (default TURN_REREAD_DEADLINE_MS). Tests shorten it.
@@ -4484,6 +4493,36 @@ export function createSpecialistQAnswer(
     // turn read as explicitly asking for public information reads the web.
     const directive =
       request.research === undefined ? undefined : await request.research;
+    /**
+     * S3 (lane S, live 2026-10-15 run 0b763858: first text at 31.6 s): the
+     * answer is named before it exists so its streamed sentences and the
+     * stored message are one message. A sentence goes out only after the
+     * answer's own guards: no invented recommendation, no status or
+     * promise talk (the stored answer may replace those; nothing said can
+     * be unsaid). The stored message stays the durable form.
+     */
+    const answerId = QMessageIdSchema.parse(randomUUID());
+    const deltas = dependencies.deltas;
+    let streamedSentences = 0;
+    const onAnswerSentence =
+      deltas === undefined
+        ? undefined
+        : (sentence: string): void => {
+            if (withoutStatusTalk(sentence).removed > 0) return;
+            // A sentence the guard would touch is not streamed at all: the
+            // stored answer decides what replaces it.
+            const checked = withoutRecommendationClaims(sentence);
+            if (checked.removed > 0) return;
+            const guardedSentence = checked.text.trim();
+            if (guardedSentence.length === 0) return;
+            streamedSentences += 1;
+            deltas.publish({
+              runId: request.runId,
+              tenantId: request.tenantId,
+              messageId: answerId,
+              text: `${guardedSentence} `,
+            });
+          };
     const result = await specialist.investigate(
       {
         company,
@@ -4507,9 +4546,16 @@ export function createSpecialistQAnswer(
         plan: request.plan,
         ...(request.signal === undefined ? {} : { signal: request.signal }),
         showStage: (stage) => showStage(request, stage),
+        ...(onAnswerSentence === undefined ? {} : { onAnswerSentence }),
       },
     );
     last = result;
+    if (streamedSentences > 0) {
+      logger?.info(
+        { qRunId: request.runId, streamedSentences },
+        "q specialist answer streamed",
+      );
+    }
 
     if (result.blocked === "CANCELLED") {
       return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
@@ -4648,6 +4694,7 @@ ${line}`;
           ];
     const message = await transactions.run(async (tx) => {
       const stored = await repositories.messages.insert(tx, {
+        id: answerId,
         tenantId: request.tenantId,
         conversationId,
         runId: request.runId,
