@@ -107,6 +107,8 @@ const team: TeamPort = {
   respondToOwnershipOffer: unused,
   decideJoinRequest: unused,
   acceptInvitation: unused,
+  acceptInvitationById: unused,
+  declineInvitation: unused,
   requestToJoin: unused,
 };
 const ports: AppActionPorts = { team };

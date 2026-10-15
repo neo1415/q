@@ -886,7 +886,11 @@ export function createCapitalRoundService(
             name: input.name?.trim() ?? before.name,
             target: input.target?.amount ?? before.target,
             currency: input.target?.currency ?? before.currency,
-            instrument: input.instrument ?? before.instrument,
+            // null is a change too: back to not stated.
+            instrument:
+              input.instrument === undefined
+                ? before.instrument
+                : input.instrument,
             openedOn: input.openedOn ?? before.openedOn,
             terms: mergeTerms(before.terms, input.terms),
           };

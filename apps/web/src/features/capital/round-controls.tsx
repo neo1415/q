@@ -20,7 +20,7 @@ import {
   roundStepAction,
 } from "./capital-actions";
 import { money } from "./money";
-import { INSTRUMENT_LABELS } from "./round-labels";
+import { InstrumentChoice } from "./instrument-choice";
 import { changedTerms, draftOf, termsFromDraft } from "./round-terms";
 import {
   RoundTermsFields,
@@ -291,14 +291,6 @@ function StepForm({
   );
 }
 
-const INSTRUMENTS: readonly CapitalRoundInstrument[] = [
-  "SAFE",
-  "EQUITY",
-  "CONVERTIBLE",
-  "ASA",
-  "OTHER",
-];
-
 function EditForm({
   round,
   rounds,
@@ -314,7 +306,9 @@ function EditForm({
   const router = useRouter();
   const [name, setName] = useState(round.name);
   const [target, setTarget] = useState(round.target.amount);
-  const [instrument, setInstrument] = useState(round.instrument);
+  const [instrument, setInstrument] = useState<CapitalRoundInstrument | null>(
+    round.instrument,
+  );
   const [draft, setDraft] = useState(() => draftOf(round.terms));
   const [note, setNote] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -385,29 +379,7 @@ function EditForm({
         value={target}
         onChange={(event) => setTarget(event.target.value)}
       />
-      <fieldset className="flex flex-col gap-2">
-        <legend className="cq-label mb-2 text-(--cq-text-primary)">
-          Instrument
-        </legend>
-        <div className="flex flex-wrap gap-2">
-          {INSTRUMENTS.map((value) => (
-            <label
-              key={value}
-              className="cq-body-sm inline-flex min-h-11 cursor-pointer items-center rounded-full border border-(--cq-border) px-4 text-(--cq-text-primary) has-checked:border-transparent has-checked:bg-(--cq-accent-soft) has-focus-visible:outline-2 has-focus-visible:outline-(--cq-focus-ring)"
-            >
-              <input
-                type="radio"
-                name={`${id}-instrument`}
-                value={value}
-                checked={instrument === value}
-                onChange={() => setInstrument(value)}
-                className="sr-only"
-              />
-              {INSTRUMENT_LABELS[value]}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <InstrumentChoice id={id} value={instrument} onChange={setInstrument} />
       <RoundTermsFields
         id={id}
         draft={draft}

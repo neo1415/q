@@ -199,7 +199,8 @@ export type RoundFacts = {
   readonly name: string;
   readonly target: string;
   readonly currency: string;
-  readonly instrument: CapitalRoundInstrument;
+  /** null: not stated. */
+  readonly instrument: CapitalRoundInstrument | null;
   readonly openedOn: string | null;
   readonly terms: CapitalRoundTerms;
 };
@@ -310,7 +311,7 @@ export function ownershipEstimate(input: {
   readonly amount: string;
   readonly currency: string;
   readonly roundCurrency: string;
-  readonly instrument: CapitalRoundInstrument;
+  readonly instrument: CapitalRoundInstrument | null;
   readonly terms: Pick<CapitalRoundTerms, "valuation" | "valuationCap">;
 }): { basisPoints: number; from: "POST_MONEY" | "CAP" } | null {
   if (input.currency !== input.roundCurrency) return null;

@@ -12,7 +12,7 @@ import { Input } from "@capital-q/ui/input";
 import { MoneyInput, type MoneyValue } from "@capital-q/ui/money-input";
 
 import { openRoundAction } from "./capital-actions";
-import { INSTRUMENT_LABELS } from "./round-labels";
+import { InstrumentChoice } from "./instrument-choice";
 import { EMPTY_DRAFT, saidTerms, termsFromDraft } from "./round-terms";
 import {
   RoundTermsFields,
@@ -36,18 +36,14 @@ const CURRENCIES = [
   { code: "VND", label: "VND" },
 ] as const;
 
-const INSTRUMENTS: readonly CapitalRoundInstrument[] = [
-  "SAFE",
-  "EQUITY",
-  "CONVERTIBLE",
-  "ASA",
-  "OTHER",
-];
-
 export type RoundDraft = {
   readonly name: string;
   readonly target: MoneyValue;
-  readonly instrument: CapitalRoundInstrument;
+  /**
+   * Prefilled only from what the company already stated for its raise;
+   * null otherwise. The form shows null as nothing chosen, never SAFE.
+   */
+  readonly instrument: CapitalRoundInstrument | null;
 };
 
 function newKey(): string {
@@ -91,7 +87,7 @@ export function OpenRound({
   }
   return (
     <RoundForm
-      draft={open === "PAST" ? { ...draft, name: "" } : draft}
+      draft={open === "PAST" ? { ...draft, name: "", instrument: null } : draft}
       past={open === "PAST"}
       leads={leads}
       rounds={rounds}
@@ -117,7 +113,10 @@ function RoundForm({
   const router = useRouter();
   const [name, setName] = useState(draft.name);
   const [target, setTarget] = useState<MoneyValue>(draft.target);
-  const [instrument, setInstrument] = useState(draft.instrument);
+  // undefined: nothing chosen yet; submitted as not stated (null).
+  const [instrument, setInstrument] = useState<
+    CapitalRoundInstrument | null | undefined
+  >(draft.instrument ?? undefined);
   const [openedOn, setOpenedOn] = useState("");
   const [closedOn, setClosedOn] = useState("");
   const [terms, setTerms] = useState(EMPTY_DRAFT);
@@ -146,7 +145,7 @@ function RoundForm({
         {
           name: name.trim(),
           target: { amount: target.amount, currency: target.currency },
-          instrument,
+          instrument: instrument ?? null,
           status,
           ...(openedOn === "" ? {} : { openedOn }),
           ...(status === "CLOSED" && closedOn !== "" ? { closedOn } : {}),
@@ -195,29 +194,7 @@ function RoundForm({
         currencies={CURRENCIES}
         onChange={setTarget}
       />
-      <fieldset className="flex flex-col gap-2">
-        <legend className="cq-label mb-2 text-(--cq-text-primary)">
-          Instrument
-        </legend>
-        <div className="flex flex-wrap gap-2">
-          {INSTRUMENTS.map((value) => (
-            <label
-              key={value}
-              className="cq-body-sm inline-flex min-h-11 cursor-pointer items-center rounded-full border border-(--cq-border) px-4 text-(--cq-text-primary) has-checked:border-transparent has-checked:bg-(--cq-accent-soft) has-focus-visible:outline-2 has-focus-visible:outline-(--cq-focus-ring)"
-            >
-              <input
-                type="radio"
-                name={`${id}-instrument`}
-                value={value}
-                checked={instrument === value}
-                onChange={() => setInstrument(value)}
-                className="sr-only"
-              />
-              {INSTRUMENT_LABELS[value]}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <InstrumentChoice id={id} value={instrument} onChange={setInstrument} />
       <div className="grid gap-4 sm:grid-cols-2">
         <Input
           id={`${id}-opened`}

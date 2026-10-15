@@ -5,6 +5,7 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { resolveOnboardingState } from "@/features/q/context";
 import { WelcomeScreen } from "@/features/welcome/welcome-screen";
+import { PendingInvitations } from "@/features/team/pending-invitations";
 import { fetchMe, updateMe } from "@capital-q/api-client";
 import { accountDetails } from "@/auth/account-details";
 import { getSessionAccessToken } from "@/auth/session";
@@ -86,6 +87,7 @@ export default async function WelcomePage({
       knownName={knownName}
       knownOrganisation={knownOrganisation}
       returning={returning}
+      invitations={<PendingInvitations />}
     />
   );
 }

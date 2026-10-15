@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { PersonaCards } from "../persona/persona-cards";
 import { destinationPath } from "../voice/destinations";
@@ -67,8 +67,14 @@ export function WelcomeScreen({
   knownName,
   knownOrganisation = null,
   returning = false,
+  invitations = null,
 }: {
   readonly knownName: string | null;
+  /**
+   * F2: invitations to their verified email, rendered on the server, so an
+   * invitee can join from where they land instead of only from the email.
+   */
+  readonly invitations?: ReactNode;
   /** What they said their organisation was called at sign-up, if they did. */
   readonly knownOrganisation?: string | null | undefined;
   /**
@@ -234,6 +240,8 @@ export function WelcomeScreen({
             </p>
           ))}
         </div>
+
+        {invitations}
 
         {voice.notice !== null ? (
           <div className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">

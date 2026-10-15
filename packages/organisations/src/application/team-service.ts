@@ -4,6 +4,8 @@ import {
   type CorrelationId,
   type InvitableRole,
   type InvitationPreviewDto,
+  type MyInvitationDto,
+  type MyInvitationsDto,
   type InviteRequest,
   type InviteResultDto,
   type LeaveResultDto,
@@ -175,6 +177,18 @@ export type TeamService = {
     token: string,
     correlationId: CorrelationId,
   ) => Promise<TeamOutcome<AcceptInvitationResultDto>>;
+  /** Pending invitations to the person's verified sign-in email. */
+  readonly myInvitations: (userId: string) => Promise<MyInvitationsDto>;
+  readonly acceptInvitationById: (
+    userId: string,
+    invitationId: string,
+    correlationId: CorrelationId,
+  ) => Promise<TeamOutcome<AcceptInvitationResultDto>>;
+  readonly declineInvitation: (
+    userId: string,
+    invitationId: string,
+    correlationId: CorrelationId,
+  ) => Promise<TeamOutcome<{ readonly declined: true }>>;
   readonly requestToJoin: (
     userId: string,
     organisationId: string,
@@ -1109,104 +1123,88 @@ export function createTeamService<Tx>(
         if (invitation === null) {
           return refuse("NOT_FOUND", "This invitation link isn't valid.");
         }
-        const organisation = await store.lockOrganisation(
-          tx,
-          invitation.organisationId,
-        );
-        if (organisation === null || organisation.status !== "active") {
-          return refuse("NOT_FOUND", "This invitation link isn't valid.");
-        }
-        const kind = teamKindOf(organisation.type);
-        const members = await store.members(tx, organisation.id);
-        const mine = members.find((member) => member.userId === userId);
-        if (invitation.status === "accepted") {
-          // A second tap on the same link, by the person who used it.
-          return mine !== undefined &&
-            mine.membershipId === invitation.acceptedMembershipId
-            ? {
-                ok: true as const,
-                value: {
-                  organisationId: organisation.id,
-                  name: organisation.name,
-                  kind,
-                  role: teamRoleOf(mine.roleCodes),
-                },
-              }
-            : refuse("NOT_PENDING", "This invitation was already used.");
-        }
-        if (invitation.status === "revoked") {
-          return refuse("NOT_PENDING", "This invitation was cancelled.");
-        }
-        if (
-          invitationState(invitation.status, invitation.expiresAt, now()) ===
-          "EXPIRED"
-        ) {
-          return refuse(
-            "EXPIRED",
-            `This invitation has expired. Invitations last ${String(INVITATION_TTL_DAYS)} days.`,
-          );
-        }
+        return acceptFound(tx, invitation, userId, correlationId);
+      }),
+
+    myInvitations: (userId) =>
+      store.transaction(async (tx) => {
+        // Only the verified sign-in email the server holds: nothing the
+        // client says is proof of an address.
         const person = await store.person(tx, userId);
-        if (
-          person.email === null ||
-          normaliseEmail(person.email) !== invitation.email
-        ) {
-          return refuse(
-            "WRONG_EMAIL",
-            `This invitation is for ${invitation.email}. Sign in with that email, or ask for an invitation to yours.`,
+        if (person.email === null) return { items: [] };
+        const email = normaliseEmail(person.email);
+        if (email === null) return { items: [] };
+        const pending = await store.pendingInvitationsForEmail(tx, email);
+        const items: MyInvitationDto[] = [];
+        for (const invitation of pending) {
+          if (
+            invitationState(invitation.status, invitation.expiresAt, now()) !==
+            "PENDING"
+          ) {
+            continue;
+          }
+          const organisation = await store.organisation(
+            tx,
+            invitation.organisationId,
           );
-        }
-        let membershipId: string;
-        let role: TeamRole;
-        if (mine !== undefined) {
-          membershipId = mine.membershipId;
-          role = teamRoleOf(mine.roleCodes);
-        } else {
-          role = invitationRoleOf(invitation.roleCode);
-          membershipId = await store.insertMembership(tx, {
-            tenantId: organisation.tenantId,
-            organisationId: organisation.id,
-            userId,
-            invitedByUserId: invitation.invitedByUserId,
+          if (organisation === null || organisation.status !== "active") {
+            continue;
+          }
+          const members = await store.members(tx, organisation.id);
+          if (members.some((member) => member.userId === userId)) continue;
+          items.push({
+            invitationId: invitation.id,
+            organisationName: organisation.name,
+            kind: teamKindOf(organisation.type),
+            role: invitationRoleOf(invitation.roleCode),
+            invitedByName: invitation.invitedByName,
+            expiresAt: invitation.expiresAt.toISOString(),
           });
-          await store.setRoles(tx, membershipId, ROLE_CODES_FOR[role]);
+        }
+        return { items };
+      }),
+
+    acceptInvitationById: (userId, invitationId, correlationId) =>
+      store.transaction(async (tx) => {
+        const invitation = await store.invitationById(tx, invitationId);
+        // Someone else's invitation reads exactly like none at all.
+        if (
+          invitation === null ||
+          !sentTo(await store.person(tx, userId), invitation)
+        ) {
+          return refuse("NOT_FOUND", "This invitation isn't valid.");
+        }
+        return acceptFound(tx, invitation, userId, correlationId);
+      }),
+
+    declineInvitation: (userId, invitationId, correlationId) =>
+      store.transaction(async (tx) => {
+        const invitation = await store.invitationById(tx, invitationId);
+        if (
+          invitation === null ||
+          !sentTo(await store.person(tx, userId), invitation)
+        ) {
+          return refuse("NOT_FOUND", "This invitation isn't valid.");
+        }
+        if (invitation.status !== "pending") {
+          return refuse("NOT_PENDING", "This invitation is no longer open.");
         }
         await store.decideInvitation(tx, invitation.id, {
-          status: "accepted",
+          status: "declined",
           decidedByUserId: userId,
-          membershipId,
+          membershipId: null,
         });
-        // Joining is choosing to act for them now; the switcher holds the rest.
-        await store.setActiveContext(tx, userId, membershipId);
         await journal.record(tx, {
-          action: "invitation.accepted",
-          tenantId: organisation.tenantId,
-          organisationId: organisation.id,
+          action: "invitation.declined",
+          tenantId: invitation.tenantId,
+          organisationId: invitation.organisationId,
           actorUserId: userId,
           resourceType: "invitation",
           resourceId: invitation.id,
           metadata: { role: invitation.roleCode },
           correlationId,
-          ...(mine === undefined
-            ? {
-                membership: {
-                  change: "CREATED" as const,
-                  membershipId,
-                  userId,
-                  role,
-                },
-              }
-            : {}),
         });
-        return {
-          ok: true as const,
-          value: {
-            organisationId: organisation.id,
-            name: organisation.name,
-            kind,
-            role,
-          },
-        };
+        return { ok: true as const, value: { declined: true as const } };
       }),
 
     requestToJoin: (userId, organisationId, message, correlationId) =>
@@ -1246,6 +1244,133 @@ export function createTeamService<Tx>(
         return asked;
       }),
   };
+
+  /**
+   * The one accept path, whichever way the invitation was found (link
+   * token or the invitee's own list): status, expiry, then the verified
+   * email, then the membership.
+   */
+  async function acceptFound(
+    tx: Tx,
+    invitation: InvitationRecord,
+    userId: string,
+    correlationId: CorrelationId,
+  ): Promise<TeamOutcome<AcceptInvitationResultDto>> {
+    const organisation = await store.lockOrganisation(
+      tx,
+      invitation.organisationId,
+    );
+    if (organisation === null || organisation.status !== "active") {
+      return refuse("NOT_FOUND", "This invitation link isn't valid.");
+    }
+    const kind = teamKindOf(organisation.type);
+    const members = await store.members(tx, organisation.id);
+    const mine = members.find((member) => member.userId === userId);
+    if (invitation.status === "accepted") {
+      // A second tap on the same link, by the person who used it.
+      return mine !== undefined &&
+        mine.membershipId === invitation.acceptedMembershipId
+        ? {
+            ok: true as const,
+            value: {
+              organisationId: organisation.id,
+              name: organisation.name,
+              kind,
+              role: teamRoleOf(mine.roleCodes),
+            },
+          }
+        : refuse("NOT_PENDING", "This invitation was already used.");
+    }
+    if (invitation.status === "revoked") {
+      return refuse("NOT_PENDING", "This invitation was cancelled.");
+    }
+    if (invitation.status === "declined") {
+      return refuse("NOT_PENDING", "This invitation was declined.");
+    }
+    if (
+      invitationState(invitation.status, invitation.expiresAt, now()) ===
+      "EXPIRED"
+    ) {
+      return refuse(
+        "EXPIRED",
+        `This invitation has expired. Invitations last ${String(INVITATION_TTL_DAYS)} days.`,
+      );
+    }
+    const person = await store.person(tx, userId);
+    if (
+      person.email === null ||
+      normaliseEmail(person.email) !== invitation.email
+    ) {
+      return refuse(
+        "WRONG_EMAIL",
+        `This invitation is for ${invitation.email}. Sign in with that email, or ask for an invitation to yours.`,
+      );
+    }
+    let membershipId: string;
+    let role: TeamRole;
+    if (mine !== undefined) {
+      membershipId = mine.membershipId;
+      role = teamRoleOf(mine.roleCodes);
+    } else {
+      role = invitationRoleOf(invitation.roleCode);
+      membershipId = await store.insertMembership(tx, {
+        tenantId: organisation.tenantId,
+        organisationId: organisation.id,
+        userId,
+        invitedByUserId: invitation.invitedByUserId,
+      });
+      await store.setRoles(tx, membershipId, ROLE_CODES_FOR[role]);
+    }
+    await store.decideInvitation(tx, invitation.id, {
+      status: "accepted",
+      decidedByUserId: userId,
+      membershipId,
+    });
+    // Joining is choosing to act for them now; the switcher holds the rest.
+    await store.setActiveContext(tx, userId, membershipId);
+    await journal.record(tx, {
+      action: "invitation.accepted",
+      tenantId: organisation.tenantId,
+      organisationId: organisation.id,
+      actorUserId: userId,
+      resourceType: "invitation",
+      resourceId: invitation.id,
+      metadata: { role: invitation.roleCode },
+      correlationId,
+      ...(mine === undefined
+        ? {
+            membership: {
+              change: "CREATED" as const,
+              membershipId,
+              userId,
+              role,
+            },
+          }
+        : {}),
+    });
+    return {
+      ok: true as const,
+      value: {
+        organisationId: organisation.id,
+        name: organisation.name,
+        kind,
+        role,
+      },
+    };
+  }
+
+  /**
+   * A person's VERIFIED email, as the store reads it, against the address an
+   * invitation was sent to.
+   */
+  function sentTo(
+    person: { readonly email: string | null },
+    invitation: InvitationRecord,
+  ): boolean {
+    return (
+      person.email !== null && normaliseEmail(person.email) === invitation.email
+    );
+  }
 
   /**
    * A person whose current organisation they no longer belong to acts for
