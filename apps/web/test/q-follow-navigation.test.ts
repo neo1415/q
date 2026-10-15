@@ -278,3 +278,57 @@ describe("B6 guard: following never takes an answer's cards off the thread", () 
     expect(turns).toEqual(before);
   });
 });
+
+describe("a map Q drew is not replaced by a move nobody asked for (owner 2026-10-15)", () => {
+  const TENSORGATE = "6b2f9851-d7e3-4197-9fd1-beffbdc153fe";
+  const map = {
+    kind: "MAP" as const,
+    title: "Where Tensorgate is based",
+    basis: "From the companies' published profiles",
+    places: [
+      { label: "Tensorgate", countryCode: "US", subject: null, note: null },
+    ],
+  };
+  const openProfile = {
+    kind: "UI_INTENT" as const,
+    intent: {
+      kind: "OPEN_RECORD_PAGE" as const,
+      page: "COMPANY" as const,
+      id: TENSORGATE,
+    },
+  };
+  const person = (id: string, text: string): QTurn => ({
+    kind: "PERSON",
+    id,
+    text,
+    unconfirmed: false,
+  });
+
+  it("keeps the map on screen: neither the profile nor a page move is followed", async () => {
+    const { followOfTurns } =
+      await import("../src/features/q/follow-navigation");
+    const seen = new Set<string>();
+    const followed = followOfTurns(
+      [
+        person("u1", "show me on a map where my top companies are based"),
+        qTurn("m1", [map, openProfile, ...toDiscover]),
+      ],
+      seen,
+    );
+    expect(followed.navigate).toBeNull();
+    expect(followed.actions).toEqual([]);
+  });
+
+  it("still follows a move their words asked for beside the drawing", async () => {
+    const { followOfTurns } =
+      await import("../src/features/q/follow-navigation");
+    const followed = followOfTurns(
+      [
+        person("u1", "Open Tensorgate and show me a chart of its raise"),
+        qTurn("m1", [map, openProfile]),
+      ],
+      new Set<string>(),
+    );
+    expect(followed.actions).toEqual([openProfile.intent]);
+  });
+});

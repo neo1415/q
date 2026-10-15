@@ -113,3 +113,9 @@ export {
   type QuestionSequenceTurn,
   type QuestionSequenceTurnReading,
 } from "./question-sequence.js";
+
+export {
+  asksForDrawing,
+  asksForMove,
+  isDrawingObject,
+} from "./drawing-request.js";
