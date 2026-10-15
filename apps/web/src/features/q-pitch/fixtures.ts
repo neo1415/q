@@ -1,5 +1,6 @@
 import type { QMessage } from "@capital-q/contracts";
 import {
+  SUBJECT_KEY,
   receiptCardIndex,
   type FixtureKey,
   type TourAction,
@@ -38,11 +39,16 @@ export function receiptCompanies(
   return cards;
 }
 
-/** `card-N` from the acknowledged receipt; anything else never resolves. */
+/**
+ * `card-N` from the acknowledged receipt; `subject` from the viewer-checked
+ * server setting; anything else never resolves.
+ */
 export function resolveCompanyFixture(
   key: FixtureKey,
   receipt: readonly ResolvedCompany[],
+  subject: ResolvedCompany | null = null,
 ): ResolvedCompany | null {
+  if (key === SUBJECT_KEY) return subject;
   const index = receiptCardIndex(key);
   return index === null ? null : (receipt[index - 1] ?? null);
 }

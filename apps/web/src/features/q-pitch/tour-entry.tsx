@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState, useSyncExternalStore } from "react";
 
+import type { TourSubject } from "./subject-model";
 import type { TourChoice } from "./tour-host";
 
 type Start = { readonly tour: TourChoice; readonly chapter: string | null };
@@ -53,8 +54,10 @@ const noSubscription = () => () => undefined;
 export function QPitchEntry({
   account,
   role,
+  subject = null,
 }: {
   readonly account: string;
+  readonly subject?: TourSubject | null | undefined;
   readonly role: "INVESTOR" | "FOUNDER";
 }) {
   // Read once from the address the page was opened with; false on the server.
@@ -72,6 +75,7 @@ export function QPitchEntry({
       role={role}
       tour={started.tour}
       chapter={started.chapter}
+      subject={subject}
       onExit={() => setEnded(true)}
     />
   );

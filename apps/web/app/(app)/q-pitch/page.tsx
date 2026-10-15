@@ -7,6 +7,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { resolveOwnContext } from "@/features/q/context";
 import { atlasChapters, tourOptions } from "@/features/q-pitch/atlas";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
+import { resolveTourSubject } from "@/features/q-pitch/subject";
 
 export const metadata: Metadata = { title: "Q Pitch" };
 export const dynamic = "force-dynamic";
@@ -36,6 +37,7 @@ export default async function QPitchPage() {
     );
   }
 
+  const subject = await resolveTourSubject();
   const options = tourOptions(now);
   const chapters = atlasChapters(now);
   return (

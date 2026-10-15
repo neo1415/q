@@ -149,3 +149,38 @@ describe("caption narrator", () => {
     expect(Date.now() - started).toBeLessThan(500);
   });
 });
+
+describe("the tour's subject company (server setting, viewer-checked)", () => {
+  const SUBJECT = { companyId: LEDGERFOLD, name: "Capital Q" };
+
+  it("resolves only the `subject` key, and only when the server gave one", () => {
+    expect(resolveCompanyFixture("subject", [], SUBJECT)).toEqual(SUBJECT);
+    expect(resolveCompanyFixture("subject", [], null)).toBeNull();
+    expect(resolveCompanyFixture("card-1", [], SUBJECT)).toBeNull();
+  });
+
+  it("needs a well-formed configured id and a read that succeeds as the viewer", async () => {
+    const { resolveTourSubjectWith } =
+      await import("@/features/q-pitch/subject-model");
+    const read = (id: string) =>
+      Promise.resolve(id === LEDGERFOLD ? SUBJECT : null);
+    expect(await resolveTourSubjectWith(undefined, read)).toBeNull();
+    expect(await resolveTourSubjectWith("not-a-uuid", read)).toBeNull();
+    expect(await resolveTourSubjectWith(F2, read)).toBeNull();
+    expect(
+      await resolveTourSubjectWith(LEDGERFOLD.toUpperCase(), read),
+    ).toEqual(SUBJECT);
+    // A read that answers for another company is not this subject.
+    expect(
+      await resolveTourSubjectWith(LEDGERFOLD, () =>
+        Promise.resolve({ companyId: F2, name: "Elsewhere" }),
+      ),
+    ).toBeNull();
+    // A refused read is no subject, never an error.
+    expect(
+      await resolveTourSubjectWith(LEDGERFOLD, () =>
+        Promise.reject(new Error("403")),
+      ),
+    ).toBeNull();
+  });
+});
