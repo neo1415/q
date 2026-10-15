@@ -39,7 +39,6 @@ import {
   buildWorld,
   deckLines,
   DOCUMENT_FILING,
-  currencyCode,
   documentText,
   SEED_MARKER,
   storyText,
@@ -135,7 +134,7 @@ export async function assertSyntheticTarget() {
   const sha = deps.deployments.edges[0]?.node?.meta?.commitHash;
   if (!sha)
     throw new Error("refusing: cannot read the deployed workers revision");
-  let source = "";
+  let source;
   try {
     execFileSync("git", ["-C", lib.ROOT, "fetch", "-q", "origin", sha], {
       stdio: "ignore",

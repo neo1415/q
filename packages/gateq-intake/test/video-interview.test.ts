@@ -310,7 +310,9 @@ describe("the GateQ video interview session", () => {
     expect(w.provider.createRoom).toHaveBeenCalledWith(
       expect.objectContaining({
         joinGraceSeconds: 30,
-        events: expect.objectContaining({ path: "/v1/gateq/video/events" }),
+        events: expect.objectContaining({
+          path: "/v1/gateq/video/events",
+        }) as unknown,
       }),
     );
     w.advance(13_000);

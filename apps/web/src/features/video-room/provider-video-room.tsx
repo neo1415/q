@@ -76,16 +76,23 @@ export type ProviderVideoRoomProps = {
   readonly aside?: ReactNode;
 };
 
+/** Held, the time shown is the full allowance (bounded by the hard stop). */
+function remainingSeconds(
+  endsAt: number,
+  held: boolean,
+  maxSeconds: number,
+): number {
+  const toStop = Math.max(0, Math.ceil((endsAt - Date.now()) / 1_000));
+  return held ? Math.min(maxSeconds, toStop) : toStop;
+}
+
 export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
   const endsAt = Date.parse(props.endsAt);
   const held = props.clockStarted === false;
   const { maxSeconds } = props;
-  // Held, the time shown is the full allowance (bounded by the hard stop).
-  const remaining = () => {
-    const toStop = Math.max(0, Math.ceil((endsAt - Date.now()) / 1_000));
-    return held ? Math.min(maxSeconds, toStop) : toStop;
-  };
-  const [left, setLeft] = useState(remaining);
+  const [left, setLeft] = useState(() =>
+    remainingSeconds(endsAt, held, maxSeconds),
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [joining, setJoining] = useState(true);
   const [ending, setEnding] = useState(false);
@@ -122,7 +129,7 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      const seconds = remaining();
+      const seconds = remainingSeconds(endsAt, held, maxSeconds);
       setLeft(seconds);
       if (seconds === 0) {
         window.clearInterval(timer);
@@ -130,8 +137,7 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
       }
     }, 1_000);
     return () => window.clearInterval(timer);
-    // `end` guards itself with a ref and reads the latest callback;
-    // `remaining` reads only these three.
+    // `end` guards itself with a ref and reads the latest callback.
   }, [endsAt, held, maxSeconds]);
 
   const minutes = Math.floor(left / 60);

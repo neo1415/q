@@ -176,7 +176,9 @@ describe("the Tavus adapter", () => {
       .createConversation({ ...base, joinGraceSeconds: 30 })
       .catch(() => undefined);
     const [, init] = fetch.mock.calls[0] ?? [];
-    const body = JSON.parse(String(init?.body)) as {
+    const sent = init?.body;
+    expect(typeof sent).toBe("string");
+    const body = JSON.parse(typeof sent === "string" ? sent : "") as {
       properties: { max_call_duration: number };
     };
     expect(body.properties.max_call_duration).toBe(210);
