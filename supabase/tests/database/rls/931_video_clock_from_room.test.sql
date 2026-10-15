@@ -1,6 +1,6 @@
 -- The founder's clock starts when the interviewer is in the room, bounded
 -- by a 30 s join grace, for GateQ and Rehearsals; the ledger counts what
--- may have run (20261227140000).
+-- may have run (20261227150000).
 begin;
 create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql

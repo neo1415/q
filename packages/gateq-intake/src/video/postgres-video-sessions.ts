@@ -26,7 +26,7 @@ const Row = z.object({
   max_seconds: z.coerce.number().int(),
   created_at: z.coerce.date(),
   ends_at: z.coerce.date(),
-  // Optional: a row read before 20261227140000 had neither column.
+  // Optional: a row read before 20261227150000 had neither column.
   room_ready_at: z.coerce.date().nullable().optional(),
   live_at: z.coerce.date().nullable().optional(),
 });
@@ -145,7 +145,7 @@ export function createPostgresGateqVideoSessions(deps: {
     },
     markLive: async (input) => {
       // Joinable, clock not started: the provisional end is the hard stop,
-      // ready + join grace + cap (migration 20261227140000).
+      // ready + join grace + cap (migration 20261227150000).
       const rows = await sql`
         update gateq.application_video_sessions
            set status = 'LIVE', provider_conversation_id = ${input.providerConversationId},

@@ -20,7 +20,7 @@ import { IntakeRefusedError } from "../contracts/index.js";
  *   maxSeconds 480 (8 minutes) · perApplication 1 · concurrency 2 ·
  *   paidRunCapSeconds 180, the existing hard cap for our own paid test
  *   runs, which stays the effective ceiling until the owner raises it.
- * The clock (live run 2026-10-15, migration 20261227140000): when the
+ * The clock (live run 2026-10-15, migration 20261227150000): when the
  * provider answers, the room is joinable and its end is provisional, ready
  * + a 30 s join grace + the cap, which is also the hard stop. The cap then
  * runs from the moment Q is in the room (the provider's replica-joined

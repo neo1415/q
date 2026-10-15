@@ -370,7 +370,7 @@ export function createPostgresRehearsalVideoStore(
     },
     markLive: async (row, input) => {
       // Joinable, clock not started: the provisional end is the hard stop,
-      // ready + 30 s join grace + 180 s (migration 20261227140000).
+      // ready + 30 s join grace + 180 s (migration 20261227150000).
       const rows = await sql<RawRow[]>`
         update q_runtime.rehearsal_video_sessions
            set status = 'LIVE', provider_key_index = ${input.keyIndex},
