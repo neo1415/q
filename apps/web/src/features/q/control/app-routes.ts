@@ -153,7 +153,9 @@ const startsWith =
 export const ROUTE_REDIRECTS: readonly Redirect[] = [
   { from: /^\/gateway$/u, to: startsWith("/gateq") },
   // The CRM's alias forwards to the routes that own its views.
-  { from: /^\/crm$/u, to: startsWith("/relationships", "/results") },
+  { from: /^\/crm$/u, to: startsWith("/relationships") },
+  // Reports are the CRM Overview now (owner feedback 2026-10-15).
+  { from: /^\/results$/u, to: startsWith("/relationships") },
   { from: /^\/discover\/yours$/u, to: startsWith("/discover") },
   {
     from: /^\/admin\/(?:verification|reviews)$/u,

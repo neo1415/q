@@ -24,7 +24,6 @@ export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
   { id: "button.hub-capital", kind: "BUTTON" },
   { id: "button.hub-discover", kind: "BUTTON" },
   { id: "button.hub-gateq", kind: "BUTTON" },
-  { id: "button.hub-results", kind: "BUTTON" },
   { id: "button.hub-work", kind: "BUTTON" },
   { id: "button.pipeline-next", kind: "BUTTON" },
   { id: "button.pipeline-search", kind: "BUTTON" },

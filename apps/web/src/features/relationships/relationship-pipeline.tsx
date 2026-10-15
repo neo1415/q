@@ -12,6 +12,7 @@ import {
   type RelationshipSummaryDto,
   type SavedRelationshipViewList,
 } from "@capital-q/contracts";
+import { cx } from "@capital-q/ui";
 import { buttonClassName } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
@@ -373,24 +374,32 @@ export function RelationshipPipeline({
             onNotice={setNotice}
           />
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={pipelineHref(query, "table")}
-              data-pipeline-layout="table"
-              aria-current={layout === "table" ? "page" : undefined}
-              className={buttonClassName("quiet")}
+            <div
+              role="group"
+              aria-label="Layout"
+              className="inline-flex rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
             >
-              Table
-            </Link>
-            <Link
-              href={pipelineHref(query, "board")}
-              data-pipeline-layout="board"
-              aria-current={layout === "board" ? "page" : undefined}
-              className={buttonClassName("quiet")}
-            >
-              Board
-            </Link>
+              {(["table", "board"] as const).map((entry) => (
+                <Link
+                  key={entry}
+                  href={pipelineHref(query, entry)}
+                  data-pipeline-layout={entry}
+                  aria-current={layout === entry ? "page" : undefined}
+                  className={cx(
+                    "cq-body-sm inline-flex min-h-10 items-center rounded-[8px] px-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
+                    layout === entry
+                      ? "bg-(--cq-surface-strong) font-semibold text-(--cq-text-primary)"
+                      : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
+                  )}
+                >
+                  {entry === "table" ? "Table" : "Board"}
+                </Link>
+              ))}
+            </div>
             <details className="cq-body-sm">
-              <summary className="cursor-pointer py-3">Columns</summary>
+              <summary className="inline-flex min-h-11 cursor-pointer items-center px-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary)">
+                Columns
+              </summary>
               {(["state", "since", "next"] as const).map((column) => (
                 <label
                   key={column}
@@ -433,9 +442,11 @@ export function RelationshipPipeline({
       ) : layout === "table" ? (
         <div className="overflow-x-auto">
           <table data-pipeline-records className="cq-body-sm w-full text-left">
-            <thead>
+            <thead className="cq-caption text-(--cq-text-secondary) [&_th]:font-medium">
               <tr>
-                <th className="p-3">Select</th>
+                <th className="p-3">
+                  <span className="sr-only">Select</span>
+                </th>
                 <th className="p-3">
                   {side === "INVESTOR" ? "Company" : "Investor"}
                 </th>
@@ -477,7 +488,7 @@ export function RelationshipPipeline({
                   </td>
                   <td className="p-3">
                     <Link
-                      className="underline underline-offset-2"
+                      className="font-medium text-(--cq-text-primary) underline-offset-4 hover:underline"
                       href={href(row)}
                       data-q-item
                     >

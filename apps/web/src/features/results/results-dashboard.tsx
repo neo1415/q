@@ -49,7 +49,8 @@ const REASON_WORDS: Readonly<Record<string, string>> = {
 
 export type ResultsDashboardProps = {
   readonly basePath: string;
-  readonly heading?: string;
+  /** Null: the page's own header names it (the CRM Overview). */
+  readonly heading?: string | null;
   readonly headingLevel?: 1 | 2;
   /** Hub filters do not yet bind report exports; keep them on Results. */
   readonly showReports?: boolean;
@@ -80,7 +81,8 @@ function Panel({
       id={id}
       aria-labelledby={id === undefined ? undefined : `${id}-title`}
       className={cx(
-        "flex min-w-0 flex-col gap-4 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 sm:p-5",
+        // A section, not a card (redesign 2026-10-15): one rule above it.
+        "flex min-w-0 flex-col gap-4 border-t border-(--cq-border-subtle) pt-5",
         className,
       )}
     >
@@ -127,8 +129,9 @@ function Tile({
       )}
     </>
   );
+  // One cell of the stat strip; the strip, not each figure, is the surface.
   const frame =
-    "flex min-w-0 flex-col gap-1 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4";
+    "flex min-w-0 flex-col gap-1 bg-(--cq-surface-raised) p-4 sm:p-5";
   return href === undefined ? (
     <div className={frame}>{body}</div>
   ) : (
@@ -136,7 +139,7 @@ function Tile({
       href={href}
       className={cx(
         frame,
-        "transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
+        "transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
       )}
     >
       {body}
@@ -155,15 +158,16 @@ function Header({
   return (
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div className="flex min-w-0 flex-col gap-1">
-        {/* Inside the CRM the page's h1 is the Hub; this is a tab's heading. */}
-        <Heading
-          className={cx(
-            props.headingLevel === 2 ? "cq-title-md" : "cq-title-xl",
-            "text-(--cq-text-primary)",
-          )}
-        >
-          {props.heading ?? "Results"}
-        </Heading>
+        {props.heading === null ? null : (
+          <Heading
+            className={cx(
+              props.headingLevel === 2 ? "cq-title-md" : "cq-title-xl",
+              "text-(--cq-text-primary)",
+            )}
+          >
+            {props.heading ?? "Results"}
+          </Heading>
+        )}
         <p className="cq-body-sm text-(--cq-text-secondary)">
           {name} · {props.results.window.label.toLowerCase()}
         </p>
@@ -534,7 +538,7 @@ function InvestorDashboard(
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       <Header props={props} name={results.organisationName} />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-border-subtle) lg:grid-cols-4">
         <Tile
           label="Interest sent"
           value={String(interest?.sent ?? f.interest)}
@@ -823,7 +827,7 @@ function FounderDashboard(
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
       <Header props={props} name={results.organisationName} />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-border-subtle) lg:grid-cols-4">
         <Tile
           label="Investors engaged"
           value={
