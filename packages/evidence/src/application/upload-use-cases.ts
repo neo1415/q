@@ -27,7 +27,6 @@ import {
   type DocumentUploadSession,
   type UploadAuthorisingCapability,
 } from "../contracts/upload.js";
-import { detectDocumentContent } from "../domain/content-validation.js";
 import {
   DocumentNotFoundError,
   DocumentStorageUnavailableError,
@@ -48,10 +47,6 @@ import {
   sanitiseOriginalFilename,
 } from "../domain/upload-policy.js";
 import {
-  stageObjectForValidation,
-  StagedObjectTooLargeError,
-} from "../infrastructure/object-staging.js";
-import {
   activeOrganisation,
   DOCUMENT_CREATE,
   DOCUMENT_MANAGE,
@@ -64,6 +59,7 @@ import {
   resolveNewDocument,
 } from "./document-use-cases.js";
 import { getEvidenceMetrics } from "./metrics.js";
+import { validateUploadedDocument } from "./upload-validation.js";
 import type { DirectUploadAuthorization } from "./storage-port.js";
 
 /**
@@ -571,58 +567,15 @@ export function createCompleteDocumentUploadSession(
       );
     }
 
-    const stat = await storage.statObject(object);
-    if (stat === null) throw await refuse("OBJECT_MISSING");
-    if (stat.sizeBytes === 0) throw await refuse("FILE_EMPTY");
-    if (stat.sizeBytes > limits.maxBytes) throw await refuse("FILE_TOO_LARGE");
-
-    const stream = await storage.openObjectStream(object);
-    const staged = await stageObjectForValidation({
-      body: stream.body,
+    const verified = await validateUploadedDocument({
+      storage,
+      object,
       maxBytes: limits.maxBytes,
-    }).catch(async (error: unknown) => {
-      if (error instanceof StagedObjectTooLargeError) {
-        throw await refuse("FILE_TOO_LARGE");
-      }
-      throw error;
+      filename: session.originalFilename,
+      declaredMimeType: session.declaredMimeType,
+      clientSha256: input.clientSha256,
+      refuse,
     });
-
-    let verified: {
-      readonly mimeType: string;
-      readonly sizeBytes: number;
-      readonly sha256: string;
-    };
-    try {
-      if (staged.sizeBytes !== stat.sizeBytes) {
-        throw await refuse("SIZE_MISMATCH");
-      }
-      const detected = await detectDocumentContent({
-        sizeBytes: staged.sizeBytes,
-        read: staged.read,
-      });
-      if (!detected.ok) throw await refuse(detected.failureCode);
-      const agreed = checkClaimedType({
-        filename: session.originalFilename,
-        declaredMimeType: session.declaredMimeType,
-        detected: detected.kind,
-      });
-      if (!agreed.ok) throw await refuse(agreed.failureCode);
-      // A client hash is an integrity hint only; the server's hash of the
-      // stored bytes is what is persisted, and disagreement is a refusal.
-      if (
-        input.clientSha256 !== undefined &&
-        input.clientSha256 !== staged.sha256
-      ) {
-        throw await refuse("STORAGE_VALIDATION_FAILED");
-      }
-      verified = {
-        mimeType: agreed.type.mimeType,
-        sizeBytes: staged.sizeBytes,
-        sha256: staged.sha256,
-      };
-    } finally {
-      await staged.dispose();
-    }
 
     const result = await transactions.run(
       async (tx): Promise<CompletedUploadResult> => {

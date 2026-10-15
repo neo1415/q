@@ -8,6 +8,7 @@ import {
   type ApplicationView,
 } from "../contracts/index.js";
 import { explainQualification } from "./coverage.js";
+import { disclosureLineageFromContext } from "./disclosure-projection.js";
 import {
   InterviewTurnOutcomeSchema,
   type GateQInterviewer,
@@ -308,11 +309,22 @@ export function createConversationService(
               signal: AbortSignal.timeout(120_000),
             })
           : InterviewTurnOutcomeSchema.parse(cached);
+      // Stamped from what the model was actually given, never from its
+      // output: no document text (documentProposals is empty for a guest),
+      // the current facts and every stored turn including this utterance.
+      // Any context without complete lineage makes this UNKNOWN (withheld
+      // by a document-aware Submit), never a guessed text-only claim.
+      const lineage = disclosureLineageFromContext({
+        documents: [],
+        facts,
+        turns: stored,
+      });
       const latencyMs = Math.max(0, Math.round(now() - receivedAt));
       if (turns !== undefined && claimId !== null) {
         if (cached === null)
           await turns.checkpointOutcome(applicationId, claimId, outcome);
         await intake.completeTurn({
+          disclosureLineage: lineage,
           token: input.token,
           claimId,
           clientTurnId: input.clientTurnId,
@@ -330,6 +342,7 @@ export function createConversationService(
       } else {
         if (!opening && outcome.facts.length > 0) {
           await intake.recordFacts({
+            disclosureLineage: lineage,
             token: input.token,
             facts: outcome.facts,
           });

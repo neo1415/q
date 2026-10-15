@@ -148,7 +148,7 @@ export function createPostgresDataRoom() {
            v.mime_type, d.current_version_id,
            greatest(d.updated_at, coalesce(e.updated_at, d.updated_at)) as updated_at,
            e.version
-      from evidence.documents d
+      from (select * from evidence.documents where owner_kind = 'ORGANISATION') d
       left join evidence.data_room_entries e on e.document_id = d.id
       left join evidence.document_versions v
         on v.id = d.current_version_id and v.tenant_id = d.tenant_id
@@ -469,7 +469,7 @@ export function createPostgresDataRoom() {
       >`
         select d.id, d.tenant_id, d.title, v.id as version_id, v.version_number,
                v.uploaded_at, d.download_audience, v.malware_scan_status, e.level
-          from evidence.documents d
+          from (select * from evidence.documents where owner_kind = 'ORGANISATION') d
           join evidence.document_versions v
             on v.id = d.current_version_id and v.tenant_id = d.tenant_id
           left join evidence.data_room_entries e on e.document_id = d.id

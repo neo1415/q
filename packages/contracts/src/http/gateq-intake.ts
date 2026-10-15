@@ -447,6 +447,13 @@ export const GateqCoverageAnsweredSchema = z
     ...CoverageDimension,
     summary: z.string().max(2000),
     provenance: GateqFactProvenanceSchema,
+    /**
+     * C2 lineage: the recorded fact and the transcript turn it was heard in
+     * (null for the form or a document). Optional so a release can accept
+     * it before any server sends it.
+     */
+    sourceFactId: z.string().uuid().optional(),
+    sourceTurnSeq: z.number().int().min(1).nullable().optional(),
   })
   .strict();
 export const GateqCoverageGapSchema = z.object(CoverageDimension).strict();
