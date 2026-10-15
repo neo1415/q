@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { publicResearchFollowUp } from "./research-follow-up.js";
+
 import { z } from "zod";
 
 import {
@@ -5003,12 +5005,20 @@ export function createModelGatewayQAnswer(
           ) {
             await stageShown(researchTool.visibleStage);
           }
+          const followUp = publicResearchFollowUp({
+            history: earlier,
+            question: latest.content,
+            aboutNamedOther: request.aboutNamedOther === true,
+            selectedCompany: request.subjects.some(
+              (subject) => subject.kind === "COMPANY",
+            ),
+          });
           const call = {
             callId: "q-research",
             name: "research_public_web",
             // The service plans further phrasings from the person's words.
             arguments: {
-              query: latest.content.trim().slice(0, 200),
+              ...(followUp ?? { query: latest.content.trim().slice(0, 200) }),
               // Enough pages to answer from, not only to compare.
               maxSources: prospectsThin ? 5 : 4,
             },

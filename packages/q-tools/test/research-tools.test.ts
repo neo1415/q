@@ -189,6 +189,101 @@ function search(
 }
 
 describe("public_web.search", () => {
+  it("keeps general research separate from the founder's selected company", async () => {
+    const {
+      port: p,
+      provider,
+      evidence,
+    } = harness({ companies: companiesWithWebsite() });
+    const outcome = await search(
+      {
+        query: `Capital Q competitors market gaps ${FOUNDER_MARKER}`,
+        target: "GENERAL",
+      },
+      speaking(
+        contextFor(actorA, founderPlan),
+        "Search Capital Q competitors and market gaps online.",
+      ),
+      p,
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    const data = (outcome.result as { data: Record<string, unknown> }).data;
+    expect(data["status"]).toBe("OK");
+    expect(JSON.stringify(provider.searches).toLowerCase()).not.toContain(
+      "alpha robotics",
+    );
+    expect(JSON.stringify(provider.searches)).not.toContain(
+      "alpharobotics.example",
+    );
+    expect(provider.egressed()).not.toContain(COMPANY_A);
+    expect(provider.egressed()).not.toContain(MARKERS.founder);
+    expect(provider.egressed()).not.toContain(FOUNDER_MARKER);
+    expect(data["entityResolution"]).toEqual({
+      status: "NOT_APPLICABLE",
+      candidates: [],
+    });
+    expect(
+      (data["sources"] as { recordedAsEvidence: boolean }[]).every(
+        (source) => !source.recordedAsEvidence,
+      ),
+    ).toBe(true);
+    expect(evidence.sources).toHaveLength(0);
+  });
+
+  it.each([{ companyId: COMPANY_A }, { aboutThemselves: true }])(
+    "refuses contradictory general-research arguments %s before providers run",
+    async (conflict) => {
+      const { port: p, provider, evidence } = harness();
+      const outcome = await search(
+        { query: "Capital Q competitors", target: "GENERAL", ...conflict },
+        speaking(
+          contextFor(actorA, founderPlan),
+          "Search Capital Q competitors.",
+        ),
+        p,
+      );
+      expect(outcome.status).toBe("FAILED");
+      expect(outcome.failureCode).toBe("INVALID_ARGUMENTS");
+      expect(provider.searches).toHaveLength(0);
+      expect(evidence.sources).toHaveLength(0);
+    },
+  );
+
+  it("general research still requires the public-external scope", async () => {
+    const { port: p, provider } = harness();
+    const outcome = await search(
+      { query: "Capital Q competitors", target: "GENERAL" },
+      speaking(
+        contextFor(actorA, founderPlanWithoutPublic),
+        "Search Capital Q competitors.",
+      ),
+      p,
+    );
+    expect(outcome.status).toBe("DENIED");
+    expect(provider.searches).toHaveLength(0);
+  });
+
+  it("retains default selected-company research and its own Evidence provenance", async () => {
+    const {
+      port: p,
+      provider,
+      evidence,
+    } = harness({ companies: companiesWithWebsite() });
+    const outcome = await search(
+      { query: "company news" },
+      speaking(contextFor(actorA, founderPlan), "What is the company news?"),
+      p,
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(JSON.stringify(provider.searches).toLowerCase()).toContain(
+      "alpha robotics",
+    );
+    expect(evidence.sources.length).toBeGreaterThan(0);
+    expect(
+      evidence.sources.every((source) => source.companyId === COMPANY_A),
+    ).toBe(true);
+  });
+
   it("is not offered and is denied without the actor-wide public-external scope", async () => {
     const { port: p, provider } = harness();
     const offered = await p.offer(contextFor(actorA, founderPlanWithoutPublic));
