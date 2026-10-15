@@ -193,6 +193,10 @@ export { readinessLeadLines } from "./own-readiness.js";
 // the attention report, for the same question.
 export { asksWhatNeedsThem } from "./attention-answer.js";
 export {
+  createPartialAnswerReader,
+  type PartialAnswerReader,
+} from "../policy/partial-answer.js";
+export {
   createSmallTalkReply,
   type SmallTalkReply,
   type SmallTalkTurn,

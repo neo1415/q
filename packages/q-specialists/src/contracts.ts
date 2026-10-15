@@ -79,6 +79,13 @@ export type QSpecialistExecutionContext = {
    * Best effort; a failure to show progress never fails the investigation.
    */
   readonly showStage?: ((stage: QVisibleStage) => Promise<void>) | undefined;
+  /**
+   * S3 (lane S): one whole sentence of the answer as the model writes it,
+   * already through the specialist's own citation rewriting. The caller
+   * applies the answer's guards before anyone sees it; the stored message
+   * remains the durable form. Never called with the last sentence.
+   */
+  readonly onAnswerSentence?: ((sentence: string) => void) | undefined;
 };
 
 /**
