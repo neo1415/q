@@ -180,7 +180,7 @@ export function GateqVideoEntry({
     <div
       className={
         primary
-          ? "gq-card flex flex-col gap-3"
+          ? "gq-card flex flex-col gap-3 p-4"
           : "flex flex-col gap-2 border-t border-(--cq-border-subtle) pt-4"
       }
       data-gateq-video-entry={variant}

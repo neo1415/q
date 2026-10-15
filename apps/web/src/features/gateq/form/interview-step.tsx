@@ -274,8 +274,10 @@ export function InterviewStep({
       <p className="cq-body gq-t2">
         Q is {fund}&apos;s analyst. It has your answers and asks what an
         investor would want to know about {companyName || "your company"}.
-        Fifteen minutes at most; stop whenever you like. &ldquo;I don&apos;t
-        know&rdquo; is a fine answer.
+        {mode === "video"
+          ? "Talk it through on video, or type if you prefer; both go into the same interview. "
+          : "Fifteen minutes at most; stop whenever you like. "}
+        &ldquo;I don&apos;t know&rdquo; is a fine answer.
       </p>
 
       {!loaded && problem === null ? (
