@@ -8,7 +8,7 @@ import { FitGlyph } from "../fit-glyph";
 const STATUS = {
   MATCH: "Meets",
   NO_MATCH: "Doesn't meet",
-  UNKNOWN: "Not answered",
+  UNKNOWN: "Needs clarification",
   NOT_APPLICABLE: "Not applicable",
 } as const;
 const PROVENANCE = {

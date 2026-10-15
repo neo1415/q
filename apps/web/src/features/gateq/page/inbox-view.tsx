@@ -1344,7 +1344,7 @@ function Detail({
                               ? "Meets"
                               : rule.standing === "DOES_NOT_MEET"
                                 ? "Doesn't meet"
-                                : "Not answered"}
+                                : "Needs clarification"}
                           </span>
                         </div>
                       ))
