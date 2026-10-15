@@ -61,12 +61,18 @@ export {
   FOUNDER_REVISABLE_STEPS,
   REVENUE_TREND_OPTIONS,
 } from "./founder-v4.js";
+export {
+  COUNTRY_OPTIONS_V5,
+  FOUNDER_DEFINITION_V5,
+  FOUNDER_DEFINITION_V5_VERSION,
+  GCC_COUNTRY_OPTIONS,
+} from "./founder-v5.js";
 /**
  * The version new founder sessions pin to, for code that reads the journey
- * (labels, step order, the interview). It is a superset of v2 and v3, so an
+ * (labels, step order, the interview). It is a superset of v2, v3 and v4, so an
  * older session reads correctly through it.
  */
-export { FOUNDER_DEFINITION_V4 as FOUNDER_DEFINITION_CURRENT } from "./founder-v4.js";
+export { FOUNDER_DEFINITION_V5 as FOUNDER_DEFINITION_CURRENT } from "./founder-v5.js";
 export {
   FounderRaiseContextSchema,
   FounderReviewContextSchema,

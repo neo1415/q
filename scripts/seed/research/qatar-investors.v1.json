@@ -282,7 +282,7 @@
           },
           "soft_wording": "Public reports say",
           "truth_class": "Q_INFERENCE",
-          "evidence_status": "DOCUMENT_SUPPORTED",
+          "evidence_status": "SELF_REPORTED",
           "lifecycle_status": "CURRENT",
           "retrieved_at": "2026-10-15",
           "uncertainty": "Inferred from the cited page's description; direct investment neither confirmed nor ruled out."

@@ -179,7 +179,8 @@ describe("prepared research entities: the loader", () => {
       expect(record.sources.length).toBeGreaterThan(0);
       expect(
         record.facts.every((f) =>
-          /^(VERIFIED|PUBLICLY_REPORTED_UNCONFIRMED)/u.test(
+          // ADR-001's evidence axis; a read public page is never "VERIFIED".
+          /^(NO_EVIDENCE|SELF_REPORTED|DOCUMENT_SUPPORTED|MULTI_SOURCE_SUPPORTED)$/u.test(
             f.evidenceClass ?? "",
           ),
         ),

@@ -209,6 +209,15 @@ export function parsePreparedSeed(raw: unknown): PreparedSeed {
         );
       }
       if (
+        fact.verification.status === "PUBLICLY_REPORTED_UNCONFIRMED" &&
+        (fact.evidence_status === "DOCUMENT_SUPPORTED" ||
+          fact.evidence_status === "MULTI_SOURCE_SUPPORTED")
+      ) {
+        throw new Error(
+          `${entity.demo_id}: an unconfirmed report is at most SELF_REPORTED`,
+        );
+      }
+      if (
         !read &&
         fact.evidence_status !== undefined &&
         fact.evidence_status !== "NO_EVIDENCE"
@@ -242,6 +251,22 @@ export function parsePreparedSeed(raw: unknown): PreparedSeed {
     }
   }
   return seed;
+}
+
+type SeedFact = PreparedSeedEntity["facts"][number];
+
+/** The fact's ADR-001 evidence status, derived when the seed does not say. */
+export function evidenceStatusOf(seed: PreparedSeed, fact: SeedFact): string {
+  if (fact.evidence_status !== undefined) return fact.evidence_status;
+  const read = fact.source_ids.filter(
+    (id) => seed.sources[id]?.access === "FETCHED",
+  );
+  if (read.length === 0) return "NO_EVIDENCE";
+  if (fact.verification.status !== "VERIFIED") return "SELF_REPORTED";
+  const hosts = new Set(
+    read.map((id) => new URL(seed.sources[id]?.url ?? "https://x").hostname),
+  );
+  return hosts.size > 1 ? "MULTI_SOURCE_SUPPORTED" : "DOCUMENT_SUPPORTED";
 }
 
 /** W3's recognition aliases (Latin script only), by the seed's demo id. */
@@ -357,10 +382,12 @@ export function toPreparedUpsert(
       .map((fact) => ({
         claim: clip(spoken(fact.soft_wording, fact.claim), 600),
         sourceIds: fact.source_ids,
-        evidenceClass:
-          fact.verification.status === "VERIFIED"
-            ? "VERIFIED"
-            : "PUBLICLY_REPORTED_UNCONFIRMED: not independently checked",
+        // ADR-001's evidence axis, conservatively: a statement found on a
+        // read public page is DOCUMENT_SUPPORTED (MULTI_ when two hosts say
+        // it), a reported-but-unconfirmed one SELF_REPORTED, an unread one
+        // NO_EVIDENCE. Never "VERIFIED": Capital Q verified nothing. The
+        // per-source reading status stays on each source.
+        evidenceClass: evidenceStatusOf(seed, fact),
         topic: fact.topic ?? null,
         status: fact.status ?? ("LINK_DISCOVERED" as const),
         asOf: fact.as_of ?? null,
