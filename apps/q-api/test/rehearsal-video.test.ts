@@ -344,6 +344,7 @@ function fakeTavus(
         meetingToken: "room-token",
       });
     },
+    joinMeeting: () => Promise.reject(new Error("unused")),
     findConversationsForPal: () => Promise.resolve([]),
     endConversation: (id) => {
       calls.ended.push({ key, id });

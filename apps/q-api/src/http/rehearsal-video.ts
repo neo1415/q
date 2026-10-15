@@ -85,7 +85,7 @@ function problem(
     .send(body);
 }
 
-function contentText(content: unknown): string {
+export function contentText(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
@@ -102,16 +102,17 @@ function contentText(content: unknown): string {
   return "";
 }
 
-function chunk(
+export function chunk(
   id: string,
   delta: Record<string, unknown>,
   finish: string | null,
+  model = "capital-q-rehearsal",
 ) {
   return `data: ${JSON.stringify({
     id,
     object: "chat.completion.chunk",
     created: Math.floor(Date.now() / 1000),
-    model: "capital-q-rehearsal",
+    model,
     choices: [{ index: 0, delta, finish_reason: finish }],
   })}\n\n`;
 }

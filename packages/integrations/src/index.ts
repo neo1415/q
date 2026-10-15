@@ -130,6 +130,7 @@ export {
 // (q-api) and the GateQ video interview (api).
 export {
   createTavusClient,
+  TAVUS_MEETING_MAX_SECONDS,
   TavusError,
   tavusFailureKind,
   type TavusClient,

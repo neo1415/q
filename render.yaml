@@ -172,6 +172,15 @@ services:
         sync: false
       - key: Q_VOICE_EXPRESSIVE
         value: "false"
+      # Owner decision 35: Q's face in Google Meet. The stock replica is
+      # Tavus "Celine - Studio" (phoenix-4), on the Builder key (TAVUS_API_KEY).
+      # The shared video ledger bounds it; without it Q keeps its voice.
+      - key: CQ_MEETING_FACE
+        value: "on"
+      - key: CQ_MEETING_FACE_ID
+        value: r4f5b5ef55c8
+      - key: CQ_MEETING_FACE_MAX_SECONDS
+        value: "600"
 
   # ---------------------------------------------------------------------
   # Background workers: outbox publishing and document processing. No
