@@ -89,6 +89,24 @@ describe("investor coverage", () => {
       state: "CONFIRMED_SAVED",
       source: "DOCUMENT",
     });
+    for (const documentType of [
+      "INVESTMENT_THESIS",
+      "LP_LETTER",
+      "COMPANY_PROFILE",
+    ]) {
+      expect(
+        field(
+          deriveOnboardingCoverage({
+            profile: INVESTOR_COVERAGE_PROFILE,
+            definition: INVESTOR_DEFINITION_V1,
+            view: viewOf(INVESTOR_DEFINITION_V1, {}),
+            documents: [{ documentType }],
+            now: NOW,
+          }),
+        )?.state,
+        documentType,
+      ).toBe("CONFIRMED_SAVED");
+    }
     const informs =
       INVESTOR_COVERAGE_PROFILE.documentFields?.[
         INVESTOR_DOCUMENT_FIELDS.materials

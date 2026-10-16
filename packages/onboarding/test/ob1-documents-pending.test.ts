@@ -42,6 +42,25 @@ describe("documents during onboarding (ob1)", () => {
         t,
       ).toBe("METADATA_ONLY");
     }
+    // An investor's fund deck and thesis are readable; an LP letter never is.
+    expect(
+      onboardingDocumentTreatment({
+        documentType: "FUND_DECK",
+        sensitivityClass: "CONFIDENTIAL",
+      }),
+    ).toBe("READ_FOR_COVERAGE");
+    expect(
+      onboardingDocumentTreatment({
+        documentType: "INVESTMENT_THESIS",
+        sensitivityClass: "CONFIDENTIAL",
+      }),
+    ).toBe("READ_FOR_COVERAGE");
+    expect(
+      onboardingDocumentTreatment({
+        documentType: "LP_LETTER",
+        sensitivityClass: "CONFIDENTIAL",
+      }),
+    ).toBe("METADATA_ONLY");
     // A deck marked highly confidential by its owner is not read either.
     expect(
       onboardingDocumentTreatment({

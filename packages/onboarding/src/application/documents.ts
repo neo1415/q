@@ -16,6 +16,10 @@ export const ONBOARDING_READABLE_DOCUMENT_TYPES = [
   "PITCH_DECK",
   "COMPANY_PROFILE",
   "PRODUCT",
+  // An investor's own fund deck and thesis (ob2's types). LP_LETTER is
+  // deliberately absent: private, metadata only.
+  "FUND_DECK",
+  "INVESTMENT_THESIS",
 ] as const;
 
 const READABLE = new Set<string>(ONBOARDING_READABLE_DOCUMENT_TYPES);
