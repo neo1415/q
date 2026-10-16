@@ -550,7 +550,7 @@ describe("the submitted investor brief", () => {
 describe("dossier figures in words (live check 2026-10-16)", () => {
   it("reads an amount frozen as '360000 USD' as the currency and grouped digits", async () => {
     const { summaryWords } =
-      await import("../src/features/gateq/page/submitted-brief");
+      await import("../src/features/gateq/page/summary-words");
     expect(summaryWords("360000 USD")).toBe("USD 360,000");
     expect(summaryWords("1500000.5 EUR")).toBe("EUR 1,500,000.50");
     expect(summaryWords("USD 360,000")).toBe("USD 360,000");

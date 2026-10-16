@@ -20,7 +20,7 @@ import {
   receivedWords,
   speakerWords,
 } from "./inbox-model";
-import { summaryWords } from "./submitted-brief";
+import { summaryWords } from "./summary-words";
 
 /**
  * GateQ slice 1: the dossier frozen with a submission, inside the existing

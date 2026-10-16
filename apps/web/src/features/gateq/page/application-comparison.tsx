@@ -9,7 +9,7 @@ import type {
 import { Button } from "@capital-q/ui/button";
 import { QSection, useQDialog } from "@/features/q/q-section";
 import { loadDetailAction } from "./gateq-actions";
-import { summaryWords } from "./submitted-brief";
+import { summaryWords } from "./summary-words";
 
 export const GATEQ_COMPARE_MAX = 6;
 const GROUPS: readonly (readonly [GateqInvestmentGroup, string])[] = [
