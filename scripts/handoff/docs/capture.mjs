@@ -83,15 +83,18 @@ const ACCOUNTS = {
 const DECLUTTER = "[data-answer-chip]{display:none!important}.cq-feed-problem{display:none!important}";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const VIEWPORTS = { d: { width: 1440, height: 900 }, m: { width: 390, height: 844 }, t: { width: 834, height: 1112 } };
 
 /** Shot list. `acct` picks the sign-in; `run` drives the page (ctx below). */
 const SHOTS = [
   // ---------- Sign-in (signed out) ----------
   { id: "signin", acct: null, title: "Sign in", path: "/auth/sign-in" },
+  { id: "signup", acct: null, title: "Create account", path: "/auth/sign-up" },
+  { id: "landing", acct: null, title: "Public home page", path: "/" },
 
   // ---------- Investor ----------
   { id: "inv-home", acct: "investor", title: "Q (home), investor", path: "/home", wait: 4000 },
-  { id: "inv-nav", acct: "investor", title: "Sidebar, investor (expanded)", path: "/capital", run: async (c) => { await c.expandNav(); } },
+  { id: "inv-nav", acct: "investor", title: "Sidebar, investor (expanded)", path: "/relationships?view=capital", run: async (c) => { await c.expandNav(); } },
   { id: "inv-discover", acct: "investor", title: "Discover feed", path: "/discover", wait: 4000 },
   { id: "inv-discover-interest", acct: "investor", title: "Express interest panel", path: "/discover", run: async (c) => { await c.clickButton(/^Interest$/); } },
   { id: "inv-discover-save", acct: "investor", title: "Saving a company", path: "/discover", run: async (c) => {
@@ -124,7 +127,7 @@ const SHOTS = [
   { id: "inv-q-ask", acct: "investor", title: "Q answer, fresh question", path: "/home", needs: "q", run: async (c) => {
       await c.askQ("Where are my deals? Show them as a table with the next step for each.");
     } },
-  { id: "inv-crm-list", acct: "investor", title: "CRM, pipeline list", path: "/relationships" },
+  { id: "inv-crm-list", acct: "investor", title: "CRM, pipeline list", path: "/relationships?view=pipeline&layout=list" },
   { id: "inv-crm-overview", acct: "investor", title: "CRM, overview", path: "/relationships?view=overview" },
   { id: "inv-crm-table", acct: "investor", title: "CRM, pipeline table", path: "/relationships?view=pipeline&layout=table" },
   { id: "inv-crm-board", acct: "investor", title: "CRM, pipeline board", path: "/relationships?view=pipeline&layout=board" },
@@ -137,12 +140,14 @@ const SHOTS = [
       await c.scrollToText("Not proceeding for now", "button");
     } },
   { id: "inv-crm-messages", acct: "investor", title: "CRM record, messages", path: () => `/relationships/company/${ids.ledgerfold}/messages` },
-  { id: "inv-capital", acct: "investor", title: "Capital, investor", path: "/capital" },
+  { id: "inv-capital", acct: "investor", title: "CRM Capital tab, investor", path: "/relationships?view=capital" },
+  { id: "inv-crm-calls", acct: "investor", title: "CRM record, calls and meetings", path: () => `/relationships/company/${ids.ledgerfold}/calls` },
+  { id: "inv-profile", acct: "investor", title: "Investor profile, own view", path: "/profile" },
   { id: "inv-mandate", acct: "investor", title: "Mandate review", path: "/onboarding/investor?review=1", wait: 4000 },
-  { id: "inv-gateq-inbox", acct: "investor", title: "GateQ inbox and dossier", path: "/gateq?tab=inbox", run: async (c) => { await c.selectApplication("Maji Loop"); } },
+  { id: "inv-gateq-inbox", acct: "investor", title: "GateQ inbox and dossier", path: "/gateq?tab=inbox", wait: 3000 },
   { id: "inv-gateq-dossier", acct: "investor", title: "GateQ dossier, details", path: "/gateq?tab=inbox", run: async (c) => {
-      await c.selectApplication("Maji Loop");
-      await c.scrollToText("What they shared");
+      await c.selectApplication("TensorGate");
+      await c.scrollToText("Submitted investment brief");
     } },
   { id: "inv-gateq-gate", acct: "investor", title: "GateQ, your gate", path: "/gateq?tab=gate" },
   { id: "inv-gateq-find", acct: "investor", title: "GateQ, find a startup", path: "/gateq?tab=find" },
@@ -165,8 +170,16 @@ const SHOTS = [
     } },
   { id: "inv-work-progress", acct: "investor", title: "Q Work, jobs in progress", path: "/work", run: async (c) => { await c.scrollTo(/^In progress/); } },
   { id: "inv-documents", acct: "investor", title: "Documents, investor", path: "/documents" },
+  { id: "inv-doc-open", acct: "investor", title: "A document Q wrote", path: "/documents", run: async (c) => {
+      const b = c.page.getByRole("button", { name: /^Open Investment brief/ }).or(c.page.getByRole("button", { name: /^Open .*memo/ })).first();
+      if (await b.count()) { await b.click().catch(() => {}); await c.page.waitForTimeout(5000); }
+    } },
+  { id: "inv-work-job", acct: "investor", title: "Q Work, the Harbourline diligence job", path: "/work", run: async (c) => { await c.scrollToText("Get the team ready for our Harbourline Cargo diligence"); } },
+  { id: "inv-work-teammap", acct: "investor", title: "Q Work, team map", path: "/work", run: async (c) => { await c.clickButton(/^Team map$/, { optional: true }); await c.page.waitForTimeout(2500); } },
   { id: "inv-daily", acct: "investor", title: "The Q Daily", path: "/daily" },
   { id: "inv-qpitch", acct: "investor", title: "Q Pitch", path: "/q-pitch" },
+  { id: "inv-qpitch-atlas", acct: "investor", title: "Q Pitch, Feature Atlas", path: "/q-pitch", run: async (c) => { await c.scrollTo("Feature Atlas"); } },
+  { id: "inv-qpitch-tour", acct: "investor", title: "Q Pitch, tour running", path: "/home?qpitch=short", needs: "q", wait: 25000 },
   { id: "inv-notifications", acct: "investor", title: "Notifications", path: "/capital", run: async (c) => { await c.page.locator("[data-notification-center]").first().click(); await c.page.waitForTimeout(3500); } },
   { id: "inv-settings", acct: "investor", title: "Settings", path: "/settings" },
   { id: "inv-plan", acct: "investor", title: "Plan", path: "/settings/plan" },
@@ -174,10 +187,11 @@ const SHOTS = [
 
   // ---------- Founder (Harbourline Cargo) ----------
   { id: "fnd-home", acct: "founder", title: "Q (home), founder", path: "/home", wait: 4000 },
-  { id: "fnd-nav", acct: "founder", title: "Sidebar, founder (expanded)", path: "/capital", run: async (c) => { await c.expandNav(); } },
+  { id: "fnd-nav", acct: "founder", title: "Sidebar, founder (expanded)", path: "/relationships?view=capital", run: async (c) => { await c.expandNav(); } },
   { id: "fnd-discover", acct: "founder", title: "Discover, investors", path: "/discover" },
   { id: "fnd-investor", acct: "founder", title: "Investor profile", path: () => `/investors/${ids.savanna}` },
   { id: "fnd-capital", acct: "founder", title: "Capital, founder", path: "/capital" },
+  { id: "fnd-crm-capital", acct: "founder", title: "CRM Capital tab, founder", path: "/relationships?view=capital" },
   { id: "fnd-readiness", acct: "founder", title: "Capital, readiness", path: "/capital?tab=readiness" },
   { id: "fnd-action-plan", acct: "founder", title: "Capital, action plan", path: "/capital?tab=action-plan" },
   { id: "fnd-documents", acct: "founder", title: "Documents, founder", path: "/documents" },
@@ -186,7 +200,7 @@ const SHOTS = [
   { id: "fnd-company", acct: "founder", title: "Company profile (founder)", path: () => `/company/${ids.harbourline}` },
   { id: "fnd-pitch", acct: "founder", title: "Pitch & media", path: "/pitch" },
   { id: "fnd-pitch-new", acct: "founder", title: "New pitch video", path: "/pitch/new" },
-  { id: "fnd-crm", acct: "founder", title: "Fundraising Hub", path: "/relationships" },
+  { id: "fnd-crm", acct: "founder", title: "Fundraising Hub", path: "/relationships?view=pipeline&layout=list" },
   { id: "fnd-crm-record", acct: "founder", title: "Fundraising Hub record", path: () => `/relationships/investor/${ids.savanna}` },
   { id: "fnd-interest", acct: "founder", title: "Investor interest", path: "/company/interest" },
   { id: "fnd-gateq", acct: "founder", title: "GateQ, founder", path: "/gateq?tab=applications" },
@@ -198,8 +212,11 @@ const SHOTS = [
       if (await role.count() && !(await role.inputValue())) await role.fill("Founder & CEO");
       await c.clickButton(/^Confirm and continue$/, { optional: true });
       await c.page.waitForTimeout(6000);
-      for (const name of [/^Continue$/, /^Start$/, /^Begin$/, /Start the interview/]) await c.clickButton(name, { optional: true, quiet: true });
-      await c.page.waitForTimeout(20000);
+      for (let i = 0; i < 4; i++) {
+        if (await c.page.getByText(/video/i).first().isVisible().catch(() => false)) break;
+        if (!(await c.clickButton(/^Continue$/, { optional: true, quiet: true }))) break;
+        await c.page.waitForTimeout(5000);
+      }
     } },
   { id: "fnd-rehearsals", acct: "founder", title: "Rehearsals, founder", path: "/rehearsals" },
   { id: "fnd-rehearsal-lobby", acct: "founder", title: "Rehearsal lobby, founder", path: () => `/rehearsals/investor/${ids.savanna}`, wait: 20000 },
@@ -221,16 +238,27 @@ const SHOTS = [
   { id: "fnd-qcard", acct: "founder", title: "Q Card", path: "/profile", run: async (c) => { await c.scrollTo("Q Card"); } },
   { id: "fnd-team", acct: "founder", title: "Team", path: "/settings/team" },
   { id: "fnd-invite", acct: "founder", title: "Invite people", path: "/settings/team", run: async (c) => { await c.clickButton(/^Invite people$/); } },
+  { id: "fnd-welcome", acct: "founder", title: "Meeting Q (arrival)", path: "/welcome?again=1", wait: 6000 },
   { id: "fnd-onboarding", acct: "founder", title: "Founder setup", path: "/onboarding/founder" },
   { id: "fnd-qpitch", acct: "founder", title: "Q Pitch, founder", path: "/q-pitch" },
 
   // ---------- Founder (Ledgerfold) ----------
   { id: "led-home", acct: "ledgerfold", title: "Q (home), Ledgerfold", path: "/home", wait: 4000 },
   { id: "led-interest", acct: "ledgerfold", title: "Investor interest, to answer", path: "/company/interest" },
-  { id: "led-crm", acct: "ledgerfold", title: "Fundraising Hub, Ledgerfold", path: "/relationships" },
+  { id: "led-crm", acct: "ledgerfold", title: "Fundraising Hub, Ledgerfold", path: "/relationships?view=pipeline&layout=list" },
   { id: "led-crm-board", acct: "ledgerfold", title: "Fundraising Hub board", path: "/relationships?view=pipeline&layout=board" },
   { id: "led-deck", acct: "ledgerfold", title: "Deck Q prepared", path: () => `/company/${ids.ledgerfold}?tab=deck`, run: async (c) => { await c.scrollTo(/deck/i); } },
 ];
+
+// Phone (390) copies of the main pages, and tablet (834) where the layout really changes.
+const MOBILE = ["landing", "signup", "inv-home", "inv-discover", "inv-explore", "inv-company", "inv-crm-overview", "inv-crm-list", "inv-crm-record", "inv-gateq-inbox", "inv-work", "fnd-home", "fnd-capital", "fnd-documents", "fnd-gate-form", "fnd-dataroom"];
+const TABLET = ["inv-discover", "inv-crm-board", "inv-gateq-inbox"];
+for (const [list, vp] of [[MOBILE, "m"], [TABLET, "t"]]) {
+  for (const id of list) {
+    const base = SHOTS.find((s) => s.id === id);
+    if (base) SHOTS.push({ ...base, id: `${id}-${vp}`, title: `${base.title} (${vp === "m" ? "phone" : "tablet"})`, vp, run: undefined });
+  }
+}
 
 const ids = {};
 
@@ -284,12 +312,12 @@ function helpers(page) {
       await page.waitForTimeout(2500);
       await page.addStyleTag({ content: DECLUTTER }).catch(() => {});
     },
-    /** Close Q's spoken-greeting caption (bottom right); it is local and comes back next visit. */
+    /** Close Q's greeting / "Needs you" panel (it only hides it; nothing is decided), so it doesn't cover the page. */
     async closeArrival() {
       const closed = await page.evaluate(() => {
         const b = [...document.querySelectorAll("button")].find((x) => {
           const r = x.getBoundingClientRect();
-          return x.textContent.trim() === "Close" && r.top > 650 && r.left > 950 && r.width > 0;
+          return x.textContent.trim() === "Close" && (r.left > 260 || window.innerWidth < 900) && r.width > 0;
         });
         if (b) b.click();
         return Boolean(b);
@@ -429,7 +457,7 @@ async function resolveIds(acct, c) {
     return a ? a.getAttribute("href") : null;
   }, { pattern, text });
   if (acct === "investor") {
-    await c.go("/relationships");
+    await c.go("/relationships?view=pipeline&layout=list");
     ids.ledgerfold ??= (await hrefFor("^/relationships/company/[0-9a-f-]+$", "Ledgerfold"))?.split("/").pop();
     ids.second ??= (await hrefFor("^/relationships/company/[0-9a-f-]+$", "Harbourline"))?.split("/").pop();
     await c.go("/rehearsals");
@@ -438,7 +466,7 @@ async function resolveIds(acct, c) {
     ids.gate ??= (await hrefFor("^/g/gq_", null))?.split("/").pop();
   }
   if (acct === "founder") {
-    await c.go("/relationships");
+    await c.go("/relationships?view=pipeline&layout=list");
     ids.savanna ??= (await hrefFor("^/relationships/investor/[0-9a-f-]+$", "Savanna"))?.split("/").pop();
     await c.go("/company/data-room");
     ids.harbourline ??= new URL(c.page.url()).pathname.split("/")[2];
@@ -481,12 +509,17 @@ async function main() {
         // A fresh tab per shot: a renderer crash on one page (the shared VM
         // runs short of memory) then costs one shot, not the rest of the run.
         const page = await ctx.newPage();
+        await page.setViewportSize(VIEWPORTS[s.vp ?? "d"]);
         const c = helpers(page);
         try {
           await c.go(p);
           if (s.wait) await page.waitForTimeout(s.wait);
           if (s.run) await s.run(c);
           await c.closeArrival();
+          await page.evaluate(() => {
+            // One tester applicant on the demo inbox uses a real e-mail address; blur it.
+            for (const el of document.querySelectorAll("body *")) if (el.tagName !== "SCRIPT" && el.children.length <= 2 && (el.textContent ?? "").length < 200 && /@(gmail|yahoo|outlook|hotmail)\./i.test(el.textContent ?? "")) el.style.filter = "blur(5px)";
+          });
           if (s.marks) writeFileSync(resolve(OUT, `${s.id}.marks.json`), JSON.stringify(await boxesFor(page, s.marks), null, 1));
           await page.screenshot({ path: resolve(OUT, `${s.id}.png`) });
           manifest[s.id] = { title: s.title, url: p, at: new Date().toISOString(), ok: true };
