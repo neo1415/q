@@ -48,6 +48,7 @@ import {
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { QPageState, QSection, useQDialog } from "@/features/q/q-section";
+import { QPageFocus } from "@/features/q/q-subject";
 
 import { QNavIcon } from "@/components/app-shell/q-nav-icon";
 import { qRef } from "@/features/q/q-ref";
@@ -822,6 +823,15 @@ export function InboxView({
           {bulk}
         </QSection>
       )}
+      {/* Q's panel is about the application being read, not the reader's
+          own organisation (live check 2026-10-16). */}
+      <QPageFocus
+        label={
+          applicationFocus === undefined || current === null
+            ? null
+            : `${current.companyName}'s application`
+        }
+      />
       <QSection
         id="gateq-inbox"
         kind="GATEQ_INBOX"
