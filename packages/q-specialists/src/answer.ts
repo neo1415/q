@@ -830,6 +830,7 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   CAPITAL_PLAN: "Opening your 12-month plan.",
   CAPITAL_INVESTORS: "Opening your investors on Capital.",
   CRM_PIPELINE: "Opening your pipeline.",
+  Q_PITCH: "Let me show you Capital Q.",
 };
 
 /** A real screen, as offered back to someone who named one that isn't. */
@@ -880,6 +881,7 @@ const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
   CAPITAL_PLAN: "Capital (12-month plan)",
   CAPITAL_INVESTORS: "Capital (Investors)",
   CRM_PIPELINE: "CRM (Pipeline)",
+  Q_PITCH: "Q Pitch",
 };
 
 /**
