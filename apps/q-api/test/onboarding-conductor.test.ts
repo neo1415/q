@@ -424,6 +424,45 @@ describe("Q leads", () => {
     }
   });
 
+  it("resuming from a profile section link asks that section first (live AG: ?section=moats was ignored)", async () => {
+    const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
+    const base = stuckView();
+    const view: OnboardingSessionView = {
+      ...base,
+      progress: {
+        ...base.progress,
+        eligibleSteps: [
+          ...base.progress.eligibleSteps,
+          { stepKey: "F9.moats", required: false, status: "PENDING" },
+        ],
+      },
+    };
+    const { fetch: f } = api({
+      kept: [
+        { role: "Q", text: "Hi Aria, welcome to Capital Q." },
+        { role: "PERSON", text: "Hi." },
+      ],
+    });
+    const conductor = createOnboardingConductor({
+      agent,
+      portFor: fakePorts(view).portFor,
+      logger,
+    });
+    const outcome = await conductor.turn(input(f, "", { focus: "moats" }));
+    expect(agent.calls).toEqual([]);
+    expect(outcome.resumed).toBe(true);
+    expect(outcome.askingAbout).toEqual(["F9.moats"]);
+    expect(outcome.reply).not.toBe(resumeLine(view, "founder"));
+    // An unknown or answered section falls back to the journey's next step.
+    const plain = await createOnboardingConductor({
+      agent,
+      portFor: fakePorts(view).portFor,
+      logger,
+    }).turn(input(f, "", { focus: "nothing" }));
+    expect(plain.reply).toBe(resumeLine(view, "founder"));
+    await tick();
+  });
+
   it("resumes a conversation under way on the next step, without greeting again and without a model", async () => {
     const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
     const ports = fakePorts();

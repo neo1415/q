@@ -7,7 +7,10 @@ import {
   type ApiSession,
 } from "@capital-q/api-client";
 import type { OnboardingSessionView } from "@capital-q/contracts";
-import { FOUNDER_STEPS } from "@capital-q/founder-onboarding";
+import {
+  FOUNDER_PROFILE_SECTIONS,
+  FOUNDER_STEPS,
+} from "@capital-q/founder-onboarding";
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 
@@ -106,6 +109,8 @@ export type NextStep = {
 export function nextUnansweredStep(
   view: OnboardingSessionView,
   journeyType: "founder" | "investor",
+  /** Only these steps, in this order (a profile section they came to fill). */
+  among?: readonly string[],
 ): NextStep | null {
   if (view.session.status === "COMPLETED") return null;
   const steps = new Map(
@@ -124,7 +129,12 @@ export function nextUnansweredStep(
       steps.has(e.stepKey),
   );
   // Required before optional, otherwise the journey's own order.
-  const chosen = open.find((e) => e.required) ?? open[0];
+  const chosen =
+    among === undefined
+      ? (open.find((e) => e.required) ?? open[0])
+      : among
+          .map((key) => open.find((e) => e.stepKey === key))
+          .find((e) => e !== undefined);
   if (chosen === undefined) return null;
   const step = steps.get(chosen.stepKey);
   if (step === undefined) return null;
@@ -602,8 +612,22 @@ export function createOnboardingConductor(
       input.session,
       input.onboardingSessionId,
     );
-    const next = nextUnansweredStep(view, input.journeyType);
-    let reply = resumeLine(view, input.journeyType);
+    // The profile section they came to fill (lane ov's Overview link,
+    // ?section=): its first open step is asked on resume too (live AG
+    // 2026-10-16: a resumed conversation ignored the section).
+    const section =
+      input.journeyType === "founder" && input.focus !== undefined
+        ? FOUNDER_PROFILE_SECTIONS.find((s) => s.key === input.focus)
+        : undefined;
+    const focused =
+      section === undefined
+        ? null
+        : nextUnansweredStep(view, input.journeyType, section.stepKeys);
+    const next = focused ?? nextUnansweredStep(view, input.journeyType);
+    let reply =
+      focused === null
+        ? resumeLine(view, input.journeyType)
+        : `Picking up where we left off. ${focused.question}`;
     let asking =
       next === null ? null : askingFor(next.stepKey, input.journeyType, view);
     // What research found while they were away is the first thing said.
