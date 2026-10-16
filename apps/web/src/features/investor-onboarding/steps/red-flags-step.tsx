@@ -10,6 +10,7 @@ import { InlineNotice } from "@capital-q/ui/states";
 import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
 import { redFlagConflictMessage } from "../models/journey";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * I7. Two clearly different lists. "I'd rather not see" is a soft
@@ -24,6 +25,7 @@ export function RedFlagsStep({
   busy,
   actions,
 }: StepProps<"red_flags">) {
+  const t = useT();
   const saved = step.response;
   const [avoid, setAvoid] = useState<readonly string[]>(saved?.avoid ?? []);
   const [hard, setHard] = useState<readonly string[]>(saved?.hard ?? []);
@@ -85,7 +87,9 @@ export function RedFlagsStep({
           id="red-flags-avoid"
           name="avoid"
           legend="I'd rather not see"
-          description="A soft preference. These can still appear, ranked lower."
+          description={t(
+            "A soft preference. These can still appear, ranked lower.",
+          )}
           options={step.options}
           values={avoid}
           disabled={busy}
@@ -104,7 +108,9 @@ export function RedFlagsStep({
           id="red-flags-hard"
           name="hard"
           legend="Never show me"
-          description="A hard exclusion. Companies that match these are not shown in your recommendations, whatever your discovery style."
+          description={t(
+            "A hard exclusion. Companies that match these are not shown in your recommendations, whatever your discovery style.",
+          )}
           options={step.options}
           values={hard}
           disabled={busy}
@@ -119,18 +125,18 @@ export function RedFlagsStep({
       </section>
       <fieldset className="flex flex-col gap-3" data-red-flags="sectors">
         <legend className="cq-label text-(--cq-text-primary)">
-          Sectors to exclude outright
+          {t("Sectors to exclude outright")}
         </legend>
-        <InlineNotice tone="info" title="Hard exclusion">
-          Companies in these categories are not shown in your recommendations.
-          This is not a preference: excluding a sector you listed as a
-          preference moves it here.
+        <InlineNotice tone="info" title={t("Hard exclusion")}>
+          {t(
+            "Companies in these categories are not shown in your recommendations. This is not a preference: excluding a sector you listed as a preference moves it here.",
+          )}
         </InlineNotice>
         <div className="flex items-end gap-2">
           <Input
             id="red-flags-search"
-            label="Search sectors or product areas"
-            placeholder="Search sectors or product areas…"
+            label={t("Search sectors or product areas")}
+            placeholder={t("Search sectors or product areas…")}
             value={query}
             disabled={busy}
             onChange={(event) => setQuery(event.target.value)}
@@ -147,11 +153,14 @@ export function RedFlagsStep({
             disabled={busy}
             onClick={() => void search()}
           >
-            Suggest
+            {t("Suggest")}
           </Button>
         </div>
         {offered.length > 0 ? (
-          <ul className="flex flex-wrap gap-2" aria-label="Suggested sectors">
+          <ul
+            className="flex flex-wrap gap-2"
+            aria-label={t("Suggested sectors")}
+          >
             {offered.map((candidate) => (
               <li key={candidate.nodeId}>
                 <Button
@@ -168,7 +177,10 @@ export function RedFlagsStep({
           </ul>
         ) : null}
         {sectors.length > 0 ? (
-          <ul className="flex flex-wrap gap-2" aria-label="Excluded sectors">
+          <ul
+            className="flex flex-wrap gap-2"
+            aria-label={t("Excluded sectors")}
+          >
             {sectors.map((item) => (
               <li key={item.nodeId}>
                 <Button

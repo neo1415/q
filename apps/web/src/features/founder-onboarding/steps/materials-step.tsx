@@ -16,6 +16,7 @@ import { InlineNotice } from "@capital-q/ui/states";
 
 import type { MaterialFileView } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F2 — "What do you already have?" (CQ-Q-021 §3, §12, §14, §57).
@@ -57,6 +58,7 @@ export function MaterialsStep({
   busy,
   actions,
 }: StepProps<"materials">): React.ReactElement {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<string>(step.kinds[0]?.value ?? "OTHER");
   const [dragging, setDragging] = useState(false);
@@ -119,7 +121,7 @@ export function MaterialsStep({
 
       <Select
         id={kindFieldId}
-        label="What is this?"
+        label={t("What is this?")}
         value={kind}
         onChange={(event) => {
           setKind(event.target.value);
@@ -160,7 +162,7 @@ export function MaterialsStep({
           onClick={() => inputRef.current?.click()}
           disabled={busy || atCapacity}
         >
-          Choose files
+          {t("Choose files")}
         </Button>
         <input
           ref={inputRef}
@@ -226,7 +228,7 @@ export function MaterialsStep({
                     }}
                     disabled={busy}
                   >
-                    Remove and try another
+                    {t("Remove and try another")}
                   </Button>
                 ) : null}
               </div>

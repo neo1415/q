@@ -6,6 +6,7 @@ import { FIT_BAND_LABELS, FIT_CONFIDENCE_LABELS } from "@capital-q/contracts";
 import { ChevronDown, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { FitPanel, useCompanyFit, type CompanyFit } from "@/features/fit";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The fit panel's place on a company profile (overnight plan A1/B3/B4).
@@ -43,12 +44,15 @@ export function fitWords(fit: CompanyFit): string | null {
 
 /** The summary strip's fit cell: words only, absent when there is no fit. */
 export function FitStripCell() {
+  const t = useT();
   const fit = useContext(ProfileFit);
   if (fit.status !== "READY") return null;
   const { band, confidence } = fit.fit.profile;
   return (
     <div className="flex min-w-0 flex-col gap-0.5" data-strip-fit>
-      <dt className="cq-caption text-(--cq-text-secondary)">Fit with you</dt>
+      <dt className="cq-caption text-(--cq-text-secondary)">
+        {t("Fit with you")}
+      </dt>
       <dd className="cq-title-sm text-(--cq-text-primary)">
         {FIT_BAND_LABELS[band]}
         <span className="cq-caption block font-normal text-(--cq-text-secondary)">
@@ -66,6 +70,7 @@ export function FitPanelSlot({
   readonly companyId: string;
   readonly companyName: string;
 }) {
+  const t = useT();
   const fit = useContext(ProfileFit);
   if (fit.status === "NONE") return null;
   const words = fitWords(fit);
@@ -77,7 +82,7 @@ export function FitPanelSlot({
       <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 py-2 lg:hidden [&::-webkit-details-marker]:hidden">
         <span className="flex min-w-0 flex-col">
           <span className="cq-title-sm text-(--cq-text-primary)">
-            Fit with your mandate
+            {t("Fit with your mandate")}
           </span>
           <span className="cq-body-sm text-(--cq-text-secondary)">
             {words ?? "Reading your fit…"}

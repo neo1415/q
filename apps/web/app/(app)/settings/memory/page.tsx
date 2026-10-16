@@ -11,6 +11,7 @@ import { getSessionAccessToken } from "@/auth/session";
 import { QMemoryList } from "@/features/settings/q-memory-list";
 import { PreferenceLearningSwitch } from "@/features/settings/preference-learning";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "What Q remembers" };
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export const dynamic = "force-dynamic";
  * read under their own session, from the Q API, and theirs to correct.
  */
 export default async function QMemoryPage() {
+  const t = await serverT();
   const { qApiBaseUrl } = loadWebServerConfig();
   const accessToken = await getSessionAccessToken();
   const read =
@@ -37,10 +39,12 @@ export default async function QMemoryPage() {
         }).catch(() => null);
   return (
     <PageContainer width="reading" className="flex flex-col gap-6">
-      <QSection id="memory" kind="MEMORY" label="what Q remembers">
+      <QSection id="memory" kind="MEMORY" label={t("what Q remembers")}>
         <PageHeader
-          title="What Q remembers"
-          description="Q uses this in every conversation. Forget anything wrong."
+          title={t("What Q remembers")}
+          description={t(
+            "Q uses this in every conversation. Forget anything wrong.",
+          )}
         />
         <PreferenceLearningSwitch initial={learning} />
         {read === null ? (
@@ -48,7 +52,7 @@ export default async function QMemoryPage() {
             className="cq-body text-(--cq-text-secondary)"
             data-state="unavailable"
           >
-            Q&apos;s memory couldn&apos;t be read just now. Reload in a moment.
+            {t("Q's memory couldn't be read just now. Reload in a moment.")}
           </p>
         ) : (
           <QMemoryList items={read.items} />

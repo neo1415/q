@@ -6,6 +6,7 @@ import { Button } from "@capital-q/ui/button";
 import { Input } from "@capital-q/ui/input";
 
 import { saveFounderBackgroundAction } from "./founder-background-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F4: "Your background" under You and your team: the founder's title at
@@ -29,6 +30,7 @@ export function FounderBackground({
 }: {
   readonly initial: FounderBackgroundValues;
 }) {
+  const t = useT();
   const id = useId();
   const [saved, setSaved] = useState(initial);
   const [title, setTitle] = useState(initial.businessTitle);
@@ -45,7 +47,7 @@ export function FounderBackground({
   return (
     <form
       className="flex flex-col gap-3"
-      aria-label="Your background"
+      aria-label={t("Your background")}
       data-founder-background
       onSubmit={(event) => {
         event.preventDefault();
@@ -76,11 +78,13 @@ export function FounderBackground({
         });
       }}
     >
-      <h3 className="cq-title-sm text-(--cq-text-primary)">Your background</h3>
+      <h3 className="cq-title-sm text-(--cq-text-primary)">
+        {t("Your background")}
+      </h3>
       <Input
         id={`${id}-title`}
-        label="Your title at the company"
-        placeholder="Co-founder & CEO"
+        label={t("Your title at the company")}
+        placeholder={t("Co-founder & CEO")}
         maxLength={120}
         value={title}
         onChange={(event) => setTitle(event.target.value)}
@@ -89,13 +93,15 @@ export function FounderBackground({
         htmlFor={`${id}-roles`}
         className="cq-label text-(--cq-text-primary)"
       >
-        Previous roles
+        {t("Previous roles")}
       </label>
       <textarea
         id={`${id}-roles`}
         className={AREA}
         maxLength={4000}
-        placeholder="Head of payments at Paystack (2019–2023); product at Interswitch"
+        placeholder={t(
+          "Head of payments at Paystack (2019–2023); product at Interswitch",
+        )}
         value={roles}
         onChange={(event) => setRoles(event.target.value)}
       />
@@ -103,19 +109,19 @@ export function FounderBackground({
         htmlFor={`${id}-education`}
         className="cq-label text-(--cq-text-primary)"
       >
-        Education and background
+        {t("Education and background")}
       </label>
       <textarea
         id={`${id}-education`}
         className={AREA}
         maxLength={4000}
-        placeholder="BSc Computer Science, University of Lagos"
+        placeholder={t("BSc Computer Science, University of Lagos")}
         value={education}
         onChange={(event) => setEducation(event.target.value)}
       />
       <div className="flex items-center gap-3">
         <Button type="submit" variant="secondary" disabled={pending}>
-          Save background
+          {t("Save background")}
         </Button>
         {message === null ? null : (
           <p role="status" className="cq-body-sm text-(--cq-text-secondary)">

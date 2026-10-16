@@ -6,6 +6,7 @@ import { Q_PERSONALITIES, type QPersonality } from "@capital-q/contracts";
 import { Tooltip, TooltipProvider } from "@capital-q/ui/tooltip";
 
 import { setPersonalityAction } from "./personality-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Who Q is with this person (founder direction 2026-09-30): one of Q's
@@ -37,6 +38,7 @@ export function PersonalitySetting({
 }: {
   readonly initial: QPersonality;
 }) {
+  const t = useT();
   const [chosen, setChosen] = useState<QPersonality>(initial);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -59,7 +61,7 @@ export function PersonalitySetting({
       <div className="flex flex-col gap-2">
         <div
           role="group"
-          aria-label="Q's personality"
+          aria-label={t("Q's personality")}
           className="flex flex-wrap gap-1"
           data-personality-setting
         >

@@ -7,6 +7,7 @@ import { Input } from "@capital-q/ui/input";
 
 import { useRegistrationDefaults } from "../../onboarding-kit/registration-defaults";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * I0. Investor type describes the organisation; the firm name creates or
@@ -19,6 +20,7 @@ export function InvestorRoleStep({
   busy,
   actions,
 }: StepProps<"investor_role">) {
+  const t = useT();
   const saved = step.response;
   const [investorType, setInvestorType] = useState<string | undefined>(
     saved?.investorType,
@@ -87,7 +89,7 @@ export function InvestorRoleStep({
       />
       <Input
         id="investor-organisation"
-        label="Your firm"
+        label={t("Your firm")}
         description={
           fromRegistration
             ? "From your sign-up. Typing another firm's name never joins it."
@@ -104,9 +106,11 @@ export function InvestorRoleStep({
       />
       <Input
         id="investor-title"
-        label="Your role there"
-        description="Optional. Shown with your name; it changes nothing you can do."
-        placeholder="Partner, Principal, Angel"
+        label={t("Your role there")}
+        description={t(
+          "Optional. Shown with your name; it changes nothing you can do.",
+        )}
+        placeholder={t("Partner, Principal, Angel")}
         autoComplete="organization-title"
         value={businessTitle}
         disabled={busy}

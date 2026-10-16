@@ -15,6 +15,7 @@ import {
 import { InvestorVisibilityScreen } from "@/features/investor/visibility-screen";
 import { resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Visibility and discovery" };
 
@@ -29,6 +30,7 @@ export const dynamic = "force-dynamic";
  * flipped by finishing onboarding.
  */
 export default async function VisibilityPage() {
+  const t = await serverT();
   const context = await resolveOwnContext();
   return (
     <PageContainer>
@@ -47,10 +49,10 @@ export default async function VisibilityPage() {
                 ]
               : []
         }
-        label="visibility and discovery"
+        label={t("visibility and discovery")}
       >
         <PageHeader
-          title="Visibility and discovery"
+          title={t("Visibility and discovery")}
           description={
             context.kind === "INVESTOR"
               ? "Who can see your investor profile, what they see, and whether founders can find you."
@@ -66,14 +68,16 @@ export default async function VisibilityPage() {
         ) : context.unavailable === true ? (
           // Not known to be nobody: Capital Q did not answer this render.
           <EmptyState
-            title="Visibility couldn't load."
-            description="Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment."
+            title={t("Visibility couldn't load.")}
+            description={t(
+              "Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment.",
+            )}
             action={
               <Link
                 href="/company/visibility"
                 className={buttonClassName("secondary")}
               >
-                Try again
+                {t("Try again")}
               </Link>
             }
           />

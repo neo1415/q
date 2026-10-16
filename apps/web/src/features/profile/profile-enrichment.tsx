@@ -24,6 +24,7 @@ import { useGlobalQ } from "@/components/app-shell/global-q";
 import { requestVerificationFromProfileAction } from "@/features/verification/verification-actions";
 import { SourcesDisclosure } from "@/components/sources-disclosure";
 import { formatDay } from "@/components/date-format";
+import { useT } from "@/features/i18n/language";
 
 /**
  * What else is known about a profile, beside what the person declared
@@ -121,6 +122,7 @@ export function ProfileFindings({
   /** Inside the Signals card, which already heads and explains it. */
   readonly bare?: boolean | undefined;
 }) {
+  const t = useT();
   const { askNow } = useGlobalQ();
   const headingId = `found-${subjectLabel.replace(/\W+/g, "-").toLowerCase()}`;
   return (
@@ -132,11 +134,12 @@ export function ProfileFindings({
       {bare ? null : (
         <>
           <h3 id={headingId} className="cq-label text-(--cq-text-primary)">
-            What Q found
+            {t("What Q found")}
           </h3>
           <p className="cq-caption pt-1 text-(--cq-text-secondary)">
-            Q&apos;s reading of public pages. Not on your profile until you
-            confirm it.
+            {t(
+              "Q's reading of public pages. Not on your profile until you confirm it.",
+            )}
           </p>
         </>
       )}
@@ -145,11 +148,11 @@ export function ProfileFindings({
           className="cq-body-sm pt-3 text-(--cq-text-secondary)"
           aria-busy="true"
         >
-          Reading what Q found…
+          {t("Reading what Q found…")}
         </p>
       ) : state.status === "UNAVAILABLE" ? (
         <p className="cq-body-sm pt-3 text-(--cq-text-secondary)">
-          Couldn&apos;t be read just now.
+          {t("Couldn't be read just now.")}
         </p>
       ) : state.findings.length === 0 ? (
         <p className="cq-body-sm pt-3 text-(--cq-text-secondary)">
@@ -209,7 +212,7 @@ export function ProfileFindings({
                   onClick={() => askNow(findingQuestion(subjectLabel, finding))}
                   aria-label={`Ask Q about: ${FINDING_LABELS[finding.key].toLowerCase()}`}
                 >
-                  Ask Q about this
+                  {t("Ask Q about this")}
                 </button>
               </div>
             </li>
@@ -294,6 +297,7 @@ export function SignalsAndVerification({
   /** Minted by the server render, so a double press is the same request. */
   readonly verificationRequestKey?: string | null | undefined;
 }) {
+  const t = useT();
   const { askNow } = useGlobalQ();
   const primary = subjects[0];
   const loading = subjects.some((s) => s.findings.status === "LOADING");
@@ -322,12 +326,12 @@ export function SignalsAndVerification({
         className="cq-title-sm flex items-center gap-2 text-(--cq-text-primary)"
       >
         <Shield size={ICON_SIZE.regular} aria-hidden="true" />
-        Signals &amp; verification
+        {t("Signals & verification")}
       </h2>
 
       <SignalsPart
         icon={<Search size={ICON_SIZE.compact} aria-hidden="true" />}
-        title="What Q found"
+        title={t("What Q found")}
         data="findings"
       >
         {loading ? (
@@ -373,7 +377,7 @@ export function SignalsAndVerification({
           onClick={() => askNow(lookDraft)}
           data-signals-look
         >
-          Ask Q to look
+          {t("Ask Q to look")}
         </button>
       </SignalsPart>
 
@@ -385,7 +389,7 @@ export function SignalsAndVerification({
             className="text-(--cq-text-secondary)"
           />
         }
-        title="Verification"
+        title={t("Verification")}
         data="verified"
       >
         {verification !== null && verification.status === "READ" ? (
@@ -423,7 +427,7 @@ export function SignalsAndVerification({
                     href={verificationHref}
                     className="text-(--cq-text-primary) underline underline-offset-4"
                   >
-                    Add claims
+                    {t("Add claims")}
                   </Link>{" "}
                   to have them checked.
                 </>
@@ -456,7 +460,7 @@ export function SignalsAndVerification({
               className={buttonClassName("secondary", "compact", "self-start")}
               data-request-verification
             >
-              Request verification
+              {t("Request verification")}
             </button>
           </form>
         ) : null}
@@ -470,14 +474,14 @@ export function SignalsAndVerification({
               )
             }
           >
-            How verification works
+            {t("How verification works")}
           </button>
         ) : (
           <Link
             href={verificationHref}
             className={buttonClassName("quiet", "compact", "-ms-2 self-start")}
           >
-            How verification works
+            {t("How verification works")}
           </Link>
         )}
       </SignalsPart>

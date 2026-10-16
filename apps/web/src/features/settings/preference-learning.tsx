@@ -9,6 +9,7 @@ import {
   choosePreferenceLearningAction,
   preferenceLearningAction,
 } from "./memory-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Consent to learn how the person likes to work (lane ob1; owner decision
@@ -32,6 +33,7 @@ export function PreferenceLearningAsk({
   /** The state read on the server, when the page already has it. */
   readonly initial?: QPreferenceLearningDto | null | undefined;
 }) {
+  const t = useT();
   const [state, setState] = useState<QPreferenceLearningDto | null>(
     initial ?? null,
   );
@@ -73,7 +75,7 @@ export function PreferenceLearningAsk({
   return (
     <div
       role="group"
-      aria-label="May Q learn how you like to work?"
+      aria-label={t("May Q learn how you like to work?")}
       className="flex flex-col gap-2"
       data-q-learning-ask
     >
@@ -87,7 +89,7 @@ export function PreferenceLearningAsk({
           disabled={pending}
           onClick={() => choose("ALLOW")}
         >
-          Allow
+          {t("Allow")}
         </Button>
         <Button
           size="compact"
@@ -95,7 +97,7 @@ export function PreferenceLearningAsk({
           disabled={pending}
           onClick={() => choose("NOT_NOW")}
         >
-          Not now
+          {t("Not now")}
         </Button>
       </div>
     </div>
@@ -107,6 +109,7 @@ export function PreferenceLearningSwitch({
 }: {
   readonly initial: QPreferenceLearningDto | null;
 }) {
+  const t = useT();
   const [state, setState] = useState(initial);
   const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -134,7 +137,7 @@ export function PreferenceLearningSwitch({
           }
         />
         <span className="cq-body text-(--cq-text-primary)">
-          Let Q learn how I like to work
+          {t("Let Q learn how I like to work")}
         </span>
       </label>
       <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -144,7 +147,7 @@ export function PreferenceLearningSwitch({
       </p>
       {failed ? (
         <p role="alert" className="cq-body-sm text-(--cq-text-primary)">
-          That didn&apos;t save. Try again.
+          {t("That didn't save. Try again.")}
         </p>
       ) : null}
     </div>

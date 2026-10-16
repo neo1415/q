@@ -7,12 +7,14 @@ import { rememberServerLanguage } from "./server-now";
 
 /** The person's interface language, from their saved choice (cached per request). */
 export async function serverUiLanguage(): Promise<UiLanguage> {
-  // A failure to read the standing (even a synchronous one) means English,
-  // never a broken page.
-  const standing = await Promise.resolve()
-    .then(() => resolveQStanding())
-    .catch(() => null);
-  const language = uiLanguageOf(standing?.language);
+  // English whenever the choice cannot be read: a page never fails over it.
+  let language: UiLanguage = "en";
+  try {
+    const standing = await resolveQStanding();
+    language = uiLanguageOf(standing?.language);
+  } catch {
+    language = "en";
+  }
   // Synchronous server components below read it (serverTNow).
   rememberServerLanguage(language);
   return language;

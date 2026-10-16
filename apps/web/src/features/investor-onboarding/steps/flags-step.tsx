@@ -6,6 +6,7 @@ import { ChoiceList, MultiChoiceList } from "@capital-q/ui/choice-list";
 import { NarrativeInput } from "@capital-q/ui/narrative-input";
 
 import { StepHeading, StrengthNote, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * I5 / I6. Positive criteria with an explicit strength: nothing is weighted
@@ -13,6 +14,7 @@ import { StepHeading, StrengthNote, type StepProps } from "./step-props";
  * automatic filter.
  */
 export function FlagsStep({ step, formId, busy, actions }: StepProps<"flags">) {
+  const t = useT();
   const saved = step.response;
   const [codes, setCodes] = useState<readonly string[]>(saved?.codes ?? []);
   const [strength, setStrength] = useState<string | undefined>(saved?.strength);
@@ -64,8 +66,10 @@ export function FlagsStep({ step, formId, busy, actions }: StepProps<"flags">) {
       {step.allowCustom ? (
         <NarrativeInput
           id={`${step.id}-custom`}
-          label="Anything else you look for?"
-          description="In your own words. Kept for people to read; it never becomes an automatic filter."
+          label={t("Anything else you look for?")}
+          description={t(
+            "In your own words. Kept for people to read; it never becomes an automatic filter.",
+          )}
           value={customText}
           maxLength={1000}
           disabled={busy}

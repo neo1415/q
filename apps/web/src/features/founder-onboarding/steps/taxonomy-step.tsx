@@ -7,6 +7,7 @@ import { InlineNotice, Skeleton } from "@capital-q/ui/states";
 
 import type { TaxonomyCandidateView } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F1 categories. Suggested categories come from the deterministic
@@ -20,6 +21,7 @@ export function TaxonomyStep({
   busy,
   actions,
 }: StepProps<"taxonomy_select">) {
+  const t = useT();
   const hasSource =
     step.sourceText !== undefined && step.sourceText.trim().length > 0;
   // Without a description there is nothing to derive candidates from.
@@ -122,27 +124,30 @@ export function TaxonomyStep({
     <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-6">
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
       {candidates === undefined ? (
-        <div aria-busy="true" aria-label="Finding suggested categories">
+        <div aria-busy="true" aria-label={t("Finding suggested categories")}>
           <Skeleton lines={3} />
         </div>
       ) : (
         <fieldset className="flex flex-col gap-3">
           <legend className="cq-label text-(--cq-text-primary)">
-            Suggested categories
+            {t("Suggested categories")}
           </legend>
           {sourceText === undefined ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              Add a short description first and suggestions will appear here.
+              {t(
+                "Add a short description first and suggestions will appear here.",
+              )}
             </p>
           ) : offered.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              No suggestions matched your description. You can skip this for
-              now.
+              {t(
+                "No suggestions matched your description. You can skip this for now.",
+              )}
             </p>
           ) : null}
           <ul
             className="flex flex-wrap gap-2"
-            aria-label="Suggested categories"
+            aria-label={t("Suggested categories")}
           >
             {offered.map((candidate) => (
               <li key={candidate.nodeId}>
@@ -172,7 +177,7 @@ export function TaxonomyStep({
               htmlFor="taxonomy-search"
               className="cq-label text-(--cq-text-primary)"
             >
-              Search for a category
+              {t("Search for a category")}
             </label>
             <div className="flex gap-2">
               <input
@@ -180,7 +185,7 @@ export function TaxonomyStep({
                 type="search"
                 value={query}
                 maxLength={200}
-                placeholder="For example: fintech, tax, insurance"
+                placeholder={t("For example: fintech, tax, insurance")}
                 className="min-h-11 flex-1 border border-(--cq-border-strong) bg-(--cq-surface) px-3 cq-body-sm text-(--cq-text-primary)"
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
@@ -198,7 +203,7 @@ export function TaxonomyStep({
                 disabled={busy || searching || query.trim().length < 2}
                 onClick={() => void search()}
               >
-                Search
+                {t("Search")}
               </Button>
             </div>
             {found === undefined ? null : searchResults.length === 0 ? (
@@ -211,7 +216,7 @@ export function TaxonomyStep({
             ) : (
               <ul
                 className="flex flex-wrap gap-2"
-                aria-label="Categories found"
+                aria-label={t("Categories found")}
               >
                 {searchResults.map((candidate) => (
                   <li key={candidate.nodeId}>

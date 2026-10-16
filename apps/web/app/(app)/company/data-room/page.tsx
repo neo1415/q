@@ -32,7 +32,6 @@ export default async function OwnDataRoomPage({
   >;
 } = {}) {
   const t = await serverT();
-
   const params = (await searchParams) ?? {};
   const asked = params["tab"];
   const tab = typeof asked === "string" && TABS.has(asked) ? asked : "dataroom";
@@ -44,7 +43,12 @@ export default async function OwnDataRoomPage({
   }
   return (
     <PageContainer>
-      <QSection id="data-room" kind="DATA_ROOM" total={0} label="the data room">
+      <QSection
+        id="data-room"
+        kind="DATA_ROOM"
+        total={0}
+        label={t("the data room")}
+      >
         {context.kind === "INVESTOR" ? (
           <EmptyState
             title={t("Data rooms belong to companies")}
@@ -53,7 +57,7 @@ export default async function OwnDataRoomPage({
             )}
             action={
               <Link className={buttonClassName("secondary")} href="/discover">
-                Open Discover
+                {t("Open Discover")}
               </Link>
             }
           />
@@ -68,7 +72,7 @@ export default async function OwnDataRoomPage({
                 className={buttonClassName("secondary")}
                 href={`/company/data-room?tab=${tab}`}
               >
-                Try again
+                {t("Try again")}
               </Link>
             }
           />
@@ -80,7 +84,7 @@ export default async function OwnDataRoomPage({
             )}
             action={
               <Link className={buttonClassName("primary")} href="/welcome">
-                Set up with Q
+                {t("Set up with Q")}
               </Link>
             }
           />

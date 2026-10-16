@@ -24,6 +24,7 @@ import {
   SettingsCard,
 } from "@/features/settings/settings-ui";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Billing · Settings" };
 
@@ -38,6 +39,7 @@ export const metadata: Metadata = { title: "Billing · Settings" };
  * button shows; otherwise the payment card says payment is not on yet.
  */
 export default async function BillingPage() {
+  const t = await serverT();
   const session = await apiSession();
   const [plan, context] = await Promise.all([
     session === null ? null : getMyPlan(session).catch(() => null),
@@ -48,20 +50,20 @@ export default async function BillingPage() {
     <PageContainer>
       <QSection id="billing" kind="BILLING" label="billing">
         <PageHeader
-          title="Billing"
-          description="Your plan, the plans on offer, and how you pay."
+          title={t("Billing")}
+          description={t("Your plan, the plans on offer, and how you pay.")}
         />
         <div className="flex flex-col gap-8">
           {plan === null ? (
             <ErrorState
-              title="Your plan couldn't load"
-              description="Nothing changed and nothing was charged."
+              title={t("Your plan couldn't load")}
+              description={t("Nothing changed and nothing was charged.")}
               action={
                 <Link
                   href="/settings/billing"
                   className={buttonClassName("secondary", "compact")}
                 >
-                  Try again
+                  {t("Try again")}
                 </Link>
               }
             />
@@ -72,7 +74,7 @@ export default async function BillingPage() {
             >
               <div className="flex min-w-0 flex-col gap-1">
                 <span className="cq-label text-(--cq-text-secondary)">
-                  Current plan
+                  {t("Current plan")}
                 </span>
                 <h2
                   id="billing-current"
@@ -92,8 +94,8 @@ export default async function BillingPage() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <RowLink href="/settings/plan">Allowances</RowLink>
-                <RowLink href="/settings/usage">Usage</RowLink>
+                <RowLink href="/settings/plan">{t("Allowances")}</RowLink>
+                <RowLink href="/settings/usage">{t("Usage")}</RowLink>
               </div>
             </section>
           )}
@@ -107,11 +109,11 @@ export default async function BillingPage() {
                 id="billing-plans"
                 className="cq-title-md text-(--cq-text-primary)"
               >
-                Plans
+                {t("Plans")}
               </h2>
               {PLAN_TIERS.preview ? (
                 <span className="cq-caption inline-flex min-h-6 items-center border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 font-medium text-(--cq-text-secondary)">
-                  Preview pricing
+                  {t("Preview pricing")}
                 </span>
               ) : null}
             </div>
@@ -141,7 +143,7 @@ export default async function BillingPage() {
 
           <SettingsCard
             id="payment"
-            title="Payment"
+            title={t("Payment")}
             description={
               plan?.hasBillingCustomer === true
                 ? "Handled securely by our payment provider."
@@ -150,27 +152,27 @@ export default async function BillingPage() {
           >
             {plan?.hasBillingCustomer === true && plan.canManage ? (
               <SettingRow
-                term="Payment method and invoices"
-                hint="Opens our payment provider"
+                term={t("Payment method and invoices")}
+                hint={t("Opens our payment provider")}
               >
                 <ManageBillingButton />
               </SettingRow>
             ) : (
               <>
-                <SettingRow term="Payment method">
+                <SettingRow term={t("Payment method")}>
                   <span className="cq-body-sm text-(--cq-text-secondary)">
-                    None on file
+                    {t("None on file")}
                   </span>
                 </SettingRow>
-                <SettingRow term="Invoices">
+                <SettingRow term={t("Invoices")}>
                   <span className="cq-body-sm text-(--cq-text-secondary)">
-                    None yet
+                    {t("None yet")}
                   </span>
                 </SettingRow>
               </>
             )}
             <SettingRow
-              term="Change plan"
+              term={t("Change plan")}
               hint={
                 plan?.canManage === false
                   ? "An admin of your organisation can change its plan"
@@ -178,10 +180,10 @@ export default async function BillingPage() {
               }
             >
               {plan?.checkoutAvailable === true && plan.canManage ? (
-                <RowLink href="/settings/plan">Choose a plan</RowLink>
+                <RowLink href="/settings/plan">{t("Choose a plan")}</RowLink>
               ) : (
                 <span className="cq-body-sm text-(--cq-text-secondary)">
-                  Nothing is charged until you agree a price
+                  {t("Nothing is charged until you agree a price")}
                 </span>
               )}
             </SettingRow>

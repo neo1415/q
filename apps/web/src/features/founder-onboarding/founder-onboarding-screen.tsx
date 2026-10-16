@@ -28,6 +28,7 @@ import { VoiceHandover } from "../voice/voice-handover";
 import { useFounderOnboarding } from "./controller/use-founder-onboarding";
 import { renderStep } from "./steps/registry";
 import { PreferenceLearningAsk } from "../settings/preference-learning";
+import { useT } from "@/features/i18n/language";
 
 const STEP_FORM_ID = "founder-onboarding-step";
 
@@ -56,6 +57,7 @@ export function FounderOnboardingScreen({
   readonly adapter: FounderOnboardingAdapter;
   readonly seed?: string | undefined;
 }) {
+  const t = useT();
   const router = useRouter();
   const client = useMemo(
     () => createFounderOnboardingClient({ adapter, seed }),
@@ -122,14 +124,14 @@ export function FounderOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-narrow) flex-col justify-center gap-6 px-4 py-10">
         <EmptyState
-          title="Founder setup isn't available right now."
+          title={t("Founder setup isn't available right now.")}
           description={
             state.errorMessage ??
             "When it is, you'll start here. Nothing you've done so far is lost."
           }
           action={
             <Link href="/home" className={buttonClassName("secondary")}>
-              Back to Home
+              {t("Back to Home")}
             </Link>
           }
         />
@@ -147,13 +149,13 @@ export function FounderOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-10">
         {state.phase === "error" ? (
-          <InlineNotice tone="danger" title="Founder setup couldn't load.">
+          <InlineNotice tone="danger" title={t("Founder setup couldn't load.")}>
             {state.errorMessage ?? "Try again in a moment."}
           </InlineNotice>
         ) : (
           <div
             aria-busy="true"
-            aria-label="Loading founder setup"
+            aria-label={t("Loading founder setup")}
             className="flex flex-col gap-4"
           >
             <Skeleton lines={1} className="w-1/2" />
@@ -169,17 +171,19 @@ export function FounderOnboardingScreen({
   if (session.status === "complete" || session.step === undefined) {
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-narrow) flex-col justify-center gap-6 px-4 py-10">
-        <h1 className="sr-only">Founder setup</h1>
+        <h1 className="sr-only">{t("Founder setup")}</h1>
         {/* Whether investors see the company is the visibility setting's
             to say; this screen does not know it, so it does not claim it
             (R30 #19). */}
         <EmptyState
-          title="Founder setup is complete."
-          description="Your company profile is in place. Tell Q what to change, in your own words, and approve it. What investors can see follows your visibility settings."
+          title={t("Founder setup is complete.")}
+          description={t(
+            "Your company profile is in place. Tell Q what to change, in your own words, and approve it. What investors can see follows your visibility settings.",
+          )}
           action={
             <div className="flex flex-wrap gap-2">
               <Link href="/home" className={buttonClassName("primary")}>
-                Go to Home
+                {t("Go to Home")}
               </Link>
               {/*
                * A finished setup cannot be stepped back into: the review
@@ -190,7 +194,7 @@ export function FounderOnboardingScreen({
                 href="/company/visibility"
                 className={buttonClassName("secondary")}
               >
-                See what investors will see
+                {t("See what investors will see")}
               </Link>
             </div>
           }
@@ -222,14 +226,14 @@ export function FounderOnboardingScreen({
         <div className="flex items-center justify-between gap-2">
           <ContinueLater className="cq-label min-h-11 text-(--cq-text-tertiary) hover:text-(--cq-text-primary)" />
           <span className="cq-label text-(--cq-text-primary)">
-            Founder setup
+            {t("Founder setup")}
           </span>
           <Button
             variant="quiet"
             size="compact"
             onClick={() => setMode("form")}
           >
-            Use the form
+            {t("Use the form")}
           </Button>
         </div>
         <QOnboardingWorkspace
@@ -265,7 +269,7 @@ export function FounderOnboardingScreen({
           setMode("conversation");
         }}
       >
-        Back to Q
+        {t("Back to Q")}
       </Button>
       {/* The form's one primary is Continue; Q's voice is the alternative. */}
       <Button
@@ -277,20 +281,21 @@ export function FounderOnboardingScreen({
         }}
       >
         <QMark size="sm" />
-        Talk with Q
+        {t("Talk with Q")}
       </Button>
     </div>
   );
 
   const notice = finishing ? (
-    <InlineNotice tone="info" title="Almost there">
-      Q is finishing its first reading of your company. This takes a few
-      seconds; you&apos;ll go on by yourself.
+    <InlineNotice tone="info" title={t("Almost there")}>
+      {t(
+        "Q is finishing its first reading of your company. This takes a few seconds; you'll go on by yourself.",
+      )}
     </InlineNotice>
   ) : state.errorMessage !== undefined ? (
     <InlineNotice
       tone="danger"
-      title="Couldn't save"
+      title={t("Couldn't save")}
       action={
         state.canRetry ? (
           <Button
@@ -298,7 +303,7 @@ export function FounderOnboardingScreen({
             size="compact"
             onClick={() => void actions.retry()}
           >
-            Try again
+            {t("Try again")}
           </Button>
         ) : undefined
       }
@@ -306,7 +311,7 @@ export function FounderOnboardingScreen({
       {state.errorMessage} Your answers on this screen are kept.
     </InlineNotice>
   ) : state.conflictNotice !== undefined ? (
-    <InlineNotice tone="info" title="Updated elsewhere">
+    <InlineNotice tone="info" title={t("Updated elsewhere")}>
       {state.conflictNotice}
     </InlineNotice>
   ) : session.source.synthetic ? (

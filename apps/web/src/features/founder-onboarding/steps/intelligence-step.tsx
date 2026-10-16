@@ -5,6 +5,7 @@ import { IntelligenceSnapshot } from "@capital-q/ui/intelligence-snapshot";
 
 import { CompanyIntelligencePanel } from "./company-intelligence-panel";
 import type { StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F8. Two things, kept apart on purpose.
@@ -19,6 +20,7 @@ import type { StepProps } from "./step-props";
  * of nothing being invented.
  */
 export function IntelligenceStep({ step }: StepProps<"snapshot">) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-8">
       <h1 className="sr-only">{step.title}</h1>
@@ -50,9 +52,10 @@ export function IntelligenceStep({ step }: StepProps<"snapshot">) {
           className="mt-0.5 shrink-0"
         />
         <span>
-          <span>Investors don&apos;t see this.</span> Private to your company.
-          Letting investors find you is a separate step later, with its own
-          checks and verification.
+          <span>{t("Investors don't see this.")}</span>{" "}
+          {t(
+            "Private to your company. Letting investors find you is a separate step later, with its own checks and verification.",
+          )}
         </span>
       </p>
     </div>

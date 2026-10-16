@@ -11,6 +11,7 @@ import {
   resolveOwnContext,
 } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Your top three" };
 export const dynamic = "force-dynamic";
@@ -22,11 +23,12 @@ export const dynamic = "force-dynamic";
  * `fit_top_candidates` tool returns.
  */
 export default async function FitTopPage() {
+  const t = await serverT();
   const context = await resolveOwnContext();
   if (context.kind !== "INVESTOR") redirect("/investors");
   return (
     <PageContainer>
-      <QSection id="top" kind="COMPANY_LIST" label="your top companies">
+      <QSection id="top" kind="COMPANY_LIST" label={t("your top companies")}>
         <FitTopView state={await topState(context.investorOrganisationId)} />
       </QSection>
     </PageContainer>

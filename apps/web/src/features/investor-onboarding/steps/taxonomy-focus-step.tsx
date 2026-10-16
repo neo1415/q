@@ -8,6 +8,7 @@ import { Input } from "@capital-q/ui/input";
 
 import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
 import { StepHeading, StrengthNote, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 type Bucket = "focus" | "avoid";
 
@@ -24,6 +25,7 @@ export function TaxonomyFocusStep({
   busy,
   actions,
 }: StepProps<"taxonomy_focus">) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState<
     readonly TaxonomyCandidateView[]
@@ -119,7 +121,9 @@ export function TaxonomyFocusStep({
           id={`${step.id}-search`}
           label={step.searchLabel}
           placeholder={step.searchPlaceholder}
-          description="Type a word or two and choose from the suggestions. Add as many as apply."
+          description={t(
+            "Type a word or two and choose from the suggestions. Add as many as apply.",
+          )}
           value={query}
           disabled={busy}
           onChange={(event) => setQuery(event.target.value)}
@@ -136,15 +140,15 @@ export function TaxonomyFocusStep({
           disabled={busy || searching}
           onClick={() => void search()}
         >
-          Suggest
+          {t("Suggest")}
         </Button>
       </div>
       {offered.length > 0 ? (
         <fieldset className="flex flex-col gap-2">
           <legend className="cq-label text-(--cq-text-primary)">
-            Suggestions
+            {t("Suggestions")}
           </legend>
-          <ul className="flex flex-wrap gap-2" aria-label="Suggestions">
+          <ul className="flex flex-wrap gap-2" aria-label={t("Suggestions")}>
             {offered.map((candidate) => (
               <li key={candidate.nodeId} className="flex items-center gap-1">
                 <Button
@@ -166,7 +170,7 @@ export function TaxonomyFocusStep({
                     disabled={busy}
                     onClick={() => add("avoid", candidate)}
                   >
-                    Rather not
+                    {t("Rather not")}
                     <span className="sr-only"> {candidate.label}</span>
                   </Button>
                 ) : null}
@@ -177,14 +181,17 @@ export function TaxonomyFocusStep({
       ) : null}
       <fieldset className="flex flex-col gap-2" data-focus-list>
         <legend className="cq-label text-(--cq-text-primary)">
-          Your preferences
+          {t("Your preferences")}
         </legend>
         {focus.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {step.emptyHint}
           </p>
         ) : (
-          <ul className="flex flex-wrap gap-2" aria-label="Chosen categories">
+          <ul
+            className="flex flex-wrap gap-2"
+            aria-label={t("Chosen categories")}
+          >
             {focus.map((item) => (
               <li key={item.nodeId}>
                 <Button
@@ -208,7 +215,7 @@ export function TaxonomyFocusStep({
           id={`${step.id}-strength`}
           name="strength"
           legend="How firm is that?"
-          description="Not chosen means a strong preference."
+          description={t("Not chosen means a strong preference.")}
           options={step.strengthOptions}
           value={strength}
           disabled={busy}
@@ -218,16 +225,22 @@ export function TaxonomyFocusStep({
       {step.allowAvoid ? (
         <fieldset className="flex flex-col gap-2" data-avoid-list>
           <legend className="cq-label text-(--cq-text-primary)">
-            Rather not see
+            {t("Rather not see")}
           </legend>
           <StrengthNote>
-            A soft preference: these can still appear, ranked lower. Nothing is
-            hidden here.
+            {t(
+              "A soft preference: these can still appear, ranked lower. Nothing is hidden here.",
+            )}
           </StrengthNote>
           {avoid.length === 0 ? (
-            <p className="cq-body-sm text-(--cq-text-secondary)">None.</p>
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {t("None.")}
+            </p>
           ) : (
-            <ul className="flex flex-wrap gap-2" aria-label="Rather not see">
+            <ul
+              className="flex flex-wrap gap-2"
+              aria-label={t("Rather not see")}
+            >
               {avoid.map((item) => (
                 <li key={item.nodeId}>
                   <Button

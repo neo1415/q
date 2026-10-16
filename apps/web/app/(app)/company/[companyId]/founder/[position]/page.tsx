@@ -10,6 +10,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { FounderPerson } from "@/features/company/material/team";
 import { apiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Founder" };
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function FounderPage({
     readonly position: string;
   }>;
 }) {
+  const t = await serverT();
   const { companyId, position } = await params;
   const session = await apiSession();
   const n = Number(position);
@@ -42,19 +44,21 @@ export default async function FounderPage({
         kind="TEAM"
         refs={[{ kind: "COMPANY", id: companyId }]}
         total={person === null ? 0 : 1}
-        label="a founder on the team"
+        label={t("a founder on the team")}
       >
         <Link
           href={`/company/${encodeURIComponent(companyId)}?tab=team`}
           className={buttonClassName("quiet", "compact", "self-start")}
         >
           <ArrowLeft size={ICON_SIZE.compact} aria-hidden="true" />
-          Back to the team
+          {t("Back to the team")}
         </Link>
         {person === null ? (
           <EmptyState
-            title="This person isn't available to you."
-            description="They may not be shown to you, or the link is out of date. Nothing is wrong with your account."
+            title={t("This person isn't available to you.")}
+            description={t(
+              "They may not be shown to you, or the link is out of date. Nothing is wrong with your account.",
+            )}
           />
         ) : (
           <FounderPerson person={person} />

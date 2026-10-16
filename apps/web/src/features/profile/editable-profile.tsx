@@ -29,6 +29,7 @@ import {
   type FieldSpec,
   type ProfileKind,
 } from "./profile-fields";
+import { useT } from "@/features/i18n/language";
 
 /**
  * One editable profile (BIZ-002): the person's own, their company's or
@@ -87,6 +88,7 @@ export function EditableProfile({
   provenance,
   editable = true,
 }: EditableProfileProps) {
+  const t = useT();
   const [values, setValues] = useState(initialValues);
   const [version, setVersion] = useState(initialVersion);
   // Several sections edit the same record (About and Company are both the
@@ -123,7 +125,7 @@ export function EditableProfile({
               router.refresh();
             }}
           >
-            Reload
+            {t("Reload")}
           </Button>
         </div>
       )}
@@ -197,6 +199,7 @@ function EditableRow({
   /** Resolves to an error message to show, or null when handled. */
   readonly onSave: (value: string | null) => Promise<string | null>;
 }) {
+  const t = useT();
   const id = useId();
   const editButton = useRef<HTMLButtonElement>(null);
   const shown = displayValue(spec.input, value);
@@ -236,7 +239,9 @@ function EditableRow({
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-0.5 sm:pt-2">
               {shown === null ? (
-                <p className="cq-body text-(--cq-text-tertiary)">Not added</p>
+                <p className="cq-body text-(--cq-text-tertiary)">
+                  {t("Not added")}
+                </p>
               ) : spec.input.kind === "url" ? (
                 <a
                   href={shown}
@@ -289,6 +294,7 @@ function FieldEditor({
   readonly onCancel: () => void;
   readonly onSave: (value: string | null) => Promise<string | null>;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState(value ?? "");
   const [error, setError] = useState<string | undefined>(undefined);
   const [pending, setPending] = useState(false);
@@ -356,7 +362,7 @@ function FieldEditor({
           {...common}
           value={draft}
           autoFocus
-          placeholder="Not added"
+          placeholder={t("Not added")}
           options={
             value !== null &&
             !spec.input.options.some((option) => option.value === value)
@@ -392,7 +398,7 @@ function FieldEditor({
           disabled={pending}
           onClick={onCancel}
         >
-          Cancel
+          {t("Cancel")}
         </Button>
       </div>
     </form>

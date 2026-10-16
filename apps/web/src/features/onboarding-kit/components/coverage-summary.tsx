@@ -12,6 +12,7 @@ import { linkClassName } from "@capital-q/ui/link";
 import { Progress } from "@capital-q/ui/states";
 
 import { onboardingCoverageAction } from "../api-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The quiet coverage view (lane ob1): one line of progress, and on request
@@ -88,6 +89,7 @@ export function CoverageSummary({
 }: {
   readonly coverage: OnboardingCoverage;
 }) {
+  const t = useT();
   const { summary } = coverage;
   const parts = [
     `Essentials ${String(summary.essentialSettled)} of ${String(summary.essentialTotal)}`,
@@ -117,17 +119,18 @@ export function CoverageSummary({
       />
       <details className="cq-body-sm text-(--cq-text-secondary)">
         <summary className="cq-label min-h-11 cursor-pointer py-2 text-(--cq-text-secondary)">
-          What Q has so far
+          {t("What Q has so far")}
         </summary>
         <div className="flex flex-col gap-4 pt-2">
           {pending.length === 0 ? null : (
-            <section aria-label="Not saved yet">
+            <section aria-label={t("Not saved yet")}>
               <h3 className="cq-label text-(--cq-text-primary)">
-                Not saved yet
+                {t("Not saved yet")}
               </h3>
               <p>
-                Capital Q couldn&apos;t save these just now. They&apos;re kept
-                and will save on their own; nothing is lost.
+                {t(
+                  "Capital Q couldn't save these just now. They're kept and will save on their own; nothing is lost.",
+                )}
               </p>
               <ul className="flex flex-col gap-1">
                 {pending.map((f) => (
@@ -140,7 +143,7 @@ export function CoverageSummary({
             How Q talks to you (concise or detailed, your language) is yours to
             see and change in{" "}
             <Link href="/settings/memory" className={linkClassName()}>
-              What Q remembers
+              {t("What Q remembers")}
             </Link>
             .
           </p>

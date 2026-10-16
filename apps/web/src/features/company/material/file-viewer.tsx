@@ -13,8 +13,6 @@ import { useT } from "@/features/i18n/language";
  * it does. Pointer events pass through to the document underneath.
  */
 export function Watermark({ words }: { readonly words: string }) {
-  const t = useT();
-
   return (
     <div
       aria-hidden="true"
@@ -26,7 +24,7 @@ export function Watermark({ words }: { readonly words: string }) {
           key={row}
           className="cq-caption -rotate-12 text-center whitespace-nowrap text-(--cq-text-tertiary) opacity-40"
         >
-          {t(words)} &nbsp; · &nbsp; {t(words)}
+          {words} &nbsp; · &nbsp; {words}
         </p>
       ))}
     </div>
@@ -44,7 +42,6 @@ export function FileViewer({
   readonly onClose: () => void;
 }) {
   const t = useT();
-
   return (
     <SheetRoot
       open={file !== null}
@@ -52,9 +49,9 @@ export function FileViewer({
     >
       {file === null ? null : (
         <SheetContent
-          title={t(title)}
+          title={title}
           side="full"
-          description={file.downloadable ? undefined : t("View only")}
+          description={file.downloadable ? undefined : "View only"}
         >
           <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4">
             <div className="relative min-h-0 flex-1 overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
@@ -64,7 +61,7 @@ export function FileViewer({
                     ? file.url
                     : `${file.url}#toolbar=0&navpanes=0`
                 }
-                title={t(title)}
+                title={title}
                 className="h-full min-h-[60dvh] w-full"
                 referrerPolicy="no-referrer"
               />
@@ -80,7 +77,7 @@ export function FileViewer({
                   className="inline-flex min-h-11 items-center gap-1.5 underline underline-offset-4"
                 >
                   <Download size={ICON_SIZE.compact} aria-hidden="true" />{" "}
-                  {t("Download")}
+                  Download
                 </a>
               ) : (
                 <>

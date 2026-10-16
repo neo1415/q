@@ -6,6 +6,7 @@ import { MultiChoiceList } from "@capital-q/ui/choice-list";
 import { MoneyInput, type MoneyValue } from "@capital-q/ui/money-input";
 
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 function greater(a: string, b: string): boolean {
   // Exact decimal comparison on strings: no floats.
@@ -30,6 +31,7 @@ export function StageChequeStep({
   busy,
   actions,
 }: StepProps<"stage_cheque">) {
+  const t = useT();
   const saved = step.response;
   const currency = saved?.currency ?? step.currencies[0]?.code ?? "USD";
   const [stages, setStages] = useState<readonly string[]>(saved?.stages ?? []);
@@ -111,8 +113,8 @@ export function StageChequeStep({
       />
       <MoneyInput
         id="cheque-min"
-        label="Minimum cheque"
-        description="Optional. Exact figures in one currency."
+        label={t("Minimum cheque")}
+        description={t("Optional. Exact figures in one currency.")}
         value={min}
         currencies={step.currencies}
         disabled={busy}
@@ -124,8 +126,8 @@ export function StageChequeStep({
       />
       <MoneyInput
         id="cheque-typical"
-        label="Typical cheque"
-        description="Optional."
+        label={t("Typical cheque")}
+        description={t("Optional.")}
         value={typical}
         currencies={step.currencies}
         disabled={busy}
@@ -137,8 +139,8 @@ export function StageChequeStep({
       />
       <MoneyInput
         id="cheque-max"
-        label="Maximum cheque"
-        description="Optional."
+        label={t("Maximum cheque")}
+        description={t("Optional.")}
         value={max}
         currencies={step.currencies}
         disabled={busy}
@@ -153,7 +155,7 @@ export function StageChequeStep({
         id="mandate-roles"
         name="roles"
         legend="How do you usually take part?"
-        description="Optional. Choose any that apply."
+        description={t("Optional. Choose any that apply.")}
         options={step.roleOptions}
         values={roles}
         disabled={busy}

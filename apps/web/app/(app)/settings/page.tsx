@@ -213,16 +213,16 @@ export default async function SettingsPage({
             </SettingRow>
             {canBrand ? (
               <SettingRow
-                term="Brand"
-                hint="Black and gold or blue, for everyone · admins only"
+                term={t("Brand")}
+                hint={t("Black and gold or blue, for everyone · admins only")}
               >
-                <RowLink href="/admin/brand">Customise</RowLink>
+                <RowLink href="/admin/brand">{t("Customise")}</RowLink>
               </SettingRow>
             ) : null}
             {canBrand ? (
               <SettingRow
-                term="How Q conducts business"
-                hint="The house guide for everyone · admins only"
+                term={t("How Q conducts business")}
+                hint={t("The house guide for everyone · admins only")}
               >
                 <RowLink href="/admin/etiquette">{t("Open")}</RowLink>
               </SettingRow>
@@ -252,10 +252,13 @@ export default async function SettingsPage({
             <SettingRow term={t("Personality")}>
               <PersonalitySetting initial={standing?.personality ?? "AUTO"} />
             </SettingRow>
-            <SettingRow term="The Q Daily" hint={t("Your morning newspaper")}>
+            <SettingRow
+              term={t("The Q Daily")}
+              hint={t("Your morning newspaper")}
+            >
               {daily === null ? (
                 <p className="cq-body-sm text-(--cq-text-secondary)">
-                  These choices couldn&apos;t load. Reload in a moment.
+                  {t("These choices couldn't load. Reload in a moment.")}
                 </p>
               ) : (
                 <DailySetting initial={daily} />
@@ -273,12 +276,14 @@ export default async function SettingsPage({
           <SettingsCard
             id="speaking"
             title={t("How Q speaks for you")}
-            description="Your guide to how Q writes and talks to investors and founders for you."
+            description={t(
+              "Your guide to how Q writes and talks to investors and founders for you.",
+            )}
           >
             {speaking === null ? (
-              <SettingRow term="Your guide">
+              <SettingRow term={t("Your guide")}>
                 <p className="cq-body-sm text-(--cq-text-secondary)">
-                  Your guide couldn&apos;t load. Reload in a moment.
+                  {t("Your guide couldn't load. Reload in a moment.")}
                 </p>
               </SettingRow>
             ) : (
@@ -294,7 +299,7 @@ export default async function SettingsPage({
             {/* A definition list holds only term/description groups (axe
                 definition-list, 2026-10-08): the setting is its description. */}
             <div className="px-5 py-4">
-              <dt className="sr-only">Notifications on this device</dt>
+              <dt className="sr-only">{t("Notifications on this device")}</dt>
               <dd>
                 <PushSetting />
               </dd>
@@ -303,7 +308,7 @@ export default async function SettingsPage({
 
           {/* meetfix-57: "Settings → Connections", where Q's reconnect link lands. */}
           <SettingsCard id="connections" title={t("Connections")}>
-            <SettingRow term="Google" hint={t("Gmail, Calendar and Meet")}>
+            <SettingRow term={t("Google")} hint={t("Gmail, Calendar and Meet")}>
               <GmailConnection
                 outcome={typeof google === "string" ? google : undefined}
                 reconnect={params["reconnect"] === "google"}

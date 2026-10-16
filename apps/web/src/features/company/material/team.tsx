@@ -23,6 +23,7 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import { VerifiedBadge } from "@/components/verified-badge";
 
 import { EntityAvatar } from "../../entity/entity-avatar";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Team tab (A1) and a founder as a person (A7). The team is ADR 0041's
@@ -64,6 +65,7 @@ export function TeamTab({
   readonly team: readonly CompanyProfileTeamMember[];
   readonly fromDeck: readonly DeckFact[];
 }) {
+  const t = useT();
   const [open, setOpen] = useState<number | null>(null);
   // Founders first, in the server's order: a founder's page is addressed
   // by that position, so the position is kept beside each member.
@@ -79,7 +81,7 @@ export function TeamTab({
   if (team.length === 0 && fromDeck.length === 0) {
     return (
       <p className="cq-body py-6 text-(--cq-text-secondary)" data-team="empty">
-        No team shown to you yet.
+        {t("No team shown to you yet.")}
       </p>
     );
   }
@@ -92,7 +94,7 @@ export function TeamTab({
               id="team-title"
               className="cq-title-sm text-(--cq-text-primary)"
             >
-              Team
+              {t("Team")}
             </h2>
             <span className="cq-caption text-(--cq-text-secondary)">
               {people.length} {people.length === 1 ? "person" : "people"}
@@ -160,7 +162,7 @@ export function TeamTab({
               </div>
               {chosen.member.shortBio === null ? (
                 <p className="cq-body-sm text-(--cq-text-secondary)">
-                  No bio shared yet.
+                  {t("No bio shared yet.")}
                 </p>
               ) : (
                 <p className="cq-body text-(--cq-text-primary)">
@@ -172,7 +174,7 @@ export function TeamTab({
                   href={`/company/${encodeURIComponent(companyId)}/founder/${String(chosen.founderIndex)}`}
                   className={buttonClassName("secondary", "regular")}
                 >
-                  Open full profile
+                  {t("Open full profile")}
                   <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
                 </Link>
               )}
@@ -189,7 +191,7 @@ export function TeamTab({
             id="deck-team-title"
             className="cq-title-sm text-(--cq-text-primary)"
           >
-            What the deck says about the team
+            {t("What the deck says about the team")}
           </h2>
           <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
             {fromDeck.map((fact) => (
@@ -225,6 +227,7 @@ export function FounderPerson({
 }: {
   readonly person: FounderPersonDto;
 }) {
+  const t = useT();
   const all: readonly (readonly [string, string | null])[] = [
     ["Age", person.age === null ? null : String(person.age)],
     [
@@ -272,7 +275,7 @@ export function FounderPerson({
             status={person.identityVerified ? "VERIFIED" : null}
             className="self-start"
           >
-            Identity verified by Capital Q
+            {t("Identity verified by Capital Q")}
           </VerifiedBadge>
         </div>
       </header>
@@ -281,7 +284,8 @@ export function FounderPerson({
           href={`/relationships/company/${encodeURIComponent(person.companyId)}`}
           className={buttonClassName("secondary", "regular")}
         >
-          <MessageSquare size={ICON_SIZE.compact} aria-hidden="true" /> Message
+          <MessageSquare size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+          {t("Message")}
         </Link>
         <Link
           href={`/q?ask=${encodeURIComponent(`Tell me about ${person.name} of ${person.companyName}.`)}`}
@@ -306,7 +310,7 @@ export function FounderPerson({
       {person.inTheirWords === null ? null : (
         <section className="flex flex-col gap-2" aria-labelledby="their-words">
           <h2 id="their-words" className="cq-title-sm text-(--cq-text-primary)">
-            In their words
+            {t("In their words")}
           </h2>
           <p className="cq-body text-(--cq-text-primary)">
             {person.inTheirWords}
@@ -315,7 +319,7 @@ export function FounderPerson({
       )}
       <section className="flex flex-col gap-2" aria-labelledby="background">
         <h2 id="background" className="cq-title-sm text-(--cq-text-primary)">
-          Background
+          {t("Background")}
         </h2>
         {person.background.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -373,7 +377,7 @@ export function FounderPerson({
       {person.lookingFor === null ? null : (
         <section className="flex flex-col gap-2" aria-labelledby="looking-for">
           <h2 id="looking-for" className="cq-title-sm text-(--cq-text-primary)">
-            What they&rsquo;re looking for
+            {t("What they’re looking for")}
           </h2>
           <p className="cq-body text-(--cq-text-primary)">
             {person.lookingFor}

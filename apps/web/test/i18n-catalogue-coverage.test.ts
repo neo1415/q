@@ -23,6 +23,16 @@ function sources(dir: string): string[] {
   });
 }
 
+/** Names that read the same in every language. */
+const SAME_IN_EVERY_LANGUAGE = new Set([
+  "Google",
+  "The Q Daily",
+  "GateQ",
+  "Q Pitch",
+  "Capital Q",
+  "Q",
+]);
+
 const LITERAL = /\bt\(\s*("(?:[^"\\]|\\.)*")\s*\)/gu;
 
 describe("the Arabic catalogue covers every wrapped string", () => {
@@ -31,7 +41,11 @@ describe("the Arabic catalogue covers every wrapped string", () => {
     for (const file of ROOTS.flatMap(sources)) {
       for (const match of readFileSync(file, "utf8").matchAll(LITERAL)) {
         const english = JSON.parse(match[1] ?? '""') as string;
-        if (translate("ar", english) === english) missing.add(english);
+        if (
+          translate("ar", english) === english &&
+          !SAME_IN_EVERY_LANGUAGE.has(english)
+        )
+          missing.add(english);
       }
     }
     expect([...missing].sort()).toEqual([]);
