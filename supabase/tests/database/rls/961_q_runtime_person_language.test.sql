@@ -27,18 +27,23 @@ select throws_ok(
   $$update q_runtime.person_standing set language = 'ar; drop table x' where user_id = pg_temp.rls_id('user_b')$$,
   '23514', null, 'anything but a tag is refused');
 
+-- q_runtime is server-only: clients have no usage on the schema, so the
+-- language is read and written through the API, never from a browser.
 select pg_temp.act_as_user_a();
-select is((select language from q_runtime.person_standing where user_id = pg_temp.rls_id('user_a')),
-  'ar', 'the person reads their own language');
-select is((select count(*)::int from q_runtime.person_standing where user_id = pg_temp.rls_id('user_b')),
-  0, 'nobody reads another person''s language');
+select throws_ok(
+  $$select language from q_runtime.person_standing where user_id = pg_temp.rls_id('user_a')$$,
+  '42501', null, 'a client cannot read standing directly, even their own');
+select throws_ok(
+  $$select count(*) from q_runtime.person_standing where user_id = pg_temp.rls_id('user_b')$$,
+  '42501', null, 'nobody reads another person''s language');
 select throws_ok(
   $$update q_runtime.person_standing set language = 'en' where user_id = pg_temp.rls_id('user_a')$$,
   '42501', null, 'a client cannot write it, even their own');
 
 select pg_temp.act_as_revoked_user();
-select is((select count(*)::int from q_runtime.person_standing), 0,
-  'a revoked member reads no standing rows');
+select throws_ok(
+  $$select count(*) from q_runtime.person_standing$$,
+  '42501', null, 'a revoked member reads no standing rows');
 
 select * from finish();
 rollback;
