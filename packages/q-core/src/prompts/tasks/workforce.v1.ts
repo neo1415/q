@@ -593,7 +593,7 @@ export const JOB_PLAN_V6: PromptDefinition<
 > = {
   ...JOB_PLAN_V5,
   version: 6,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Live 2026-10-15: v5's strict reference pattern refused whole plans over the shape of evidence references. References are loose strings; code extracts and grounds the F numbers. The template asks for F and the number alone.",
   effectiveFrom: "2026-10-16",
@@ -607,6 +607,34 @@ export const JOB_PLAN_V6: PromptDefinition<
     "A reference must be one of the F numbers above.",
     'A reference must be one of the F numbers above, written as F and the number alone (for example "F3"), never the fact\'s text.',
   ),
+};
+
+/**
+ * v7 (wf, live 2026-10-16): a decision the person states about a
+ * relationship ("we're going into diligence on X") travels with the work
+ * they asked for. Recording it is their commercial call: it is the first
+ * next action (relationship.outcome.change, which code marks as needing
+ * approval), never a step and never done instead of the work.
+ */
+export const JOB_PLAN_V7: PromptDefinition<
+  JobPlanVariablesV5,
+  JobPlanResultV6
+> = {
+  ...JOB_PLAN_V6,
+  version: 7,
+  status: "ACTIVE",
+  changeDescription:
+    "A relationship decision stated with the job is recorded only as the person's first next action (tool relationship.outcome.change), never a step; prerequisites are what the outcome depends on that the plan does not produce, never a step's output, and never MET from a pending move (live 2026-10-16).",
+  effectiveFrom: "2026-10-16",
+  template: JOB_PLAN_V6.template
+    .replace(
+      "Never mark MET without a fact.",
+      'Never mark MET without a fact, and never from a fact that says something is still to happen (a move that is theirs or yours, or something waiting). A prerequisite is something the outcome depends on that this plan does not itself produce: never list a step\'s own output ("a memo has been prepared") as one.',
+    )
+    .replace(
+      "- Contradictions are kept,",
+      "- When the job states a decision about one of their relationships (moving it into diligence, passing, pausing, investing), recording it is their call: make it the first next action with tool relationship.outcome.change, saying what would be recorded. Never plan it as a step, and plan the work they asked for as usual.\n- Contradictions are kept,",
+    ),
 };
 
 const SUBSTANCE_CRITIQUE_TEMPLATE = `TASK: SUBSTANCE_CRITIQUE

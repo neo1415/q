@@ -257,7 +257,7 @@ export function WorkforceTeam({
       <h2 id="workforce-team-heading" className="sr-only">
         Q’s team
       </h2>
-      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0">
+      <div className="relative -mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0">
         {counts.map(({ state, count }) => (
           <button
             key={state}

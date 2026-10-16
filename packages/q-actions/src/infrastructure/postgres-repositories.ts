@@ -414,12 +414,15 @@ export function createPostgresQActionRepositories(): QActionRepositories {
             from q_runtime.approvals p
             join q_runtime.actions a
               on a.id = p.action_id and a.tenant_id = p.tenant_id
-            left join q_runtime.runs r
+            join q_runtime.runs r
               on r.id = a.run_id and r.tenant_id = a.tenant_id
            where p.tenant_id = ${input.tenantId}
              and p.requested_from_user_id = ${input.userId}
              and a.organisation_id = ${input.organisationId}
              and p.status = 'PENDING'
+             -- Only a card its run still waits on can be decided (live
+             -- 2026-10-16: a cancelled run's card was listed as waiting).
+             and r.status = 'AWAITING_APPROVAL'
              and p.expires_at > ${input.now.toISOString()}::text::timestamptz
            order by p.requested_at desc, p.id desc
            limit ${input.limit}`;

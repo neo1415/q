@@ -1138,6 +1138,55 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     }
   });
 
+  it("STRANDED CARD (live 2026-10-16): a card whose run stopped waiting is revoked for good, and an ended run's cards are never listed as waiting", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder, service } = world;
+      // The run stopped waiting (a cancellation in flight): approving is
+      // refused, and the revocation now commits instead of rolling back.
+      const moved = await propose(world, founder, { note: "Stranded one." });
+      await db.sql`
+        update q_runtime.runs set status = 'CANCEL_REQUESTED'
+         where id = ${moved.action.runId}`;
+      await expect(
+        service.approve({
+          actor: founder.actor,
+          approvalId: moved.approval.id,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(QApprovalAlreadyDecidedError);
+      const [revoked] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${moved.approval.id}`;
+      expect(revoked?.status).toBe("REVOKED");
+      const [withdrawn] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.actions where id = ${moved.action.id}`;
+      expect(withdrawn?.status).toBe("WITHDRAWN");
+
+      // A run that ends takes its open card with it, and the card is no
+      // longer counted as waiting; another run's card is untouched.
+      const ending = await propose(world, founder, {
+        note: "Ends with its run.",
+      });
+      const open = await propose(world, founder, { note: "Still waiting." });
+      await db.sql`
+        update q_runtime.runs
+           set status = 'CANCELLED', completed_at = now(), failure_code = 'RUN_CANCELLED'
+         where id = ${ending.action.runId}`;
+      const [ended] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${ending.approval.id}`;
+      expect(ended?.status).toBe("REVOKED");
+      const waiting = await service.listPendingApprovals({
+        actor: founder.actor,
+      });
+      const ids = waiting.map((row) => row.approvalId);
+      expect(ids).not.toContain(ending.approval.id);
+      expect(ids).not.toContain(moved.approval.id);
+      expect(ids).toContain(open.approval.id);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
   it("EAGER EXPIRY (recovery D2, audit D-01): the sweep expires a lapsed card and its action without anyone deciding; an open one is left", async () => {
     // A one-second TTL: the sweep only ever touches rows already lapsed.
     const world = await commitWorld({ policy: { approvalTtlMs: 1_000 } });

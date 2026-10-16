@@ -55,7 +55,7 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
     <nav
       ref={ref}
       aria-label="CRM"
-      className="-mx-4 flex items-stretch gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+      className="relative -mx-4 flex items-stretch gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
     >
       <QPageState
         {...(view === "overview" ? { tab: "overview" as const } : {})}

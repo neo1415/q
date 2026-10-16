@@ -325,7 +325,7 @@ export function ConsoleNav({
   return (
     <nav
       aria-label="Console sections"
-      className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"
+      className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"
     >
       <ul className="flex gap-1 border-b border-(--cq-border-subtle)">
         {allowed.map((section) => {

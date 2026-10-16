@@ -570,7 +570,7 @@ export function ExploreScreen({
       <div
         role="group"
         aria-label="Topics"
-        className="flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none]"
+        className="relative flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none]"
       >
         {topics.map((t) => (
           <button

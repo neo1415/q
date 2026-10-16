@@ -623,3 +623,47 @@ describe("loose references from the live planner (2026-10-15)", () => {
     expect(grounded.droppedRefs).toBe(2);
   });
 });
+
+describe("MET needs a fact that shows it in place (live 2026-10-16)", () => {
+  it("never reads a pending move or a waiting card as MET", () => {
+    const situation = situationFrom({
+      briefs: [brief()],
+      waiting: [{ summary: "Q's team: prepare diligence" }],
+    });
+    const move = situation.facts.find((fact) => fact.kind === "YOUR_MOVE");
+    const waiting = situation.facts.find(
+      (fact) => fact.kind === "WAITING_APPROVAL",
+    );
+    const state = situation.facts.find(
+      (fact) => fact.kind === "RELATIONSHIP_STATE",
+    );
+    const grounded = groundReasoning(
+      {
+        outcome: "Ready for diligence on Harbourline Cargo.",
+        prerequisites: [
+          {
+            what: "The diligence call has been set up",
+            status: "MET",
+            blocking: true,
+            evidence: [move?.ref ?? "", waiting?.ref ?? ""],
+            resolvedBy: null,
+          },
+          {
+            what: "A meeting was held",
+            status: "MET",
+            blocking: false,
+            evidence: [state?.ref ?? ""],
+            resolvedBy: null,
+          },
+        ],
+        nextActions: [],
+      },
+      situation,
+      [],
+    );
+    expect(grounded.reasoning.prerequisites.map((one) => one.status)).toEqual([
+      "UNKNOWN",
+      "MET",
+    ]);
+  });
+});

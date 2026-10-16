@@ -8,7 +8,12 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import type { RelationshipDigest } from "./relationship-data";
 import { RelationshipsBoard } from "./relationships-board";
-import { cursorOf, listOrder, pageAfter } from "./relationships-view";
+import {
+  cursorOf,
+  listOrder,
+  pageAfter,
+  type CommitmentFact,
+} from "./relationships-view";
 
 /**
  * The Relationships page body (R27; founder critique 2026-10-04). One row
@@ -24,7 +29,10 @@ export function RelationshipsIndex({
   digests = {},
   now = readClock(),
   fits,
+  commitments,
 }: {
+  /** Commitments waiting on this side, by relationship id (Capital). */
+  readonly commitments?: Readonly<Record<string, CommitmentFact>> | undefined;
   /** Fit with the investor's own mandate by company id (ADR 0052; B3). */
   readonly fits?: Readonly<Record<string, FitProfileDto | null>> | undefined;
   readonly side: "INVESTOR" | "COMPANY" | "NONE";
@@ -81,6 +89,7 @@ export function RelationshipsIndex({
       }
       now={now}
       fits={fits}
+      commitments={commitments}
     />
   );
 }

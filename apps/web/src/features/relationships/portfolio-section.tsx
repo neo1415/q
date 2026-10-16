@@ -28,7 +28,16 @@ export const PORTFOLIO_PAGE = 8;
 export function PortfolioSection({
   items,
   commitments,
+  agreed,
 }: {
+  /**
+   * Commitments both sides confirmed whose money has not arrived yet
+   * (Results' CONFIRMED line). They are not investments: the projector
+   * reads INVESTED only on receipt or an INVESTED-level confirmation.
+   * Undefined: not known, so nothing is said.
+   */
+  readonly agreed?:
+    { readonly count: number; readonly amounts: readonly string[] } | undefined;
   readonly items: readonly RelationshipSummaryDto[] | undefined;
   readonly commitments: ReadonlyMap<
     string,
@@ -54,13 +63,31 @@ export function PortfolioSection({
           Your portfolio couldn&apos;t be read just now. Nothing is lost.
         </p>
       ) : items.length === 0 ? (
-        <p
-          className="cq-body-sm px-4 py-4 text-(--cq-text-secondary) sm:px-5"
+        <div
+          className="flex flex-col gap-2 px-4 py-4 sm:px-5"
           data-state="empty"
         >
-          No investments recorded yet. A company joins your portfolio when a
-          commitment is confirmed on its relationship.
-        </p>
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            No investments recorded yet. A company joins your portfolio when its
+            money is marked received.
+          </p>
+          {agreed === undefined || agreed.count === 0 ? null : (
+            <p className="cq-body-sm cq-numeric text-(--cq-text-primary)">
+              {agreed.count === 1
+                ? "1 commitment is confirmed and not yet received"
+                : `${String(agreed.count)} commitments are confirmed and not yet received`}
+              {agreed.amounts.length === 0
+                ? ". "
+                : ` (${agreed.amounts.join(", ")}). `}
+              <Link
+                href="/relationships?view=capital#commitments"
+                className="font-medium text-(--cq-accent) underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+              >
+                Open Capital
+              </Link>
+            </p>
+          )}
+        </div>
       ) : (
         <PagedList
           items={items.map((item, index) => ({
