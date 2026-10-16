@@ -6,6 +6,7 @@ import {
 import { CORE_AR } from "./catalog/core";
 import { DISCOVER_AR } from "./catalog/discover";
 import { DOCUMENTS_AR } from "./catalog/documents";
+import { GATEQ_AR } from "./catalog/gateq";
 import { Q_AR } from "./catalog/q";
 import { RELATIONSHIPS_AR } from "./catalog/relationships";
 import { indexPatterns, localiseDate, matchPattern } from "./patterns";
@@ -31,6 +32,7 @@ const ARABIC: Readonly<Record<string, string>> = {
   ...CORE_AR,
   ...RELATIONSHIPS_AR,
   ...DOCUMENTS_AR,
+  ...GATEQ_AR,
   ...Q_AR,
   ...DISCOVER_AR,
 };

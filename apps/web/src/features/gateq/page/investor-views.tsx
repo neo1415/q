@@ -30,6 +30,7 @@ import {
 } from "./gateq-actions";
 import { ErrorBlock, Skeleton, StateBlock } from "./gateq-chrome";
 import { CopyLink } from "./inbox-view";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The investor's "Find a startup" and "Your gate" (F3, F2; design
@@ -65,6 +66,8 @@ export function FindView({
   readonly initialResults?: readonly FoundStartup[] | null;
   readonly limited?: boolean;
 }) {
+  const t = useT();
+
   const [text, setText] = useState(initialText);
   const [results, setResults] = useState<readonly FoundStartup[] | null>(
     initialResults,
@@ -85,19 +88,19 @@ export function FindView({
     <>
       <div className="gq-card gq-findbox">
         <label className="gq-label" htmlFor="gq-find">
-          Describe the company you&apos;re looking for
+          {t("Describe the company you're looking for")}
         </label>
         <textarea
           id="gq-find"
           className="gq-input"
           value={text}
           maxLength={500}
-          placeholder="Seed fintech in Nigeria or Ghana, raising under $2M"
+          placeholder={t("Seed fintech in Nigeria or Ghana, raising under $2M")}
           onChange={(e) => setText(e.target.value)}
         />
         {query.chips.length === 0 ? null : (
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="cq-caption gq-t2">Q understood:</span>
+            <span className="cq-caption gq-t2">{t("Q understood:")}</span>
             {query.chips.map((chip) => (
               <span
                 key={`${chip.dimension}-${chip.label}`}
@@ -106,11 +109,13 @@ export function FindView({
                 title={
                   chip.checkable
                     ? undefined
-                    : "Companies don't share this with Capital Q yet, so it isn't checked"
+                    : t(
+                        "Companies don't share this with Capital Q yet, so it isn't checked",
+                      )
                 }
               >
-                {chip.label}
-                {chip.checkable ? "" : " (not checked)"}
+                {t(chip.label)}
+                {chip.checkable ? "" : t(" (not checked)")}
               </span>
             ))}
           </div>
@@ -122,13 +127,13 @@ export function FindView({
             disabled={pending || text.trim().length < 3}
           >
             <Search {...icon} />
-            Find
+            {t("Find")}
           </Button>
           <Button
             variant="quiet"
             onClick={() => setText("Climate hardware in East Africa")}
           >
-            Try: &ldquo;climate hardware in East Africa&rdquo;
+            {t("Try: “climate hardware in East Africa”")}
           </Button>
         </div>
       </div>
@@ -136,15 +141,16 @@ export function FindView({
         <div className="gq-banner">
           <Shield {...icon} />
           <span>
-            Showing companies open to everyone. Verify your firm to search
-            companies that share only with verified investors.
+            {t(
+              "Showing companies open to everyone. Verify your firm to search companies that share only with verified investors.",
+            )}
           </span>
         </div>
       ) : null}
       {notice === null ? null : (
         <div className="gq-banner" role="status">
           <Bookmark {...icon} />
-          <span>{notice}</span>
+          <span>{t(notice)}</span>
         </div>
       )}
       {state === "loading" || pending ? (
@@ -152,14 +158,14 @@ export function FindView({
           <div className="flex items-center gap-3 bg-(--cq-surface-subtle) p-3.5">
             <QNavIcon size={22} strokeWidth={2} aria-hidden />
             <span className="cq-body-sm">
-              Searching the companies you can see…
+              {t("Searching the companies you can see…")}
             </span>
           </div>
           <Skeleton width="100%" height={70} />
           <Skeleton width="100%" height={70} />
         </>
       ) : state === "error" || failed ? (
-        <ErrorBlock what="Your search" retryHref="/gateq?tab=find" />
+        <ErrorBlock t={t} what="Your search" retryHref="/gateq?tab=find" />
       ) : state === "empty" || (results !== null && results.length === 0) ? (
         <StateBlock
           icon={
@@ -169,8 +175,10 @@ export function FindView({
               aria-hidden
             />
           }
-          title="No company on Capital Q matches all of that yet"
-          body="Save it as an alert and it stays on your Find tab. Or loosen one part of the description."
+          title={t("No company on Capital Q matches all of that yet")}
+          body={t(
+            "Save it as an alert and it stays on your Find tab. Or loosen one part of the description.",
+          )}
         >
           <Button
             variant="primary"
@@ -188,14 +196,14 @@ export function FindView({
               })
             }
           >
-            Save as alert
+            {t("Save as alert")}
           </Button>
         </StateBlock>
       ) : results === null ? null : (
         <>
           <div className="gq-sect-h">
             <h2 className="cq-label gq-t2">
-              {results.length} compan
+              {results.length} {t("compan")}
               {results.length === 1 ? "y matches" : "ies match"}
             </h2>
             <Button
@@ -215,7 +223,7 @@ export function FindView({
               }
             >
               <Bookmark {...icon} />
-              Save as alert
+              {t("Save as alert")}
             </Button>
           </div>
           <div>
@@ -226,25 +234,29 @@ export function FindView({
                 href={`/company/${company.companyId}`}
               >
                 <span className="gq-logo" style={{ width: 48, height: 48 }}>
-                  {company.name.slice(0, 1).toUpperCase()}
+                  {t(company.name.slice(0, 1).toUpperCase())}
                 </span>
                 <span className="min-w-0">
                   <b className="font-semibold">{company.name}</b>
                   {company.oneLiner === null ? null : (
-                    <span className="cq-body-sm block">{company.oneLiner}</span>
+                    <span className="cq-body-sm block">
+                      {t(company.oneLiner)}
+                    </span>
                   )}
                   <span className="cq-caption gq-t2">
-                    {[
-                      company.stage === null
-                        ? null
-                        : (STAGE_WORDS[company.stage] ?? company.stage),
-                      company.country,
-                    ]
-                      .filter((part) => part !== null)
-                      .join(" · ")}
+                    {t(
+                      [
+                        company.stage === null
+                          ? null
+                          : (STAGE_WORDS[company.stage] ?? company.stage),
+                        company.country,
+                      ]
+                        .filter((part) => part !== null)
+                        .join(" · "),
+                    )}
                   </span>
                 </span>
-                <span className="gq-mini">In your Discover</span>
+                <span className="gq-mini">{t("In your Discover")}</span>
               </Link>
             ))}
           </div>
@@ -252,16 +264,18 @@ export function FindView({
       )}
       <div className="gq-card flex flex-wrap items-center gap-3 p-4">
         <span className="min-w-[220px] flex-1">
-          <b className="font-medium">Know a company that isn&apos;t here?</b>
+          <b className="font-medium">{t("Know a company that isn't here?")}</b>
           <span className="cq-body-sm gq-t2 block">
-            Send them your gate link. They check their fit in two minutes.
+            {t(
+              "Send them your gate link. They check their fit in two minutes.",
+            )}
           </span>
         </span>
         <Link
           href="/gateq?tab=gate"
           className={buttonClassName("secondary", "compact")}
         >
-          Share your gate
+          {t("Share your gate")}
         </Link>
       </div>
     </>
@@ -305,6 +319,8 @@ export function GateView({
   readonly canDecide: boolean;
   readonly editor?: ReactNode;
 }) {
+  const t = useT();
+
   const [days, setDays] = useState(
     replyWithinDays === null ? "" : String(replyWithinDays),
   );
@@ -321,7 +337,7 @@ export function GateView({
     );
   }
   if (state === "error")
-    return <ErrorBlock what="Your gate" retryHref="/gateq?tab=gate" />;
+    return <ErrorBlock t={t} what="Your gate" retryHref="/gateq?tab=gate" />;
   const mode =
     state === "empty" ? "CLOSED" : (policy?.version.inboundMode ?? "QUALIFIED");
   const rules = policy?.criteria ?? [];
@@ -331,14 +347,19 @@ export function GateView({
         <div className="gq-banner">
           <Lock {...icon} />
           <span>
-            Only admins of your firm can change the gate. You can copy and share
-            the link.
+            {t(
+              "Only admins of your firm can change the gate. You can copy and share the link.",
+            )}
           </span>
         </div>
       )}
       <section className="gq-card flex flex-col gap-3 p-[18px]">
-        <h2 className="cq-title-sm">Who can apply</h2>
-        <div className="gq-seg" role="radiogroup" aria-label="Who can apply">
+        <h2 className="cq-title-sm">{t("Who can apply")}</h2>
+        <div
+          className="gq-seg"
+          role="radiogroup"
+          aria-label={t("Who can apply")}
+        >
           {MODE_WORDS.map(([value, label]) => (
             <Button
               key={value}
@@ -349,40 +370,46 @@ export function GateView({
               disabled={!canDecide}
               onClick={() => setEditing(true)}
             >
-              {label}
+              {t(label)}
             </Button>
           ))}
         </div>
         <p className="cq-body-sm gq-t2">
           {mode === "CLOSED"
-            ? "Your gate is closed. Founders see that you're not taking applications right now."
+            ? t(
+                "Your gate is closed. Founders see that you're not taking applications right now.",
+              )
             : mode === "OPEN"
-              ? "Anyone can send. Founders still see your rules and how they stand."
-              : "Founders who don't meet a rule see why, and can't send. Unanswered questions never count as a no."}
+              ? t(
+                  "Anyone can send. Founders still see your rules and how they stand.",
+                )
+              : t(
+                  "Founders who don't meet a rule see why, and can't send. Unanswered questions never count as a no.",
+                )}
         </p>
       </section>
       <section className="gq-sect">
         <div className="gq-sect-h">
-          <h2 className="cq-title-sm">Your rules</h2>
+          <h2 className="cq-title-sm">{t("Your rules")}</h2>
           <Button
             variant="quiet"
             size="compact"
             disabled={!canDecide}
             onClick={() => setEditing(!editing)}
           >
-            {editing ? "Done" : "Edit"}
+            {editing ? t("Done") : t("Edit")}
           </Button>
         </div>
         {rules.length === 0 ? (
           <div className="flex flex-col items-start gap-3">
             <p className="cq-body gq-t2">
-              No published criteria yet, so nothing is checked: founders see no
-              judgement either way. Give Q your mandate and it drafts the
-              criteria; you confirm each one.
+              {t(
+                "No published criteria yet, so nothing is checked: founders see no judgement either way. Give Q your mandate and it drafts the criteria; you confirm each one.",
+              )}
             </p>
             {canDecide && editor !== undefined && !editing ? (
               <Button variant="primary" onClick={() => setEditing(true)}>
-                Draft criteria from your mandate
+                {t("Draft criteria from your mandate")}
               </Button>
             ) : null}
           </div>
@@ -394,14 +421,14 @@ export function GateView({
                 className="flex min-h-12 items-center justify-between gap-3"
               >
                 <span className="gq-t2">
-                  {DIMENSION_WORDS[rule.config.type] ?? rule.config.type}
+                  {t(DIMENSION_WORDS[rule.config.type] ?? rule.config.type)}
                 </span>
                 <span className="text-end">
-                  {rule.label}
+                  {t(rule.label)}
                   {rule.requiredness === "REQUIRED" ? (
                     ""
                   ) : (
-                    <span className="gq-t3"> · preferred</span>
+                    <span className="gq-t3"> {t("· preferred")}</span>
                   )}
                 </span>
               </li>
@@ -411,7 +438,7 @@ export function GateView({
         {editing && canDecide ? editor : null}
       </section>
       <section className="gq-sect">
-        <h2 className="cq-title-sm">Promise to founders</h2>
+        <h2 className="cq-title-sm">{t("Promise to founders")}</h2>
         {canDecide ? (
           <form
             className="flex flex-wrap items-center gap-2"
@@ -440,54 +467,57 @@ export function GateView({
             }}
           >
             <span className="cq-body">
-              We reply to every qualified application within
+              {t("We reply to every qualified application within")}
             </span>
             <input
               className="gq-input"
               style={{ width: 72 }}
               inputMode="numeric"
-              aria-label="Working days"
+              aria-label={t("Working days")}
               value={days}
               onChange={(e) => setDays(e.target.value)}
             />
-            <span className="cq-body">working days.</span>
+            <span className="cq-body">{t("working days.")}</span>
             <Button size="compact" type="submit" disabled={pending}>
-              Save
+              {t("Save")}
             </Button>
           </form>
         ) : (
           <p className="cq-body">
             {replyWithinDays === null ? (
-              "No reply promise yet."
+              t("No reply promise yet.")
             ) : (
               <>
-                We reply to every qualified application within{" "}
-                <b>{replyWithinDays} working days</b>.
+                {t("We reply to every qualified application within")}{" "}
+                <b>
+                  {replyWithinDays} {t("working days")}
+                </b>
+                .
               </>
             )}
           </p>
         )}
         {saved === null ? null : (
           <p className="cq-caption gq-t2" role="status">
-            {saved}
+            {t(saved)}
           </p>
         )}
       </section>
       <section className="gq-sect">
-        <h2 className="cq-title-sm">Share</h2>
+        <h2 className="cq-title-sm">{t("Share")}</h2>
         <div className="flex flex-wrap gap-2">
-          <CopyLink text={link} label="Copy link" />
+          <CopyLink text={link} label={t("Copy link")} />
           <Button size="compact" onClick={() => setShowQr(true)}>
             <LayoutGrid {...icon} />
-            QR code
+            {t("QR code")}
           </Button>
-          <CopyLink text={snippet} label="Website snippet" />
+          <CopyLink text={snippet} label={t("Website snippet")} />
           <Link
             href={link.replace(/^https?:\/\/[^/]+/, "")}
             className={buttonClassName("quiet", "compact")}
             target="_blank"
           >
-            Preview the form
+            {t("Preview the form")}
           </Link>
         </div>
         <code className="cq-caption block break-all bg-(--cq-surface-subtle) p-3">
@@ -497,11 +527,11 @@ export function GateView({
       </section>
       <SheetRoot open={showQr} onOpenChange={setShowQr}>
         {showQr ? (
-          <SheetContent title="Your gate's QR code" side="side">
+          <SheetContent title={t("Your gate's QR code")} side="side">
             <div
               className="mx-auto size-56 bg-(--cq-surface) p-3 text-(--cq-text-primary)"
               role="img"
-              aria-label="QR code for your gate"
+              aria-label={t("QR code for your gate")}
               // Our own encoder's SVG, built on the server; no user markup.
               dangerouslySetInnerHTML={{ __html: qr }}
             />
@@ -513,6 +543,8 @@ export function GateView({
 }
 
 export function GateEmpty({ onOpen }: { readonly onOpen?: ReactNode }) {
+  const t = useT();
+
   return (
     <StateBlock
       icon={
@@ -522,8 +554,10 @@ export function GateEmpty({ onOpen }: { readonly onOpen?: ReactNode }) {
           aria-hidden
         />
       }
-      title="You don't have a gate yet"
-      body="A gate is a short form on your own link, QR code or website. Founders check their fit with your rules in two minutes, and only those who fit can send."
+      title={t("You don't have a gate yet")}
+      body={t(
+        "A gate is a short form on your own link, QR code or website. Founders check their fit with your rules in two minutes, and only those who fit can send.",
+      )}
     >
       {onOpen}
     </StateBlock>

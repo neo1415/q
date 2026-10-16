@@ -8,8 +8,13 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+vi.mock("../src/features/gateq/gateway-actions", () => ({
+  openGatewayAction: vi.fn(),
+}));
+
 import { dealFixture } from "../app/dev/deal-close/fixtures";
 import { DOCUMENTS_AR } from "../src/features/i18n/catalog/documents";
+import { GATEQ_AR } from "../src/features/i18n/catalog/gateq";
 import { RELATIONSHIPS_AR } from "../src/features/i18n/catalog/relationships";
 import { LanguageProvider } from "../src/features/i18n/language";
 import { translate } from "../src/features/i18n/messages";
@@ -19,6 +24,14 @@ import {
   DealStageStrip,
 } from "../src/features/relationships/deal-stage-strip";
 import { NotScannedNote } from "../src/features/documents/not-scanned-note";
+import {
+  CopyButton,
+  OpenGatewayButton,
+} from "../src/features/gateq/gateway-controls";
+import {
+  ErrorBlock,
+  GateqChrome,
+} from "../src/features/gateq/page/gateq-chrome";
 import { RelationshipsEmpty } from "../src/features/relationships/relationships-empty";
 
 /**
@@ -36,6 +49,7 @@ const PLACEHOLDERS = /\{[A-Za-z][A-Za-z0-9]*\}/gu;
 const AREAS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   relationships: RELATIONSHIPS_AR,
   documents: DOCUMENTS_AR,
+  gateq: GATEQ_AR,
 };
 
 describe("the area catalogues", () => {
@@ -163,6 +177,57 @@ describe("Documents and data rooms in Arabic", () => {
     ).toBe("4 مستندات يمكنك رؤيتها، في 2 مجلدات. 1 منها مفتوحة لك الآن.");
     expect(translate("ar", "Cap table and equity")).toBe(
       "جدول الرسملة وحقوق الملكية",
+    );
+  });
+});
+
+describe("GateQ in Arabic", () => {
+  const arabic = (english: string) => translate("ar", english);
+
+  it("renders the investor's tabs and an unloaded block from a server translator", () => {
+    render(
+      <GateqChrome t={arabic} role="INVESTOR" active="inbox">
+        <ErrorBlock t={arabic} what="Your search" retryHref="/gateq?tab=find" />
+      </GateqChrome>,
+    );
+    expect(screen.getByRole("link", { name: "الوارد" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "بوابتك" })).toBeTruthy();
+    expect(screen.getByText("تعذّر تحميل بحثك")).toBeTruthy();
+    // The shared word wins: the same English means the same everywhere.
+    expect(
+      screen.getByRole("link", { name: translate("ar", "Try again") }),
+    ).toBeTruthy();
+  });
+
+  it("keeps the same blocks English without a translator", () => {
+    render(
+      <GateqChrome role="FOUNDER" active="applications">
+        <ErrorBlock what="Search" retryHref="/gateq?tab=claim" />
+      </GateqChrome>,
+    );
+    expect(screen.getByRole("link", { name: "Applications" })).toBeTruthy();
+    expect(screen.getByText("Search didn't load")).toBeTruthy();
+  });
+
+  it("renders the gateway controls in Arabic under the provider", () => {
+    render(
+      <LanguageProvider language="ar">
+        <OpenGatewayButton />
+        <CopyButton text="https://example.test/g/abc" label="Copy gate link" />
+      </LanguageProvider>,
+    );
+    expect(screen.getByRole("button", { name: "افتح بوابتي" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "انسخ رابط البوابة" }),
+    ).toBeTruthy();
+  });
+
+  it("says a founder's fit with the fund's name kept as written", () => {
+    expect(translate("ar", "You fit Kiln Ventures's mandate")).toBe(
+      "أنت تتوافق مع تفويض Kiln Ventures",
+    );
+    expect(translate("ar", "Replies within 10 working days")).toBe(
+      "يردّ خلال 10 أيام عمل",
     );
   });
 });

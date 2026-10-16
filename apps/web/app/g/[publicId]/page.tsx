@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { founderFormContext } from "@/features/gateq/form/founder-prefill";
 import { GateQForm } from "@/features/gateq/form/gateq-form";
 import { publicGateway } from "@/features/gateq/public-gateway";
+import { serverT } from "@/features/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * asks the same questions with nothing filled in.
  */
 export default async function GatewayPage({ params }: Props) {
+  const t = await serverT();
+
   const gateway = await publicGateway((await params).publicId);
   if (gateway === null) notFound();
   const founder = await founderFormContext();
@@ -38,7 +41,7 @@ export default async function GatewayPage({ params }: Props) {
         materials={founder.materials}
       />
       <p className="cq-caption text-(--cq-text-tertiary)">
-        Powered by Capital Q
+        {t("Powered by Capital Q")}
       </p>
     </main>
   );

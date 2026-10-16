@@ -8,7 +8,7 @@
  * itself a catalogue string or pattern (a stage, "3 documents") is
  * translated too; names,
  * figures and dates pass through unchanged. `{n}` (and `{n2}`, `{count}`)
- * matches a figure only.
+ * matches a figure only, and `{date}` only something with a digit in it.
  */
 type Compiled = {
   readonly regex: RegExp;
@@ -85,6 +85,14 @@ export function matchPattern(
   for (const pattern of candidates) {
     const match = pattern.regex.exec(english);
     if (match === null) continue;
+    // {date}, {date2}: a date or time only, never someone's words.
+    if (
+      pattern.names.some(
+        (name, i) => name.startsWith("date") && !/\d/.test(match[i + 1] ?? ""),
+      )
+    ) {
+      continue;
+    }
     const values = new Map<string, string>();
     pattern.names.forEach((name, i) => {
       const value = match[i + 1] ?? "";

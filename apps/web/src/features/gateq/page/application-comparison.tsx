@@ -10,6 +10,7 @@ import { Button } from "@capital-q/ui/button";
 import { QSection, useQDialog } from "@/features/q/q-section";
 import { loadDetailAction } from "./gateq-actions";
 import { summaryWords } from "./summary-words";
+import { useT } from "@/features/i18n/language";
 
 export const GATEQ_COMPARE_MAX = 6;
 const GROUPS: readonly (readonly [GateqInvestmentGroup, string])[] = [
@@ -30,6 +31,8 @@ function Fact({
     GateqInboxDetailDto["dossier"]
   >["dimensions"][number]["facts"][number];
 }) {
+  const t = useT();
+
   const truth = {
     USER_CLAIM: "Applicant claim",
     ESTIMATE: "Estimate",
@@ -53,13 +56,14 @@ function Fact({
   return (
     <div className="flex flex-col gap-1">
       <p className="whitespace-pre-wrap break-words">
-        {summaryWords(fact.summary)}
+        {t(summaryWords(fact.summary))}
       </p>
       <p className="cq-caption gq-t2">
-        Origin: {origin} · Truth: {truth} · Evidence: {evidence}
+        {t("Origin:")} {t(origin)} {t("· Truth:")} {t(truth)} {t("· Evidence:")}{" "}
+        {t(evidence)}
       </p>
       {fact.derivation === undefined ? null : (
-        <p className="cq-caption gq-t2">{fact.derivation}</p>
+        <p className="cq-caption gq-t2">{t(fact.derivation)}</p>
       )}
     </div>
   );
@@ -70,6 +74,8 @@ function ComparisonTable({
 }: {
   readonly details: readonly GateqInboxDetailDto[];
 }) {
+  const t = useT();
+
   const row = (
     key: string,
     label: string,
@@ -80,7 +86,7 @@ function ComparisonTable({
         scope="row"
         className="cq-body-sm min-w-44 px-2 py-3 text-start align-top font-medium text-(--cq-text-secondary)"
       >
-        {label}
+        {t(label)}
       </th>
       {details.map((detail) => (
         <td
@@ -97,16 +103,16 @@ function ComparisonTable({
       className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
       tabIndex={0}
       role="region"
-      aria-label="Application comparison table"
+      aria-label={t("Application comparison table")}
     >
       <table className="w-full border-collapse text-start">
         <caption className="sr-only">
-          Saved submitted applications compared side by side
+          {t("Saved submitted applications compared side by side")}
         </caption>
         <thead>
           <tr>
             <th scope="col" className="cq-label px-2 py-3">
-              Submitted information
+              {t("Submitted information")}
             </th>
             {details.map((detail) => (
               <th
@@ -118,7 +124,7 @@ function ComparisonTable({
                   {detail.dossier?.company.name ?? detail.item.companyName}
                 </span>
                 <span className="cq-caption gq-t2 block">
-                  {detail.item.reference}
+                  {t(detail.item.reference)}
                 </span>
               </th>
             ))}
@@ -168,30 +174,30 @@ function ComparisonTable({
                 {detail.dossier == null
                   ? detail.rules.map((rule) => (
                       <li key={rule.label}>
-                        {rule.label} ·{" "}
+                        {t(rule.label)} ·{" "}
                         {rule.standing === "MEETS"
-                          ? "Meets"
+                          ? t("Meets")
                           : rule.standing === "DOES_NOT_MEET"
-                            ? "Doesn't meet"
-                            : "Needs clarification"}{" "}
-                        · {rule.required ? "Required" : "Preferred"}
+                            ? t("Doesn't meet")
+                            : t("Needs clarification")}{" "}
+                        · {rule.required ? t("Required") : t("Preferred")}
                       </li>
                     ))
                   : detail.dossier.qualification.criteria.map((rule) => (
                       <li key={rule.label}>
-                        {rule.label} ·{" "}
-                        {
+                        {t(rule.label)} ·{" "}
+                        {t(
                           {
                             MATCH: "Meets",
                             NO_MATCH: "Doesn't meet",
                             UNKNOWN: "Needs clarification",
                             NOT_APPLICABLE: "Not applicable",
-                          }[rule.status]
-                        }{" "}
+                          }[rule.status],
+                        )}{" "}
                         ·{" "}
                         {rule.requiredness === "REQUIRED"
-                          ? "Required"
-                          : "Preferred"}
+                          ? t("Required")
+                          : t("Preferred")}
                       </li>
                     ))}
               </ul>
@@ -236,8 +242,8 @@ function ComparisonTable({
               <ul className="flex flex-col gap-2">
                 {detail.answers.map((answer) => (
                   <li key={answer.label}>
-                    <b className="font-medium">{answer.label}:</b>{" "}
-                    {answer.value}
+                    <b className="font-medium">{t(answer.label)}:</b>{" "}
+                    {t(answer.value)}
                   </li>
                 ))}
               </ul>
@@ -255,17 +261,17 @@ function ComparisonTable({
               <ul className="flex flex-col gap-1">
                 {detail.dossier.unknowns.map((gap) => (
                   <li key={`unknown:${gap.dimension}`}>
-                    Unknown · {gap.label}
+                    {t("Unknown ·")} {t(gap.label)}
                   </li>
                 ))}
                 {detail.dossier.declined.map((gap) => (
                   <li key={`declined:${gap.dimension}`}>
-                    Declined · {gap.label}
+                    {t("Declined ·")} {t(gap.label)}
                   </li>
                 ))}
                 {detail.dossier.missing.map((gap) => (
                   <li key={`missing:${gap.dimension}`}>
-                    Missing · {gap.label}
+                    {t("Missing ·")} {t(gap.label)}
                   </li>
                 ))}
               </ul>
@@ -279,7 +285,7 @@ function ComparisonTable({
             ) : (
               <ul className="flex flex-col gap-1">
                 {detail.dossier.contradictions.map((line, index) => (
-                  <li key={index}>{line}</li>
+                  <li key={index}>{t(line)}</li>
                 ))}
               </ul>
             ),
@@ -290,7 +296,7 @@ function ComparisonTable({
             ) : (
               <ul>
                 {detail.shared.map((document) => (
-                  <li key={document.documentId}>{document.title}</li>
+                  <li key={document.documentId}>{t(document.title)}</li>
                 ))}
               </ul>
             ),
@@ -302,7 +308,7 @@ function ComparisonTable({
             ) : (
               <ul className="flex flex-col gap-2">
                 {detail.dossier.diligenceQuestions.map((question, index) => (
-                  <li key={index}>{question.question}</li>
+                  <li key={index}>{t(question.question)}</li>
                 ))}
               </ul>
             ),
@@ -326,6 +332,8 @@ export function ApplicationComparison({
   readonly demoDetails?:
     Readonly<Record<string, GateqInboxDetailDto>> | undefined;
 }) {
+  const t = useT();
+
   const [details, setDetails] = useState<readonly GateqInboxDetailDto[] | null>(
     null,
   );
@@ -397,14 +405,14 @@ export function ApplicationComparison({
   if (loading)
     return (
       <p role="status" className="cq-body-sm gq-t2">
-        Loading selected submissions…
+        {t("Loading selected submissions…")}
       </p>
     );
   if (problem !== null)
     return (
       <div className="flex flex-col items-start gap-3">
         <p role="alert" className="cq-body-sm">
-          {problem}
+          {t(problem)}
         </p>
         <Button
           onClick={() => {
@@ -414,7 +422,7 @@ export function ApplicationComparison({
             setAttempt((current) => current + 1);
           }}
         >
-          Try again
+          {t("Try again")}
         </Button>
       </div>
     );
@@ -424,11 +432,12 @@ export function ApplicationComparison({
       id="gateq-comparison"
       kind="GATEQ_APPLICATION"
       refs={refs}
-      label="Submitted application comparison"
+      label={t("Submitted application comparison")}
     >
       <p className="cq-body-sm gq-t2 mb-4">
-        Saved submission data, compared side by side. Claims and evidence retain
-        their recorded status. Your team makes the investment decision.
+        {t(
+          "Saved submission data, compared side by side. Claims and evidence retain their recorded status. Your team makes the investment decision.",
+        )}
       </p>
       <ComparisonTable details={details} />
     </QSection>

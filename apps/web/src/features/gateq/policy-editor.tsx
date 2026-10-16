@@ -15,6 +15,7 @@ import { ICON_SIZE, ICON_STROKE, Trash2, Upload, X } from "@capital-q/ui/icons";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import { extractPolicyAction, publishPolicyAction } from "./gateway-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The investor's side of "Q sets it up for you" (P7). Paste or upload the
@@ -105,6 +106,8 @@ export function PolicyEditor({
   readonly hasRules: boolean;
   readonly preview?: PolicyEditorPreview;
 }) {
+  const t = useT();
+
   const router = useRouter();
   const textId = useId();
   const file = useRef<HTMLInputElement>(null);
@@ -218,8 +221,12 @@ export function PolicyEditor({
             className="cq-body-sm text-(--cq-text-secondary)"
           >
             {hasRules
-              ? "Paste an updated mandate and Q drafts new rules. Your current rules stay until you publish."
-              : "Paste your mandate or thesis. Q drafts the rules founders are checked against; you confirm each one."}
+              ? t(
+                  "Paste an updated mandate and Q drafts new rules. Your current rules stay until you publish.",
+                )
+              : t(
+                  "Paste your mandate or thesis. Q drafts the rules founders are checked against; you confirm each one.",
+                )}
           </label>
           <textarea
             id={textId}
@@ -231,7 +238,9 @@ export function PolicyEditor({
             }}
             rows={7}
             maxLength={20_000}
-            placeholder="We invest $250k to $1.5m in pre-seed to Series A fintech in West Africa and Kenya. We don't invest in online betting."
+            placeholder={t(
+              "We invest $250k to $1.5m in pre-seed to Series A fintech in West Africa and Kenya. We don't invest in online betting.",
+            )}
             className="cq-body w-full resize-y border border-(--cq-border-subtle) bg-(--cq-surface) p-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -240,7 +249,7 @@ export function PolicyEditor({
               onClick={read}
               disabled={pending || text.trim() === ""}
             >
-              {pending ? "Q is reading…" : "Draft rules with Q"}
+              {pending ? t("Q is reading…") : t("Draft rules with Q")}
             </Button>
             <Button
               variant="secondary"
@@ -252,7 +261,7 @@ export function PolicyEditor({
                 strokeWidth={ICON_STROKE}
                 aria-hidden="true"
               />
-              Upload a file
+              {t("Upload a file")}
             </Button>
             <input
               ref={file}
@@ -266,8 +275,9 @@ export function PolicyEditor({
             {pending ? <QSwarm state="THINKING" pixels={28} /> : null}
           </div>
           <p className="cq-caption text-(--cq-text-tertiary)">
-            Your mandate stays private. Founders see only the name of each rule,
-            never its values or your text.
+            {t(
+              "Your mandate stays private. Founders see only the name of each rule, never its values or your text.",
+            )}
           </p>
         </div>
       ) : (
@@ -277,11 +287,15 @@ export function PolicyEditor({
             <div className="flex flex-col gap-1">
               <h3 className="cq-title-sm text-(--cq-text-primary)">
                 {proposals.length === 0
-                  ? "Q couldn't find rules in that text"
-                  : `Q drafted ${proposals.length} rule${proposals.length === 1 ? "" : "s"}. Check each one.`}
+                  ? t("Q couldn't find rules in that text")
+                  : t(
+                      `Q drafted ${proposals.length} rule${proposals.length === 1 ? "" : "s"}. Check each one.`,
+                    )}
               </h3>
               <p className="cq-body-sm text-(--cq-text-secondary)">
-                Nothing is live until you publish. Remove anything Q read wrong.
+                {t(
+                  "Nothing is live until you publish. Remove anything Q read wrong.",
+                )}
               </p>
             </div>
           </div>
@@ -303,12 +317,14 @@ export function PolicyEditor({
                           label: event.target.value.slice(0, 120),
                         }))
                       }
-                      aria-label={`Name founders see for the ${DIMENSION_WORDS[proposal.dimension]} rule`}
+                      aria-label={t(
+                        `Name founders see for the ${DIMENSION_WORDS[proposal.dimension]} rule`,
+                      )}
                       className="cq-label min-h-11 min-w-0 flex-1 border border-transparent bg-transparent px-2 text-(--cq-text-primary) hover:border-(--cq-border-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                     />
                     <div
                       role="group"
-                      aria-label="How strict"
+                      aria-label={t("How strict")}
                       className="flex border border-(--cq-border-subtle) p-0.5"
                     >
                       {(["REQUIRED", "PREFERRED"] as const).map((level) => (
@@ -324,14 +340,16 @@ export function PolicyEditor({
                           }
                           className="cq-caption min-h-10 px-3 text-(--cq-text-secondary) aria-pressed:bg-(--cq-surface-strong) aria-pressed:text-(--cq-text-primary)"
                         >
-                          {level === "REQUIRED" ? "Required" : "Preferred"}
+                          {level === "REQUIRED"
+                            ? t("Required")
+                            : t("Preferred")}
                         </button>
                       ))}
                     </div>
                     <Button
                       variant="quiet"
                       size="compact"
-                      aria-label={`Remove the ${proposal.label} rule`}
+                      aria-label={t(`Remove the ${proposal.label} rule`)}
                       onClick={() => update(proposal.key, () => null)}
                     >
                       <Trash2
@@ -350,11 +368,11 @@ export function PolicyEditor({
                           className="cq-caption flex items-center gap-1 bg-(--cq-surface-subtle) py-0.5 pe-0.5 ps-2.5 text-(--cq-text-primary)"
                         >
                           {proposal.config.type === "EXCLUDED_TAXONOMY"
-                            ? `Not ${value}`
-                            : value}
+                            ? t(`Not ${value}`)
+                            : t(value)}
                           <button
                             type="button"
-                            aria-label={`Remove ${value}`}
+                            aria-label={t(`Remove ${value}`)}
                             onClick={() =>
                               update(proposal.key, (p) =>
                                 withoutValue(p, index),
@@ -382,7 +400,8 @@ export function PolicyEditor({
 
                   {proposal.quote === "" ? null : (
                     <p className="cq-caption text-(--cq-text-tertiary)">
-                      From your mandate: &ldquo;{proposal.quote}&rdquo;
+                      {t("From your mandate: “")}
+                      {proposal.quote}&rdquo;
                     </p>
                   )}
                 </li>
@@ -394,21 +413,27 @@ export function PolicyEditor({
             <div className="cq-body-sm flex flex-col gap-1 text-(--cq-text-secondary)">
               {notFound.length === 0 ? null : (
                 <p>
-                  Not in your mandate, so no rule:{" "}
-                  {notFound
-                    .map(
-                      (d) =>
-                        DIMENSION_WORDS[d as PolicyProposalDto["dimension"]] ??
-                        d,
-                    )
-                    .join(", ")}
+                  {t("Not in your mandate, so no rule:")}{" "}
+                  {t(
+                    notFound
+                      .map(
+                        (d) =>
+                          DIMENSION_WORDS[
+                            d as PolicyProposalDto["dimension"]
+                          ] ?? d,
+                      )
+                      .join(", "),
+                  )}
                   .
                 </p>
               )}
               {excludedPlaces.length === 0 ? null : (
                 <p>
-                  You mentioned not investing in {excludedPlaces.join(", ")}.
-                  Places are only ever an allow-list here, so Q left that out.
+                  {t("You mentioned not investing in")}{" "}
+                  {t(excludedPlaces.join(", "))}
+                  {t(
+                    ". Places are only ever an allow-list here, so Q left that out.",
+                  )}
                 </p>
               )}
             </div>
@@ -417,29 +442,29 @@ export function PolicyEditor({
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" onClick={publish} disabled={pending}>
               {pending
-                ? "Publishing…"
+                ? t("Publishing…")
                 : proposals.length === 0
-                  ? "Publish with no rules (open to all)"
-                  : "Publish these rules"}
+                  ? t("Publish with no rules (open to all)")
+                  : t("Publish these rules")}
             </Button>
             <Button
               variant="quiet"
               onClick={() => setProposals(null)}
               disabled={pending}
             >
-              Back to the text
+              {t("Back to the text")}
             </Button>
           </div>
         </div>
       )}
       {published ? (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          Published. Founders are now checked against these rules.
+          {t("Published. Founders are now checked against these rules.")}
         </p>
       ) : null}
       {message === null ? null : (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="alert">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>
@@ -456,6 +481,8 @@ function ChequeFields({
   >;
   readonly onChange: (config: Proposal["config"]) => void;
 }) {
+  const t = useT();
+
   const field =
     "cq-body-sm min-h-11 w-32 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
   return (
@@ -465,17 +492,17 @@ function ChequeFields({
       </span>
       <input
         inputMode="numeric"
-        aria-label="Smallest cheque"
+        aria-label={t("Smallest cheque")}
         value={config.minCheque}
         onChange={(event) =>
           onChange({ ...config, minCheque: amount(event.target.value) ?? "0" })
         }
         className={field}
       />
-      <span className="cq-caption text-(--cq-text-secondary)">to</span>
+      <span className="cq-caption text-(--cq-text-secondary)">{t("to")}</span>
       <input
         inputMode="numeric"
-        aria-label="Largest cheque (empty for no ceiling)"
+        aria-label={t("Largest cheque (empty for no ceiling)")}
         value={config.maxCheque ?? ""}
         onChange={(event) =>
           onChange({ ...config, maxCheque: amount(event.target.value) })

@@ -86,6 +86,7 @@ import {
   rulesWords,
   shortcutFor,
 } from "./inbox-model";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The investor's GateQ inbox (F4; design a/gateq.html "Investor: GateQ
@@ -179,6 +180,8 @@ export function InboxView({
   viewBase = "/gateq?tab=inbox&view=",
   demo,
 }: InboxViewProps) {
+  const t = useT();
+
   const router = useRouter();
   const viewHref = (view: string) => `${viewBase}${view}`;
   const desktop = useIsDesktop();
@@ -454,7 +457,7 @@ export function InboxView({
   // ------------------------------------------------------------------------
 
   const chips = (
-    <div className="gq-chips" role="navigation" aria-label="Views">
+    <div className="gq-chips" role="navigation" aria-label={t("Views")}>
       {chipsFor(solo).map(([view, label]) => {
         const count = inbox?.counts[view] ?? 0;
         return (
@@ -464,7 +467,7 @@ export function InboxView({
             className="gq-chip"
             aria-current={inbox?.view === view ? "page" : undefined}
           >
-            {label}
+            {t(label)}
             {count > 0 && view !== "PASSED" && view !== "ARCHIVED" ? (
               <span className="gq-count">{count}</span>
             ) : null}
@@ -511,6 +514,7 @@ export function InboxView({
       <>
         {chips}
         <ErrorBlock
+          t={t}
           what="Your GateQ inbox"
           retryHref={viewHref(inbox?.view ?? "INBOX")}
         />
@@ -536,13 +540,15 @@ export function InboxView({
             }
             title={
               inbox?.view === "INBOX" || inbox === null
-                ? "No applications yet"
-                : "Nothing here"
+                ? t("No applications yet")
+                : t("Nothing here")
             }
             body={
               inbox?.view === "INBOX" || inbox === null
-                ? "Share your gate and founders can check their fit with you in two minutes. Only companies that meet your rules can send."
-                : "Nothing in this view right now."
+                ? t(
+                    "Share your gate and founders can check their fit with you in two minutes. Only companies that meet your rules can send.",
+                  )
+                : t("Nothing in this view right now.")
             }
           >
             <CopyLink
@@ -554,11 +560,11 @@ export function InboxView({
               href="/gateq?tab=gate"
               className={buttonClassName("secondary")}
             >
-              Preview the form
+              {t("Preview the form")}
             </Link>
           </StateBlock>
           <div className="gq-card flex flex-col gap-2 p-4">
-            <p className="cq-label gq-t2">Your gate link</p>
+            <p className="cq-label gq-t2">{t("Your gate link")}</p>
             <p
               className="cq-body break-all"
               style={{
@@ -566,10 +572,10 @@ export function InboxView({
                 fontSize: 14,
               }}
             >
-              {gateLink.replace(/^https?:\/\//, "")}
+              {t(gateLink.replace(/^https?:\/\//, ""))}
             </p>
             <p className="cq-caption gq-t3">
-              Also as a QR code and a snippet for your website.
+              {t("Also as a QR code and a snippet for your website.")}
             </p>
           </div>
         </div>
@@ -583,9 +589,11 @@ export function InboxView({
       <div
         className="gq-bulk"
         role="toolbar"
-        aria-label={`${checked.size} selected`}
+        aria-label={t(`${checked.size} selected`)}
       >
-        <b className="px-2 font-medium">{checked.size} selected</b>
+        <b className="px-2 font-medium">
+          {checked.size} {t("selected")}
+        </b>
         <button
           type="button"
           disabled={
@@ -595,11 +603,12 @@ export function InboxView({
           }
           onClick={() => setSheet({ kind: "compare", ids: [...checked] })}
         >
-          Compare
+          {t("Compare")}
         </button>
         {checked.size > GATEQ_COMPARE_MAX ? (
           <span className="cq-caption">
-            Select up to {GATEQ_COMPARE_MAX} applications to compare.
+            {t("Select up to")} {GATEQ_COMPARE_MAX}{" "}
+            {t("applications to compare.")}
           </span>
         ) : null}
         <button
@@ -607,7 +616,7 @@ export function InboxView({
           onClick={() => setSheet({ kind: "label", ids: [...checked] })}
         >
           <Tag {...icon} />
-          Label
+          {t("Label")}
         </button>
         {solo || !canDecide ? null : (
           <button
@@ -615,7 +624,7 @@ export function InboxView({
             onClick={() => setSheet({ kind: "assign", ids: [...checked] })}
           >
             <UserPlus {...icon} />
-            Assign
+            {t("Assign")}
           </button>
         )}
         <button
@@ -632,24 +641,24 @@ export function InboxView({
           }}
         >
           <Download {...icon} />
-          Download packs
+          {t("Download packs")}
         </button>
         <button type="button" onClick={() => archive([...checked])}>
           <Archive {...icon} />
-          Archive
+          {t("Archive")}
         </button>
         {canDecide ? (
           <button
             type="button"
             onClick={() => setSheet({ kind: "pass", ids: [...checked] })}
           >
-            Pass…
+            {t("Pass…")}
           </button>
         ) : null}
         <span className="flex-1" />
         <button
           type="button"
-          aria-label="Clear selection"
+          aria-label={t("Clear selection")}
           onClick={() => setChecked(new Set())}
         >
           <X {...icon} />
@@ -666,7 +675,7 @@ export function InboxView({
       className="gq-list"
       ref={listRef}
       role="listbox"
-      aria-label="Applications"
+      aria-label={t("Applications")}
       aria-multiselectable="true"
     >
       <div className="gq-listhead">
@@ -675,7 +684,7 @@ export function InboxView({
           className="grid size-11 place-items-center text-(--cq-text-tertiary) lg:size-9"
           role="checkbox"
           aria-checked={allChecked}
-          aria-label="Select all"
+          aria-label={t("Select all")}
           onClick={() =>
             setChecked(
               allChecked
@@ -692,14 +701,14 @@ export function InboxView({
         </button>
         {searching ? (
           <label className="gq-search flex-1">
-            <span className="sr-only">Search applications</span>
+            <span className="sr-only">{t("Search applications")}</span>
             <Search {...icon} />
             <input
               ref={searchRef}
               className="gq-input"
               style={{ minHeight: 36 }}
               value={search}
-              placeholder="Search"
+              placeholder={t("Search")}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
@@ -717,15 +726,15 @@ export function InboxView({
               onClick={() => setSearching(true)}
             >
               <Filter {...icon} />
-              Filter
+              {t("Filter")}
             </Button>
             <Button
               variant="quiet"
               size="compact"
               className="gq-hide-s"
-              aria-label="Sorted by reply-by date"
+              aria-label={t("Sorted by reply-by date")}
             >
-              Reply-by date
+              {t("Reply-by date")}
               <ChevronDown {...icon} />
             </Button>
           </>
@@ -734,11 +743,13 @@ export function InboxView({
         <Button
           variant="quiet"
           size="compact"
-          title="Q proposes what to look at first, what to ask for and which to prepare a pass for. You approve."
+          title={t(
+            "Q proposes what to look at first, what to ask for and which to prepare a pass for. You approve.",
+          )}
           onClick={() => setSheet({ kind: "triage" })}
         >
           <QNavIcon size={16} strokeWidth={ICON_STROKE} aria-hidden />
-          Triage
+          {t("Triage")}
         </Button>
       </div>
       {visible.map((item) => (
@@ -761,9 +772,11 @@ export function InboxView({
       ))}
       <p className="cq-caption gq-t3 px-3 py-3.5">
         {inbox.counts.NOT_A_FIT > 0
-          ? `${inbox.counts.NOT_A_FIT} application${inbox.counts.NOT_A_FIT === 1 ? "" : "s"} outside your rules ${inbox.counts.NOT_A_FIT === 1 ? "is" : "are"} under Not a fit. `
+          ? t(
+              `${inbox.counts.NOT_A_FIT} application${inbox.counts.NOT_A_FIT === 1 ? "" : "s"} outside your rules ${inbox.counts.NOT_A_FIT === 1 ? "is" : "are"} under Not a fit. `,
+            )
           : ""}
-        Q never passes on your behalf.
+        {t("Q never passes on your behalf.")}
       </p>
     </div>
   );
@@ -807,7 +820,7 @@ export function InboxView({
           id="gateq-application"
           kind="GATEQ_APPLICATION"
           refs={[applicationFocus]}
-          label="Submitted GateQ application"
+          label={t("Submitted GateQ application")}
         />
       )}
       {chips}
@@ -818,7 +831,7 @@ export function InboxView({
           id="gateq-selection"
           kind="GATEQ_INBOX"
           refs={selectedRefs}
-          label="Selected GateQ applications"
+          label={t("Selected GateQ applications")}
         >
           {bulk}
         </QSection>
@@ -829,7 +842,7 @@ export function InboxView({
         label={
           applicationFocus === undefined || current === null
             ? null
-            : `${current.companyName}'s application`
+            : t(`${current.companyName}'s application`)
         }
       />
       <QSection
@@ -839,7 +852,7 @@ export function InboxView({
           kind: "GATEQ_APPLICATION",
           id: item.applicationId,
         }))}
-        label="GateQ inbox"
+        label={t("GateQ inbox")}
       >
         <div className="gq-ibx">
           {list}
@@ -851,16 +864,16 @@ export function InboxView({
       <p className="cq-caption gq-t3">
         {shortcutsOn ? (
           <>
-            Keys: <span className="gq-kbd">j</span>{" "}
-            <span className="gq-kbd">k</span> move,{" "}
-            <span className="gq-kbd">x</span> select,{" "}
-            <span className="gq-kbd">s</span> star,{" "}
-            <span className="gq-kbd">e</span> archive,{" "}
-            <span className="gq-kbd">#</span> pass,{" "}
-            <span className="gq-kbd">/</span> search.{" "}
+            {t("Keys:")} <span className="gq-kbd">j</span>{" "}
+            <span className="gq-kbd">k</span> {t("move,")}{" "}
+            <span className="gq-kbd">x</span> {t("select,")}{" "}
+            <span className="gq-kbd">s</span> {t("star,")}{" "}
+            <span className="gq-kbd">e</span> {t("archive,")}{" "}
+            <span className="gq-kbd">#</span> {t("pass,")}{" "}
+            <span className="gq-kbd">/</span> {t("search.")}{" "}
           </>
         ) : (
-          "Keyboard shortcuts are off. "
+          t("Keyboard shortcuts are off. ")
         )}
         <button
           type="button"
@@ -875,7 +888,7 @@ export function InboxView({
             }
           }}
         >
-          Turn {shortcutsOn ? "off" : "on"}
+          {t("Turn")} {shortcutsOn ? "off" : "on"}
         </button>
       </p>
 
@@ -890,7 +903,7 @@ export function InboxView({
             <button
               type="button"
               className="grid size-11 place-items-center"
-              aria-label="Back to inbox"
+              aria-label={t("Back to inbox")}
               onClick={() => setPhoneOpen(false)}
             >
               <ChevronLeft
@@ -903,7 +916,7 @@ export function InboxView({
             <button
               type="button"
               className="grid size-11 place-items-center"
-              aria-label={current.starred ? "Unstar" : "Star"}
+              aria-label={current.starred ? t("Unstar") : t("Star")}
               aria-pressed={current.starred}
               onClick={() => star([current.applicationId], !current.starred)}
             >
@@ -917,7 +930,7 @@ export function InboxView({
             <button
               type="button"
               className="grid size-11 place-items-center"
-              aria-label="Archive"
+              aria-label={t("Archive")}
               onClick={() => archive([current.applicationId])}
             >
               <Archive {...icon} size={18} />
@@ -925,7 +938,7 @@ export function InboxView({
             <button
               type="button"
               className="grid size-11 place-items-center"
-              aria-label="Download pack"
+              aria-label={t("Download pack")}
               onClick={() =>
                 setSheet({ kind: "pack", id: current.applicationId })
               }
@@ -941,14 +954,14 @@ export function InboxView({
                 setSheet({ kind: "pass", ids: [current.applicationId] })
               }
             >
-              Pass
+              {t("Pass")}
             </Button>
             <Button
               onClick={() =>
                 setSheet({ kind: "pack", id: current.applicationId })
               }
             >
-              Pack
+              {t("Pack")}
             </Button>
             <Button
               variant="primary"
@@ -957,7 +970,7 @@ export function InboxView({
                 setSheet({ kind: "reply", id: current.applicationId })
               }
             >
-              Reply
+              {t("Reply")}
             </Button>
           </div>
         </div>
@@ -1058,6 +1071,8 @@ function Row({
   readonly onCheck: () => void;
   readonly onStar: () => void;
 }) {
+  const t = useT();
+
   const reply = replyWords(item);
   return (
     <div
@@ -1080,7 +1095,7 @@ function Row({
         className="gq-ck"
         role="checkbox"
         aria-checked={checked}
-        aria-label={`Select ${item.companyName}`}
+        aria-label={t(`Select ${item.companyName}`)}
         onClick={(event) => {
           event.stopPropagation();
           onCheck();
@@ -1096,7 +1111,9 @@ function Row({
         type="button"
         className="gq-st"
         aria-pressed={item.starred}
-        aria-label={`${item.starred ? "Unstar" : "Star"} ${item.companyName}`}
+        aria-label={t(
+          `${item.starred ? "Unstar" : "Star"} ${item.companyName}`,
+        )}
         onClick={(event) => {
           event.stopPropagation();
           onStar();
@@ -1107,30 +1124,35 @@ function Row({
       <div className="gq-main">
         <span className="gq-nm">
           {item.companyName}
-          {item.unread ? <span className="sr-only"> (unread)</span> : null}
+          {item.unread ? (
+            <span className="sr-only"> {t("(unread)")}</span>
+          ) : null}
         </span>
         {item.oneLiner === null ? null : (
-          <span className="gq-ln">{item.oneLiner}</span>
+          <span className="gq-ln">{t(item.oneLiner)}</span>
         )}
         <span className="gq-tags">
           <span className="gq-mini">
             <FitGlyph kind={fitGlyphFor(item)} size={12} />
-            {fitWordsFor(item)}
+            {t(fitWordsFor(item))}
           </span>
-          <span className="gq-mini">{rulesWords(item.rules)}</span>
+          <span className="gq-mini">{t(rulesWords(item.rules))}</span>
           {item.labels.map((label) => (
             <span key={label} className="gq-lbl">
-              {label}
+              {t(label)}
             </span>
           ))}
         </span>
       </div>
       <div className="gq-right">
         <span className="cq-caption gq-t3">
-          {receivedWords(item.submittedAt)}
+          {t(receivedWords(item.submittedAt))}
         </span>
         {item.assignee === null ? null : (
-          <span className="gq-ini" title={`Assigned to ${item.assignee.name}`}>
+          <span
+            className="gq-ini"
+            title={t(`Assigned to ${item.assignee.name}`)}
+          >
             {item.assignee.initials}
           </span>
         )}
@@ -1172,6 +1194,8 @@ function Detail({
   readonly onArchive: () => void;
   readonly onNote: (body: string) => void;
 }) {
+  const t = useT();
+
   const [note, setNote] = useState("");
   const [more, setMore] = useState(false);
   const view = qView(item);
@@ -1185,21 +1209,25 @@ function Detail({
           className="gq-logo"
           style={{ width: 56, height: 56, fontSize: 22 }}
         >
-          {item.companyName.slice(0, 1).toUpperCase()}
+          {t(item.companyName.slice(0, 1).toUpperCase())}
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="cq-title-lg">{item.companyName}</h2>
           {item.oneLiner === null ? null : (
-            <p className="cq-body">{item.oneLiner}</p>
+            <p className="cq-body">{t(item.oneLiner)}</p>
           )}
           <p className="cq-caption gq-t2">
-            {[item.stage, item.sector, item.country]
-              .filter((part) => part !== null)
-              .join(" · ")}
+            {t(
+              [item.stage, item.sector, item.country]
+                .filter((part) => part !== null)
+                .join(" · "),
+            )}
             {item.raise === null
               ? ""
-              : ` · Raising ${item.raise.currency === "USD" ? "$" : `${item.raise.currency} `}${Number(item.raise.amount).toLocaleString("en-US")}`}
-            {` · Applied ${receivedWords(item.submittedAt)}`}
+              : t(
+                  ` · Raising ${item.raise.currency === "USD" ? "$" : `${item.raise.currency} `}${Number(item.raise.amount).toLocaleString("en-US")}`,
+                )}
+            {t(` · Applied ${receivedWords(item.submittedAt)}`)}
           </p>
         </div>
       </div>
@@ -1212,7 +1240,7 @@ function Detail({
           onClick={onReply}
         >
           <MessageSquare {...icon} />
-          Reply
+          {t("Reply")}
         </Button>
         {contactEmail !== null ? (
           <a
@@ -1220,7 +1248,7 @@ function Detail({
             href={`mailto:${contactEmail}?subject=${encodeURIComponent(`${fund} and ${item.companyName}: a call`)}`}
             aria-disabled={!canDecide}
           >
-            Book a call
+            {t("Book a call")}
           </a>
         ) : null}
         <Button
@@ -1228,7 +1256,7 @@ function Detail({
           disabled={!canDecide || passed !== undefined}
           onClick={onPass}
         >
-          Pass
+          {t("Pass")}
         </Button>
         <span className="flex-1" />
         {solo ? null : (
@@ -1239,18 +1267,18 @@ function Detail({
             onClick={onAssign}
           >
             <UserPlus {...icon} />
-            Assign
+            {t("Assign")}
           </Button>
         )}
         <Button variant="quiet" size="compact" onClick={onPack}>
           <Download {...icon} />
-          Download pack
+          {t("Download pack")}
         </Button>
         <span className="relative">
           <Button
             variant="quiet"
             size="compact"
-            aria-label="More: label, archive"
+            aria-label={t("More: label, archive")}
             aria-expanded={more}
             onClick={() => setMore(!more)}
           >
@@ -1268,7 +1296,7 @@ function Detail({
                 onClick={() => (setMore(false), onLabel())}
               >
                 <Tag {...icon} />
-                Label
+                {t("Label")}
               </Button>
               <Button
                 variant="quiet"
@@ -1277,7 +1305,7 @@ function Detail({
                 onClick={() => (setMore(false), onArchive())}
               >
                 <Archive {...icon} />
-                Archive
+                {t("Archive")}
               </Button>
             </span>
           ) : null}
@@ -1288,8 +1316,10 @@ function Detail({
         <div className="gq-banner">
           <Lock {...icon} />
           <span>
-            You&apos;re a <b>Member</b>: you can read applications, add notes
-            and download packs. Admins reply and pass.
+            {t("You're a")} <b>{t("Member")}</b>
+            {t(
+              ": you can read applications, add notes and download packs. Admins reply and pass.",
+            )}
           </span>
         </div>
       )}
@@ -1298,7 +1328,8 @@ function Detail({
         <div className="gq-banner">
           <Send {...icon} />
           <span>
-            Passed with a reason. They got: &ldquo;{passed.body}&rdquo;
+            {t("Passed with a reason. They got: “")}
+            {passed.body}&rdquo;
           </span>
         </div>
       )}
@@ -1309,9 +1340,10 @@ function Detail({
             <QNavIcon size={22} strokeWidth={2} aria-hidden />
           </span>
           <div className="flex flex-col gap-0.5">
-            <p className="gq-who">Q&apos;s view, not a verified fact</p>
+            <p className="gq-who">{t("Q's view, not a verified fact")}</p>
             <p className="cq-body">
-              <b>{view.lead}.</b> <span className="gq-t2">{view.why}</span>
+              <b>{t(view.lead)}.</b>{" "}
+              <span className="gq-t2">{t(view.why)}</span>
             </p>
           </div>
         </div>
@@ -1333,11 +1365,11 @@ function Detail({
                 }}
               >
                 <section className="gq-sect">
-                  <h3 className="cq-title-sm">Your gate&apos;s rules</h3>
+                  <h3 className="cq-title-sm">{t("Your gate's rules")}</h3>
                   <div>
                     {detail.rules.length === 0 ? (
                       <p className="cq-body-sm gq-t2">
-                        No published rules yet, so nothing was checked.
+                        {t("No published rules yet, so nothing was checked.")}
                       </p>
                     ) : (
                       detail.rules.map((rule) => (
@@ -1355,13 +1387,13 @@ function Detail({
                                   : "unk"
                             }
                           />
-                          <span>{rule.label}</span>
+                          <span>{t(rule.label)}</span>
                           <span className="gq-status">
                             {rule.standing === "MEETS"
-                              ? "Meets"
+                              ? t("Meets")
                               : rule.standing === "DOES_NOT_MEET"
-                                ? "Doesn't meet"
-                                : "Needs clarification"}
+                                ? t("Doesn't meet")
+                                : t("Needs clarification")}
                           </span>
                         </div>
                       ))
@@ -1369,38 +1401,40 @@ function Detail({
                   </div>
                 </section>
                 <section className="gq-sect">
-                  <h3 className="cq-title-sm">Their answers</h3>
+                  <h3 className="cq-title-sm">{t("Their answers")}</h3>
                   <ul className="flex flex-col">
                     {detail.answers.map((answer) => (
                       <li
                         key={answer.label}
                         className="flex min-h-7 items-center gap-2 text-sm"
                       >
-                        <span className="flex-1 gq-t2">{answer.label}</span>
-                        <span>{answer.value}</span>
+                        <span className="flex-1 gq-t2">{t(answer.label)}</span>
+                        <span>{t(answer.value)}</span>
                       </li>
                     ))}
                   </ul>
                   <p className="cq-caption gq-t3">
-                    Their own claims, not verified.
+                    {t("Their own claims, not verified.")}
                   </p>
                 </section>
               </div>
 
               <section className="gq-sect">
-                <h3 className="cq-title-sm">Their note</h3>
+                <h3 className="cq-title-sm">{t("Their note")}</h3>
                 <p className="cq-body" style={{ maxWidth: "62ch" }}>
                   {detail.note === null ? (
-                    <span className="gq-t2">No note.</span>
+                    <span className="gq-t2">{t("No note.")}</span>
                   ) : (
-                    `“${detail.note}”`
+                    t(`“${detail.note}”`)
                   )}
                 </p>
                 {detail.contact.name || detail.contact.email ? (
                   <p className="cq-caption gq-t2">
-                    {[detail.contact.name, detail.contact.email]
-                      .filter((part) => part !== null)
-                      .join(" · ")}
+                    {t(
+                      [detail.contact.name, detail.contact.email]
+                        .filter((part) => part !== null)
+                        .join(" · "),
+                    )}
                   </p>
                 ) : null}
               </section>
@@ -1419,10 +1453,10 @@ function Detail({
           ) : null}
 
           <section className="gq-sect">
-            <h3 className="cq-title-sm">What they shared</h3>
+            <h3 className="cq-title-sm">{t("What they shared")}</h3>
             {detail.shared.length === 0 ? (
               <p className="cq-body-sm gq-t2">
-                No documents were attached to this submission.
+                {t("No documents were attached to this submission.")}
               </p>
             ) : (
               <ul className="gq-hair">
@@ -1433,9 +1467,11 @@ function Detail({
                   >
                     <FileText {...icon} size={18} />
                     <span className="flex-1">
-                      <b className="block font-medium">{document.title}</b>
+                      <b className="block font-medium">{t(document.title)}</b>
                       <span className="cq-caption gq-t2">
-                        In the download pack when the founder allows downloads
+                        {t(
+                          "In the download pack when the founder allows downloads",
+                        )}
                       </span>
                     </span>
                   </li>
@@ -1446,8 +1482,10 @@ function Detail({
 
           <section className="gq-sect">
             <div className="gq-sect-h">
-              <h3 className="cq-title-sm">Team notes</h3>
-              <span className="cq-caption gq-t3">Only {fund} sees these</span>
+              <h3 className="cq-title-sm">{t("Team notes")}</h3>
+              <span className="cq-caption gq-t3">
+                {t(`Only ${fund} sees these`)}
+              </span>
             </div>
             {detail.notes.map((entry) => (
               <div key={entry.id} className="gq-note">
@@ -1455,7 +1493,7 @@ function Detail({
                 <span>
                   <b className="font-medium">{entry.author.name}</b>{" "}
                   <span className="cq-caption gq-t3">
-                    {receivedWords(entry.createdAt)}
+                    {t(receivedWords(entry.createdAt))}
                   </span>
                   <br />
                   {entry.body}
@@ -1473,24 +1511,24 @@ function Detail({
             >
               <input
                 className="gq-input"
-                placeholder="Add a note for your team"
-                aria-label="Add a note for your team"
+                placeholder={t("Add a note for your team")}
+                aria-label={t("Add a note for your team")}
                 value={note}
                 maxLength={2000}
                 onChange={(event) => setNote(event.target.value)}
               />
-              <Button type="submit" aria-label="Add note">
+              <Button type="submit" aria-label={t("Add note")}>
                 <Send {...icon} />
               </Button>
             </form>
           </section>
 
           <section className="gq-sect">
-            <h3 className="cq-title-sm">What&apos;s happened</h3>
+            <h3 className="cq-title-sm">{t("What's happened")}</h3>
             <ul className="gq-tl">
               {detail.activity.map((entry, index) => (
                 <li key={`${entry.at}-${index}`}>
-                  <span className="gq-t3">{receivedWords(entry.at)}</span>
+                  <span className="gq-t3">{t(receivedWords(entry.at))}</span>
                   <span>{entry.text}</span>
                 </li>
               ))}
@@ -1533,6 +1571,8 @@ function Sheets({
   readonly onLabelled: (ids: readonly string[], label: string) => void;
   readonly onPreparePasses: (ids: readonly string[]) => void;
 }) {
+  const t = useT();
+
   const nameOf = (id: string) =>
     items.find((item) => item.applicationId === id)?.companyName ??
     "this company";
@@ -1563,7 +1603,7 @@ function Sheets({
     >
       {sheet === null ? null : (
         <SheetContent
-          title={title}
+          title={t(title)}
           side={sheet.kind === "compare" ? "full" : "side"}
         >
           {sheet.kind === "compare" ? (
@@ -1628,7 +1668,7 @@ function Sheets({
                   className="flex min-h-13 w-full items-center gap-3 text-start gq-t2"
                   onClick={() => onAssigned(sheet.ids, null)}
                 >
-                  Nobody
+                  {t("Nobody")}
                 </button>
               </li>
             </ul>
@@ -1689,6 +1729,8 @@ function PassSheet({
   ) => void;
   readonly onCancel: () => void;
 }) {
+  const t = useT();
+
   const first = items.find((item) => item.applicationId === ids[0]);
   const suggested: GateqPassReason =
     first?.fit === "NOT_A_FIT" ? "OTHER" : "TIMING";
@@ -1717,7 +1759,7 @@ function PassSheet({
   return (
     <div className="flex flex-col gap-3.5">
       <p className="gq-label" id={reasonId}>
-        Main reason
+        {t("Main reason")}
       </p>
       <div className="gq-opts" role="radiogroup" aria-labelledby={reasonId}>
         {PASS_REASONS.map(([code, label]) => (
@@ -1734,7 +1776,7 @@ function PassSheet({
               );
             }}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>
@@ -1742,11 +1784,13 @@ function PassSheet({
         <div key={id} className="gq-field">
           <label className="gq-label" htmlFor={`pm-${id}`}>
             {ids.length === 1
-              ? "Message to the founder"
-              : `To ${items.find((item) => item.applicationId === id)?.companyName ?? "the founder"}`}{" "}
+              ? t("Message to the founder")
+              : t(
+                  `To ${items.find((item) => item.applicationId === id)?.companyName ?? "the founder"}`,
+                )}{" "}
             <span className="gq-prefill">
               <QNavIcon size={13} strokeWidth={ICON_STROKE} aria-hidden />
-              Drafted by Q
+              {t("Drafted by Q")}
             </span>
           </label>
           <textarea
@@ -1762,8 +1806,9 @@ function PassSheet({
         </div>
       ))}
       <p className="cq-caption gq-t3">
-        Sent only when you press the button, exactly as shown. Founders always
-        get a reason.
+        {t(
+          "Sent only when you press the button, exactly as shown. Founders always get a reason.",
+        )}
       </p>
       <div className="flex gap-2">
         <Button
@@ -1776,10 +1821,12 @@ function PassSheet({
             if (reason !== null) onSend(ids, reason, messages);
           }}
         >
-          {ids.length === 1 ? "Send and pass" : `Send ${ids.length} and pass`}
+          {ids.length === 1
+            ? t("Send and pass")
+            : t(`Send ${ids.length} and pass`)}
         </Button>
         <Button variant="quiet" onClick={onCancel}>
-          Cancel
+          {t("Cancel")}
         </Button>
       </div>
     </div>
@@ -1795,13 +1842,16 @@ function TriageSheet({
   readonly canDecide: boolean;
   readonly onPreparePasses: (ids: readonly string[]) => void;
 }) {
+  const t = useT();
+
   const open = items.filter((item) => item.folder === "INBOX");
   const outside = open.filter((item) => item.fit === "NOT_A_FIT");
   return (
     <div className="flex flex-col gap-3.5">
       <p className="cq-body-sm gq-t2">
-        From your gate&apos;s rules and your reply promise. Proposals only:
-        nothing is sent or changed until you say so.
+        {t(
+          "From your gate's rules and your reply promise. Proposals only: nothing is sent or changed until you say so.",
+        )}
       </p>
       <ul className="gq-hair">
         {open.map((item) => {
@@ -1811,13 +1861,13 @@ function TriageSheet({
               <b className="font-medium">{item.companyName}</b>
               <span className="cq-body-sm">
                 {item.rules.total === 0
-                  ? "Look at it yourself"
+                  ? t("Look at it yourself")
                   : item.fit === "NOT_A_FIT"
-                    ? "Prepare a pass"
+                    ? t("Prepare a pass")
                     : item.fit === "PARTIAL" || item.rules.unknown > 0
-                      ? "Ask for more"
-                      : "Look at first"}
-                <span className="gq-t2"> · {view.why}</span>
+                      ? t("Ask for more")
+                      : t("Look at first")}
+                <span className="gq-t2"> · {t(view.why)}</span>
               </span>
             </li>
           );
@@ -1830,8 +1880,8 @@ function TriageSheet({
             onPreparePasses(outside.map((item) => item.applicationId))
           }
         >
-          Prepare {outside.length} pass{outside.length === 1 ? "" : "es"} to
-          review
+          {t(`Prepare ${outside.length} pass`)}
+          {outside.length === 1 ? "" : "es"} {t("to review")}
         </Button>
       ) : null}
     </div>
@@ -1847,15 +1897,17 @@ function ReplySheet({
   readonly onSend: (message: string) => void;
   readonly onCancel: () => void;
 }) {
+  const t = useT();
+
   const [message, setMessage] = useState(initial);
   return (
     <div className="flex flex-col gap-3.5">
       <div className="gq-field">
         <label className="gq-label" htmlFor="gq-reply">
-          Message to the founder{" "}
+          {t("Message to the founder")}{" "}
           <span className="gq-prefill">
             <QNavIcon size={13} strokeWidth={ICON_STROKE} aria-hidden />
-            Drafted by Q
+            {t("Drafted by Q")}
           </span>
         </label>
         <textarea
@@ -1868,7 +1920,7 @@ function ReplySheet({
         />
       </div>
       <p className="cq-caption gq-t3">
-        Sent only when you press Send, exactly as shown.
+        {t("Sent only when you press Send, exactly as shown.")}
       </p>
       <div className="flex gap-2">
         <Button
@@ -1876,10 +1928,10 @@ function ReplySheet({
           disabled={message.trim() === ""}
           onClick={() => onSend(message.trim())}
         >
-          Send
+          {t("Send")}
         </Button>
         <Button variant="quiet" onClick={onCancel}>
-          Cancel
+          {t("Cancel")}
         </Button>
       </div>
     </div>
@@ -1899,6 +1951,8 @@ function PackSheet({
   readonly demo: boolean;
   readonly onDone: () => void;
 }) {
+  const t = useT();
+
   const rows: readonly (readonly [string, string, boolean])[] = [
     ["One-page summary", "Company, round, your rules and how they stood", true],
     ...(detail?.shared ?? []).map(
@@ -1914,16 +1968,17 @@ function PackSheet({
   return (
     <div className="flex flex-col gap-3.5">
       <p className="cq-body-sm gq-t2">
-        One zip with everything {name} shared with you, with your name on the
-        summary. Your team notes are never in it.
+        {t(
+          `One zip with everything ${name} shared with you, with your name on the summary. Your team notes are never in it.`,
+        )}
       </p>
       <ul className="gq-hair">
         {rows.map(([title, meta]) => (
           <li key={title} className="gq-pick">
-            <input type="checkbox" checked readOnly aria-label={title} />
+            <input type="checkbox" checked readOnly aria-label={t(title)} />
             <span>
-              <b className="block font-medium">{title}</b>
-              <span className="cq-caption gq-t2">{meta}</span>
+              <b className="block font-medium">{t(title)}</b>
+              <span className="cq-caption gq-t2">{t(meta)}</span>
             </span>
           </li>
         ))}
@@ -1935,7 +1990,7 @@ function PackSheet({
         onClick={() => window.setTimeout(onDone, 300)}
       >
         <Download {...icon} />
-        Download zip
+        {t("Download zip")}
       </a>
     </div>
   );
@@ -1948,6 +2003,8 @@ function LabelSheet({
   readonly labels: readonly string[];
   readonly onLabel: (label: string) => void;
 }) {
+  const t = useT();
+
   const [text, setText] = useState("");
   return (
     <div className="flex flex-col gap-3">
@@ -1961,7 +2018,7 @@ function LabelSheet({
               onClick={() => onLabel(label)}
             >
               <Tag {...icon} />
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
@@ -1975,13 +2032,13 @@ function LabelSheet({
       >
         <input
           className="gq-input"
-          aria-label="New label"
-          placeholder="New label, like IC next week"
+          aria-label={t("New label")}
+          placeholder={t("New label, like IC next week")}
           value={text}
           maxLength={40}
           onChange={(e) => setText(e.target.value)}
         />
-        <Button type="submit">Add</Button>
+        <Button type="submit">{t("Add")}</Button>
       </form>
     </div>
   );
@@ -1998,6 +2055,8 @@ export function CopyLink({
   readonly primary?: boolean;
   readonly label?: string;
 }) {
+  const t = useT();
+
   const [copied, setCopied] = useState(false);
   return (
     <Button
@@ -2015,12 +2074,14 @@ export function CopyLink({
       }}
     >
       <LinkIcon {...icon} />
-      {copied ? "Copied" : label}
+      {copied ? t("Copied") : t(label)}
     </Button>
   );
 }
 
 function Toast({ message }: { readonly message: string | null }) {
+  const t = useT();
+
   return (
     <div
       role="status"
@@ -2030,7 +2091,7 @@ function Toast({ message }: { readonly message: string | null }) {
     >
       {message === null ? null : (
         <span className="gq-card block px-4 py-2.5 text-sm shadow-(--cq-shadow-overlay)">
-          {message}
+          {t(message)}
         </span>
       )}
     </div>

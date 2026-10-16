@@ -41,7 +41,14 @@ const Q_GATEQ_TABS: Readonly<Record<GateqTab, string>> = {
   gate: "tab.gate",
 };
 
+/**
+ * These blocks render on the server and in client views alike, so the
+ * caller hands in its translator (serverT/useT); English without one.
+ */
+const english = (text: string): string => text;
+
 export function GateqChrome({
+  t = english,
   role,
   active,
   unread,
@@ -50,6 +57,7 @@ export function GateqChrome({
   children,
   maxWidth,
 }: {
+  readonly t?: ((english: string) => string) | undefined;
   readonly role: "FOUNDER" | "INVESTOR";
   readonly active: GateqTab;
   readonly unread?: number | undefined;
@@ -75,7 +83,7 @@ export function GateqChrome({
               href={hrefFor(tab)}
               aria-current={tab === active ? "page" : undefined}
             >
-              {label}
+              {t(label)}
               {tab === "inbox" && unread !== undefined && unread > 0 ? (
                 <span className="gq-n">{unread}</span>
               ) : null}
@@ -112,9 +120,11 @@ export function StateBlock({
 }
 
 export function ErrorBlock({
+  t = english,
   what,
   retryHref,
 }: {
+  readonly t?: ((english: string) => string) | undefined;
   readonly what: string;
   readonly retryHref: string;
 }) {
@@ -127,8 +137,10 @@ export function ErrorBlock({
           aria-hidden
         />
       }
-      title={`${what} didn't load`}
-      body="The connection dropped before it finished. Nothing you did was lost."
+      title={t(`${what} didn't load`)}
+      body={t(
+        "The connection dropped before it finished. Nothing you did was lost.",
+      )}
     >
       <a href={retryHref} className={buttonClassName("secondary")}>
         <RotateCw
@@ -136,7 +148,7 @@ export function ErrorBlock({
           strokeWidth={ICON_STROKE}
           aria-hidden
         />
-        Try again
+        {t("Try again")}
       </a>
     </StateBlock>
   );

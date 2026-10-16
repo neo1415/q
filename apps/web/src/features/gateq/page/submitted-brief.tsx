@@ -8,6 +8,7 @@ import { QControl } from "@/features/q/control/q-control";
 
 import { FitGlyph } from "../fit-glyph";
 import { summaryWords } from "./summary-words";
+import { useT } from "@/features/i18n/language";
 
 const STATUS = {
   MATCH: "Meets",
@@ -93,6 +94,8 @@ export function SubmittedBrief({
   readonly dossier: GateqDossierV1;
   readonly synthesis?: GateqSynthesisV1 | null | undefined;
 }) {
+  const t = useT();
+
   const factLabels = new Map(
     dossier.dimensions.flatMap((group) =>
       group.facts.map((fact) => [fact.sourceFactId, fact.label] as const),
@@ -106,47 +109,52 @@ export function SubmittedBrief({
   return (
     <section
       className="flex flex-col gap-5"
-      aria-label="Submitted investment brief"
+      aria-label={t("Submitted investment brief")}
     >
       <header className="flex flex-col gap-1">
-        <h3 className="cq-title-md">Submitted investment brief</h3>
+        <h3 className="cq-title-md">{t("Submitted investment brief")}</h3>
         <p className="cq-caption gq-t2">
-          Deterministic summary · {dossier.application.reference} · Submitted{" "}
+          {t("Deterministic summary ·")} {t(dossier.application.reference)}{" "}
+          {t("· Submitted")}{" "}
           <time dateTime={dossier.application.submittedAt}>
-            {dateWords(dossier.application.submittedAt)} UTC
+            {t(dateWords(dossier.application.submittedAt))} {t("UTC")}
           </time>
         </p>
         <p className="cq-body-sm gq-t2">
-          Frozen from the founder&apos;s submission. Investment decisions remain
-          with your team.
+          {t(
+            "Frozen from the founder's submission. Investment decisions remain with your team.",
+          )}
         </p>
       </header>
 
-      <section className="gq-sect" aria-label="Submitted company and contact">
-        <h4 className="cq-title-sm">Company and founder</h4>
+      <section
+        className="gq-sect"
+        aria-label={t("Submitted company and contact")}
+      >
+        <h4 className="cq-title-sm">{t("Company and founder")}</h4>
         <dl className="grid grid-cols-[minmax(5rem,auto)_1fr] gap-x-4 gap-y-2 cq-body-sm">
-          <dt className="gq-t2">Company</dt>
+          <dt className="gq-t2">{t("Company")}</dt>
           <dd className="min-w-0 break-words">
-            {dossier.company.name ?? "Not provided"}
+            {dossier.company.name ?? t("Not provided")}
           </dd>
-          <dt className="gq-t2">Description</dt>
+          <dt className="gq-t2">{t("Description")}</dt>
           <dd className="min-w-0 whitespace-pre-wrap break-words">
-            {dossier.company.description ?? "Not provided"}
+            {dossier.company.description ?? t("Not provided")}
           </dd>
-          <dt className="gq-t2">Stage</dt>
-          <dd>{dossier.company.stage ?? "Unknown"}</dd>
-          <dt className="gq-t2">Country</dt>
-          <dd>{dossier.company.country ?? "Unknown"}</dd>
-          <dt className="gq-t2">Sectors</dt>
+          <dt className="gq-t2">{t("Stage")}</dt>
+          <dd>{dossier.company.stage ?? t("Unknown")}</dd>
+          <dt className="gq-t2">{t("Country")}</dt>
+          <dd>{dossier.company.country ?? t("Unknown")}</dd>
+          <dt className="gq-t2">{t("Sectors")}</dt>
           <dd>
             {dossier.company.sectorPhrases.length === 0
-              ? "Unknown"
-              : dossier.company.sectorPhrases.join(", ")}
+              ? t("Unknown")
+              : t(dossier.company.sectorPhrases.join(", "))}
           </dd>
-          <dt className="gq-t2">Website</dt>
+          <dt className="gq-t2">{t("Website")}</dt>
           <dd className="min-w-0 break-words">
             {website === null ? (
-              (dossier.company.website ?? "Not provided")
+              (dossier.company.website ?? t("Not provided"))
             ) : (
               <a
                 href={website}
@@ -160,37 +168,39 @@ export function SubmittedBrief({
           </dd>
           {contact === null ? (
             <>
-              <dt className="gq-t2">Contact</dt>
-              <dd>Not recorded in this submission</dd>
+              <dt className="gq-t2">{t("Contact")}</dt>
+              <dd>{t("Not recorded in this submission")}</dd>
             </>
           ) : (
             <>
-              <dt className="gq-t2">Founder</dt>
+              <dt className="gq-t2">{t("Founder")}</dt>
               <dd>
-                {contact.name} · {contact.role}
+                {contact.name} · {t(contact.role)}
               </dd>
-              <dt className="gq-t2">Contact company</dt>
+              <dt className="gq-t2">{t("Contact company")}</dt>
               <dd>{contact.companyName}</dd>
-              <dt className="gq-t2">Email</dt>
+              <dt className="gq-t2">{t("Email")}</dt>
               <dd className="min-w-0 break-words">
                 {contact.email}
                 <span className="cq-caption gq-t2 block">
                   {contact.emailConfirmed
-                    ? "Email ownership confirmed"
-                    : "Email ownership not confirmed"}
+                    ? t("Email ownership confirmed")
+                    : t("Email ownership not confirmed")}
                 </span>
               </dd>
               {contact.phone === null ? null : (
                 <>
-                  <dt className="gq-t2">Phone</dt>
-                  <dd>{contact.phone}</dd>
+                  <dt className="gq-t2">{t("Phone")}</dt>
+                  <dd>{t(contact.phone)}</dd>
                 </>
               )}
               {contact.preferredChannel === null ? null : (
                 <>
-                  <dt className="gq-t2">Preferred contact</dt>
+                  <dt className="gq-t2">{t("Preferred contact")}</dt>
                   <dd>
-                    {contact.preferredChannel === "EMAIL" ? "Email" : "Phone"}
+                    {contact.preferredChannel === "EMAIL"
+                      ? t("Email")
+                      : t("Phone")}
                   </dd>
                 </>
               )}
@@ -199,7 +209,7 @@ export function SubmittedBrief({
         </dl>
         {dossier.company.note === null ? null : (
           <div className="mt-3">
-            <h4 className="cq-label">Founder&apos;s note</h4>
+            <h4 className="cq-label">{t("Founder's note")}</h4>
             <p className="cq-body-sm whitespace-pre-wrap">
               {dossier.company.note}
             </p>
@@ -207,12 +217,15 @@ export function SubmittedBrief({
         )}
       </section>
 
-      <section className="gq-sect" aria-label="Submitted mandate qualification">
-        <h4 className="cq-title-sm">Published mandate qualification</h4>
+      <section
+        className="gq-sect"
+        aria-label={t("Submitted mandate qualification")}
+      >
+        <h4 className="cq-title-sm">{t("Published mandate qualification")}</h4>
         <p className="cq-body-sm mb-2">
           {dossier.qualification.criteria.length === 0
-            ? "No published criteria were checked"
-            : OUTCOME[dossier.qualification.outcome]}
+            ? t("No published criteria were checked")
+            : t(OUTCOME[dossier.qualification.outcome])}
         </p>
         <ul>
           {dossier.qualification.criteria.map((criterion) => (
@@ -227,68 +240,77 @@ export function SubmittedBrief({
                 }
               />
               <span className="flex-1">
-                {criterion.label}
+                {t(criterion.label)}
                 <span className="cq-caption gq-t2 block">
                   {criterion.requiredness === "REQUIRED"
-                    ? "Required"
-                    : "Preferred"}
+                    ? t("Required")
+                    : t("Preferred")}
                 </span>
               </span>
-              <span className="gq-status">{STATUS[criterion.status]}</span>
+              <span className="gq-status">{t(STATUS[criterion.status])}</span>
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="gq-sect" aria-label="Submitted investment dimensions">
+      <section
+        className="gq-sect"
+        aria-label={t("Submitted investment dimensions")}
+      >
         <h4 className="cq-title-sm">
-          Company evidence by investment dimension
+          {t("Company evidence by investment dimension")}
         </h4>
         <p className="cq-caption gq-t2 mb-3">
-          Claims, estimates and their recorded evidence are shown separately.
+          {t(
+            "Claims, estimates and their recorded evidence are shown separately.",
+          )}
         </p>
         {dossier.dimensions.length === 0 ? (
           <p className="cq-body-sm gq-t2">
-            No investment-dimension claims were recorded.
+            {t("No investment-dimension claims were recorded.")}
           </p>
         ) : (
           <div className="flex flex-col gap-4">
             {dossier.dimensions.map((group) => (
-              <section key={group.group} aria-label={group.label}>
-                <h5 className="cq-label">{group.label}</h5>
+              <section key={group.group} aria-label={t(group.label)}>
+                <h5 className="cq-label">{t(group.label)}</h5>
                 {group.facts.length === 0 ? (
-                  <p className="cq-body-sm gq-t2 py-2">Not provided</p>
+                  <p className="cq-body-sm gq-t2 py-2">{t("Not provided")}</p>
                 ) : null}
                 <ul className="gq-hair">
                   {group.facts.map((fact) => (
                     <li key={fact.dimension} className="py-3">
-                      <h6 className="cq-body-sm font-medium">{fact.label}</h6>
+                      <h6 className="cq-body-sm font-medium">
+                        {t(fact.label)}
+                      </h6>
                       <p className="cq-body-sm whitespace-pre-wrap break-words">
-                        {summaryWords(fact.summary)}
+                        {t(summaryWords(fact.summary))}
                       </p>
                       <dl className="cq-caption gq-t2 mt-1 flex flex-wrap gap-x-4 gap-y-1">
                         <div>
-                          <dt className="inline">Origin: </dt>
+                          <dt className="inline">{t("Origin:")} </dt>
                           <dd className="inline">
                             {fact.truthClass === "Q_INFERENCE"
-                              ? "Derived by Q, not said in these words"
-                              : PROVENANCE[fact.provenance]}
+                              ? t("Derived by Q, not said in these words")
+                              : t(PROVENANCE[fact.provenance])}
                           </dd>
                         </div>
                         <div>
-                          <dt className="inline">Truth: </dt>
-                          <dd className="inline">{TRUTH[fact.truthClass]}</dd>
+                          <dt className="inline">{t("Truth:")} </dt>
+                          <dd className="inline">
+                            {t(TRUTH[fact.truthClass])}
+                          </dd>
                         </div>
                         <div>
-                          <dt className="inline">Evidence: </dt>
+                          <dt className="inline">{t("Evidence:")} </dt>
                           <dd className="inline">
-                            {EVIDENCE[fact.evidenceStatus]}
+                            {t(EVIDENCE[fact.evidenceStatus])}
                           </dd>
                         </div>
                       </dl>
                       {fact.derivation === undefined ? null : (
                         <p className="cq-caption gq-t2 mt-1">
-                          {fact.derivation}
+                          {t(fact.derivation)}
                         </p>
                       )}
                     </li>
@@ -300,17 +322,18 @@ export function SubmittedBrief({
         )}
         {hasSupportedClaims ? (
           <p className="cq-caption gq-t2 mt-3">
-            Document support is recorded for some claims. Exact document, page
-            or section references are not available in this brief.
+            {t(
+              "Document support is recorded for some claims. Exact document, page or section references are not available in this brief.",
+            )}
           </p>
         ) : null}
       </section>
 
       <section
         className="gq-sect"
-        aria-label="Evidence gaps and contradictions"
+        aria-label={t("Evidence gaps and contradictions")}
       >
-        <h4 className="cq-title-sm">Evidence gaps and contradictions</h4>
+        <h4 className="cq-title-sm">{t("Evidence gaps and contradictions")}</h4>
         <div className="flex flex-col gap-3">
           {(
             [
@@ -320,10 +343,10 @@ export function SubmittedBrief({
           ).map(([label, gaps]) =>
             gaps.length === 0 ? null : (
               <div key={label}>
-                <h5 className="cq-label">{label}</h5>
+                <h5 className="cq-label">{t(label)}</h5>
                 <ul className="cq-body-sm">
                   {gaps.map((gap) => (
-                    <li key={gap.dimension}>{gap.label}</li>
+                    <li key={gap.dimension}>{t(gap.label)}</li>
                   ))}
                 </ul>
               </div>
@@ -331,13 +354,13 @@ export function SubmittedBrief({
           )}
           {dossier.missing.length === 0 ? null : (
             <div>
-              <h5 className="cq-label">Missing information</h5>
+              <h5 className="cq-label">{t("Missing information")}</h5>
               <ul className="cq-body-sm flex flex-col gap-1">
                 {dossier.missing.map((gap) => (
                   <li key={gap.dimension}>
-                    {gap.label}
+                    {t(gap.label)}
                     <span className="cq-caption gq-t2 block">
-                      {REASON[gap.reason]}
+                      {t(REASON[gap.reason])}
                     </span>
                   </li>
                 ))}
@@ -346,10 +369,10 @@ export function SubmittedBrief({
           )}
           {dossier.contradictions.length === 0 ? null : (
             <div>
-              <h5 className="cq-label">Conflicting answers</h5>
+              <h5 className="cq-label">{t("Conflicting answers")}</h5>
               <ul className="cq-body-sm flex flex-col gap-1">
                 {dossier.contradictions.map((line, index) => (
-                  <li key={index}>{line}</li>
+                  <li key={index}>{t(line)}</li>
                 ))}
               </ul>
             </div>
@@ -360,64 +383,71 @@ export function SubmittedBrief({
             dossier.contradictions.length ===
           0 ? (
             <p className="cq-body-sm gq-t2">
-              No gaps or contradictions were recorded. This does not establish
-              independent verification.
+              {t(
+                "No gaps or contradictions were recorded. This does not establish independent verification.",
+              )}
             </p>
           ) : null}
         </div>
       </section>
 
-      <section className="gq-sect" aria-label="Submitted diligence questions">
-        <h4 className="cq-title-sm">Questions for diligence</h4>
+      <section
+        className="gq-sect"
+        aria-label={t("Submitted diligence questions")}
+      >
+        <h4 className="cq-title-sm">{t("Questions for diligence")}</h4>
         {dossier.diligenceQuestions.length === 0 ? (
           <p className="cq-body-sm gq-t2">
-            No diligence questions were recorded.
+            {t("No diligence questions were recorded.")}
           </p>
         ) : (
           <ol className="flex flex-col gap-3 cq-body-sm">
             {dossier.diligenceQuestions.map((question, index) => (
               <li key={index}>
                 <span className="cq-caption gq-t2 block">
-                  {BASIS[question.basis]}
+                  {t(BASIS[question.basis])}
                 </span>
-                {question.question}
+                {t(question.question)}
               </li>
             ))}
           </ol>
         )}
         {synthesis === null ? (
           <p className="cq-caption gq-t2 mt-3">
-            Q&apos;s reading of this submission isn&apos;t ready yet.
+            {t("Q's reading of this submission isn't ready yet.")}
           </p>
         ) : (
           <section
             className="mt-4 flex flex-col gap-2"
-            aria-label="Q's reading"
+            aria-label={t("Q's reading")}
           >
-            <h5 className="cq-label">Q&apos;s reading</h5>
+            <h5 className="cq-label">{t("Q's reading")}</h5>
             <p className="cq-caption gq-t2">
-              Q&apos;s inference from this submission only. Not verified, not a
-              score and not a decision.
+              {t(
+                "Q's inference from this submission only. Not verified, not a score and not a decision.",
+              )}
             </p>
-            <p className="cq-body-sm">{synthesis.takeaway}</p>
+            <p className="cq-body-sm">{t(synthesis.takeaway)}</p>
             {synthesis.points.length === 0 ? null : (
               <ul className="gq-hair">
                 {synthesis.points.map((point, index) => (
                   <li key={index} className="flex flex-col gap-0.5 py-2">
                     <span className="cq-caption gq-t2">
-                      {POINT[point.kind]}
+                      {t(POINT[point.kind])}
                     </span>
                     <span className="cq-body-sm">{point.text}</span>
                     <span className="cq-caption gq-t3">
-                      From:{" "}
-                      {[
-                        ...point.factIds.map(
-                          (id) => factLabels.get(id) ?? "a recorded fact",
-                        ),
-                        ...point.turnSeqs.map(
-                          (seq) => `interview turn ${String(seq)}`,
-                        ),
-                      ].join(", ")}
+                      {t("From:")}{" "}
+                      {t(
+                        [
+                          ...point.factIds.map(
+                            (id) => factLabels.get(id) ?? "a recorded fact",
+                          ),
+                          ...point.turnSeqs.map(
+                            (seq) => `interview turn ${String(seq)}`,
+                          ),
+                        ].join(", "),
+                      )}
                     </span>
                   </li>
                 ))}
@@ -438,23 +468,27 @@ export function SubmittedTranscript({
   readonly turns: readonly ApplicationTranscriptTurnDto[] | null | undefined;
   readonly recordedTurnCount?: number | undefined;
 }) {
+  const t = useT();
+
   if (turns === null || turns === undefined)
     return (
       <section className="gq-sect">
-        <h3 className="cq-title-sm">Interview transcript</h3>
+        <h3 className="cq-title-sm">{t("Interview transcript")}</h3>
         <p className="cq-body-sm gq-t2">
           {recordedTurnCount !== undefined && recordedTurnCount > 0
-            ? `This submission records ${recordedTurnCount} interview turns. The transcript is unavailable in this response.`
-            : "No interview transcript was included in this submission."}
+            ? t(
+                `This submission records ${recordedTurnCount} interview turns. The transcript is unavailable in this response.`,
+              )
+            : t("No interview transcript was included in this submission.")}
         </p>
       </section>
     );
   if (turns.length === 0)
     return (
       <section className="gq-sect">
-        <h3 className="cq-title-sm">Interview transcript</h3>
+        <h3 className="cq-title-sm">{t("Interview transcript")}</h3>
         <p className="cq-body-sm gq-t2">
-          The submitted interview contains no turns.
+          {t("The submitted interview contains no turns.")}
         </p>
       </section>
     );
@@ -463,15 +497,16 @@ export function SubmittedTranscript({
     <QControl id="disclosure.gateq-transcript" kind="DISCLOSURE">
       <details className="gq-sect group">
         <summary className="cq-title-sm min-h-11 cursor-pointer py-2">
-          Interview transcript · {turns.length} turns
+          {t(`Interview transcript · ${turns.length} turns`)}
         </summary>
         <p className="cq-caption gq-t2 mb-3">
-          The founder&apos;s interview exactly as submitted. Claims and Q&apos;s
-          questions retain their original wording.
+          {t(
+            "The founder's interview exactly as submitted. Claims and Q's questions retain their original wording.",
+          )}
         </p>
         <ol
           className="flex flex-col gap-4"
-          aria-label="Submitted interview transcript"
+          aria-label={t("Submitted interview transcript")}
         >
           {turns.map((turn) => (
             <li
@@ -479,8 +514,11 @@ export function SubmittedTranscript({
               className="border-s border-(--cq-border-subtle) ps-3"
             >
               <p className="cq-caption gq-t2 mb-1">
-                {turn.role === "PERSON" ? "Founder" : "Q"} · Turn {turn.seq} ·{" "}
-                <time dateTime={turn.at}>{dateWords(turn.at)} UTC</time>
+                {turn.role === "PERSON" ? t("Founder") : "Q"} {t("· Turn")}{" "}
+                {turn.seq} ·{" "}
+                <time dateTime={turn.at}>
+                  {t(dateWords(turn.at))} {t("UTC")}
+                </time>
               </p>
               <p className="cq-body-sm whitespace-pre-wrap break-words">
                 {turn.text}
