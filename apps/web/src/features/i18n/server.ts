@@ -2,6 +2,7 @@ import "server-only";
 
 import { resolveQStanding } from "@/features/q/context";
 
+import { machineUiText } from "./machine";
 import { translate, uiLanguageOf, type UiLanguage } from "./messages";
 import { rememberServerLanguage } from "./server-now";
 
@@ -15,6 +16,8 @@ export async function serverUiLanguage(): Promise<UiLanguage> {
   } catch {
     language = "en";
   }
+  // Q's machine translations, registered for this render (none for English).
+  await machineUiText(language);
   // Synchronous server components below read it (serverTNow).
   rememberServerLanguage(language);
   return language;

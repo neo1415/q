@@ -7,6 +7,7 @@ import { PublicBrandStyle } from "@/features/brand-theme/public-brand-style";
 import { FictionalNames } from "@/components/app-shell/fictional-names";
 import { QControlRuntime } from "@/features/q/control/q-control-runtime";
 import { LanguageProvider } from "@/features/i18n/language";
+import { machineUiText } from "@/features/i18n/machine";
 import { uiLanguageOf } from "@/features/i18n/messages";
 
 // Session-bound HTML is rendered per request and never prerendered or
@@ -33,9 +34,11 @@ export default async function OnboardingLayout({
     redirect("/paused");
   }
   // Outside the app shell: the same "fictional" names rule as inside it.
-  // Multilingual Q: onboarding speaks their chosen language too.
+  // Any language: onboarding speaks their chosen language too.
+  const language = uiLanguageOf(standing?.language);
+  const machine = await machineUiText(language);
   return (
-    <LanguageProvider language={uiLanguageOf(standing?.language)}>
+    <LanguageProvider language={language} machine={machine}>
       <div data-fictional-scope>
         <PublicBrandStyle />
         {children}

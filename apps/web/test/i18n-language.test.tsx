@@ -117,23 +117,6 @@ describe("the interface language", () => {
   });
 });
 
-describe("Settings says what is Arabic today", () => {
-  it("names the Arabic surfaces and the pages still in English, in both languages", async () => {
-    const { ARABIC_NOW, STILL_ENGLISH, VIDEO_FALLBACK } =
-      await import("../src/features/settings/language-setting");
-    expect(ARABIC_NOW).toMatch(/conversation with Q/u);
-    expect(ARABIC_NOW).toMatch(/voice/u);
-    expect(ARABIC_NOW).toMatch(/rehearsals/u);
-    expect(ARABIC_NOW).toMatch(/onboarding/u);
-    expect(ARABIC_NOW).toMatch(/every page/u);
-    expect(STILL_ENGLISH).toMatch(/decision card/u);
-    expect(STILL_ENGLISH).not.toMatch(/since your last visit/u);
-    for (const line of [ARABIC_NOW, STILL_ENGLISH, VIDEO_FALLBACK]) {
-      expect(translate("ar", line)).not.toBe(line);
-    }
-  });
-});
-
 describe("changing language by telling Q (live, no reload)", () => {
   beforeAll(async () => {
     await loadWire();
@@ -180,10 +163,18 @@ describe("changing language by telling Q (live, no reload)", () => {
     expect(
       performClientAction({ kind: "SET_LANGUAGE", language: "ar" }, effects),
     ).toBe(true);
+    // Any language: French is a language like any other now.
     expect(
       performClientAction({ kind: "SET_LANGUAGE", language: "fr" }, effects),
+    ).toBe(true);
+    // Not a language tag at all: refused by the contract.
+    expect(
+      performClientAction(
+        { kind: "SET_LANGUAGE", language: "Not A Tag" },
+        effects,
+      ),
     ).toBe(false);
-    expect(seen).toEqual(["ar"]);
+    expect(seen).toEqual(["ar", "fr"]);
   });
 });
 

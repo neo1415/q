@@ -2,11 +2,15 @@ import { createHash } from "node:crypto";
 import { resolveTxt } from "node:dns/promises";
 
 import {
+  languageDirectionOf,
   RESERVED_TEST_EMAIL_REASON,
   reservedTestEmailDomain,
+  UI_TEXT_CATALOG_VERSION,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import {
+  EMAIL_HAND_CATALOGUES,
+  EMAIL_SOURCE_STRINGS,
   localiseEmail,
   type EmailLanguage,
   type LocalisableMessage,
@@ -365,9 +369,13 @@ export function recordingEmailSender<M extends { readonly to: string }>(
 }
 
 /**
- * The language a recipient chose for Capital Q, by their sign-in address:
- * "ar" only for a known person whose saved choice is Arabic. Unknown
- * addresses, people who never chose (AUTO) and English all read "en".
+ * The language a recipient chose for Capital Q, by their sign-in address,
+ * with what to write it in: the hand-written email catalogue for that
+ * language (Arabic) merged over the shared machine translations of the
+ * same English strings (q_runtime.ui_translations, the interface's own
+ * cache). Unknown addresses, people who never chose (AUTO), English, and
+ * a language with nothing translated yet all read "en": never a half
+ * guess. Direction comes from the runtime's own data.
  */
 export async function recipientLanguage(
   sql: DatabaseExecutor,
@@ -382,5 +390,20 @@ export async function recipientLanguage(
       join q_runtime.person_standing s on s.user_id = p.id
      where lower(u.email) = ${address}
      limit 1`;
-  return rows[0]?.language === "ar" ? "ar" : "en";
+  const tag = rows[0]?.language ?? null;
+  if (tag === null) return "en";
+  const primary = tag.split("-")[0]?.toLowerCase() ?? "en";
+  if (primary === "en") return "en";
+  const machine = await sql<{ source_text: string; translated_text: string }[]>`
+    select source_text, translated_text
+      from q_runtime.ui_translations
+     where language = ${tag}
+       and catalog_version = ${UI_TEXT_CATALOG_VERSION}
+       and status = 'ACCEPTED'
+       and source_text = any(${[...EMAIL_SOURCE_STRINGS]}::text[])`;
+  const catalogue: Record<string, string> = {};
+  for (const row of machine) catalogue[row.source_text] = row.translated_text;
+  Object.assign(catalogue, EMAIL_HAND_CATALOGUES[primary] ?? {});
+  if (Object.keys(catalogue).length === 0) return "en";
+  return { tag, direction: languageDirectionOf(tag), catalogue };
 }

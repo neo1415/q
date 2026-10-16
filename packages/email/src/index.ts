@@ -313,6 +313,9 @@ export { EMAIL_ARABIC } from "./arabic.js";
 export {
   localiseEmail,
   translateEmailText,
+  EMAIL_HAND_CATALOGUES,
+  EMAIL_SOURCE_STRINGS,
   type EmailLanguage,
+  type EmailLocale,
   type LocalisableMessage,
 } from "./localise.js";

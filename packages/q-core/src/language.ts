@@ -1,8 +1,10 @@
 import type { QLanguageCode, QLanguagePreference } from "@capital-q/contracts";
 
+import { languageInfo } from "./language/registry.js";
+
 /**
- * The language Q uses with a person (owner directive 2026-10-16, Arabic
- * first). One place decides it, so text, every voice line, rehearsals and
+ * The language Q uses with a person (owner directive 2026-10-16: any
+ * language). One place decides it, so text, every voice line, rehearsals and
  * onboarding agree:
  *
  *   saved preference (Settings)  >  the device's language  >  English
@@ -29,12 +31,25 @@ export function effectiveLocale(
     : undefined;
 }
 
-/** The supported language a locale means, or null for any other. */
+/**
+ * The offered language a locale means (its canonical tag, region kept:
+ * "ar-AE", "en-US"), or null for nothing or a tag the registry does not
+ * offer.
+ */
 export function supportedLanguageOf(
   locale: string | undefined,
 ): QLanguageCode | null {
-  const primary = locale?.split("-")[0]?.toLowerCase();
-  return primary === "ar" || primary === "en" ? primary : null;
+  const info = languageInfo(locale);
+  return info === null ? null : info.tag;
+}
+
+/** The language named for a prompt: "Swahili (Kiswahili)", "Arabic (العربية)". */
+function promptName(language: QLanguageCode): string | null {
+  const info = languageInfo(language);
+  if (info === null || info.primary === "en") return null;
+  return info.nativeName === info.englishName
+    ? info.englishName
+    : `${info.englishName} (${info.nativeName})`;
 }
 
 const KEEP_EXACT =
@@ -43,13 +58,15 @@ const KEEP_EXACT =
 /**
  * The note for a written answer, placed with the person's other notes.
  * Null for English, or when nothing was chosen: Q then follows the
- * language they write in, as before.
+ * language they write in, as before. One sentence for every language.
  */
 export function writtenLanguageNote(
   language: QLanguageCode | null | undefined,
 ): string | null {
-  if (language !== "ar") return null;
-  return `THEIR LANGUAGE: this person chose Arabic. Write everything they read in clear, professional Modern Standard Arabic (فصحى). If they write to you in another language, or ask you to switch, follow them. If they mix Arabic and English, answer in Arabic and keep the English terms they used. ${KEEP_EXACT} JSON keys, codes, enum values and identifiers stay exactly as the output format specifies; only the words meant for the person are Arabic.`;
+  const name =
+    language === null || language === undefined ? null : promptName(language);
+  if (name === null) return null;
+  return `THEIR LANGUAGE: this person chose ${name}. Write everything they read in clear, professional ${name}, in the standard written form professionals use at work. If they write to you in another language, or ask you to switch, follow them. If they mix it with English, answer in their language and keep the English terms they used. ${KEEP_EXACT} JSON keys, codes, enum values and identifiers stay exactly as the output format specifies; only the words meant for the person are in their language.`;
 }
 
 /**
@@ -59,6 +76,8 @@ export function writtenLanguageNote(
 export function spokenLanguageNote(
   language: QLanguageCode | null | undefined,
 ): string | null {
-  if (language !== "ar") return null;
-  return `Language: this person chose Arabic. Speak natural, clear Modern Standard Arabic, the register a Gulf professional uses at work, and understand Gulf and other Arabic dialects and Arabic-English code-switching. If they speak to you in English, or ask you to switch, follow them. Keep names, company names and investment terms as they say them (ARR, SAFE, term sheet). Say amounts as spoken Arabic with the currency named (USD, dirhams, riyals); never convert a currency.`;
+  const name =
+    language === null || language === undefined ? null : promptName(language);
+  if (name === null) return null;
+  return `Language: this person chose ${name}. Speak natural, clear ${name}, the standard register a professional uses at work, and understand regional accents and dialects and their mixing with English. If they speak to you in another language, or ask you to switch, follow them. Keep names, company names and investment terms as they say them (ARR, SAFE, term sheet). Say amounts in spoken words with the currency named; never convert a currency.`;
 }

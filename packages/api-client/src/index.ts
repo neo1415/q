@@ -393,7 +393,12 @@ export {
   startRehearsal,
 } from "./rehearsals.js";
 // end REHEARSE block
-export { getQStanding, setQLanguage, setQPersonality } from "./standing.js";
+export {
+  getQStanding,
+  getUiText,
+  setQLanguage,
+  setQPersonality,
+} from "./standing.js";
 // AUTO block: Q's delegated work, Web Push, notification settings.
 export {
   answerQWork,

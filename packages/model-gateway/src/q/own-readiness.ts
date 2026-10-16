@@ -1,5 +1,9 @@
 import type { QLanguageCode } from "@capital-q/contracts";
-import { readinessLeadCopy, type AuthorisedFact } from "@capital-q/q-core";
+import {
+  hasReadinessLeadCopy,
+  readinessLeadCopy,
+  type AuthorisedFact,
+} from "@capital-q/q-core";
 
 /**
  * A founder's own readiness, read for them when they ask what to do next
@@ -127,6 +131,7 @@ export function readinessLeadLines(
   read: unknown,
   language: QLanguageCode | null = null,
 ): string | null {
+  if (!hasReadinessLeadCopy(language)) return null;
   const copy = readinessLeadCopy(language);
   if (typeof read !== "object" || read === null) return null;
   const { status, data } = read as { status?: unknown; data?: unknown };

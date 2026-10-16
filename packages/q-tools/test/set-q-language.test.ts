@@ -12,10 +12,23 @@ import {
 import { actorA, actorB, contextFor, planFor } from "./support.js";
 
 /**
- * Multilingual Q: "switch to Arabic", in any language, sets the same
+ * Any language: "switch to French", in any language, sets the same
  * per-person preference as Settings, for the person asking and nobody else,
  * and carries the screen's switch and Q's confirmation in the new language.
+ * The registry's resolution (Intl data) is q-core's and tested there; this
+ * stand-in knows a few names, as the real one knows every offered language.
  */
+const KNOWN: Readonly<
+  Record<string, { tag: string; nativeName: string; englishName: string }>
+> = {
+  ar: { tag: "ar", nativeName: "العربية", englishName: "Arabic" },
+  en: { tag: "en", nativeName: "English", englishName: "English" },
+  fr: { tag: "fr", nativeName: "français", englishName: "French" },
+  français: { tag: "fr", nativeName: "français", englishName: "French" },
+  الفرنسية: { tag: "fr", nativeName: "français", englishName: "French" },
+  es: { tag: "es", nativeName: "español", englishName: "Spanish" },
+};
+
 function harness() {
   const saved: { userId: string; language: QLanguagePreference }[] = [];
   const executor = createQToolExecutor({
@@ -25,6 +38,7 @@ function harness() {
           saved.push({ userId: actor.userId, language });
           return Promise.resolve();
         },
+        resolve: (asked) => KNOWN[asked] ?? null,
       }),
     ]),
   });
@@ -66,9 +80,9 @@ describe("set_q_language", () => {
       language: "ar",
       done: true,
       clientAction: { kind: "SET_LANGUAGE", language: "ar" },
-      confirm: LANGUAGE_CONFIRMATIONS.ar,
+      confirm: LANGUAGE_CONFIRMATIONS["ar"],
     });
-    expect(LANGUAGE_CONFIRMATIONS.ar).toMatch(/بالعربية/u);
+    expect(LANGUAGE_CONFIRMATIONS["ar"]).toMatch(/بالعربية/u);
   });
 
   it("switches back to English, confirmed in English", async () => {
@@ -80,7 +94,7 @@ describe("set_q_language", () => {
     expect(outcome.status).toBe("SUCCEEDED");
     expect(saved.at(-1)?.language).toBe("en");
     expect(outcome.result.ok && outcome.result.data).toMatchObject({
-      confirm: LANGUAGE_CONFIRMATIONS.en,
+      confirm: LANGUAGE_CONFIRMATIONS["en"],
     });
   });
 
@@ -107,13 +121,53 @@ describe("set_q_language", () => {
     expect(saved).toEqual([]);
   });
 
-  it("refuses a language Capital Q does not offer", async () => {
+  it("accepts a language named in another language and confirms in it", async () => {
+    const { executor, saved } = harness();
+    for (const asked of ["français", "الفرنسية", "fr"]) {
+      const outcome = await executor.execute(
+        call({ language: asked }),
+        contextFor(actorA, ownConversation(actorA)),
+      );
+      expect(outcome.status).toBe("SUCCEEDED");
+      expect(outcome.result.ok && outcome.result.data).toMatchObject({
+        language: "fr",
+        done: true,
+        clientAction: { kind: "SET_LANGUAGE", language: "fr" },
+      });
+      // No hand-written French line: Q is told to say it in French.
+      expect(outcome.result.ok && outcome.result.data.confirm).toMatch(
+        /^Say this in French \(français\)/u,
+      );
+    }
+    expect(saved.map((s) => s.language)).toEqual(["fr", "fr", "fr"]);
+  });
+
+  it("switches between any two languages in turn", async () => {
+    const { executor, saved } = harness();
+    for (const asked of ["fr", "ar", "es"]) {
+      await executor.execute(
+        call({ language: asked }),
+        contextFor(actorA, ownConversation(actorA)),
+      );
+    }
+    expect(saved.map((s) => s.language)).toEqual(["fr", "ar", "es"]);
+  });
+
+  it("refuses a language Capital Q does not offer, honestly, and saves nothing", async () => {
     const { executor, saved } = harness();
     const outcome = await executor.execute(
-      call({ language: "fr" }),
+      call({ language: "Klingon" }),
       contextFor(actorA, ownConversation(actorA)),
     );
-    expect(outcome.status).not.toBe("SUCCEEDED");
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(outcome.result.ok && outcome.result.data).toMatchObject({
+      language: null,
+      done: false,
+      clientAction: null,
+    });
+    expect(outcome.result.ok && outcome.result.data.confirm).toMatch(
+      /^I can't do Klingon yet.*for example French/u,
+    );
     expect(saved).toEqual([]);
   });
 });

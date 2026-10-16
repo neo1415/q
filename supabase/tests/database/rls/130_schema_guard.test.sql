@@ -181,6 +181,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   -- 2026-10 build (classified by the lead from the live grants + RLS state).
   ('q_runtime', 'errands',                  'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'person_standing',          'RLS_REQUIRED',         '{SELECT}'),
+  -- Lane lang: shared machine translations of the interface; suite 973.
+  ('q_runtime', 'ui_translations',          'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'rehearsals',               'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'persona_profiles',         'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'rehearsal_external_subjects', 'RLS_REQUIRED',      '{SELECT}'),

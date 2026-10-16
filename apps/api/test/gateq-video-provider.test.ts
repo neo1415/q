@@ -98,7 +98,7 @@ describe("GateQ video provider bridge URL", () => {
 });
 
 describe("GateQ video in Arabic (lane ml)", () => {
-  const room = (language?: "ar" | null) => ({
+  const room = (language?: string | null) => ({
     sessionId: "s1",
     maxSeconds: 180,
     testMode: false,
@@ -129,6 +129,26 @@ describe("GateQ video in Arabic (lane ml)", () => {
     const conversation = bodies.find((b) => b.url.endsWith("/v2/conversations"))
       ?.body as { properties: { languages?: string[] } };
     expect(conversation.properties.languages).toEqual(["ar", "en"]);
+  });
+
+  it("runs any language Tavus lists first, and keeps a room English (said in English) when it does not", async () => {
+    const french = fakeTavus();
+    await provider(french.pool).createRoom(room("fr"));
+    const frRoom = french.bodies.find((b) =>
+      b.url.endsWith("/v2/conversations"),
+    )?.body as { properties: { languages?: string[] } };
+    expect(frRoom.properties.languages).toEqual(["fr", "en"]);
+    const swahili = fakeTavus();
+    await provider(swahili.pool).createRoom(room("sw"));
+    const swRoom = swahili.bodies.find((b) =>
+      b.url.endsWith("/v2/conversations"),
+    )?.body as { properties: Record<string, unknown> };
+    expect(swRoom.properties["languages"]).toBeUndefined();
+    const swPal = swahili.bodies.find((b) => b.url.endsWith("/v2/pals"))
+      ?.body as {
+      verbal_disclosure: string;
+    };
+    expect(swPal.verbal_disclosure).toMatch(/^Just so you know, I'm Q/u);
   });
 
   it("leaves an English room exactly as it was", async () => {
