@@ -41,6 +41,17 @@ export function quickAcknowledgement(input: {
   if (results.some((result) => result.outcome !== "COMMITTED")) return null;
   const items: string[] = [];
   for (const result of results) {
+    // A fact kept with their notes (not a question on their path) reads as
+    // its own line ("revenue: first revenue only"), never "anything else".
+    const kept = /^(.*?) \(kept with their notes/u.exec(result.recorded ?? "");
+    if (kept?.[1] !== undefined) {
+      items.push(
+        kept[1]
+          .slice(0, MAX_VALUE)
+          .replace(/^([^:]+):/u, (l) => l.toLowerCase()),
+      );
+      continue;
+    }
     const label = input.labelOf(result.stepKey);
     // Their own sentence keeps its words, not its full stop ("schools..").
     const value = (result.recorded?.trim() ?? "").replace(/[.!?;:,\s]+$/u, "");

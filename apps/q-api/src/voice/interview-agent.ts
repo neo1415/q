@@ -1508,6 +1508,24 @@ export function createInterviewAgent(
         ) {
           return null;
         }
+        // Everything their words stated is on the record (or kept): a step
+        // the reading found stated that no write covered yet -- one that
+        // only opened with this round's answers ("raising" opens the raise
+        // questions) -- needs another round, not a closing reply (live
+        // 2026-10-16: the amount and currency waited a whole turn).
+        const recordedNow = new Set(port.recorded());
+        const answered = new Set(
+          state.steps
+            .filter((row) => row.status !== "OPEN")
+            .map((row) => row.stepKey),
+        );
+        if (
+          [...authority.stated].some(
+            (key) => !recordedNow.has(key) && !answered.has(key),
+          )
+        ) {
+          return null;
+        }
         const raised = raisedChecks.get(input.onboardingSessionId);
         if (state.checks.some((check) => raised?.has(check.checkId) !== true)) {
           return null;
