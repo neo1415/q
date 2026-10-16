@@ -133,6 +133,24 @@ const SHOW_PHRASES = [
   "the notifications",
   "notifications",
   "now",
+  // Multilingual Q: the same short yes, in Arabic (MSA and Gulf).
+  "نعم",
+  "أجل",
+  "ايوه",
+  "إيه",
+  "اي",
+  "طيب",
+  "حسنا",
+  "حسناً",
+  "تمام",
+  "أكيد",
+  "بالتأكيد",
+  "أرني",
+  "اعرضها",
+  "اعرضه",
+  "خلنا نشوف",
+  "دعني أرى",
+  "الآن",
 ];
 
 const OTHER_PHRASES = [
@@ -156,6 +174,17 @@ const OTHER_PHRASES = [
   "skip it",
   "i'll look later",
   "let's talk",
+  "شيء آخر",
+  "موضوع آخر",
+  "شي ثاني",
+  "ليس الآن",
+  "مو الحين",
+  "لاحقا",
+  "لاحقاً",
+  "بعدين",
+  "لا",
+  "لا شكرا",
+  "لا شكراً",
 ];
 
 const SOCIAL_PHRASES = [
@@ -180,6 +209,16 @@ const SOCIAL_PHRASES = [
   "thanks",
   "thank you",
   "cheers",
+  "مرحبا",
+  "مرحباً",
+  "أهلا",
+  "أهلاً",
+  "السلام عليكم",
+  "صباح الخير",
+  "مساء الخير",
+  "كيف حالك",
+  "شكرا",
+  "شكراً",
 ];
 
 /** Words that carry no meaning of their own in a short reply. */
@@ -223,6 +262,12 @@ const FILLER = new Set([
   "good",
   "great",
   "fine",
+  "من",
+  "فضلك",
+  "لو",
+  "يا",
+  "شكرا",
+  "شكراً",
 ]);
 
 const MAX_REPLY_WORDS = 10;

@@ -6,6 +6,7 @@ import { WAKE_PHRASES } from "./phrases";
 import { wakeSupported } from "./support";
 import { storeWakePreference, useWakePreference } from "./wake-preference";
 import { setWakePausedByYou, useWakeStatus } from "./wake-status";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Settings → Q → "Say 'Hey Q' to start" (D2). Off by default. Turning it
@@ -30,6 +31,7 @@ const PHRASES = WAKE_PHRASES.map((phrase) => `“${phrase.label}”`);
 const PHRASE_LIST = `${PHRASES.slice(0, -1).join(", ")} or ${PHRASES.at(-1) ?? ""}`;
 
 export function WakeSetting() {
+  const t = useT();
   const id = useId();
   const on = useWakePreference();
   const status = useWakeStatus();
@@ -72,7 +74,7 @@ export function WakeSetting() {
           id={`${id}-label`}
           className="cq-body-sm text-(--cq-text-primary)"
         >
-          Say “Hey Q” to start
+          {t("Say “Hey Q” to start")}
         </span>
         <button
           type="button"

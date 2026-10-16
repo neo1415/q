@@ -13,6 +13,7 @@ import { GATEQ_AR } from "./catalog/gateq";
 import { Q_AR } from "./catalog/q";
 import { RELATIONSHIPS_AR } from "./catalog/relationships";
 import { SETUP_AR } from "./catalog/setup";
+import { SHELL_AR } from "./catalog/shell";
 import { WORK_AR } from "./catalog/work";
 import { indexPatterns, localiseDate, matchPattern } from "./patterns";
 
@@ -45,6 +46,7 @@ const ARABIC: Readonly<Record<string, string>> = {
   ...DISCOVER_AR,
   ...COMPANY_AR,
   ...SETUP_AR,
+  ...SHELL_AR,
 };
 
 export function uiLanguageOf(

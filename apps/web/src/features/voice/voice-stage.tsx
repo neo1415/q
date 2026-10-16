@@ -8,6 +8,7 @@ import { ICON_SIZE, MessageSquare, Mic, Upload, X } from "@capital-q/ui/icons";
 import { apertureStateFromVoice, QAperture } from "../q-aperture";
 import type { VoiceSessionClient, VoiceState } from "./session";
 import { VOICE_STATE_LABELS } from "./session";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The voice stage (CQ-Q-VOICE-001 rework): when the person talks with Q,
@@ -98,6 +99,7 @@ export function VoiceStage({
   uploadAction,
   progress,
 }: VoiceStageProps) {
+  const t = useT();
   const [typing, setTyping] = useState(false);
   const [draft, setDraft] = useState("");
   const [picks, setPicks] = useState<readonly string[]>([]);
@@ -176,7 +178,7 @@ export function VoiceStage({
       className="cq-stage fixed inset-0 z-(--cq-z-modal) flex flex-col text-(--cq-text-primary)"
       role="dialog"
       aria-modal="true"
-      aria-label="Talking with Q"
+      aria-label={t("Talking with Q")}
       data-q-voice-stage={client.state}
     >
       {/* Top bar: who you're with, progress, the way out to the form. */}
@@ -192,7 +194,7 @@ export function VoiceStage({
               className="cq-stage-quiet"
               onClick={onUseForm}
             >
-              Use the form
+              {t("Use the form")}
             </button>
           ) : null}
           <button type="button" className="cq-stage-quiet" onClick={onEnd}>
@@ -232,7 +234,7 @@ export function VoiceStage({
             </span>
             {client.pausedAway === true ? (
               <span className="cq-caption text-(--cq-text-secondary)">
-                Q isn&apos;t listening. Tap Unmute when you want to talk.
+                {t("Q isn't listening. Tap Unmute when you want to talk.")}
               </span>
             ) : null}
             {thinkingNote !== null ? (
@@ -269,7 +271,7 @@ export function VoiceStage({
               ref={listRef}
               className="cq-stage-scroll w-full max-w-2xl flex-none space-y-3 overflow-y-auto border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
               style={{ maxHeight: "32vh" }}
-              aria-label="Everything we've said"
+              aria-label={t("Everything we've said")}
             >
               {lines.map((line) => (
                 <li
@@ -315,7 +317,7 @@ export function VoiceStage({
                 className="cq-stage-quiet"
                 onClick={onDismissNotice}
               >
-                Dismiss
+                {t("Dismiss")}
               </button>
             </div>
           ) : null}
@@ -328,7 +330,7 @@ export function VoiceStage({
               <div
                 className="flex flex-wrap justify-center gap-2"
                 role="group"
-                aria-label="Options"
+                aria-label={t("Options")}
               >
                 {asking.options.map((option) => {
                   const key = option.key;
@@ -375,11 +377,11 @@ export function VoiceStage({
                     setPicks([]);
                   }}
                 >
-                  That’s all of them
+                  {t("That’s all of them")}
                 </button>
               ) : null}
               <span className="cq-caption text-(--cq-text-tertiary)">
-                Tap one, or just say it.
+                {t("Tap one, or just say it.")}
               </span>
             </div>
           ) : null}
@@ -397,28 +399,28 @@ export function VoiceStage({
             className="flex w-full max-w-2xl items-center gap-2"
           >
             <label htmlFor={inputId} className="sr-only">
-              Type to Q
+              {t("Type to Q")}
             </label>
             <input
               id={inputId}
               autoFocus
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Type instead"
+              placeholder={t("Type instead")}
               autoComplete="off"
               // min-w-0: an input's intrinsic width otherwise pushed Cancel
               // off the right edge of a phone.
               className="cq-stage-input min-w-0"
             />
             <button type="submit" className="cq-stage-primary">
-              Send
+              {t("Send")}
             </button>
             <button
               type="button"
               className="cq-stage-quiet"
               onClick={() => setTyping(false)}
             >
-              Cancel
+              {t("Cancel")}
             </button>
           </form>
         ) : null}
@@ -444,7 +446,7 @@ export function VoiceStage({
             onClick={() => setTyping((current) => !current)}
           >
             <MessageSquare size={ICON_SIZE.compact} aria-hidden="true" />
-            Type
+            {t("Type")}
           </button>
           {onUpload !== undefined ? (
             <>
@@ -478,7 +480,7 @@ export function VoiceStage({
             <div
               className="flex items-center gap-1"
               role="group"
-              aria-label="Q's voice"
+              aria-label={t("Q's voice")}
             >
               {voices.map((choice) => (
                 <button
@@ -498,7 +500,7 @@ export function VoiceStage({
             </div>
           ) : null}
           <label className="flex items-center gap-2 cq-caption text-(--cq-text-secondary)">
-            Volume
+            {t("Volume")}
             <input
               type="range"
               min={0}

@@ -349,6 +349,7 @@ export function MandateReviewStep({
         </>
       )}
       <ContextIndicator
+        translate={t}
         scope="investor_private"
         detail="Declared by you. Founders never see your mandate."
       />

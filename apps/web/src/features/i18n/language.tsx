@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+
+import { UiTextProvider } from "@capital-q/ui/ui-text";
 import {
   createContext,
   useContext,
@@ -74,9 +76,12 @@ export function LanguageProvider({
   }, [language, dir]);
   return (
     <LanguageContext.Provider value={language}>
-      <div lang={language} dir={dir} className="contents" data-ui-language>
-        {children}
-      </div>
+      {/* The shared components (@capital-q/ui) read the same catalogue. */}
+      <UiTextProvider translate={(english) => translate(language, english)}>
+        <div lang={language} dir={dir} className="contents" data-ui-language>
+          {children}
+        </div>
+      </UiTextProvider>
     </LanguageContext.Provider>
   );
 }

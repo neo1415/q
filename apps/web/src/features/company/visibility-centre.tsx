@@ -301,7 +301,7 @@ function WhoSeesWhat({
               <span className="cq-label text-(--cq-text-primary)">
                 {OBJECT_WORDS[object.object].name}
               </span>
-              <ContextIndicator scope={object.scope} compact />
+              <ContextIndicator translate={t} scope={object.scope} compact />
             </div>
             <p className="cq-body-sm text-(--cq-text-secondary)">
               {OBJECT_WORDS[object.object].scopeWords(object.scope)}

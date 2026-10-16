@@ -6,6 +6,7 @@ import type { PendingClaimDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
 import { decideCompanyClaimAction } from "./team-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * P14: people who asked to claim (or join) this company through "Find my
@@ -23,6 +24,7 @@ export function CompanyClaims({
 }: {
   readonly initial: readonly PendingClaimDto[];
 }) {
+  const t = useT();
   const [claims, setClaims] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -56,7 +58,7 @@ export function CompanyClaims({
         id="company-claims-title"
         className="cq-title-sm text-(--cq-text-primary)"
       >
-        Asked to claim your company
+        {t("Asked to claim your company")}
       </h2>
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
         {claims.map((claim) => (
@@ -82,7 +84,7 @@ export function CompanyClaims({
                 disabled={pending}
                 onClick={() => decide(claim, true)}
               >
-                Let in
+                {t("Let in")}
               </Button>
               <Button
                 variant="secondary"
@@ -90,7 +92,7 @@ export function CompanyClaims({
                 disabled={pending}
                 onClick={() => decide(claim, false)}
               >
-                Decline
+                {t("Decline")}
               </Button>
             </span>
           </li>

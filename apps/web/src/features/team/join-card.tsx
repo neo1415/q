@@ -12,6 +12,7 @@ import { SignOutButton } from "@/features/auth";
 
 import { acceptInvitationAction } from "./team-actions";
 import { teamWords } from "./team-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Accept an invitation (G2), built to the mockup's accept view: one card,
@@ -44,6 +45,7 @@ function Problem({
   readonly body: string;
   readonly children?: ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="px-4">
       <div className={CARD} data-join-state="error">
@@ -57,7 +59,7 @@ function Problem({
         <p className="cq-body text-(--cq-text-secondary)">{body}</p>
         {children ?? (
           <Link href="/home" className={buttonClassName("secondary")}>
-            Go to Capital Q
+            {t("Go to Capital Q")}
           </Link>
         )}
       </div>
@@ -78,6 +80,7 @@ export function JoinCard({
   readonly keeps: string | null;
   readonly alreadyIn: boolean;
 }) {
+  const t = useT();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +88,7 @@ export function JoinCard({
   if (preview === null) {
     return (
       <Problem
-        title="This invitation link isn't valid"
+        title={t("This invitation link isn't valid")}
         body="It may have been copied only in part. Open the link from the email again, or ask for a new invitation."
       />
     );
@@ -96,7 +99,7 @@ export function JoinCard({
   if (preview.state === "EXPIRED") {
     return (
       <Problem
-        title="This invitation has expired"
+        title={t("This invitation has expired")}
         body={`Invitations last 7 days. Ask ${inviterFirst} at ${preview.organisationName} to send a new one.`}
       />
     );
@@ -104,7 +107,7 @@ export function JoinCard({
   if (preview.state === "REVOKED") {
     return (
       <Problem
-        title="This invitation was cancelled"
+        title={t("This invitation was cancelled")}
         body={`Ask ${inviterFirst} at ${preview.organisationName} if you should still join.`}
       />
     );
@@ -112,7 +115,7 @@ export function JoinCard({
   if (preview.state === "DECLINED") {
     return (
       <Problem
-        title="You declined this invitation"
+        title={t("You declined this invitation")}
         body={`Ask ${inviterFirst} at ${preview.organisationName} for a new one if you'd like to join.`}
       />
     );
@@ -124,12 +127,12 @@ export function JoinCard({
         body="This invitation was already used to join."
       >
         <Link href="/settings/team" className={buttonClassName("primary")}>
-          Open your team
+          {t("Open your team")}
         </Link>
       </Problem>
     ) : (
       <Problem
-        title="This invitation was already used"
+        title={t("This invitation was already used")}
         body={`Ask ${inviterFirst} at ${preview.organisationName} for a new one.`}
       />
     );
@@ -231,7 +234,7 @@ export function JoinCard({
           href="/home"
           className={buttonClassName("quiet", "regular", "w-full")}
         >
-          Not now
+          {t("Not now")}
         </Link>
       </div>
     </div>
