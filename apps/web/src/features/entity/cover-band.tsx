@@ -53,21 +53,29 @@ function ridge(
     const mid = (x0 + x1) / 2;
     path += ` C${String(mid)} ${String(y0)} ${String(mid)} ${String(y1)} ${String(x1)} ${String(y1)}`;
   }
-  return `${path} L${String(WIDTH)} ${String(HEIGHT)} L0 ${String(HEIGHT)} Z`;
+  return path;
 }
 
-/** The two ridges for one organisation (exported for its test). */
+/** A ridge line closed down to the bottom edge, for its fill. */
+function filled(line: string): string {
+  return `${line} L${String(WIDTH)} ${String(HEIGHT)} L0 ${String(HEIGHT)} Z`;
+}
+
+/**
+ * The two ridges for one organisation (exported for its test): each
+ * closed for its fill, and the far ridge's crest alone for its hairline.
+ */
 export function coverBandPaths(seed: string): {
   readonly far: string;
+  readonly crest: string;
   readonly near: string;
 } {
   const next = seeded(seed);
   const farBase = 0.42 + next() * 0.14;
   const nearBase = 0.68 + next() * 0.12;
-  return {
-    far: ridge(next, farBase, 0.3, 4 + Math.floor(next() * 3)),
-    near: ridge(next, nearBase, 0.22, 3 + Math.floor(next() * 2)),
-  };
+  const crest = ridge(next, farBase, 0.3, 4 + Math.floor(next() * 3));
+  const near = ridge(next, nearBase, 0.22, 3 + Math.floor(next() * 2));
+  return { far: filled(crest), crest, near: filled(near) };
 }
 
 export function CoverBand({
@@ -77,7 +85,7 @@ export function CoverBand({
   readonly seed: string;
   readonly className?: string | undefined;
 }) {
-  const { far, near } = coverBandPaths(seed);
+  const { far, crest, near } = coverBandPaths(seed);
   return (
     <svg
       aria-hidden="true"
@@ -88,9 +96,10 @@ export function CoverBand({
       data-cover-band
     >
       <rect width={WIDTH} height={HEIGHT} fill="var(--cq-surface-subtle)" />
+      <path d={far} fill="var(--cq-surface-strong)" />
       <path
-        d={far}
-        fill="var(--cq-surface-strong)"
+        d={crest}
+        fill="none"
         stroke="var(--cq-border-strong)"
         strokeWidth="1"
         vectorEffect="non-scaling-stroke"

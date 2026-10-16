@@ -14,7 +14,9 @@ describe("the drawn cover band", () => {
 
   it("stays inside the band, ridges closed to the bottom edge", () => {
     for (let n = 0; n < 50; n += 1) {
-      const { far, near } = coverBandPaths(`seed-${String(n)}`);
+      const { far, crest, near } = coverBandPaths(`seed-${String(n)}`);
+      expect(far.startsWith(crest)).toBe(true);
+      expect(crest).not.toContain("Z");
       for (const path of [far, near]) {
         const numbers = (path.match(/-?\d+(\.\d+)?/gu) ?? []).map(Number);
         expect(numbers.every((v) => v >= 0 && v <= 400)).toBe(true);
