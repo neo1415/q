@@ -43,3 +43,29 @@ export const QUiTextDtoSchema = z
   })
   .strict();
 export type QUiTextDto = z.infer<typeof QUiTextDtoSchema>;
+
+/**
+ * `POST /v1/q/words`: words Capital Q stored or composed for this person
+ * (a readiness question Q prepared, a card's line), in the language they
+ * chose. The language is their saved one, never the request's. Only each
+ * sentence's skeleton is translated (names, figures, codes and quotes are
+ * lifted out first), cached and shared under the UI_TRANSLATION cap. An
+ * entry is null where the English stands (English chosen, not translated
+ * in time).
+ */
+export const Q_WORDS_PATH = "/v1/q/words" as const;
+
+export const QWordsRequestSchema = z
+  .object({
+    texts: z.array(z.string().min(1).max(600)).min(1).max(40),
+  })
+  .strict();
+export type QWordsRequest = z.infer<typeof QWordsRequestSchema>;
+
+export const QWordsDtoSchema = z
+  .object({
+    language: QLanguageCodeSchema.nullable(),
+    texts: z.array(z.string().max(4_000).nullable()).max(40),
+  })
+  .strict();
+export type QWordsDto = z.infer<typeof QWordsDtoSchema>;

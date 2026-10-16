@@ -230,6 +230,10 @@ import {
   createUiTextService,
   parseUiTranslationDailyCapUsd,
 } from "./composition/ui-text.js";
+import {
+  createAnswerWords,
+  createCachedLineTranslator,
+} from "./composition/answer-words.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
 import {
@@ -3901,24 +3905,40 @@ const standingStore = createPostgresStandingStore(database.sql);
  * unless CQ_UI_TRANSLATION_DAILY_CAP_USD says otherwise, counted from the
  * ledger rows of that class only.
  */
+const uiTranslationCap = createDailySpendCap({
+  capUsd: parseUiTranslationDailyCapUsd(process.env),
+  readSpentSinceUsd: createPostgresDailySpendReader({
+    sql: database.sql,
+    taskClass: "UI_TRANSLATION",
+  }),
+  onReadFailure: (error) => {
+    logger.warn(
+      { err: error, spendCap: "UI_TRANSLATION" },
+      "ui translation cap could not read the ledger; using the last total",
+    );
+  },
+});
 const uiText = createUiTextService({
   store: createPostgresUiTextStore(database.sql),
   translate: createGatewayUiTextTranslator(
     modelGateway,
     budgetForTaskClass("UI_TRANSLATION"),
   ),
-  cap: createDailySpendCap({
-    capUsd: parseUiTranslationDailyCapUsd(process.env),
-    readSpentSinceUsd: createPostgresDailySpendReader({
-      sql: database.sql,
-      taskClass: "UI_TRANSLATION",
-    }),
-    onReadFailure: (error) => {
-      logger.warn(
-        { err: error, spendCap: "UI_TRANSLATION" },
-        "ui translation cap could not read the ledger; using the last total",
-      );
-    },
+  // One daily ceiling for the class, shared with Q's code-written words.
+  cap: uiTranslationCap,
+  logger,
+});
+// Q's code-written words in any language: lane lang's store, translator
+// and daily cap, under their own namespace (composition/answer-words.ts).
+const answerWords = createAnswerWords({
+  translateLines: createCachedLineTranslator({
+    store: createPostgresUiTextStore(database.sql),
+    translate: createGatewayUiTextTranslator(
+      modelGateway,
+      budgetForTaskClass("UI_TRANSLATION"),
+    ),
+    cap: uiTranslationCap,
+    logger,
   }),
   logger,
 });
@@ -4050,6 +4070,18 @@ const qIntelligence = composeQIntelligence({
       .then((standing) =>
         standing.language === "AUTO" ? null : standing.language,
       ),
+  // Any language: what Q writes by code, through the shared translation
+  // layer (names and figures lifted out first; English when not ready).
+  localiseWords: async ({ tenantId, userId, runId }, texts) => {
+    const standing = await standingStore.read(userId, tenantId, new Date());
+    if (standing.language === "AUTO") return texts.map(() => null);
+    return answerWords.localise(standing.language, texts, {
+      tenantId,
+      userId,
+      correlationId: `answer-words:${runId}`,
+      purpose: "OTHER",
+    });
+  },
   // Multilingual Q: the language they chose, as the words Q is told.
   languageOf: ({ tenantId, userId }) =>
     standingStore
@@ -6664,6 +6696,15 @@ const { app, logger: appLogger } = createApp(
     // end BILLING-2 block
     standing: standingStore,
     uiText,
+    answerWords: {
+      answerWords,
+      languageOf: ({ tenantId, userId }) =>
+        standingStore
+          .read(userId, tenantId, new Date())
+          .then((standing) =>
+            standing.language === "AUTO" ? null : standing.language,
+          ),
+    },
     // RECOVERY B1: the reader Q's what_needs_me tool uses, for the pages.
     attention: qTools.attention,
     arrivalSnapshots,

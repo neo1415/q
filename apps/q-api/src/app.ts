@@ -1,4 +1,8 @@
 import {
+  registerAnswerWordsRoutes,
+  type AnswerWordsRoutesDependencies,
+} from "./composition/answer-words.js";
+import {
   registerUiTextRoutes,
   type UiTextRoutesDependencies,
 } from "./composition/ui-text.js";
@@ -232,6 +236,10 @@ export type QApiModules = {
   readonly standing?: StandingRoutesDependencies["standing"] | undefined;
   /** Any-language interface: machine translations of the UI catalogue. */
   readonly uiText?: UiTextRoutesDependencies["uiText"] | undefined;
+  /** Words stored for a person, in their own language (any language). */
+  readonly answerWords?:
+    | Pick<AnswerWordsRoutesDependencies, "answerWords" | "languageOf">
+    | undefined;
   /** RECOVERY B1: what needs the person, every source (unread ≠ empty). */
   readonly attention?: AttentionRoutesDependencies["attention"] | undefined;
   /** W1: the Arrival Snapshot (what Q told them on arrival), one read for every surface. */
@@ -846,6 +854,14 @@ export function createApp(
         resolver: security.resolver,
         identity: security.identity,
         standing: modules.standing,
+      });
+    }
+    if (modules.answerWords !== undefined) {
+      registerAnswerWordsRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        ...modules.answerWords,
       });
     }
     if (modules.uiText !== undefined) {

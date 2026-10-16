@@ -50,3 +50,30 @@ describe("investorDiscoveryLaneOf", () => {
     expect(lane?.discoverInvestors?.regions).toEqual(["qatari"]);
   });
 });
+
+describe("a question about their own figures is not an investor search (live 2026-10-16)", () => {
+  for (const said of [
+    // English
+    "We want to raise USD 1.5m seed from Gulf investors. Is this amount reasonable for us?",
+    "We're pitching Saudi family offices next month. What valuation should we ask for?",
+    // Arabic
+    "نريد جمع 1.5 مليون دولار من مستثمرين في الخليج. هل هذا المبلغ منطقي؟",
+    // Mixed, as said live
+    "We want to raise USD 1.5m seed from Gulf investors. هل هذا المبلغ منطقي لـ Rimal Freight مع 9 موظفين؟",
+  ]) {
+    it(`"${said.slice(0, 60)}…" goes to Q, not the list`, () => {
+      expect(investorDiscoveryLaneOf(said)).toBeNull();
+    });
+  }
+
+  for (const said of [
+    "Our round is USD 1.5m. Who in the Gulf might back us?",
+    // (An Arabic search is the first read's, not this English word list.)
+  ]) {
+    it(`"${said.slice(0, 50)}…" is still a search: its question is the ask`, () => {
+      expect(investorDiscoveryLaneOf(said)?.questionKind).toBe(
+        "DISCOVER_INVESTORS",
+      );
+    });
+  }
+});

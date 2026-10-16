@@ -94,3 +94,46 @@ describe("fastLaneOf (D1 investor discovery)", () => {
     ).toBe(false);
   });
 });
+
+describe("the first read's investor ask yields to their own question (any language)", () => {
+  const skim = (regions: string[]) => ({
+    kind: "DISCOVER_INVESTORS" as const,
+    confidence: "HIGH" as const,
+    count: null,
+    discover: null,
+    person: null,
+    investors: { regions, sector: null, stage: null, aboutMyCompany: true },
+  });
+
+  it("English, Arabic and mixed turns asking about their amount wait for Q", () => {
+    for (const [regions, said] of [
+      [
+        ["Gulf"],
+        "We want to raise USD 1.5m from Gulf investors. Is that amount reasonable?",
+      ],
+      [
+        ["الخليج"],
+        "نريد جمع 1.5 مليون دولار من مستثمري الخليج. هل هذا المبلغ معقول؟",
+      ],
+      [
+        ["Gulf"],
+        "We want to raise USD 1.5m seed from Gulf investors. هل هذا المبلغ منطقي؟",
+      ],
+      [
+        ["Golfe"],
+        "Nous levons 1,5 M USD auprès d'investisseurs du Golfe. Ce montant est-il raisonnable ?",
+      ],
+    ] as const) {
+      expect(fastLaneOf(skim([...regions]), said)).toBeNull();
+    }
+  });
+
+  it("a question that is itself the search still goes to the list", () => {
+    expect(
+      fastLaneOf(
+        skim(["Gulf"]),
+        "We raise USD 1.5m. Which Gulf investors could fit?",
+      )?.questionKind,
+    ).toBe("DISCOVER_INVESTORS");
+  });
+});
