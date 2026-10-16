@@ -656,7 +656,9 @@ export function FeedCard({
               strokeWidth={ICON_STROKE}
             />
           )}
-          <span className="cq-feed-rail-label">{saved ? "Saved" : "Save"}</span>
+          <span className="cq-feed-rail-label">
+            {t(saved ? "Saved" : "Save")}
+          </span>
         </Button>
         {/* Pass is neutral: quiet, never danger, never red. */}
         <Button

@@ -93,6 +93,7 @@ export function QBriefing({
   /** Only today's setup reminder card, without the line (the arrival's). */
   readonly onlyReminder?: boolean | undefined;
 }) {
+  const t = useT();
   const [shown, setShown] = useState<Briefing | null>(null);
   const [putOff, setPutOff] = useState<ReadonlySet<string>>(new Set());
 
@@ -128,7 +129,7 @@ export function QBriefing({
     >
       {onlyReminder ? null : (
         <p id="q-briefing-line" className="cq-body text-(--cq-text-primary)">
-          {shown.line}
+          {t(shown.line)}
         </p>
       )}
       <ul className="grid w-full gap-2 sm:grid-cols-2">
@@ -149,10 +150,10 @@ export function QBriefing({
               >
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="cq-body-sm font-medium text-(--cq-text-primary)">
-                    {item.title}
+                    {t(item.title)}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {item.description}
+                    {t(item.description)}
                   </span>
                 </span>
                 <ChevronRight

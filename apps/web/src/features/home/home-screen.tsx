@@ -31,7 +31,7 @@ import { resolveBriefing } from "./briefing-facts";
 import { resolveReturningFacts } from "./returning-facts";
 import { ReturningWelcome } from "./returning-welcome";
 import { resolveSetupReminder } from "./setup-reminder";
-import { serverT } from "@/features/i18n/server";
+import { serverT, serverUiLanguage } from "@/features/i18n/server";
 
 /**
  * Home is Q (QX-001 §4; doc 17 §60-§63; acceptance A and K).
@@ -212,7 +212,7 @@ export async function HomeScreen({
               ? "WELCOME"
               : "BRIEFING",
       };
-      const greeting = returningGreeting(facts);
+      const greeting = returningGreeting(facts, await serverUiLanguage());
       welcome = (
         <>
           <ReturningWelcome

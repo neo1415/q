@@ -127,10 +127,22 @@ export type ReturningGreeting = {
   readonly spoken: string;
 };
 
-export function returningGreeting(facts: ReturningFacts): ReturningGreeting {
+export function returningGreeting(
+  facts: ReturningFacts,
+  /** Multilingual Q: "ar" welcomes in Arabic; anything else in English. */
+  language: "en" | "ar" = "en",
+): ReturningGreeting {
   const name = firstName(facts.name);
-  const headline = name === null ? "Welcome back." : `Welcome back, ${name}.`;
-  const question = questionFor(facts);
+  const headline =
+    language === "ar"
+      ? name === null
+        ? "أهلاً بعودتك."
+        : `أهلاً بعودتك، ${name}.`
+      : name === null
+        ? "Welcome back."
+        : `Welcome back, ${name}.`;
+  const question =
+    language === "ar" ? arabicQuestionFor(facts) : questionFor(facts);
   const leftOff = welcomeReminds(facts) ? (facts.setup?.pending ?? null) : null;
   return { headline, question, leftOff, spoken: `${headline} ${question}` };
 }
@@ -173,6 +185,28 @@ function questionFor(facts: ReturningFacts): string {
   return role === "FOUNDER"
     ? "What would you like to work on today?"
     : "What would you like to do today?";
+}
+
+/** questionFor, in Arabic: the same choice of what is most worth saying. */
+function arabicQuestionFor(facts: ReturningFacts): string {
+  if (facts.unfinished !== null && welcomeReminds(facts)) {
+    return facts.unfinished === "investor"
+      ? "تفويضك لم يكتمل بعد — هل نتابع من حيث توقفنا، أم تفضّل أن تتجول أولاً؟"
+      : "إعداد شركتك لم يكتمل بعد — هل نتابع من حيث توقفنا؟";
+  }
+  const role = roleOf(facts);
+  if (role === "INVESTOR" && facts.feed === "YES") {
+    return "في خلاصتك شركات مرتبة وفق تفويضك. من أين تودّ أن تبدأ؟";
+  }
+  if (role === "INVESTOR" && facts.feed === "NO") {
+    return "تفويضك جاهز، ولا يوجد في Capital Q ما يطابقه بعد. هل ننظر فيما يقترب منه، أم نراجع التفويض معاً؟";
+  }
+  if (role === "FOUNDER" && facts.pitch === "NO") {
+    return "يشاهد المستثمرون العرض قبل قراءة أي شيء آخر. هل تودّ تسجيل عرضك، أم العمل على شيء آخر؟";
+  }
+  return role === "FOUNDER"
+    ? "على ماذا تودّ أن تعمل اليوم؟"
+    : "ماذا تودّ أن تفعل اليوم؟";
 }
 
 /**

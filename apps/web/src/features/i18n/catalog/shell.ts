@@ -4,6 +4,87 @@
  */
 export const SHELL_AR: Readonly<Record<string, string>> = {
   "Look at it": "اطّلع عليه",
+  "A few things need you.": "بضعة أمور تحتاجك.",
+  "A first meeting is the natural next step.":
+    "الاجتماع الأول هو الخطوة الطبيعية التالية.",
+  "Accept to connect, or decline.": "اقبل للتواصل، أو ارفض.",
+  "Add stage, sector or geography to sharpen your feed.":
+    "أضف المرحلة أو القطاع أو الجغرافيا لتدقيق خلاصتك.",
+  "Companies are ranked against an active mandate.":
+    "تُرتَّب الشركات وفق تفويض مفعّل.",
+  "Finish your company setup when you're ready; Q picks up where you left off.":
+    "أكمل إعداد شركتك حين تكون جاهزاً؛ وسيتابع Q من حيث توقفت.",
+  "Finish your mandate when you're ready; your feed sharpens with it.":
+    "أكمل تفويضك حين تكون جاهزاً؛ وتزداد خلاصتك دقة معه.",
+  "Here's what changed this week.": "إليك ما تغيّر هذا الأسبوع.",
+  "Matches your mandate. You haven't acted on it yet.":
+    "تطابق تفويضك. لم تتخذ إجراءً بشأنها بعد.",
+  "Not yet acted on": "لم يُتخذ إجراء بعد",
+  "Nothing is needed from you.": "لا شيء مطلوب منك.",
+  "One step before investors can find you": "خطوة واحدة قبل أن يجدك المستثمرون",
+  "One thing needs you.": "أمر واحد يحتاجك.",
+  "Waiting for your approval": "بانتظار موافقتك",
+  "Worth a look.": "يستحق نظرة.",
+  "Your calls couldn't be read just now.": "تعذّرت قراءة مكالماتك الآن.",
+  "Your conversation stays where it is.": "تبقى محادثتك كما هي.",
+  "Your mandate has no preferences yet": "تفويضك بلا تفضيلات بعد",
+  "Your mandate isn't active": "تفويضك غير مفعّل",
+  // Home's cards, Explore's topics, profile labels and "Q can see".
+  "For you": "لك",
+  "Your companies": "شركاتك",
+  Everything: "الكل",
+  "New this week": "جديد هذا الأسبوع",
+  "Ask Q how Capital Q works for you.": "اسأل Q كيف يعمل Capital Q لصالحك.",
+  "Ask Q what an investor would question first.":
+    "اسأل Q عمّا سيسأل عنه المستثمر أولاً.",
+  "Ask Q what you have told Capital Q you invest in.":
+    "اسأل Q عمّا أخبرت Capital Q أنك تستثمر فيه.",
+  Capital: "رأس المال",
+  "Carry on out loud; Q asks, you answer.": "تابع بصوت عالٍ؛ Q يسأل وأنت تجيب.",
+  "Cheque size": "حجم الاستثمار",
+  "Companies ranked against your mandate.": "شركات مرتبة وفق تفويضك.",
+  "Continue setup": "تابع الإعداد",
+  "Create an investor deck for my company.": "أنشئ عرضاً للمستثمرين لشركتي.",
+  "Create your investor deck": "أنشئ عرضك للمستثمرين",
+  "Discovery preferences": "تفضيلات الاكتشاف",
+  Exclusions: "الاستبعادات",
+  "Founder fit": "التوافق مع المؤسس",
+  "Investment criteria": "معايير الاستثمار",
+  "Investment focus": "محور الاستثمار",
+  "Investment mandate": "تفويض الاستثمار",
+  Largest: "الأكبر",
+  "Pick up where you left off, the way you were doing it.":
+    "تابع من حيث توقفت، بالطريقة التي كنت تعمل بها.",
+  "Q drafts one from what you have already shared.":
+    "يصوغ Q واحداً مما شاركته بالفعل.",
+  "Q room": "غرفة Q",
+  Raise: "الجولة",
+  "Record your pitch": "سجّل عرضك",
+  Relationships: "العلاقات",
+  Smallest: "الأصغر",
+  "Talk it through": "ناقشه",
+  Target: "المستهدف",
+  "The short video investors watch first.":
+    "المقطع القصير الذي يشاهده المستثمرون أولاً.",
+  Traction: "النمو",
+  Typical: "المعتاد",
+  "Use of funds": "استخدام الأموال",
+  "What in my deck would an investor question first?":
+    "ما الذي في عرضي سيسأل عنه المستثمر أولاً؟",
+  "Who can see you": "من يمكنه رؤيتك",
+  "Your company profile": "ملف شركتك",
+  "Your feed": "خلاصتك",
+  "Your investor deck": "عرضك للمستثمرين",
+  "Your role": "دورك",
+  "a company profile": "ملف شركة",
+  "a relationship": "علاقة",
+  "nothing open": "لا شيء مفتوح",
+  "this page": "هذه الصفحة",
+  "your documents": "مستنداتك",
+  "your pitch": "عرضك",
+  "your profile": "ملفك الشخصي",
+  Team: "الفريق",
+  Sector: "القطاع",
   // @capital-q/ui components, through UiTextProvider.
   "Add a category": "أضف فئة",
   Attached: "مرفق",

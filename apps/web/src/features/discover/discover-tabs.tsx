@@ -128,7 +128,7 @@ export function DiscoverTabs({
               onClick={() => choose(entry.tab)}
               data-discover-tab-button={entry.tab}
             >
-              {entry.label}
+              {t(entry.label)}
             </button>
           );
         })}
