@@ -503,8 +503,9 @@ const presenceResearch =
         // fictional-world seed's own; a read failure keeps the old behaviour.
         isFictionalAccount: async (userId) => {
           const rows = await database.sql<{ fictional: boolean }[]>`
-            select coalesce(u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb
-                        and u.raw_app_meta_data -> 'fictional_demo' = 'true'::jsonb,
+            select coalesce((u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb
+                         and u.raw_app_meta_data -> 'fictional_demo' = 'true'::jsonb)
+                        or u.email like '%@fictional.capitalq.local',
                         false) as fictional
               from identity.user_profiles p
               join auth.users u on u.id = p.auth_user_id

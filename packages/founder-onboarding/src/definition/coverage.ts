@@ -68,6 +68,13 @@ export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 20,
     },
     [FOUNDER_STEPS.materials]: {
+      satisfiedByDocuments: [
+        "PITCH_DECK",
+        "COMPANY_PROFILE",
+        "PRODUCT",
+        "FINANCIAL_MODEL",
+        "MANAGEMENT_ACCOUNTS",
+      ],
       concept: "company.materials",
       priority: "IMPORTANT",
       label: "Deck or materials",
