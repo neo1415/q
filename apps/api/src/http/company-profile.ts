@@ -40,6 +40,8 @@ import {
 } from "../security/actor-context.js";
 import {
   pitchClaimsFor,
+  pitchSectionsFor,
+  type StoredPitchSection,
   presentPitchRaise,
   type RaiseSharing,
 } from "../pitch-claims.js";
@@ -191,6 +193,18 @@ export type CompanyProfilePorts = {
         companyId: string,
         mediaAssetId: string,
       ) => Promise<readonly TimedCue[] | null>)
+    | undefined;
+  /**
+   * Lane ov: Q's stored section reading of a pitch, for this actor, under
+   * the media context's playback rule; null where they may not play it or
+   * it was not read yet. Absent: no pitch sections.
+   */
+  readonly pitchSections?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+        mediaAssetId: string,
+      ) => Promise<readonly StoredPitchSection[] | null>)
     | undefined;
   /** How the founder set the current raise's sharing (pitch-claims.ts). */
   readonly raiseSharing?:
@@ -385,6 +399,17 @@ export function registerCompanyProfileRoutes(
               ),
             )
           : [];
+      // Lane ov: the same pitches, read into the profile's sections.
+      const sections =
+        full && profile.pitchSections !== undefined
+          ? await pitchSectionsFor(videos, (mediaAssetId) =>
+              quietly(
+                profile.pitchSections?.(actor, company.id, mediaAssetId) ??
+                  Promise.resolve(null),
+                null,
+              ),
+            )
+          : [];
       const sharing: RaiseSharing =
         claims.some((claim) => claim.kind === "RAISE") &&
         profile.raiseSharing !== undefined
@@ -444,6 +469,7 @@ export function registerCompanyProfileRoutes(
                     },
               team: [...team],
               pitchClaims: pitch.pitchClaims,
+              pitchSections: sections,
               raiseFromPitch,
               pitchRaiseNotice: pitch.pitchRaiseNotice,
               ...(view === null ? {} : { raiseView: view }),

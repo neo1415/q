@@ -52,7 +52,9 @@ export function pendingCount(data: ArrivalData): number {
   const questions = data.questions?.length ?? 0;
   // The continue-setup card, shown with the rest once they choose to look.
   const setup = Math.max(0, Math.min(1, data.setupReminders ?? 0));
-  return decisions + lines + matches + questions + setup;
+  // Founders: their deck sections waiting on a check, as one item.
+  const deck = (data.deckReview?.pending ?? 0) > 0 ? 1 : 0;
+  return decisions + lines + matches + questions + setup + deck;
 }
 
 export const SOMETHING_ELSE_QUESTION = "What would you like to know?";

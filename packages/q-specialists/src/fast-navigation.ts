@@ -68,12 +68,13 @@ const FACET_OF_TAB: Readonly<Record<TabAsk["tab"], NamedRecordFacet>> = {
  */
 export function withTabs(
   intent: OpenRecordIntent,
-  ask: Pick<TabAsk, "tab" | "subTab" | "viewer">,
+  ask: Pick<TabAsk, "tab" | "subTab" | "viewer" | "section">,
 ): OpenRecordIntent {
   const candidate = QOpenRecordPageIntentSchema.safeParse({
     ...intent,
     tab: ask.tab,
     ...(ask.subTab === null ? {} : { subTab: ask.subTab }),
+    ...(ask.section === undefined ? {} : { section: ask.section }),
     ...(ask.viewer ? { viewer: "OPEN" } : {}),
   });
   return candidate.success ? candidate.data : intent;

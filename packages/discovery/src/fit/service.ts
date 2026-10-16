@@ -7,6 +7,14 @@ import {
   FIT_PARAMETERS,
   fitScoreOutOf10,
   FitComparisonDtoSchema,
+  INVESTABILITY_BAND_LABELS,
+  investabilityLine,
+  notAssessedInvestability,
+  SCORE_CONFIDENCE_LABELS,
+  suitabilityFromFit,
+  suitabilityLine,
+  type CompanyScoresDto,
+  type InvestabilityDto,
   type FitCandidateSource,
   type FitComparisonDto,
   type FitOutcome,
@@ -104,6 +112,18 @@ export type FitServiceDependencies = {
   readonly unclaimedPublic?:
     | ((companyIds: readonly string[]) => Promise<ReadonlySet<string>>)
     | undefined;
+  /**
+   * 2026-10-16: each admitted company's Investability (InvestIQ, from the
+   * investor-eligible projection), read only after eligibility admitted
+   * it. Absent: every company reads NOT_ASSESSED.
+   */
+  readonly investability?:
+    | ((
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, InvestabilityDto>>)
+    | undefined;
+  /** The method label a NOT_ASSESSED company is shown under. */
+  readonly investabilityMethodVersion?: string | undefined;
   readonly config?: FitConfig | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
@@ -122,6 +142,8 @@ export type FitProfileItem = {
   /** For Q's view: what the company stated where this reader may see it. */
   readonly evidence?: readonly FitEvidenceLine[] | undefined;
   readonly evidenceConfidential?: boolean | undefined;
+  /** Investability and Suitability: two scores, never blended. */
+  readonly scores?: CompanyScoresDto | undefined;
 };
 
 export type FitProfilesResult =
@@ -268,8 +290,30 @@ export function createFitService(
         evidenceConfidential: input.evidenceConfidential ?? false,
       });
     }
-    // Request order, as eligibility returned it.
-    return { kind: "OK", items };
+    // Request order, as eligibility returned it. Scores are read only for
+    // the companies eligibility admitted for this reader.
+    const investability =
+      dependencies.investability === undefined || items.length === 0
+        ? new Map<string, InvestabilityDto>()
+        : await dependencies
+            .investability(items.map((i) => i.assessment.profile.companyId))
+            .catch(() => new Map<string, InvestabilityDto>());
+    const method = dependencies.investabilityMethodVersion ?? "investiq/v1";
+    return {
+      kind: "OK",
+      items: items.map((item) => {
+        const companyId = item.assessment.profile.companyId;
+        return {
+          ...item,
+          scores: {
+            companyId,
+            investability:
+              investability.get(companyId) ?? notAssessedInvestability(method),
+            suitability: suitabilityFromFit(item.assessment.profile),
+          },
+        };
+      }),
+    };
   };
 
   return {
@@ -405,6 +449,7 @@ export function buildFitComparison(input: {
         ...(input.sources.get(item.assessment.profile.companyId) ?? ["FEED"]),
       ].sort(),
       profile: item.assessment.profile,
+      ...(item.scores === undefined ? {} : { scores: item.scores }),
       bestOn: bestOn(index),
     })),
     considered: input.items.length,
@@ -417,15 +462,33 @@ export function buildFitComparison(input: {
 }
 
 /** One profile, as plain text (Q's fallback where cards are not rendered). */
+/**
+ * The two scores as one plain line, each with its coverage and confidence;
+ * computed by code, repeated by Q, never blended.
+ */
+export function companyScoresText(scores: CompanyScoresDto): string {
+  const inv = scores.investability;
+  const invWords =
+    inv.status === "SCORED" && inv.band !== null && inv.confidence !== null
+      ? `${investabilityLine(inv)} (${INVESTABILITY_BAND_LABELS[inv.band]}, ${SCORE_CONFIDENCE_LABELS[inv.confidence].toLowerCase()})`
+      : investabilityLine(inv);
+  const suit =
+    scores.suitability === null ? null : suitabilityLine(scores.suitability);
+  return [invWords, suit].filter((part) => part !== null).join(". ") + ".";
+}
+
 export function fitProfileText(
   name: string,
   profile: FitProfileDto,
-  options: { readonly summaryOnly?: boolean } = {},
+  options: {
+    readonly summaryOnly?: boolean;
+    readonly scores?: CompanyScoresDto | undefined;
+  } = {},
 ): string {
   // ADR 0059: the score out of 10 beside the words, computed here from the
   // rows below (never by a model); none when too little is known.
   const score = fitScoreOutOf10(profile);
-  const head = `${name}: ${score === null ? "" : `${score}/10 · `}${FIT_BAND_LABELS[profile.band]}, ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}.`;
+  const head = `${name}: ${score === null ? "" : `${score}/10 · `}${FIT_BAND_LABELS[profile.band]}, ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}.${options.scores === undefined ? "" : ` ${companyScoresText(options.scores)}`}`;
   if (options.summaryOnly === true) return head;
   const rows = profile.parameters.map(
     (p) =>
@@ -448,7 +511,7 @@ export function fitComparisonText(
   if (options.summaryOnly === true) {
     const scores = comparison.entries.map((entry) => {
       const score = fitScoreOutOf10(entry.profile);
-      return `${entry.position}. ${entry.name}: ${score === null ? FIT_BAND_LABELS[entry.profile.band] : `${score}/10`}`;
+      return `${entry.position}. ${entry.name}: ${score === null ? FIT_BAND_LABELS[entry.profile.band] : `${score}/10`}${entry.scores === undefined ? "" : ` · ${companyScoresText(entry.scores)}`}`;
     });
     return [
       ...scores,
@@ -456,7 +519,8 @@ export function fitComparisonText(
     ].join("\n");
   }
   const parts = comparison.entries.map(
-    (e) => `${e.position}. ${fitProfileText(e.name, e.profile, options)}`,
+    (e) =>
+      `${e.position}. ${fitProfileText(e.name, e.profile, { ...options, scores: e.scores })}`,
   );
   return [
     ...parts,

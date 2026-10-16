@@ -542,7 +542,7 @@ export function createOnboardingTools(
       status: "ACTIVE",
       providerName: "record_answers",
       description:
-        "Records what the person has told you, for any steps at once, each with their own words as the quote. Each result says COMMITTED (now on the record, with what was recorded), REJECTED (with the reason), AMBIGUOUS (with candidates: ask which), UNMATCHED (their words name none of the step's choices; candidates lists every choice: record again with the one that means what they said, by its name, and say which you chose, or ask them when none fits) or NEEDS_FIRST (another step must be answered first). Only a COMMITTED result is on the record. Also returns what is still open afterwards, required first.",
+        "Records what the person has told you, for any steps at once, each with their own words as the quote. Each result says COMMITTED (now on the record, with what was recorded), REJECTED (with the reason), AMBIGUOUS (with candidates: ask which), UNMATCHED (their words name none of the step's choices; candidates lists every choice: record again with the one that means what they said, by its name, and say which you chose, or ask them when none fits) or NEEDS_FIRST (another step must be answered first). Only a COMMITTED result is on the record. Record everything they told you, each fact once, for the step it answers: when no option fits, record their own words for that step and they are saved as they said them, like 'Other' on a form; never ask them to rephrase or use a format. Also returns what is still open afterwards, required first.",
       classification: "SIDE_EFFECT",
       riskClass: "LOW_RISK_INTERNAL",
       requiredCapabilities: [capability("onboarding.session.respond")],

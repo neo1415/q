@@ -8,6 +8,7 @@ import type {
 import { ArrowUpRight, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { RelationshipFitChips } from "@/features/fit/relationship-fit-chips";
+import { CompanyScoresLive } from "@/features/scores";
 
 import { dealDay } from "./deal-stage-strip";
 import {
@@ -27,9 +28,12 @@ import { serverTNow } from "@/features/i18n/server-now";
  * like "none".
  */
 export function FitAndInterest({
+  companyId,
   fit,
   interest,
 }: {
+  /** Investability and Suitability beside the fit (ADR 0074); absent: not shown. */
+  readonly companyId?: string | undefined;
   readonly fit: Read<FitProfileDto | null>;
   readonly interest: Read<InterestDto | null>;
 }) {
@@ -37,40 +41,45 @@ export function FitAndInterest({
 
   const state = fitState(fit);
   return (
-    <dl className="flex flex-col gap-4" data-fit-and-interest>
-      <div className="flex flex-col gap-1.5">
-        <dt className="cq-body-sm font-medium text-(--cq-text-primary)">
-          {t("Fit with your mandate")}
-        </dt>
-        <dd className="flex flex-col gap-1.5">
-          {state === "UNAVAILABLE" ? (
-            <span className="cq-body-sm text-(--cq-text-secondary)">
-              {t("Couldn't be read right now")}
-            </span>
-          ) : (
-            <RelationshipFitChips
-              profile={fit.kind === "READ" ? fit.value : null}
-            />
-          )}
-          <span className="cq-caption text-(--cq-text-secondary)">
-            {t(
-              "From your declared mandate and what the company has shared. Unknown stays unknown.",
+    <div className="flex flex-col gap-4">
+      {companyId === undefined ? null : (
+        <CompanyScoresLive companyId={companyId} variant="full" />
+      )}
+      <dl className="flex flex-col gap-4" data-fit-and-interest>
+        <div className="flex flex-col gap-1.5">
+          <dt className="cq-body-sm font-medium text-(--cq-text-primary)">
+            {t("Fit with your mandate")}
+          </dt>
+          <dd className="flex flex-col gap-1.5">
+            {state === "UNAVAILABLE" ? (
+              <span className="cq-body-sm text-(--cq-text-secondary)">
+                {t("Couldn't be read right now")}
+              </span>
+            ) : (
+              <RelationshipFitChips
+                profile={fit.kind === "READ" ? fit.value : null}
+              />
             )}
-          </span>
-        </dd>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <dt className="cq-body-sm font-medium text-(--cq-text-primary)">
-          {t("Your interest")}
-        </dt>
-        <dd
-          className="cq-body-sm text-(--cq-text-secondary)"
-          data-interest-words
-        >
-          {t(interestWords(interest, dealDay))}
-        </dd>
-      </div>
-    </dl>
+            <span className="cq-caption text-(--cq-text-secondary)">
+              {t(
+                "From your declared mandate and what the company has shared. Unknown stays unknown.",
+              )}
+            </span>
+          </dd>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <dt className="cq-body-sm font-medium text-(--cq-text-primary)">
+            {t("Your interest")}
+          </dt>
+          <dd
+            className="cq-body-sm text-(--cq-text-secondary)"
+            data-interest-words
+          >
+            {t(interestWords(interest, dealDay))}
+          </dd>
+        </div>
+      </dl>
+    </div>
   );
 }
 

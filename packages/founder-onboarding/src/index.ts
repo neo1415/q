@@ -67,6 +67,8 @@ export {
   type FounderReviewResult,
   type FounderReviewServiceDependencies,
   type FounderReviewSkipReason,
+  type FounderPitchSectionsPort,
+  PITCH_TRANSCRIPT_SOURCE,
 } from "./integration/review-service.js";
 export * from "./intelligence/index.js";
 export {

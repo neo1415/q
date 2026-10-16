@@ -15,6 +15,7 @@ import { GATEQ_AR } from "./catalog/gateq";
 import { LANGUAGE_AR } from "./catalog/language";
 import { Q_AR } from "./catalog/q";
 import { RELATIONSHIPS_AR } from "./catalog/relationships";
+import { SCORES_AR } from "./catalog/scores";
 import { SETUP_AR } from "./catalog/setup";
 import { SHELL_AR } from "./catalog/shell";
 import { SWEEP_AR } from "./catalog/sweep";
@@ -68,6 +69,7 @@ const ARABIC: Readonly<Record<string, string>> = {
   ...SHELL_AR,
   ...ANSWERS_AR,
   ...LANGUAGE_AR,
+  ...SCORES_AR,
   // Last: a taxonomy name reads the same on every screen (one term for
   // "Series A" everywhere), whatever an area catalogue says.
   ...TAXONOMY_AR,

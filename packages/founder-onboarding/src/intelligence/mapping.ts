@@ -1,6 +1,7 @@
 import type { FounderFactKey } from "@capital-q/q-core";
 
 import { FOUNDER_STEPS } from "../definition/founder-v1.js";
+import { FOUNDER_PROFILE_STEPS } from "../definition/profile-sections.js";
 
 /**
  * Which onboarding step answers each extractable fact (CQ-Q-021 §20, §23).
@@ -38,6 +39,19 @@ const FACT_TO_STEP: Readonly<Partial<Record<FounderFactKey, string>>> = {
   instrument: FOUNDER_STEPS.instrument,
   timeframe: FOUNDER_STEPS.timeframe,
   use_of_funds: FOUNDER_STEPS.useOfFunds,
+  // Founder v6: the company profile sections, one step each.
+  opportunity: FOUNDER_PROFILE_STEPS.opportunity,
+  problem: FOUNDER_PROFILE_STEPS.problem,
+  solution: FOUNDER_PROFILE_STEPS.solution,
+  how_it_works: FOUNDER_PROFILE_STEPS.howItWorks,
+  business_model: FOUNDER_PROFILE_STEPS.businessModel,
+  vision: FOUNDER_PROFILE_STEPS.vision,
+  go_to_market: FOUNDER_PROFILE_STEPS.goToMarket,
+  competition: FOUNDER_PROFILE_STEPS.competition,
+  moats: FOUNDER_PROFILE_STEPS.moats,
+  roadmap: FOUNDER_PROFILE_STEPS.roadmap,
+  why_us_why_now: FOUNDER_PROFILE_STEPS.whyUsWhyNow,
+  closing: FOUNDER_PROFILE_STEPS.closing,
 };
 
 export function stepForFactKey(key: FounderFactKey): string | null {

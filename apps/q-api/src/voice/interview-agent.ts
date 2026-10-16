@@ -15,6 +15,7 @@ import {
 import {
   COUNTRY_OPTIONS_V5,
   FOUNDER_STEPS,
+  FOUNDER_PROFILE_SECTIONS,
 } from "@capital-q/founder-onboarding";
 import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
 import {
@@ -99,7 +100,10 @@ import {
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
-import { ONBOARDING_ARABIC_NOTE, withArabicQuestions } from "./step-copy-ar.js";
+import {
+  onboardingLanguageNote,
+  withQuestionsInLanguage,
+} from "./step-copy-language.js";
 import { settleKnownAnswers } from "./known-answers.js";
 import { textStatedIn } from "./value-support.js";
 
@@ -340,6 +344,17 @@ export type InterviewAgentDependencies = {
    * saving (lane ob1). Absent: such a failure is reported, not held.
    */
   readonly heldWrites?: HeldWritesStore | undefined;
+  /**
+   * Any language: the questions code adds, through Q's shared translation
+   * layer (English product copy). Each entry, or null to keep the English.
+   */
+  readonly localiseWords?:
+    | ((
+        actor: ActorContext,
+        language: string,
+        texts: readonly string[],
+      ) => Promise<readonly (string | null)[]>)
+    | undefined;
 };
 
 export type RaisedChecks = {
@@ -793,7 +808,11 @@ export function createInterviewAgent(
     const personality = standing?.personality ?? "AUTO";
     // Multilingual Q: the language they chose for Q (Settings or by telling
     // Q), so the interview opens and asks in it.
-    const arabic = standing?.language === "ar";
+    const language =
+      standing === null || standing.language === "AUTO"
+        ? null
+        : standing.language;
+    const languageNote = onboardingLanguageNote(language);
     const conductBefore = standing?.conduct ?? INITIAL_CONDUCT;
     // A paused account talks to nobody until a person at Capital Q has
     // looked at it: refused here, before any model is called.
@@ -1077,8 +1096,23 @@ export function createInterviewAgent(
     await settleKnownAnswers(port, input.journeyType);
     await prefillFromSignup();
     let state = await port.state();
+    // The profile section they came to fill (lane ov's Overview link): its
+    // first open step is asked first. A key of the shared config only.
+    const focusSection =
+      input.journeyType === "founder" && input.focus !== undefined
+        ? FOUNDER_PROFILE_SECTIONS.find(
+            (section) => section.key === input.focus,
+          )
+        : undefined;
+    const focusStepOf = (current: typeof state): string | null =>
+      focusSection?.stepKeys.find((key) =>
+        current.steps.some(
+          (row) => row.stepKey === key && row.status === "OPEN",
+        ),
+      ) ?? null;
     const flowFor = (current: typeof state) =>
       onboardingFlowFor({
+        focusStepKey: focusStepOf(current),
         journey: input.journeyType,
         opening,
         state: current,
@@ -1357,7 +1391,7 @@ export function createInterviewAgent(
         // their explicit delegation, is scoped delegation, not an action on
         // Q's own account. Trusted text in the charter's frame.
         environmentNotes:
-          "You change the person's onboarding only through your tools; a tool result is what happened. Capital Q grants scoped delegation here: when the person explicitly hands you a choice about their own onboarding and asks you to go ahead, recording your choice is acting on their instruction, reversible and theirs to change, and is permitted without a further approval step.",
+          "Never ask the person to answer in a particular format, wording or unit; understand whatever way they say it, and record it. You change the person's onboarding only through your tools; a tool result is what happened. Capital Q grants scoped delegation here: when the person explicitly hands you a choice about their own onboarding and asks you to go ahead, recording your choice is acting on their instruction, reversible and theirs to change, and is permitted without a further approval step.",
         variables: {
           journey: input.journeyType,
           channel: input.channel,
@@ -1372,10 +1406,7 @@ export function createInterviewAgent(
           approved: current().approved,
           declined: current().declined,
           turnNotes: current().turnNotes(state),
-          personality: [
-            PERSONALITY_NOTES[personality],
-            arabic ? ONBOARDING_ARABIC_NOTE : "",
-          ]
+          personality: [PERSONALITY_NOTES[personality], languageNote]
             .filter((note) => note.length > 0)
             .join(" ")
             .slice(0, 1_200),
@@ -1728,6 +1759,9 @@ export function createInterviewAgent(
     const backedReply = withoutUnbackedSaveClaims(
       replyWritten,
       opening || recorded.length > 0 || (heldNote?.applied.length ?? 0) > 0,
+      // Code's own words only in English; in any other language the claim
+      // is taken out and the model's reply speaks for itself.
+      writtenInLatinScript(utterance) ? undefined : "",
     );
     if (backedReply !== replyWritten) {
       logger.info({}, "interview reply claimed a save nothing backed; removed");
@@ -1894,8 +1928,17 @@ export function createInterviewAgent(
 
     // Multilingual Q (live 2026-10-16): the questions code adds are the
     // journey's English; an Arabic speaker hears each step in Arabic.
-    if (arabic) {
-      reply = withArabicQuestions(reply, journeySteps, SPOKEN_QUESTIONS);
+    if (language !== null) {
+      reply = await withQuestionsInLanguage(
+        reply,
+        journeySteps,
+        SPOKEN_QUESTIONS,
+        language,
+        (lines) =>
+          dependencies.localiseWords === undefined
+            ? Promise.resolve(lines.map(() => null))
+            : dependencies.localiseWords(actor, language, lines),
+      );
     }
 
     // Kept: one exchange per turn, under one reference.

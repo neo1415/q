@@ -234,7 +234,7 @@ export default async function CompanyPage({
         available={
           profile.overview === null
             ? ["elevator"]
-            : ["overview", "elevator", "dataroom", "deck", "team"]
+            : ["overview", "diligence", "elevator", "dataroom", "deck", "team"]
         }
         focus={{ kind: "COMPANY", id: profile.companyId }}
       >

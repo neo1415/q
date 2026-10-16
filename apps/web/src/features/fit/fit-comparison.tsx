@@ -19,6 +19,8 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 
+import { CompanyScores } from "@/features/scores";
+
 import { fitHeadline } from "./fit-breakdown";
 import { FitGlyph, glyphKindOf } from "./fit-glyph";
 import { QViewMark, useQViews, type QViewPort } from "./q-view-note";
@@ -243,6 +245,9 @@ export function FitComparisonView({
                   {t(FIT_CONFIDENCE_LABELS[e.profile.confidence])}
                 </span>
               </span>
+              {e.scores === undefined ? null : (
+                <CompanyScores scores={e.scores} variant="compact" />
+              )}
             </div>
           ))}
           {comparison.parameters.map((parameter) => (
@@ -315,6 +320,9 @@ export function FitComparisonView({
                     {fitHeadline(e.profile)} ·{" "}
                     {FIT_CONFIDENCE_LABELS[e.profile.confidence].toLowerCase()}
                   </span>
+                  {e.scores === undefined ? null : (
+                    <CompanyScores scores={e.scores} variant="compact" />
+                  )}
                 </span>
                 <ChevronDown
                   size={ICON_SIZE.compact}

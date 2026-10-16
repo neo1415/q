@@ -38,6 +38,7 @@ import { shareCompany, type ShareOutcome } from "./share-company";
 import { attachHlsOrNativeSource } from "./player/hls-source";
 import { PitchPlayer } from "./player/pitch-player";
 import { useT } from "@/features/i18n/language";
+import { CompanyScoresFor, useCompanyScores } from "@/features/scores";
 
 /** A swipe down this far on the details sheet closes it. */
 const SHEET_DISMISS_PX = 64;
@@ -45,10 +46,12 @@ const SHEET_DISMISS_PX = 64;
 /**
  * One company in the feed (CQ-WEB-022; doc 17 §66-§68, doc 19 §44-§45).
  *
- * What is absent is the design. There is no score, no percentage, no fit
- * meter, no "top match" badge and nowhere to put one: doc 19 forbids
- * presenting the ranking's arithmetic as a judgement, so the card says
- * only what was declared and in whose vocabulary. Pass is a quiet
+ * What is absent is the design. There is no percentage, no fit meter, no
+ * "top match" badge: doc 19 forbids presenting the ranking's arithmetic as
+ * a judgement, so the card says what was declared and in whose vocabulary.
+ * ADR 0074 (owner 2026-10-16) adds exactly two scores, each its own line
+ * with its coverage: Investability (InvestIQ, on shared evidence) and
+ * Suitability (the fit). Never blended, never the ranking's order value. Pass is a quiet
  * secondary control, never danger — a pass is "not now", not a verdict.
  */
 
@@ -310,6 +313,9 @@ export function FeedCard({
   // The caption's "more": in place, over its own darker scrim (Discover v2).
   const [captionOpen, setCaptionOpen] = useState(false);
   const wide = useDesktopPanel();
+  // Investability and Suitability (owner 2026-10-16; ADR 0074): read for
+  // the page in one batched call, off the swipe path; absent until known.
+  const scores = useCompanyScores([company.companyId]);
   // The server-rendered control cannot open Q until its handler is attached.
   // Keep it disabled through hydration so an early press is never discarded.
   const interactive = useSyncExternalStore(
@@ -409,6 +415,13 @@ export function FeedCard({
             {company.shortDescription}
           </p>
         )}
+
+        <CompanyScoresFor
+          scores={scores}
+          companyId={company.companyId}
+          variant="compact"
+          className="cq-feed-muted"
+        />
 
         {/*
           Filters the reader applied that this company could not be checked

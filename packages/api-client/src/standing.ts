@@ -5,6 +5,8 @@ import {
   Q_STANDING_PATH,
   Q_STANDING_PERSONALITY_PATH,
   QStandingDtoSchema,
+  Q_WORDS_PATH,
+  QWordsDtoSchema,
   type QLanguagePreference,
   type QPersonality,
 } from "@capital-q/contracts";
@@ -43,4 +45,14 @@ export function setQLanguage(
  */
 export function getUiText(session: ApiSession, language: string) {
   return call(session, "GET", qUiTextPath(language), QUiTextDtoSchema);
+}
+
+/**
+ * Words Capital Q stored for this person, in their chosen language: null
+ * entries stay English. A Q API session.
+ */
+export function localiseWords(session: ApiSession, texts: readonly string[]) {
+  return call(session, "POST", Q_WORDS_PATH, QWordsDtoSchema, {
+    body: { texts: [...texts] },
+  });
 }

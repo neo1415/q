@@ -110,6 +110,7 @@ export function registerQInterviewRoute(
           signup: signupContextFromToken(accessToken),
           utterance: input.utterance,
           recentTurns: [...input.recentTurns],
+          ...(input.focus === undefined ? {} : { focus: input.focus }),
         })
         .catch((error: unknown) => {
           if (error instanceof AccountPausedError) return null;

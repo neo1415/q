@@ -175,6 +175,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "CAPITAL_ACTION_PLAN",
   "CAPITAL_PLAN",
   "CAPITAL_INVESTORS",
+  // Lane ov 2026-10-16: the CRM's Pipeline tab ("open the pipeline").
+  "CRM_PIPELINE",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
@@ -344,6 +346,9 @@ export type QRecordPage = z.infer<typeof QRecordPageSchema>;
  */
 export const Q_COMPANY_PROFILE_TABS = [
   "overview",
+  // Lane ov 2026-10-16: the profile's Diligence tab (questions, evidence,
+  // risks); a relationship page has its own "diligence" tab too.
+  "diligence",
   "elevator",
   "dataroom",
   "deck",
@@ -354,10 +359,19 @@ export const Q_RELATIONSHIP_TABS = [
   "calls",
   "diligence",
 ] as const satisfies readonly QManifestTab[];
+/** Both lists, each tab once ("diligence" is on both pages). */
 export const Q_RECORD_TABS = [
-  ...Q_COMPANY_PROFILE_TABS,
-  ...Q_RELATIONSHIP_TABS,
-] as const;
+  "overview",
+  "diligence",
+  "elevator",
+  "dataroom",
+  "deck",
+  "team",
+  "messages",
+  "calls",
+] as const satisfies readonly (
+  (typeof Q_COMPANY_PROFILE_TABS)[number] | (typeof Q_RELATIONSHIP_TABS)[number]
+)[];
 export const QRecordTabSchema = z.enum(Q_RECORD_TABS);
 export type QRecordTab = z.infer<typeof QRecordTabSchema>;
 
@@ -386,6 +400,17 @@ export function recordPageHasTab(page: QRecordPage, tab: QRecordTab): boolean {
   return false;
 }
 
+/**
+ * Lane ov 2026-10-16: one section of a company profile's Overview (the
+ * founder profile's standard sections, `FOUNDER_PROFILE_SECTIONS` in
+ * @capital-q/founder-onboarding), by its key. An identifier, never text:
+ * the list itself is versioned there, so the contract bounds the shape and
+ * the browser follows only keys its own copy of the list has.
+ */
+export const QProfileSectionKeySchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9_]{0,47}$/u);
+
 /** An element id inside a Q Daily edition page (story or section). */
 export const QDailyAnchorSchema = z
   .string()
@@ -404,6 +429,8 @@ export const QOpenRecordPageIntentSchema = z
     tab: QRecordTabSchema.optional(),
     /** N2: a section of the pitch deck's read (a deck sub-tab). */
     subTab: DeckSectionCodeSchema.optional(),
+    /** Lane ov: one section of the profile's Overview (the overview tab only). */
+    section: QProfileSectionKeySchema.optional(),
     /** N2: open the deck in its viewer at once (the deck tab only). */
     viewer: z.literal("OPEN").optional(),
     /**
@@ -436,6 +463,16 @@ export const QOpenRecordPageIntentSchema = z
     {
       message: "a sub-tab and the viewer belong to the deck tab",
       path: ["subTab"],
+    },
+  )
+  .refine(
+    (intent) =>
+      intent.section === undefined ||
+      intent.tab === "overview" ||
+      (intent.tab === undefined && intent.page === "COMPANY"),
+    {
+      message: "a profile section belongs to the overview tab",
+      path: ["section"],
     },
   );
 

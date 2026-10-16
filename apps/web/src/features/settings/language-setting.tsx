@@ -110,8 +110,7 @@ export function LanguageSetting({
         setMessage("Couldn't save that just now. Please try again.");
         return;
       }
-      // Kept in English and said in the language at render: the choice
-      // just switched the language, so the words follow it.
+      // Said in the language at render: the choice just switched it.
       setMessage("Saved. Q uses this from your next message or call.");
       // Every provider switches at once and the server words refresh.
       announceLanguage(result.language);

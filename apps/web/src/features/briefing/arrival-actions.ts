@@ -35,6 +35,7 @@ import {
   rejectQApprovalAction,
 } from "@/features/q/actions";
 import { fitProfilesAction } from "@/features/fit/fit-actions";
+import { ownDeckReview } from "@/features/company/material/deck-pending-server";
 import { ownReadiness } from "@/features/readiness/readiness-data";
 import {
   apiSession,
@@ -261,6 +262,9 @@ export async function arrivalBriefingAction(
           )
           .catch(() => null)
       : undefined;
+  // Founders (lead 2026-10-16): deck sections Q read, not yet checked.
+  const deckReview =
+    context?.kind === "FOUNDER" ? await ownDeckReview() : undefined;
   const needsYouNotices =
     notices?.ok === true
       ? groupNotices(notices.value.items).needsYou.map((group) => group.notice)
@@ -388,6 +392,9 @@ export async function arrivalBriefingAction(
     jobsDone: jobsDoneOf(workforce, since),
     ...(matches === undefined ? {} : { matches }),
     ...(questions === undefined ? {} : { questions }),
+    ...(deckReview === undefined || deckReview === null
+      ? {}
+      : { deckReview: { pending: deckReview.pending, href: deckReview.href } }),
   };
 }
 

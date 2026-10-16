@@ -42,6 +42,7 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
   CAPITAL_ACTION_PLAN: "/relationships?view=capital&tab=action-plan",
   CAPITAL_PLAN: "/relationships?view=capital&tab=plan",
   CAPITAL_INVESTORS: "/relationships?view=capital&tab=investors",
+  CRM_PIPELINE: "/relationships?view=pipeline",
   SEARCH: "/explore",
   PEOPLE_SEARCH: "/search",
   GATEWAY: "/gateq",

@@ -304,6 +304,17 @@ export {
   type DiligenceDocumentSummariser,
 } from "./diligence-summary.js";
 export {
+  createPitchSectionReader,
+  normalisePitchSectionReading,
+  PITCH_SECTION_READER_PROMPT_VERSION,
+  pitchTranscriptText,
+  type PitchCue,
+  type PitchSectionReader,
+  type PitchSectionReadFact,
+  type PitchSectionReading,
+  type PitchSectionSpec,
+} from "./pitch-section-reader.js";
+export {
   createDeckReader,
   DECK_READER_PROMPT_VERSION,
   DECK_READER_TEXT_MAX,
@@ -1672,6 +1683,24 @@ export type ModelGatewayQAnswerDependencies = {
       }) => Promise<string | null>)
     | undefined;
   /**
+   * Multilingual Q, any language (owner directive 2026-10-16): the words
+   * Q writes by code (attention, person search, fit, mandate, investors
+   * who could fit...) in the person's chosen language, through the shared
+   * translation layer with names and figures lifted out. Each entry is the
+   * text in their language, or null to keep the English. Absent, or a
+   * failure: the English stands.
+   */
+  readonly localiseWords?:
+    | ((
+        request: {
+          readonly tenantId: string;
+          readonly userId: string;
+          readonly runId: string;
+        },
+        texts: readonly string[],
+      ) => Promise<readonly (string | null)[]>)
+    | undefined;
+  /**
    * ADR 0050: the business etiquette guides in force for this person (the
    * house guide and their own), rendered as fenced reference text that
    * shapes Q's manner with them and the drafts it writes for them. Null or
@@ -2565,13 +2594,12 @@ export function createModelGatewayQAnswer(
         available: prefetchTools,
       }).catch(() => null);
     // D1: investors of a region or kind, found by meaning; cards by code.
-    const investorsFor = (ask: InvestorAsk, language: "en" | "ar") =>
+    const investorsFor = (ask: InvestorAsk) =>
       runInvestorDiscovery({
         ask,
         tools,
         context: toolContext,
         available: prefetchTools,
-        language,
       }).catch(() => null);
     // RECOVERY-2026-10 B1 (live T3): "what needs me" is read from every
     // source through the attention tool, under this run's plan, beside the
@@ -4288,6 +4316,56 @@ export function createModelGatewayQAnswer(
           return stored;
         });
       };
+      /**
+       * An answer composed by code, in the person's language (any
+       * language): the prose and each card set's title and follow-ups go
+       * through the shared translation layer with their data lifted out.
+       * The prose decides: untranslated, everything stays English.
+       */
+      const persistCodeAnswer = async (
+        content: string,
+        given?: QResponseMessage["blocks"],
+      ) => {
+        const localise = dependencies.localiseWords;
+        if (localise === undefined) return persistAnswer(content, given);
+        const cardSets = (given ?? []).filter(
+          (block): block is QAnswerCardsBlock => block.kind === "ANSWER_CARDS",
+        );
+        const texts = [
+          content,
+          ...cardSets.flatMap((block) => [block.title, ...block.followUps]),
+        ];
+        const said = await localise(
+          {
+            tenantId: request.tenantId,
+            userId: request.actorUserId,
+            runId: request.runId,
+          },
+          texts,
+        ).catch(() => null);
+        const prose = said?.[0];
+        if (said === null || prose === null || prose === undefined) {
+          return persistAnswer(content, given);
+        }
+        let at = 1;
+        const next = (english: string) => {
+          const words = said[at];
+          at += 1;
+          return words === null || words === undefined ? english : words;
+        };
+        const blocks = given?.map((block) =>
+          block.kind === "ANSWER_CARDS"
+            ? {
+                ...block,
+                title: next(block.title).slice(0, 120),
+                followUps: block.followUps.map((chip) =>
+                  next(chip).slice(0, 120),
+                ),
+              }
+            : block,
+        );
+        return persistAnswer(prose, blocks);
+      };
       // A fit question over a set they own (lead live replay 2026-10-07:
       // 36 s and "I can't provide mandate scores"): the fits were computed
       // by code beside the reads above, and the answer is the cards plus a
@@ -4308,7 +4386,7 @@ export function createModelGatewayQAnswer(
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const text = attentionAnswerText(attentionReport);
-        const message = await persistAnswer(
+        const message = await persistCodeAnswer(
           leadLines === undefined ? text : `${leadLines}\n\n${text}`,
           // G-R4: the report itself, for the screen (items and unread).
           [{ kind: "ATTENTION", report: attentionReport }],
@@ -4342,7 +4420,7 @@ export function createModelGatewayQAnswer(
       ) {
         const recall = ownMandateAnswer(prepared.ownMandateData());
         if (recall !== null) {
-          const message = await persistAnswer(
+          const message = await persistCodeAnswer(
             leadLines === undefined ? recall : `${leadLines}\n\n${recall}`,
           );
           logger?.info(
@@ -4375,7 +4453,7 @@ export function createModelGatewayQAnswer(
               dependencies.arrivalSkimGraceMs ?? ARRIVAL_SKIM_GRACE_MS,
             ));
       if (followUp !== null) {
-        const message = await persistAnswer(
+        const message = await persistCodeAnswer(
           leadLines === undefined
             ? followUp.text
             : `${leadLines}\n\n${followUp.text}`,
@@ -4429,7 +4507,7 @@ export function createModelGatewayQAnswer(
               publicSources.push(source);
             }
           }
-          const message = await persistAnswer(
+          const message = await persistCodeAnswer(
             found.text,
             found.block === null ? [] : [found.block],
           );
@@ -4466,7 +4544,9 @@ export function createModelGatewayQAnswer(
         const mapStarted = Date.now();
         const drawn = await mapFor(companiesMapAsk);
         if (drawn !== null) {
-          const message = await persistAnswer(drawn.text, [...drawn.blocks]);
+          const message = await persistCodeAnswer(drawn.text, [
+            ...drawn.blocks,
+          ]);
           logger?.info(
             {
               qRunId: request.runId,
@@ -4496,7 +4576,7 @@ export function createModelGatewayQAnswer(
         const factStarted = Date.now();
         const fact = await factFor(companyFactAsk);
         if (fact !== null) {
-          const message = await persistAnswer(fact.text, [
+          const message = await persistCodeAnswer(fact.text, [
             { kind: "COMPANY_REFERENCE", companyId: fact.companyId },
           ]);
           logger?.info(
@@ -4529,15 +4609,9 @@ export function createModelGatewayQAnswer(
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const investorsStarted = Date.now();
-        // Multilingual Q: a chosen language note means Arabic (the only
-        // language with one); the answer is composed in it from the same
-        // facts.
-        const found = await investorsFor(
-          request.discoverInvestors,
-          (await languageRead) === null ? "en" : "ar",
-        );
+        const found = await investorsFor(request.discoverInvestors);
         if (found !== null) {
-          const message = await persistAnswer(
+          const message = await persistCodeAnswer(
             found.text,
             found.block === null ? [] : [found.block],
           );
@@ -4574,7 +4648,7 @@ export function createModelGatewayQAnswer(
         const discoverStarted = Date.now();
         const found = await discoverFor(request.discoverCompanies);
         if (found !== null) {
-          const message = await persistAnswer(
+          const message = await persistCodeAnswer(
             found.text,
             found.block === null ? [] : [found.block],
           );
@@ -4654,7 +4728,7 @@ export function createModelGatewayQAnswer(
             considered: sweep.considered,
             asked: latest.content,
           });
-          const message = await persistAnswer(text, [block]);
+          const message = await persistCodeAnswer(text, [block]);
           logger?.info(
             {
               qRunId: request.runId,

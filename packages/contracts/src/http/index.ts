@@ -1193,9 +1193,11 @@ export {
   CompanyProfileDtoSchema,
   CompanyProfileOverviewSchema,
   PitchClaimDtoSchema,
+  PitchSectionFactDtoSchema,
   PitchClaimKindSchema,
   PitchRaiseNoticeSchema,
   type PitchClaimDto,
+  type PitchSectionFactDto,
   type PitchClaimKind,
   type PitchRaiseNotice,
   CompanyProfileViewerSchema,
@@ -1458,6 +1460,8 @@ export * from "./reviews-kyb.js";
 export * from "./etiquette.js";
 // MATCH block (ADR 0052): fit with your mandate, Q's view, top N.
 export * from "./fit.js";
+// SCORES block (2026-10-16): Investability (InvestIQ) and Suitability.
+export * from "./company-scores.js";
 // PROFILE block (overnight A1-A8): data room, pitch deck, founder as a person.
 export * from "./data-room.js";
 export * from "./deck.js";

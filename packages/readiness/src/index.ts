@@ -48,3 +48,7 @@ export {
 // InvestIQ shadow assessment (ADR 0068, PROPOSED): never replaces a
 // production readiness, fit or card value.
 export * from "./investiq/index.js";
+// Investability (owner 2026-10-16): InvestIQ v1, investor-facing, computed
+// ONLY from investor-eligible inputs (src/investability/inputs.ts). It never
+// reads the founder's readiness diagnosis, coaching or private records.
+export * from "./investability/index.js";

@@ -56,6 +56,8 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   CAPITAL_ACTION_PLAN: "/relationships?view=capital&tab=action-plan",
   CAPITAL_PLAN: "/relationships?view=capital&tab=plan",
   CAPITAL_INVESTORS: "/relationships?view=capital&tab=investors",
+  // Lane ov 2026-10-16: the CRM's Pipeline tab.
+  CRM_PIPELINE: "/relationships?view=pipeline",
   INTERVIEW: null,
   INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
   INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",

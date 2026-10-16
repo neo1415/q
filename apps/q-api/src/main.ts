@@ -231,6 +231,7 @@ import {
   createUiTextService,
   parseUiTranslationDailyCapUsd,
 } from "./composition/ui-text.js";
+import { createAnswerWords } from "./composition/answer-words.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
 import {
@@ -3929,7 +3930,7 @@ const uiText = createUiTextService({
 });
 /**
  * Q's code-written lines in any language (lane ml): English skeletons with
- * names and figures lifted into {v1}…, cached under answer-words.v1.
+ * names and figures lifted into {v1}…, cached under answer-words.v2.
  */
 export const translateLines = createLineTranslator({
   store: uiTextStore,
@@ -3937,6 +3938,9 @@ export const translateLines = createLineTranslator({
   cap: uiTranslationCap,
   logger,
 });
+// Q's code-written answers through lane lang's translateLines
+// (composition/answer-words.ts: skeletons in, data put back).
+const answerWords = createAnswerWords({ translateLines, logger });
 // What this conversation already produced, read back from the owning
 // records as the person (CQ-QX-008): a document through the artifact
 // service (owner-scoped), an action through its approval record.
@@ -4065,6 +4069,16 @@ const qIntelligence = composeQIntelligence({
       .then((standing) =>
         standing.language === "AUTO" ? null : standing.language,
       ),
+  // Any language: what Q writes by code, through the shared translation
+  // layer (names and figures lifted out first; English when not ready).
+  localiseWords: async ({ tenantId, userId }, texts) => {
+    const standing = await standingStore.read(userId, tenantId, new Date());
+    if (standing.language === "AUTO") return texts.map(() => null);
+    return answerWords.localise(standing.language, texts, {
+      tenantId,
+      userId,
+    });
+  },
   // Multilingual Q: the language they chose, as the words Q is told.
   languageOf: ({ tenantId, userId }) =>
     standingStore
@@ -6035,6 +6049,13 @@ const reportPausedAccount = async (
   }
 };
 const interviewLoop = createInterviewAgent({
+  // Any language: the questions code adds, through Q's shared translation
+  // layer (Arabic's hand-written questions win).
+  localiseWords: (actor, language, texts) =>
+    answerWords.localise(language, texts, {
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+    }),
   // Lane ob1 (2026-10-16): after a round that only saved answers, all
   // committed, with nothing else to judge, code writes the reply (what was
   // saved, then the next coverage question) instead of a second model round.
@@ -6679,6 +6700,15 @@ const { app, logger: appLogger } = createApp(
     // end BILLING-2 block
     standing: standingStore,
     uiText,
+    answerWords: {
+      answerWords,
+      languageOf: ({ tenantId, userId }) =>
+        standingStore
+          .read(userId, tenantId, new Date())
+          .then((standing) =>
+            standing.language === "AUTO" ? null : standing.language,
+          ),
+    },
     // RECOVERY B1: the reader Q's what_needs_me tool uses, for the pages.
     attention: qTools.attention,
     arrivalSnapshots,

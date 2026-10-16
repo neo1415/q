@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { CompanyScoresLive } from "@/features/scores";
 import { useState } from "react";
 
 import { Button, buttonClassName } from "@capital-q/ui/button";
@@ -131,6 +133,7 @@ export function SavedCompanies({
                         {company.description}
                       </span>
                     )}
+                    <CompanyScoresLive companyId={company.companyId} />
                   </span>
                   <ChevronRight
                     aria-hidden="true"

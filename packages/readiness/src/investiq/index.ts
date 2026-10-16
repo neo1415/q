@@ -39,6 +39,9 @@ export {
 } from "./method-v0.js";
 export {
   assessInvestIQV1,
+  INVESTIQ_V1_ARITHMETIC,
+  INVESTIQ_V2_ARITHMETIC,
+  type InvestIQArithmetic,
   bandOf,
   confidenceOf,
   InvestIQV1AssessmentSchema,

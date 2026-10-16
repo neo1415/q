@@ -1,4 +1,8 @@
-import { fitScoreOutOf10 } from "@capital-q/contracts";
+import {
+  fitScoreOutOf10,
+  suitabilityFromFit,
+  type SuitabilityDto,
+} from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
 import type { EligibilityReasonCode } from "../eligibility/contracts.js";
@@ -51,7 +55,57 @@ export const FIT_ORDER_V1 = Object.freeze({
   description:
     "Discover order agrees with the fit shown out of 10: scored candidates ordered by score, then the fit tie-break, then the base rank; unscored candidates keep their base positions; exploration and diversity moves are labelled.",
 } as const);
-export const FIT_ORDER_CURRENT = FIT_ORDER_V1;
+/**
+ * `fit-order.v2` (owner 2026-10-16): the same policy as v1, with
+ * Investability (FDN InvestIQ, investor-eligible evidence only) as a
+ * weighted component AFTER explicit fit:
+ *
+ *   order value = (w_s × Suitability + w_i × Investability) / (w_s + w_i)
+ *
+ * on a 0-100 scale, where Suitability is the fit out of 10 × 10 (exactly
+ * the number the reader sees). Rules kept from v1, unchanged:
+ *   - hard eligibility first (only admitted candidates are ordered);
+ *   - a candidate with no fit score keeps its base position: Investability
+ *     never promotes or buries a company the fit cannot score;
+ *   - Investability unknown (not assessed, or insufficient evidence) is
+ *     simply absent: the order value is the fit alone, never a low number;
+ *   - exploration and diversity reorder afterwards and are labelled.
+ * The two scores are shown separately and never as this blend; the blend
+ * is an ordering key only. No pay-to-rank, no engagement signal, no model.
+ */
+export const FIT_ORDER_V2 = Object.freeze({
+  version: "fit-order.v2",
+  fitConfigVersion: FIT_CONFIG_CURRENT.version,
+  baseRankingConfigVersion: RANKING_CONFIG_CURRENT.version,
+  weights: Object.freeze({ suitability: 0.75, investability: 0.25 }),
+  description:
+    "Discover order: candidates the fit can score are ordered by 0.75 × Suitability (fit out of 10 × 10) + 0.25 × Investability (InvestIQ, when scored), then the fit tie-break, then the base rank; unscored candidates keep their base positions; unknown Investability is left out, never read as low; exploration and diversity moves are labelled.",
+} as const);
+export const FIT_ORDER_CURRENT = FIT_ORDER_V2;
+
+export type FitOrderWeights = {
+  readonly suitability: number;
+  readonly investability: number;
+};
+
+/**
+ * The ordering value under fit-order.v2: null when the fit shows no score.
+ * Investability enters only when it is a scored number.
+ */
+export function discoverOrderValue(
+  fitScoreOutOf10: number | null,
+  investability: number | null,
+  weights: FitOrderWeights = FIT_ORDER_V2.weights,
+): number | null {
+  if (fitScoreOutOf10 === null) return null;
+  const suitability = fitScoreOutOf10 * 10;
+  if (investability === null) return suitability;
+  return (
+    (weights.suitability * suitability +
+      weights.investability * investability) /
+    (weights.suitability + weights.investability)
+  );
+}
 
 export type FitOrderEntry = {
   readonly companyId: string;
@@ -63,6 +117,11 @@ export type FitOrderKey = {
   readonly assessment: FitAssessment | null;
   /** The number the reader sees out of 10, or null when none is shown. */
   readonly score: number | null;
+  /**
+   * fit-order.v2: the 0-100 ordering value (discoverOrderValue). Absent:
+   * the fit score alone orders (Q's side-by-side top N).
+   */
+  readonly orderValue?: number | null | undefined;
 };
 
 export type FitOrderedCandidate = {
@@ -88,8 +147,10 @@ export function fitOrderScore(assessment: FitAssessment | null): number | null {
  * Used by the slate order and Q's side-by-side top N.
  */
 export function compareFitOrder(a: FitOrderKey, b: FitOrderKey): number {
-  const sa = a.score ?? -1;
-  const sb = b.score ?? -1;
+  const valueOf = (k: FitOrderKey) =>
+    k.orderValue ?? (k.score === null ? -1 : k.score * 10);
+  const sa = valueOf(a);
+  const sb = valueOf(b);
   if (sa !== sb) return sb - sa;
   if (a.assessment !== null && b.assessment !== null) {
     return compareAssessmentMerit(a.assessment, b.assessment);
@@ -119,11 +180,13 @@ export function orderByFit(
     if (placed === undefined) {
       throw new Error("fit order lost a candidate");
     }
-    const score = keyOf(placed.companyId).score;
+    const key = keyOf(placed.companyId);
+    const score = key.score;
+    const value = key.orderValue ?? (score === null ? null : score * 10);
     return {
       companyId: placed.companyId,
       rank: index + 1,
-      internalScore: score === null ? null : score / 10,
+      internalScore: value === null ? null : value / 100,
       score,
     };
   });
@@ -147,8 +210,29 @@ export type FitOrdering = {
  * (never a member's private view), so the order does not depend on which
  * member the worker built as.
  */
+export type SuitabilityRecord = {
+  readonly tenantId: string;
+  readonly investorOrganisationId: string;
+  /** The investor's identity organisation (the members who may read it). */
+  readonly organisationId: string;
+  readonly mandateId: string;
+  readonly companyId: string;
+  readonly suitability: SuitabilityDto;
+  readonly computedAt: string;
+};
+
 export function createFitOrdering(dependencies: {
   readonly inputs: FitInputSource;
+  /**
+   * fit-order.v2: each company's scored Investability (0-100), from the
+   * investor-eligible projection. Absent or failing: none is known.
+   */
+  readonly investability?:
+    | ((companyIds: readonly string[]) => Promise<ReadonlyMap<string, number>>)
+    | undefined;
+  /** The Suitability each candidate was ordered with (investor-private projection). */
+  readonly recordSuitability?:
+    ((rows: readonly SuitabilityRecord[]) => Promise<void>) | undefined;
   readonly config?: FitConfig | undefined;
   readonly clock?: (() => Date) | undefined;
 }): FitOrdering {
@@ -158,12 +242,20 @@ export function createFitOrdering(dependencies: {
     version: FIT_ORDER_CURRENT.version,
     order: async (input) => {
       if (input.candidates.length === 0) return [];
-      const inputs = await dependencies.inputs.read({
-        actor: input.actor,
-        investorOrganisationId: input.investorOrganisationId,
-        mandateId: input.mandateId,
-        companyIds: input.candidates.map((c) => c.companyId),
-      });
+      const companyIds = input.candidates.map((c) => c.companyId);
+      const [inputs, investability] = await Promise.all([
+        dependencies.inputs.read({
+          actor: input.actor,
+          investorOrganisationId: input.investorOrganisationId,
+          mandateId: input.mandateId,
+          companyIds,
+        }),
+        dependencies.investability === undefined
+          ? Promise.resolve(new Map<string, number>())
+          : dependencies
+              .investability(companyIds)
+              .catch(() => new Map<string, number>()),
+      ]);
       const now = clock();
       const keys = new Map<string, FitOrderKey>();
       for (const candidate of input.candidates) {
@@ -183,12 +275,40 @@ export function createFitOrdering(dependencies: {
                 config,
                 now.toISOString(),
               );
+        const score = fitOrderScore(assessment);
         keys.set(candidate.companyId, {
           assessment,
-          score: fitOrderScore(assessment),
+          score,
+          orderValue: discoverOrderValue(
+            score,
+            investability.get(candidate.companyId) ?? null,
+          ),
         });
       }
-      return orderByFit(input.candidates, keys);
+      const ordered = orderByFit(input.candidates, keys);
+      if (
+        dependencies.recordSuitability !== undefined &&
+        input.actor.organisationId !== undefined
+      ) {
+        const organisationId = input.actor.organisationId;
+        const computedAt = now.toISOString();
+        const rows: SuitabilityRecord[] = [];
+        for (const [companyId, key] of keys) {
+          if (key.assessment === null) continue;
+          rows.push({
+            tenantId: input.actor.tenantId,
+            investorOrganisationId: input.investorOrganisationId,
+            organisationId,
+            mandateId: input.mandateId,
+            companyId,
+            suitability: suitabilityFromFit(key.assessment.profile),
+            computedAt,
+          });
+        }
+        // A projection of what was used; never fails the build.
+        await dependencies.recordSuitability(rows).catch(() => undefined);
+      }
+      return ordered;
     },
   };
 }
