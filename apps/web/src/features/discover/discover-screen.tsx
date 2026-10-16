@@ -197,7 +197,7 @@ export function DiscoverInvestors({
               <div className="flex flex-col gap-3">
                 <Reasons reasons={item.reasons} />
                 {gate === undefined ? null : (
-                  <GateFit gate={gate} apply={false} />
+                  <GateFit gate={gate} apply={false} compact />
                 )}
               </div>
             );
