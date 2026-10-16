@@ -306,7 +306,9 @@ describe("the reply after a clean save is written by code", () => {
 describe("no closing reply while a stated fact is unsaved (live AF 2026-10-16)", () => {
   it("a step the reading found stated, not yet written, gets another model round", async () => {
     const world = founderWorld();
-    const said = "Seed stage, based in Kenya, raising half a million.";
+    // Two figures: code cannot tell which is the amount, so the model does.
+    const said =
+      "Seed stage, based in Kenya, raising half a million, 12 people.";
     const model = recordingModel([
       { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
       { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
@@ -321,6 +323,30 @@ describe("no closing reply while a stated fact is unsaved (live AF 2026-10-16)",
       replyByCodeAfterCleanSave: true,
     }).turn({ ...turn(world, said), actor });
     expect(model.calls()).toBe(2);
+  });
+
+  it("one figure for the one stated amount: code records it, no second round", async () => {
+    const world = founderWorld();
+    const said = "Seed stage, based in Kenya, raising half a million.";
+    const model = recordingModel([
+      { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
+      { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+    ]);
+    const outcome = await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(
+        reading({ stated: ["F1.stage", "F1.country", "F6.target_amount"] }),
+      ),
+      replyByCodeAfterCleanSave: true,
+    }).turn({ ...turn(world, said), actor });
+    const amount = world.recordedValue("F6.target_amount");
+    expect(amount?.type === "RANGE" ? Number(amount.value) : null).toBe(
+      500_000,
+    );
+    expect(model.calls()).toBe(1);
+    expect(outcome.reply).toMatch(/500,000|500000/u);
   });
 });
 

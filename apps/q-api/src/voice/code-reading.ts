@@ -59,6 +59,10 @@ function namesOption(step: OnboardingStepManifest, said: string): boolean {
   });
 }
 
+/** One web address and nothing else: "tidewell.africa", "https://x.io/". */
+const BARE_ADDRESS =
+  /^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:\/\S*)?$/u;
+
 const BARE_FIGURE = /^\d{1,3}(,\d{3})*(\.\d+)?$|^\d+(\.\d+)?$/;
 
 export function codeReading(input: {
@@ -79,6 +83,12 @@ export function codeReading(input: {
   readonly openChoices?: readonly OnboardingStepManifest[] | undefined;
   /** Recommendations waiting for their decision: a "yes" could approve one. */
   readonly pendingCount: number;
+  /**
+   * The website step, while open: a bare web address is its answer
+   * whatever Q asked (live AH 2026-10-16: "tidewell.africa" under the
+   * problem question waited a turn to be saved).
+   */
+  readonly openWebsite?: OnboardingStepManifest | undefined;
 }): QTurnAuthority | null {
   const { asked } = input;
   const said = normal(input.utterance);
@@ -107,6 +117,9 @@ export function codeReading(input: {
             ? shortTextAnswer(said)
             : false;
     if (answersAsked) return stated(asked);
+  }
+  if (input.openWebsite !== undefined && BARE_ADDRESS.test(said)) {
+    return stated(input.openWebsite);
   }
   // Exactly one open choice step has these words as an option.
   const named = (input.openChoices ?? []).filter((step) =>

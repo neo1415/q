@@ -61,11 +61,13 @@ import type {
 
 import {
   EXCLUSION_SIBLINGS,
+  asciiDigits,
   definitionFor,
   describeValue,
   optionsOf,
   readRefusal,
   recordedCurrency,
+  spokenFiguresIn,
   toOpenStep,
   toResponseValue,
   MONEY_STEP,
@@ -2930,6 +2932,23 @@ export function currencyNamedIn(
   text: string,
 ): { readonly optionKey: string; readonly quote: string } | "SEVERAL" | null {
   if (!MONEY_FIGURE.test(text)) return null;
+  const only = optionNamedIn(journeyType, step, text);
+  if (only === null || only === "SEVERAL") return only;
+  // A dollar the journey does not offer by name is not the US dollar.
+  if (only.optionKey === "usd" && OTHER_DOLLARS.test(text)) return null;
+  return only;
+}
+
+/**
+ * The one choice of a single-select step their words name, by its label,
+ * key or the journey's aliases, longest names first ("singapore dollars"
+ * is not also "dollars"); "SEVERAL" when they name more than one.
+ */
+export function optionNamedIn(
+  journeyType: "founder" | "investor",
+  step: { readonly stepKey: string; readonly configuration: unknown },
+  text: string,
+): { readonly optionKey: string; readonly quote: string } | "SEVERAL" | null {
   const configuration = step.configuration as {
     readonly options?: readonly {
       readonly optionKey?: string;
@@ -2967,7 +2986,55 @@ export function currencyNamedIn(
   if (found.size > 1) return "SEVERAL";
   const [only] = [...found];
   if (only === undefined) return null;
-  // A dollar the journey does not offer by name is not the US dollar.
-  if (only[0] === "usd" && OTHER_DOLLARS.test(text)) return null;
   return { optionKey: only[0], quote: only[1] };
+}
+
+/** The scale a figure's word or letter multiplies it by. */
+const FIGURE_SCALES: Readonly<Record<string, number>> = {
+  k: 1_000,
+  thousand: 1_000,
+  grand: 1_000,
+  m: 1_000_000,
+  mn: 1_000_000,
+  mil: 1_000_000,
+  million: 1_000_000,
+  bn: 1_000_000_000,
+  b: 1_000_000_000,
+  billion: 1_000_000_000,
+};
+
+/**
+ * Every figure their words give, in digits ("750 thousand", "$1.5m",
+ * "2,000,000", "14") or in words ("five million"), each with the words
+ * that give it. For deciding only when a turn holds exactly one figure;
+ * the write check still reads the figure from the quote.
+ */
+export function moneyFiguresIn(
+  text: string,
+): readonly { readonly value: number; readonly text: string }[] {
+  const out: { value: number; text: string }[] = [];
+  const digits = asciiDigits(text);
+  const pattern =
+    /(?:[$€£₦]\s*)?(\d+(?:[.,]\d+)*)(?:\s*(k|m|mn|mil|bn|b|thousand|grand|million|billion)\b)?/giu;
+  for (const match of digits.matchAll(pattern)) {
+    const raw = match[1] ?? "";
+    // "1,500,000" and "1.5": a comma before three digits groups thousands.
+    const number = Number(
+      /^\d{1,3}(?:,\d{3})+$/u.test(raw)
+        ? raw.replace(/,/gu, "")
+        : raw.replace(/,/gu, "."),
+    );
+    if (!Number.isFinite(number)) continue;
+    const scale = FIGURE_SCALES[(match[2] ?? "").toLowerCase()] ?? 1;
+    out.push({ value: Math.round(number * scale), text: match[0].trim() });
+  }
+  if (out.length === 0) {
+    for (const value of spokenFiguresIn(text)) {
+      out.push({ value, text: text.trim().slice(0, 300) });
+    }
+  } else if (spokenFiguresIn(text).length > 0) {
+    // Figures in digits and in words: more than one, so none is decided.
+    out.push(...spokenFiguresIn(text).map((value) => ({ value, text: "" })));
+  }
+  return out;
 }

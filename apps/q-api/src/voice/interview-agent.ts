@@ -81,6 +81,8 @@ import {
 import {
   coverageProfileFor,
   createOnboardingPort,
+  moneyFiguresIn,
+  optionNamedIn,
   type RecommendationStore,
 } from "./onboarding-port.js";
 import type { HeldWritesStore } from "./held-writes.js";
@@ -92,6 +94,8 @@ import {
   acknowledgementIn,
   acknowledgementParts,
   quickAcknowledgement,
+  RESEARCH_NOTHING_LINE,
+  RESEARCH_STARTED_LINE,
   type ChoicesOf,
 } from "./quick-acknowledgement.js";
 import {
@@ -358,6 +362,14 @@ export type InterviewAgentDependencies = {
    * Any language: the questions code adds, through Q's shared translation
    * layer (English product copy). Each entry, or null to keep the English.
    */
+  /** Warms a chosen language's acknowledgement copy (once per process). */
+  readonly warmAcknowledgements?:
+    | ((
+        actor: ActorContext,
+        language: string,
+        journey: "founder" | "investor",
+      ) => void)
+    | undefined;
   readonly localiseWords?:
     | ((
         actor: ActorContext,
@@ -859,6 +871,9 @@ export function createInterviewAgent(
       utterance,
     );
     const language = replyLanguage.kind === "CHOSEN" ? replyLanguage.tag : null;
+    if (language !== null) {
+      dependencies.warmAcknowledgements?.(actor, language, input.journeyType);
+    }
     const codeSpeaksEnglish = replyLanguage.kind === "ENGLISH";
     const languageNote =
       replyLanguage.kind === "THEIRS"
@@ -977,6 +992,10 @@ export function createInterviewAgent(
                     step.configuration.stepType === "single_select",
                 ),
                 pendingCount: pending.length,
+                openWebsite: journeySteps.find(
+                  (step) =>
+                    open.has(step.stepKey) && step.stepKey.endsWith(".website"),
+                ),
               });
             })()
           : null;
@@ -1646,11 +1665,9 @@ export function createInterviewAgent(
         ) {
           return null;
         }
-        if (
-          researchNote !== null ||
-          heldNote !== undefined ||
-          unsaidShown.size > 0
-        ) {
+        // Research starting, or finding nothing, is one fixed line now
+        // said by code (live AH 2026-10-16: a whole model round for it).
+        if (heldNote !== undefined || unsaidShown.size > 0) {
           return null;
         }
         const settled = reading ?? (await readingDone);
@@ -1711,6 +1728,12 @@ export function createInterviewAgent(
           next: flow.next,
           // One person turn and one of Q's per exchange.
           turnIndex: Math.floor(thread.length / 2),
+          fixedLead: language !== null,
+          ...(researchNote === "STARTED"
+            ? { aside: RESEARCH_STARTED_LINE }
+            : researchNote === "NOTHING_FOUND"
+              ? { aside: RESEARCH_NOTHING_LINE }
+              : {}),
         };
         const reply =
           language === null
@@ -1776,6 +1799,85 @@ export function createInterviewAgent(
       logger.info(
         { stepKey: saved.stepKey },
         "stated currency recorded by code",
+      );
+    };
+    /**
+     * Steps their latest words state that only opened with an answer saved
+     * this turn ("actively raising 750 thousand dollars on a SAFE": the
+     * amount and instrument open once "raising" is saved), recorded by
+     * code where their words decide them exactly: one choice of the step
+     * named, or the one figure of the turn for the one stated number step.
+     * Saves the second model round (live AH 2026-10-16: 3 calls). Anything
+     * less exact is left to the model as before. Through the same guarded
+     * port, with their own words as the quote.
+     */
+    const completeStatedByCode = async (): Promise<void> => {
+      if (opening || reading === null) return;
+      const stated = reading.authority.stated;
+      const done = new Set(port.recorded());
+      const open = unrecordedStatedIn(state, stated).filter(
+        (key) => !done.has(key),
+      );
+      if (open.length === 0) return;
+      const answers: {
+        stepKey: string;
+        value: string | number;
+        quote: string;
+      }[] = [];
+      const numberSteps: string[] = [];
+      for (const key of open) {
+        const step = journeySteps.find((s) => s.stepKey === key);
+        const type = step?.configuration.stepType;
+        if (step === undefined) continue;
+        if (type === "single_select") {
+          const named = optionNamedIn(input.journeyType, step, utterance);
+          if (named !== null && named !== "SEVERAL") {
+            answers.push({
+              stepKey: key,
+              value: named.optionKey,
+              quote: named.quote,
+            });
+          }
+        } else if (type === "range") {
+          numberSteps.push(key);
+        }
+      }
+      const figures = moneyFiguresIn(utterance);
+      const [figure] = figures;
+      if (
+        numberSteps.length === 1 &&
+        figures.length === 1 &&
+        figure !== undefined
+      ) {
+        answers.push({
+          stepKey: numberSteps[0] ?? "",
+          value: figure.value,
+          quote: figure.text,
+        });
+      }
+      if (answers.length === 0) return;
+      const results = await port
+        .record(
+          answers.map((answer) => ({
+            ...answer,
+            basis: "STATED" as const,
+            ownWords: false,
+          })),
+        )
+        .catch(() => []);
+      actions.push({
+        tool: "record_answers",
+        input: { answers, by: "code: stated in their latest words" },
+        result: { ok: true, data: { results } },
+      });
+      state = await port.state();
+      logger.info(
+        {
+          committed: results
+            .filter((r) => r.outcome === "COMMITTED")
+            .map((r) => r.stepKey),
+        },
+        "stated answers completed by code",
       );
     };
     try {
@@ -1858,6 +1960,7 @@ export function createInterviewAgent(
         await prefillFromSignup();
         state = await port.state();
         await recordStatedCurrency(false);
+        await completeStatedByCode();
         // Everything they said is saved and their words ask nothing else:
         // the reply is decided, so code writes it (no second model round).
         // After any recording round, not only the first: facts that open
