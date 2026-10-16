@@ -33,6 +33,8 @@ import {
 } from "@capital-q/contracts";
 import { apiSession } from "@/features/q/context";
 import { loadWebServerConfig } from "@capital-q/config/web";
+import { effectiveLocale } from "@capital-q/q-core";
+import { resolveQStanding } from "@/features/q/context";
 
 /**
  * Starts per visitor, on this instance (P7). The API caps starts per
@@ -433,13 +435,21 @@ export async function videoStateAction(
 
 export async function startVideoAction(
   sessionToken: string,
+  deviceLanguage?: string,
 ): Promise<VideoResult> {
   const token = Token.safeParse(sessionToken);
   const url = base();
   if (!token.success || url === null)
     return { ok: false, message: "Please try again." };
+  // Lane ml: the room's language. A signed-in applicant's saved choice wins
+  // over the device's; the API validates the tag again.
+  const standing = await resolveQStanding().catch(() => null);
+  const locale = effectiveLocale(standing?.language, deviceLanguage);
   try {
-    return { ok: true, state: await startApplicationVideo(url, token.data) };
+    return {
+      ok: true,
+      state: await startApplicationVideo(url, token.data, locale),
+    };
   } catch (error: unknown) {
     return videoFailure(error);
   }

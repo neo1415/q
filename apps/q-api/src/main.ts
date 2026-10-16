@@ -3972,6 +3972,13 @@ const qIntelligence = composeQIntelligence({
     standingStore
       .read(userId, tenantId, new Date())
       .then((standing) => PERSONALITY_NOTES[standing.personality]),
+  // Multilingual Q: their language for the lines code writes (readiness).
+  languageCodeOf: (actor) =>
+    standingStore
+      .read(actor.userId, actor.tenantId, new Date())
+      .then((standing) =>
+        standing.language === "AUTO" ? null : standing.language,
+      ),
   // Multilingual Q: the language they chose, as the words Q is told.
   languageOf: ({ tenantId, userId }) =>
     standingStore

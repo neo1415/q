@@ -20,7 +20,11 @@ import {
   type QOwnOnboardingPort,
   type ModelGatewayQAnswerDependencies,
 } from "@capital-q/model-gateway/q";
-import type { ArrivalSnapshot, ModelDataPosture } from "@capital-q/contracts";
+import type {
+  ArrivalSnapshot,
+  ModelDataPosture,
+  QLanguageCode,
+} from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import {
   createEmbeddingService,
@@ -216,6 +220,10 @@ export type QIntelligenceDependencies = {
     | undefined;
   /** Multilingual Q: the language note for each person, or null. */
   readonly languageOf?: ModelGatewayQAnswerDependencies["languageOf"];
+  /** Multilingual Q: the person's chosen language, for code-written copy. */
+  readonly languageCodeOf?:
+    | ((actor: QAnswerRequest["actor"]) => Promise<QLanguageCode | null>)
+    | undefined;
   /** Who is asking: their own name and company (founder live 2026-09-30). */
   /** Their own rehearsals and saved zone, for the own-day read. */
   readonly ownDay?: ModelGatewayQAnswerDependencies["ownDay"];
@@ -564,7 +572,12 @@ export function composeQIntelligence(
       ...(logger === undefined ? {} : { logger }),
     }),
     // Lead 2026-10-03: "what should I do next?" opens with their readiness.
-    readinessLead: createToolReadinessLead({ tools }),
+    readinessLead: createToolReadinessLead({
+      tools,
+      ...(dependencies.languageCodeOf === undefined
+        ? {}
+        : { languageOf: dependencies.languageCodeOf }),
+    }),
     // QA 2026-10-03: work handed over in general is a standing instruction.
     delegation: createToolDelegationPort({
       tools,

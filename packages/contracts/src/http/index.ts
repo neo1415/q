@@ -997,6 +997,8 @@ export {
   GateqVideoSessionDtoSchema,
   GateqVideoStateDtoSchema,
   GateqVideoEndRequestSchema,
+  GateqVideoStartRequestSchema,
+  type GateqVideoStartRequest,
   GateqVideoBridgeBodySchema,
   type GateqVideoSessionDto,
   type GateqVideoStateDto,

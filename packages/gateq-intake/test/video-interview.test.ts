@@ -276,6 +276,23 @@ describe("the GateQ video interview session", () => {
     expect(w.provider.createRoom).not.toHaveBeenCalled();
   });
 
+  it("passes the applicant's Arabic to the room, and nothing for English (lane ml)", async () => {
+    const arabic = world();
+    await arabic.video.start({
+      token: TOKEN,
+      correlationId: "c",
+      locale: "ar-AE",
+    });
+    expect(arabic.provider.createRoom).toHaveBeenCalledWith(
+      expect.objectContaining({ language: "ar" }),
+    );
+    const english = world();
+    await english.video.start({ token: TOKEN, correlationId: "c" });
+    expect(english.provider.createRoom).toHaveBeenCalledWith(
+      expect.objectContaining({ language: null }),
+    );
+  });
+
   it("starts one room with Q's opening, the capped duration and a bridge bearer it never stores in clear", async () => {
     const w = world();
     const session = await w.video.start({ token: TOKEN, correlationId: "c" });

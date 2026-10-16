@@ -15,11 +15,15 @@ import {
 describe("compound fit meaning in the existing readers", () => {
   it("publishes new versions without rewriting historical prompts", () => {
     const registry = createDefaultPromptRegistry();
+    // v51 (lane ml) adds nextSteps and keeps v50's compound-fit text.
     expect(registry.getActive("TURN_READER").definition).toMatchObject({
-      version: 50,
-      template: TURN_READER_V50.template,
+      version: 51,
       status: "ACTIVE",
     });
+    expect(
+      registry.getActive("TURN_READER").definition.template.split(V50_FIT),
+    ).toHaveLength(2);
+    expect(TURN_READER_V50.status).toBe("DEPRECATED");
     expect(registry.getActive("TURN_SKIM").definition).toMatchObject({
       version: 5,
       template: TURN_SKIM_V5.template,

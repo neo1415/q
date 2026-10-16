@@ -25,6 +25,15 @@ const NAMES: Readonly<Record<QLanguagePreference, string>> = {
   ar: "العربية",
 };
 
+/** The surfaces that follow Arabic in full today (lane ml, 2026-10-16). */
+export const ARABIC_NOW =
+  "In Arabic: your conversation with Q (typed and spoken), voice calls, rehearsals, and onboarding's frame and confirmations.";
+/** What does not, yet. */
+export const STILL_ENGLISH =
+  "Still in English: other pages (Discover, Explore, CRM, company profiles, documents, Results) and some onboarding questions.";
+export const VIDEO_FALLBACK =
+  "Video rehearsals in Arabic depend on the face's voice; if it does not sound right, use a voice or text rehearsal.";
+
 export function LanguageSetting({
   initial,
 }: {
@@ -82,11 +91,19 @@ export function LanguageSetting({
         ))}
       </div>
       {chosen === "ar" ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          {t(
-            "Video rehearsals in Arabic depend on the face's voice; if it does not sound right, use a voice or text rehearsal.",
-          )}
-        </p>
+        <div className="flex flex-col gap-1" data-language-coverage>
+          {/* What is Arabic today, and what is not: said plainly, so the
+              choice never promises more than the product does. */}
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {t(ARABIC_NOW)}
+          </p>
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {t(STILL_ENGLISH)}
+          </p>
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {t(VIDEO_FALLBACK)}
+          </p>
+        </div>
       ) : null}
       {message === null ? null : (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">

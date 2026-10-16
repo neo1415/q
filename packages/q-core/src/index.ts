@@ -87,6 +87,11 @@ export {
   supportedLanguageOf,
   writtenLanguageNote,
 } from "./language.js";
+export {
+  READINESS_LEAD_ARABIC_STEPS,
+  readinessLeadCopy,
+  type ReadinessLeadCopy,
+} from "./readiness-lead-copy.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { GATEQ_INTERVIEWER_V1 } from "./prompts/tasks/gateq-interviewer.v1.js";
 export {
@@ -390,6 +395,9 @@ export {
   TURN_READER_V49_SCHEMA_VERSION,
   TurnReaderV49ResultSchema,
   type TurnReaderV49Result,
+  TURN_READER_V51_SCHEMA_VERSION,
+  TurnReaderV51ResultSchema,
+  type TurnReaderV51Result,
   type TurnReference,
   type TurnReferenceOpenKind,
   TurnReaderV30ResultSchema,
@@ -1573,6 +1581,10 @@ export {
 } from "./speech/daily-news.js";
 
 export { TURN_READER_V50, V50_FIT } from "./prompts/tasks/turn-reader.v50.js";
+export {
+  TURN_READER_V51,
+  V51_NEXT_STEPS,
+} from "./prompts/tasks/turn-reader.v51.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 
 export {

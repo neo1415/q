@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 
 import type {
   ApplicationCoverageDto,
@@ -21,6 +27,7 @@ import {
 } from "@/features/video-room/video-allowance";
 
 import { GateqVideoRoom } from "./gateq-video-room";
+import { deviceLocale } from "@/features/voice/device-locale";
 
 /**
  * The way into the GateQ video interview (C3). It appears only when the
@@ -36,6 +43,9 @@ import { GateqVideoRoom } from "./gateq-video-room";
  * typing instead (not offered, refused, cap reached, or the person's
  * choice) through `onUnavailable` / `onTypeInstead`.
  */
+/** The device language does not change while the page is open. */
+const noLanguageChanges = () => () => undefined;
+
 export function GateqVideoEntry({
   token,
   fund,
@@ -69,6 +79,13 @@ export function GateqVideoEntry({
   const [message, setMessage] = useState<string | null>(null);
   const [why, setWhy] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
+  // Lane ml: an Arabic device is told how an Arabic video room behaves.
+  // Read after mount: the server has no device language.
+  const arabic = useSyncExternalStore(
+    noLanguageChanges,
+    () => /^ar\b/iu.test(deviceLocale().locale ?? ""),
+    () => false,
+  );
   const [pending, startTransition] = useTransition();
   // Latest callbacks, so the state read runs once per token.
   const unavailable = useRef(onUnavailable);
@@ -213,6 +230,16 @@ export function GateqVideoEntry({
           this application. Nothing reaches {fund} until I review and submit.
         </span>
       </label>
+      {arabic ? (
+        <p
+          lang="ar"
+          dir="rtl"
+          className="cq-body-sm text-(--cq-text-secondary)"
+        >
+          تجري المقابلة المرئية بالعربية، ويعتمد وضوحها على صوت الوجه المختار؛
+          إن لم يبدُ مناسباً فيمكنك المتابعة بالكتابة.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant={primary ? "primary" : "secondary"}
@@ -220,7 +247,10 @@ export function GateqVideoEntry({
           onClick={() =>
             startTransition(async () => {
               setMessage(null);
-              const result = await startVideoAction(token);
+              const result = await startVideoAction(
+                token,
+                deviceLocale().locale,
+              );
               if (!result.ok) {
                 setMessage(result.message);
                 setAvailable(false);

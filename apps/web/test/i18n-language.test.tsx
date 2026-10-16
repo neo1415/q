@@ -105,3 +105,19 @@ describe("the interface language", () => {
     }
   });
 });
+
+describe("Settings says what is Arabic today", () => {
+  it("names the Arabic surfaces and the pages still in English, in both languages", async () => {
+    const { ARABIC_NOW, STILL_ENGLISH, VIDEO_FALLBACK } =
+      await import("../src/features/settings/language-setting");
+    expect(ARABIC_NOW).toMatch(/conversation with Q/u);
+    expect(ARABIC_NOW).toMatch(/voice/u);
+    expect(ARABIC_NOW).toMatch(/rehearsals/u);
+    expect(ARABIC_NOW).toMatch(/onboarding/u);
+    expect(STILL_ENGLISH).toMatch(/Discover/u);
+    expect(STILL_ENGLISH).toMatch(/CRM/u);
+    for (const line of [ARABIC_NOW, STILL_ENGLISH, VIDEO_FALLBACK]) {
+      expect(translate("ar", line)).not.toBe(line);
+    }
+  });
+});

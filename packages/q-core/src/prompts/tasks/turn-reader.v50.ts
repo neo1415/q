@@ -15,7 +15,7 @@ export const TURN_READER_V50: PromptDefinition<
 > = {
   ...TURN_READER_V49,
   version: 50,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Compound mandate questions retain all requested analysis through the existing own-record answer path; ranking-only FIT keeps its deterministic shortcut.",
   effectiveFrom: "2026-10-13",
