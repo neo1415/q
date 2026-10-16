@@ -3,6 +3,8 @@
  * Settings pages (plan, billing, usage, memory) and Rehearsals.
  */
 export const SETUP_AR: Readonly<Record<string, string>> = {
+  // F9: the form section's button to tell Q instead of typing.
+  "Tell Q": "أخبر Q",
   "$0.00/mo USD": "USD 0.00 شهرياً",
   "A hard exclusion. Companies that match these are not shown in your recommendations, whatever your discovery style.":
     "استبعاد صارم. الشركات المطابقة لهذه لا تظهر في توصياتك، أياً كان أسلوب اكتشافك.",

@@ -168,7 +168,8 @@ export type OnboardingState = z.infer<typeof OnboardingStateSchema>;
 const QuoteSchema = z
   .string()
   .trim()
-  .min(3)
+  // "GP", "UK": a short answer is still their words.
+  .min(1)
   .max(400)
   .describe(
     "The person's exact words, verbatim, that give this answer, or that delegate the choice to you.",
@@ -210,7 +211,10 @@ export const RecordOnboardingAnswersInputSchema = z
           .strict(),
       )
       .min(1)
-      .max(12),
+      // A long answer states many facts at once (live 2026-10-16: thirteen
+      // in one investor answer made the whole call invalid, and none were
+      // saved). The port saves them in batches.
+      .max(40),
   })
   .strict();
 export type RecordOnboardingAnswersInput = z.infer<
@@ -270,7 +274,7 @@ export type OnboardingRecordResult = z.infer<
 
 export const RecordOnboardingAnswersOutputSchema = z
   .object({
-    results: z.array(OnboardingRecordResultSchema).max(24),
+    results: z.array(OnboardingRecordResultSchema).max(40),
     /**
      * What is still open after these writes, required first: the picture
      * the reply must be grounded in, since the state read before the turn
