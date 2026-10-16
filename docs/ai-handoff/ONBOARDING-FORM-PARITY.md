@@ -25,6 +25,22 @@ is filled from it, not from a second list.
   mode appear in the other after reload.
 - **Saved progress** is server-side per step (session version + step states).
 
+## Status after ob2 (branch `claude/ob2-oct16`)
+
+| # | Status |
+|---|---|
+| G1 | Done: the registration organisation is the starting value of F1.company_name / I0.organisation_name ("From your sign-up"), only for the journey it was typed for; recorded only on Continue; a saved answer wins. Live-checked locally against production. |
+| G2 | Done: sign-up chooses Raise capital / Invest (Google carries it on the return path); `/welcome` opens that journey without the role question; invitees choose nothing. |
+| G3, G4, G5, G8 | Done on ob1's contract: the form renders `deriveOnboardingCoverage` (same definition, session view, registration facts as REGISTRATION) — summary line plus "What Q has" (state in words, value, provenance, Required/Optional, Confirm / Not right, jump to the screen). |
+| G6 | Open: investor upload needs an ob1 coverage decision (no investor document step exists). |
+| G7 | Partial (unchanged). |
+| G9, G10 | Waiting on ob1 (deferral and notes in coverage; the API route adds held saves and document types). |
+
+Observations for ob1 (not changed here): a field seeded from registration stays
+`KNOWN`/REGISTRATION after the person confirms and saves it (expected
+`CONFIRMED_SAVED`); a typed conversation answer (TYPED_TEXT) is attributed to
+"FORM".
+
 ## Gaps (form vs. the directive)
 
 | # | Gap | Founder | Investor | Owner |
