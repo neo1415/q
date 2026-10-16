@@ -52,6 +52,15 @@ export type GroundedReasoning = {
 };
 
 const NEXT_ACTIONS_PLANNED_MAX = 6;
+
+/** Facts that say something is still to happen, or is not known. */
+const PENDING_KINDS: ReadonlySet<string> = new Set([
+  "YOUR_MOVE",
+  "THEIR_MOVE",
+  "WAITING_APPROVAL",
+  "MESSAGE_WAITING",
+  "UNKNOWN",
+]);
 const NEXT_ACTIONS_MAX = 8;
 
 function refsIn(
@@ -84,6 +93,7 @@ export function groundReasoning(
   }[],
 ): GroundedReasoning {
   const known = new Set(situation.facts.map((fact) => fact.ref));
+  const kinds = new Map(situation.facts.map((fact) => [fact.ref, fact.kind]));
   const keys = new Set(steps.map((step) => step.key));
   const dropped = { count: 0 };
   const prerequisites: WorkforcePrerequisite[] = proposed.prerequisites
@@ -92,10 +102,16 @@ export function groundReasoning(
       const evidence = refsIn(one.evidence, known, dropped);
       return {
         what: one.what.slice(0, 300),
-        // Met is a claim about the record: without a fact behind it, it is
-        // not known (never presented as verified).
+        // Met is a claim about the record: without a fact that shows it
+        // in place, it is not known (never presented as verified). A move
+        // still to make, something waiting or an unread source never shows
+        // anything in place (live 2026-10-16: "the call has been set up"
+        // was marked MET from "your move: set up a call").
         status:
-          one.status === "MET" && evidence.length === 0
+          one.status === "MET" &&
+          !evidence.some(
+            (ref) => !PENDING_KINDS.has(kinds.get(ref) ?? "UNKNOWN"),
+          )
             ? "UNKNOWN"
             : one.status,
         blocking: one.blocking,

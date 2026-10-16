@@ -1328,7 +1328,9 @@ export function createQActionService(
           // in this transaction and the refusal is raised after it, so the
           // person's next attempt meets "already decided", not a second sweep.
           const result = await transactions.run<
-            DecideQApprovalResult | { readonly lapsed: true }
+            | DecideQApprovalResult
+            | { readonly lapsed: true }
+            | { readonly runNotWaiting: true }
           >(async (tx) => {
             const { approval, action } = await loadForActor(
               tx.sql,
@@ -1378,9 +1380,13 @@ export function createQActionService(
               throw new QApprovalNotFoundError();
             }
             if (run.status !== "AWAITING_APPROVAL") {
+              // Live 2026-10-16: the revocation was made and then thrown away
+              // with the transaction, so the card stayed PENDING forever --
+              // never approvable, yet counted as "already waiting". Like a
+              // lapse, it commits here and the refusal is raised after.
               await revokeForRun(tx, approval, action);
               outcome = "run_not_waiting";
-              throw new QApprovalAlreadyDecidedError("REVOKED");
+              return { runNotWaiting: true };
             }
 
             const definition = registry.get(action.actionType);
@@ -1581,6 +1587,9 @@ export function createQActionService(
           });
           if ("lapsed" in result) {
             throw new QApprovalExpiredError();
+          }
+          if ("runNotWaiting" in result) {
+            throw new QApprovalAlreadyDecidedError("REVOKED");
           }
           logger?.info(
             {

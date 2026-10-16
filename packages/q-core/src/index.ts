@@ -1328,6 +1328,7 @@ export {
   JOB_PLAN_V3,
   JOB_PLAN_V5,
   JOB_PLAN_V6,
+  JOB_PLAN_V7,
   REPLY_READER_V1,
 } from "./prompts/tasks/workforce.v1.js";
 export {
@@ -1567,6 +1568,10 @@ export {
 } from "./speech/daily-news.js";
 
 export { TURN_READER_V50, V50_FIT } from "./prompts/tasks/turn-reader.v50.js";
+export {
+  TURN_READER_V51,
+  V51_DECISION_WITH_WORK,
+} from "./prompts/tasks/turn-reader.v51.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 
 export {
