@@ -12,6 +12,7 @@ import { RelationshipTimeline } from "@/features/relationships/relationship-time
 import { messageCountOf } from "@/features/relationships/brief-lines";
 import { loadCompanySideRelationship } from "@/features/relationships/relationship-page-data";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Calls" };
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ export default async function CompanyCallsPage({
 }: {
   readonly params: Promise<{ readonly investorOrganisationId: string }>;
 }) {
+  const t = await serverT();
+
   const { investorOrganisationId } = await params;
   const basePath = `/relationships/investor/${investorOrganisationId}`;
   const loaded = await loadCompanySideRelationship(investorOrganisationId);
@@ -64,8 +67,9 @@ export default async function CompanyCallsPage({
               className="cq-body-sm text-(--cq-text-secondary)"
               data-calls-unavailable
             >
-              Calls couldn&apos;t be read just now. Nothing has changed; try
-              again in a moment.
+              {t(
+                "Calls couldn't be read just now. Nothing has changed; try again in a moment.",
+              )}
             </p>
           )}
           <RelationshipSchedule

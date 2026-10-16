@@ -17,6 +17,7 @@ import {
 
 import { CounterpartAvatar } from "./relationships-board";
 import { since, type NeedsYouCard } from "./relationships-view";
+import { useT } from "@/features/i18n/language";
 
 /** Five rows answer "what needs me now"; "See all" pages the rest. */
 export const NEEDS_YOU_SHOWN = 5;
@@ -43,6 +44,8 @@ export function NeedsYouQueue({
   readonly now: number;
   readonly unavailable?: boolean;
 }) {
+  const t = useT();
+
   const router = useRouter();
   const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
   const [all, setAll] = useState(false);
@@ -83,15 +86,15 @@ export function NeedsYouQueue({
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="cq-body-sm truncate font-semibold text-(--cq-text-primary)">
             {card.relationship === null
-              ? card.title
+              ? t(card.title)
               : card.relationship.counterpart.name}
           </p>
           <p className="cq-body-sm line-clamp-2 text-(--cq-text-secondary)">
-            {card.relationship === null ? null : card.title}
+            {card.relationship === null ? null : t(card.title)}
             {card.count > 1 ? (
               <span className="cq-numeric text-(--cq-text-tertiary)">
                 {card.relationship === null ? "" : " · "}
-                {`${String(card.count)} updates`}
+                {t(`${String(card.count)} updates`)}
               </span>
             ) : null}
           </p>
@@ -99,7 +102,7 @@ export function NeedsYouQueue({
       </div>
       <div className="ms-11 flex flex-none items-center gap-1 sm:ms-0">
         <span className="cq-caption cq-numeric me-2 w-10 text-end text-(--cq-text-tertiary)">
-          <time dateTime={card.latestAt}>{since(card.latestAt, now)}</time>
+          <time dateTime={card.latestAt}>{t(since(card.latestAt, now))}</time>
         </span>
         {card.action.href === null ? (
           <button
@@ -107,7 +110,7 @@ export function NeedsYouQueue({
             onClick={() => clear(card)}
             className={buttonClassName("secondary", "compact")}
           >
-            {card.action.label}
+            {t(card.action.label)}
           </button>
         ) : (
           <Link
@@ -125,7 +128,7 @@ export function NeedsYouQueue({
             {card.action.label === "Upload & share" ? (
               <Upload size={ICON_SIZE.compact} aria-hidden="true" />
             ) : null}
-            {card.action.label}
+            {t(card.action.label)}
           </Link>
         )}
         {card.step === true ? (
@@ -136,7 +139,7 @@ export function NeedsYouQueue({
           <button
             type="button"
             onClick={() => clear(card)}
-            aria-label={`Dismiss ${card.title}`}
+            aria-label={t(`Dismiss ${card.title}`)}
             className="inline-flex size-11 flex-none items-center justify-center text-(--cq-text-tertiary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           >
             <X size={ICON_SIZE.compact} aria-hidden="true" />
@@ -150,7 +153,7 @@ export function NeedsYouQueue({
   return (
     <Panel
       id="needs-you"
-      title="Needs you"
+      title={t("Needs you")}
       count={left.length > 0 ? left.length : undefined}
       lead
       flush
@@ -173,16 +176,18 @@ export function NeedsYouQueue({
           className="cq-body-sm px-4 py-4 text-(--cq-text-secondary) sm:px-5"
           data-state="unavailable"
         >
-          What needs you couldn&apos;t be read just now. Your relationships
-          below are unchanged.
+          {t(
+            "What needs you couldn't be read just now. Your relationships below are unchanged.",
+          )}
         </p>
       ) : left.length === 0 ? (
         <p
           className="cq-body-sm px-4 py-4 text-(--cq-text-secondary) sm:px-5"
           data-state="empty"
         >
-          Nothing needs you right now. New interest, messages and requests
-          arrive here first.
+          {t(
+            "Nothing needs you right now. New interest, messages and requests arrive here first.",
+          )}
         </p>
       ) : all ? (
         <PagedList

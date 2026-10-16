@@ -1,5 +1,7 @@
 import type { DealViewDto } from "@capital-q/contracts";
 
+import { useT } from "@/features/i18n/language";
+
 /**
  * The deal stage strip (design 2026-10-08/deal-close): the same strip on
  * both sides of the ONE relationship, read from the server's deal-stage.v1
@@ -126,10 +128,13 @@ export function DealStageStrip({
 }: {
   readonly view: Pick<DealViewDto, "stages" | "current" | "end">;
 }) {
+  // Rendered only inside the client deal card; dealDay above stays usable
+  // from server code.
+  const t = useT();
   const steps = stripSteps(view);
   return (
     <ol
-      aria-label="Where this deal is"
+      aria-label={t("Where this deal is")}
       className="grid grid-cols-1 gap-1 sm:grid-flow-col sm:auto-cols-fr sm:gap-1.5"
       data-deal-strip
     >
@@ -162,17 +167,17 @@ export function DealStageStrip({
               aria-hidden="true"
               className={`me-2 inline-block size-2 rounded-full sm:hidden ${BAR[step.status]}`}
             />
-            {step.label}
+            {t(step.label)}
           </span>
           <span className="cq-caption text-(--cq-text-tertiary)">
-            {step.status === "skipped" ? "Not recorded" : (step.date ?? "")}
+            {step.status === "skipped" ? t("Not recorded") : (step.date ?? "")}
             <span className="sr-only">
               {step.status === "next"
-                ? " still ahead"
+                ? ` ${t("still ahead")}`
                 : step.status === "current"
-                  ? " (current)"
+                  ? ` ${t("(current)")}`
                   : step.status === "skipped"
-                    ? ", passed without its own record"
+                    ? `, ${t("passed without its own record")}`
                     : ""}
             </span>
           </span>
@@ -192,6 +197,7 @@ export function DealGuide({
 }: {
   readonly view: Pick<DealViewDto, "stages" | "current" | "end">;
 }) {
+  const t = useT();
   if (view.end !== null) return null;
   const index =
     view.current === null
@@ -212,11 +218,11 @@ export function DealGuide({
       className="cq-body-sm text-(--cq-text-secondary)"
       data-deal-guide={next.stage}
     >
-      {now}{" "}
+      {t(now)}{" "}
       <span className="text-(--cq-text-primary)">
-        Next: {DEAL_STAGE_WORDS[next.stage]}.
+        {t(`Next: ${DEAL_STAGE_WORDS[next.stage]}.`)}
       </span>{" "}
-      {DEAL_STAGE_GUIDE[next.stage]}
+      {t(DEAL_STAGE_GUIDE[next.stage])}
     </p>
   );
 }

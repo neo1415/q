@@ -32,6 +32,7 @@ import {
 } from "./deal-actions";
 import { DealGuide, DealStageStrip, dealDay } from "./deal-stage-strip";
 import type { RelationshipSide } from "./relationship-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The deal on the ONE relationship (founder, 2026-10-08; design
@@ -132,6 +133,8 @@ function Confirm({
   readonly children?: ReactNode;
   readonly primary?: boolean;
 }) {
+  const t = useT();
+
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState(() => newKey("x"));
   const [busy, setBusy] = useState(false);
@@ -149,12 +152,12 @@ function Confirm({
         disabled={disabled}
         onClick={() => setOpen(true)}
       >
-        {label}
+        {t(label)}
       </Button>
       {open ? (
         <DialogContent
-          title={title}
-          description={description}
+          title={t(title)}
+          description={t(description)}
           actions={
             <>
               <Button
@@ -204,6 +207,8 @@ function TermsForm({
     key: string,
   ) => Promise<boolean>;
 }) {
+  const t = useT();
+
   const id = useId();
   const current = view.terms;
   const [instrument, setInstrument] = useState<DealInstrument>(
@@ -272,7 +277,9 @@ function TermsForm({
   return (
     <div className="flex flex-col gap-3" data-terms-form>
       <label className="flex flex-col gap-1.5" htmlFor={`${id}-instrument`}>
-        <span className="cq-label text-(--cq-text-primary)">Instrument</span>
+        <span className="cq-label text-(--cq-text-primary)">
+          {t("Instrument")}
+        </span>
         <select
           id={`${id}-instrument`}
           className={INPUT}
@@ -281,14 +288,14 @@ function TermsForm({
         >
           {INSTRUMENTS.map((option) => (
             <option key={option.code} value={option.code}>
-              {option.label}
+              {t(option.label)}
             </option>
           ))}
         </select>
       </label>
       <MoneyInput
         id={`${id}-amount`}
-        label="Investment"
+        label={t("Investment")}
         value={amount}
         currencies={CURRENCIES}
         onChange={setAmount}
@@ -297,8 +304,8 @@ function TermsForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5" htmlFor={`${id}-cap`}>
           <span className="cq-label text-(--cq-text-primary)">
-            {basis === "PRICED" ? "Pre-money valuation" : "Valuation cap"}{" "}
-            (optional)
+            {basis === "PRICED" ? t("Pre-money valuation") : t("Valuation cap")}{" "}
+            {t("(optional)")}
           </span>
           <input
             id={`${id}-cap`}
@@ -309,21 +316,23 @@ function TermsForm({
           />
         </label>
         <label className="flex flex-col gap-1.5" htmlFor={`${id}-basis`}>
-          <span className="cq-label text-(--cq-text-primary)">Basis</span>
+          <span className="cq-label text-(--cq-text-primary)">
+            {t("Basis")}
+          </span>
           <select
             id={`${id}-basis`}
             className={INPUT}
             value={basis}
             onChange={(e) => setBasis(e.target.value as typeof basis)}
           >
-            <option value="POST_MONEY">Post-money cap</option>
-            <option value="PRE_MONEY">Pre-money cap</option>
-            <option value="PRICED">Priced (pre-money valuation)</option>
+            <option value="POST_MONEY">{t("Post-money cap")}</option>
+            <option value="PRE_MONEY">{t("Pre-money cap")}</option>
+            <option value="PRICED">{t("Priced (pre-money valuation)")}</option>
           </select>
         </label>
         <label className="flex flex-col gap-1.5" htmlFor={`${id}-discount`}>
           <span className="cq-label text-(--cq-text-primary)">
-            Discount % (optional)
+            {t("Discount % (optional)")}
           </span>
           <input
             id={`${id}-discount`}
@@ -337,7 +346,7 @@ function TermsForm({
         </label>
         <label className="flex flex-col gap-1.5" htmlFor={`${id}-prorata`}>
           <span className="cq-label text-(--cq-text-primary)">
-            Pro-rata right
+            {t("Pro-rata right")}
           </span>
           <select
             id={`${id}-prorata`}
@@ -345,15 +354,15 @@ function TermsForm({
             value={proRata}
             onChange={(e) => setProRata(e.target.value as typeof proRata)}
           >
-            <option value="UNKNOWN">Not stated</option>
-            <option value="YES">Yes</option>
-            <option value="NO">No</option>
+            <option value="UNKNOWN">{t("Not stated")}</option>
+            <option value="YES">{t("Yes")}</option>
+            <option value="NO">{t("No")}</option>
           </select>
         </label>
       </div>
       <label className="flex flex-col gap-1.5" htmlFor={`${id}-other`}>
         <span className="cq-label text-(--cq-text-primary)">
-          Other terms (optional)
+          {t("Other terms (optional)")}
         </span>
         <textarea
           id={`${id}-other`}
@@ -366,7 +375,7 @@ function TermsForm({
       </label>
       <label className="flex flex-col gap-1.5" htmlFor={`${id}-doc`}>
         <span className="cq-label text-(--cq-text-primary)">
-          Terms document (shared in the data room)
+          {t("Terms document (shared in the data room)")}
         </span>
         <select
           id={`${id}-doc`}
@@ -374,19 +383,23 @@ function TermsForm({
           value={document}
           onChange={(e) => setDocument(e.target.value)}
         >
-          <option value="">None attached</option>
+          <option value="">{t("None attached")}</option>
           {view.sharedDocumentIds.map((doc) => (
             <option key={doc} value={doc}>
-              {shortDoc(doc)}
+              {t(shortDoc(doc))}
             </option>
           ))}
         </select>
       </label>
       <Confirm
-        label={current === null ? "Record the terms" : "Record a revision"}
-        title="Record these terms?"
-        description="Both sides see exactly these terms on the relationship. A later change is a new version; nothing is edited."
-        confirmLabel="Approve and record"
+        label={
+          current === null ? t("Record the terms") : t("Record a revision")
+        }
+        title={t("Record these terms?")}
+        description={t(
+          "Both sides see exactly these terms on the relationship. A later change is a new version; nothing is edited.",
+        )}
+        confirmLabel={t("Approve and record")}
         primary
         disabled={pending || amount.amount === ""}
         onConfirm={(key) => onRecord(terms, key)}
@@ -396,7 +409,7 @@ function TermsForm({
           data-terms-preview
         >
           {preview.map((part) => (
-            <li key={part}>{part}</li>
+            <li key={part}>{t(part)}</li>
           ))}
         </ul>
       </Confirm>
@@ -416,6 +429,8 @@ export function RelationshipDeal({
   /** For the design harness: a view to render without reading. */
   readonly initial?: DealViewDto | null | undefined;
 }) {
+  const t = useT();
+
   const [view, setView] = useState<DealViewDto | null>(initial);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -493,33 +508,36 @@ export function RelationshipDeal({
       {view.end?.kind === "CLOSED" ? (
         <section
           className="flex flex-col gap-3"
-          aria-label="Investment closed"
+          aria-label={t("Investment closed")}
           data-deal-final="CLOSED"
         >
           <p className="cq-body text-(--cq-text-primary)">
-            <strong>Investment closed</strong> on {dealDay(view.end.at)}
-            {view.terms === null ? "" : `: ${termsLine(view.terms)}`}. This is
-            the final state; the history and reports stay.
+            <strong>{t("Investment closed")}</strong> {t("on")}{" "}
+            {dealDay(view.end.at)}
+            {view.terms === null ? "" : t(`: ${termsLine(view.terms)}`)}
+            {t(". This is the final state; the history and reports stay.")}
           </p>
           {side === "INVESTOR" ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              {counterpart} is in your portfolio: it counts in{" "}
+              {counterpart} {t("is in your portfolio: it counts in")}{" "}
               <a
                 className="underline underline-offset-2"
                 href="/relationships?view=overview"
               >
-                the CRM Overview
+                {t("the CRM Overview")}
               </a>{" "}
-              from the money received.
+              {t("from the money received.")}
             </p>
           ) : null}
           {view.updateCadence === null ? null : (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              Q suggests: {view.updateCadence}
+              {t("Q suggests:")} {t(view.updateCadence)}
             </p>
           )}
           <h3 className="cq-body font-semibold text-(--cq-text-primary)">
-            {side === "COMPANY" ? "Investor onboarded" : "Portfolio entry"}
+            {side === "COMPANY"
+              ? t("Investor onboarded")
+              : t("Portfolio entry")}
           </h3>
           <ul className="flex flex-col gap-1" data-deal-checklist>
             {view.checklist.map((item) => (
@@ -529,7 +547,7 @@ export function RelationshipDeal({
                   className="size-5 accent-(--cq-accent)"
                   checked={item.done}
                   disabled={item.done || pending}
-                  aria-label={item.label}
+                  aria-label={t(item.label)}
                   onChange={() =>
                     void apply(tickChecklistAction(relationshipId, item.code))
                   }
@@ -537,11 +555,11 @@ export function RelationshipDeal({
                 <span
                   className={`cq-body ${item.done ? "text-(--cq-text-secondary)" : "text-(--cq-text-primary)"}`}
                 >
-                  {item.label}
+                  {t(item.label)}
                   {item.fromRecord ? (
                     <span className="cq-caption text-(--cq-text-tertiary)">
                       {" "}
-                      · from the record
+                      {t("· from the record")}
                     </span>
                   ) : null}
                 </span>
@@ -556,29 +574,35 @@ export function RelationshipDeal({
           className="cq-body border-s-2 border-(--cq-border) ps-3 text-(--cq-text-primary)"
           data-deal-final="PASSED"
         >
-          {side === "INVESTOR" ? "You decided" : `${counterpart} decided`} not
-          to proceed on {dealDay(view.end.at)}. The relationship is archived,
-          never deleted: its history and reports stay here.
+          {side === "INVESTOR" ? t("You decided") : t(`${counterpart} decided`)}{" "}
+          {t("not to proceed on")} {dealDay(view.end.at)}
+          {t(
+            ". The relationship is archived, never deleted: its history and reports stay here.",
+          )}
         </p>
       ) : null}
 
       {view.terms === null || editingTerms ? null : (
         <div className="flex flex-col gap-1" data-deal-terms>
           <span className="cq-caption text-(--cq-text-tertiary)">
-            Terms · version {view.terms.version} · recorded by{" "}
-            {view.terms.recordedBy ??
-              (view.terms.recordedBySide === side
-                ? "your side"
-                : counterpart)}{" "}
-            on {dealDay(view.terms.recordedAt)}
+            {t("Terms · version")} {view.terms.version} {t("· recorded by")}{" "}
+            {t(
+              view.terms.recordedBy ??
+                (view.terms.recordedBySide === side
+                  ? "your side"
+                  : counterpart),
+            )}{" "}
+            {t("on")} {dealDay(view.terms.recordedAt)}
           </span>
           <span className="cq-body text-(--cq-text-primary)">
-            {termsLine(view.terms)}
+            {t(termsLine(view.terms))}
           </span>
           <span className="cq-body-sm text-(--cq-text-secondary)">
             {view.terms.signedAt === null
-              ? "Not signed yet."
-              : `Signed ${dealDay(view.terms.signedAt)}, signed copy on file.`}
+              ? t("Not signed yet.")
+              : t(
+                  `Signed ${dealDay(view.terms.signedAt)}, signed copy on file.`,
+                )}
           </span>
         </div>
       )}
@@ -586,7 +610,7 @@ export function RelationshipDeal({
       {steps.length === 0 ? null : (
         <div className="flex flex-col gap-3" data-deal-next>
           <h3 className="cq-body font-semibold text-(--cq-text-primary)">
-            Next step
+            {t("Next step")}
           </h3>
           {steps
             .filter((step) => STEP_WORDS[step] !== undefined)
@@ -614,7 +638,7 @@ export function RelationshipDeal({
                 className="min-h-11 self-start"
                 onClick={() => setEditingTerms(true)}
               >
-                Revise the terms
+                {t("Revise the terms")}
               </Button>
             )
           ) : null}
@@ -624,7 +648,8 @@ export function RelationshipDeal({
                 className="cq-label text-(--cq-text-primary)"
                 htmlFor={`${noteId}-signed`}
               >
-                Signed copy (shared with {counterpart} in the data room)
+                {t("Signed copy (shared with")} {counterpart}{" "}
+                {t("in the data room)")}
               </label>
               <select
                 id={`${noteId}-signed`}
@@ -632,18 +657,22 @@ export function RelationshipDeal({
                 value={signedDoc}
                 onChange={(e) => setSignedDoc(e.target.value)}
               >
-                <option value="">Choose the signed copy</option>
+                <option value="">{t("Choose the signed copy")}</option>
                 {signCandidates.map((doc) => (
                   <option key={doc} value={doc}>
-                    {shortDoc(doc)}
+                    {t(shortDoc(doc))}
                   </option>
                 ))}
               </select>
               <Confirm
-                label="Record as signed"
-                title={`Record terms v${String(view.terms.version)} as signed?`}
-                description="Both sides see the terms marked signed with the signed copy attached. It applies to exactly this version: if the terms change first, nothing is recorded."
-                confirmLabel="Approve and record"
+                label={t("Record as signed")}
+                title={t(
+                  `Record terms v${String(view.terms.version)} as signed?`,
+                )}
+                description={t(
+                  "Both sides see the terms marked signed with the signed copy attached. It applies to exactly this version: if the terms change first, nothing is recorded.",
+                )}
+                confirmLabel={t("Approve and record")}
                 disabled={pending || signedDoc === ""}
                 onConfirm={(key) =>
                   view.terms === null
@@ -659,20 +688,22 @@ export function RelationshipDeal({
                 }
               >
                 <p className="cq-body text-(--cq-text-primary)">
-                  {termsLine(view.terms)}
+                  {t(termsLine(view.terms))}
                 </p>
                 <p className="cq-body-sm text-(--cq-text-secondary)">
-                  {signedDoc === "" ? "" : shortDoc(signedDoc)}
+                  {signedDoc === "" ? "" : t(shortDoc(signedDoc))}
                 </p>
               </Confirm>
             </div>
           ) : null}
           {steps.includes("CLOSE") ? (
             <Confirm
-              label="Close the investment"
-              title={`Close the investment with ${counterpart}?`}
-              description="Signed terms and received money: both sides see it closed, a closing report is filed, and this becomes the relationship's final state."
-              confirmLabel="Approve and close"
+              label={t("Close the investment")}
+              title={t(`Close the investment with ${counterpart}?`)}
+              description={t(
+                "Signed terms and received money: both sides see it closed, a closing report is filed, and this becomes the relationship's final state.",
+              )}
+              confirmLabel={t("Approve and close")}
               primary
               disabled={pending}
               onConfirm={(key) =>
@@ -683,7 +714,7 @@ export function RelationshipDeal({
                 className="cq-body-sm text-(--cq-text-secondary)"
                 htmlFor={`${noteId}-close`}
               >
-                A closing note both sides see (optional)
+                {t("A closing note both sides see (optional)")}
               </label>
               <textarea
                 id={`${noteId}-close`}
@@ -700,16 +731,17 @@ export function RelationshipDeal({
 
       <section
         className="flex flex-col gap-2"
-        aria-label="Reports"
+        aria-label={t("Reports")}
         data-deal-reports
       >
         <h3 className="cq-body font-semibold text-(--cq-text-primary)">
-          Reports
+          {t("Reports")}
         </h3>
         {view.reports.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            No report filed yet. Reports are compiled from the record at each
-            stage.
+            {t(
+              "No report filed yet. Reports are compiled from the record at each stage.",
+            )}
           </p>
         ) : (
           <ul className="flex flex-col">
@@ -721,13 +753,13 @@ export function RelationshipDeal({
               >
                 <span className="flex min-w-0 flex-col">
                   <span className="cq-body text-(--cq-text-primary)">
-                    {REPORT_WORDS[report.kind]}
+                    {t(REPORT_WORDS[report.kind])}
                   </span>
                   <span className="cq-caption text-(--cq-text-tertiary)">
                     v{report.version} · {dealDay(report.createdAt)} ·{" "}
                     {report.visibility === "relationship_shared"
-                      ? `Shared with ${counterpart}`
-                      : "Only your organisation"}
+                      ? t(`Shared with ${counterpart}`)
+                      : t("Only your organisation")}
                   </span>
                 </span>
                 <a
@@ -735,7 +767,7 @@ export function RelationshipDeal({
                   href={`${base}/reports/${report.reportId}`}
                   download
                 >
-                  PDF
+                  {t("PDF")}
                 </a>
               </li>
             ))}
@@ -743,7 +775,7 @@ export function RelationshipDeal({
         )}
         <div className="flex flex-wrap items-center gap-2">
           <label className="sr-only" htmlFor={`${noteId}-kind`}>
-            Report
+            {t("Report")}
           </label>
           <select
             id={`${noteId}-kind`}
@@ -755,7 +787,7 @@ export function RelationshipDeal({
           >
             {reportKinds.map((kind) => (
               <option key={kind} value={kind}>
-                {REPORT_WORDS[kind]}
+                {t(REPORT_WORDS[kind])}
               </option>
             ))}
           </select>
@@ -773,21 +805,21 @@ export function RelationshipDeal({
               )
             }
           >
-            File a report
+            {t("File a report")}
           </Button>
           <a
             className="cq-body-sm inline-flex min-h-11 items-center px-3 text-(--cq-text-secondary) underline underline-offset-2"
             href={`${base}/audit`}
             download
           >
-            Audit trail (CSV)
+            {t("Audit trail (CSV)")}
           </a>
         </div>
       </section>
 
       {message === null ? null : (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>

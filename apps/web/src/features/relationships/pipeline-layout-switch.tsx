@@ -9,6 +9,7 @@ import { LinkPending } from "@/components/link-pending";
 import { useQControlGroup } from "@/features/q/control/q-control";
 
 import type { PipelineLayout } from "./hub-view";
+import { useT } from "@/features/i18n/language";
 
 const LABELS: Readonly<Record<PipelineLayout, string>> = {
   list: "List",
@@ -29,6 +30,8 @@ export function PipelineLayoutSwitch({
   readonly layout: PipelineLayout;
   readonly hrefs: Readonly<Record<PipelineLayout, string>>;
 }) {
+  const t = useT();
+
   const ref = useRef<HTMLDivElement>(null);
   useQControlGroup({
     kind: "TAB",
@@ -43,7 +46,7 @@ export function PipelineLayoutSwitch({
     <div
       ref={ref}
       role="group"
-      aria-label="Layout"
+      aria-label={t("Layout")}
       className="inline-flex self-start border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
       data-pipeline-layouts
     >
@@ -60,7 +63,7 @@ export function PipelineLayoutSwitch({
               : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
           )}
         >
-          {LABELS[entry]}
+          {t(LABELS[entry])}
           <LinkPending />
         </Link>
       ))}

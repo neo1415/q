@@ -17,6 +17,7 @@ import {
   type Read,
   type RecordWorkRow,
 } from "./record-workspace";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /**
  * Fit and interest, side by side and never merged (CLAUDE.md invariants:
@@ -32,17 +33,19 @@ export function FitAndInterest({
   readonly fit: Read<FitProfileDto | null>;
   readonly interest: Read<InterestDto | null>;
 }) {
+  const t = serverTNow();
+
   const state = fitState(fit);
   return (
     <dl className="flex flex-col gap-4" data-fit-and-interest>
       <div className="flex flex-col gap-1.5">
         <dt className="cq-body-sm font-medium text-(--cq-text-primary)">
-          Fit with your mandate
+          {t("Fit with your mandate")}
         </dt>
         <dd className="flex flex-col gap-1.5">
           {state === "UNAVAILABLE" ? (
             <span className="cq-body-sm text-(--cq-text-secondary)">
-              Couldn&apos;t be read right now
+              {t("Couldn't be read right now")}
             </span>
           ) : (
             <RelationshipFitChips
@@ -50,20 +53,21 @@ export function FitAndInterest({
             />
           )}
           <span className="cq-caption text-(--cq-text-secondary)">
-            From your declared mandate and what the company has shared. Unknown
-            stays unknown.
+            {t(
+              "From your declared mandate and what the company has shared. Unknown stays unknown.",
+            )}
           </span>
         </dd>
       </div>
       <div className="flex flex-col gap-1.5">
         <dt className="cq-body-sm font-medium text-(--cq-text-primary)">
-          Your interest
+          {t("Your interest")}
         </dt>
         <dd
           className="cq-body-sm text-(--cq-text-secondary)"
           data-interest-words
         >
-          {interestWords(interest, dealDay)}
+          {t(interestWords(interest, dealDay))}
         </dd>
       </div>
     </dl>
@@ -80,10 +84,12 @@ export function RecordQWork({
 }: {
   readonly rows: Read<readonly RecordWorkRow[]>;
 }) {
+  const t = serverTNow();
+
   if (rows.kind === "UNAVAILABLE") {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        Q&apos;s work couldn&apos;t be read right now. Nothing is lost.
+        {t("Q's work couldn't be read right now. Nothing is lost.")}
       </p>
     );
   }
@@ -99,7 +105,7 @@ export function RecordQWork({
               href={row.href}
               className="cq-body inline-flex min-h-11 items-center gap-1 font-medium text-(--cq-text-primary) underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
             >
-              {row.title}
+              {t(row.title)}
               <ArrowUpRight
                 size={ICON_SIZE.compact}
                 aria-hidden="true"
@@ -107,20 +113,20 @@ export function RecordQWork({
               />
             </Link>
             <span className="cq-caption cq-numeric text-(--cq-text-secondary)">
-              {`${row.status} · ${row.stage} · ${dealDay(row.updatedAt)}`}
+              {t(`${row.status} · ${row.stage} · ${dealDay(row.updatedAt)}`)}
             </span>
           </div>
           {row.report === null ? null : (
             <p className="cq-body-sm text-(--cq-text-secondary)">
               <span className="text-(--cq-text-primary)">
-                {row.report.headline}
+                {t(row.report.headline)}
               </span>
-              {` · ${row.report.verdict} · `}
+              {t(` · ${row.report.verdict} · `)}
               <Link
                 href={row.report.href}
                 className="underline underline-offset-4 hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
               >
-                Read the report
+                {t("Read the report")}
               </Link>
             </p>
           )}
@@ -143,10 +149,12 @@ export function recordWorkSlot(rows: Read<readonly RecordWorkRow[]>) {
  * unreadable read says so.
  */
 export function recordGateqSlot(read: Read<RelationshipGateqApplicationsDto>) {
+  const t = serverTNow();
+
   if (read.kind === "UNAVAILABLE") {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        GateQ applications couldn&apos;t be read right now.
+        {t("GateQ applications couldn't be read right now.")}
       </p>
     );
   }
@@ -162,17 +170,17 @@ export function recordGateqSlot(read: Read<RelationshipGateqApplicationsDto>) {
         >
           <div className="flex min-w-0 flex-col">
             <span className="cq-body font-medium text-(--cq-text-primary)">
-              {row.title}
+              {t(row.title)}
             </span>
             <span className="cq-caption cq-numeric text-(--cq-text-secondary)">
-              {row.status}
+              {t(row.status)}
             </span>
           </div>
           <Link
             href={row.href}
             className="cq-body-sm inline-flex min-h-11 items-center gap-1 text-(--cq-text-primary) underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           >
-            {row.action}
+            {t(row.action)}
             <ArrowUpRight
               size={ICON_SIZE.compact}
               aria-hidden="true"

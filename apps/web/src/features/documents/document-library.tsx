@@ -785,7 +785,7 @@ export function DocumentLibrary({
                     className="hidden h-1 flex-1 overflow-hidden bg-(--cq-surface-strong) sm:block"
                   >
                     <span
-                      className="block h-full origin-left bg-(--cq-accent) transition-transform duration-(--cq-motion-fast)"
+                      className="block h-full origin-left bg-(--cq-accent) rtl:origin-right transition-transform duration-(--cq-motion-fast)"
                       style={{ transform: `scaleX(${String(entry.progress)})` }}
                     />
                   </span>

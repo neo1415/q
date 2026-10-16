@@ -1865,7 +1865,9 @@ function DelegationSwitch({
           <span
             className={cx(
               "absolute size-4 rounded-full bg-(--cq-surface) transition-transform",
-              on ? "translate-x-5" : "translate-x-1",
+              on
+                ? "translate-x-5 rtl:-translate-x-5"
+                : "translate-x-1 rtl:-translate-x-1",
             )}
           />
         </span>

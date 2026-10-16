@@ -30,6 +30,7 @@ import {
   type RelationshipSide,
   STATE_WORDS,
 } from "./relationship-words";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /**
  * The conversation with a counterpart (founder design 2026-09-28,
@@ -203,10 +204,14 @@ function RailFact({
   readonly label: string;
   readonly value: string;
 }) {
+  const t = serverTNow();
+
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="cq-caption text-(--cq-text-tertiary)">{label}</dt>
-      <dd className="cq-body-sm text-end text-(--cq-text-primary)">{value}</dd>
+      <dt className="cq-caption text-(--cq-text-tertiary)">{t(label)}</dt>
+      <dd className="cq-body-sm text-end text-(--cq-text-primary)">
+        {t(value)}
+      </dd>
     </div>
   );
 }

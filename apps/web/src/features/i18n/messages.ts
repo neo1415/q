@@ -4,6 +4,8 @@ import {
 } from "@capital-q/contracts";
 
 import { CORE_AR } from "./catalog/core";
+import { RELATIONSHIPS_AR } from "./catalog/relationships";
+import { indexPatterns, localiseDate, matchPattern } from "./patterns";
 
 /**
  * The interface's language (multilingual Q, Arabic first, 2026-10-16).
@@ -24,6 +26,7 @@ export type UiLanguage = "en" | "ar";
  */
 const ARABIC: Readonly<Record<string, string>> = {
   ...CORE_AR,
+  ...RELATIONSHIPS_AR,
 };
 
 export function uiLanguageOf(
@@ -40,9 +43,20 @@ const CATALOGUE: Readonly<
   Record<UiLanguage, Readonly<Record<string, string>>>
 > = { en: {}, ar: ARABIC };
 
-/** The text in this language; the English source when there is none. */
+const PATTERNS = { en: indexPatterns({}), ar: indexPatterns(ARABIC) };
+
+/**
+ * The text in this language; the English source when there is none. A
+ * sentence with a name or figure in it matches a `{placeholder}` key.
+ */
 export function translate(language: UiLanguage, english: string): string {
-  return CATALOGUE[language][english] ?? english;
+  const catalogue = CATALOGUE[language];
+  return (
+    catalogue[english] ??
+    matchPattern(PATTERNS[language], catalogue, english) ??
+    (language === "ar" ? localiseDate(english) : undefined) ??
+    english
+  );
 }
 
 /** Strings this catalogue translates, for tests. */
