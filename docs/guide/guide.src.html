@@ -1,0 +1,2293 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Capital Q Guide</title>
+    <style>
+      :root {
+        --ink: #1b1a17;
+        --muted: #5b5850;
+        --line: #d9d5cb;
+        --paper: #ffffff;
+        --wash: #f6f4ef;
+        --accent: #7a5c12;
+        --accent-wash: #fbf6e9;
+        --note: #eef2f6;
+        --note-line: #9aaabb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --ink: #ecebe6;
+          --muted: #b3afa4;
+          --line: #3a3832;
+          --paper: #141310;
+          --wash: #1d1c18;
+          --accent: #d9b35c;
+          --accent-wash: #2a2416;
+          --note: #1b2129;
+          --note-line: #4f6070;
+        }
+      }
+      * {
+        box-sizing: border-box;
+        border-radius: 0 !important;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          16px/1.6 "Helvetica Neue",
+          Helvetica,
+          Arial,
+          sans-serif;
+      }
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 32px 16px 80px;
+      }
+      h1 {
+        font-size: 34px;
+        line-height: 1.15;
+        margin: 0 0 8px;
+      }
+      h2 {
+        font-size: 26px;
+        line-height: 1.2;
+        margin: 56px 0 12px;
+        padding-top: 12px;
+        border-top: 3px solid var(--ink);
+      }
+      h3 {
+        font-size: 20px;
+        margin: 36px 0 8px;
+      }
+      h4 {
+        font-size: 16px;
+        margin: 20px 0 4px;
+      }
+      p,
+      li {
+        max-width: 72ch;
+      }
+      a {
+        color: var(--accent);
+      }
+      .cover {
+        padding: 48px 0 24px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 24px;
+      }
+      .cover .sub {
+        font-size: 19px;
+        color: var(--muted);
+        margin: 0 0 16px;
+      }
+      .meta {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .toc-list {
+        padding-left: 20px;
+        columns: 2;
+        column-gap: 32px;
+        font-size: 15px;
+      }
+      .toc-list li {
+        break-inside: avoid;
+        margin: 2px 0;
+      }
+      .toc-list li.sub {
+        list-style: none;
+        margin-left: 12px;
+        font-size: 14px;
+      }
+      .toc-list li.sub::before {
+        content: "– ";
+        color: var(--muted);
+      }
+      figure.shot {
+        margin: 18px 0 22px;
+        break-inside: avoid;
+      }
+      .frame {
+        position: relative;
+        border: 1px solid var(--line);
+        background: var(--wash);
+      }
+      .frame img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .dot {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        width: 26px;
+        height: 26px;
+        border-radius: 50% !important;
+        background: #c0261c;
+        color: #fff;
+        font:
+          700 14px/26px Helvetica,
+          Arial,
+          sans-serif;
+        text-align: center;
+        box-shadow: 0 0 0 3px #fff;
+      }
+      figcaption {
+        font-size: 13px;
+        color: var(--muted);
+        margin-top: 6px;
+      }
+      .key {
+        font-size: 15px;
+        border-left: 3px solid #c0261c;
+        padding: 4px 0 4px 12px;
+        margin: 0 0 16px;
+      }
+      .key b {
+        display: inline-block;
+        min-width: 22px;
+        height: 22px;
+        border-radius: 50% !important;
+        background: #c0261c;
+        color: #fff;
+        text-align: center;
+        font-size: 12px;
+        line-height: 22px;
+        margin-right: 4px;
+      }
+      .box {
+        border: 1px solid var(--line);
+        background: var(--wash);
+        padding: 12px 16px;
+        margin: 16px 0;
+        break-inside: avoid;
+      }
+      .box.q {
+        background: var(--accent-wash);
+        border-color: var(--accent);
+      }
+      .box.limit {
+        background: var(--note);
+        border-color: var(--note-line);
+      }
+      .box > :first-child {
+        margin-top: 0;
+      }
+      .box > :last-child {
+        margin-bottom: 0;
+      }
+      .box h4 {
+        margin: 0 0 4px;
+        font-size: 14px;
+        letter-spacing: 0.02em;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 15px;
+        margin: 12px 0;
+      }
+      th,
+      td {
+        text-align: left;
+        vertical-align: top;
+        border: 1px solid var(--line);
+        padding: 6px 10px;
+      }
+      th {
+        background: var(--wash);
+      }
+      code {
+        font-family: Menlo, Consolas, monospace;
+        font-size: 14px;
+      }
+      .phones td {
+        border: 0;
+        width: 33%;
+        padding: 4px;
+      }
+      .phones figure.shot {
+        margin: 0;
+      }
+      .phones figcaption {
+        font-size: 12px;
+      }
+      td code {
+        font-size: 12.5px;
+        overflow-wrap: anywhere;
+      }
+      .story ol > li {
+        margin-bottom: 10px;
+      }
+      dl.glossary dt {
+        font-weight: 700;
+        margin-top: 12px;
+      }
+      dl.glossary dd {
+        margin: 2px 0 0 0;
+      }
+      .missing {
+        color: #c0261c;
+        font-style: italic;
+      }
+      @media (max-width: 600px) {
+        .toc-list {
+          columns: 1;
+        }
+        h1 {
+          font-size: 28px;
+        }
+      }
+      @media print {
+        body {
+          font-size: 11pt;
+          background: #fff;
+          color: #000;
+        }
+        main {
+          max-width: none;
+          padding: 0;
+        }
+        h2 {
+          break-before: page;
+          margin-top: 0;
+        }
+        h2,
+        h3,
+        h4 {
+          break-after: avoid;
+        }
+        .cover {
+          break-after: page;
+          border: 0;
+        }
+        .toc-page {
+          break-after: page;
+        }
+        a {
+          color: #000;
+          text-decoration: none;
+        }
+        figure.shot {
+          break-inside: avoid;
+        }
+        h3[id^="s-"] {
+          break-before: page;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="cover">
+        <h1>Capital Q: a guide to every feature</h1>
+        <p class="sub">
+          Where to go, what each page does, and what to do there. With
+          step-by-step stories for investors and founders.
+        </p>
+        <p class="meta">
+          Screenshots taken from the live product on
+          <!--BUILT-->
+          using fictional demo accounts. Every company, investor and person
+          shown is made up for demonstration.
+        </p>
+      </section>
+
+      <section class="toc-page">
+        <h3>Contents</h3>
+        <!--TOC-->
+      </section>
+
+      <!-- ===================================================================== -->
+      <h2 id="what">1. What Capital Q is</h2>
+
+      <p>
+        Capital Q helps investors and founders of private companies find each
+        other and decide with evidence. At its centre is <b>Q</b>, an AI
+        investment analyst you can type or talk to. Investors set out what they
+        invest in (their <i>mandate</i>). Capital Q then shows them companies
+        that fit, explains why, keeps track of every relationship, and helps
+        them reach a decision. Founders upload what they already have. Q reads
+        it, builds their company profile and deck, shows them what investors
+        will question, matches them with investors, and helps them practise and
+        apply. Capital Q is not a marketplace or a chatbot. It keeps facts and
+        opinions apart, says plainly when something is unknown, and never acts
+        for you without your approval.
+      </p>
+
+      <div class="box">
+        <h4>Three things to know before you start</h4>
+        <ol>
+          <li>
+            <b>Q asks before it acts.</b> When Q prepares something that
+            matters, like a message, an expression of interest or a meeting, you
+            see it first and click Approve. Nothing is sent until you do.
+          </li>
+          <li>
+            <b>Unknown stays unknown.</b> If a fact is missing, Capital Q says
+            “unknown”. It never counts a gap against a company.
+          </li>
+          <li>
+            <b>Private stays private.</b> A founder’s private documents and
+            notes never shape what an investor sees unless the founder shares
+            them.
+          </li>
+        </ol>
+      </div>
+
+      <!-- ===================================================================== -->
+      <h2 id="signin">2. Getting in: create an account, sign in, meet Q</h2>
+
+      <p>
+        Capital Q runs in any modern web browser on a computer, tablet or phone.
+        The address is <b>https://capital-qweb-production.up.railway.app</b>.
+      </p>
+      <shot
+        id="landing"
+        caption="The public home page. Click Get started to create an account, or Sign in."
+        marks="1:Sign in,2:Get started"
+      ></shot>
+
+      <h3 id="g-signup" class="toc">Creating a new account</h3>
+      <ol>
+        <li>On the home page, click <b>Get started</b>.</li>
+        <li>
+          Type your name (what Q should call you), and your company or fund if
+          you like. The company is optional; it helps Q find the right you.
+        </li>
+        <li>
+          Type your email address and a password of at least 8 characters. Or
+          click <b>Continue with Google</b>.
+        </li>
+        <li>
+          Click <b>Create account</b>. Capital Q emails you a link to confirm
+          your address. Open it.
+        </li>
+        <li>
+          Q greets you and asks what brings you to Capital Q. You say whether
+          you are a <b>founder</b> or an <b>investor</b>, and Q starts your
+          set-up (see section 4.23).
+        </li>
+      </ol>
+      <shot
+        id="signup"
+        caption="Create your account. You don’t pick founder or investor here; Q asks you that next."
+      ></shot>
+
+      <h3 id="g-signin" class="toc">Signing in</h3>
+      <ol>
+        <li>Click <b>Sign in</b> on the home page.</li>
+        <li>
+          Type one of the demo email addresses below, then the shared demo
+          password the team gives you.
+        </li>
+        <li>
+          Click <b>Sign in</b>. You land on the Q page. (You can also use
+          Google, or ask for an emailed sign-in link.)
+        </li>
+      </ol>
+      <shot id="signin" caption="The sign-in page."></shot>
+
+      <table>
+        <tr>
+          <th>Who you will be</th>
+          <th>Email address</th>
+          <th>What you will see</th>
+        </tr>
+        <tr>
+          <td>Amara, an investor at Savanna Seed Partners</td>
+          <td><code>investor.savanna-seed@fictional.capitalq.local</code></td>
+          <td>
+            A seed-stage investor with a mandate, a feed of matching companies,
+            ten relationships, a GateQ inbox with applications, a Q diligence
+            job on Harbourline Cargo, and a commitment to Ledgerfold.
+          </td>
+        </tr>
+        <tr>
+          <td>Babatunde, founder of Harbourline Cargo</td>
+          <td><code>babatunde.tunde-cargo@fictional.capitalq.local</code></td>
+          <td>
+            A Series A logistics company with an uploaded deck, a data room, a
+            team of three, and a connection with Savanna Seed Partners.
+          </td>
+        </tr>
+        <tr>
+          <td>Adaeze, founder of Ledgerfold</td>
+          <td><code>founder.ledgerfold@fictional.capitalq.local</code></td>
+          <td>
+            A seed fintech that Q helped prepare. It has investor interest to
+            answer, a deck Q prepared, and past rehearsals.
+          </td>
+        </tr>
+      </table>
+
+      <div class="box limit">
+        <h4>Good to know</h4>
+        <p>
+          These are shared demo accounts. Please don’t change their passwords or
+          delete anything. To try a brand-new sign-up, use your own email
+          address: the confirmation email has to reach a real inbox.
+        </p>
+      </div>
+
+      <!-- ===================================================================== -->
+      <h2 id="map">3. A map of the app</h2>
+
+      <p>
+        The sidebar on the left is how you get around. The top four items are
+        the same for everyone. The <b>Workspace</b> and <b>You</b> groups open
+        when you click them, and they change a little depending on whether you
+        are an investor or a founder.
+      </p>
+
+      <table>
+        <tr>
+          <th>Sidebar item</th>
+          <th>Investor</th>
+          <th>Founder</th>
+        </tr>
+        <tr>
+          <td><b>Discover</b></td>
+          <td>A video feed of companies ranked against your mandate.</td>
+          <td>Investors who might fit you, and other founders’ videos.</td>
+        </tr>
+        <tr>
+          <td><b>Explore</b></td>
+          <td colspan="2">
+            Browse and search every company, investor, person and pitch on
+            Capital Q.
+          </td>
+        </tr>
+        <tr>
+          <td><b>Q</b></td>
+          <td colspan="2">
+            Your home page. Talk or type to Q. See what Q did and what needs
+            you.
+          </td>
+        </tr>
+        <tr>
+          <td><b>CRM</b></td>
+          <td>
+            Your <i>Investment Hub</i>, with three tabs: <b>Overview</b>,
+            <b>Pipeline</b> (every company you are talking to) and
+            <b>Capital</b> (your commitments and mandate).
+          </td>
+          <td>
+            Your <i>Fundraising Hub</i>, with the same three tabs:
+            <b>Overview</b>, <b>Pipeline</b> (every investor you are talking to)
+            and <b>Capital</b> (your raise, readiness and plans).
+          </td>
+        </tr>
+        <tr>
+          <td colspan="3"><b>Workspace group</b></td>
+        </tr>
+        <tr>
+          <td>GateQ</td>
+          <td>Your inbox of applications, your gate, and startup search.</td>
+          <td>Your applications to investors.</td>
+        </tr>
+        <tr>
+          <td>Work</td>
+          <td colspan="2">
+            Q Work: jobs Q is doing for you, and anything that needs your yes.
+          </td>
+        </tr>
+        <tr>
+          <td>Company requests</td>
+          <td>Companies that asked to connect with you.</td>
+          <td>(not shown)</td>
+        </tr>
+        <tr>
+          <td>Pitch &amp; media</td>
+          <td>(not shown)</td>
+          <td>Your pitch videos.</td>
+        </tr>
+        <tr>
+          <td>Data room &amp; deck</td>
+          <td>(not shown)</td>
+          <td>Your data room folders and your deck.</td>
+        </tr>
+        <tr>
+          <td>Documents</td>
+          <td colspan="2">All your files, including the ones Q writes.</td>
+        </tr>
+        <tr>
+          <td>Rehearsals</td>
+          <td colspan="2">Practise a meeting with Q playing the other side.</td>
+        </tr>
+        <tr>
+          <td>Q Pitch</td>
+          <td>A guided tour of Capital Q, led by Q.</td>
+          <td>Not available yet for founders.</td>
+        </tr>
+        <tr>
+          <td>The Q Daily</td>
+          <td colspan="2">Your personal news edition.</td>
+        </tr>
+        <tr>
+          <td colspan="3"><b>You group</b></td>
+        </tr>
+        <tr>
+          <td>Profile, Usage, Settings</td>
+          <td colspan="2">
+            Your profile and Q Card, what you have used this month, and your
+            settings, team and plan.
+          </td>
+        </tr>
+      </table>
+
+      <p>
+        At the bottom of the sidebar you’ll find three small buttons: the
+        <b>theme</b> switch (light, device or dark), the <b>bell</b> for
+        notifications, and <b>sign out</b>. The label above them shows which
+        workspace you are in, for example “Investor private · Savanna Seed
+        Partners”.
+      </p>
+
+      <shot
+        id="inv-nav"
+        caption="The investor’s sidebar with both groups open."
+        marks="1:Discover,2:Explore,3:Q,4:CRM,5:GateQ,6:Settings"
+      ></shot>
+      <p class="key">
+        <b>1</b> Discover <b>2</b> Explore <b>3</b> Q <b>4</b> CRM <b>5</b> the
+        Workspace group starts here <b>6</b> Settings
+      </p>
+      <shot
+        id="fnd-nav"
+        caption="The founder’s sidebar. Founders also get Pitch &amp; media and Data room &amp; deck."
+        marks="1:Pitch & media,2:Data room & deck"
+      ></shot>
+
+      <p>
+        <b>On a phone</b>, the sidebar becomes a bar at the bottom: Discover,
+        Explore, Q, CRM and <b>More</b> (everything else). See section 4.24.
+      </p>
+
+      <p>
+        <b>Q is on every page.</b> Press <b>Control+K</b> (or <b>Cmd+K</b> on a
+        Mac), or click the small Q button at the right edge of the screen, to
+        ask Q about whatever you are looking at.
+      </p>
+
+      <!-- ===================================================================== -->
+      <h2 id="pages">4. Every page, one by one</h2>
+      <p>
+        Each page below says what it is for, shows what you’ll see, lists what
+        you can do, and explains how Q helps there.
+      </p>
+
+      <!-- Q -->
+      <h3 id="p-q" class="toc">4.1 Q (your home page)</h3>
+      <p>
+        <b>What it’s for:</b> this is where you start each day. Q greets you,
+        tells you what it did since your last visit, and shows what needs you.
+        You can type or talk to Q here.
+      </p>
+      <shot
+        id="inv-home"
+        caption="The Q page for an investor. The Q room is always dark, so Q’s light stands out."
+        marks="1:Talk with Q,2:Message Q,3:Conversations,4:Board"
+      ></shot>
+      <p class="key">
+        <b>1</b> Talk with Q (voice) <b>2</b> type a message <b>3</b> past
+        conversations <b>4</b> the Board, where Q pins its answers
+      </p>
+      <h4>What you can do</h4>
+      <ol>
+        <li>Read the greeting and the short list of what changed this week.</li>
+        <li>
+          Click a suggestion such as <b>Your feed</b> or <b>Your mandate</b> to
+          start there.
+        </li>
+        <li>
+          Type a question in <b>Message Q</b> at the bottom and press Enter. For
+          example: “Compare Ledgerfold and Harbourline Cargo against my
+          mandate.”
+        </li>
+        <li>
+          Click <b>Talk with Q</b> to speak instead. Allow the microphone when
+          your browser asks. Q answers out loud and shows captions.
+        </li>
+        <li>
+          Click <b>Conversations</b> to reopen an earlier chat. Click
+          <b>New chat</b> to start fresh.
+        </li>
+        <li>
+          Click <b>Board</b> to see the cards, tables and comparisons Q has made
+          for you.
+        </li>
+      </ol>
+      <shot
+        id="fnd-home"
+        caption="The Q page for a founder: next three actions and what could stop the raise."
+      ></shot>
+      <shot
+        id="inv-q-conversations"
+        caption="Previous conversations. Click any one to reopen it."
+      ></shot>
+
+      <h4>What Q’s answers look like</h4>
+      <p>
+        Q answers in plain words first, then adds a card or table when a picture
+        helps. Switch between the <b>Q</b> view (Q’s light and what needs you)
+        and the <b>Chat</b> view (the full conversation) with the buttons at the
+        top. A <b>Q card</b> shows each company, what is known, what does not
+        match, and what is still unknown. Each measure has its own label, such
+        as <i>Good</i>, <i>Partial</i> or <i>Unknown</i>, so you never rely on
+        colour alone. Q always says how many sources it used, and that a fit
+        score is about your mandate, not the quality of the business.
+      </p>
+      <shot
+        id="inv-q-compare"
+        caption="Q’s Chat view. Every answer lists its sources. When asked for a founder’s private notes, Q says plainly that they are not available to you."
+      ></shot>
+      <shot
+        id="inv-q-risk"
+        caption="Q’s risk assessment of one company, with the evidence behind each point."
+      ></shot>
+      <shot
+        id="inv-q-board"
+        caption="The Board keeps Q’s cards, such as comparisons against your mandate with a fit score for each company, so you can come back to them."
+      ></shot>
+      <shot
+        id="inv-q-ask"
+        caption="A fresh question: “Where are my deals?”. Q answers from your CRM records and shows its sources."
+      ></shot>
+      <shot
+        id="fnd-q-chat"
+        caption="A founder asks Q what is missing before investors will take a first call. Q answers with a short, ordered list and its sources."
+      ></shot>
+
+      <div class="box q">
+        <h4>How Q helps here</h4>
+        <p>
+          Q can answer questions, compare companies, open any page for you
+          (“open the Ledgerfold record”), click buttons on the page you are on,
+          and prepare actions such as a message or an expression of interest.
+          Anything that changes something for another person waits for your
+          <b>Approve</b>.
+        </p>
+      </div>
+      <div class="box limit">
+        <h4>Limits</h4>
+        <p>
+          Voice needs a microphone and a supported browser (recent Chrome, Edge
+          or Safari). The voice screen is not pictured in this guide because
+          starting it opens a live, paid voice session.
+        </p>
+      </div>
+
+      <!-- Discover -->
+      <h3 id="p-discover" class="toc">4.2 Discover</h3>
+      <p>
+        <b>What it’s for (investors):</b> a feed of short company pitch videos,
+        ranked against your mandate. Next to each video you see the key facts
+        and <b>why it’s here</b>. Nobody can pay to be ranked higher.
+      </p>
+      <shot
+        id="inv-discover"
+        caption="Discover for an investor. The video plays on the left; facts and reasons are on the right. (The screenshot browser can’t play video, so you see the opening frame.)"
+        marks="1:Interest,2:Save,3:Pass,4:Ask Q,5:Open profile,6:Filters"
+      ></shot>
+      <p class="key">
+        <b>1</b> Interest <b>2</b> Save <b>3</b> Pass <b>4</b> Ask Q about this
+        company <b>5</b> Open the full profile <b>6</b> Filters
+      </p>
+      <h4>What you can do</h4>
+      <ol>
+        <li>
+          Watch the pitch. Use the up and down arrows (or your keyboard’s arrow
+          keys) to move between companies. Press Space to pause.
+        </li>
+        <li>
+          Read <b>Why it’s here</b> to see which parts of your mandate the
+          company matches.
+        </li>
+        <li>
+          Click <b>Save</b> to keep it for later. The company is not told.
+        </li>
+        <li>
+          Click <b>Pass</b> to move it out of your feed. You can undo this from
+          <b>Passed</b>.
+        </li>
+        <li>
+          Click <b>Interest</b>, read the note, then click
+          <b>Express interest</b> to tell the founders you’d like to explore.
+          This is not a commitment to invest.
+        </li>
+        <li>Click <b>Open profile</b> to see everything about the company.</li>
+        <li>
+          Use <b>Filters</b>, <b>Verified</b> and <b>Has pitch video</b> to
+          narrow the feed. Click <b>Your companies</b> to see the companies you
+          already have relationships with.
+        </li>
+      </ol>
+      <shot
+        id="inv-discover-interest"
+        caption="Express interest. Q explains what it means before you confirm."
+      ></shot>
+      <p>
+        <b>What it’s for (founders):</b> a list of investors who made themselves
+        visible, checked against your company. The list is based only on what
+        investors publish; their private mandates never shape it. A second tab,
+        <b>Founders’ videos</b>, shows other companies’ pitches.
+      </p>
+      <shot
+        id="fnd-discover"
+        caption="Discover for a founder: investors who might fit, with their type and status."
+      ></shot>
+      <div class="box q">
+        <h4>How Q helps here</h4>
+        <p>
+          Click <b>Ask Q</b> beside a video to get Q’s view of the company
+          against your mandate. Say “save this one” or “next company” and Q does
+          it for you.
+        </p>
+      </div>
+
+      <!-- Saved / compare -->
+      <h3 id="p-saved" class="toc">4.3 Saved, Passed and Compare</h3>
+      <p>
+        <b>What it’s for:</b> the companies you saved or passed, and a
+        side-by-side comparison of two to four of them.
+      </p>
+      <shot
+        id="inv-saved"
+        caption="Saved companies. Tick two to four, then compare them."
+      ></shot>
+      <ol>
+        <li>
+          In Discover, click <b>Saved</b> (or <b>Passed</b>) near the top.
+        </li>
+        <li>Tick the companies you want to compare.</li>
+        <li>
+          Click <b>Compare side by side</b> for a table, or
+          <b>Compare with Q</b> for Q’s written view.
+        </li>
+      </ol>
+      <shot
+        id="inv-compare"
+        caption="Side by side: each company on the same measures as your top three. Unknown never counts against a company."
+      ></shot>
+
+      <!-- Explore -->
+      <h3 id="p-explore" class="toc">4.4 Explore</h3>
+      <p>
+        <b>What it’s for:</b> browsing everything on Capital Q, not just your
+        matches. Pitches are grouped by topic. Search sits at the top.
+      </p>
+      <shot
+        id="inv-explore"
+        caption="Explore: pitches for you, everything, new this week, and topic tabs."
+        marks="1:For you,2:Everything,3:New this week"
+      ></shot>
+      <ol>
+        <li>Click a tab such as <b>New this week</b> or a sector.</li>
+        <li>Click a pitch to watch it and open the company.</li>
+        <li>
+          Type in the search box and press Enter. Results are split into
+          Companies, Investors, People and Pitches.
+        </li>
+      </ol>
+      <shot
+        id="inv-explore-search"
+        caption="Searching Explore for “fintech”."
+      ></shot>
+
+      <!-- Search -->
+      <h3 id="p-search" class="toc">4.5 Search</h3>
+      <p>
+        <b>What it’s for:</b> finding a person or company by name among your
+        relationships and Discover, or opening anyone’s Q Card by their @handle.
+        Go to it from Explore or by typing <code>/search</code> after the web
+        address.
+      </p>
+      <shot
+        id="inv-search"
+        caption="Search finds Ledgerfold by name and by its @handle."
+      ></shot>
+
+      <!-- Company profile -->
+      <h3 id="p-company" class="toc">4.6 A company profile</h3>
+      <p>
+        <b>What it’s for:</b> everything Capital Q knows about one company, with
+        the evidence behind it. Investors see how it fits their mandate.
+        Founders see what investors would see.
+      </p>
+      <shot
+        id="inv-company"
+        caption="Ledgerfold’s profile, seen by an investor. The top card shows fit with your mandate, measure by measure."
+        marks="1:Overview,2:Elevator,3:Data room,4:Pitch deck,5:Team,6:Your relationship"
+      ></shot>
+      <p class="key">
+        <b>1</b> Overview <b>2</b> Elevator (pitch videos) <b>3</b> Data room
+        <b>4</b> Pitch deck <b>5</b> Team <b>6</b> jump to your CRM record
+      </p>
+      <h4>What you can do</h4>
+      <ol>
+        <li>
+          Read <b>Fit with your mandate</b>. Click <b>See why</b> for the
+          reasons.
+        </li>
+        <li>
+          Scroll to <b>Questions to investigate</b>,
+          <b>Risks and unknowns</b> and
+          <b>What is known, and how well supported</b>. Each fact shows where it
+          came from.
+        </li>
+        <li>
+          Click a ready-made question, such as “What are the round terms?”, to
+          ask Q.
+        </li>
+        <li>
+          Click <b>Send questions</b> to send your questions to the founder.
+        </li>
+        <li>
+          Open the <b>Pitch deck</b> tab to flip through the deck, or click
+          <b>Full screen</b>.
+        </li>
+        <li>
+          Open the <b>Data room</b> tab to open shared documents or request the
+          ones marked “On request”.
+        </li>
+        <li>Open the <b>Team</b> tab to see the founders and their roles.</li>
+      </ol>
+      <shot
+        id="inv-company-full"
+        caption="Further down: risks, unknowns, and how well each fact is supported."
+      ></shot>
+      <shot
+        id="inv-company-deck"
+        caption="The Pitch deck tab. Use the arrows or Full screen."
+      ></shot>
+      <shot
+        id="inv-company-dataroom"
+        caption="The Data room tab: documents open to you, and those you can request."
+      ></shot>
+      <shot id="inv-company-team" caption="The Team tab."></shot>
+      <div class="box q">
+        <h4>How Q helps here</h4>
+        <p>
+          Click <b>Ask Q to check the evidence</b> or any “Ask Q about …”
+          button. Q tells you what is verified, what the company only claims,
+          and what is unknown.
+        </p>
+      </div>
+
+      <!-- Investor profile -->
+      <h3 id="p-investor" class="toc">4.7 An investor profile and mandate</h3>
+      <p>
+        <b>What it’s for (founders):</b> what an investor looks for, checked
+        against your company, rule by rule. It uses only their public profile
+        and their published GateQ rules, never their private thesis.
+      </p>
+      <shot
+        id="fnd-investor"
+        caption="Savanna Seed Partners, seen by a founder: their profile, what they look for, and your next actions."
+        marks="1:Open in CRM,2:Apply via GateQ,3:Rehearse"
+      ></shot>
+      <ol>
+        <li>
+          Read <b>What this investor looks for</b>. Each rule says Met, Not met
+          or Unknown.
+        </li>
+        <li>
+          Click <b>Apply via GateQ</b> to apply through their gate,
+          <b>Rehearse</b> to practise a meeting with them, or
+          <b>Open in CRM</b> if you are already connected.
+        </li>
+        <li>
+          If you aren’t connected yet, use <b>Connect</b> to ask to connect.
+        </li>
+      </ol>
+      <p>
+        <b>Your own investor profile:</b> click <b>Profile</b> in the You group.
+        It shows your name, role and firm, your typical cheque, stages and key
+        sectors, and an About section. Click <b>Edit profile</b> to change it,
+        <b>Share Q Card</b> to share it, or <b>Visibility</b> to choose whether
+        founders can find you.
+      </p>
+      <shot
+        id="inv-profile"
+        caption="An investor’s own profile."
+        marks="1:Edit profile,2:Share Q Card,3:Visibility"
+      ></shot>
+      <p>
+        <b>Your mandate</b> is the set of rules you invest by: stage, cheque
+        size, places, sectors, business types, and green and red flags. It is
+        private to your firm. You see it on the CRM <b>Capital</b> tab; click
+        <b>Review my mandate</b> to change it, or ask Q to “sharpen my mandate”.
+        Discover ranks companies against it.
+      </p>
+      <shot
+        id="inv-mandate"
+        caption="Reviewing your mandate, field by field."
+      ></shot>
+
+      <!-- Capital -->
+      <h3 id="p-capital" class="toc">4.8 Capital (a tab in the CRM)</h3>
+      <p>
+        <b>What it’s for (investors):</b> your money and your mandate in one
+        place: what you have committed, what needs you, and the rules you invest
+        by. Click <b>CRM</b>, then the <b>Capital</b> tab.
+      </p>
+      <shot
+        id="inv-capital"
+        caption="The Capital tab for an investor: commitments at the top, your mandate below."
+        marks="1:Capital,2:Mark as sent"
+      ></shot>
+      <ol>
+        <li>
+          Under <b>Needs you</b>, click <b>Mark as sent</b> once you have wired
+          agreed money. The company then confirms it arrived.
+        </li>
+        <li>
+          Click <b>Review my mandate</b> to change your stage, cheque size,
+          sectors, places or red flags.
+        </li>
+        <li>
+          Use the quick buttons, such as <b>Companies that fit my mandate</b> or
+          <b>Where are my deals?</b>, to ask Q.
+        </li>
+      </ol>
+      <p>
+        <b>What it’s for (founders):</b> your raise. The CRM <b>Capital</b> tab,
+        and the full Capital page that Q links to from your home page (“Action
+        plan”, “Readiness”), show <b>Overview</b>, <b>Raise &amp; rounds</b>,
+        <b>Readiness</b>, <b>Action plan</b>, <b>12-month plan</b> and
+        <b>Investors</b>.
+      </p>
+      <shot
+        id="fnd-crm-capital"
+        caption="The Capital tab for a founder."
+      ></shot>
+      <shot
+        id="fnd-capital"
+        caption="The founder’s Capital page: the round, what could stop the raise, and next steps."
+        marks="1:Readiness,2:Action plan"
+      ></shot>
+      <shot
+        id="fnd-readiness"
+        caption="Readiness: how ready you look to an investor today, in words, with the evidence behind it. Only your team sees this."
+      ></shot>
+      <shot
+        id="fnd-action-plan"
+        caption="Action plan: the steps to do now, next and later."
+      ></shot>
+      <div class="box q">
+        <h4>How Q helps here</h4>
+        <p>
+          Founders can click <b>Plan this raise</b>,
+          <b>Make my pitch deck</b> or <b>What’s missing?</b>. Investors can
+          click <b>Sharpen my mandate</b>. Q drafts; you confirm.
+        </p>
+      </div>
+
+      <!-- CRM -->
+      <h3 id="p-crm" class="toc">
+        4.9 CRM (Investment Hub and Fundraising Hub)
+      </h3>
+      <p>
+        <b>What it’s for:</b> one record for every company (or investor) you are
+        talking to, with its stage, history, notes, next step and documents.
+        Investors see it as the <b>Investment Hub</b>, founders as the
+        <b>Fundraising Hub</b>. There is only ever one record per
+        company–investor pair, so Discover, GateQ and the CRM always agree.
+      </p>
+      <p>
+        The CRM has three tabs along the top: <b>Overview</b>,
+        <b>Pipeline</b> and <b>Capital</b> (section 4.8).
+      </p>
+      <h4>Overview</h4>
+      <shot
+        id="inv-crm-overview"
+        caption="Overview: what needs you, your portfolio, this period’s numbers, activity and pipeline. Download as PDF or CSV."
+      ></shot>
+      <h4>Pipeline: list, table and board</h4>
+      <shot
+        id="inv-crm-list"
+        caption="Pipeline as a list, with quick filters: All, Needs you, Awaiting reply, Connected, In diligence."
+        marks="1:Overview,2:Pipeline,3:List,4:Table,5:Board"
+      ></shot>
+      <shot
+        id="inv-crm-table"
+        caption="Pipeline as a table. Sort, choose columns, save views and export."
+      ></shot>
+      <shot
+        id="inv-crm-board"
+        caption="Pipeline as a board, one column per stage."
+      ></shot>
+      <ol>
+        <li>Click <b>CRM</b> in the sidebar.</li>
+        <li>
+          Click <b>Pipeline</b>, then <b>List</b>, <b>Table</b> or <b>Board</b>.
+        </li>
+        <li>
+          Use the stage filter and sort menus. Click <b>Save view</b> to keep a
+          set-up you like.
+        </li>
+        <li>Click <b>Export</b> to download the list.</li>
+        <li>
+          Click <b>Preview</b> for a quick look, or click a name to open its
+          record.
+        </li>
+      </ol>
+      <h4>A record</h4>
+      <shot
+        id="inv-crm-record"
+        caption="The Ledgerfold record: the stage bar, the deal steps and the next step."
+        marks="1:Book a call,2:Messages,3:Calls"
+      ></shot>
+      <p>
+        The bar across the top shows the stages: Interest, Connected, Met,
+        Diligence, Invested. Under <b>Deal</b> you see Soft commit, Terms,
+        Signed, Funds received and Closed. Any change makes a new version;
+        nothing is overwritten.
+      </p>
+      <shot
+        id="inv-crm-notes"
+        caption="Private notes (only your team sees them) and the Next panel."
+        marks="1:Save note"
+      ></shot>
+      <shot
+        id="inv-crm-decision"
+        caption="Recording a decision: Pause for now, or Not proceeding for now. A relationship is archived, never deleted."
+        marks="1:Pause for now,2:Not proceeding for now"
+      ></shot>
+      <shot
+        id="inv-crm-book"
+        caption="Book a call: find a time, or have Q join the call."
+      ></shot>
+      <shot
+        id="inv-crm-messages"
+        caption="Messages with the company, kept on the record."
+      ></shot>
+      <h4>Meetings</h4>
+      <p>
+        Open the <b>Calls</b> tab on a record to book a meeting, or have Q join
+        it. Below, you see every step of the relationship with its date.
+      </p>
+      <shot
+        id="inv-crm-calls"
+        caption="The Calls tab: book a meeting or have Q join it, with the relationship’s history underneath."
+        marks="1:Find a time"
+      ></shot>
+      <h4>What you can do on a record</h4>
+      <ol>
+        <li>Write a <b>private note</b> and click <b>Save note</b>.</li>
+        <li>Click <b>Book a call</b>, then <b>Find a time</b>.</li>
+        <li>Click <b>Send a message</b> or open the <b>Messages</b> tab.</li>
+        <li>
+          Click <b>Record the terms</b> or <b>File a report</b> as the deal
+          moves on.
+        </li>
+        <li>Click <b>Set a reminder</b> so Q nudges you later.</li>
+        <li>
+          Record your decision with <b>Pause for now</b> or
+          <b>Not proceeding for now</b>.
+        </li>
+        <li>
+          Click <b>Audit trail (CSV)</b> to download every step with who did it
+          and when.
+        </li>
+      </ol>
+      <shot id="fnd-crm" caption="The founder’s Fundraising Hub."></shot>
+      <shot
+        id="fnd-crm-record"
+        caption="A founder’s record for an investor. The investor states an amount on the Commitment card; the company confirms it."
+      ></shot>
+      <div class="box q">
+        <h4>How Q helps here</h4>
+        <p>
+          Click <b>Let Q handle this</b> and Q takes care of the follow-up, such
+          as replying or finding a meeting time, asking for your yes before
+          anything is sent. Click <b>Ask Q about this relationship</b> for a
+          summary of where things stand.
+        </p>
+      </div>
+      <div class="box limit">
+        <h4>Limits</h4>
+        <p>
+          Booking a call needs your Google Calendar connected in
+          <b>Settings → Connections</b>. Without it, Capital Q tells you so and
+          you can’t pick a time yet. Having Q join a live call has not yet been
+          proven in a live meeting.
+        </p>
+      </div>
+
+      <!-- Requests / interest -->
+      <h3 id="p-requests" class="toc">
+        4.10 Company requests and investor interest
+      </h3>
+      <p>
+        <b>Company requests (investors):</b> companies that asked to connect
+        with you, ranked by fit. Accepting connects you; it is not an
+        investment.
+      </p>
+      <shot
+        id="inv-requests"
+        caption="Company requests, with Q’s view and the main risk for each."
+      ></shot>
+      <p>
+        <b>Investor interest (founders):</b> investors who expressed interest in
+        your company. Click <b>Accept</b> to connect, or <b>Decline</b>.
+      </p>
+      <shot
+        id="led-interest"
+        caption="Ledgerfold has interest from Zino Aviation waiting for an answer."
+        marks="1:Accept,2:Decline"
+      ></shot>
+
+      <!-- GateQ -->
+      <h3 id="p-gateq" class="toc">4.11 GateQ</h3>
+      <p>
+        <b>What it’s for:</b> GateQ is an investor’s front door. The investor
+        publishes a few simple rules (stage, place, sector, cheque size).
+        Founders check their fit in two minutes and apply. Q interviews them and
+        turns the answers into a short dossier for the investor.
+      </p>
+      <h4>Investors: the inbox and the dossier</h4>
+      <shot
+        id="inv-gateq-inbox"
+        caption="The GateQ inbox. Applications are sorted into Fits, Partial and Not a fit; the dossier opens on the right."
+        marks="1:Inbox,2:Find a startup,3:Your gate,4:Triage,5:Reply,6:Pass"
+      ></shot>
+      <p class="key">
+        <b>1</b> Inbox <b>2</b> Find a startup <b>3</b> Your gate
+        <b>4</b> Triage <b>5</b> Reply <b>6</b> Pass
+      </p>
+      <shot
+        id="inv-gateq-dossier"
+        caption="The TensorGate dossier: the submitted investment brief, company and founder details, and Q’s reading of the interview, with the founder’s own words kept separate from Q’s view. (One contact address is blurred: this applicant is a real tester.)"
+      ></shot>
+      <ol>
+        <li>Click <b>GateQ</b>, then <b>Inbox</b>.</li>
+        <li>
+          Use the views on the left: Starred, Fits, Partial, Not a fit, Passed,
+          Archived.
+        </li>
+        <li>Click an application to open its dossier.</li>
+        <li>
+          Read the brief, the rules it meets, and anything needing
+          clarification.
+        </li>
+        <li>
+          Click <b>Reply</b> to answer, <b>Pass</b> to decline politely,
+          <b>Download pack</b> to save it, or <b>Add note</b> for your team.
+        </li>
+      </ol>
+      <h4>Investors: your gate</h4>
+      <shot
+        id="inv-gateq-gate"
+        caption="Your gate: who can apply, your rules, your promise to founders, and how to share it."
+        marks="1:Copy link,2:QR code,3:Website snippet,4:Preview the form"
+      ></shot>
+      <ol>
+        <li>
+          Choose who can apply: <b>Closed</b>,
+          <b>Only companies that meet my rules</b>, or <b>Anyone</b>.
+        </li>
+        <li>Click <b>Edit</b> to change your rules, then <b>Save</b>.</li>
+        <li>
+          Share the gate with <b>Copy link</b>, a <b>QR code</b>, or a
+          <b>Website snippet</b> for your own site.
+        </li>
+      </ol>
+      <shot
+        id="inv-gateq-find"
+        caption="Find a startup: describe what you want in your own words."
+      ></shot>
+      <h4>Founders: applying</h4>
+      <shot
+        id="fnd-gateq"
+        caption="GateQ for a founder: your applications, and Find my startup."
+      ></shot>
+      <shot
+        id="fnd-gate-form"
+        caption="An investor’s gate, seen by a founder. The rules are on the left; your application on the right. Nothing is sent until you press Submit."
+      ></shot>
+      <shot
+        id="fnd-gate-interview"
+        caption="Applying: Q fills in what it already knows from your profile. You check each of the four short steps and click Continue."
+      ></shot>
+      <p>
+        <b>The interview is video first.</b> After the short form, Q offers a
+        short video interview: Q appears on screen and asks a few questions
+        about your company. You agree to the recording, then start it. If video
+        isn’t offered or you would rather type, you answer the same questions in
+        writing. When you finish, you review the summary and press
+        <b>Submit</b>. The investor gets a dossier with your answers in your own
+        words, and Q’s reading of them, clearly labelled.
+      </p>
+      <div class="box q">
+        <h4>How Q helps here</h4>
+        <p>
+          Investors can ask Q to triage the inbox, summarise an application,
+          draft a reply or a pass, label or star applications. Founders get a
+          short interview from Q instead of a long form, and can ask Q “do we
+          fit?” before applying.
+        </p>
+      </div>
+      <div class="box limit">
+        <h4>Limits</h4>
+        <p>
+          The video interview uses a paid video service with a monthly
+          allowance, so it appears only when it is switched on and there is time
+          left. Typing is always available.
+        </p>
+      </div>
+
+      <!-- Rehearsals -->
+      <h3 id="p-rehearsals" class="toc">4.12 Rehearsals</h3>
+      <p>
+        <b>What it’s for:</b> practising a meeting before the real one. Q plays
+        the other side by voice (an investor for founders, a founder for
+        investors), based only on public and shared information. Afterwards you
+        get a scored review.
+      </p>
+      <shot
+        id="inv-rehearsals"
+        caption="Rehearsals: pick who to practise with, see your latest score and past rehearsals."
+      ></shot>
+      <shot
+        id="inv-rehearsal-lobby"
+        caption="The lobby: what Q knows about how they are likely to come across. Click Join now to start."
+      ></shot>
+      <shot
+        id="inv-rehearsal-review"
+        caption="The review: a score, what went right, what to improve, tips, and the transcript."
+      ></shot>
+      <ol>
+        <li>Click <b>Rehearsals</b>, then <b>Rehearse</b> next to a name.</li>
+        <li>
+          Read the lobby notes. Pick Q’s voice, how hard they should be
+          (<b>Gentle</b>, <b>Realistic</b> or <b>Tough</b>), and how you’ll meet
+          (<b>Voice room</b>, or <b>Video</b> for up to 3 minutes when
+          available).
+        </li>
+        <li>Click <b>Join now</b> and allow your microphone.</li>
+        <li>Talk as you would in the real meeting. End when you are ready.</li>
+        <li>
+          Read the review and click <b>Rehearse again</b> to try once more.
+        </li>
+      </ol>
+      <div class="box limit">
+        <h4>Limits</h4>
+        <p>
+          Your plan sets how many rehearsals you get each month; the page tells
+          you how many are left.
+        </p>
+      </div>
+
+      <!-- Work -->
+      <h3 id="p-work" class="toc">4.13 Q Work</h3>
+      <p>
+        <b>What it’s for:</b> the jobs you give Q, and everything Q needs your
+        yes for. Sections: <b>Needs you</b>, <b>Q suggests</b>,
+        <b>Done for you</b> and <b>In progress</b>.
+      </p>
+      <shot
+        id="inv-work"
+        caption="Q Work: what needs you, what Q suggests, what it has done, and what it is doing."
+        marks="1:Give Q a task,2:Team map,3:Cost"
+      ></shot>
+      <ol>
+        <li>Click <b>Give Q a task</b> and describe the job in a sentence.</li>
+        <li>Watch it appear under <b>In progress</b>.</li>
+        <li>
+          When Q needs you, it appears under <b>Needs you</b>. Read the exact
+          message or action, then approve or change it.
+        </li>
+        <li>
+          Under <b>Done for you</b>, click <b>Thread</b> to see what was sent
+          and the replies.
+        </li>
+        <li>
+          Click a suggestion under <b>Q suggests</b>, such as “Kazikit hasn’t
+          replied. Follow up?”, to start it.
+        </li>
+      </ol>
+      <shot
+        id="inv-work-thread"
+        caption="A job Q finished: the approved message to the founder and the conversation that followed."
+      ></shot>
+      <h4>Q’s team at work</h4>
+      <p>
+        Behind the one Q you talk to, a team of specialists does the steps of a
+        bigger job: research, documents, writing, reviewing, scheduling,
+        outreach. Click <b>Team map</b> to see who is working, who is idle and
+        what each one did. You never pick or talk to them directly.
+      </p>
+      <shot
+        id="inv-work-teammap"
+        caption="Team map: Lead Q finished all 4 steps of the Harbourline diligence job; Research, Documents and Helper did their parts."
+        marks="1:Map,2:List"
+      ></shot>
+      <shot
+        id="fnd-work"
+        caption="Q Work for a founder: verification is waiting on a registration document."
+      ></shot>
+      <div class="box limit">
+        <h4>Limits</h4>
+        <p>
+          <b>Cost</b> shows what Q’s work has cost so far. You can pause Q’s
+          work at any time.
+        </p>
+      </div>
+
+      <!-- Documents -->
+      <h3 id="p-documents" class="toc">4.14 Documents, data room and deck</h3>
+      <p>
+        <b>What it’s for:</b> every file you have uploaded and every document Q
+        has written for you, such as investment memos and briefs. Each file says
+        who can see it.
+      </p>
+      <shot
+        id="fnd-documents"
+        caption="A founder’s documents: each shows its type, size, who can see it, and whether Q has read it."
+        marks="1:Upload,2:Requested,3:Data room"
+      ></shot>
+      <ol>
+        <li>Click <b>Upload</b> and pick your files. Q reads each one.</li>
+        <li>
+          Use the filters (Decks, Financials, Legal, By Q, Shared) or search.
+        </li>
+        <li>
+          Click a document’s actions menu to rename, share with an investor, or
+          archive it.
+        </li>
+        <li>
+          Open <b>Requested</b> to see documents investors have asked for.
+        </li>
+      </ol>
+      <shot
+        id="inv-documents"
+        caption="An investor’s documents: memos and briefs Q made, visible only to your team."
+      ></shot>
+      <h4>Data room (founders)</h4>
+      <p>
+        Click <b>Data room &amp; deck</b> in the sidebar. Documents sit in
+        standard folders. For each document you choose <b>Public</b>,
+        <b>On request</b>, <b>Shared only</b> or <b>Private</b>. Investors see
+        the data room once you accept their interest. Capital Q shows how many
+        of the usual documents for your round you already have.
+      </p>
+      <shot
+        id="fnd-dataroom"
+        caption="The founder’s data room, folder by folder, with a visibility choice for each document."
+        marks="1:Public,2:On request,3:Shared only,4:Private"
+      ></shot>
+      <p>
+        When an investor asks for a document, it shows under
+        <b>Waiting for you</b>. Click <b>Share</b> to send it for a set time
+        (for example 30 days), or <b>Not now</b>.
+      </p>
+      <h4>Deck (founders)</h4>
+      <p>
+        When you upload a deck, Q reads it section by section. Investors see a
+        section only after you confirm Q read it correctly.
+      </p>
+      <shot
+        id="fnd-deck"
+        caption="Checking Q’s reading of your deck: Looks right, This is wrong, or Correct it."
+        marks="1:Confirm all and show,2:Looks right,3:This is wrong"
+      ></shot>
+      <shot
+        id="led-deck"
+        caption="Ledgerfold’s deck, which Q prepared with the founder."
+      ></shot>
+
+      <!-- Pitch -->
+      <h3 id="p-pitch" class="toc">4.15 Pitch &amp; media (founders)</h3>
+      <p>
+        <b>What it’s for:</b> your pitch videos. A live video appears in
+        investors’ Discover feeds, subject to who you let see it.
+      </p>
+      <shot
+        id="fnd-pitch"
+        caption="Pitch &amp; media: your videos and who can see each one."
+        marks="1:New video"
+      ></shot>
+      <shot id="fnd-pitch-new" caption="Adding a new pitch video."></shot>
+      <ol>
+        <li>Click <b>Pitch &amp; media</b>, then <b>New video</b>.</li>
+        <li>Upload your video and give it a title.</li>
+        <li>Choose who can see it, then publish.</li>
+      </ol>
+
+      <!-- Daily -->
+      <h3 id="p-daily" class="toc">4.16 The Q Daily</h3>
+      <p>
+        <b>What it’s for:</b> a short news edition written for you, following
+        your sectors and stage. Each story links to its source.
+      </p>
+      <shot
+        id="inv-daily"
+        caption="The Q Daily: your sector, deals and rounds, Q’s take, and earlier editions."
+        marks="1:Download PDF,2:Change how often"
+      ></shot>
+      <ol>
+        <li>Click <b>The Q Daily</b>.</li>
+        <li>
+          Read the lead story, then scroll for your sector, deals and Q’s take.
+        </li>
+        <li>
+          Click <b>Download PDF</b> to keep it, or <b>Change how often</b> to
+          pick daily or weekly.
+        </li>
+      </ol>
+
+      <!-- Q Pitch -->
+      <h3 id="p-qpitch" class="toc">4.17 Q Pitch</h3>
+      <p>
+        <b>What it’s for:</b> a guided tour of Capital Q that Q leads by voice,
+        through the real app and real (demo) data. The
+        <b>Investor premiere</b> is one continuous tour of about 5 to 7 minutes.
+        The <b>Two-minute version</b> is a short taster. The
+        <b>Feature Atlas</b> lets you open one chapter at a time when you want
+        to go deeper.
+      </p>
+      <shot
+        id="inv-qpitch"
+        caption="Q Pitch: the investor premiere, the two-minute version, and the Feature Atlas."
+        marks="1:Start"
+      ></shot>
+      <ol>
+        <li>
+          Click <b>Q Pitch</b> in the Workspace group. Turn your sound on.
+        </li>
+        <li>
+          Click <b>Start</b> beside <i>Investor premiere</i> or
+          <i>Two-minute version</i>. Q takes you to the Q page; click
+          <b>Start the tour</b> to hear it, or <b>Captions only</b>.
+        </li>
+        <li>
+          Q moves through the app on its own: your mandate, your feed and top
+          three, saving a company, one company on the evidence, risks, a
+          side-by-side comparison, what Q knows versus what you may see, GateQ
+          and an applicant’s transcript, the CRM record and its history,
+          preparing a meeting, Q Work, Documents and The Q Daily.
+        </li>
+        <li>
+          Use the on-screen controls at any time: <b>Back</b>, <b>Pause</b>,
+          <b>Show me that again</b>, <b>Skip</b>, <b>Chapters</b> and
+          <b>End</b>. Press Escape to pause, or just ask a question out loud.
+        </li>
+        <li>
+          To see one topic only, scroll to the <b>Feature Atlas</b> and click
+          <b>Open</b> beside a chapter.
+        </li>
+      </ol>
+      <shot
+        id="inv-qpitch-atlas"
+        caption="The Feature Atlas. Each chapter says whether it has been checked in a live browser (Certified) or not yet (Internal only)."
+      ></shot>
+      <shot
+        id="inv-qpitch-tour"
+        caption="Starting a tour: Q asks whether to present aloud (turn your sound on) or show captions only. Click Start the tour."
+        marks="1:Start the tour,2:Captions only"
+      ></shot>
+      <div class="box limit">
+        <h4>Limits</h4>
+        <p>
+          Q Pitch is for investor workspaces. Founders see a note that a founder
+          edition hasn’t been built yet. In the premiere, 11 of 17 scenes have
+          been checked in a live browser; the rest are marked internal.
+        </p>
+      </div>
+
+      <!-- Profile -->
+      <h3 id="p-profile" class="toc">4.18 Profile and Q Card</h3>
+      <p>
+        <b>What it’s for:</b> what other people see about you and your company.
+        Edit any section in place. Your <b>Q Card</b> is a short, shareable
+        summary of your company with a link and QR code that works outside
+        Capital Q.
+      </p>
+      <shot
+        id="fnd-profile"
+        caption="A founder’s profile. Edit any section; share your Q Card; set visibility."
+        marks="1:Edit profile,2:Share Q Card,3:Visibility"
+      ></shot>
+      <shot
+        id="fnd-qcard"
+        caption="The Q Card section: create it yourself or ask Q to make it."
+      ></shot>
+
+      <!-- Settings -->
+      <h3 id="p-settings" class="toc">4.19 Settings, plan and usage</h3>
+      <p>
+        <b>What it’s for:</b> your account, team, appearance, how Q speaks,
+        notifications, connections (such as Google), plan and billing, and
+        privacy.
+      </p>
+      <shot
+        id="inv-settings"
+        caption="Settings, top of the page: Account, Team and Appearance."
+      ></shot>
+      <ul>
+        <li>
+          <b>Appearance:</b> light, device or dark; how much Q’s light moves;
+          sounds.
+        </li>
+        <li>
+          <b>Q:</b> Q’s voice (female or male) and personality (warm, witty,
+          sharp).
+        </li>
+        <li>
+          <b>How Q speaks for you:</b> write a guide for the tone Q uses in your
+          name.
+        </li>
+        <li><b>Notifications</b> and <b>The Q Daily</b> frequency.</li>
+        <li><b>Connections:</b> connect Google to book calls.</li>
+      </ul>
+      <div class="box">
+        <h4>Coming soon</h4>
+        <p>
+          <b>Language.</b> Capital Q is in English today. Arabic and other
+          languages, with a language choice in Settings, are being built.
+        </p>
+      </div>
+      <shot
+        id="inv-plan"
+        caption="Plan: what is included this month and how much you have used."
+      ></shot>
+      <div class="box limit">
+        <h4>Limits</h4>
+        <p>
+          Everyone is on the free <b>Launch</b> plan while Capital Q launches.
+          To change plan, click <b>Ask to change plan</b>.
+        </p>
+      </div>
+
+      <!-- Team -->
+      <h3 id="p-team" class="toc">4.20 Team and invitations</h3>
+      <p>
+        <b>What it’s for:</b> the people who work on your company or firm with
+        you, and what each role can do. <b>Owner</b>: everything, plus billing
+        and handing over ownership. <b>Admin</b>: invites people, edits the
+        profile, approves what Q sends. <b>Member</b>: reviews, writes notes,
+        works the inbox; can suggest but not approve.
+      </p>
+      <shot
+        id="fnd-team"
+        caption="Harbourline Cargo’s team: an owner, an admin and a member."
+        marks="1:Invite people"
+      ></shot>
+      <shot
+        id="fnd-invite"
+        caption="Inviting someone: their email and their role."
+      ></shot>
+
+      <!-- Notifications -->
+      <h3 id="p-notifications" class="toc">4.21 Notifications and approvals</h3>
+      <p>
+        <b>What it’s for:</b> one list of what happened and what needs your yes.
+        Click the <b>bell</b> at the bottom of the sidebar.
+      </p>
+      <shot
+        id="inv-notifications"
+        caption="Notifications: messages, things that need your yes, shared documents."
+        marks="1:Turn on notifications,2:Open Q’s work"
+      ></shot>
+      <ol>
+        <li>Click the bell.</li>
+        <li>Click an item to open it.</li>
+        <li>
+          For “needs your yes” items, click <b>Open Q’s work</b> to approve or
+          change them.
+        </li>
+        <li>
+          Click <b>Turn on notifications</b> to get alerts on this device.
+        </li>
+      </ol>
+
+      <!-- Verification -->
+      <h3 id="p-verification" class="toc">4.22 Verification</h3>
+      <p>
+        <b>What it’s for:</b> a person at Capital Q checks your identity and
+        your organisation’s registered details. Verified means checked; it is
+        not an endorsement.
+      </p>
+      <shot
+        id="inv-verification"
+        caption="Verification: both the person and the fund are verified."
+      ></shot>
+
+      <!-- Onboarding -->
+      <h3 id="p-onboarding" class="toc">4.23 Getting started (onboarding)</h3>
+      <p>
+        <b>Founders:</b> “upload what you already have, Q works first, then fill
+        gaps.” The steps are: what brings you here, your company, stage, what
+        the company does, how you would categorise it, what you already have
+        (pitch deck, financial model, management accounts, company memo), then
+        “Here’s what we have so far”, your founding team, business and traction,
+        and whether you are raising now. You can skip any step; unknown is fine.
+        Q shows you useful results before it asks for a video or verification.
+      </p>
+      <p>
+        <b>Investors:</b> capture your mandate quickly: which mandate, whether
+        you are deploying now, stage and cheque, where you invest, sectors,
+        business attributes, green and red flags, then “Your mandate is ready”.
+        Your personalised feed appears straight away.
+      </p>
+      <p>
+        Q runs the set-up as a conversation. You can talk or type, skip any
+        question, and come back later. Q fills in what it can from your
+        documents and website and asks you to confirm anything important before
+        it counts.
+      </p>
+      <shot
+        id="fnd-welcome"
+        caption="Meeting Q. Every new person starts here; Q says hello and leads the set-up."
+      ></shot>
+      <shot
+        id="fnd-onboarding"
+        caption="A founder who has finished set-up sees this. You can return to any answer from your profile."
+      ></shot>
+      <div class="box">
+        <h4>Coming soon</h4>
+        <p>
+          A new, more intelligent onboarding is being built: Q will read more of
+          what you already have and ask even fewer questions. This guide will be
+          refreshed when it ships.
+        </p>
+      </div>
+      <div class="box limit">
+        <h4>Limits</h4>
+        <p>
+          The demo accounts have already finished onboarding, so this guide
+          doesn’t show the first-time screens. To see them, click
+          <b>Create account</b> on the sign-in page and use your own email
+          address.
+        </p>
+      </div>
+
+      <!-- Phone and tablet -->
+      <h3 id="p-mobile" class="toc">4.24 On a phone or tablet</h3>
+      <p>
+        Everything works on a phone. The sidebar becomes a bar at the bottom
+        with <b>Discover</b>, <b>Explore</b>, <b>Q</b>, <b>CRM</b> and
+        <b>More</b>. Tap <b>More</b> for GateQ, Work, Documents, Rehearsals,
+        Settings and the rest. The bell and the theme switch sit at the top.
+        Pages stack into one column; lists open their details on a new screen.
+      </p>
+      <table class="phones">
+        <tr>
+          <td><shot id="landing-m" caption="Home page on a phone."></shot></td>
+          <td><shot id="signup-m" caption="Create account."></shot></td>
+          <td><shot id="inv-home-m" caption="The Q page."></shot></td>
+        </tr>
+        <tr>
+          <td>
+            <shot
+              id="inv-discover-m"
+              caption="Discover: the pitch fills the screen."
+            ></shot>
+          </td>
+          <td><shot id="inv-explore-m" caption="Explore."></shot></td>
+          <td><shot id="inv-company-m" caption="A company profile."></shot></td>
+        </tr>
+        <tr>
+          <td><shot id="inv-crm-overview-m" caption="CRM Overview."></shot></td>
+          <td><shot id="inv-crm-list-m" caption="CRM Pipeline."></shot></td>
+          <td><shot id="inv-crm-record-m" caption="A CRM record."></shot></td>
+        </tr>
+        <tr>
+          <td><shot id="inv-gateq-inbox-m" caption="GateQ inbox."></shot></td>
+          <td>
+            <shot
+              id="inv-work-m"
+              caption="Q Work, with an approval waiting."
+            ></shot>
+          </td>
+          <td><shot id="fnd-home-m" caption="A founder’s Q page."></shot></td>
+        </tr>
+        <tr>
+          <td>
+            <shot id="fnd-capital-m" caption="A founder’s Capital page."></shot>
+          </td>
+          <td><shot id="fnd-documents-m" caption="Documents."></shot></td>
+          <td>
+            <shot id="fnd-gate-form-m" caption="Applying through GateQ."></shot>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <b>On a tablet</b> held upright (about 834 pixels wide), Capital Q uses
+        the phone layout with more room: the bottom bar replaces the sidebar and
+        wider pages such as the pipeline board keep their columns.
+      </p>
+      <shot
+        id="inv-discover-t"
+        caption="Discover on a tablet: the pitch fills the screen, with the actions down the right."
+      ></shot>
+      <shot
+        id="inv-crm-board-t"
+        caption="The pipeline board on a tablet, with the bottom bar."
+      ></shot>
+      <shot id="inv-gateq-inbox-t" caption="GateQ on a tablet."></shot>
+
+      <!-- ===================================================================== -->
+      <h2 id="stories">5. Step-by-step stories</h2>
+      <p>
+        Each story follows one person through a real task, from start to finish,
+        using the demo accounts.
+      </p>
+
+      <h3 id="s-investor" class="toc">
+        Story 1. An investor finds a company and decides
+      </h3>
+      <p class="meta">Sign in as Amara (investor). Time: about 15 minutes.</p>
+      <div class="story">
+        <ol>
+          <li>
+            <b>Open Discover.</b> Click <b>Discover</b>. You see Ledgerfold, a
+            seed fintech in Lagos. Read <b>Why it’s here</b>: stage, place and
+            sector all match your mandate.
+            <shot id="inv-discover" caption="Ledgerfold in Discover."></shot>
+          </li>
+          <li>
+            <b>Save it.</b> Click <b>Save</b>. It goes to your Saved list.
+            Ledgerfold is not told.
+            <shot id="inv-discover-save" caption="After clicking Save."></shot>
+          </li>
+          <li>
+            <b>Ask Q.</b> Click <b>Ask Q</b>, or open Q and ask “What are the
+            main risks with Ledgerfold?”. Q answers with a card that separates
+            what is verified from what is claimed or unknown.
+            <shot
+              id="inv-q-risk"
+              caption="Q’s risk assessment of Ledgerfold."
+            ></shot>
+          </li>
+          <li>
+            <b>Compare.</b> Click <b>Saved</b>, tick Ledgerfold and another
+            company, and click <b>Compare side by side</b>. Or ask Q: “Compare
+            Ledgerfold and Harbourline Cargo against my mandate.”
+            <shot id="inv-compare" caption="Side by side."></shot>
+          </li>
+          <li>
+            <b>Read the full profile.</b> Click <b>Open profile</b>. Check the
+            deck, the data room and the team tabs.
+            <shot id="inv-company" caption="Ledgerfold’s profile."></shot>
+          </li>
+          <li>
+            <b>Express interest.</b> Back in Discover, click <b>Interest</b>,
+            then <b>Express interest</b>. Ledgerfold’s founders are told you
+            would like to explore. In this demo, Ledgerfold has already
+            accepted, so you are <i>Connected</i>.
+            <shot id="inv-discover-interest" caption="Express interest."></shot>
+          </li>
+          <li>
+            <b>Follow up in the CRM.</b> Click <b>CRM</b>. Ledgerfold is in your
+            pipeline. Click its name to open the record.
+            <shot id="inv-crm-board" caption="Your pipeline as a board."></shot>
+          </li>
+          <li>
+            <b>Write a private note.</b> Scroll to <b>Private notes</b>, type
+            your thoughts, and click <b>Save note</b>. Only your team sees it.
+            <shot
+              id="inv-crm-notes"
+              caption="Private notes on the record."
+            ></shot>
+          </li>
+          <li>
+            <b>Book a meeting.</b> Click <b>Book a call</b>, then
+            <b>Find a time</b>. (Connect Google Calendar in Settings first.) You
+            can also click <b>Have Q join a call</b>.
+            <shot id="inv-crm-book" caption="Book a call."></shot>
+          </li>
+          <li>
+            <b>Record your decision.</b> After the meeting, move the deal
+            forward with <b>Record the terms</b>, or record
+            <b>Pause for now</b> or <b>Not proceeding for now</b>. If you go
+            ahead, the commitment appears on the CRM <b>Capital</b> tab, where
+            you click <b>Mark as sent</b> once the money is wired.
+            <shot
+              id="inv-crm-decision"
+              caption="Decision buttons on the record."
+            ></shot>
+            <shot
+              id="inv-capital"
+              caption="The Ledgerfold commitment on the Capital tab, ready to mark as sent."
+            ></shot>
+          </li>
+        </ol>
+      </div>
+
+      <h3 id="s-founder" class="toc">
+        Story 2. A founder gets ready, applies and tracks interest
+      </h3>
+      <p class="meta">
+        Sign in as Babatunde (Harbourline Cargo). Ledgerfold’s account shows the
+        same steps further along.
+      </p>
+      <div class="story">
+        <ol>
+          <li>
+            <b>Onboard.</b> A new founder answers a few short questions and
+            uploads what they already have. Q reads it and fills in the profile.
+            (See section 4.23.)
+          </li>
+          <li>
+            <b>Upload documents.</b> Click <b>Documents</b>, then <b>Upload</b>.
+            Add your deck, accounts and team summary. Each shows “Q has read
+            it”.
+            <shot
+              id="fnd-documents"
+              caption="Harbourline’s uploaded documents."
+            ></shot>
+          </li>
+          <li>
+            <b>Check what Q read in your deck.</b> Open the
+            <b>Pitch deck</b> tab on your company. Mark each section
+            <b>Looks right</b> or <b>This is wrong</b>, then click
+            <b>Confirm all and show</b>.
+            <shot
+              id="fnd-deck"
+              caption="Confirming Q’s reading of the deck."
+            ></shot>
+          </li>
+          <li>
+            <b>Let Q build the deck.</b> On <b>Capital</b>, click
+            <b>Make my pitch deck</b>. Q drafts an investor deck from your
+            documents. Ledgerfold’s founder already has one.
+            <shot
+              id="led-deck"
+              caption="The deck Q prepared for Ledgerfold."
+            ></shot>
+          </li>
+          <li>
+            <b>Set up the data room.</b> Click <b>Data room &amp; deck</b>.
+            Choose who can see each document.
+            <shot id="fnd-dataroom" caption="The data room."></shot>
+          </li>
+          <li>
+            <b>Publish a pitch.</b> Click <b>Pitch &amp; media</b>, then
+            <b>New video</b>, upload, choose who can see it, and publish. Your
+            pitch now appears in investors’ Discover feeds.
+            <shot
+              id="fnd-pitch"
+              caption="Harbourline’s live pitch video."
+            ></shot>
+          </li>
+          <li>
+            <b>Find an investor.</b> Click <b>Discover</b> and open Savanna Seed
+            Partners. Check which of their published rules you meet.
+            <shot
+              id="fnd-investor"
+              caption="Savanna Seed Partners’ profile."
+            ></shot>
+          </li>
+          <li>
+            <b>Apply through GateQ.</b> Open the investor’s gate. Confirm your
+            details and check the four short steps Q filled in. Q then offers a
+            short <b>video interview</b> first; agree to the recording and start
+            it, or answer the same questions by typing. Review, then press
+            <b>Submit</b>.
+            <shot
+              id="fnd-gate-form"
+              caption="The gate: rules on the left, your application on the right."
+            ></shot>
+            <shot
+              id="fnd-gate-interview"
+              caption="Step 1 of 4, already filled in from your profile."
+            ></shot>
+          </li>
+          <li>
+            <b>Rehearse.</b> Click <b>Rehearsals</b>, then
+            <b>Rehearse</b> beside the investor. Q plays the investor by voice.
+            Read your review afterwards.
+            <shot
+              id="fnd-rehearsal-lobby"
+              caption="Ready to rehearse with Savanna Seed Partners."
+            ></shot>
+            <shot
+              id="inv-rehearsal-review"
+              caption="A rehearsal review: a score, what went right, what to improve, and the transcript."
+            ></shot>
+          </li>
+          <li>
+            <b>Track interest in the CRM.</b> When an investor expresses
+            interest, it appears on <b>Q</b> and under <b>Investor interest</b>.
+            Click <b>Accept</b> to connect. Then follow each investor in your
+            <b>Fundraising Hub</b>.
+            <shot
+              id="led-interest"
+              caption="Answering investor interest."
+            ></shot>
+            <shot id="led-crm" caption="Ledgerfold’s Fundraising Hub."></shot>
+          </li>
+        </ol>
+      </div>
+
+      <h3 id="s-dossier" class="toc">
+        Story 3. An investor reviews a GateQ application and decides
+      </h3>
+      <p class="meta">Sign in as Amara.</p>
+      <div class="story">
+        <ol>
+          <li>
+            Click <b>GateQ</b>. The inbox opens on <b>Inbox</b>. Applications
+            show how many of your rules they meet.
+            <shot id="inv-gateq-inbox" caption="The GateQ inbox."></shot>
+          </li>
+          <li>
+            Click <b>Fits</b> to see only the applications that meet your rules.
+            Click one, for example Maji Loop.
+          </li>
+          <li>
+            Read the dossier: the submitted investment brief, what they shared,
+            any rules needing clarification, and what has happened so far.
+            <shot
+              id="inv-gateq-dossier"
+              caption="The Maji Loop dossier."
+            ></shot>
+          </li>
+          <li>
+            Ask Q: “Summarise this application and tell me what to ask.” Q
+            answers from the dossier only.
+          </li>
+          <li>Add a note for your team with <b>Add note</b>, or star it.</li>
+          <li>
+            Decide. Click <b>Reply</b> to invite them to a call, or <b>Pass</b>.
+            Q can draft the pass for you; you approve the exact words before it
+            is sent. Either way, the founder hears back, as your gate promises.
+          </li>
+        </ol>
+      </div>
+
+      <h3 id="s-team" class="toc">Story 4. A team owner invites a teammate</h3>
+      <p class="meta">Sign in as Babatunde (owner of Harbourline Cargo).</p>
+      <div class="story">
+        <ol>
+          <li>
+            Click <b>You</b> in the sidebar, then <b>Settings</b>, then
+            <b>Team</b>. <shot id="fnd-team" caption="The team page."></shot>
+          </li>
+          <li>
+            Click <b>Invite people</b>. Type the person’s email (you can add
+            several, separated by commas), choose <b>Member</b> or <b>Admin</b>,
+            add a short message if you like, and click <b>Send invitation</b>.
+            <shot id="fnd-invite" caption="The invite form."></shot>
+          </li>
+          <li>
+            The teammate gets an email. When they sign in to Capital Q with that
+            email, they see an invitation card. They click <b>Accept</b> and
+            join the company. They can also decline.
+          </li>
+          <li>
+            Back on the Team page, the new person appears with their role. You
+            can change their role, resend or cancel an invitation, or remove
+            someone.
+          </li>
+        </ol>
+      </div>
+      <div class="box limit">
+        <h4>Not pictured</h4>
+        <p>
+          The acceptance screen is not shown: taking it would send a real
+          invitation from a demo account.
+        </p>
+      </div>
+
+      <h3 id="s-work" class="toc">
+        Story 5. Q Work: a multi-step diligence job, approved by you
+      </h3>
+      <p class="meta">
+        Sign in as Amara. This job already exists on the demo account, so you
+        can follow it without starting a new one.
+      </p>
+      <div class="story">
+        <ol>
+          <li>
+            Click <b>Work</b>. In <b>Give Q a task</b>, Amara typed: “Get the
+            team ready for our Harbourline Cargo diligence: research, a reviewed
+            memo and founder questions.”
+          </li>
+          <li>
+            Q showed its plan and its budget, and waited. Amara clicked
+            <b>Approve</b>. Nothing starts until you approve the plan.
+          </li>
+          <li>
+            Q’s team did four steps: research on the company, a document review,
+            an investment brief that a second specialist checked, and five
+            questions for the founder. Click <b>Team map</b> to see who did
+            what.
+            <shot
+              id="inv-work-teammap"
+              caption="The team map for the job."
+            ></shot>
+          </li>
+          <li>
+            The job shows under <b>Done for you</b>. Click
+            <b>Open document</b> to read the investment brief Q wrote.
+            <shot
+              id="inv-work-job"
+              caption="The finished job, with its investment brief."
+              marks="1:Open document"
+            ></shot>
+            <shot
+              id="inv-doc-open"
+              caption="The investment brief Q wrote on Harbourline Cargo. Use Edit with Q to change it, V1/V2 to see versions, or PDF to download it."
+            ></shot>
+          </li>
+          <li>
+            The five founder questions go to another company, so Q did not send
+            them. They wait under <b>Needs you</b>, word for word.
+            <shot
+              id="inv-work"
+              caption="“Send Harbourline Cargo these 5 questions” waiting for your yes."
+              marks="1:Approve,2:Decline"
+            ></shot>
+          </li>
+          <li>
+            Read them. Click <b>Approve</b> to send them exactly as written, or
+            <b>Decline</b>. If you ask Q to change the wording, you approve the
+            new words again.
+          </li>
+        </ol>
+      </div>
+      <div class="box limit">
+        <h4>Good to know</h4>
+        <p>
+          Some older test jobs on the demo account show “Failed” or “Not allowed
+          to do this step”, each with a plain reason; nothing was sent for
+          those. The Cost figure at the top of Q Work shows what Q’s work has
+          cost so far.
+        </p>
+      </div>
+
+      <h3 id="s-qpitch" class="toc">Story 6. Running Q Pitch</h3>
+      <p class="meta">
+        Sign in as Amara. Turn your sound on. The premiere takes 5 to 7 minutes.
+      </p>
+      <div class="story">
+        <ol>
+          <li>
+            Click <b>Q Pitch</b> in the Workspace group.
+            <shot id="inv-qpitch" caption="Q Pitch."></shot>
+          </li>
+          <li>
+            Click <b>Start</b> beside <b>Investor premiere</b>. Q opens the Q
+            page and asks how to present; click <b>Start the tour</b> (or
+            <b>Captions only</b>). Q introduces itself and begins.
+            <shot
+              id="inv-qpitch-tour"
+              caption="Choose Start the tour (with sound) or Captions only."
+            ></shot>
+          </li>
+          <li>
+            Sit back. Q opens each page itself and explains what you see, from
+            your mandate to the CRM and Q Work.
+          </li>
+          <li>
+            Interrupt whenever you like: click <b>Pause</b> or <b>Back</b>, say
+            “show me GateQ”, or ask a question. Q answers, then carries on.
+          </li>
+          <li>
+            Click <b>End</b> when you are done. Later, open a single chapter
+            from the <b>Feature Atlas</b>.
+          </li>
+        </ol>
+      </div>
+
+      <!-- ===================================================================== -->
+      <h2 id="glossary">6. Glossary</h2>
+      <dl class="glossary">
+        <dt>Approve</dt>
+        <dd>
+          Your yes to an action Q prepared. It covers exactly what you saw; if
+          anything changes, Q asks again.
+        </dd>
+        <dt>Board</dt>
+        <dd>
+          The panel on the Q page where Q keeps its cards, tables and
+          comparisons.
+        </dd>
+        <dt>Commitment</dt>
+        <dd>
+          An amount an investor says they will invest, confirmed by the company.
+          It moves from agreed, to sent, to received.
+        </dd>
+        <dt>Connected</dt>
+        <dd>Both sides agreed to talk. It is not an investment.</dd>
+        <dt>CRM</dt>
+        <dd>
+          Where you track every relationship. Investors call it the Investment
+          Hub; founders the Fundraising Hub.
+        </dd>
+        <dt>Data room</dt>
+        <dd>
+          A founder’s folders of company documents. The founder decides,
+          document by document, who can see what.
+        </dd>
+        <dt>Discover</dt>
+        <dd>
+          The ranked video feed of companies (for investors) or the list of
+          investors (for founders).
+        </dd>
+        <dt>Dossier</dt>
+        <dd>
+          The short report Q makes from a GateQ application, for the investor to
+          review.
+        </dd>
+        <dt>Express interest</dt>
+        <dd>
+          Telling a company you would like to explore. It is not a commitment.
+        </dd>
+        <dt>GateQ</dt>
+        <dd>
+          An investor’s front door: published rules, a two-minute fit check for
+          founders, a short interview by Q, and an inbox of dossiers.
+        </dd>
+        <dt>InvestIQ</dt>
+        <dd>
+          Capital Q’s method for judging how ready a company is to raise.
+          Founders see it as <b>Readiness</b> on the Capital page: each area in
+          words, with its evidence and gaps. It does not give a single score
+          yet.
+        </dd>
+        <dt>Mandate</dt>
+        <dd>
+          What an investor invests in: stage, cheque size, places, sectors,
+          business types, and red flags. Discover ranks companies against it.
+        </dd>
+        <dt>Mandate fit</dt>
+        <dd>
+          How well a company matches your mandate. It is not a judgement of the
+          business.
+        </dd>
+        <dt>Pass</dt>
+        <dd>
+          Moving a company out of your feed, or declining an application. You
+          can undo a pass in Discover.
+        </dd>
+        <dt>Pipeline</dt>
+        <dd>Your relationships by stage, shown as a list, table or board.</dd>
+        <dt>Q</dt>
+        <dd>
+          Capital Q’s AI investment analyst. You talk to one Q, wherever you are
+          in the app.
+        </dd>
+        <dt>Q Card</dt>
+        <dd>
+          A short, shareable summary of a company, with a link and QR code, that
+          works outside Capital Q.
+        </dd>
+        <dt>Q Daily</dt>
+        <dd>Your personal news edition, daily or weekly.</dd>
+        <dt>Q Pitch</dt>
+        <dd>A guided tour of Capital Q, narrated by Q.</dd>
+        <dt>Q Work</dt>
+        <dd>Jobs you have given Q, and the steps waiting for your approval.</dd>
+        <dt>Readiness</dt>
+        <dd>See InvestIQ.</dd>
+        <dt>Rehearsal</dt>
+        <dd>
+          A practice meeting where Q plays the other side by voice, followed by
+          a scored review.
+        </dd>
+        <dt>Save</dt>
+        <dd>
+          Keeping a company for later. The company is not told, and saving is
+          not interest.
+        </dd>
+        <dt>Unknown</dt>
+        <dd>A fact Capital Q doesn’t have. It never counts against anyone.</dd>
+        <dt>Verified</dt>
+        <dd>Checked by a person at Capital Q. Not an endorsement.</dd>
+        <dt>Visibility</dt>
+        <dd>
+          Who can see something: just you, your team, a specific investor,
+          everyone on Capital Q, or the public web.
+        </dd>
+      </dl>
+
+      <!-- ===================================================================== -->
+      <h2 id="limits">7. Limits and what’s coming</h2>
+      <div class="box limit">
+        <h4>Works today, with limits</h4>
+        <ul>
+          <li>
+            <b>Booking calls</b> needs Google Calendar connected in Settings →
+            Connections.
+          </li>
+          <li>
+            <b>Video interviews in GateQ</b> run on a paid video service with a
+            monthly allowance. When it is off or used up, founders type their
+            answers instead.
+          </li>
+          <li>
+            <b>Rehearsals, Q Daily, web research and other Q features</b> have
+            monthly allowances on the free Launch plan. See
+            <b>Settings → Plan</b>.
+          </li>
+          <li>
+            <b>Voice</b> needs a microphone and a recent Chrome, Edge or Safari.
+          </li>
+          <li>
+            <b>Pitch videos</b> need a browser that plays standard web video.
+            Very locked-down browsers show “This pitch can’t play here”; the
+            rest of the profile still works.
+          </li>
+          <li>
+            <b>Readiness</b> is described in words. A single InvestIQ score will
+            come only once the scoring method is formally approved.
+          </li>
+          <li>
+            <b>Red-flag rules</b> in a mandate can’t all be checked
+            automatically yet. When one can’t, nobody is hidden because of it,
+            and Discover says so.
+          </li>
+        </ul>
+      </div>
+      <div class="box">
+        <h4>Coming soon</h4>
+        <ul>
+          <li><b>Arabic and other languages</b>, chosen in Settings.</li>
+          <li>
+            <b>A new, more intelligent onboarding</b> that asks even fewer
+            questions.
+          </li>
+          <li>
+            <b>Q Pitch for founders.</b> Today the tour is for investors only.
+          </li>
+          <li>
+            <b>Q joining live meetings.</b> “Have Q join a call” is built but
+            has not yet been proven in a live meeting.
+          </li>
+          <li>
+            <b>More Q Pitch chapters</b>, including meetings, the company data
+            room, readiness and the founder journey.
+          </li>
+          <li>
+            <b>Switching between a founder and an investor workspace</b> with
+            one sign-in.
+          </li>
+          <li><b>Guest document uploads</b> in GateQ applications.</li>
+          <li>
+            <b>Ongoing polish.</b> Small layout fixes ship often, so a screen
+            may look slightly different from these pictures.
+          </li>
+        </ul>
+      </div>
+
+      <p class="meta">
+        This guide is rebuilt from the live product with
+        <code>scripts/handoff/docs/capture.mjs</code> and
+        <code>build.mjs</code>.
+      </p>
+    </main>
+  </body>
+</html>

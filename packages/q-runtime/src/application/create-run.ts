@@ -261,6 +261,11 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
       input.screen === undefined ? null : screenKept(input.screen, refs);
     const keptByConversation = (all: readonly QSubjectRef[]) =>
       all.filter((ref) => !onScreen.includes(ref));
+    // "This company" is the one on screen, not one the conversation carried
+    // from an earlier page (run 5, 16 Oct: asked while a profile was still
+    // loading, Q answered about the feed's last card). Only over carried
+    // subjects: subjects the person named this turn keep their order.
+    if (requested.length === 0) refs = screenCompanyFirst(refs, input.screen);
 
     refs = await withOwnContext(dependencies, actor, refs);
 
@@ -488,6 +493,34 @@ function screenWithManifest(
 }
 
 /** The screen's entities as subjects, each resolved for the actor or dropped. */
+/**
+ * The company the screen names moved ahead of the subjects a conversation
+ * carried, when the screen names exactly one: its `companyId`, with no
+ * other company declared in focus. Several or none: unchanged, so the run
+ * asks rather than guesses. Only a company already among the run's
+ * subjects can move, and a screen company joins them only when it resolves
+ * for this actor (withScreenEntities), so one the person may not see is
+ * never chosen.
+ */
+export function screenCompanyFirst(
+  refs: readonly QSubjectRef[],
+  screen: CreateQRunRequest["screen"],
+): readonly QSubjectRef[] {
+  const named = screen?.companyId;
+  if (named === undefined) return refs;
+  const focus = screen?.manifest?.focus;
+  if (focus !== undefined && focus.kind === "COMPANY" && focus.id !== named) {
+    return refs;
+  }
+  const at = refs.findIndex(
+    (ref) => ref.kind === "COMPANY" && ref.companyId === named,
+  );
+  if (at <= 0) return refs;
+  const first = refs[at];
+  if (first === undefined) return refs;
+  return [first, ...refs.slice(0, at), ...refs.slice(at + 1)];
+}
+
 async function withScreenEntities(
   subjects: QRuntimeDependencies["subjects"],
   actor: ActorContext,
