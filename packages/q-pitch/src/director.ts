@@ -532,6 +532,12 @@ export function transition(
       if (target < 0) return reject(state, event, "CHAPTER_UNAVAILABLE");
       return moveTo(state, target);
     }
+    case "GO_TO_STEP": {
+      if (event.index >= state.scenes.length) {
+        return reject(state, event, "STEP_OUT_OF_RANGE");
+      }
+      return moveTo(state, event.index);
+    }
     case "ROLE_SWITCHED": {
       if (sameActor(event.actor, state.actor))
         return reject(state, event, "SAME_ACTOR");

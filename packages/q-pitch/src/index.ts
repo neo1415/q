@@ -62,3 +62,4 @@ export {
   PREMIERE_SCRIPT,
   SHORT_SCRIPT,
 } from "./premiere.js";
+export * from "./step-commands.js";

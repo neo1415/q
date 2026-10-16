@@ -110,6 +110,17 @@ export const GuideEventSchema = z.discriminatedUnion("type", [
   z
     .object({ type: z.literal("JUMP_TO_CHAPTER"), chapterId: ChapterIdSchema })
     .strict(),
+  /**
+   * Q Pitch v6 step commands ("go to step 7", "back two", "forward three"):
+   * the scene at this 0-based index, resolved by the control layer from
+   * the current one. Out of range is refused, never clamped.
+   */
+  z
+    .object({
+      type: z.literal("GO_TO_STEP"),
+      index: z.number().int().min(0).max(199),
+    })
+    .strict(),
   /** The server switched the authorised workspace (QP-F10); never a UI toggle. */
   z
     .object({ type: z.literal("ROLE_SWITCHED"), actor: TourActorSchema })
@@ -131,6 +142,8 @@ export const REJECTION_REASONS = [
   "NO_VALID_SCENE",
   "CHAPTER_UNAVAILABLE",
   "SAME_ACTOR",
+  /** A step number the tour does not have. */
+  "STEP_OUT_OF_RANGE",
 ] as const;
 export type RejectionReason = (typeof REJECTION_REASONS)[number];
 
