@@ -193,3 +193,54 @@ export function afterLeadLines(text: string, leadLines: string): string {
   // A bare leading item marker with nothing repeated is still a list restart.
   return rest.replace(/^1[.)]\s+/u, "");
 }
+
+/** Words that ask about the size or make-up of their own team. */
+export const ASKS_ABOUT_OWN_TEAM =
+  /\b(founders?|co-?founders?|team|headcount|employees?|staff|people (?:work|working)|how many people)\b/iu;
+
+/**
+ * Their company's team counts, read for them this turn from the canonical
+ * team facts (read_my_record COMPANY_TEAM) when they ask about their team
+ * (live 2026-10-16: with nothing read, Q answered "1 founder and 1 person"
+ * for a company recorded as 2 founders and 14 people). Only RECORDED counts
+ * are stated; otherwise the fact says the counts are not on record.
+ */
+export function ownTeamFact(read: unknown): AuthorisedFact | null {
+  if (typeof read !== "object" || read === null) return null;
+  const { status, data } = read as { status?: unknown; data?: unknown };
+  if (status !== "FOUND" || typeof data !== "object" || data === null) {
+    return null;
+  }
+  const counts = (data as { teamCounts?: unknown }).teamCounts as
+    | {
+        readonly status?: unknown;
+        readonly numberOfFounders?: unknown;
+        readonly numberOfFullTimeFounders?: unknown;
+        readonly peopleWorkingOnTheCompany?: unknown;
+      }
+    | undefined;
+  const number = (value: unknown): string | null =>
+    typeof value === "number" && Number.isFinite(value) ? String(value) : null;
+  const founders = number(counts?.numberOfFounders);
+  const fullTime = number(counts?.numberOfFullTimeFounders);
+  const people = number(counts?.peopleWorkingOnTheCompany);
+  const statement =
+    counts?.status === "RECORDED"
+      ? [
+          "THEIR OWN TEAM (read for them this turn from the company's recorded team facts; these are the only team counts to state):",
+          founders === null ? null : `founders: ${founders};`,
+          fullTime === null ? null : `full-time founders: ${fullTime};`,
+          people === null ? null : `people working on the company: ${people}.`,
+          "Their own membership is one person, not the team size.",
+        ]
+          .filter((part): part is string => part !== null)
+          .join(" ")
+      : "THEIR OWN TEAM: the company's team counts are not on record (or could not be read this turn). Say so; never infer a count from members or from them alone.";
+  return {
+    scope: "COMPANY_PROFILE",
+    statement: statement.slice(0, 600),
+    truthClass: "USER_CLAIM",
+    evidenceStatus: "SELF_REPORTED",
+    source: "your company's team facts on Capital Q",
+  };
+}

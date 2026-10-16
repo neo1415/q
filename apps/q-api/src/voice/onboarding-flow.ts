@@ -235,3 +235,30 @@ function questionCore(wording: string | undefined): string | null {
   const core = last.split(" ").length >= 3 ? last : normalWords(wording);
   return core.split(" ").length >= 3 ? core : null;
 }
+
+/** A sentence that says something went on the record. */
+const SAVE_CLAIM =
+  /\b(saved|recorded|on (?:your|the) record|noted|captured|logged|stored)\b/iu;
+
+/**
+ * Nothing was committed this turn, so nothing may be said to be saved
+ * (live 2026-10-16: "$1,200,000 is saved for the raise" with no write;
+ * "Noted." for a figure that was refused). Each sentence claiming a save is
+ * taken out; where one was, the reply says plainly it is not saved yet.
+ */
+export function withoutUnbackedSaveClaims(
+  reply: string,
+  committedThisTurn: boolean,
+): string {
+  if (committedThisTurn) return reply;
+  const sentences = reply.match(/[^.?!]+[.?!]*/g) ?? [reply];
+  // What was on the record before this turn may be said to be ("your
+  // website is already saved"); only a claim about this turn is checked.
+  const kept = sentences.filter(
+    (sentence) =>
+      !SAVE_CLAIM.test(sentence) ||
+      /\b(already|earlier|before|previously)\b/iu.test(sentence),
+  );
+  if (kept.length === sentences.length) return reply;
+  return `I haven't saved that yet. ${kept.join("").trim()}`.trim();
+}

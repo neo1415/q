@@ -44,34 +44,50 @@ function shortTextAnswer(said: string): boolean {
   );
 }
 
+/** Whether their words are exactly one of a choice step's options. */
+function namesOption(step: OnboardingStepManifest, said: string): boolean {
+  const config = step.configuration;
+  if (config.stepType !== "single_select") return false;
+  return config.options.some((option) => {
+    const label = normal(option.label);
+    // "US dollars" for "US dollar": a plural is the same choice.
+    return (
+      label === said ||
+      `${label}s` === said ||
+      normal(option.optionKey) === said
+    );
+  });
+}
+
+const BARE_FIGURE = /^\d{1,3}(,\d{3})*(\.\d+)?$|^\d+(\.\d+)?$/;
+
 export function codeReading(input: {
   readonly utterance: string;
   /** The step Q's last turn asked, if code knows it. */
   readonly asked: OnboardingStepManifest | undefined;
+  /**
+   * The step Q asked the turn before, still open: a bare figure given late
+   * answers it (live 2026-10-16: "1200000" said after Q had moved on from
+   * "how much are you raising?" to the currency).
+   */
+  readonly askedBefore?: OnboardingStepManifest | undefined;
+  /**
+   * Choice steps still open on their path: words that are exactly one of
+   * their options, unambiguously, state that step even when Q asked
+   * another ("US dollars." under "how much are you raising?").
+   */
+  readonly openChoices?: readonly OnboardingStepManifest[] | undefined;
   /** Recommendations waiting for their decision: a "yes" could approve one. */
   readonly pendingCount: number;
 }): QTurnAuthority | null {
   const { asked } = input;
   const said = normal(input.utterance);
-  if (asked === undefined || input.pendingCount > 0) return null;
+  if (input.pendingCount > 0) return null;
   // A question is never an answer, whatever it names.
   if (input.utterance.includes("?")) return null;
   if (said.length === 0 || said.length > MAX_UTTERANCE) return null;
-  const config = asked.configuration;
-  const states =
-    config.stepType === "single_select"
-      ? config.options.some(
-          (option) =>
-            normal(option.label) === said || normal(option.optionKey) === said,
-        )
-      : config.stepType === "range"
-        ? /^\d{1,3}(,\d{3})*(\.\d+)?$|^\d+(\.\d+)?$/.test(said)
-        : config.stepType === "short_text"
-          ? shortTextAnswer(said)
-          : false;
-  if (!states) return null;
-  return {
-    stated: new Set([asked.stepKey]),
+  const stated = (step: OnboardingStepManifest): QTurnAuthority => ({
+    stated: new Set([step.stepKey]),
     declined: new Set(),
     handed: new Set(),
     approved: new Set(),
@@ -79,5 +95,33 @@ export function codeReading(input: {
     lookup: null,
     pausing: false,
     pronounce: null,
-  };
+  });
+  if (asked !== undefined) {
+    const config = asked.configuration;
+    const answersAsked =
+      config.stepType === "single_select"
+        ? namesOption(asked, said)
+        : config.stepType === "range"
+          ? BARE_FIGURE.test(said)
+          : config.stepType === "short_text"
+            ? shortTextAnswer(said)
+            : false;
+    if (answersAsked) return stated(asked);
+  }
+  // Exactly one open choice step has these words as an option.
+  const named = (input.openChoices ?? []).filter((step) =>
+    namesOption(step, said),
+  );
+  if (named.length === 1 && named[0] !== undefined) return stated(named[0]);
+  // A bare figure for the number question asked just before.
+  const before = input.askedBefore;
+  if (
+    before !== undefined &&
+    before.configuration.stepType === "range" &&
+    asked?.configuration.stepType !== "range" &&
+    BARE_FIGURE.test(said)
+  ) {
+    return stated(before);
+  }
+  return null;
 }
