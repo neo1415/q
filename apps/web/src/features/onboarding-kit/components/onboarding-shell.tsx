@@ -5,14 +5,15 @@ import { Button, buttonClassName, IconButton } from "@capital-q/ui/button";
 import { ArrowLeft, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import type { SaveStatus } from "../controller";
+import { ContinueLater } from "./continue-later";
 import { SaveStatusIndicator } from "./save-status";
 
 /**
  * Focused onboarding frame. Mobile: compact top bar (Back · wordmark ·
- * Save & leave), progress, the step, and a bottom action area that reserves
+ * Continue later), progress, the step, and a bottom action area that reserves
  * its own space and respects the safe area and the on-screen keyboard.
  * Desktop centres the same column at reading width. The bottom navigation is
- * deliberately absent; "Save & leave" is the exit, always visible.
+ * deliberately absent; "Continue later" is the exit, always visible.
  *
  * The action bar is part of the reading column, not a full-bleed strip: it
  * sits directly under the step and only sticks to the bottom of the viewport
@@ -80,12 +81,7 @@ export function OnboardingShell({
             />
           </IconButton>
           <span className="cq-label text-(--cq-text-primary)">Capital Q</span>
-          <Link
-            href="/home"
-            className={buttonClassName("quiet", "regular", "px-3")}
-          >
-            Save &amp; leave
-          </Link>
+          <ContinueLater />
         </div>
         <div className="mx-auto w-full max-w-(--cq-layout-reading) px-4 pb-3">
           {progress}

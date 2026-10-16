@@ -313,6 +313,7 @@ import {
   createOnboardingNudges,
   createOnboardingQRecommendations,
   createOnboardingService,
+  createPostgresPendingWriteRepository,
   OnboardingSessionIdSchema,
   createOwnOnboardingSummaryReader,
   type OwnOnboardingSummaryReader,
@@ -489,6 +490,7 @@ import {
   createMemoryService,
   createPostgresKnowledgeRepository,
   createPostgresMemoryRepository,
+  createPostgresPreferenceLearningConsent,
 } from "@capital-q/q-knowledge";
 import {
   AuthUserIdSchema,
@@ -598,6 +600,8 @@ import { createSupabaseRequestAuthenticator } from "./security/supabase-authenti
 import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
 import { createVoiceSessionSealer } from "./voice/session-token.js";
+import { createHeldWritesStore } from "./voice/held-writes.js";
+import { createOnboardingTranscriptPort } from "./composition/onboarding-transcript.js";
 import { createInterviewAgent } from "./voice/interview-agent.js";
 import { createOnboardingConductor } from "./voice/onboarding-conductor.js";
 import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
@@ -2165,6 +2169,11 @@ const profileFindingsReader = createProfileFindingsReader({
 // Their own onboarding, as Q and the reminders read it: once per run (R5;
 // it was read four times), dropped by any onboarding or mandate write the
 // run makes.
+// Lane ob1 (owner decision 2026-10-16): Q infers communication
+// preferences only with the person's consent, per tenant; no row is no.
+const preferenceLearningConsent = createPostgresPreferenceLearningConsent({
+  sql: database.sql,
+});
 const ownOnboardingSummaryReads = createOwnOnboardingSummaryReader({
   sql: database.sql,
 });
@@ -3165,6 +3174,12 @@ const qTools = createQTools({
           profileMaterial.dataRoom.view(actor, companyId),
       }),
     },
+    // Lane ob1: their own setup conversation, recalled for their own questions.
+    onboardingTranscript: createOnboardingTranscriptPort({ sql: database.sql }),
+    preferenceLearning: {
+      decide: (actor, choice) =>
+        preferenceLearningConsent.decide(actor, choice, "CONVERSATION"),
+    },
     ownRecords: {
       read: (actor, query) => ownRecords.read(actor, query),
       reassessReadiness: (actor, companyId, correlationId) =>
@@ -3706,6 +3721,7 @@ const memoryService = createMemoryService({
   logger,
 });
 const memoryLearner = createMemoryLearner({
+  learningConsent: preferenceLearningConsent,
   gateway: modelGateway,
   dataPosture: demoDataPosture,
   memory: memoryService,
@@ -5903,6 +5919,13 @@ const reportPausedAccount = async (
   }
 };
 const interviewLoop = createInterviewAgent({
+  // Lane ob1: a confirmed answer a brief API outage kept from saving is
+  // held in onboarding.pending_writes and replayed on the next turn.
+  heldWrites: createHeldWritesStore({
+    sql: database.sql,
+    repository: createPostgresPendingWriteRepository(),
+    newKey: randomUUID,
+  }),
   standing: standingStore,
   onPaused: reportPausedAccount,
   gateway: modelGateway,
@@ -6403,6 +6426,7 @@ const { app, logger: appLogger } = createApp(
     // the own-public-presence envelope, then the cited pages.
     profileFindings: profileFindingsReader,
     memory: memoryService,
+    learningConsent: preferenceLearningConsent,
     meetingAssistant,
     // MEET-HOST block (ADR 0037)
     meetingHost,

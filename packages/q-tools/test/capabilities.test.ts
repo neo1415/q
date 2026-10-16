@@ -66,6 +66,8 @@ const EVERY_PORT: QToolPorts = {
   documentStudio: STUB,
   recordChanges: STUB,
   ownRecords: STUB,
+  onboardingTranscript: STUB,
+  preferenceLearning: STUB,
   profileMaterial: STUB,
   evidenceDocuments: STUB,
   relationshipMail: STUB,

@@ -315,7 +315,10 @@ describe("ADR 0016 · M2 · a question, an answer and a correction in one turn",
       type: "RANGE",
       value: "15000",
     });
-    expect(outcome.reply).toBe(answer);
+    // Lane ob1 (owner 2026-10-16): a non-final turn never ends without
+    // the next question; the model's words come first, unchanged.
+    expect(outcome.reply.startsWith(answer)).toBe(true);
+    expect(outcome.reply.trim().endsWith("?")).toBe(true);
     // What is still open after the writes reached the model before it replied.
     expect(seen[1]?.text).toContain("stillOpen");
   });

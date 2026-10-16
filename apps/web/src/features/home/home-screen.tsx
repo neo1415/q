@@ -23,6 +23,7 @@ import {
   chooseReturningCards,
   firstName,
   returningGreeting,
+  setupRemindersWaiting,
   type ReturningFacts,
 } from "./returning";
 import type { Briefing } from "./briefing";
@@ -217,6 +218,7 @@ export async function HomeScreen({
             cards={chooseReturningCards(facts)}
             subject={askSubject(context)}
             briefing={briefing}
+            setupReminders={setupRemindersWaiting(facts)}
           />
           {/*
             Q.01/Q.04: a founder's next question from Q and next three

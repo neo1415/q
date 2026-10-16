@@ -167,9 +167,12 @@ describe("what Q says on arrival", () => {
       null,
     );
     expect(words.quiet).toBe(true);
+    // Owner 2026-10-16: nothing waiting is the greeting and one open
+    // question, with no urgency of its own.
     expect(words.spoken).toMatch(
-      /^Good afternoon, Zino\. (?:Good to see you\.|Nice to have you back\.|Glad you're here\.|Good to have you back\.)$/u,
+      /^Good afternoon, Zino\. (?:Good to see you\.|Nice to have you back\.|Glad you're here\.|Good to have you back\.) What would you like to look at\?$/u,
     );
+    expect(words.opener.offersChoice).toBe(false);
     expect(words.spoken).not.toMatch(/quiet|nothing needs you/iu);
     expect(words.dailyPaths).toEqual([]);
     expect(words.firstCard).toBeNull();
@@ -186,12 +189,18 @@ describe("what Q says on arrival", () => {
       new Date("2026-10-08T13:30:00Z"),
       null,
     );
-    expect(words.spoken).toContain("7 October");
-    expect(words.spoken).toContain("Paystack Labs raises $20 million");
-    expect(words.spoken).toContain("Nigeria cuts licence fees");
-    expect(words.spoken).not.toContain("third story");
-    expect(words.spoken).toMatch(/gist|short version|tell you more|open one/iu);
-    expect(words.spoken).not.toMatch(/all quiet|nothing needs you/iu);
+    // Owner 2026-10-16: the opener is the greeting and one question; the
+    // stories stay in the full lowdown, said when they ask for it.
+    expect(words.spoken).not.toContain("Paystack");
+    expect(words.spoken).toMatch(/What would you like to look at\?$/u);
+    expect(words.briefing).toContain("7 October");
+    expect(words.briefing).toContain("Paystack Labs raises $20 million");
+    expect(words.briefing).toContain("Nigeria cuts licence fees");
+    expect(words.briefing).not.toContain("third story");
+    expect(words.briefing).toMatch(
+      /gist|short version|tell you more|open one/iu,
+    );
+    expect(words.briefing).not.toMatch(/all quiet|nothing needs you/iu);
     expect(words.dailyPaths).toEqual([
       "/daily/7b1c0e55-0000-4000-8000-0000000000e1",
     ]);
@@ -310,8 +319,11 @@ describe("all of it up front, then any words (Zino, 2026-10-08)", () => {
     expect(words.summary).toBe(
       "Three things: the Spheros reply is held, Tensorgate wants a call next week, and Halyard Security wants a call next week.",
     );
-    expect(words.spoken).toContain(words.summary ?? "-");
-    expect(words.spoken).toMatch(/Tell me what you'd like done/u);
+    // Said once they choose to look; the opener only counts them.
+    expect(words.briefing).toContain(words.summary ?? "-");
+    expect(words.briefing).toMatch(/Tell me what you'd like done/u);
+    expect(words.spoken).not.toContain(words.summary ?? "-");
+    expect(words.spoken).toMatch(/You have \d+ things waiting\./u);
   });
 
   it("numbers the cards c1.. in screen order for the reader", () => {

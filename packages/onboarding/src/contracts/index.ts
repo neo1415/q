@@ -200,6 +200,8 @@ export type OnboardingResponse = {
   /** The person's own meaning where the options could not hold it; never a filter. */
   readonly note: string | null;
   readonly sourceModality: OnboardingSourceModality;
+  /** FORM or CONVERSATION, as the client declared it; null when unknown. */
+  readonly channel?: "FORM" | "CONVERSATION" | null | undefined;
   readonly createdAt: UtcTimestamp;
   readonly supersededByResponseId: OnboardingResponseId | null;
   /** When the person took this answer back without replacing it; history only. */
@@ -214,6 +216,7 @@ export type ValidatedOnboardingResponse = {
   readonly rawText: string | null;
   readonly note: string | null;
   readonly sourceModality: OnboardingSourceModality;
+  readonly channel?: "FORM" | "CONVERSATION" | null | undefined;
 };
 
 export const OnboardingSourceRefSchema = z

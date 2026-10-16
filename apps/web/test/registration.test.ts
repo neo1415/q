@@ -38,7 +38,7 @@ describe("decideArrival", () => {
     ).toEqual({ kind: "WELCOME", journey: null });
   });
 
-  it("resumes an unfinished journey", () => {
+  it("lets somebody with an unfinished setup in (owner 2026-10-16: no gate)", () => {
     expect(
       decideArrival({
         state: { kind: "UNFINISHED", journey: "founder" },
@@ -47,7 +47,7 @@ describe("decideArrival", () => {
         workspaceChosen: false,
         intendedJourney: "investor",
       }),
-    ).toEqual({ kind: "RESUME", path: "/onboarding/founder?from=home" });
+    ).toEqual({ kind: "HOME" });
   });
 
   it("asks somebody with several workspaces which one, once per browser session", () => {

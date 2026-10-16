@@ -3,11 +3,12 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { DocumentRepository } from "@capital-q/evidence";
 import type { Logger } from "@capital-q/observability";
-import type {
-  OnboardingResponseRepository,
-  OnboardingSessionRepository,
-  OnboardingSuggestionRepository,
-  OnboardingUtteranceRepository,
+import {
+  onboardingDocumentTreatment,
+  type OnboardingResponseRepository,
+  type OnboardingSessionRepository,
+  type OnboardingSuggestionRepository,
+  type OnboardingUtteranceRepository,
 } from "@capital-q/onboarding";
 import type { ChunkRepository } from "@capital-q/q-knowledge";
 import type { TenantId, UserId } from "@capital-q/security";
@@ -72,6 +73,8 @@ import {
 export const FOUNDER_REVIEW_SKIP_REASONS = [
   /** The document is not attached to a company. */
   "NOT_A_COMPANY_DOCUMENT",
+  /** Sensitive or unsuitable for onboarding: acknowledged by metadata, never read. */
+  "NOT_FOR_ONBOARDING_READING",
   /** Nobody is in a founder journey for that company right now. */
   "NO_ACTIVE_SESSION",
   /** Processing finished but produced no readable passages. */
@@ -327,6 +330,19 @@ export function createFounderDocumentReview(
       );
       if (document === null || document.companyId === null) {
         return { kind: "SKIPPED", reason: "NOT_A_COMPANY_DOCUMENT" };
+      }
+      // Lane ob1: onboarding reads only suitable, non-sensitive material
+      // (deck, company or product profile). Financial, legal, corporate,
+      // customer or data-room documents, and anything classed highly
+      // confidential, are acknowledged by their metadata only: there is no
+      // authorised onboarding purpose to read them, so no model sees them.
+      if (
+        onboardingDocumentTreatment({
+          documentType: document.documentType,
+          sensitivityClass: document.sensitivityClass,
+        }) === "METADATA_ONLY"
+      ) {
+        return { kind: "SKIPPED", reason: "NOT_FOR_ONBOARDING_READING" };
       }
 
       // The founder's own journey for this company. A document uploaded by
