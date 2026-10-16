@@ -118,6 +118,13 @@ export const PAGE_SETTLE_MS = 8_000;
 export async function pageSettled(
   signal: AbortSignal,
   maxMs: number = PAGE_SETTLE_MS,
+  /**
+   * The company Q will be asked about (the session's page subject). Run 6,
+   * 16 Oct: the page had settled, but the subject was still the feed's
+   * last card, and the question was sent about it. On a company page the
+   * question waits until the subject is that company too.
+   */
+  subjectCompany?: () => string | undefined,
 ): Promise<boolean> {
   const until = Date.now() + maxMs;
   for (;;) {
@@ -130,7 +137,9 @@ export async function pageSettled(
     )?.[1];
     const focused =
       company === undefined ||
-      manifest?.focus?.id.toLowerCase() === company.toLowerCase();
+      (manifest?.focus?.id.toLowerCase() === company.toLowerCase() &&
+        (subjectCompany === undefined ||
+          subjectCompany()?.toLowerCase() === company.toLowerCase()));
     if (!loading && focused) return true;
     if (signal.aborted || Date.now() > until) return false;
     await sleep(150);
@@ -364,7 +373,10 @@ export function useTourPorts(
       const known = new Set<string>(messages().map((m) => m.runId));
       if (q.runId !== null) known.add(q.runId);
       if (q.state.runId !== null) known.add(q.state.runId);
-      await pageSettled(signal);
+      await pageSettled(signal, PAGE_SETTLE_MS, () => {
+        const subject = qRef.current?.subject;
+        return subject?.kind === "COMPANY" ? subject.companyId : undefined;
+      });
       if (signal.aborted) return outcome(false, "CANCELLED");
       setOpen(true);
       TOUR_ASKS.add(text.trim());
