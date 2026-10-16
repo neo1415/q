@@ -301,6 +301,27 @@ describe("the reply after a clean save is written by code", () => {
   });
 });
 
+describe("no closing reply while a stated fact is unsaved (live AF 2026-10-16)", () => {
+  it("a step the reading found stated, not yet written, gets another model round", async () => {
+    const world = founderWorld();
+    const said = "Seed stage, based in Kenya, raising half a million.";
+    const model = recordingModel([
+      { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
+      { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+    ]);
+    await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(
+        reading({ stated: ["F1.stage", "F1.country", "F6.target_amount"] }),
+      ),
+      replyByCodeAfterCleanSave: true,
+    }).turn({ ...turn(world, said), actor });
+    expect(model.calls()).toBe(2);
+  });
+});
+
 describe("quickAcknowledgement", () => {
   const next = { question: "What does the company do?", optional: false };
   const labelOf = (key: string) =>

@@ -351,7 +351,7 @@ function RubricMark({ section }: { readonly section: DeckCoachingSection }) {
 }
 
 function qAsk(words: string) {
-  return `/q?ask=${encodeURIComponent(words)}`;
+  return `/home?ask=${encodeURIComponent(words)}`;
 }
 
 export function DeckCoach({

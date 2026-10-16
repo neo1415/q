@@ -7,6 +7,8 @@ import { createLogger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
+import { RecordOnboardingAnswersInputSchema } from "@capital-q/q-tools";
+
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
 
 import { codeReading } from "../src/voice/code-reading.js";
@@ -17,6 +19,7 @@ import {
 import { quickAcknowledgement } from "../src/voice/quick-acknowledgement.js";
 import {
   branchStepKeys,
+  createOnboardingPort,
   proposalPrerequisites,
   verbatimOptionIn,
 } from "../src/voice/onboarding-port.js";
@@ -213,5 +216,49 @@ describe("live latency run on release AA (2026-10-16)", () => {
         turnIndex: 0,
       }),
     ).not.toContain("..");
+  });
+});
+
+describe("live acceptance on AF (2026-10-16)", () => {
+  it("'Other' keeps their words: 'Based in Uganda' is not a bare 'Somewhere else'", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.country",
+      recorded: { "F0.intent": "raising_now" },
+    });
+    const said = "Based in Uganda.";
+    const port = createOnboardingPort({
+      session: turn(world, said).session,
+      onboardingSessionId: turn(world, said).onboardingSessionId,
+      journeyType: "founder",
+      ownerUserId: "b0000000-0000-4000-8000-000000000001",
+      personTurns: [said],
+      authority: () => Promise.resolve(reading({ stated: ["F1.country"] })),
+    });
+    await port.record([
+      {
+        stepKey: "F1.country",
+        value: "Somewhere else",
+        quote: "Based in Uganda",
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    expect(world.recordedValue("F1.country")).toEqual({
+      type: "SINGLE_SELECT",
+      optionKey: "other",
+    });
+    expect(world.recordedNote("F1.country")).toBe("Based in Uganda");
+  });
+
+  it("a long answer of thirteen facts, with a two-letter quote, is a valid call", () => {
+    const answers = Array.from({ length: 13 }, (_, i) => ({
+      stepKey: `I2.step_${String(i)}`,
+      value: "x",
+      quote: i === 0 ? "GP" : "their words",
+    }));
+    expect(
+      RecordOnboardingAnswersInputSchema.safeParse({ answers }).success,
+    ).toBe(true);
   });
 });

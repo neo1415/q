@@ -460,7 +460,7 @@ export function pitchProfileSections(
           : "Not provided. Unknown, not zero: ask them.",
       facts: rows,
       where: where === null ? null : `${where} of the deck`,
-      askHref: `/q?ask=${encodeURIComponent(`About ${input.companyName}'s ${label.toLowerCase()}: `)}`,
+      askHref: `/home?ask=${encodeURIComponent(`About ${input.companyName}'s ${label.toLowerCase()}: `)}`,
       askLabel: `Ask Q about ${label.toLowerCase()}`,
       ...(input.own &&
       !provided &&

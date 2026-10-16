@@ -465,7 +465,7 @@ describe("founder journey over the runtime contract", () => {
     });
   });
 
-  it("refuses a session whose definition has a step this build cannot present", async () => {
+  it("presents a session whose definition has a step this build has no screen for (live 2026-10-16)", async () => {
     const port = createFixtureRuntimePort({ storage: null, seed: "reset" });
     const unknownVersion: RuntimePort = {
       ...port,
@@ -493,9 +493,11 @@ describe("founder journey over the runtime contract", () => {
             };
       },
     };
+    // Never refused: the unknown step is drawn as its question and a text
+    // field when the journey reaches it (fallbackGroup).
     await expect(
       createRuntimeFounderClient(unknownVersion, SOURCE).getSession(),
-    ).rejects.toMatchObject({ kind: "UNAVAILABLE" });
+    ).resolves.toMatchObject({ status: "in_progress" });
   });
 });
 

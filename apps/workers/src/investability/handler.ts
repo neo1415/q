@@ -106,6 +106,11 @@ export function withInvestabilityRecompute(
     readonly registry: EventRegistry;
     readonly sql: DatabaseExecutor;
     readonly service: Pick<InvestabilityService, "recompute">;
+    /**
+     * A new revision changes the Discover order (fit-order.v2): refresh the
+     * slates that serve this company. Never fails the event.
+     */
+    readonly onRecorded?: ((companyId: string) => Promise<void>) | undefined;
     readonly logger: RunnerLogger;
   },
 ): (message: QueueMessage) => Promise<MessageOutcome> {
@@ -121,6 +126,7 @@ export function withInvestabilityRecompute(
       for (const companyId of companies) {
         const outcome = await service.recompute(companyId);
         if (outcome.kind === "RECORDED") {
+          await options.onRecorded?.(companyId).catch(() => undefined);
           logger.info(
             {
               event: "investability.recorded",
@@ -156,6 +162,14 @@ const FULL_SWEEP_EVERY_TICKS = 48;
 
 export async function runInvestabilitySweepTicker(options: {
   readonly service: Pick<InvestabilityService, "sweep">;
+  /**
+   * After a sweep that recorded anything, and once after the first sweep
+   * of a process (a deploy may have changed the method or the order),
+   * every current slate is refreshed once (coalesced per mandate), so
+   * Discover's order uses the new Investability without waiting for the
+   * slates to expire.
+   */
+  readonly onScoresChanged?: (() => Promise<void>) | undefined;
   readonly signal: AbortSignal;
   readonly logger: RunnerLogger;
   readonly intervalMs?: number | undefined;
@@ -165,6 +179,7 @@ export async function runInvestabilitySweepTicker(options: {
   const sleep = options.sleep ?? abortableSleep;
   await sleep(FIRST_SWEEP_DELAY_MS, options.signal);
   let tick = 1;
+  let first = true;
   while (!options.signal.aborted) {
     try {
       // Changed companies every tick (one read when nothing changed); every
@@ -176,6 +191,10 @@ export async function runInvestabilitySweepTicker(options: {
         { event: "investability.sweep", changedOnly, ...result },
         "investability sweep",
       );
+      if (result.recorded > 0 || first) {
+        await options.onScoresChanged?.().catch(() => undefined);
+      }
+      first = false;
     } catch {
       options.logger.warn(
         { event: "investability.sweep_failed" },

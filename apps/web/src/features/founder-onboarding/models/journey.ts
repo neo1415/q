@@ -10,6 +10,8 @@ import {
   FOUNDER_DEFINITION_V2_VERSION,
   FOUNDER_DEFINITION_V4_VERSION,
   FOUNDER_FINANCIAL_STEPS,
+  FOUNDER_PROFILE_SECTION_STEPS,
+  FOUNDER_PROFILE_SECTIONS,
   FOUNDER_STEPS,
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
@@ -69,7 +71,15 @@ export type GroupId =
   | "traction"
   | "capital_objective"
   | "follow_up"
-  | "snapshot";
+  | "snapshot"
+  /** A founder profile section of its own (definition v6, phase F9). */
+  | `profile:${string}`
+  /**
+   * A step this build has no screen for (a later definition): drawn as a
+   * question and a text field, never a reason to refuse the whole setup
+   * (live 2026-10-16: v6 took founder setup down on the web).
+   */
+  | `step:${string}`;
 
 export type Group = {
   readonly id: GroupId;
@@ -194,6 +204,19 @@ export const GROUPS: readonly Group[] = [
       S.raiseConfirm,
     ],
   },
+  // Founder v6: one optional text section per profile section (F9).
+  ...FOUNDER_PROFILE_SECTION_STEPS.map(
+    (step): Group => ({
+      id: `profile:${step.stepKey}`,
+      kind: "narrative",
+      section: "business",
+      title:
+        FOUNDER_PROFILE_SECTIONS.find((section) =>
+          section.stepKeys.includes(step.stepKey),
+        )?.title ?? step.configuration.prompt,
+      stepKeys: [step.stepKey],
+    }),
+  ),
   {
     id: "follow_up",
     kind: "narrative",
@@ -222,11 +245,14 @@ const STEP_CONFIG = new Map(
 );
 
 export function groupOf(stepKey: string): Group | undefined {
-  return GROUP_BY_STEP.get(stepKey);
+  return GROUP_BY_STEP.get(stepKey) ?? fallbackGroup(stepKey);
 }
 
 export function groupById(id: string): Group | undefined {
-  return GROUP_BY_ID.get(id as GroupId);
+  return (
+    GROUP_BY_ID.get(id as GroupId) ??
+    (id.startsWith("step:") ? fallbackGroup(id.slice(5)) : undefined)
+  );
 }
 
 function config(stepKey: string) {
@@ -235,6 +261,17 @@ function config(stepKey: string) {
     throw new Error(`unknown founder step ${stepKey}`);
   }
   return step;
+}
+
+/** A step this build does not know: its question and a text field. */
+function fallbackGroup(stepKey: string): Group {
+  return {
+    id: `step:${stepKey}`,
+    kind: "narrative",
+    section: "review",
+    title: STEP_CONFIG.get(stepKey)?.configuration.prompt ?? "One more question",
+    stepKeys: [stepKey],
+  };
 }
 
 export function optionsOf(stepKey: string): readonly ChoiceOption[] {
@@ -369,10 +406,9 @@ export function isSupportedVersion(view: OnboardingSessionView): boolean {
   // a hard-coded version list refused every new founder until it was edited.
   // A later version that only adds options (v5: Gulf countries) renders as
   // is; one that adds a step this build does not know is refused honestly.
-  return (
-    view.session.definitionVersion >= FOUNDER_DEFINITION_V2_VERSION &&
-    view.progress.eligibleSteps.every((step) => GROUP_BY_STEP.has(step.stepKey))
-  );
+  // A step this build has no screen for is drawn as a question and a text
+  // field (fallbackGroup): it never refuses the setup (live 2026-10-16).
+  return view.session.definitionVersion >= FOUNDER_DEFINITION_V2_VERSION;
 }
 
 function single(state: RuntimeState, key: string): string | undefined {
@@ -401,7 +437,7 @@ function refs(state: RuntimeState, key: string): string[] | undefined {
 /** The screen the session is on: by current step, or the snapshot once complete. */
 export function currentGroup(view: OnboardingSessionView): Group {
   const key = view.session.currentStepKey;
-  const group = key === null ? undefined : GROUP_BY_STEP.get(key);
+  const group = key === null ? undefined : groupOf(key);
   return group ?? SNAPSHOT_GROUP;
 }
 
@@ -510,7 +546,10 @@ export function toPresentation(
   const state = runtimeState(view);
   const current = currentGroup(view);
   const complete = view.session.status !== "ACTIVE";
-  const steps: StepSummary[] = GROUPS.flatMap((group) => {
+  const unknown = view.progress.eligibleSteps
+    .filter((step) => !GROUP_BY_STEP.has(step.stepKey))
+    .map((step) => fallbackGroup(step.stepKey));
+  const steps: StepSummary[] = [...GROUPS, ...unknown].flatMap((group) => {
     const status = groupStatus(group, state, current);
     return status === null
       ? []
@@ -567,6 +606,38 @@ function base<TKind extends StepKind>(
     help: configuration.supportingText,
     optional: !required,
     skipped: skippedGroup(group, state),
+  };
+}
+
+/**
+ * A profile section, or a step this build has no screen for: its question
+ * and a text field. The runtime takes their words for any question
+ * (always-save), so nothing here depends on knowing the step's type.
+ */
+function ownWordsStep(group: Group, state: RuntimeState): StepView {
+  const key = group.stepKeys[0];
+  const known = STEP_CONFIG.get(key);
+  const live =
+    state.view.currentStep?.stepKey === key ? state.view.currentStep : null;
+  const eligible = state.view.progress.eligibleSteps.find(
+    (step) => step.stepKey === key,
+  );
+  const value = text(state, key);
+  return {
+    id: group.id,
+    kind: "narrative",
+    section: group.section,
+    title: group.title,
+    prompt: known?.configuration.prompt ?? live?.prompt ?? group.title,
+    help: known?.configuration.supportingText,
+    optional: !(known?.required ?? eligible?.required ?? false),
+    skipped: skippedGroup(group, state),
+    maxLength:
+      known?.configuration.stepType === "long_text"
+        ? known.configuration.maxLength
+        : 2000,
+    voiceEnabled: false,
+    response: value === undefined ? undefined : { kind: "narrative", text: value },
   };
 }
 
@@ -713,6 +784,8 @@ function buildStep(
       return buildCapitalObjective(group, state, context);
     case "snapshot":
       return buildSnapshot(group, state, context, extras.companyId);
+    default:
+      return ownWordsStep(group, state);
   }
 }
 
