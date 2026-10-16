@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   appendOnboardingInterviewTurns,
@@ -526,13 +526,14 @@ export function createOnboardingConductor(
     input: InterviewAgentTurnInput,
     text: string,
     stepKey: string | null,
+    turnRef: string = randomUUID(),
   ) => {
     if (text.length === 0) return;
     void appendOnboardingInterviewTurns(
       input.session,
       input.onboardingSessionId,
       {
-        turnRef: randomUUID(),
+        turnRef,
         turns: [
           {
             role: "Q",
@@ -640,7 +641,23 @@ export function createOnboardingConductor(
       await hold(input, waiting);
     }
     searchByName(input, view);
-    keep(input, reply, asking?.stepKey ?? null);
+    // Once per reopening (live AG 2026-10-16: each load kept the resume line
+    // twice). The same line already last in the conversation is not kept
+    // again, and two opens of the same conversation state at once share
+    // one idempotent reference, so the API keeps one.
+    const items = kept?.items ?? [];
+    const last = items.at(-1);
+    if (!(last?.role === "Q" && last.text === reply)) {
+      keep(
+        input,
+        reply,
+        asking?.stepKey ?? null,
+        resumeTurnRef(
+          input.onboardingSessionId,
+          `${items.length}|${last?.createdAt ?? ""}|${reply}`,
+        ),
+      );
+    }
     return {
       reply,
       intent: "RESUME",
@@ -790,4 +807,13 @@ export function createOnboardingConductor(
     researchEnded: agent.researchEnded,
     enqueueFound,
   };
+}
+
+/** A stable UUID for one resume line over one conversation state. */
+export function resumeTurnRef(sessionId: string, state: string): string {
+  const hex = createHash("sha256")
+    .update(`resume|${sessionId}|${state}`)
+    .digest("hex");
+  // Shaped as a version-4-style UUID: the API checks the form only.
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }

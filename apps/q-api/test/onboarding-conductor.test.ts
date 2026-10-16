@@ -424,6 +424,27 @@ describe("Q leads", () => {
     }
   });
 
+  it("a reopening whose resume line is already last keeps it once, not again (live AG: twice per load)", async () => {
+    const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
+    const line = resumeLine(stuckView(), "founder");
+    const { fetch: f, appended } = api({
+      kept: [
+        { role: "Q", text: "Hi Aria, welcome to Capital Q." },
+        { role: "PERSON", text: "Hi." },
+        { role: "Q", text: line },
+      ],
+    });
+    const conductor = createOnboardingConductor({
+      agent,
+      portFor: fakePorts().portFor,
+      logger,
+    });
+    const outcome = await conductor.turn(input(f, ""));
+    expect(outcome.reply).toBe(line);
+    await tick();
+    expect(appended).toEqual([]);
+  });
+
   it("resuming from a profile section link asks that section first (live AG: ?section=moats was ignored)", async () => {
     const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
     const base = stuckView();
