@@ -50,6 +50,8 @@ import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
 } from "../onboarding-kit/material-actions";
+import { CONTINUE_LATER_PAUSE_MS } from "../onboarding-kit/components/continue-later";
+import { writeLastMode } from "../onboarding-kit/last-mode";
 import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { requestMove } from "../q/ui-act-controller";
@@ -301,6 +303,19 @@ export function QOnboardingWorkspace({
     },
   });
   const voiceActive = voice.active;
+  // Owner 2026-10-16: the reminder's one tap reopens the mode last used.
+  // Talking with Q is remembered as voice; typing to Q (below) as the
+  // conversation.
+  const rawJourney = session.raw?.session.journeyType;
+  const journeyName =
+    rawJourney === "founder" || rawJourney === "investor"
+      ? rawJourney
+      : undefined;
+  useEffect(() => {
+    if (voiceActive && journeyName !== undefined) {
+      writeLastMode(journeyName, "voice");
+    }
+  }, [voiceActive, journeyName]);
   /**
    * Arriving by voice (Q's first minute handed over): the voice stage
    * holds until the interview's line is up, or until it fails and the
@@ -774,6 +789,9 @@ export function QOnboardingWorkspace({
         }
       }
       push("PERSON", trimmed);
+      if (journeyName !== undefined) {
+        writeLastMode(journeyName, "conversation");
+      }
       settleReading();
       setNarrowedTo(null);
       // A pause or a return to the interview is read by the loop like any
@@ -862,6 +880,16 @@ export function QOnboardingWorkspace({
       // does from a spoken one (QX-004 D): the same destination map, the
       // same hand-over to the form. Before this a typed "open Discover"
       // reached this seam and went nowhere.
+      if (turn.navigate === "HOME" && turn.reply !== null) {
+        // "Let's finish this later" (owner 2026-10-16): Q's one-line
+        // acknowledgement stays readable, then they are let into the app.
+        pendingReply.current = null;
+        push("Q", turn.reply);
+        window.setTimeout(() => {
+          router.push("/home");
+        }, CONTINUE_LATER_PAUSE_MS);
+        return;
+      }
       if (turn.navigate === "FORM") {
         const editor =
           prompt === null ? undefined : vocabulary.editorFor(prompt.stepKey);
@@ -899,6 +927,7 @@ export function QOnboardingWorkspace({
       voiceActive,
       voiceConnected,
       voiceSendText,
+      journeyName,
     ],
   );
 

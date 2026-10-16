@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   composeReturningOpener,
+  plainOpener,
   type OpenerFacts,
 } from "../src/voice/returning-opener.js";
 
@@ -15,8 +16,16 @@ const none: OpenerFacts = {
   unreadNotices: 0,
 };
 
+const FEW =
+  "You have a few things waiting. Would you like to look at them now, or talk about something else?";
+
+/**
+ * Owner 2026-10-16: the server's fallback opener is the web's opener --
+ * the greeting, that things wait (never a number it cannot stand behind),
+ * and the two choices -- and never lists an item.
+ */
 describe("the returning opener", () => {
-  it("leads with a call coming up and offers to prep", () => {
+  it("says things are waiting and offers the two choices, never the list", () => {
     const line = composeReturningOpener(
       "Zino",
       {
@@ -26,57 +35,64 @@ describe("the returning opener", () => {
           startsAt: new Date("2026-09-30T11:00:00.000Z"),
         },
         remindersDue: 2,
+        firstReminder: "Follow up with Ada",
+        notesReady: 1,
+        notesQuestion: "How did it go?",
+        unreadNotices: 3,
+        scoutFinding: "Kazikit opens a Lagos office",
+        instructionNews: "While you were away, I sent 4 messages.",
       },
       NOW,
     );
-    expect(line).toBe(
-      'Hi Zino. You have "Call with Kazikit" in about 3 hours. And 2 reminders due today. Want me to prep you for it?',
+    expect(line).toBe(`Hi Zino. ${FEW}`);
+    for (const item of [
+      "Kazikit",
+      "Ada",
+      "notes",
+      "reminder",
+      "How did it go",
+      "sent 4",
+      "3",
+    ]) {
+      expect(line).not.toContain(item);
+    }
+  });
+
+  it.each([
+    ["a call coming up", { nextCall: { purpose: "x", startsAt: NOW } }],
+    ["a reminder due", { remindersDue: 1, firstReminder: "x" }],
+    ["call notes", { notesReady: 1 }],
+    ["an unread notice", { unreadNotices: 1 }],
+    ["a scout finding", { scoutFinding: "x" }],
+  ] as const)("any one thing waiting (%s) is 'a few things'", (_, more) => {
+    expect(composeReturningOpener(null, { ...none, ...more }, NOW)).toBe(
+      `Welcome back. ${FEW}`,
     );
   });
 
-  it("offers notes, then a reminder, then what came in", () => {
-    expect(
-      composeReturningOpener("Zino", { ...none, notesReady: 1 }, NOW),
-    ).toContain("My notes from your last call are ready");
-    expect(
-      composeReturningOpener(
-        null,
-        { ...none, remindersDue: 1, firstReminder: "Follow up with Ada" },
-        NOW,
-      ),
-    ).toBe(
-      'Welcome back. You asked me to remind you: "Follow up with Ada". Want to deal with it now?',
-    );
-    expect(
-      composeReturningOpener("Zino", { ...none, unreadNotices: 3 }, NOW),
-    ).toContain("3 things came in");
-  });
-
-  it("still offers something when nothing is waiting", () => {
+  it("with nothing waiting: the greeting and one open question", () => {
     expect(composeReturningOpener("Zino", none, NOW)).toBe(
-      "Hi Zino. Want me to see what's new for you, or is there something on your mind?",
+      "Hi Zino. What would you like to look at?",
     );
-  });
-});
-
-describe("after a call (2026-10-02)", () => {
-  it("asks how it went, with the outcome Q proposes from its notes", () => {
+    // Work Q did is news, not something waiting.
     expect(
       composeReturningOpener(
         "Zino",
-        {
-          ...none,
-          notesReady: 1,
-          notesQuestion:
-            "How did it go? It sounded like next steps are diligence — record that?",
-        },
+        { ...none, instructionNews: "While you were away, I sent 4 messages." },
         NOW,
       ),
-    ).toBe(
-      "Hi Zino. My notes from your last call are ready. How did it go? It sounded like next steps are diligence — record that?",
-    );
+    ).toBe("Hi Zino. What would you like to look at?");
   });
 
+  it("with no read at all: the plain hello, which claims nothing", () => {
+    expect(plainOpener("Zino")).toBe(
+      "Hi Zino. What would you like to look at?",
+    );
+    expect(plainOpener(null)).toBe("Hi. What would you like to look at?");
+  });
+});
+
+describe("by their clock (2026-10-08)", () => {
   it("greets by the person's own clock when their time zone is known (2026-10-08)", () => {
     // 08:00 UTC is 09:00 in Lagos and 04:00 in New York.
     expect(

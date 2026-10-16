@@ -424,6 +424,16 @@ export function onboardingPath(state: OnboardingState): string | null {
   return state.kind === "NEW" ? "/welcome" : null;
 }
 
+/**
+ * Whether the app shell holds the person to the way in (owner 2026-10-16:
+ * the app is fully usable with setup incomplete). Only somebody who has
+ * not started a journey at all is held, to the welcome; an unfinished
+ * setup keeps the whole shell.
+ */
+export function onboardingGate(state: OnboardingState): string | null {
+  return state.kind === "NEW" ? onboardingPath(state) : null;
+}
+
 export const resolveOwnContext = cache(async (): Promise<OwnContext> =>
   resolveOwnContextWith(await apiSession(), {
     // The switcher's own read, shared within the render.

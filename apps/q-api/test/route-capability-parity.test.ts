@@ -575,6 +575,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "tool.get_onboarding_state",
   ),
   "api/http/onboarding.ts GET byId": cap("tool.get_onboarding_state"),
+  "api/http/onboarding.ts GET `${byId}${ONBOARDING_COVERAGE_SEGMENT}`": cap(
+    "tool.get_onboarding_state",
+  ),
   // Setup reminders (founder directive 2026-09-27): Home's card claims
   // today's reminder; "Later" / "stop" are Q's own tool too.
   "api/http/onboarding.ts GET `${nudgePath}${ONBOARDING_NUDGE_BRIEFING_SEGMENT}`":
@@ -781,6 +784,12 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "q-api/http/memory.ts POST Q_MEMORY_FORGET_PATH": exempt(
     "the person correcting Q's memory of them; never a Q action",
+  ),
+  "q-api/http/memory.ts GET Q_MEMORY_LEARNING_PATH": exempt(
+    "the person's own consent state for preference learning; Q reads it on every run, not as a tool",
+  ),
+  "q-api/http/memory.ts POST Q_MEMORY_LEARNING_PATH": cap(
+    "tool.set_preference_learning",
   ),
   "q-api/http/profile-findings.ts GET Q_PROFILE_FINDINGS_PATH": cap(
     "tool.read_my_record",
@@ -1236,6 +1245,10 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
  * ceiling; pending the lead's decision on declaring q-api actions.
  */
 const HELD_RETRY: ReadonlySet<string> = new Set([
+  // The person's own consent switch for preference learning (owner
+  // directive 2026-10-16: learning only with consent). Q's twin is the
+  // set_preference_learning tool; the route is the Settings switch.
+  "q-api/http/memory.ts POST Q_MEMORY_LEARNING_PATH",
   "q-api/http/workforce.ts POST Q_WORKFORCE_DRAFT_RETRY_PATH",
   // A POST that only reads the person's words into verbs; changes nothing.
   "q-api/http/briefing-command.ts POST Q_BRIEFING_COMMAND_PATH",

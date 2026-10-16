@@ -63,6 +63,7 @@ import {
   type ArrivalDecisionResult,
 } from "./arrival-actions";
 import {
+  chooseOpener,
   carryStatus,
   claimGreeting,
   isHandled,
@@ -71,15 +72,19 @@ import {
   markLeft,
   refreshArrival,
   setArrivalSpoken,
+  setOpenerOffered,
   takeCarriedStatus,
   useArrival,
+  useArrivalSetupReminders,
+  useOpener,
   type ArrivalLoader,
 } from "./arrival-store";
+import { SOMETHING_ELSE_QUESTION, type OpenerChoice } from "./opener";
+import { tellLineOpenerAnswer } from "./opener-answer";
 import { useQControl } from "@/features/q/control/q-control";
 
 import { loadArrival } from "./arrival-browser";
 import { setRoomFilled, useRoomSlots } from "./arrival-room";
-import { DailyPrefetch } from "./daily-prefetch";
 
 /**
  * Q on arrival (Zino, 2026-10-08; designs docs/design/2026-10-08/briefing
@@ -1100,6 +1105,50 @@ export function useLaterCards(load: ArrivalLoader, ready: boolean): void {
   }, [items, ready, load]);
 }
 
+/**
+ * The opener's two answers (owner 2026-10-16): look at what waits now, or
+ * talk about something else. Typed or spoken answers reach the same choice
+ * (arrival-store `answerOpener`).
+ */
+export function OpenerChoices({
+  pending,
+  compact,
+  onChoose,
+}: {
+  readonly pending: number;
+  readonly compact: boolean;
+  readonly onChoose: (choice: OpenerChoice) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="What would you like to do?"
+      className={cx(
+        "flex flex-wrap gap-2",
+        compact ? "justify-start" : "justify-center",
+      )}
+      data-arrival-opener
+    >
+      <Button
+        variant="primary"
+        size="large"
+        onClick={() => onChoose("SHOW")}
+        data-arrival-opener-show
+      >
+        {pending === 1 ? "Look at it" : "Look at them"}
+      </Button>
+      <Button
+        variant="secondary"
+        size="large"
+        onClick={() => onChoose("OTHER")}
+        data-arrival-opener-other
+      >
+        Something else
+      </Button>
+    </div>
+  );
+}
+
 export function ArrivalBriefing({
   variant,
   fallback = null,
@@ -1161,20 +1210,51 @@ export function ArrivalBriefing({
       data: { ...loaded.data, cards },
     };
   }, [loaded, greets]);
+  const setupReminders = useArrivalSetupReminders();
   const words = useMemo(
     () =>
       ready === null
         ? null
-        : arrivalWords(ready.data, now?.() ?? new Date(), browserZone()),
-    [ready, now],
+        : arrivalWords(
+            { ...ready.data, setupReminders },
+            now?.() ?? new Date(),
+            browserZone(),
+          ),
+    [ready, now, setupReminders],
   );
+  const opener = useOpener();
   useEffect(() => {
     if (words !== null && ready !== null && !ready.quietHead) {
-      setArrivalSpoken(words.spoken);
+      setArrivalSpoken(words.spoken, words.briefing);
+      setOpenerOffered(words.opener.offersChoice);
     }
   }, [words, ready]);
   if (ready === null || words === null) return <>{fallback}</>;
   const compact = variant === "dock";
+  // Owner 2026-10-16: the cards come up only once they choose to look.
+  const showCards = opener.choice === "SHOW";
+  const choose = (choice: OpenerChoice) => {
+    chooseOpener(choice);
+    tellLineOpenerAnswer(choice);
+    // The dock has no place to type: "something else" hands over to Q.
+    if (compact && choice === "OTHER") onClose?.();
+  };
+  // What Q says after the greeting: the opener until they answer, then
+  // what follows from the answer.
+  const after =
+    opener.choice === "OTHER"
+      ? SOMETHING_ELSE_QUESTION
+      : opener.choice === "SHOW" && words.opener.offersChoice
+        ? "Here's what's waiting."
+        : words.opener.line;
+  const choices =
+    words.opener.offersChoice && opener.choice === null ? (
+      <OpenerChoices
+        pending={words.opener.pending}
+        compact={compact}
+        onChoose={choose}
+      />
+    ) : null;
   // E1: on the Q page the cards are the stage's (arrival-stage.tsx), which
   // outlives this welcome; here only the words.
   const inline = cards === "inline";
@@ -1182,7 +1262,10 @@ export function ArrivalBriefing({
   if (compact && ready.data.cards.length === 0 && words.quiet) return null;
   // Nothing left to put to them, and the greeting was given: the page's
   // own welcome (or, in the dock, nothing).
-  if (ready.quietHead && (!inline || ready.data.cards.length === 0)) {
+  if (
+    ready.quietHead &&
+    (!inline || ready.data.cards.length === 0 || !showCards)
+  ) {
     return compact ? null : <>{fallback}</>;
   }
   return (
@@ -1194,9 +1277,6 @@ export function ArrivalBriefing({
       data-arrival={variant}
       data-arrival-quiet={words.quiet ? "" : undefined}
     >
-      {words.dailyPaths.length === 0 || ready.quietHead ? null : (
-        <DailyPrefetch paths={words.dailyPaths} />
-      )}
       {ready.quietHead ? (
         variant === "page" ? (
           fallback
@@ -1207,13 +1287,7 @@ export function ArrivalBriefing({
             <span className="font-semibold text-(--cq-text-primary)">
               {words.greeting}
             </span>{" "}
-            {words.lowdown}
-            {words.summary === null ? null : (
-              <>
-                {" "}
-                <span data-arrival-summary>{words.summary}</span>
-              </>
-            )}
+            <span data-arrival-lowdown>{after}</span>
           </p>
           {onClose === undefined ? null : (
             <Button
@@ -1244,27 +1318,12 @@ export function ArrivalBriefing({
                 {words.welcome}{" "}
               </span>
             )}
-            {words.lowdown}
+            {after}
           </p>
-          {words.summary === null ? null : (
-            <p
-              className="cq-body cq-prose text-balance text-(--cq-text-primary)"
-              data-arrival-summary
-            >
-              {words.summary}
-            </p>
-          )}
-          {words.matches === null ? null : (
-            <p
-              className="cq-body cq-prose text-balance text-(--cq-text-primary)"
-              data-arrival-matches-words
-            >
-              {words.matches}
-            </p>
-          )}
         </div>
       )}
-      {!inline || ready.data.cards.length === 0 ? null : (
+      {ready.quietHead ? null : choices}
+      {!inline || ready.data.cards.length === 0 || !showCards ? null : (
         <Sequence
           key={ready.round}
           data={ready.data}

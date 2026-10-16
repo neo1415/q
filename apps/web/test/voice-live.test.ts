@@ -348,6 +348,8 @@ describe("the GPT-Live delegation bridge", () => {
     expect(sent[0]?.delegation_id).toBeNull();
     expect(sent[0]?.content).toContain("never repeat card or screen text");
     expect(sent[0]?.content).toContain("Spheros is waiting");
+    // Owner 2026-10-16: a counted opening is said as a count, never a list.
+    expect(sent[0]?.content).toContain("never the items, names or details");
   });
 
   it("tells the voice nothing was cancelled until the server confirms", async () => {

@@ -52,7 +52,8 @@ vi.mock("../src/features/work/notice-store", () => ({
 const { ArrivalStage } = await import("../src/features/briefing/arrival-stage");
 const { ArrivalRoom, RoomBelow, StageModeProvider } =
   await import("../src/features/briefing/arrival-room");
-const { resetArrival } = await import("../src/features/briefing/arrival-store");
+const { answerOpener, chooseOpener, resetArrival, setOpenerOffered } =
+  await import("../src/features/briefing/arrival-store");
 const { resetArrivalGate } =
   await import("../src/features/briefing/arrival-gate");
 const { cardInFocus } = await import("../src/features/voice/line-cards");
@@ -197,12 +198,66 @@ afterEach(() => {
   cleanup();
 });
 
-async function settle() {
+/** The read lands; `look`: they chose to look (owner 2026-10-16). */
+async function settle(look = true) {
   await act(async () => {
     await Promise.resolve();
     await Promise.resolve();
   });
+  if (look) {
+    act(() => {
+      chooseOpener("SHOW");
+    });
+  }
 }
+
+describe("the cards wait for their answer to Q's opener (owner 2026-10-16)", () => {
+  it("shows nothing until they choose to look, then everything at once", async () => {
+    render(<Page />);
+    await settle(false);
+    expect(document.querySelector("[data-arrival-stage]")).toBeNull();
+    expect(document.querySelector("[data-arrival-card]")).toBeNull();
+    // Nothing on screen to decide, so a spoken "send it" has no card.
+    expect(cardInFocus()).toBe(false);
+    // The stage itself opens the question (a call may have replaced the
+    // welcome): a spoken "yes" still brings the cards up.
+    act(() => {
+      expect(answerOpener("yes please")).toBe("SHOW");
+    });
+    expect(document.querySelector("[data-arrival-card]")).not.toBeNull();
+    expect(document.querySelector("[data-arrival-activity]")).not.toBeNull();
+    expect(document.querySelector("[data-arrival-matches]")).not.toBeNull();
+    expect(cardInFocus()).toBe(true);
+  });
+
+  it("'something else' or a question of their own keeps the cards away", async () => {
+    render(<Page />);
+    await settle(false);
+    act(() => {
+      setOpenerOffered(true);
+    });
+    act(() => {
+      expect(answerOpener("what's my readiness score?")).toBe("QUESTION");
+    });
+    expect(document.querySelector("[data-arrival-card]")).toBeNull();
+    // Answered once: a later "yes" is just words for Q.
+    expect(answerOpener("yes")).toBeNull();
+    expect(document.querySelector("[data-arrival-card]")).toBeNull();
+  });
+
+  it("a hello answers nothing; the question stays open", async () => {
+    render(<Page />);
+    await settle(false);
+    act(() => {
+      setOpenerOffered(true);
+    });
+    expect(answerOpener("Good morning Q")).toBe("SOCIAL");
+    act(() => {
+      expect(answerOpener("show me")).toBe("SHOW");
+    });
+    expect(document.querySelector("[data-arrival-card]")).not.toBeNull();
+  });
+});
 
 describe("E1: the arrival is a layer of the stage", () => {
   it("keeps the cards and the voice decider after the conversation starts", async () => {

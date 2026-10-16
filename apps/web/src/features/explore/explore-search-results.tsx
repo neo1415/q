@@ -114,7 +114,6 @@ function Section({
 export function ExploreSearchResults({
   view,
   state = "ready",
-  columns,
   posters,
   sectorLabels,
   limited,
@@ -122,7 +121,6 @@ export function ExploreSearchResults({
 }: {
   readonly view: ExploreSearchView;
   readonly state?: "ready" | "loading" | "error";
-  readonly columns: number | null;
   readonly posters: Readonly<Record<string, string>>;
   readonly sectorLabels: ReadonlyMap<string, string>;
   readonly limited: React.ReactNode;
@@ -225,17 +223,15 @@ export function ExploreSearchResults({
     );
   }
 
-  const grid = (tiles: readonly ExploreTileDto[]) =>
-    columns === null ? null : (
-      <ExploreGrid
-        tiles={tiles}
-        posters={posters}
-        columns={columns}
-        sectorLabels={sectorLabels}
-        label="Pitches"
-        onOpen={(index) => onOpen(tiles, index)}
-      />
-    );
+  const grid = (tiles: readonly ExploreTileDto[]) => (
+    <ExploreGrid
+      tiles={tiles}
+      posters={posters}
+      sectorLabels={sectorLabels}
+      label="Pitches"
+      onOpen={(index) => onOpen(tiles, index)}
+    />
+  );
   const list = (results: readonly ProfileResult[], empty: string) =>
     results.length === 0 ? (
       <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
