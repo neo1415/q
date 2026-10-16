@@ -518,6 +518,9 @@ function readingItems(
         stepId: group.id,
         label: stepLabel,
         value: rendered,
+        ...(suggestion.rationale === null
+          ? {}
+          : { note: suggestion.rationale }),
       },
     ];
   });

@@ -51,6 +51,8 @@ export type OnboardingTurn = {
    * turn would start, then returns to the interview.
    */
   readonly researching: string | null;
+  /** The steps Q's reply asks about; absent when not known. */
+  readonly askingAbout?: readonly string[] | undefined;
   /** Q's patience after the turn (founder direction 2026-09-30). */
   readonly conduct?: QConduct | undefined;
   /** PRESENCE: what Q's particles form for which sentence. */
@@ -389,6 +391,7 @@ export function useOnboardingJourney<
             reply: outcome.reply,
             navigate: outcome.navigate,
             researching: outcome.researching,
+            askingAbout: outcome.askingAbout,
             conduct: outcome.conduct,
             gestures: outcome.gestures,
           };
@@ -405,6 +408,7 @@ export function useOnboardingJourney<
           reply: outcome.reply,
           navigate: outcome.navigate,
           researching: outcome.researching,
+          askingAbout: outcome.askingAbout,
           conduct: outcome.conduct,
           gestures: outcome.gestures,
         };
