@@ -232,3 +232,22 @@ describe("approval by words, read by code", () => {
     expect(calls.read).toBe(1);
   });
 });
+
+describe("the question back, answered (live 2026-10-16)", () => {
+  it("a plain 'yes' to two cards asks in words the next turn reads, and 'both' then approves both", async () => {
+    const first = port([FOLLOW_UP, MEETING]);
+    const asked = await decidePending(first.value, turn("yes"));
+    expect(first.calls.approve).toEqual([]);
+    const line = asked.kind === "REPLY" ? asked.line : "";
+    expect(line.startsWith(WHICH_TO_APPROVE)).toBe(true);
+    const second = port([FOLLOW_UP, MEETING]);
+    await decidePending(
+      second.value,
+      turn("both", [
+        { role: "USER", text: "yes" },
+        { role: "Q", text: line },
+      ]),
+    );
+    expect(second.calls.approve).toEqual(["f1", "m1"]);
+  });
+});

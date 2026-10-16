@@ -152,10 +152,14 @@ export function replacesLine(replaced: readonly string[]): string {
     : `This replaces the earlier cards: ${names.join("; ")} (no longer waiting).`;
 }
 
-export function proposedLine(summary: string): string {
+export function proposedLine(summary: string, cardOnly = false): string {
   // Plain status (R23/R37, live 2026-09-27 #2): what it is, and that it
-  // is not saved until approved, on the card or by saying so.
-  return `${sentence(summary)} Not saved yet: tap Approve on the card, or tell me to go ahead.`;
+  // is not saved until approved, on the card or by saying so. A kind
+  // that keeps its card (money, terms, a private document shared) is
+  // never invited to be approved by words (owner 2026-10-16).
+  return cardOnly
+    ? `${sentence(summary)} Not saved yet: it needs your tap on Approve on the card.`
+    : `${sentence(summary)} Not saved yet: tap Approve on the card, or tell me to go ahead.`;
 }
 
 export function refusedLine(reason: string): string {
@@ -176,9 +180,26 @@ export function createQActionNarrator(dependencies: {
   readonly actions: Pick<QActionRepository, "findById">;
   readonly registry: QActionRegistry;
   readonly logger?: Logger | undefined;
+  /** Whether a kind keeps its card's Approve (never approved by words). */
+  readonly cardOnly?:
+    | ((action: {
+        readonly actionType: string;
+        readonly actionClass: string;
+      }) => boolean)
+    | undefined;
 }): QActionNarrator {
   const { sql, transactions, runtime, actions, registry, logger } =
     dependencies;
+  const keepsCard = (action: {
+    readonly actionType?: string | undefined;
+    readonly riskClass?: string | undefined;
+  }): boolean =>
+    dependencies.cardOnly !== undefined &&
+    action.actionType !== undefined &&
+    dependencies.cardOnly({
+      actionType: action.actionType,
+      actionClass: action.riskClass ?? "",
+    });
 
   /**
    * One Q message in the run's own conversation, with its durable
@@ -255,8 +276,8 @@ export function createQActionNarrator(dependencies: {
         options?.alreadyWaiting === true
           ? alreadyWaitingLine(action.summary)
           : options?.replaces !== undefined && options.replaces.length > 0
-            ? `${proposedLine(action.summary)} ${replacesLine(options.replaces)}`
-            : proposedLine(action.summary),
+            ? `${proposedLine(action.summary, keepsCard(action))} ${replacesLine(options.replaces)}`
+            : proposedLine(action.summary, keepsCard(action)),
         proposalBlocks(action, approval),
       ),
     refused: (run, reason) => say(run, refusedLine(reason)),

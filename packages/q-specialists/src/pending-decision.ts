@@ -559,9 +559,14 @@ async function concludeWaiting(
   if (only === undefined) {
     // A request of its own is answered as one, not asked "which one?".
     if (!reply) return { kind: "NONE" };
+    // Asked so that the answer ("both", "the second one", a name) is read
+    // by code on the next turn (live 2026-10-16).
     return {
       kind: "REPLY",
-      line: whichLine(pending.map((proposal) => proposal.summary)),
+      line: whichToDecideLine(
+        read.decision === "NO" ? "DECLINE" : "APPROVE",
+        pending.map((proposal) => proposal.summary),
+      ),
     };
   }
   if (read.decision === "YES" && !mayApprove && elsewhere && !namedElsewhere) {

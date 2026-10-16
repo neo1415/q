@@ -657,6 +657,7 @@ import { createHandleClaimAction } from "./composition/handle-claim-action.js";
 import { assertComposedActionTypes } from "./composition/q-action-types.js";
 import {
   createConversationApprovalPort,
+  keepsItsCard,
   createPendingDecisionPort,
   createRecentPendingElsewhere,
   plainProposalStatus,
@@ -3630,6 +3631,7 @@ const qActionPort = createQActionPort({
     actions: qActionRepositories.actions,
     registry: qActionRegistry,
     logger,
+    cardOnly: keepsItsCard,
   }),
   logger,
 });
