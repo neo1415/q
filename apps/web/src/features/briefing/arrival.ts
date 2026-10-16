@@ -32,6 +32,7 @@ import type {
 import { attentionLines, unreadWords } from "./attention";
 import { greetingSeed, warmGreeting } from "./greeting";
 import { matchesWords, type ArrivalMatches } from "./matches";
+import { openerOf, type Opener } from "./opener";
 
 /**
  * The arrival briefing as the page shows and Q says it (Zino, 2026-10-08):
@@ -272,8 +273,19 @@ export type ArrivalWords = {
   readonly firstCard: string | null;
   /** Every card in one sentence ("Three things: ..."); null with none. */
   readonly summary: string | null;
-  /** Everything Q says first, on voice. */
+  /**
+   * Everything Q says first, on screen and on voice (owner 2026-10-16): the
+   * warm greeting and the opener -- how many things wait and whether to
+   * look at them now -- never the list itself.
+   */
   readonly spoken: string;
+  /** The opener: the count, the question, and whether choices are offered. */
+  readonly opener: Opener;
+  /**
+   * The full lowdown, as Q used to open with it (lowdown, every card in a
+   * sentence, matches, questions): said only once they choose to look.
+   */
+  readonly briefing: string;
   /** P4: the edition route(s) the welcome's stories open, to prefetch. */
   readonly dailyPaths: readonly string[];
 };
@@ -397,6 +409,7 @@ export function arrivalWords(
     data.attention === null || data.attention === undefined
       ? []
       : attentionLines(data.attention);
+  const opener = openerOf(data);
   return {
     greeting,
     welcome: warm.slice(greeting.length).trim() || null,
@@ -415,8 +428,9 @@ export function arrivalWords(
     firstCard,
     summary,
     matches: matchesLine,
-    spoken: [
-      warm,
+    spoken: [warm, opener.line].join(" "),
+    opener,
+    briefing: [
       dailyLine ?? lowdown.text,
       ...(summary === null
         ? [firstCard]

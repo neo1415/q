@@ -78,7 +78,11 @@ export function ReturningWelcome({
   const router = useRouter();
   const tools = useQSurfaceTools();
   const arrival = useArrivalStatus();
-  const arrived = arrival.kind === "READY" && !arrival.nudge;
+  // Still being read counts as arrived: on sign-in Q greets and asks
+  // before anything is listed (owner 2026-10-16), so the older briefing's
+  // cards never flash up first.
+  const arrived =
+    arrival.kind === "PENDING" || (arrival.kind === "READY" && !arrival.nudge);
   const [asking, setAsking] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Today's setup reminder, when this welcome carries it: counted once the

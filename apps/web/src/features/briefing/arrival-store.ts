@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from "react";
 
 import type { ArrivalData } from "./arrival";
 import { decideArrival, onReturn } from "./arrival-gate";
+import { readOpenerReply, type OpenerChoice, type OpenerReply } from "./opener";
 
 /**
  * The arrival briefing's data for this page load, shared by the Q page
@@ -46,6 +47,12 @@ const NAME_KEY = "cq.q.first-name";
 
 function set(next: ArrivalStatus): void {
   status = next;
+  // A new arrival asks again (owner 2026-10-16); cards that come in later
+  // (a nudge) keep the answer they gave this arrival.
+  if (next.kind === "READY" && !next.nudge) {
+    opener = { choice: null, offered: false };
+    notifyOpener();
+  }
   // Remembered so a call that opens before the briefing lands can still
   // greet them by name (a per-browser convenience; blocked storage is fine).
   if (next.kind === "READY" && next.data.firstName !== null) {
@@ -192,8 +199,18 @@ export function useArrivalStatus(): ArrivalStatus {
   );
 }
 
-export function setArrivalSpoken(words: string | null): void {
+export function setArrivalSpoken(
+  words: string | null,
+  full: string | null = null,
+): void {
   spoken = words;
+  briefingWords = full;
+}
+
+/** The full lowdown, said only once they choose to look; null: none. */
+let briefingWords: string | null = null;
+export function arrivalBriefingWords(): string | null {
+  return briefingWords;
 }
 
 /** What Q says first on voice when the briefing was given; null otherwise. */
@@ -267,8 +284,82 @@ export function takeCarriedStatus(): string | null {
   return text;
 }
 
+// ---------------------------------------------------------------------------
+// The opener's answer (owner 2026-10-16): Q greets, says how many things
+// wait, and asks whether to look at them now or talk about something else.
+// The cards come up only once they say so. Presentation only: what waits,
+// and every decision on it, is untouched.
+
+type OpenerState = {
+  /** Their answer this arrival; null: not answered yet. */
+  readonly choice: OpenerChoice | null;
+  /** Whether the opener offered the two choices (something waits). */
+  readonly offered: boolean;
+};
+
+let opener: OpenerState = { choice: null, offered: false };
+const openerSubscribers = new Set<() => void>();
+
+function notifyOpener(): void {
+  for (const notify of openerSubscribers) notify();
+}
+
+function subscribeOpener(notify: () => void): () => void {
+  openerSubscribers.add(notify);
+  return () => {
+    openerSubscribers.delete(notify);
+  };
+}
+
+const NO_OPENER: OpenerState = { choice: null, offered: false };
+
+/** The opener's state for this arrival (re-renders on an answer). */
+export function useOpener(): OpenerState {
+  return useSyncExternalStore(
+    subscribeOpener,
+    () => opener,
+    () => NO_OPENER,
+  );
+}
+
+/** The greeting on screen offered the two choices (or, false, did not). */
+export function setOpenerOffered(offered: boolean): void {
+  if (opener.offered === offered) return;
+  opener = { ...opener, offered };
+  notifyOpener();
+}
+
+/** Their answer: by a button, or read from their own words. */
+export function chooseOpener(choice: OpenerChoice): void {
+  if (opener.choice === choice) return;
+  opener = { ...opener, choice };
+  notifyOpener();
+}
+
+/** Whether the cards may come up: they chose to look at them. */
+export function openerShowsCards(): boolean {
+  return opener.choice === "SHOW";
+}
+
+/**
+ * Their words while the opener's question is open: a plain yes brings the
+ * cards up, a plain "something else" moves on, and anything else is a
+ * question of its own (it moves on too, and is answered as asked). Null
+ * when no choice is open, so the words go to Q as ever.
+ */
+export function answerOpener(words: string): OpenerReply | null {
+  if (!opener.offered || opener.choice !== null) return null;
+  const reply = readOpenerReply(words);
+  // A hello answers nothing: the question stays open.
+  if (reply !== "SOCIAL") chooseOpener(reply === "SHOW" ? "SHOW" : "OTHER");
+  return reply;
+}
+
 /** For the dev harness and tests: start over. */
 export function resetArrival(): void {
+  opener = { choice: null, offered: false };
+  notifyOpener();
+  briefingWords = null;
   status = { kind: "PENDING" };
   started = false;
   spoken = null;

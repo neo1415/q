@@ -38,6 +38,7 @@ import {
   markArrivalSaid,
   refreshArrival,
   useArrival,
+  useOpener,
   type ArrivalLoader,
 } from "./arrival-store";
 import { FollowUpStack } from "@/features/readiness/follow-up-stack";
@@ -414,6 +415,9 @@ export function ArrivalStage({
   const voiceActive = session?.voice.active === true;
   const { askNow } = useGlobalQ();
   const [expanded, setExpanded] = useState(false);
+  // Owner 2026-10-16: Q greets and asks first; the cards come up only once
+  // they choose to look (a button, or their own words, typed or said).
+  const looking = useOpener().choice === "SHOW";
   const rawData = ready?.data ?? null;
   // Founder P5: cards the person cleared (by voice or click) are left out
   // here, so they take no space. Presentation only: the arrival's data, its
@@ -546,7 +550,8 @@ export function ArrivalStage({
   }, [targets]);
   const shown = revealedGroups({
     present,
-    speaking: speakingAtStart === true,
+    // They asked to see them: all of it at once, not as Q names each.
+    speaking: speakingAtStart === true && !looking,
     reached,
     settled,
   });
@@ -588,6 +593,7 @@ export function ArrivalStage({
 
   const strip = mode === "STRIP" && !expanded;
   const beside =
+    looking &&
     !strip &&
     mode === "FULL" &&
     wide &&
@@ -607,7 +613,7 @@ export function ArrivalStage({
     if (mode === "FULL") setExpanded(false);
   }
 
-  if (data === null || present.length === 0) return null;
+  if (data === null || present.length === 0 || !looking) return null;
 
   const activityCard = shown.includes("ACTIVITY") ? (
     <ActivityCard lines={activity} />
