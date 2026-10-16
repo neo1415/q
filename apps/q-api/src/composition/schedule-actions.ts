@@ -23,7 +23,7 @@ import {
 } from "@capital-q/communication";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
-import type { ActorContext } from "@capital-q/security";
+import type { ActorContext, PersonProfileStore } from "@capital-q/security";
 import {
   defineQAction,
   type AnyQActionDefinition,
@@ -81,6 +81,11 @@ export const ReminderCreatePayloadSchema = z
     remindAt: UtcTimestampSchema,
     /** The zone the person named the time in, for what they are shown. */
     timeZone: TimeZoneSchema.optional(),
+    /**
+     * The zone they named when their profile had none, kept as theirs on
+     * approval so Q never asks again (owner 2026-10-16). On the card.
+     */
+    saveTimeZone: TimeZoneSchema.optional(),
     note: ReminderNoteSchema.optional(),
     channel: ReminderChannelSchema,
   })
@@ -214,8 +219,35 @@ const relationshipTarget = (relationshipId: string): readonly QSubjectRef[] => [
 export function createReminderCreateAction(dependencies: {
   readonly schedule: ScheduleService;
   readonly logger?: Logger | undefined;
+  /** Their own profile, where an approved `saveTimeZone` is kept. */
+  readonly people?: Pick<PersonProfileStore, "read" | "update"> | undefined;
 }): AnyQActionDefinition {
-  const { schedule, logger } = dependencies;
+  const { schedule, logger, people } = dependencies;
+  /**
+   * Kept only when they still have none: an approved card never overwrites
+   * a zone they set since. A failure is logged; the reminder stands.
+   */
+  const keepTimeZone = async (
+    actor: ActorContext,
+    zone: string,
+  ): Promise<void> => {
+    if (people === undefined || actor.actorType !== "HUMAN") return;
+    try {
+      const profile = await people.read(actor.userId);
+      if (profile === null || (profile.timeZone ?? null) !== null) return;
+      await people.update({
+        userId: actor.userId,
+        expectedVersion: profile.version,
+        changes: { timeZone: zone },
+      });
+      logger?.info({ timeZone: zone }, "their stated time zone was kept");
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error },
+        "their stated time zone could not be kept; the reminder stands",
+      );
+    }
+  };
   return defineQAction<
     ReminderCreatePayload,
     z.infer<typeof ReminderResultSchema>
@@ -236,7 +268,7 @@ export function createReminderCreateAction(dependencies: {
           : [],
     describe: (payload) => ({
       summary: `Reminder: ${payload.title}`,
-      preview: `${payload.title}\n${when(payload.remindAt, payload.timeZone)}${payload.channel === "EMAIL" ? " (and by email)" : ""}${payload.note === undefined ? "" : `\n\n${payload.note}`}`,
+      preview: `${payload.title}\n${when(payload.remindAt, payload.timeZone)}${payload.channel === "EMAIL" ? " (and by email)" : ""}${payload.saveTimeZone === undefined ? "" : `\nAlso keeps ${payload.saveTimeZone} as your time zone, so I won't ask again.`}${payload.note === undefined ? "" : `\n\n${payload.note}`}`,
     }),
     confirm: (payload, result) =>
       result.alreadyCreated
@@ -274,6 +306,9 @@ export function createReminderCreateAction(dependencies: {
           qActionId: action.actionId,
         });
         if (outcome.outcome === "OK") {
+          if (action.payload.saveTimeZone !== undefined) {
+            await keepTimeZone(context.approver, action.payload.saveTimeZone);
+          }
           logger?.info(
             {
               actionId: action.actionId,

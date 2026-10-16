@@ -180,6 +180,18 @@ export function createQActionNarrator(dependencies: {
   readonly actions: Pick<QActionRepository, "findById">;
   readonly registry: QActionRegistry;
   readonly logger?: Logger | undefined;
+  /**
+   * A decision made in the person's own words is answered in the turn
+   * they spoke (owner 2026-10-16: two "Done" lines for one action). While
+   * that turn waits for the action, its outcome line is handed to it here
+   * instead of being written a second time on the paused run.
+   */
+  readonly relay?:
+    | {
+        readonly heldFor: (actionId: string) => boolean;
+        readonly hold: (actionId: string, line: string) => void;
+      }
+    | undefined;
   /** Whether a kind keeps its card's Approve (never approved by words). */
   readonly cardOnly?:
     | ((action: {
@@ -248,6 +260,20 @@ export function createQActionNarrator(dependencies: {
     }
   };
 
+  /** Said here, or handed to the turn that decided it by words. */
+  const sayOnce = async (
+    actionId: string,
+    run: QRunRef,
+    line: string,
+  ): Promise<void> => {
+    const relay = dependencies.relay;
+    if (relay !== undefined && relay.heldFor(actionId)) {
+      relay.hold(actionId, line);
+      return;
+    }
+    await say(run, line);
+  };
+
   /** "Done", from the persisted execution, in the definition's own words. */
   const executedLine = async (
     context: QActionExecuteContext,
@@ -298,13 +324,13 @@ export function createQActionNarrator(dependencies: {
             return null;
           });
           // No record saying EXECUTED, no "done".
-          if (line !== null) await say(run, line);
+          if (line !== null) await sayOnce(context.actionId, run, line);
           return;
         }
         case "FAILED":
         case "RECONCILIATION_REQUIRED":
         case "BLOCKED":
-          await say(run, failedLine());
+          await sayOnce(context.actionId, run, failedLine());
           return;
         // Said once, by the invocation that executed; a replayed gate that
         // finds the work already done has nothing new to tell.

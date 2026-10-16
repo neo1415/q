@@ -4,6 +4,7 @@ import {
   explicitlyApproves,
   mayStandAsApproval,
   readApprovalWords,
+  readEditRequest,
 } from "../src/approval-words.js";
 
 /**
@@ -141,5 +142,27 @@ describe("readApprovalWords", () => {
       kind: "APPROVE",
       ordinal: 1,
     });
+  });
+});
+
+describe("readEditRequest (live 2026-10-16)", () => {
+  it.each([
+    ["Sounds good but change the date", "date", false],
+    ["yes but change the time", "time", false],
+    ["change it", null, false],
+    ["change the date to Friday", "date", true],
+    ["move it to 3pm", null, true],
+    ["make it 30 minutes instead", null, true],
+    ["تمام لكن غير التاريخ", "التاريخ", false],
+  ] as const)("%s: field %s, value given %s", (said, field, valueGiven) => {
+    expect(readEditRequest(said, { summaries: [CARD] })).toEqual({
+      field,
+      valueGiven,
+    });
+  });
+
+  it("is null for anything that is not an edit", () => {
+    expect(readEditRequest("I approve")).toBeNull();
+    expect(readEditRequest("what is Harbourline raising")).toBeNull();
   });
 });

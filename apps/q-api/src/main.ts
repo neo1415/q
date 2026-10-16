@@ -657,6 +657,7 @@ import { createHandleClaimAction } from "./composition/handle-claim-action.js";
 import { assertComposedActionTypes } from "./composition/q-action-types.js";
 import {
   createConversationApprovalPort,
+  createDecisionRelay,
   keepsItsCard,
   createPendingDecisionPort,
   createRecentPendingElsewhere,
@@ -2338,10 +2339,13 @@ const entitlements = createEntitlementService({ sql: database.sql });
 // Approval by conversation: the one change waiting for this person in
 // this conversation, approved as the card approves it (live test
 // 2026-09-27 #1). The engine and orchestrator are composed below.
+// One outcome line per action decided in words (owner 2026-10-16).
+const decisionRelay = createDecisionRelay();
 const conversationApprovals = createConversationApprovalPort({
   runtime: qRuntime,
   late: () => ({ actions: qActions, orchestrator, continueApproved }),
   logger,
+  relay: decisionRelay,
 });
 const errandStore = createPostgresErrandStore(database.sql);
 // ADR 0040 (Proposed): the services the app's declared actions call, and
@@ -3510,7 +3514,7 @@ const qActionRegistry = createQActionRegistry([
   // R34: chat message from the relationship chat.
   createChatMessageSendAction({ chat, logger }),
   // BIZ-008: reminders and calls (Google Calendar + Meet).
-  createReminderCreateAction({ schedule, logger }),
+  createReminderCreateAction({ schedule, logger, people }),
   createMeetingScheduleAction({
     schedule,
     logger,
@@ -3632,6 +3636,7 @@ const qActionPort = createQActionPort({
     registry: qActionRegistry,
     logger,
     cardOnly: keepsItsCard,
+    relay: decisionRelay,
   }),
   logger,
 });

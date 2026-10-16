@@ -1,4 +1,8 @@
-import { closestByName, readApprovalWords } from "@capital-q/q-tools";
+import {
+  closestByName,
+  readApprovalWords,
+  readEditRequest,
+} from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
 /**
@@ -106,7 +110,11 @@ export type PendingDecisionPort = {
   readonly approve: (
     context: PendingDecisionContext,
     proposalId: string,
-  ) => Promise<{ readonly status: PendingDecisionStatus }>;
+  ) => Promise<{
+    readonly status: PendingDecisionStatus;
+    /** The action's own outcome line, when it settled meanwhile. */
+    readonly line?: string | undefined;
+  }>;
   readonly decline: (
     context: PendingDecisionContext,
     proposalId: string,
@@ -591,8 +599,8 @@ async function concludeWaiting(
     };
   }
   if (read.decision === "YES") {
-    const { status } = await port.approve(input.context, only.proposalId);
-    const line = statusLine(status, only.summary);
+    const approved = await port.approve(input.context, only.proposalId);
+    const line = approved.line ?? statusLine(approved.status, only.summary);
     // Anything more they said is answered after the decision.
     return read.remainder === null
       ? { kind: "REPLY", line }
@@ -603,6 +611,17 @@ async function concludeWaiting(
   return read.remainder === null
     ? { kind: "REPLY", line }
     : { kind: "ANSWER_THEN", before: line, after: null };
+}
+
+/** Q asks for the new value of an edit that gave none; nothing changes. */
+export function askForChangeLine(
+  field: string | null,
+  summary: string,
+): string {
+  const what = named(summary);
+  return field === null
+    ? `What would you like changed in "${what}"? It stays as it is until you tell me.`
+    : `What should the new ${field} be for "${what}"? It stays as it is until you tell me.`;
 }
 
 /** How Q asks which card a decision in words is about. */
@@ -663,8 +682,22 @@ async function decideByWords(
   const words = readApprovalWords(input.utterance, {
     summaries: all.map((proposal) => proposal.summary),
   });
-  // Asks for something different: never this card as it is.
-  if (words.kind === "EDIT") return ASKS_CHANGE;
+  // Asks for something different: never this card as it is. Without the
+  // new value ("but change the date"), Q asks for it; with it, the turn
+  // is answered as a request, so the change is prepared again.
+  if (words.kind === "EDIT") {
+    const edit = readEditRequest(input.utterance, {
+      summaries: all.map((proposal) => proposal.summary),
+    });
+    const card = stage.only;
+    if (edit !== null && !edit.valueGiven && card !== undefined) {
+      return {
+        kind: "REPLY",
+        line: askForChangeLine(edit.field, card.summary),
+      };
+    }
+    return ASKS_CHANGE;
+  }
   if (words.kind === "NONE") return null;
   const lastQ =
     [...input.recentTurns].reverse().find((t) => t.role === "Q")?.text ?? "";
@@ -721,11 +754,15 @@ async function decideByWords(
   }
   const lines: string[] = [];
   for (const target of targets) {
-    const { status } =
+    const decided: {
+      status: PendingDecisionStatus;
+      line?: string | undefined;
+    } =
       decision === "APPROVE"
         ? await port.approve(input.context, target.proposalId)
         : await port.decline(input.context, target.proposalId);
-    lines.push(statusLine(status, target.summary));
+    // One line per action: its own outcome line when it has one.
+    lines.push(decided.line ?? statusLine(decided.status, target.summary));
   }
   return { kind: "REPLY", line: lines.join(" ") };
 }

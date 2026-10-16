@@ -672,6 +672,11 @@ export type PendingProposalPort = {
     proposalId: string,
   ) => Promise<{
     readonly status: ProposalPlainStatus | "CHANGED" | "CARD_ONLY";
+    /**
+     * The action's own outcome line ("Done. I'll remind you: …"), when it
+     * settled while this approval waited: said once, by whoever asked.
+     */
+    readonly line?: string | undefined;
   }>;
   /**
    * R33: declines exactly this proposal through the Approval Engine's own
