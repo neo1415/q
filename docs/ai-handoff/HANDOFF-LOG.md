@@ -763,7 +763,7 @@ Lanes:
 - **Workspace:** `/home/user/q-lang` (worktree), branch `claude/lang-oct16` from `origin/build/int-rc` (int-rc merged in at c5333a9c).
 - **What:** language is a setting, any language, switchable between any two. There is no per-language code: names, direction and dates come from Intl, and screens in a language without a hand catalogue are machine-translated once through the Model Gateway (new `UI_TRANSLATION` class), cached in `q_runtime.ui_translations` and shared. Arabic's hand catalogue still wins. Voice and video choose provider configuration from one documented capability table and fall back honestly. Full detail and sources: `docs/ai-handoff/LANGUAGES-2026-10-16.md`.
 - **Status:** IMPLEMENTED + LOCAL TESTED (targeted vitest, root `tsc` clean, eslint/prettier on changed files). NOT merged, NOT CI-verified, NOT deployed, NOT live-verified. No live model, Tavus, Deepgram or ElevenLabs calls were made.
-- **Migration:** `20261228150500_ui_translations.sql` with pgTAP `973`; `320`, `590` and `130_schema_guard` were updated. **Deploy the code first, then apply the migration:** an older catalog loader rejects an unknown task-class policy, and this branch's loader skips such policies.
+- **Migration:** `20261228150500_ui_translations.sql` with pgTAP `974`; `320`, `590` and `130_schema_guard` were updated. **Deploy the code first, then apply the migration:** an older catalog loader rejects an unknown task-class policy, and this branch's loader skips such policies.
 - **Config:** `CQ_UI_TRANSLATION_DAILY_CAP_USD` (default 2).
 - **Next action:**
   1. Merge into `build/int-rc` and run CI.
