@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PermittedContextPlan } from "@capital-q/contracts";
 import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding";
+import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import { createLogger } from "@capital-q/observability";
 import type { ContextFirewallPort } from "@capital-q/q-runtime";
@@ -390,5 +391,56 @@ describe("codeReading: only the exact case, never wider than the reader", () => 
     expect(
       codeReading({ utterance: "Seed", asked: undefined, pendingCount: 0 }),
     ).toBeNull();
+  });
+});
+
+describe("codeReading: a few plain words for an asked text step (live 2026-10-16)", () => {
+  const title = INVESTOR_DEFINITION_V1.steps.find(
+    (s) => s.stepKey === "I0.business_title",
+  );
+
+  it("'Partner.' states the title", () => {
+    expect(
+      codeReading({
+        utterance: "Partner.",
+        asked: title,
+        pendingCount: 0,
+      })?.stated.has("I0.business_title"),
+    ).toBe(true);
+  });
+
+  it("a decline, a deferral, a delegation, a greeting or a question is the reader's", () => {
+    for (const utterance of [
+      "skip",
+      "not sure",
+      "rather not say",
+      "you pick",
+      "later",
+      "hello",
+      "Partner?",
+      "Partner and also our main strategy",
+    ]) {
+      expect(
+        codeReading({ utterance, asked: title, pendingCount: 0 }),
+        utterance,
+      ).toBeNull();
+    }
+  });
+});
+
+describe("the journey's own platform step is never put to the person", () => {
+  it("the mandate reference step is not in the state Q reads", async () => {
+    const world = investorSession({ currentStepKey: "I0.business_title" });
+    const port = createOnboardingPort({
+      session: turn(world, "").session,
+      onboardingSessionId: turn(world, "").onboardingSessionId,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [],
+    });
+    const state = await port.state();
+    expect(state.steps.map((s) => s.stepKey)).not.toContain(
+      "I1.mandate_context",
+    );
   });
 });

@@ -494,14 +494,11 @@ export function createOnboardingPort(input: {
     for (const eligible of view.progress.eligibleSteps) {
       const step = steps.get(eligible.stepKey);
       if (step === undefined) continue;
-      // A reference to a platform record (the mandate being defined),
-      // once resolved, is not something to discuss with the person.
-      const config = step.configuration;
-      if (
-        eligible.status === "COMPLETED" &&
-        config.stepType === "reference_select" &&
-        config.resourceType !== "TAXONOMY_NODE"
-      ) {
+      // A reference to a platform record (the mandate being defined) is
+      // the journey's to settle, never something to discuss with the
+      // person, resolved or not (live 2026-10-16: "your main investment
+      // strategy, or a different one?" asked, and unrecordable).
+      if (isPlatformReference(step)) {
         continue;
       }
       const open = toOpenStep(step, view);
@@ -629,6 +626,11 @@ export function createOnboardingPort(input: {
     );
     trusted = true;
   };
+
+  /** A step that points at a platform record (a mandate), not a vocabulary. */
+  const isPlatformReference = (step: OnboardingStepManifest): boolean =>
+    step.configuration.stepType === "reference_select" &&
+    step.configuration.resourceType !== "TAXONOMY_NODE";
 
   /** Where a refusal names a prerequisite by its field, the step that holds it. */
   const stepNamed = (suffix: string | null): string | undefined =>
@@ -2089,7 +2091,9 @@ export function createOnboardingPort(input: {
           .filter(
             (step): step is OnboardingStepManifest =>
               step !== undefined &&
-              step.configuration.stepType !== "confirmation",
+              step.configuration.stepType !== "confirmation" &&
+              // The journey settles these itself; never a question.
+              !isPlatformReference(step),
           )
           .map((step) => ({
             stepKey: step.stepKey,
@@ -2121,6 +2125,57 @@ export function createOnboardingPort(input: {
           };
         }
       }
+      // They asked to finish: an optional question the journey is waiting
+      // on is set aside (theirs to answer later), so the journey reaches
+      // and settles its own platform steps (live 2026-10-16: an unsaved
+      // optional title held the mandate step back and finishing stalled).
+      for (let guard = 0; guard < 4; guard += 1) {
+        const gapsNow = view.progress.eligibleSteps.filter(
+          (e) => e.required && e.status !== "COMPLETED",
+        );
+        const onlyPlatform =
+          gapsNow.length > 0 &&
+          gapsNow.every((e) => {
+            const step = steps.get(e.stepKey);
+            return (
+              step !== undefined &&
+              (isPlatformReference(step) ||
+                step.configuration.stepType === "confirmation")
+            );
+          }) &&
+          gapsNow.some((e) => {
+            const step = steps.get(e.stepKey);
+            return step !== undefined && isPlatformReference(step);
+          });
+        const waitingOn = view.currentStep;
+        const waitingStep =
+          waitingOn === null || waitingOn === undefined
+            ? undefined
+            : steps.get(waitingOn.stepKey);
+        if (
+          !onlyPlatform ||
+          waitingStep === undefined ||
+          waitingStep.required ||
+          view.responses.some((r) => r.stepKey === waitingStep.stepKey)
+        ) {
+          break;
+        }
+        try {
+          trusted = false;
+          latest = await settle(
+            await skipOnboardingStep(
+              input.session,
+              input.onboardingSessionId,
+              waitingStep.stepKey,
+              { expectedSessionVersion: view.session.version },
+              randomUUID(),
+            ),
+          );
+          view = latest;
+        } catch {
+          break;
+        }
+      }
       const gaps = missing(view);
       if (gaps.length > 0) return { completed: false, missing: gaps };
       // The journey's own review steps, confirmed on the person's word —
@@ -2147,7 +2202,17 @@ export function createOnboardingPort(input: {
         view = await current();
       }
       if (!view.progress.canComplete) {
-        return { completed: false, missing: missing(view) };
+        const left = missing(view);
+        return {
+          completed: false,
+          missing: left,
+          ...(left.length === 0
+            ? {
+                reason:
+                  "The setup is still settling its own steps, so it was not completed yet. Tell them plainly and ask them to confirm again in a moment.",
+              }
+            : {}),
+        };
       }
       try {
         trusted = false;
