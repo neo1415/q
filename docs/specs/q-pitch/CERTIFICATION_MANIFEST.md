@@ -214,3 +214,34 @@ Every other atlas feature currently has no certification entry and must not be p
   - The investor feed never published its card in focus to the page manifest, so `carousel.feed` Next or Previous could never be confirmed, for the tour or for Q itself.
   - The By Q filter act now sets the filter and is DONE once it reads By Q.
 - **Flags:** `/api/company-photo/<id>` still answers 404 for companies without a photo (13 times in run 3; the avatar falls back to initials). The Discover card in focus was Basketari, which is not a fictional-world company; the feed scene names no company.
+
+## Premiere v5 acceptance run 4 — production `2c2010cb` (batch S), 16 Oct 2026 about 06:59–07:07 UTC (Lane P)
+
+- **Method:** as run 3: Playwright, `investor.savanna-seed@fictional.capitalq.local`, `?qpitch=premiere`, "Start the tour", nothing blocked, the microphone denied (standard voice). `CQ_SPEECH_LINES_PER_10MIN=300` on q-api. Receipts: scratchpad `v5-acc/run4/` (run log, a screenshot per scene, the panel at the live answer, video), not committed.
+- **Result:** RUNNING 32 s after Start; 17 scenes in **6:53** (tour complete at 413 s); hand-over: the strip left by itself, Q on `/home`. 1 fallback, 0 page errors, 0 console errors, **0 speech refusals** (narration audible as standard voice through scene 17).
+
+| #   | Scene                     | Start (s) | Took (s) | Result                                                                       |
+| --- | ------------------------- | --------- | -------- | ---------------------------------------------------------------------------- |
+| 1   | Hello, I'm Q              | 0         | 38       | complete                                                                     |
+| 2   | Your mandate              | 39        | 18       | complete                                                                     |
+| 3   | Discover: pitches         | 58        | 10       | complete; two Next moves DONE, "AI presenter · AI-generated" label on screen |
+| 4   | Save one for later        | 69        | 8        | complete                                                                     |
+| 5   | Top three                 | 78        | 15       | complete                                                                     |
+| 6   | Harbourline Cargo         | 94        | 57       | **ACK_TIMEOUT** (host defect, fixed below)                                   |
+| 7   | Harbourline vs Clinicrest | 160       | 47       | complete, **with the live question**                                         |
+| 8   | GateQ: Maji Loop          | 209       | 25       | complete; transcript scrolled to and opened                                  |
+| 9   | CRM overview              | 236       | 11       | complete                                                                     |
+| 10  | Clinicrest record         | 249       | 9        | complete; "What happened" on screen with dated entries                       |
+| 11  | Preparing a meeting       | 260       | 9        | complete                                                                     |
+| 12  | Q Work                    | 270       | 10       | complete                                                                     |
+| 13  | Documents                 | 282       | 14       | complete; By Q, memo opened in the viewer                                    |
+| 14  | Notifications             | 297       | 7        | complete                                                                     |
+| 15  | Q-to-Q rehearsal          | 305       | 72       | complete; review `/rehearsals/r/c2e3b7a2…`                                   |
+| 16  | Capital Q's own profile   | 379       | 12       | complete                                                                     |
+| 17  | Your move (Home)          | 392       | 21       | complete; hand-over                                                          |
+
+- **Live question: PASS, and now visible.** "What cheque range does my mandate allow?" during scene 7: paused, answered, resumed by itself. The Q panel showed the question and the answer in full ("USD 250,000–1,000,000 … typical USD 600,000"), above the Board (`ask-14000.png`).
+- **Scene 6 defect (fixed on `claude/p-premiere-fix2-oct16`):** opening Harbourline loaded its Q conversation, whose history held run 3's typed question. The host took that loaded turn for a new viewer question and paused the tour ("Paused for your question" with nothing asked), and the scene's own question then timed out. Now only a question first seen unconfirmed (typed on this page) pauses the tour; loaded history never does (`viewerQuestions`, with tests).
+- **Promoted to PRODUCTION_LIVE_VERIFIED:** `FEED-VIEW`, `GATEQ-DOSSIER-VIEW`, `DOCUMENT-OPEN`.
+- **Stays CODE_VERIFIED:** `CRM-RECORD-VIEW`. The history is on screen with dates, but the tour strip covers part of it, and "each entry marked with who can see it" was not legible in the receipt.
+- **Speech:** with the allowance at 300, no 429 in the whole run; narration ran to the end.
