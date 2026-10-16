@@ -27,6 +27,7 @@ import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
 import { VoiceHandover } from "../voice/voice-handover";
 import { useFounderOnboarding } from "./controller/use-founder-onboarding";
 import { renderStep } from "./steps/registry";
+import { PreferenceLearningAsk } from "../settings/preference-learning";
 
 const STEP_FORM_ID = "founder-onboarding-step";
 
@@ -194,6 +195,8 @@ export function FounderOnboardingScreen({
             </div>
           }
         />
+        {/* Lane ob1: the end of onboarding is a natural moment to ask, once. */}
+        <PreferenceLearningAsk />
       </div>
     );
   }

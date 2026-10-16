@@ -752,3 +752,12 @@ export {
   type RecallMySetupInput,
   type RecallMySetupOutput,
 } from "./tools/onboarding-transcript.js";
+export {
+  createSetPreferenceLearningTool,
+  SET_PREFERENCE_LEARNING,
+  SetPreferenceLearningInputSchema,
+  SetPreferenceLearningOutputSchema,
+  type PreferenceLearningPort,
+  type SetPreferenceLearningInput,
+  type SetPreferenceLearningOutput,
+} from "./tools/preference-learning.js";

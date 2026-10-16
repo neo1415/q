@@ -1,5 +1,6 @@
 "use client";
 
+import { PreferenceLearningAsk } from "@/features/settings/preference-learning";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -256,6 +257,13 @@ export function ReturningWelcome({
           Remind me next week
         </button>
       ) : null}
+
+      {/*
+        Lane ob1: once, after the greeting and its choices, never before:
+        may Q learn how they like to work? Renders nothing unless asking
+        is due (never answered, or "Not now" more than 30 days ago).
+      */}
+      <PreferenceLearningAsk />
 
       {/* Polite, so a failed ask is read out without taking focus. */}
       <p

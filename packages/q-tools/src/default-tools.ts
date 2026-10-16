@@ -54,6 +54,7 @@ import { createProposeHumanReviewTool } from "./tools/human-review.js";
 // DOCS block.
 import { createDocumentStudioTools } from "./tools/documents.js";
 import { createRecallMySetupTool } from "./tools/onboarding-transcript.js";
+import { createSetPreferenceLearningTool } from "./tools/preference-learning.js";
 import { createOwnRecordTools } from "./tools/own-records.js";
 import { createRecordChangeTools } from "./tools/record-changes.js";
 import { createFillProfileGapsTool } from "./tools/profile-gaps.js";
@@ -302,6 +303,9 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...(ports.onboardingTranscript === undefined
       ? []
       : [createRecallMySetupTool(ports.onboardingTranscript)]),
+    ...(ports.preferenceLearning === undefined
+      ? []
+      : [createSetPreferenceLearningTool(ports.preferenceLearning)]),
     // ADMIN block: "how is my raise going", "download my pipeline report".
     ...createResultsTools(ports),
     // ADMIN-3: "want a person to look at this?"

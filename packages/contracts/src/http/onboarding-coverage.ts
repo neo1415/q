@@ -143,6 +143,11 @@ export const OnboardingCoverageFieldSchema = z
     evidenceWanted: z.array(z.string().min(1).max(64)).max(8),
     /** A confirmed change is held for retry and is NOT yet saved. */
     savePending: z.boolean(),
+    /**
+     * The journey's own sense of what is most valuable to ask first within
+     * a priority (lower first); absent: the definition's order.
+     */
+    rank: z.number().int().min(0).max(999).optional(),
     /** Steps whose answers decide whether this one applies. */
     dependsOn: z.array(OnboardingStepKeySchema).max(8),
   })

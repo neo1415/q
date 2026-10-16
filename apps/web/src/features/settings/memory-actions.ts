@@ -2,7 +2,12 @@
 
 import { z } from "zod";
 
-import { forgetQMemory } from "@capital-q/api-client";
+import {
+  forgetQMemory,
+  getQPreferenceLearning,
+  setQPreferenceLearning,
+} from "@capital-q/api-client";
+import type { QPreferenceLearningDto } from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -25,4 +30,35 @@ export async function forgetMemoryAction(
   } catch {
     return { ok: false };
   }
+}
+
+async function qSession() {
+  const { qApiBaseUrl } = loadWebServerConfig();
+  const accessToken = await getSessionAccessToken();
+  return qApiBaseUrl === undefined || accessToken === null
+    ? null
+    : { baseUrl: qApiBaseUrl, accessToken };
+}
+
+/** Whether Q may learn how they like to work (lane ob1). Null: unknown. */
+export async function preferenceLearningAction(): Promise<QPreferenceLearningDto | null> {
+  const session = await qSession();
+  if (session === null) return null;
+  return getQPreferenceLearning(session).catch(() => null);
+}
+
+const Choice = z.object({
+  choice: z.enum(["ALLOW", "NOT_NOW", "TURN_OFF"]),
+  via: z.enum(["PROMPT", "SETTINGS"]),
+});
+
+/** Their choice, for their current workspace only. Null when it did not save. */
+export async function choosePreferenceLearningAction(
+  raw: unknown,
+): Promise<QPreferenceLearningDto | null> {
+  const input = Choice.safeParse(raw);
+  if (!input.success) return null;
+  const session = await qSession();
+  if (session === null) return null;
+  return setQPreferenceLearning(session, input.data).catch(() => null);
 }

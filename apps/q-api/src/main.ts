@@ -490,6 +490,7 @@ import {
   createMemoryService,
   createPostgresKnowledgeRepository,
   createPostgresMemoryRepository,
+  createPostgresPreferenceLearningConsent,
 } from "@capital-q/q-knowledge";
 import {
   AuthUserIdSchema,
@@ -2168,6 +2169,11 @@ const profileFindingsReader = createProfileFindingsReader({
 // Their own onboarding, as Q and the reminders read it: once per run (R5;
 // it was read four times), dropped by any onboarding or mandate write the
 // run makes.
+// Lane ob1 (owner decision 2026-10-16): Q infers communication
+// preferences only with the person's consent, per tenant; no row is no.
+const preferenceLearningConsent = createPostgresPreferenceLearningConsent({
+  sql: database.sql,
+});
 const ownOnboardingSummaryReads = createOwnOnboardingSummaryReader({
   sql: database.sql,
 });
@@ -3170,6 +3176,10 @@ const qTools = createQTools({
     },
     // Lane ob1: their own setup conversation, recalled for their own questions.
     onboardingTranscript: createOnboardingTranscriptPort({ sql: database.sql }),
+    preferenceLearning: {
+      decide: (actor, choice) =>
+        preferenceLearningConsent.decide(actor, choice, "CONVERSATION"),
+    },
     ownRecords: {
       read: (actor, query) => ownRecords.read(actor, query),
       reassessReadiness: (actor, companyId, correlationId) =>
@@ -3711,6 +3721,7 @@ const memoryService = createMemoryService({
   logger,
 });
 const memoryLearner = createMemoryLearner({
+  learningConsent: preferenceLearningConsent,
   gateway: modelGateway,
   dataPosture: demoDataPosture,
   memory: memoryService,
@@ -6415,6 +6426,7 @@ const { app, logger: appLogger } = createApp(
     // the own-public-presence envelope, then the cited pages.
     profileFindings: profileFindingsReader,
     memory: memoryService,
+    learningConsent: preferenceLearningConsent,
     meetingAssistant,
     // MEET-HOST block (ADR 0037)
     meetingHost,

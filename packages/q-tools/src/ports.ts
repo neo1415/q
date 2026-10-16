@@ -1,5 +1,6 @@
 import type { ProfileMaterialPort } from "./tools/profile-material.js";
 import type { OnboardingTranscriptPort } from "./tools/onboarding-transcript.js";
+import type { PreferenceLearningPort } from "./tools/preference-learning.js";
 import type { AttentionPort } from "./tools/attention.js";
 import type { InvestorGateFitDto } from "@capital-q/contracts";
 
@@ -581,6 +582,8 @@ export type QToolPorts = {
   readonly ownRecords?: OwnRecordsPort | undefined;
   /** Lane ob1: their own setup conversation, for their own later questions. */
   readonly onboardingTranscript?: OnboardingTranscriptPort | undefined;
+  /** Lane ob1: their answer to "may Q learn how you like to work?". */
+  readonly preferenceLearning?: PreferenceLearningPort | undefined;
   /** Overnight A8: a company's deck and data room, as the person's tabs show them. */
   readonly profileMaterial?: ProfileMaterialPort | undefined;
   /** R33: their organisation's uploaded documents (metadata). */

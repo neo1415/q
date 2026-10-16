@@ -81,6 +81,11 @@ import {
 } from "./onboarding-port.js";
 import type { HeldWritesStore } from "./held-writes.js";
 import { createReplySentenceStream } from "./reply-stream.js";
+import {
+  firstNameOf,
+  onboardingFlowFor,
+  withNextQuestion,
+} from "./onboarding-flow.js";
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
@@ -446,6 +451,8 @@ export function turnNotesFor(input: {
    * Held changes replayed before this turn (lane ob1), by question: now
    * saved, refused on replay, or still held because a service is down.
    */
+  /** Proactive flow guidance (owner 2026-10-16), first among the notes. */
+  readonly flow?: string | undefined;
   readonly held?:
     | {
         readonly applied: readonly string[];
@@ -455,6 +462,9 @@ export function turnNotesFor(input: {
     | undefined;
 }): string {
   const notes: string[] = [];
+  if (input.flow !== undefined && input.flow.length > 0) {
+    notes.push(input.flow);
+  }
   const held = input.held;
   if (held !== undefined) {
     const list = (items: readonly string[]) =>
@@ -994,6 +1004,19 @@ export function createInterviewAgent(
     await settleKnownAnswers(port, input.journeyType);
     await prefillFromSignup();
     let state = await port.state();
+    const flowFor = (current: typeof state) =>
+      onboardingFlowFor({
+        journey: input.journeyType,
+        opening,
+        state: current,
+        firstName: firstNameOf(input.signup?.displayName ?? null),
+        knownName:
+          (input.journeyType === "founder"
+            ? textAnswerOf(port.view(), FOUNDER_STEPS.companyName)
+            : firmNameOf(port.view(), null)) ||
+          (input.signup?.organisationName?.trim() ?? "") ||
+          null,
+      });
     if (research !== undefined) {
       considerResearch(port.view());
       // What research found and can now be offered is held before the
@@ -1185,6 +1208,7 @@ export function createInterviewAgent(
           : null;
       const pausing = authority.pausing && !opening;
       const turnNotes = turnNotesFor({
+        flow: pausing ? undefined : flowFor(state).note,
         pausing,
         lookup,
         pronounce,
@@ -1514,7 +1538,7 @@ export function createInterviewAgent(
         : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.");
     // Never the previous question word for word (QA 2026-10-03): what they
     // said is acknowledged first, and the question comes in other words.
-    const reply = notVerbatim(replyWritten, lastQTurn ?? null, {
+    let reply = notVerbatim(replyWritten, lastQTurn ?? null, {
       asking: result?.asking ?? null,
       alternate: (stepKey) => {
         const step = journeySteps.find((s) => s.stepKey === stepKey);
@@ -1579,8 +1603,9 @@ export function createInterviewAgent(
         : steps.get(result.asking);
     // A step whose concept is settled is never offered as the question,
     // whatever the reply asked (one concept, one answer).
+    const stateAfter = await port.state().catch(() => null);
     const covered = new Set(
-      (await port.state().catch(() => null))?.steps
+      stateAfter?.steps
         .filter((row) => row.coveredBy !== undefined)
         .map((row) => row.stepKey) ?? [],
     );
@@ -1633,6 +1658,36 @@ export function createInterviewAgent(
           e.status !== "COMPLETED" &&
           e.status !== "SKIPPED",
       );
+
+    // Proactive (owner 2026-10-16): a turn that is not the last never ends
+    // without the next most valuable question, from coverage. Not while a
+    // look-up takes over the line, they are pausing, or the model failed.
+    if (
+      result !== undefined &&
+      !handingOver &&
+      !pausing &&
+      stateAfter !== null &&
+      !stateAfter.completed
+    ) {
+      const backed = withNextQuestion(
+        reply,
+        onboardingFlowFor({
+          journey: input.journeyType,
+          opening: false,
+          state: stateAfter,
+          firstName: null,
+          knownName: null,
+        }),
+        stateAfter.completed,
+      );
+      if (backed !== reply) {
+        logger.info(
+          {},
+          "interview reply asked nothing; the next question was added",
+        );
+        reply = backed;
+      }
+    }
 
     // Kept: one exchange per turn, under one reference.
     const turns = [

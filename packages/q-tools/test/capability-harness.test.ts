@@ -111,6 +111,7 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     recordChanges: port(),
     ownRecords: port(),
     onboardingTranscript: port(),
+    preferenceLearning: port(),
     profileMaterial: port(),
     evidenceDocuments: port(),
     relationshipMail: port(),
