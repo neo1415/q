@@ -117,6 +117,7 @@ export {
   startOnboardingSession,
   reviseOnboardingResponse,
   submitOnboardingResponse,
+  submitOnboardingResponses,
 } from "./onboarding.js";
 
 export {

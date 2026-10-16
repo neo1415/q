@@ -375,6 +375,7 @@ describe("person-scoped actions (onboarding)", () => {
   it("each is a route under the onboarding actor, served to Q by its loop's own tool, never a new one", () => {
     expect(PERSON_ACTIONS.map((action) => action.name)).toEqual([
       "onboarding.answer.submit",
+      "onboarding.answers.submit",
       "onboarding.answer.revise",
       "onboarding.step.skip",
       "onboarding.answer.withdraw",

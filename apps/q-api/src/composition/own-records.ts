@@ -1,6 +1,7 @@
 import type { CapitalService } from "@capital-q/capital";
 import {
   CompanyIdSchema,
+  CompanyTeamFactsNotFoundError,
   declaredFactsForNetwork,
   isNetworkVisible,
   projectCompanyForNetwork,
@@ -96,9 +97,14 @@ export function createOwnRecordsPort(
               .catch(() => null),
             deps.companyService
               .getCompanyTeamFacts({ actor, companyId: id })
-              .catch(() => null),
+              .then((facts) => ({ status: "RECORDED" as const, facts }))
+              .catch((error: unknown) =>
+                error instanceof CompanyTeamFactsNotFoundError
+                  ? { status: "NOT_RECORDED" as const }
+                  : { status: "UNAVAILABLE" as const },
+              ),
           ]);
-          return { membership, founderProfile, teamFacts };
+          return companyTeamRecord(membership, founderProfile, teamFacts);
         }
         case "RAISE_HISTORY": {
           const page = await deps.capital.listCapitalObjectives({
@@ -209,5 +215,65 @@ export function createRelationshipMailPort(integrations: {
         at: item.occurredAt,
       }));
     },
+  };
+}
+
+/**
+ * The team record as Q reads it (live acceptance 2026-10-16: Q said "1
+ * founder, 1 person works here" for a company whose canonical team facts
+ * were 2 founders and 14 people). The company's own counts come ONLY from
+ * the canonical team facts, under names that say what they count; the
+ * caller's own membership is labelled as theirs, never a team list to be
+ * counted; and a missing or unreadable count says so, so nothing is
+ * inferred in its place. Unknown stays unknown.
+ */
+export function companyTeamRecord(
+  membership: {
+    readonly businessTitle?: string | null;
+    readonly isFounder?: boolean;
+    readonly relationshipType?: string;
+  } | null,
+  founderProfile: unknown,
+  teamFacts:
+    | {
+        readonly status: "RECORDED";
+        readonly facts: {
+          readonly founderCount: number | null;
+          readonly fullTimeFounderCount: number | null;
+          readonly teamSize: number | null;
+          readonly updatedAt?: string;
+        };
+      }
+    | { readonly status: "NOT_RECORDED" | "UNAVAILABLE" },
+) {
+  return {
+    teamCounts:
+      teamFacts.status === "RECORDED"
+        ? {
+            status: "RECORDED",
+            numberOfFounders: teamFacts.facts.founderCount,
+            numberOfFullTimeFounders: teamFacts.facts.fullTimeFounderCount,
+            peopleWorkingOnTheCompany: teamFacts.facts.teamSize,
+            ...(teamFacts.facts.updatedAt === undefined
+              ? {}
+              : { updatedAt: teamFacts.facts.updatedAt }),
+            note: "The company's own declared counts. Null means not stated: unknown, never zero or one.",
+          }
+        : {
+            status: teamFacts.status,
+            note:
+              teamFacts.status === "NOT_RECORDED"
+                ? "No team counts are recorded yet. Say they are not recorded; never infer them."
+                : "The team counts could not be read just now. Say so; never infer them.",
+          },
+    yourOwnRole:
+      membership === null
+        ? null
+        : {
+            title: membership.businessTitle ?? null,
+            isFounder: membership.isFounder ?? null,
+            note: "Only the person asking. Not a list of the team and never a count of it.",
+          },
+    yourFounderProfile: founderProfile,
   };
 }

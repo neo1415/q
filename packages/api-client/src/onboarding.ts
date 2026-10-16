@@ -17,6 +17,7 @@ import {
   ONBOARDING_CURRENT_SEGMENT,
   ONBOARDING_PATH,
   ONBOARDING_RESOLVE_SEGMENT,
+  ONBOARDING_RESPONSES_BATCH_SEGMENT,
   ONBOARDING_RESPONSES_SEGMENT,
   ONBOARDING_REVISIONS_SEGMENT,
   ONBOARDING_SESSIONS_SEGMENT,
@@ -25,6 +26,7 @@ import {
   ONBOARDING_STEPS_SEGMENT,
   ONBOARDING_SUGGESTIONS_SEGMENT,
   OnboardingSessionViewSchema,
+  SubmitOnboardingResponsesResultSchema,
   ONBOARDING_NUDGE_SEGMENT,
   ONBOARDING_NUDGE_BRIEFING_SEGMENT,
   ONBOARDING_NUDGE_CHOICE_SEGMENT,
@@ -41,6 +43,7 @@ import {
   type WithdrawOnboardingResponseRequest,
   type StartOnboardingSessionRequest,
   type SubmitOnboardingResponseRequest,
+  type SubmitOnboardingResponsesRequest,
 } from "@capital-q/contracts";
 
 import { call, type ApiSession } from "./request.js";
@@ -101,6 +104,25 @@ export function submitOnboardingResponse(
     "POST",
     `${byId(sessionId)}${ONBOARDING_RESPONSES_SEGMENT}`,
     OnboardingSessionViewSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/**
+ * `POST /v1/onboarding/sessions/:sessionId/responses/batch` — several
+ * answers committed in one transaction; each answer's outcome in order.
+ */
+export function submitOnboardingResponses(
+  session: ApiSession,
+  sessionId: string,
+  request: SubmitOnboardingResponsesRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_RESPONSES_BATCH_SEGMENT}`,
+    SubmitOnboardingResponsesResultSchema,
     { body: request, ...idempotent(idempotencyKey) },
   );
 }

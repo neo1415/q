@@ -5978,6 +5978,13 @@ const reportPausedAccount = async (
   }
 };
 const interviewLoop = createInterviewAgent({
+  // Lane ob1 (2026-10-16): after a round that only saved answers, all
+  // committed, with nothing else to judge, code writes the reply (what was
+  // saved, then the next coverage question) instead of a second model round.
+  replyByCodeAfterCleanSave: true,
+  // ...and a reply that is exactly one choice of the step just asked is
+  // read by code, not the delegation reader.
+  readingByCodeWhereExact: true,
   // Lane ob1: a confirmed answer a brief API outage kept from saving is
   // held in onboarding.pending_writes and replayed on the next turn.
   heldWrites: createHeldWritesStore({

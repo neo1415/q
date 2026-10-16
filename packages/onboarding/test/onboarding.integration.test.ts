@@ -1291,6 +1291,54 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
   // Suggestions
   // -------------------------------------------------------------------------
 
+  it("several answers commit in one transaction: order-independent, refusals reported, one idempotency record (lane ob1 latency)", async () => {
+    await withWorld(async (world) => {
+      const { service, adminA } = world;
+      const { view } = await start(world, adminA);
+      const id = view.session.id as OnboardingSessionId;
+      const key = randomUUID();
+      const batch = {
+        actor: adminA,
+        sessionId: id,
+        // The amount is only on the path once the intent is in: said
+        // first, it lands on the second pass.
+        responses: [
+          { stepKey: "raise_amount", response: range("5000000") },
+          { stepKey: "intent", response: select("raising_now") },
+          { stepKey: "ghost", response: select("x") },
+        ],
+        expectedSessionVersion: 1,
+        idempotencyKey: key,
+        correlationId: CORRELATION(),
+      };
+      const out = await service.runtime.submitResponses(batch);
+      expect(out.results.map((r) => r.outcome)).toEqual([
+        "COMMITTED",
+        "COMMITTED",
+        "REFUSED",
+      ]);
+      const refusedItem = out.results[2];
+      expect(
+        refusedItem?.outcome === "REFUSED" ? refusedItem.refusal.detail : null,
+      ).toContain("STEP_NOT_ELIGIBLE");
+      expect(out.view.responses.map((r) => r.stepKey).sort()).toEqual([
+        "intent",
+        "raise_amount",
+      ]);
+      expect(out.view.session.version).toBe(3);
+      // The same request again is a replay, not two more commits.
+      const again = await service.runtime.submitResponses(batch);
+      expect(again.view.session.version).toBe(3);
+      // The same key on a different request is a conflict.
+      await expect(
+        service.runtime.submitResponses({
+          ...batch,
+          responses: [{ stepKey: "intent", response: select("exploring") }],
+        }),
+      ).rejects.toBeInstanceOf(OnboardingMutationConflictError);
+    });
+  });
+
   it("a rejected proposal is discarded for good: never offered again, by Q or a document re-read (lane ob1)", async () => {
     await withWorld(async (world) => {
       const { tx, service, adminA } = world;

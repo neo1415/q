@@ -9,6 +9,7 @@ import {
   listTaxonomyNodes,
   resolveOnboardingSuggestion,
   submitOnboardingResponse,
+  submitOnboardingResponses,
   withdrawOnboardingResponse,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -343,6 +344,13 @@ export function createOnboardingPort(input: {
     ),
   );
   let latest: OnboardingSessionView | null = null;
+  /**
+   * Whether `latest` is the view this port's own write just committed, so
+   * a state read right after it needs no second round trip (owner
+   * 2026-10-16). Any other mutation, or one that failed or timed out,
+   * leaves it false: the next read goes back to the service.
+   */
+  let trusted = false;
   const written: string[] = [];
   const userId = input.ownerUserId as UserId;
   const store = input.recommendations;
@@ -461,7 +469,7 @@ export function createOnboardingPort(input: {
   };
 
   const state = async (): Promise<OnboardingState> => {
-    const view = await fresh();
+    const view = trusted && latest !== null ? latest : await fresh();
     const pendingList = await pendingNow().catch(() => []);
     const heldSteps =
       input.held === undefined
@@ -601,6 +609,7 @@ export function createOnboardingPort(input: {
     note?: string,
   ): Promise<void> => {
     const view = await current();
+    trusted = false;
     latest = await settle(
       await submitOnboardingResponse(
         input.session,
@@ -618,6 +627,7 @@ export function createOnboardingPort(input: {
         randomUUID(),
       ),
     );
+    trusted = true;
   };
 
   /** Where a refusal names a prerequisite by its field, the step that holds it. */
@@ -894,6 +904,7 @@ export function createOnboardingPort(input: {
 
   const withdraw = async (stepKey: string): Promise<void> => {
     const view = await current();
+    trusted = false;
     latest = await settle(
       await withdrawOnboardingResponse(
         input.session,
@@ -1286,6 +1297,7 @@ export function createOnboardingPort(input: {
           view = await current();
         }
         if (view.progress.canComplete) {
+          trusted = false;
           latest = await completeOnboardingSession(
             input.session,
             input.onboardingSessionId,
@@ -1308,14 +1320,55 @@ export function createOnboardingPort(input: {
     }
   };
 
-  const recordOne = async (answer: {
+  type Answer = {
     readonly stepKey: string;
     readonly value: string | readonly string[] | number | boolean;
     readonly quote: string;
     readonly basis?: "STATED" | "DELEGATED" | undefined;
     readonly ownWords?: boolean | undefined;
-  }): Promise<OnboardingRecordResult> => {
-    if (!said(answer.quote)) return unsaid(answer.stepKey);
+  };
+  /**
+   * What one answer comes to before anything is written: a result already
+   * decided (refused, held for their yes), a confirmation (which finishes,
+   * so it is done on its own), or a write the checks allowed. Planning only
+   * reads, so a batch plans every answer at once and writes them together.
+   */
+  type Planned =
+    | { readonly kind: "DONE"; readonly result: OnboardingRecordResult }
+    | {
+        readonly kind: "CONFIRM";
+        readonly step: OnboardingStepManifest;
+        readonly value: Answer["value"];
+      }
+    | {
+        readonly kind: "WRITE";
+        readonly step: OnboardingStepManifest;
+        readonly value: OnboardingResponseValue;
+        readonly note?: string | undefined;
+        readonly quote: string;
+      };
+  const done = (result: OnboardingRecordResult): Planned => ({
+    kind: "DONE",
+    result,
+  });
+  const recordOne = async (answer: Answer): Promise<OnboardingRecordResult> => {
+    const plan = await planOne(answer);
+    if (plan.kind === "DONE") return plan.result;
+    if (plan.kind === "CONFIRM") return confirmStep(plan.step, plan.value);
+    const result = await write(plan.step, plan.value, plan.note);
+    if (result.outcome === "COMMITTED") {
+      noteFigure(plan.step, plan.value, plan.quote);
+    }
+    return result;
+  };
+  /**
+   * Each answer's resolution, started for a whole batch at once: the only
+   * planning that waits on the network (vocabulary look-ups), so it runs
+   * concurrently while the checks themselves stay in order.
+   */
+  const warmed = new Map<Answer, ReturnType<typeof resolve>>();
+  const planOne = async (answer: Answer): Promise<Planned> => {
+    if (!said(answer.quote)) return done(unsaid(answer.stepKey));
     // A delegation is an instruction given now, "in the same instruction"
     // (lead decision, 2026-09-25): an earlier question or remark is not
     // the person handing Q this choice.
@@ -1324,26 +1377,26 @@ export function createOnboardingPort(input: {
       (input.personTurns[0] === undefined ||
         !quoteOccursIn(answer.quote, input.personTurns[0]))
     ) {
-      return {
+      return done({
         stepKey: answer.stepKey.slice(0, 80),
         outcome: "REJECTED",
         reason:
           "A choice is delegated only by what they say now, handing it to you; that quote is not from their latest words, so nothing was recorded.",
-      };
+      });
     }
     if (answer.basis !== "DELEGATED") {
       const refused = await notStated(answer.stepKey, answer.quote);
-      if (refused !== null) return refused;
+      if (refused !== null) return done(refused);
     }
     if (answer.basis === "DELEGATED") {
       const authority = (await input.authority?.()) ?? null;
       if (authority === null || !authority.handed.has(answer.stepKey)) {
-        return {
+        return done({
           stepKey: answer.stepKey.slice(0, 80),
           outcome: "REJECTED",
           reason:
             "They have not handed you this choice, so nothing was recorded. Hold it with recommend, say what you suggest and why, and let them decide.",
-        };
+        });
       }
     }
     // Confirming the journey's review activates what it set up: that is
@@ -1352,10 +1405,10 @@ export function createOnboardingPort(input: {
     // left the mandate ACTIVE and the session open).
     const confirming = steps.get(answer.stepKey);
     if (confirming?.configuration.stepType === "confirmation") {
-      return confirmStep(confirming, answer.value);
+      return { kind: "CONFIRM", step: confirming, value: answer.value };
     }
-    const resolved = await resolve(answer);
-    if (!resolved.ok) return resolved.result;
+    const resolved = await (warmed.get(answer) ?? resolve(answer));
+    if (!resolved.ok) return done(resolved.result);
     const reading = (await input.authority?.()) ?? null;
     const latestStated =
       reading !== null && statedIn(reading.stated, resolved.step.stepKey);
@@ -1403,22 +1456,22 @@ export function createOnboardingPort(input: {
             rationale: `from what they said earlier: "${answer.quote.slice(0, 120)}"`,
             runId: input.runId ?? null,
           });
-          return {
+          return done({
             stepKey: resolved.step.stepKey,
             outcome: "REJECTED",
             reason:
               "Held for their confirmation, not recorded yet: it is your reading of something they said earlier. Read it back with any others in one short line; when they agree, accept_recommendation records it.",
-          };
+          });
         } catch {
           // Falls through to asking them.
         }
       }
-      return {
+      return done({
         stepKey: resolved.step.stepKey,
         outcome: "REJECTED",
         reason:
           "That comes from something they said earlier, and which choice it is was your reading. Say back what you understood in a few words and record it when they agree.",
-      };
+      });
     }
     const refused = unsupported(
       resolved.step,
@@ -1426,7 +1479,7 @@ export function createOnboardingPort(input: {
       answer,
       readerStated,
     );
-    if (refused !== null) return refused;
+    if (refused !== null) return done(refused);
     if (
       resolved.note !== undefined &&
       answer.basis !== "DELEGATED" &&
@@ -1436,18 +1489,150 @@ export function createOnboardingPort(input: {
         textStatedIn(resolved.note, input.lastQTurn)
       )
     ) {
-      return {
+      return done({
         stepKey: resolved.step.stepKey,
         outcome: "REJECTED",
         reason:
           "That is none of this step's options and not in their words, so nothing was recorded. Record their own words for it, or the option that means what they said.",
-      };
+      });
     }
-    const written = await write(resolved.step, resolved.value, resolved.note);
-    if (written.outcome === "COMMITTED") {
-      noteFigure(resolved.step, resolved.value, answer.quote);
+    return {
+      kind: "WRITE",
+      step: resolved.step,
+      value: resolved.value,
+      note: resolved.note,
+      quote: answer.quote,
+    };
+  };
+
+  /**
+   * Several allowed writes in one transaction (owner 2026-10-16). Each is
+   * checked by the journey exactly as a single submission is; one it
+   * refuses is reported with its reason and the others still commit. What
+   * is COMMITTED is said only after the commit returned. Where the service
+   * is briefly down, every one is held for retry, never claimed as saved.
+   * Null: this service cannot take a batch (an older release); the caller
+   * writes them one by one as before.
+   */
+  const writeMany = async (
+    plans: readonly Extract<Planned, { kind: "WRITE" }>[],
+  ): Promise<OnboardingRecordResult[] | null> => {
+    const ready: {
+      readonly plan: Extract<Planned, { kind: "WRITE" }>;
+      readonly value: OnboardingResponseValue;
+      readonly movedFrom?: OnboardingRecordResult["movedFrom"];
+    }[] = [];
+    const early = new Map<number, OnboardingRecordResult>();
+    // In order, one at a time: settling a sibling list may itself write.
+    for (const [index, plan] of plans.entries()) {
+      const prepared = await prepareSiblings(plan.step, plan.value);
+      if (!prepared.ok) {
+        early.set(index, prepared.result);
+        continue;
+      }
+      ready.push({
+        plan,
+        value: prepared.value,
+        ...(prepared.movedFrom === undefined
+          ? {}
+          : { movedFrom: prepared.movedFrom }),
+      });
     }
-    return written;
+    const questionOf = (step: OnboardingStepManifest) =>
+      (SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt).slice(
+        0,
+        400,
+      );
+    const settled: OnboardingRecordResult[] = [];
+    if (ready.length > 0) {
+      const view = await current();
+      trusted = false;
+      try {
+        const out = await submitOnboardingResponses(
+          input.session,
+          input.onboardingSessionId,
+          {
+            responses: ready.map((item) => ({
+              stepKey: item.plan.step.stepKey,
+              response: {
+                value: item.value,
+                ...(item.plan.note === undefined
+                  ? {}
+                  : { note: item.plan.note }),
+                channel: "CONVERSATION" as const,
+              },
+            })),
+            expectedSessionVersion: view.session.version,
+          },
+          randomUUID(),
+        );
+        latest = await settle(out.view);
+        trusted = true;
+        const after = latest;
+        settled.push(
+          ...(await Promise.all(
+            ready.map(async (item, index): Promise<OnboardingRecordResult> => {
+              const outcome = out.results[index];
+              const stepKey = item.plan.step.stepKey;
+              if (outcome?.outcome !== "COMMITTED") {
+                return refused(stepKey, {
+                  problem: outcome?.refusal ?? { detail: null, errors: [] },
+                });
+              }
+              written.push(stepKey);
+              noteFigure(item.plan.step, item.value, item.plan.quote);
+              return {
+                stepKey,
+                outcome: "COMMITTED",
+                question: questionOf(item.plan.step),
+                recorded: (item.plan.note === undefined
+                  ? await spoken(item.plan.step, item.value, after)
+                  : `${item.plan.note} (in their words)`
+                ).slice(0, 600),
+                ...(item.movedFrom === undefined
+                  ? {}
+                  : { movedFrom: item.movedFrom }),
+              };
+            }),
+          )),
+        );
+      } catch (error: unknown) {
+        const status = (error as { readonly status?: unknown }).status;
+        if (status === 404 || status === 405) return null;
+        for (const item of ready) {
+          const stepKey = item.plan.step.stepKey;
+          if (input.held !== undefined && isTransientOnboardingFailure(error)) {
+            try {
+              await input.held.hold(stepKey, {
+                value: item.value,
+                ...(item.plan.note === undefined
+                  ? {}
+                  : { note: item.plan.note }),
+              });
+              settled.push({
+                stepKey,
+                outcome: "HELD_FOR_RETRY",
+                question: questionOf(item.plan.step),
+                reason:
+                  "Not saved yet: the service is briefly unavailable. Their answer is held and will be saved automatically; nothing is lost. Tell them plainly it is not saved yet, do not ask it again, and carry on.",
+              });
+              continue;
+            } catch {
+              // The hold itself failed: report the original failure.
+            }
+          }
+          settled.push(refused(stepKey, error));
+        }
+      }
+    }
+    // Back in the order the plans came in.
+    const out: OnboardingRecordResult[] = [];
+    let next = 0;
+    for (const index of plans.keys()) {
+      const result = early.get(index) ?? settled[next++];
+      if (result !== undefined) out.push(result);
+    }
+    return out.length === plans.length ? out : null;
   };
 
   /**
@@ -1688,6 +1873,7 @@ export function createOnboardingPort(input: {
         }
         try {
           const view = await current();
+          trusted = false;
           latest = await settle(
             await resolveOnboardingSuggestion(
               input.session,
@@ -1872,6 +2058,7 @@ export function createOnboardingPort(input: {
             // history kept; the service sets the step aside.
             await withdraw(step.stepKey);
           } else {
+            trusted = false;
             latest = await settle(
               await skipOnboardingStep(
                 input.session,
@@ -1963,6 +2150,7 @@ export function createOnboardingPort(input: {
         return { completed: false, missing: missing(view) };
       }
       try {
+        trusted = false;
         latest = await completeOnboardingSession(
           input.session,
           input.onboardingSessionId,
@@ -1994,8 +2182,54 @@ export function createOnboardingPort(input: {
           return refused(answer.stepKey, error);
         }
       };
-      // In order: a prerequisite said in the same breath lands first.
-      for (const answer of answers) results.push(await safely(answer));
+      // Planned together (reads only: their words, the reading, the
+      // vocabularies), then every allowed write committed in ONE
+      // transaction (owner 2026-10-16: a round trip per answer made a
+      // typed turn 6-18 s). A confirmation finishes, so it goes last and
+      // on its own; a sibling exclusion list is settled before the batch.
+      for (const answer of answers) {
+        const resolving = resolve(answer);
+        // Settled here or by the plan that awaits it; never unhandled.
+        resolving.catch(() => undefined);
+        warmed.set(answer, resolving);
+      }
+      const plans: Planned[] = [];
+      for (const answer of answers) {
+        const plan = await planOne(answer).catch((error: unknown): Planned =>
+          done(refused(answer.stepKey, error)),
+        );
+        // A figure planned for one step is not also another's in the same
+        // breath (one stated figure answers one step), as if each had
+        // committed in turn.
+        if (plan.kind === "WRITE")
+          noteFigure(plan.step, plan.value, plan.quote);
+        plans.push(plan);
+      }
+      warmed.clear();
+      const writes = plans.flatMap((plan, index) =>
+        plan.kind === "WRITE" ? [{ plan, index }] : [],
+      );
+      const committedBatch =
+        writes.length > 1 ? await writeMany(writes.map((w) => w.plan)) : null;
+      for (const [index, plan] of plans.entries()) {
+        const answer = answers[index];
+        if (answer === undefined) continue;
+        if (plan.kind === "DONE") {
+          results.push(plan.result);
+          continue;
+        }
+        if (plan.kind === "WRITE" && committedBatch !== null) {
+          const at = writes.findIndex((w) => w.index === index);
+          const result = committedBatch[at];
+          if (result !== undefined) {
+            results.push(result);
+            continue;
+          }
+        }
+        // One write, a confirmation, or a batch the service could not
+        // take as one: the single path, in the order they spoke.
+        results.push(await safely(answer));
+      }
       // A refused step whose prerequisite landed later in the batch gets
       // one more try, so the order they spoke in does not matter.
       for (const [index, result] of results.entries()) {
@@ -2038,6 +2272,7 @@ export function createOnboardingPort(input: {
               : { note: write.response.note }),
             channel: "CONVERSATION" as const,
           };
+          trusted = false;
           latest = await settle(
             await submitOnboardingResponse(
               input.session,
