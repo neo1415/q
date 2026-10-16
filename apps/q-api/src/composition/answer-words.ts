@@ -19,7 +19,7 @@ import {
 } from "../security/actor-context.js";
 import type { QVoiceRoutesDependencies } from "../voice/routes.js";
 
-import type { TranslateLines } from "./ui-text.js";
+import type { TranslateLines, TranslateLinesOptions } from "./ui-text.js";
 
 /**
  * Words Q writes by code, in the person's language (owner directive
@@ -56,6 +56,7 @@ export type AnswerWords = {
     language: string,
     texts: readonly string[],
     attribution: Omit<ModelAttribution, "correlationId" | "purpose">,
+    options?: TranslateLinesOptions,
   ) => Promise<readonly (string | null)[]>;
 };
 
@@ -69,7 +70,7 @@ export function createAnswerWords(dependencies: {
   readonly logger?: Logger | undefined;
 }): AnswerWords {
   return {
-    localise: async (language, texts, attribution) => {
+    localise: async (language, texts, attribution, options) => {
       const info = languageInfo(language);
       const none = texts.map(() => null);
       if (info === null || info.primary === "en") return none;
@@ -82,6 +83,7 @@ export function createAnswerWords(dependencies: {
           info.tag,
           skeletons,
           attribution,
+          options,
         );
         return texts.map((text, i) =>
           i < MAX_TEXTS ? localisedAnswer(text, translated) : null,

@@ -487,7 +487,17 @@ export type TranslateLines = (
   language: string,
   lines: readonly string[],
   attribution: Omit<ModelAttribution, "correlationId" | "purpose">,
+  options?: TranslateLinesOptions,
 ) => Promise<ReadonlyMap<string, string>>;
+
+export type TranslateLinesOptions = {
+  /**
+   * Only lines already translated come back, without waiting: lines never
+   * seen are still sent to the model in the background, so the next caller
+   * has them (lane ob1: a code-written reply must not wait on a model).
+   */
+  readonly cachedOnly?: boolean | undefined;
+};
 
 export function createLineTranslator(dependencies: {
   readonly store: UiTextStore;
@@ -588,7 +598,7 @@ export function createLineTranslator(dependencies: {
     }
   };
 
-  return async (language, requested, attribution) => {
+  return async (language, requested, attribution, options) => {
     const info = languageInfo(language);
     const result = new Map<string, string>();
     if (info === null || info.primary === "en") return result;
@@ -623,7 +633,7 @@ export function createLineTranslator(dependencies: {
       for (const line of missing) inFlight.set(`${info.tag}|${line}`, pass);
       waits.push(pass);
     }
-    if (waits.length > 0) {
+    if (waits.length > 0 && options?.cachedOnly !== true) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       await Promise.race([
         Promise.all(waits),
