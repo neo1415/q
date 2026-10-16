@@ -9,7 +9,12 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
 
-import { withoutAnsweredQuestions } from "../src/voice/onboarding-flow.js";
+import { codeReading } from "../src/voice/code-reading.js";
+import {
+  withoutAnsweredQuestions,
+  withoutUnbackedSaveClaims,
+} from "../src/voice/onboarding-flow.js";
+import { quickAcknowledgement } from "../src/voice/quick-acknowledgement.js";
 import {
   branchStepKeys,
   proposalPrerequisites,
@@ -151,5 +156,62 @@ describe("a question about their own upload is answered, never handed to a look-
     expect(outcome.researching).toBeNull();
     expect(outcome.reply).not.toMatch(/proper look|research it with you/i);
     expect(seen.join("\n")).not.toContain("A look-up will run");
+  });
+});
+
+describe("live latency run on release AA (2026-10-16)", () => {
+  it("'US dollars.' under 'how much are you raising?' states the open currency step", () => {
+    const read = codeReading({
+      utterance: "US dollars.",
+      asked: stepOf("F6.target_amount"),
+      openChoices: [stepOf("F6.currency"), stepOf("F6.instrument")].filter(
+        (s) => s !== undefined,
+      ),
+      pendingCount: 0,
+    });
+    expect([...(read?.stated ?? [])]).toEqual(["F6.currency"]);
+  });
+
+  it("a bare figure after Q moved on answers the amount asked just before", () => {
+    const read = codeReading({
+      utterance: "1200000",
+      asked: stepOf("F6.currency"),
+      askedBefore: stepOf("F6.target_amount"),
+      pendingCount: 0,
+    });
+    expect([...(read?.stated ?? [])]).toEqual(["F6.target_amount"]);
+  });
+
+  it("never 'saved' when nothing was committed this turn", () => {
+    const out = withoutUnbackedSaveClaims(
+      "Veridia Water's site is noted. And $1,200,000 is saved for the raise. Which currency are you raising in?",
+      false,
+    );
+    expect(out).not.toMatch(/saved for the raise|is noted/);
+    expect(out).toMatch(/^I haven't saved that yet\./);
+    expect(out).toMatch(/Which currency are you raising in\?$/);
+    expect(withoutUnbackedSaveClaims("Stage: Seed is saved. Next?", true)).toBe(
+      "Stage: Seed is saved. Next?",
+    );
+    expect(
+      withoutUnbackedSaveClaims("Your website is already saved. Next?", false),
+    ).toBe("Your website is already saved. Next?");
+  });
+
+  it("a read-back keeps their words without a doubled full stop", () => {
+    expect(
+      quickAcknowledgement({
+        results: [
+          {
+            stepKey: "F1.description",
+            outcome: "COMMITTED",
+            recorded: "Water units for clinics.",
+          },
+        ],
+        labelOf: () => "What the company does",
+        next: { question: "What stage is the company at?", optional: false },
+        turnIndex: 0,
+      }),
+    ).not.toContain("..");
   });
 });
