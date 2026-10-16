@@ -422,7 +422,10 @@ export function InterviewStep({
             Pause, come back later
           </Button>
           <Button
-            variant="primary"
+            // While the video interview is on offer and nothing is answered,
+            // it is the step's primary; skipping is the way out, not the
+            // weightiest button (live check 2026-10-16).
+            variant={answered || mode === "text" ? "primary" : "secondary"}
             style={{ minWidth: 160 }}
             onClick={onFinish}
             disabled={pending || unsent !== null || !loaded}
