@@ -79,6 +79,8 @@ export type OnboardingClient<TView, TResponse> = {
           readonly role: "person" | "q";
           readonly text: string;
         }[];
+        /** The founder profile section they came to fill (Overview link). */
+        readonly focus?: string | undefined;
       }) => Promise<{
         readonly view: TView;
         /** Null when the one Q interviewer answered; `reply` is then Q's words. */

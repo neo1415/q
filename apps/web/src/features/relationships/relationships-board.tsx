@@ -22,6 +22,7 @@ import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { effectShown } from "@/features/q/control/perform";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 import { RelationshipFitLine } from "@/features/fit/relationship-fit-chips";
+import { CompanyScoresLive } from "@/features/scores";
 
 import type { RelationshipDigest } from "./relationship-data";
 import { relationshipHref, STATE_WORDS } from "./relationship-words";
@@ -476,6 +477,10 @@ function RelationshipRow({
           </p>
         )}
         {fit === undefined ? null : <RelationshipFitLine profile={fit} />}
+        {fit === undefined ? null : (
+          // Investability and Suitability (ADR 0074): the investor's rows only.
+          <CompanyScoresLive companyId={item.counterpart.id} />
+        )}
         <div className="flex items-center gap-2 lg:hidden">
           {pill}
           {when}

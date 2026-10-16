@@ -33,6 +33,12 @@ export type TabAsk = {
   readonly name: string | null;
   /** The deck itself was asked for: it opens in its viewer at once. */
   readonly viewer: boolean;
+  /**
+   * Lane ov 2026-10-16: one section of the profile's Overview ("show me
+   * Harbourline's market", "go to the go-to-market section"), by its key in
+   * the founder profile's section list. Absent: none asked.
+   */
+  readonly section?: string | undefined;
 };
 
 const TAB_WORDS: readonly (readonly [QRecordTab, string])[] = [
@@ -63,6 +69,50 @@ const SECTION_WORDS: readonly (readonly [DeckSectionCode, string])[] = [
   ["TEAM", "team"],
 ];
 const ANY_SECTION = SECTION_WORDS.map(([, words]) => `(?:${words})`).join("|");
+
+/**
+ * Lane ov 2026-10-16: the profile Overview's sections, by the words people
+ * use, keyed by the section's key in `FOUNDER_PROFILE_SECTIONS`
+ * (@capital-q/founder-onboarding, the one versioned list; a web test
+ * holds these keys equal to it). Longer phrases first: "why now" before
+ * "now", "go-to-market" before "market". Words are matched, never passed
+ * through.
+ */
+export const PROFILE_SECTION_WORDS: readonly (readonly [string, string])[] = [
+  [
+    "why_us_why_now",
+    "why\\s+us\\??(?:[\\s,]+why\\s+now\\??)?|why\\s+now\\??|timing",
+  ],
+  [
+    "go_to_market",
+    "go[\\s-]*to[\\s-]*market(?:\\s+strategy)?|gtm|distribution",
+  ],
+  [
+    "opportunity",
+    "opportunity(?:\\s+(?:and|&)\\s+economics)?|economics|unit\\s+economics|market(?:\\s+size)?|traction|value\\s+prop(?:osition)?",
+  ],
+  ["business_model", "business\\s+model|revenue\\s+model|pricing"],
+  ["how_it_works", "how\\s+it\\s+works|product"],
+  ["competition", "competitive\\s+landscape|competition|competitors"],
+  ["moats", "moats?|advantages?|defensibility|unfair\\s+advantage"],
+  ["roadmap", "roadmap|milestones"],
+  ["vision", "(?:our\\s+)?vision|mission"],
+  ["problem", "(?:the\\s+)?problem"],
+  ["solution", "solution"],
+  ["team", "(?:our\\s+)?team|founders?"],
+  ["ask", "(?:our\\s+|the\\s+)?ask|use\\s+of\\s+funds|raise"],
+  ["closing", "closing(?:\\s+statement)?"],
+];
+const ANY_PROFILE_SECTION = PROFILE_SECTION_WORDS.map(
+  ([, words]) => `(?:${words})`,
+).join("|");
+
+function profileSectionOf(word: string): string | null {
+  for (const [key, words] of PROFILE_SECTION_WORDS) {
+    if (new RegExp(`^(?:${words})$`, "iu").test(word.trim())) return key;
+  }
+  return null;
+}
 
 /**
  * The verbs that go to a place. "draft", "make", "create", "build" are not
@@ -189,6 +239,36 @@ function fromObject(rawObject: string): TabAsk | null {
     if (tab === null || name === undefined) return null;
     return { tab, subTab: null, name, viewer: tab === "deck" };
   }
+  return profileSectionAsk(object);
+}
+
+/**
+ * Lane ov: a section of the profile's Overview. Only with a word that
+ * makes it a place: "the go-to-market section", "Harbourline's market",
+ * "the market section for Harbourline". A bare "the market" is a topic,
+ * left to Q.
+ */
+function profileSectionAsk(object: string): TabAsk | null {
+  const sectioned = new RegExp(
+    `^(?:(?:the|their|its)\\s+)?(${ANY_PROFILE_SECTION})\\s+(?:section|part)(?:\\s+(?:for|of|at|on|in)\\s+(.+?))?(?:\\s+(?:of|on|in)\\s+(?:the|their|its)\\s+overview)?$`,
+    "iu",
+  ).exec(object);
+  if (sectioned !== null) {
+    const section = profileSectionOf(sectioned[1] ?? "");
+    const name = ownerOf(sectioned[2]);
+    if (section === null || name === undefined) return null;
+    return { tab: "overview", subTab: null, name, viewer: false, section };
+  }
+  const owned = new RegExp(
+    `^(.+?)'s\\s+(${ANY_PROFILE_SECTION})(?:\\s+(?:section|part))?$`,
+    "iu",
+  ).exec(object);
+  if (owned !== null) {
+    const section = profileSectionOf(owned[2] ?? "");
+    const name = ownerOf(owned[1]);
+    if (section === null || name === undefined) return null;
+    return { tab: "overview", subTab: null, name, viewer: false, section };
+  }
   return null;
 }
 
@@ -236,6 +316,15 @@ export function screenTabTarget(
     screen.route === "COMPANY" ||
     screen.route === "RELATIONSHIP_COMPANY" ||
     screen.route === "PITCH";
+  // Lane ov 2026-10-16: on a company's profile, "the diligence tab" is the
+  // profile's own Diligence tab; on a relationship page, the relationship's.
+  if (
+    ask.tab === "diligence" &&
+    screen.route === "COMPANY" &&
+    screen.companyId !== undefined
+  ) {
+    return { page: "COMPANY", id: screen.companyId };
+  }
   if (
     ask.tab === "calls" ||
     ask.tab === "diligence" ||
@@ -269,6 +358,7 @@ export function screenTabTarget(
 /** Where Q says it is going: "the team tab", "diligence", "the deck". */
 export function tabPlace(ask: TabAsk): string {
   if (ask.subTab !== null) return "that part of the deck";
+  if (ask.section !== undefined) return "that section of the overview";
   switch (ask.tab) {
     case "overview":
       return "the overview";

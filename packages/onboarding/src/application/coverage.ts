@@ -51,6 +51,8 @@ export type OnboardingCoverageFieldProfile = {
   readonly satisfiedByDocuments?: readonly string[] | undefined;
   /** What to ask first within a priority (lower first). Absent: definition order. */
   readonly rank?: number | undefined;
+  /** False: never asked as a gap (owner: a profile's Closing); still confirmable. */
+  readonly askable?: boolean | undefined;
   /** Rough seconds to answer it in conversation; for the time estimate. */
   readonly seconds?: number | undefined;
 };
@@ -307,7 +309,14 @@ export function proposalSource(
   if (refs.some((r) => PUBLIC_SOURCE_TYPES.has(r.sourceType))) {
     return "PUBLIC_RESEARCH";
   }
-  if (refs.some((r) => r.sourceType === "EVIDENCE_DOCUMENT")) {
+  // Their deck, or their own pitch video's transcript: their material.
+  if (
+    refs.some(
+      (r) =>
+        r.sourceType === "EVIDENCE_DOCUMENT" ||
+        r.sourceType === "PITCH_TRANSCRIPT",
+    )
+  ) {
     return "DOCUMENT";
   }
   if (refs.some((r) => r.sourceType === "Q_RECOMMENDATION")) {
@@ -475,6 +484,7 @@ export function deriveOnboardingCoverage(
         savePending: pendingSaves.has(step.stepKey),
         dependsOn: branchDependencies(step.branching).slice(0, 8),
         ...(fieldProfile.rank === undefined ? {} : { rank: fieldProfile.rank }),
+        ...(fieldProfile.askable === false ? { askable: false } : {}),
       };
     },
   );
@@ -602,7 +612,7 @@ export function selectNextFields(
       }
     }
     for (const f of open) {
-      if (tierOf(f) === tier && f.state === "MISSING") {
+      if (tierOf(f) === tier && f.state === "MISSING" && f.askable !== false) {
         push(f, tier === 0 ? "ESSENTIAL_MISSING" : "IMPORTANT_MISSING");
       }
     }
@@ -623,7 +633,9 @@ export function selectNextFields(
       if (f.state === "SUPPLIED_UNCONFIRMED") push(f, "CONFIRM_PROPOSAL");
     }
     const offer = open
-      .filter((f) => f.state === "DEFERRABLE" && !f.declined)
+      .filter(
+        (f) => f.state === "DEFERRABLE" && !f.declined && f.askable !== false,
+      )
       .sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority])[0];
     if (offer !== undefined) push(offer, "OPTIONAL_OFFER");
   }

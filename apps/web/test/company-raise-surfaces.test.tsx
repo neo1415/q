@@ -153,6 +153,9 @@ function renderProfile(
   view: CompanyRaiseView,
   viewer: CompanyProfileDto["viewer"] = "INVESTOR",
   deck: CompanyDeckView | null = null,
+  // Lane ov 2026-10-16: the strip is the Overview's; the raise fold is
+  // Diligence's.
+  tab: "overview" | "diligence" = "diligence",
 ): void {
   const profile: CompanyProfileDto = {
     viewer,
@@ -184,7 +187,7 @@ function renderProfile(
   render(
     <CompanyProfileView
       profile={profile}
-      tab="overview"
+      tab={tab}
       interest={null}
       connected={false}
       sectorLabels={[]}
@@ -194,11 +197,13 @@ function renderProfile(
 }
 
 function profileWords(view: CompanyRaiseView): string {
-  renderProfile(view);
+  renderProfile(view, "INVESTOR", null, "overview");
   const fact = document.querySelector(
     "[data-profile-key-facts] [data-raise-fact]",
   );
   const words = normalised(fact);
+  cleanup();
+  renderProfile(view);
   // "The raise" line, without the investor's deck note after it.
   const line = (
     document.querySelector('[data-overview-fold="company-raise"] summary p')

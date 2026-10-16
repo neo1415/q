@@ -122,6 +122,13 @@ export type ArrivalData = {
    * `setupRemindersWaiting` counts it: 0 or 1; absent: none.
    */
   readonly setupReminders?: number | undefined;
+  /**
+   * Founders (lead 2026-10-16): Q's deck reading waiting on their check,
+   * shown with Q's questions and counted as one thing waiting; absent or
+   * null: nothing pending (or not a founder).
+   */
+  readonly deckReview?:
+    { readonly pending: number; readonly href: string } | null | undefined;
 };
 
 /**

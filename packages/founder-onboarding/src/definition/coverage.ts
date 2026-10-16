@@ -1,6 +1,7 @@
 import type { OnboardingCoverageProfile } from "@capital-q/onboarding";
 
 import { FOUNDER_STEPS } from "./founder-v1.js";
+import { FOUNDER_PROFILE_SECTIONS } from "./profile-sections.js";
 import { FOUNDER_FINANCIAL_STEPS } from "./founder-v4.js";
 
 /**
@@ -22,9 +23,35 @@ const FINANCIAL_EVIDENCE = [
   "FINANCIAL_MODEL",
 ] as const;
 
+/**
+ * The company profile sections a step of their own holds (owner template,
+ * profile-sections.ts): asked after the essentials, in the order investors
+ * need them, only when the deck and the pitch did not answer them. The
+ * first five investors need are IMPORTANT; the rest OPTIONAL; Closing is
+ * never asked.
+ */
+const PROFILE_SECTION_FIELDS: OnboardingCoverageProfile["fields"] =
+  Object.fromEntries(
+    FOUNDER_PROFILE_SECTIONS.flatMap((section) =>
+      section.stepKeys
+        .filter((key) => key.startsWith("F9."))
+        .map((key) => [
+          key,
+          {
+            concept: `company.profile.${section.key}`,
+            priority: section.investorRank <= 5 ? "IMPORTANT" : "OPTIONAL",
+            label: section.title,
+            rank: 20 + section.investorRank,
+            seconds: 30,
+            ...(section.askable ? {} : { askable: false }),
+          },
+        ]),
+    ),
+  );
+
 export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
   journeyType: "founder",
-  version: "founder-coverage-2026-10-16",
+  version: "founder-coverage-2026-10-16.2",
   registrationSeeds: { organisationName: FOUNDER_STEPS.companyName },
   fields: {
     [FOUNDER_STEPS.companyName]: {
@@ -241,5 +268,6 @@ export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       label: "Anything else",
       seconds: 30,
     },
+    ...PROFILE_SECTION_FIELDS,
   },
 };

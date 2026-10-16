@@ -7,6 +7,10 @@ import type {
 } from "@capital-q/contracts";
 
 import { money } from "@/features/capital/money";
+import {
+  DECK_REVIEW_TITLE,
+  deckReviewLine,
+} from "@/features/company/material/deck-pending";
 
 /**
  * The Relationships list's view model (founder critique 2026-10-04: "next
@@ -403,6 +407,8 @@ export type NeedsYouCard = {
    * is done, so it has no dismiss.
    */
   readonly step?: boolean;
+  /** A second line for a card about no one relationship (the deck review). */
+  readonly detail?: string;
 };
 
 type Family = "reply" | "answer" | "files" | "money" | "other";
@@ -531,6 +537,14 @@ export function needsYouCards(input: {
     /** When it last moved: a message, else the state change. */
     readonly at: string;
   }[];
+  /**
+   * Founders (lead 2026-10-16): deck sections Q read that they have not
+   * checked yet. A step, not a notice: it leaves when they are checked.
+   */
+  readonly deckReview?:
+    | { readonly pending: number; readonly href: string; readonly at: string }
+    | null
+    | undefined;
 }): readonly NeedsYouCard[] {
   const byCounterpart = new Map(
     input.items.map((item) => [item.counterpart.id.toLowerCase(), item]),
@@ -631,7 +645,27 @@ export function needsYouCards(input: {
       step: true,
     });
   }
-  return [...cards.values()].toSorted(
+  const sorted = [...cards.values()].toSorted(
     (a, b) => Date.parse(b.latestAt) - Date.parse(a.latestAt),
   );
+  const review = input.deckReview;
+  if (input.side !== "COMPANY" || review === null || review === undefined) {
+    return sorted;
+  }
+  if (review.pending <= 0) return sorted;
+  return [
+    {
+      key: "deck-review",
+      title: DECK_REVIEW_TITLE,
+      detail: deckReviewLine(review.pending),
+      relationship: null,
+      latestAt: review.at,
+      count: 1,
+      noticeIds: [],
+      reminderId: null,
+      action: { label: "Review sections", href: review.href },
+      step: true,
+    },
+    ...sorted,
+  ];
 }

@@ -175,7 +175,9 @@ const FOUNDER_VIEW: CompanyProfileDto = {
 
 function renderProfile(
   profile: CompanyProfileDto,
-  tab: "overview" | "elevator" = "overview",
+  // Lane ov 2026-10-16: the old Overview's folds are the Diligence tab;
+  // the strip stays on the Overview (`stripText`).
+  tab: "overview" | "diligence" | "elevator" = "diligence",
 ) {
   return render(
     <CompanyProfileView
@@ -186,6 +188,15 @@ function renderProfile(
       sectorLabels={["Energy storage"]}
     />,
   );
+}
+
+/** The Overview's summary strip, rendered on its own and read. */
+function stripText(profile: CompanyProfileDto): string {
+  const { container, unmount } = renderProfile(profile, "overview");
+  const text =
+    container.querySelector("[data-profile-key-facts]")?.textContent ?? "";
+  unmount();
+  return text;
 }
 
 beforeEach(() => {
@@ -245,15 +256,12 @@ describe("the profile, for an investor", () => {
     for (const name of ["Data room", "Pitch deck", "Team"]) {
       expect(tabs.textContent).toContain(name);
     }
+    expect(tabs.textContent).toContain("Diligence");
     expect(
       screen
-        .getByRole("link", { name: "Overview" })
+        .getByRole("link", { name: "Diligence" })
         .getAttribute("aria-current"),
     ).toBe("page");
-    // Short in the summary strip, exact under The raise.
-    expect(
-      document.querySelector("[data-profile-key-facts]")?.textContent,
-    ).toContain("$1.5M");
     expect(screen.getAllByText("USD 1,500,000")).toHaveLength(1);
     expect(
       screen.getByRole("heading", { name: "In their words" }),
@@ -269,6 +277,9 @@ describe("the profile, for an investor", () => {
     expect(
       screen.getByRole("button", { name: /Express interest/i }),
     ).toBeTruthy();
+    cleanup();
+    // Short in the Overview's summary strip, exact under The raise.
+    expect(stripText(investorProfile())).toContain("$1.5M");
   });
 
   it("a synthetic-demo attestation shows a quiet 'Demo verified (synthetic)' with its basis, never the gold badge", () => {
@@ -394,7 +405,7 @@ describe("the profile, for an investor", () => {
           ...base,
           overview: { ...base.overview, raise: null, deck: null },
         }}
-        tab="overview"
+        tab="diligence"
         interest={null}
         connected={true}
         sectorLabels={["Energy storage"]}
@@ -562,10 +573,15 @@ describe("the overview, decluttered, with what the pitch says", () => {
         pitchClaims: [saidRaise, traction],
       }),
     );
-    const strip = document.querySelector("[data-profile-key-facts]");
-    expect(strip?.textContent).toContain("$4M seed");
-    expect(strip?.textContent).toContain("Said in their pitch, 0:43");
-    expect(strip?.textContent).not.toContain("Not shared");
+    const strip = stripText(
+      withPitch({
+        raiseFromPitch: saidRaise,
+        pitchClaims: [saidRaise, traction],
+      }),
+    );
+    expect(strip).toContain("$4M seed");
+    expect(strip).toContain("Said in their pitch, 0:43");
+    expect(strip).not.toContain("Not shared");
     const quote = document.querySelector("blockquote[data-pitch-claim=RAISE]");
     expect(quote?.textContent).toContain("raising a $4 million seed");
     expect(quote?.textContent).toContain("0:43");
@@ -577,8 +593,9 @@ describe("the overview, decluttered, with what the pitch says", () => {
 
   it("still says not shared when there is no raise from the pitch (unknown stays unknown)", () => {
     renderProfile(withPitch({ raiseFromPitch: null, pitchClaims: [] }));
-    const strip = document.querySelector("[data-profile-key-facts]");
-    expect(strip?.textContent).toContain("Not shared");
+    expect(
+      stripText(withPitch({ raiseFromPitch: null, pitchClaims: [] })),
+    ).toContain("Not shared");
     expect(
       document.querySelector("[data-overview-fold=company-traction]")
         ?.textContent,
@@ -650,7 +667,14 @@ describe("moving between a profile's tabs", () => {
       <ProfileTabs
         base={base}
         initial="overview"
-        available={["overview", "elevator", "dataroom", "deck", "team"]}
+        available={[
+          "overview",
+          "diligence",
+          "elevator",
+          "dataroom",
+          "deck",
+          "team",
+        ]}
       >
         <CompanyProfileView
           profile={profile}
@@ -714,7 +738,14 @@ describe("moving between a profile's tabs", () => {
       <ProfileTabs
         base={base}
         initial="overview"
-        available={["overview", "elevator", "dataroom", "deck", "team"]}
+        available={[
+          "overview",
+          "diligence",
+          "elevator",
+          "dataroom",
+          "deck",
+          "team",
+        ]}
       >
         <CompanyProfileView
           profile={profile}

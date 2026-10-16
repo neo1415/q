@@ -110,6 +110,8 @@ describe("registry", () => {
         "DILIGENCE_DOCUMENT_SUMMARY",
         // Overnight A5 2026-10-06: a pitch deck into twelve sections.
         "DECK_EXTRACTION",
+        // Lane ov 2026-10-16: a pitch transcript into the profile's sections.
+        "PITCH_SECTION_EXTRACTION",
         // ADR 0011: a yes, a no or neither, read from the person's words.
         "DECISION_READER",
         // Founder brief J7: people's words read by meaning.

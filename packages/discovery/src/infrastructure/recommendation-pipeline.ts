@@ -70,6 +70,10 @@ import {
 import { createSlateBuilder, type SlateBuilder } from "../slates/builder.js";
 import type { FilterMoney } from "../slates/filters.js";
 import { createFitOrdering } from "../fit/order.js";
+import {
+  createPostgresInvestabilityScores,
+  createPostgresSuitabilityRecorder,
+} from "./postgres-company-scores.js";
 import { createFitInputSource } from "./fit-inputs.js";
 import type { SlatePolicy } from "../slates/contracts.js";
 import type { RefreshRequestStore, SlateRepository } from "../slates/ports.js";
@@ -427,6 +431,9 @@ export function createRecommendationPipeline(
   const currentRaises = dependencies.currentRaises;
   const fitOrdering = createFitOrdering({
     clock,
+    // fit-order.v2: Investability after explicit fit; Suitability recorded.
+    investability: createPostgresInvestabilityScores({ sql }),
+    recordSuitability: createPostgresSuitabilityRecorder({ sql }),
     inputs: createFitInputSource({
       sql,
       eligibilityPorts,

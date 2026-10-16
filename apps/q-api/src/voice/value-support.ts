@@ -13,7 +13,7 @@
  * here.
  */
 
-import { spokenFiguresIn } from "./interview-steps.js";
+import { asciiDigits, spokenFiguresIn } from "./interview-steps.js";
 
 /**
  * Digit sequences in text, with grouping and decimal marks between digits
@@ -21,7 +21,8 @@ import { spokenFiguresIn } from "./interview-steps.js";
  * writes "one" and "five million" as often as "1" and "5,000,000", and a
  * founder was asked to say "1" for the form (live 2026-09-30).
  */
-function digitRuns(text: string): string[] {
+function digitRuns(raw: string): string[] {
+  const text = asciiDigits(raw);
   const runs: string[] = [];
   for (const figure of spokenFiguresIn(text)) {
     if (Number.isInteger(figure)) runs.push(String(figure));

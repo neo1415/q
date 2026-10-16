@@ -545,6 +545,9 @@ importers:
       '@capital-q/q-specialists':
         specifier: workspace:*
         version: link:../../packages/q-specialists
+      '@capital-q/readiness':
+        specifier: workspace:*
+        version: link:../../packages/readiness
       '@capital-q/security':
         specifier: workspace:*
         version: link:../../packages/security

@@ -186,3 +186,46 @@ describe("proactive onboarding (owner 2026-10-16)", () => {
     expect(outcome.reply).toBe("What stage is Quillmark at?");
   });
 });
+
+describe("a section link from the Overview (lane ov: ?talk=1&section=<key>)", () => {
+  it("Q opens on that section's question, ahead of coverage's own next one", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.description",
+      recorded: { "F0.intent": "raising_now" },
+    });
+    const { gateway, seen } = saying("Hi Ines.");
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall,
+      logger,
+    }).turn({
+      ...turn(world, ""),
+      signup,
+      actor,
+      focus: "problem",
+    });
+    const told = seen[0] ?? "";
+    expect(told).toContain(
+      "They came here to fill this part of their company profile",
+    );
+    expect(told).toContain("What problem are you solving, and for whom?");
+    expect(outcome.reply.trim().endsWith("?")).toBe(true);
+  });
+
+  it("an unknown section changes nothing", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.description",
+      recorded: { "F0.intent": "raising_now" },
+    });
+    const { gateway, seen } = saying("Hi Ines.");
+    await createInterviewAgent({ gateway, firewall, logger }).turn({
+      ...turn(world, ""),
+      signup,
+      actor,
+      focus: "not_a_section",
+    });
+    expect(seen[0]).not.toContain("They came here to fill");
+  });
+});

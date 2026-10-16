@@ -388,6 +388,7 @@ export {
 } from "./fast-navigation.js";
 export { namedRecordRequestOf } from "./named-record-request.js";
 export {
+  PROFILE_SECTION_WORDS,
   screenTabTarget,
   tabAskOf,
   tabPlace,

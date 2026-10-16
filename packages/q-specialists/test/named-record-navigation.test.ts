@@ -539,6 +539,20 @@ describe("W4: a researched entity by name, when it is none of their relationship
 });
 
 describe("a language named is not a record (live 2026-10-16)", () => {
+  it("leaves any language by name to Q's language tool, never a record (live 2026-10-16)", () => {
+    for (const text of [
+      "Please switch to French.",
+      "switch to Swahili please",
+      "go to Spanish",
+      "switch to the Portuguese language",
+      "switch to français",
+    ]) {
+      expect(namedRecordRequestOf(text), text).toBeNull();
+    }
+    // A short word is a word, not a language code.
+    expect(namedRecordRequestOf("open Shiftwell")).not.toBeNull();
+  });
+
   it("leaves 'switch to English' and its kin to Q's language tool", () => {
     for (const words of [
       "switch to English",

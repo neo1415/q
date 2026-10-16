@@ -49,6 +49,20 @@ export const FOUNDER_FACT_KEYS = [
   "instrument",
   "timeframe",
   "use_of_funds",
+  // The founder company profile's own sections (owner template,
+  // 2026-10-16): a passage's account of each, in the founder's words.
+  "opportunity",
+  "problem",
+  "solution",
+  "how_it_works",
+  "business_model",
+  "vision",
+  "go_to_market",
+  "competition",
+  "moats",
+  "roadmap",
+  "why_us_why_now",
+  "closing",
 ] as const;
 export const FounderFactKeySchema = z.enum(FOUNDER_FACT_KEYS);
 export type FounderFactKey = z.infer<typeof FounderFactKeySchema>;

@@ -483,7 +483,19 @@ describe("response validation per step type (§40, §96-99, §210)", () => {
       sourceModality: "SELECTION",
     });
     invalid("intent", { value: { type: "SINGLE_SELECT", optionKey: "nope" } });
-    invalid("intent", { value: { type: "TEXT", text: "raising" } });
+    // Their own words are an answer too, like "Other" on a form (owner
+    // 2026-10-16): kept verbatim as TEXT, never refused.
+    expect(
+      validateOnboardingResponse(defStep("intent"), {
+        value: { type: "TEXT", text: "raising, sort of" },
+      }),
+    ).toMatchObject({
+      responseType: "TEXT",
+      rawText: "raising, sort of",
+      sourceModality: "TYPED_TEXT",
+    });
+    invalid("intent", { value: { type: "TEXT", text: "x".repeat(501) } });
+    invalid("intent", { value: { type: "CONFIRMATION", confirmed: true } });
     invalid("intent", {
       value: { type: "SINGLE_SELECT", optionKey: "raising_now", extra: 1 },
     });

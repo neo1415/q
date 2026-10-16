@@ -56,6 +56,19 @@ const FREE_TEXT_KEYS: ReadonlySet<FounderFactKey> = new Set<FounderFactKey>([
   "company_name",
   "website",
   "description",
+  // Founder v6: every company profile section takes the founder's words.
+  "opportunity",
+  "problem",
+  "solution",
+  "how_it_works",
+  "business_model",
+  "vision",
+  "go_to_market",
+  "competition",
+  "moats",
+  "roadmap",
+  "why_us_why_now",
+  "closing",
 ]);
 
 type Option = { readonly optionKey: string; readonly label: string };

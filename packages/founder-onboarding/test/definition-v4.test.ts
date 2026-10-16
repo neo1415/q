@@ -34,12 +34,12 @@ const step = (key: string) =>
   FOUNDER_DEFINITION_V4.steps.find((s) => s.stepKey === key);
 
 describe("founder definition v4", () => {
-  it("is valid, and superseded only by v5", () => {
+  it("is valid, and superseded by v5 and v6", () => {
     expect(() =>
       validateOnboardingManifest(FOUNDER_DEFINITION_V4),
     ).not.toThrow();
     expect(FOUNDER_DEFINITION_V4.version).toBe(4);
-    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(5);
+    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(6);
   });
 
   it("keeps every v3 step unchanged and in v3's relative order", () => {

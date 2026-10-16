@@ -5,9 +5,11 @@ import type {
   Money,
   PitchClaimDto,
   PitchRaiseNotice,
+  PitchSectionFactDto,
   PitchSummaryDto,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor } from "@capital-q/database";
+import { PitchSectionFactDtoSchema } from "@capital-q/contracts";
+import { decodeJsonbString, type DatabaseExecutor } from "@capital-q/database";
 import { extractPitchClaims, type TimedCue } from "@capital-q/media";
 import type { DisclosurePolicyRepository } from "@capital-q/permissions";
 
@@ -65,6 +67,97 @@ export async function pitchClaimsFor(
           })),
     )
     .slice(0, 40);
+}
+
+/** One stored section of a pitch's reading, as the worker wrote it. */
+export type StoredPitchSection = {
+  readonly key: string;
+  readonly facts: readonly {
+    readonly label: string;
+    readonly value: string;
+    readonly atSeconds: number;
+  }[];
+};
+
+/**
+ * Lane ov 2026-10-16: what the pitches this reader may play say, section
+ * by section, from Q's stored reading of each transcript (no model runs
+ * here). `readingOf` authorises each pitch with the player's own rule and
+ * returns null where this reader may not play it, or it was not read yet.
+ * Every fact is the founder's own claim with its moment; anything the
+ * stored row holds that does not fit the contract is dropped, never shown.
+ */
+export async function pitchSectionsFor(
+  videos: readonly PitchSummaryDto[],
+  readingOf: (
+    mediaAssetId: string,
+  ) => Promise<readonly StoredPitchSection[] | null>,
+): Promise<PitchSectionFactDto[]> {
+  const read = await Promise.all(
+    videos.slice(0, PITCH_CLAIM_VIDEOS_MAX).map(async (video) => ({
+      video,
+      sections: await readingOf(video.mediaAssetId).catch(() => null),
+    })),
+  );
+  const out: PitchSectionFactDto[] = [];
+  for (const { video, sections } of read) {
+    for (const section of sections ?? []) {
+      for (const fact of section.facts) {
+        const parsed = PitchSectionFactDtoSchema.safeParse({
+          sectionKey: section.key,
+          label: fact.label,
+          value: fact.value,
+          pitchId: video.mediaAssetId,
+          pitchTitle: video.title ?? null,
+          atSeconds: fact.atSeconds,
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+          source: "PITCH_VIDEO",
+        });
+        if (parsed.success) out.push(parsed.data);
+      }
+    }
+  }
+  return out.slice(0, 160);
+}
+
+/**
+ * The newest stored reading of one pitch (media.pitch_section_readings).
+ * The caller has already authorised the pitch for the reader; this is the
+ * server's own read of a server-only table. Malformed entries are dropped.
+ */
+export async function storedPitchSections(
+  sql: DatabaseExecutor,
+  mediaAssetId: string,
+): Promise<readonly StoredPitchSection[] | null> {
+  const rows = await sql<{ sections: unknown }[]>`
+    select sections from media.pitch_section_readings
+     where media_asset_id = ${mediaAssetId}
+     order by created_at desc
+     limit 1`;
+  const row = rows[0];
+  if (row === undefined) return null;
+  const raw = decodeJsonbString(row.sections);
+  if (!Array.isArray(raw)) return null;
+  const out: StoredPitchSection[] = [];
+  for (const entry of raw as unknown[]) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const { key, facts } = entry as { key?: unknown; facts?: unknown };
+    if (typeof key !== "string" || !Array.isArray(facts)) continue;
+    out.push({
+      key,
+      facts: (facts as unknown[]).flatMap((fact) => {
+        if (typeof fact !== "object" || fact === null) return [];
+        const { label, value, atSeconds } = fact as Record<string, unknown>;
+        return typeof label === "string" &&
+          typeof value === "string" &&
+          typeof atSeconds === "number"
+          ? [{ label, value, atSeconds }]
+          : [];
+      }),
+    });
+  }
+  return out;
 }
 
 function normalised(amount: string): string {

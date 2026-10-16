@@ -23,6 +23,10 @@ import {
   type DisclosureAccessService,
 } from "@capital-q/permissions";
 import type { FitQViewer } from "@capital-q/q-specialists";
+import {
+  createPostgresInvestabilityStore,
+  INVESTABILITY_METHOD_VERSION,
+} from "@capital-q/readiness";
 import type { InvestorFeedPort } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
@@ -206,7 +210,15 @@ export function createFitComposition(
       return [] as readonly T[];
     });
 
+  // 2026-10-16: Investability (InvestIQ) from the investor-eligible
+  // projection, read only for companies the fit service already admitted.
+  const investabilityStore = createPostgresInvestabilityStore({
+    sql: dependencies.sql,
+  });
   const fit = createFitService({
+    investability: (companyIds) =>
+      investabilityStore.current(companyIds, INVESTABILITY_METHOD_VERSION),
+    investabilityMethodVersion: INVESTABILITY_METHOD_VERSION,
     investorSubject: dependencies.eligibilityPorts.investorSubject,
     eligibility: dependencies.eligibility,
     inputs,

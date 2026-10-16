@@ -75,6 +75,19 @@ export function fastLaneOf(
     // investors nobody asked for. The region words stay as they were said.
     const investors = skim.investors;
     if (investors === null || investors === undefined) return null;
+    // A question about something else, with the investors only in what
+    // they told Q, is not a search (any language: the region words are
+    // the first read's own, as said).
+    if (
+      investors.regions.length > 0 &&
+      asksSomethingElse(text, (sentence) =>
+        investors.regions.some((region) =>
+          sentence.toLowerCase().includes(region.toLowerCase()),
+        ),
+      )
+    ) {
+      return null;
+    }
     return {
       questionKind: "DISCOVER_INVESTORS",
       discoverInvestors: {
@@ -370,10 +383,47 @@ const COUNT_WORDS: Readonly<Record<string, number>> = {
   few: 3,
 };
 
+/**
+ * The turn's questions: sentences ending in a question mark of any script
+ * (? ؟ ？). Split on sentence ends of any script too.
+ */
+function questionsOf(text: string): readonly string[] {
+  return text
+    .split(/(?<=[.!?؟？。！])\s+|\n+/u)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => /[?؟？]$/u.test(sentence));
+}
+
+/**
+ * Live 2026-10-16: "We want to raise USD 1.5m seed from Gulf investors.
+ * هل هذا المبلغ منطقي ...؟" was answered with a list of investors. When the
+ * turn asks a question and none of its questions is about the investors
+ * (they appear only in what the person told Q), what is asked is the
+ * question (their amount, their plan), never a search. Structural, so it
+ * holds in any language: `mentions` says whether a sentence names the ask.
+ */
+export function asksSomethingElse(
+  utterance: string,
+  mentions: (sentence: string) => boolean,
+): boolean {
+  const questions = questionsOf(utterance);
+  return questions.length > 0 && !questions.some(mentions);
+}
+
 export function investorDiscoveryLaneOf(utterance: string): FastLane | null {
   const text = utterance.trim().slice(0, 300);
   if (text.length === 0 || ACTION_WORDS.test(text)) return null;
   if (!INVESTOR_INTENT.test(text)) return null;
+  if (
+    asksSomethingElse(
+      text,
+      (sentence) =>
+        INVESTOR_INTENT.test(sentence) ||
+        REGION_TERMS.some((term) => sentence.toLowerCase().includes(term)),
+    )
+  ) {
+    return null;
+  }
   const lower = text.toLowerCase();
   const regions: string[] = [];
   for (const term of REGION_TERMS) {

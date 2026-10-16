@@ -1,0 +1,493 @@
+import { describe, expect, it } from "vitest";
+
+import { createOnboardingPort } from "../src/voice/onboarding-port.js";
+
+import { reading } from "./authority-fixtures.js";
+import { investorSession, turn } from "./interviewer-fixtures.js";
+
+/**
+ * Always save (owner 2026-10-16): every fact a person gives is saved, every
+ * time. Each case is a fact as said, and what the acting model passes for
+ * it (meaning is the model's). The independent reading notices NOTHING in
+ * any case: what is proven is that code saves the fact without depending on
+ * a model noticing it. Built from every miss in the live runs (founder,
+ * investor and Arabic, 2026-10-16), plus at least five phrasings per field
+ * type, unusual and mixed-language ones included.
+ *
+ * Persisted: the step holds an answer afterwards, structured or in their
+ * own words; a fact for a question not on their path is kept with their
+ * notes. Target: 100% persisted, 0 dropped, 0 duplicated.
+ */
+
+type Case = {
+  readonly id: string;
+  readonly journey: "founder" | "investor";
+  readonly said: string;
+  readonly stepKey: string;
+  readonly value: string | number | readonly string[];
+  readonly quote: string;
+  /** Off their path: kept with the journey's notes, never refused. */
+  readonly offPath?: boolean;
+};
+
+const F = "founder" as const;
+const I = "investor" as const;
+
+export const ALWAYS_SAVE_CASES: readonly Case[] = [
+  // Logged misses (live 2026-10-16).
+  {
+    id: "live-usd",
+    journey: F,
+    said: "US dollars.",
+    stepKey: "F6.currency",
+    value: "US dollars",
+    quote: "US dollars",
+  },
+  {
+    id: "live-1200000",
+    journey: F,
+    said: "1200000",
+    stepKey: "F6.target_amount",
+    value: 1_200_000,
+    quote: "1200000",
+  },
+  {
+    id: "live-partner",
+    journey: I,
+    said: "Partner.",
+    stepKey: "I0.business_title",
+    value: "Partner",
+    quote: "Partner",
+  },
+  {
+    id: "live-health",
+    journey: I,
+    said: "Mostly health.",
+    stepKey: "I3.sectors",
+    value: ["health"],
+    quote: "health",
+  },
+  {
+    id: "live-first-revenue",
+    journey: F,
+    said: "We have pilots running and first revenue only.",
+    stepKey: "F5.revenue_status",
+    value: "early",
+    quote: "first revenue only",
+    offPath: true,
+  },
+  {
+    id: "live-500k",
+    journey: F,
+    said: "About 500 thousand dollars.",
+    stepKey: "F6.target_amount",
+    value: 500_000,
+    quote: "About 500 thousand dollars",
+  },
+  {
+    id: "live-500k-currency",
+    journey: F,
+    said: "About 500 thousand dollars.",
+    stepKey: "F6.currency",
+    value: "dollars",
+    quote: "dollars",
+  },
+  {
+    id: "live-aed-revenue",
+    journey: F,
+    said: "monthly revenue 180k AED",
+    stepKey: "F5.monthly_revenue",
+    value: 180_000,
+    quote: "180k AED",
+    offPath: true,
+  },
+  {
+    id: "live-usd-1.5m",
+    journey: F,
+    said: "raise USD 1.5m",
+    stepKey: "F6.target_amount",
+    value: 1_500_000,
+    quote: "USD 1.5m",
+  },
+  // One choice.
+  {
+    id: "stage-plain",
+    journey: F,
+    said: "We're at seed.",
+    stepKey: "F1.stage",
+    value: "seed",
+    quote: "seed",
+  },
+  {
+    id: "stage-label",
+    journey: F,
+    said: "Pre-seed, honestly.",
+    stepKey: "F1.stage",
+    value: "Pre-seed",
+    quote: "Pre-seed",
+  },
+  {
+    id: "stage-caps",
+    journey: F,
+    said: "SERIES A just closed",
+    stepKey: "F1.stage",
+    value: "series a",
+    quote: "SERIES A",
+  },
+  {
+    id: "stage-other",
+    journey: F,
+    said: "Bootstrapped so far, no outside money.",
+    stepKey: "F1.stage",
+    value: "bootstrapped",
+    quote: "Bootstrapped so far, no outside money",
+  },
+  {
+    id: "stage-between",
+    journey: F,
+    said: "Somewhere between seed and Series A.",
+    stepKey: "F1.stage",
+    value: "seed to series A",
+    quote: "Somewhere between seed and Series A",
+  },
+  {
+    id: "stage-arabic",
+    journey: F,
+    said: "نحن في مرحلة البذرة",
+    stepKey: "F1.stage",
+    value: "seed",
+    quote: "مرحلة البذرة",
+  },
+  // Currency.
+  {
+    id: "ccy-code",
+    journey: F,
+    said: "USD",
+    stepKey: "F6.currency",
+    value: "USD",
+    quote: "USD",
+  },
+  {
+    id: "ccy-dirhams",
+    journey: F,
+    said: "In dirhams.",
+    stepKey: "F6.currency",
+    value: "AED",
+    quote: "dirhams",
+  },
+  {
+    id: "ccy-naira",
+    journey: F,
+    said: "naira",
+    stepKey: "F6.currency",
+    value: "Nigerian naira",
+    quote: "naira",
+  },
+  {
+    id: "ccy-arabic",
+    journey: F,
+    said: "بالدولار الأمريكي",
+    stepKey: "F6.currency",
+    value: "usd",
+    quote: "بالدولار الأمريكي",
+  },
+  {
+    id: "ccy-mix",
+    journey: F,
+    said: "A mix of euros and dollars.",
+    stepKey: "F6.currency",
+    value: "euros and dollars",
+    quote: "A mix of euros and dollars",
+  },
+  // Money.
+  {
+    id: "money-short",
+    journey: F,
+    said: "$1.2m",
+    stepKey: "F6.target_amount",
+    value: 1_200_000,
+    quote: "$1.2m",
+  },
+  {
+    id: "money-words",
+    journey: F,
+    said: "A million and a half.",
+    stepKey: "F6.target_amount",
+    value: 1_500_000,
+    quote: "A million and a half",
+  },
+  {
+    id: "money-arabic",
+    journey: F,
+    said: "١٫٥ مليون دولار",
+    stepKey: "F6.target_amount",
+    value: 1_500_000,
+    quote: "١٫٥ مليون دولار",
+  },
+  {
+    id: "money-mixed",
+    journey: F,
+    said: "We're raising USD 1.5m بالدولار",
+    stepKey: "F6.target_amount",
+    value: 1_500_000,
+    quote: "USD 1.5m",
+  },
+  {
+    id: "money-k",
+    journey: F,
+    said: "750k",
+    stepKey: "F6.target_amount",
+    value: "750k",
+    quote: "750k",
+  },
+  // A count.
+  {
+    id: "count-people",
+    journey: F,
+    said: "12 people.",
+    stepKey: "F4.team_size",
+    value: 12,
+    quote: "12 people",
+  },
+  {
+    id: "count-words",
+    journey: F,
+    said: "Fourteen of us.",
+    stepKey: "F4.team_size",
+    value: 14,
+    quote: "Fourteen",
+  },
+  {
+    id: "count-dozen",
+    journey: F,
+    said: "A dozen or so.",
+    stepKey: "F4.team_size",
+    value: "a dozen or so",
+    quote: "A dozen or so",
+  },
+  {
+    id: "count-arabic",
+    journey: F,
+    said: "١٤ موظفاً",
+    stepKey: "F4.team_size",
+    value: 14,
+    quote: "١٤ موظفاً",
+  },
+  {
+    id: "count-around",
+    journey: F,
+    said: "Around 20, including contractors.",
+    stepKey: "F4.team_size",
+    value: 20,
+    quote: "Around 20",
+  },
+  // Short text.
+  {
+    id: "title-gp",
+    journey: I,
+    said: "I'm a GP.",
+    stepKey: "I0.business_title",
+    value: "GP",
+    quote: "GP",
+  },
+  {
+    id: "title-md",
+    journey: I,
+    said: "Managing director.",
+    stepKey: "I0.business_title",
+    value: "Managing director",
+    quote: "Managing director",
+  },
+  {
+    id: "title-arabic",
+    journey: I,
+    said: "شريك",
+    stepKey: "I0.business_title",
+    value: "شريك",
+    quote: "شريك",
+  },
+  {
+    id: "title-principal",
+    journey: I,
+    said: "Principal at the fund.",
+    stepKey: "I0.business_title",
+    value: "Principal",
+    quote: "Principal",
+  },
+  {
+    id: "title-lower",
+    journey: I,
+    said: "venture partner",
+    stepKey: "I0.business_title",
+    value: "venture partner",
+    quote: "venture partner",
+  },
+  // Several choices.
+  {
+    id: "multi-two",
+    journey: F,
+    said: "Product and engineering.",
+    stepKey: "F4.functions",
+    value: ["product", "engineering"],
+    quote: "Product and engineering",
+  },
+  {
+    id: "multi-one",
+    journey: F,
+    said: "Mostly sales.",
+    stepKey: "F4.functions",
+    value: ["sales"],
+    quote: "sales",
+  },
+  {
+    id: "multi-near",
+    journey: F,
+    said: "Ops and a bit of design.",
+    stepKey: "F4.functions",
+    value: ["operations", "design"],
+    quote: "Ops and a bit of design",
+  },
+  {
+    id: "multi-other",
+    journey: F,
+    said: "A bit of everything.",
+    stepKey: "F4.functions",
+    value: ["everything"],
+    quote: "A bit of everything",
+  },
+  {
+    id: "multi-arabic",
+    journey: F,
+    said: "الهندسة والمبيعات",
+    stepKey: "F4.functions",
+    value: ["engineering", "sales"],
+    quote: "الهندسة والمبيعات",
+  },
+  // Categories.
+  {
+    id: "cat-named",
+    journey: I,
+    said: "Fintech.",
+    stepKey: "I3.sectors",
+    value: ["fintech"],
+    quote: "Fintech",
+  },
+  {
+    id: "cat-partial",
+    journey: I,
+    said: "Climate and fintech.",
+    stepKey: "I3.sectors",
+    value: ["climate", "fintech"],
+    quote: "Climate and fintech",
+  },
+  {
+    id: "cat-none",
+    journey: I,
+    said: "Agritech, mostly smallholder tools.",
+    stepKey: "I3.sectors",
+    value: ["agritech"],
+    quote: "Agritech, mostly smallholder tools",
+  },
+  {
+    id: "cat-arabic",
+    journey: I,
+    said: "التكنولوجيا المالية",
+    stepKey: "I3.sectors",
+    value: ["fintech"],
+    quote: "التكنولوجيا المالية",
+  },
+  {
+    id: "cat-phrase",
+    journey: I,
+    said: "Anything that helps farmers sell more.",
+    stepKey: "I3.sectors",
+    value: ["helps farmers sell more"],
+    quote: "helps farmers sell more",
+  },
+];
+
+const FINTECH = "a0000000-0000-4000-8000-0000000000f1";
+
+async function persisted(c: Case): Promise<{
+  readonly saved: boolean;
+  readonly duplicated: boolean;
+}> {
+  const world = investorSession({
+    journey: c.journey,
+    currentStepKey: c.stepKey,
+    recorded:
+      c.journey === "founder"
+        ? { "F0.intent": "raising_now", "F1.company_name": "Lumora Grid" }
+        : { "I0.investor_type": "vc" },
+    taxonomy: { fintech: FINTECH },
+    ...(c.offPath === true ? { ineligible: [c.stepKey] } : {}),
+  });
+  const port = createOnboardingPort({
+    session: turn(world, c.said).session,
+    onboardingSessionId: turn(world, c.said).onboardingSessionId,
+    journeyType: c.journey,
+    ownerUserId: "b0000000-0000-4000-8000-000000000001",
+    personTurns: [c.said],
+    // The reading notices nothing: code alone must save it.
+    // (CQ_EVAL_READER=1: it notices the step, to measure that case too.)
+    authority: () =>
+      Promise.resolve(
+        reading(
+          process.env["CQ_EVAL_READER"] === "1" ? { stated: [c.stepKey] } : {},
+        ),
+      ),
+  });
+  const results = await port
+    .record([
+      {
+        stepKey: c.stepKey,
+        value: typeof c.value === "object" ? [...c.value] : c.value,
+        quote: c.quote,
+        basis: "STATED",
+        ownWords: false,
+      },
+    ])
+    .catch(() => []);
+  const notes =
+    c.journey === "founder" ? "F7.follow_up" : "I11.additional_context";
+  const held =
+    c.offPath === true
+      ? world.recordedValue(notes)
+      : world.recordedValue(c.stepKey);
+  const saved =
+    held !== undefined &&
+    (c.offPath !== true ||
+      (held.type === "TEXT" && held.text.includes(c.quote)));
+  const tries = world.attempts().filter((key) => key === c.stepKey).length;
+  if (process.env["CQ_EVAL_TRACE"] === "1" && !(held !== undefined)) {
+    console.log(c.id, JSON.stringify(results));
+  }
+  return { saved, duplicated: c.offPath !== true && tries > 1 };
+}
+
+describe("always save: every stated fact is persisted (owner 2026-10-16)", () => {
+  it("has at least five phrasings per field type, Arabic and mixed included", () => {
+    expect(ALWAYS_SAVE_CASES.length).toBeGreaterThanOrEqual(40);
+  });
+
+  it("persists 100% with 0 drops and 0 duplicates, with no help from the reading", async () => {
+    const dropped: string[] = [];
+    const duplicated: string[] = [];
+    for (const c of ALWAYS_SAVE_CASES) {
+      const result = await persisted(c);
+      if (!result.saved) dropped.push(c.id);
+      if (result.duplicated) duplicated.push(c.id);
+    }
+    const total = ALWAYS_SAVE_CASES.length;
+    console.log(
+      JSON.stringify({
+        total,
+        persisted: total - dropped.length,
+        dropped,
+        duplicated,
+      }),
+    );
+    expect(dropped).toEqual([]);
+    expect(duplicated).toEqual([]);
+  }, 60_000);
+});

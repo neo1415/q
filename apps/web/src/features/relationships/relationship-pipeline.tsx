@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { CompanyScoresLive } from "@/features/scores";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -556,6 +558,9 @@ export function RelationshipPipeline({
                     >
                       {row.counterpart.name}
                     </Link>
+                    {row.counterpart.kind === "COMPANY" ? (
+                      <CompanyScoresLive companyId={row.counterpart.id} />
+                    ) : null}
                   </td>
                   {preferences.columns.includes("state") ? (
                     <td className="py-3 pe-4 whitespace-nowrap text-(--cq-text-primary)">
@@ -635,6 +640,9 @@ export function RelationshipPipeline({
                         >
                           {row.counterpart.name}
                         </Link>
+                        {row.counterpart.kind === "COMPANY" ? (
+                          <CompanyScoresLive companyId={row.counterpart.id} />
+                        ) : null}
                         {row.nextStep === "NONE" ? null : (
                           <p className="cq-caption text-(--cq-text-secondary)">
                             {t(PIPELINE_NEXT_WORDS[row.nextStep])}

@@ -769,6 +769,9 @@ export const Q_VOICE_DESTINATIONS = [
   "CAPITAL_ACTION_PLAN",
   "CAPITAL_PLAN",
   "CAPITAL_INVESTORS",
+  // Lane ov 2026-10-16: the CRM's Pipeline tab (RELATIONSHIPS is its
+  // Overview, CAPITAL its Capital tab).
+  "CRM_PIPELINE",
   "INTERVIEW",
   "INTERVIEW_FOUNDER",
   "INTERVIEW_INVESTOR",

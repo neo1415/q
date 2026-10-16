@@ -29,6 +29,7 @@ const OPENED_BY_CODE: ReadonlySet<string> = new Set([
   "CAPITAL_ACTION_PLAN",
   "CAPITAL_PLAN",
   "CAPITAL_INVESTORS",
+  "CRM_PIPELINE",
 ]);
 
 export const READER_DESTINATIONS = Q_NAVIGATE_DESTINATIONS.filter(

@@ -111,6 +111,7 @@ export function useProfileTab(): ProfileTab | null {
 /** Q's ids for the profile's tabs (literal, for the parity matrix). */
 const Q_PROFILE_TABS: Readonly<Record<ProfileTab, string>> = {
   overview: "tab.overview",
+  diligence: "tab.diligence",
   elevator: "tab.elevator",
   dataroom: "tab.dataroom",
   deck: "tab.deck",

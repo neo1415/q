@@ -220,6 +220,8 @@ export type QIntelligenceDependencies = {
     | undefined;
   /** Multilingual Q: the language note for each person, or null. */
   readonly languageOf?: ModelGatewayQAnswerDependencies["languageOf"];
+  /** Any language: Q's code-written words through the shared translation layer. */
+  readonly localiseWords?: ModelGatewayQAnswerDependencies["localiseWords"];
   /** Multilingual Q: the person's chosen language, for code-written copy. */
   readonly languageCodeOf?:
     | ((actor: QAnswerRequest["actor"]) => Promise<QLanguageCode | null>)
@@ -418,6 +420,9 @@ export function composeQIntelligence(
     ...(dependencies.languageOf === undefined
       ? {}
       : { languageOf: dependencies.languageOf }),
+    ...(dependencies.localiseWords === undefined
+      ? {}
+      : { localiseWords: dependencies.localiseWords }),
     ...(dependencies.askerOf === undefined
       ? {}
       : { askerOf: dependencies.askerOf }),

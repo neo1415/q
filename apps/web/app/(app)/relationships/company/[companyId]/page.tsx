@@ -122,6 +122,7 @@ export default async function InvestorRelationshipPage({
         }
         fitAndInterest={
           <FitAndInterest
+            companyId={companyId}
             fit={fit}
             interest={
               own === null

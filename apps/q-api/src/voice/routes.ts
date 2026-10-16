@@ -728,16 +728,17 @@ export function registerQVoiceRoutes(
           { language: chosen, reason: "VOICE_LANGUAGE_UNAVAILABLE" },
           "voice line refused for its language",
         );
+        // 422 with a body that says 422 (RFC 9457): live 2026-10-16 the
+        // body said 400 under a 422.
+        const problem = createProblemDetails({
+          code: "VALIDATION_FAILED",
+          requestId: request.id,
+          detail: `Q can't hold a voice conversation in ${name} yet: the speech services Capital Q uses don't support it. Type to Q instead and Q answers in ${name}, or switch to another language for voice.`,
+        });
         return reply
-          .code(422)
+          .code(problem.status)
           .type(PROBLEM_CONTENT_TYPE)
-          .send(
-            createProblemDetails({
-              code: "INVALID_REQUEST",
-              requestId: request.id,
-              detail: `Q can't hold a voice conversation in ${name} yet: the speech services Capital Q uses don't support it. Type to Q instead and Q answers in ${name}, or switch to another language for voice.`,
-            }),
-          );
+          .send(problem);
       }
 
       // Q opens the interview in its own words: a greeting and the live

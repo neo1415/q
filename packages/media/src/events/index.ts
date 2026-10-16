@@ -178,6 +178,30 @@ export const MediaAssetModeratedEvent = defineEvent({
     "A moderation decision was recorded for a media asset, with its provenance. Automation only ever allows or holds for a person; it never blocks.",
 });
 
+/**
+ * Q read a pitch's transcript into the founder profile's sections and the
+ * reading was stored (lane ov, media.pitch_section_readings). Identifiers
+ * only: never a fact, a quote or the transcript. Founder onboarding
+ * consumes it to propose those sections for the founder to confirm.
+ */
+export const MediaPitchSectionsReadEvent = defineEvent({
+  name: "media.pitch_sections.read",
+  version: 1,
+  owner: MEDIA_EVENT_OWNER,
+  producer: "capitalq://workers/media",
+  consumers: ["@capital-q/workers"],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      ...ownership,
+      readingId: UuidSchema,
+    })
+    .strict(),
+  description:
+    "A pitch's transcript was read into the founder profile's sections and stored. Identifiers only.",
+});
+
 export const MEDIA_EVENTS: readonly EventDefinition[] = [
   MediaAssetCreatedEvent,
   MediaAssetReplacedEvent,
@@ -185,6 +209,7 @@ export const MEDIA_EVENTS: readonly EventDefinition[] = [
   MediaAssetStatusChangedEvent,
   MediaAssetPlaybackPolicyChangedEvent,
   MediaAssetModeratedEvent,
+  MediaPitchSectionsReadEvent,
 ];
 
 /** A person acted: their tenant, their organisation, their correlation. */
@@ -318,6 +343,19 @@ export function mediaAssetDeletedEvent(
     MediaAssetDeletedEvent,
     context,
     { type: "media_asset", id: data.mediaAssetId, version: assetVersion },
+    data,
+  );
+}
+
+/** The platform stored a pitch section reading (lane ov's worker). */
+export function mediaPitchSectionsReadEvent(
+  context: SystemContext,
+  data: z.infer<typeof MediaPitchSectionsReadEvent.dataSchema>,
+) {
+  return envelope(
+    MediaPitchSectionsReadEvent,
+    context,
+    { type: "pitch_section_reading", id: data.readingId, version: 1 },
     data,
   );
 }
