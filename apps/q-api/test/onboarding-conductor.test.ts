@@ -424,6 +424,112 @@ describe("Q leads", () => {
     }
   });
 
+  it("a section link resumed in Arabic: the section's hand question, kept once as said", async () => {
+    const base = stuckView();
+    const view: OnboardingSessionView = {
+      ...base,
+      progress: {
+        ...base.progress,
+        eligibleSteps: [
+          ...base.progress.eligibleSteps,
+          { stepKey: "F9.moats", required: false, status: "PENDING" },
+        ],
+      },
+    };
+    const kept = [
+      { role: "Q" as const, text: "Hi Aria, welcome to Capital Q." },
+      { role: "PERSON" as const, text: "مرحبا" },
+    ];
+    const { fetch: f, appended } = api({ kept });
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!"))),
+      portFor: fakePorts(view).portFor,
+      logger,
+      languageOf: () => Promise.resolve("ar"),
+      localiseWords: (_actor, _language, texts) =>
+        Promise.resolve(texts.map((text) => `[ar] ${text}`)),
+    });
+    const outcome = await conductor.turn(input(f, "", { focus: "moats" }));
+    expect(outcome.askingAbout).toEqual(["F9.moats"]);
+    expect(outcome.reply).toContain("ما الذي يجعل موقعكم صعب التقليد؟");
+    expect(outcome.reply).not.toMatch(/hard to copy/iu);
+    await tick();
+    // What is kept is the reply as said, in Arabic; a second open with it
+    // already last keeps nothing more.
+    expect(appended).toEqual([outcome.reply]);
+    const again = api({ kept: [...kept, { role: "Q", text: outcome.reply }] });
+    await createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!"))),
+      portFor: fakePorts(view).portFor,
+      logger,
+      languageOf: () => Promise.resolve("ar"),
+      localiseWords: (_actor, _language, texts) =>
+        Promise.resolve(texts.map((text) => `[ar] ${text}`)),
+    }).turn(input(again.fetch, "", { focus: "moats" }));
+    await tick();
+    expect(again.appended).toEqual([]);
+  });
+
+  it("a reopening whose resume line is already last keeps it once, not again (live AG: twice per load)", async () => {
+    const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
+    const line = resumeLine(stuckView(), "founder");
+    const { fetch: f, appended } = api({
+      kept: [
+        { role: "Q", text: "Hi Aria, welcome to Capital Q." },
+        { role: "PERSON", text: "Hi." },
+        { role: "Q", text: line },
+      ],
+    });
+    const conductor = createOnboardingConductor({
+      agent,
+      portFor: fakePorts().portFor,
+      logger,
+    });
+    const outcome = await conductor.turn(input(f, ""));
+    expect(outcome.reply).toBe(line);
+    await tick();
+    expect(appended).toEqual([]);
+  });
+
+  it("resuming from a profile section link asks that section first (live AG: ?section=moats was ignored)", async () => {
+    const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
+    const base = stuckView();
+    const view: OnboardingSessionView = {
+      ...base,
+      progress: {
+        ...base.progress,
+        eligibleSteps: [
+          ...base.progress.eligibleSteps,
+          { stepKey: "F9.moats", required: false, status: "PENDING" },
+        ],
+      },
+    };
+    const { fetch: f } = api({
+      kept: [
+        { role: "Q", text: "Hi Aria, welcome to Capital Q." },
+        { role: "PERSON", text: "Hi." },
+      ],
+    });
+    const conductor = createOnboardingConductor({
+      agent,
+      portFor: fakePorts(view).portFor,
+      logger,
+    });
+    const outcome = await conductor.turn(input(f, "", { focus: "moats" }));
+    expect(agent.calls).toEqual([]);
+    expect(outcome.resumed).toBe(true);
+    expect(outcome.askingAbout).toEqual(["F9.moats"]);
+    expect(outcome.reply).not.toBe(resumeLine(view, "founder"));
+    // An unknown or answered section falls back to the journey's next step.
+    const plain = await createOnboardingConductor({
+      agent,
+      portFor: fakePorts(view).portFor,
+      logger,
+    }).turn(input(f, "", { focus: "nothing" }));
+    expect(plain.reply).toBe(resumeLine(view, "founder"));
+    await tick();
+  });
+
   it("resumes a conversation under way on the next step, without greeting again and without a model", async () => {
     const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
     const ports = fakePorts();

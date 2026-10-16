@@ -98,6 +98,7 @@ import {
   firstNameOf,
   onboardingFlowFor,
   withNextQuestion,
+  withoutUnbackedFieldClaims,
   withoutUnbackedSaveClaims,
   withoutAnsweredQuestions,
 } from "./onboarding-flow.js";
@@ -490,6 +491,21 @@ function countryLabelOf(view: OnboardingSessionView | null): string | null {
   );
 }
 
+/** Steps the reading found stated that are still open on the record. */
+export function unrecordedStatedIn(
+  now: {
+    readonly steps: readonly {
+      readonly stepKey: string;
+      readonly status: string;
+    }[];
+  },
+  stated: ReadonlySet<string>,
+): string[] {
+  return [...stated].filter((key) =>
+    now.steps.some((row) => row.stepKey === key && row.status === "OPEN"),
+  );
+}
+
 export function turnNotesFor(input: {
   readonly pausing: boolean;
   /** Research first (BIZ-009): what to say about it this turn, once. */
@@ -513,6 +529,12 @@ export function turnNotesFor(input: {
    */
   /** Proactive flow guidance (owner 2026-10-16), first among the notes. */
   readonly flow?: string | undefined;
+  /**
+   * Steps their latest words state that are open and not on the record
+   * yet (live AG 2026-10-16: geography and sectors stated, never recorded,
+   * then claimed as saved). Named first so this round records them.
+   */
+  readonly unrecordedStated?: readonly string[] | undefined;
   readonly held?:
     | {
         readonly applied: readonly string[];
@@ -522,6 +544,14 @@ export function turnNotesFor(input: {
     | undefined;
 }): string {
   const notes: string[] = [];
+  if (
+    input.unrecordedStated !== undefined &&
+    input.unrecordedStated.length > 0
+  ) {
+    notes.push(
+      `NOT SAVED YET: their latest words state these and they are not on the record. Record each now, quoting only the words about it; a category or option nothing holds is recorded in their own words. Never say these are saved until a tool result says COMMITTED: ${input.unrecordedStated.join("; ")}`,
+    );
+  }
   if (input.flow !== undefined && input.flow.length > 0) {
     notes.push(input.flow);
   }
@@ -1343,6 +1373,12 @@ export function createInterviewAgent(
       // turn, and the round was still told to ask for the description).
       const turnNotes = (now: typeof state) =>
         turnNotesFor({
+          unrecordedStated: opening
+            ? []
+            : unrecordedStatedIn(now, authority.stated).map(
+                (key) =>
+                  `${coverageProfileFor(input.journeyType).fields[key]?.label ?? questionOf(key)} (${key})`,
+              ),
           flow: pausing ? undefined : flowFor(now).note,
           pausing,
           lookup,
@@ -1691,7 +1727,61 @@ export function createInterviewAgent(
         });
         return parsed.success ? parsed.data : null;
       };
+    /**
+     * The currency they named beside a figure, recorded by code once its
+     * question is open (owner 2026-10-16: "500 thousand dollars" was saved
+     * and Q still asked which currency). Shown to Q as done this turn, so
+     * it is said back ("US dollars") and they can correct it.
+     */
+    const recordStatedCurrency = async (
+      earlierOnly: boolean,
+    ): Promise<void> => {
+      if (opening) return;
+      const saved = await port
+        .recordStatedCurrency({ earlierOnly })
+        .catch(() => null);
+      if (saved === null) return;
+      const option = journeySteps.find(
+        (step) => step.stepKey === saved.stepKey,
+      )?.configuration;
+      const label =
+        saved.optionKey === "usd"
+          ? "US dollars"
+          : ((option !== undefined && "options" in option
+              ? option.options.find((o) => o.optionKey === saved.optionKey)
+                  ?.label
+              : undefined) ?? saved.optionKey.toUpperCase());
+      actions.push({
+        tool: "record_answers",
+        input: {
+          answers: [
+            {
+              stepKey: saved.stepKey,
+              value: saved.optionKey,
+              quote: saved.quote,
+            },
+          ],
+          by: "code: the currency they named beside a figure; say it back so they can correct it",
+        },
+        result: {
+          ok: true,
+          data: {
+            results: [
+              { stepKey: saved.stepKey, outcome: "COMMITTED", recorded: label },
+            ],
+          },
+        },
+      });
+      state = await port.state();
+      logger.info(
+        { stepKey: saved.stepKey },
+        "stated currency recorded by code",
+      );
+    };
     try {
+      // Before the first round, only what they said in earlier turns; the
+      // latest words are the model's to record, and code's after its round.
+      await recordStatedCurrency(true);
       while (
         result === undefined &&
         rounds < MAX_ROUNDS &&
@@ -1767,6 +1857,7 @@ export function createInterviewAgent(
         }
         await prefillFromSignup();
         state = await port.state();
+        await recordStatedCurrency(false);
         // Everything they said is saved and their words ask nothing else:
         // the reply is decided, so code writes it (no second model round).
         // After any recording round, not only the first: facts that open
@@ -1927,7 +2018,25 @@ export function createInterviewAgent(
     if (backedReply !== replyWritten) {
       logger.info({}, "interview reply claimed a save nothing backed; removed");
     }
-    let reply = notVerbatim(backedReply, lastQTurn ?? null, {
+    // Field by field too: a field named as saved must be on the record.
+    const onRecord = new Set(view.responses.map((r) => r.stepKey));
+    const profileFields = coverageProfileFor(input.journeyType).fields;
+    const fieldBackedReply = withoutUnbackedFieldClaims(
+      backedReply,
+      view.progress.eligibleSteps
+        .filter(
+          (e) => !onRecord.has(e.stepKey) && !recorded.includes(e.stepKey),
+        )
+        .map((e) => profileFields[e.stepKey]?.label ?? "")
+        .filter((label) => label.length > 0),
+    );
+    if (fieldBackedReply !== backedReply) {
+      logger.info(
+        {},
+        "interview reply named an unsaved field as saved; removed",
+      );
+    }
+    let reply = notVerbatim(fieldBackedReply, lastQTurn ?? null, {
       asking: result?.asking ?? null,
       alternate: (stepKey) => {
         // An English rewording only where the reply is English or will be

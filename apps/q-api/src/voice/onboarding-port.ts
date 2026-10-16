@@ -225,6 +225,20 @@ export type BoundOnboardingPort = OnboardingToolPort &
      */
     readonly recordKnown: (stepKey: string, raw: string) => Promise<boolean>;
     /**
+     * The currency they named beside a figure ("500 thousand dollars"),
+     * recorded by code when the currency question is open and their words
+     * name exactly one currency (owner 2026-10-16: never ask for a currency
+     * already stated). Null when nothing was recorded.
+     */
+    readonly recordStatedCurrency: (options?: {
+      /** Only their earlier words: the latest are the acting model's first. */
+      readonly earlierOnly?: boolean;
+    }) => Promise<{
+      readonly stepKey: string;
+      readonly optionKey: string;
+      readonly quote: string;
+    } | null>;
+    /**
      * Replays held changes (lane ob1) through the ordinary submit, before
      * the turn reads its state. Null when nothing can be held here.
      */
@@ -705,6 +719,25 @@ export function createOnboardingPort(input: {
       }
     | { readonly ok: false; readonly result: OnboardingRecordResult };
 
+  /**
+   * The part of their words about one field: the clauses of the quote that
+   * carry the field's words, or of the turn of theirs the quote came from
+   * when the quote was cut short before them; else the quote's best part.
+   */
+  const fieldWordsOf = (quote: string, reading: string): string => {
+    // A long quote is read in its whole turn: its clauses, not a cut one.
+    const inTurn =
+      quote.trim().length <= 80
+        ? undefined
+        : input.personTurns
+            .filter((said) => quoteOccursIn(quote, said))
+            .map((said) => fieldClausesOf(said, reading))
+            .find((part) => part !== null);
+    return (
+      inTurn ?? fieldClausesOf(quote, reading) ?? fieldPartOf(quote, reading)
+    );
+  };
+
   /** What the words resolve to for this step, validated; nothing written. */
   const resolve = async (answer: {
     readonly stepKey: string;
@@ -731,9 +764,11 @@ export function createOnboardingPort(input: {
     // them otherwise. Bounded as the runtime keeps them.
     const ownWordsFor = (reading: string): string => {
       const quote = answer.quote?.trim() ?? "";
-      const words =
-        quote.length > 0 && quote.length <= 300 ? quote : reading.trim();
-      return words.slice(0, 500);
+      // Only this field's part of their words (live AG 2026-10-16: a quote
+      // of the whole opening statement became the excluded sectors).
+      return (
+        quote.length > 0 ? fieldWordsOf(quote, reading) : reading.trim()
+      ).slice(0, 500);
     };
     const c = step.configuration;
     if (
@@ -1172,9 +1207,12 @@ export function createOnboardingPort(input: {
       };
     } catch (error: unknown) {
       if (offPath(error)) {
+        const reading = await spoken(step, value, await current());
         const kept = await keepOffPath(
           step,
-          words ?? note ?? (await spoken(step, value, await current())),
+          words === undefined
+            ? (note ?? reading)
+            : fieldWordsOf(words, reading),
         );
         if (kept !== null) return kept;
       }
@@ -1284,7 +1322,13 @@ export function createOnboardingPort(input: {
       value.type === "TEXT" &&
       !readBack &&
       !step.stepKey.endsWith(".website") &&
-      !textStatedIn(value.text, answer.quote)
+      !textStatedIn(value.text, answer.quote) &&
+      // Or the field's part of the same turn of theirs the quote is from
+      // (a quote cut short before the words about this field).
+      !input.personTurns.some(
+        (said) =>
+          quoteOccursIn(answer.quote, said) && textStatedIn(value.text, said),
+      )
     ) {
       return refuse(
         "That text is not in their words, so nothing was recorded. Free text is recorded in the person's own words, and only for the question it answers.",
@@ -1604,13 +1648,20 @@ export function createOnboardingPort(input: {
     // currency was re-asked for several turns).
     const namedByThem =
       readerStated &&
-      resolved.value.type === "SINGLE_SELECT" &&
-      onlyOptionNamedIn(
-        input.journeyType,
-        resolved.step,
-        resolved.value.optionKey,
-        answer.quote,
-      );
+      ((resolved.value.type === "SINGLE_SELECT" &&
+        onlyOptionNamedIn(
+          input.journeyType,
+          resolved.step,
+          resolved.value.optionKey,
+          answer.quote,
+        )) ||
+        // Categories they named in their own words ("Europe and North
+        // Africa", "climate, logistics"): each phrase is in the quote, so
+        // it is their statement, not Q's inference; committed, never held
+        // as a proposal (live AG 2026-10-16).
+        (resolved.value.type === "RESOURCE_REFERENCE" &&
+          resolved.value.resourceType === "TAXONOMY_NODE" &&
+          phrasesNamedIn(answer.value, answer.quote)));
     if (
       input.authority !== undefined &&
       !latestStated &&
@@ -1761,7 +1812,13 @@ export function createOnboardingPort(input: {
               errors: [],
             };
             if (offPath({ problem })) {
-              const kept = await keepOffPath(item.plan.step, item.plan.quote);
+              const kept = await keepOffPath(
+                item.plan.step,
+                fieldWordsOf(
+                  item.plan.quote,
+                  await spoken(item.plan.step, item.value, await current()),
+                ),
+              );
               if (kept !== null) return kept;
             }
             return refused(stepKey, { problem });
@@ -2522,6 +2579,44 @@ export function createOnboardingPort(input: {
     recorded: () => [...written],
     recordFromSignup: (stepKey, text) => recordPlatformHeld(stepKey, text),
     recordKnown: (stepKey, raw) => recordPlatformHeld(stepKey, raw),
+    recordStatedCurrency: async (options) => {
+      const stepKey =
+        input.journeyType === "founder" ? "F6.currency" : "I2.currency";
+      const step = steps.get(stepKey);
+      if (step === undefined || written.includes(stepKey)) return null;
+      const view = await current();
+      if (view.responses.some((r) => r.stepKey === stepKey)) return null;
+      const open = view.progress.eligibleSteps.some(
+        (e) =>
+          e.stepKey === stepKey &&
+          e.status !== "COMPLETED" &&
+          e.status !== "SKIPPED",
+      );
+      if (!open) return null;
+      // Latest words first: a later currency is their correction.
+      const turns =
+        options?.earlierOnly === true
+          ? input.personTurns.slice(1)
+          : input.personTurns;
+      for (const text of turns) {
+        // A question names a currency without stating theirs.
+        if (ASKING.test(text.trim())) continue;
+        const named = currencyNamedIn(input.journeyType, step, text);
+        if (named === "SEVERAL") return null;
+        if (named === null) continue;
+        try {
+          await submit(stepKey, {
+            type: "SINGLE_SELECT",
+            optionKey: named.optionKey,
+          });
+          written.push(stepKey);
+          return { stepKey, optionKey: named.optionKey, quote: named.quote };
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    },
     replayHeld: async () => {
       const drain = input.held?.drain;
       if (drain === undefined) return null;
@@ -2735,4 +2830,144 @@ export function onlyOptionNamedIn(
   return (
     named.length === 1 && (named[0]?.optionKey ?? named[0]?.key) === optionKey
   );
+}
+
+/**
+ * Whether every phrase of a value is in their quote, word for word (case
+ * and plural aside): "Europe, North Africa" in "Europe and North Africa".
+ */
+export function phrasesNamedIn(
+  value: string | readonly string[] | number | boolean,
+  quote: string,
+): boolean {
+  const phrases = (typeof value === "object" ? [...value] : [String(value)])
+    .flatMap((phrase) => phrase.split(/\s*[,;]\s*/u))
+    .map((phrase) => phrase.trim())
+    .filter((phrase) => phrase.length > 0);
+  if (phrases.length === 0) return false;
+  const said = normalisedWords(quote);
+  return phrases.every((phrase) => {
+    const words = normalisedWords(phrase).trim();
+    if (words.length === 0) return false;
+    return (
+      said.includes(` ${words} `) ||
+      said.includes(` ${words.replace(/s$/u, "")} `) ||
+      said.includes(` ${words}s `)
+    );
+  });
+}
+
+const FIELD_STOP_WORDS = new Set(
+  "the and or but with from that this they them their our your for into about over just only also very".split(
+    " ",
+  ),
+);
+
+function contentWords(text: string): string[] {
+  return (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
+    .filter((word) => word.length >= 3 && !FIELD_STOP_WORDS.has(word))
+    .map((word) => (word.length > 4 ? word.replace(/(?:es|s)$/u, "") : word));
+}
+
+/**
+ * The part of their quote that is about one field (live AG 2026-10-16: the
+ * model quoted a whole opening statement for the excluded sectors, and the
+ * whole statement was saved as them). A short quote is the field's already;
+ * a long one keeps only the clauses that carry the field's own words (the
+ * value as read), still in their words. When no clause carries them, the
+ * value as read stands if it is short, else the quote as it was.
+ */
+export function fieldPartOf(quote: string, reading: string): string {
+  const said = quote.trim();
+  if (said.length <= 80) return said;
+  const part = fieldClausesOf(said, reading);
+  if (part !== null) return part;
+  const read = reading.trim();
+  return read.length > 0 && read.length <= 200 ? read : said.slice(0, 300);
+}
+
+/** The clauses of their words that carry the field's own words, or null. */
+export function fieldClausesOf(quote: string, reading: string): string | null {
+  const said = quote.trim();
+  if (said.length <= 80) return said.length > 0 ? said : null;
+  const wanted = new Set(contentWords(reading));
+  if (wanted.size === 0) return null;
+  const carries = (text: string) =>
+    contentWords(text).some((word) => wanted.has(word));
+  const sentences = said.match(/[^.!?;]+[.!?;]*/gu) ?? [said];
+  const parts: string[] = [];
+  for (const sentence of sentences) {
+    if (!carries(sentence)) continue;
+    const clauses = sentence.split(/,\s+/u);
+    const kept = clauses.filter(carries);
+    parts.push(
+      (kept.length > 0 ? kept.join(", ") : sentence)
+        .trim()
+        .replace(/^(?:and|but|so|also|plus|honestly)\b[\s,]*/iu, "")
+        .replace(/[,;:\s]+$/u, ""),
+    );
+  }
+  return parts.length > 0 ? parts.join("; ").slice(0, 300) : null;
+}
+
+/** Dollars of a country other than the US: never read as US dollars. */
+const OTHER_DOLLARS =
+  /\b(?:canadian|australian|hong kong|new zealand|singapore|taiwan(?:ese)?|jamaican|namibian|liberian|zimbabwe(?:an)?|fiji(?:an)?|east caribbean|brunei|bahamian|barbadian|belize|bermudian|cayman|guyanese|trinidad|surinamese|solomon)\s+dollars?\b|\b(?:c|a|s|hk|nz|nt)\$|\b(?:cad|aud|hkd|nzd|twd|jmd)\b/iu;
+
+/** A figure in their words: digits or a spoken amount. */
+const MONEY_FIGURE =
+  /\d|\b(?:thousand|million|billion|hundred|grand|mil|mn|bn)\b/iu;
+
+/**
+ * The one currency their words name beside a figure, by the step's labels,
+ * keys and the journey's aliases ("dollars", "$" for the US dollar);
+ * "SEVERAL" when they name more than one; null when none, no figure, or a
+ * dollar of another country the step does not offer.
+ */
+export function currencyNamedIn(
+  journeyType: "founder" | "investor",
+  step: { readonly stepKey: string; readonly configuration: unknown },
+  text: string,
+): { readonly optionKey: string; readonly quote: string } | "SEVERAL" | null {
+  if (!MONEY_FIGURE.test(text)) return null;
+  const configuration = step.configuration as {
+    readonly options?: readonly {
+      readonly optionKey?: string;
+      readonly label?: string;
+    }[];
+  };
+  const aliases = (
+    journeyType === "founder"
+      ? FOUNDER_UTTERANCE_ALIASES
+      : INVESTOR_UTTERANCE_ALIASES
+  )[step.stepKey];
+  const names = (configuration.options ?? []).flatMap((option) => {
+    const key = option.optionKey ?? "";
+    return [
+      option.label ?? "",
+      ...(key.length >= 3 ? [key] : []),
+      ...(aliases?.[key] ?? []),
+    ]
+      .map((name) => normalisedWords(name).trim())
+      .filter((name) => name.length > 0)
+      .map((name) => ({ name, key }));
+  });
+  // Longest names first, each taken out once found: "singapore dollars"
+  // is not also "dollars".
+  names.sort((a, b) => b.name.length - a.name.length);
+  let said = normalisedWords(text);
+  const found = new Map<string, string>();
+  for (const { name, key } of names) {
+    for (const form of [name, `${name}s`]) {
+      if (!said.includes(` ${form} `)) continue;
+      if (!found.has(key)) found.set(key, form);
+      said = said.split(` ${form} `).join(" ");
+    }
+  }
+  if (found.size > 1) return "SEVERAL";
+  const [only] = [...found];
+  if (only === undefined) return null;
+  // A dollar the journey does not offer by name is not the US dollar.
+  if (only[0] === "usd" && OTHER_DOLLARS.test(text)) return null;
+  return { optionKey: only[0], quote: only[1] };
 }

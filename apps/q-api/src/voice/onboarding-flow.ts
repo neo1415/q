@@ -281,3 +281,34 @@ export function withoutUnbackedSaveClaims(
   if (kept.length === sentences.length) return reply;
   return `${notSavedYet} ${kept.join("").trim()}`.trim();
 }
+
+/**
+ * A "saved" claim naming a field that is not on the record (live AG
+ * 2026-10-16: "I've saved your ... geography, sectors" when neither was
+ * written). Each sentence claiming a save that names such a field, by its
+ * label, is taken out; what was saved is said only by its own result.
+ */
+export function withoutUnbackedFieldClaims(
+  reply: string,
+  /** Labels of fields on their path with nothing on the record. */
+  notOnRecord: readonly string[],
+): string {
+  const terms = notOnRecord
+    .map((label) => label.trim().toLowerCase())
+    .filter((label) => label.length >= 4)
+    .map((label) => label.replace(/s$/u, ""));
+  if (terms.length === 0) return reply;
+  const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const naming = new RegExp(`\\b(?:${terms.map(escape).join("|")})s?\\b`, "iu");
+  const sentences = reply.match(/[^.?!]+[.?!]*/g) ?? [reply];
+  const kept = sentences.filter(
+    (sentence) =>
+      !(
+        SAVE_CLAIM.test(sentence) &&
+        naming.test(sentence) &&
+        !/\b(?:not|haven't|hasn't|isn't|yet)\b/iu.test(sentence)
+      ),
+  );
+  if (kept.length === sentences.length) return reply;
+  return kept.join("").trim();
+}
