@@ -5,6 +5,7 @@ import { type FormEvent } from "react";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * I12. The truthful handoff. The mandate is real and active; recommendation
@@ -17,6 +18,7 @@ export function HandoffStep({
   busy: _busy,
   actions,
 }: StepProps<"handoff">) {
+  const t = useT();
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void actions.submit({ kind: "handoff", confirmed: true });
@@ -30,7 +32,9 @@ export function HandoffStep({
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
       <dl className="flex flex-col gap-3" data-handoff>
         <div className="flex flex-col gap-1">
-          <dt className="cq-caption text-(--cq-text-tertiary)">Mandate</dt>
+          <dt className="cq-caption text-(--cq-text-tertiary)">
+            {t("Mandate")}
+          </dt>
           <dd className="cq-body text-(--cq-text-primary)" data-handoff-mandate>
             {handoff === undefined
               ? "Not available"
@@ -41,19 +45,20 @@ export function HandoffStep({
         </div>
         <div className="flex flex-col gap-1">
           <dt className="cq-caption text-(--cq-text-tertiary)">
-            Recommendations
+            {t("Recommendations")}
           </dt>
           <dd
             className="cq-body text-(--cq-text-primary)"
             data-handoff-recommendation
           >
-            Discover ranks companies against this mandate and explains every
-            result.
+            {t(
+              "Discover ranks companies against this mandate and explains every result.",
+            )}
           </dd>
         </div>
         <div className="flex flex-col gap-1">
           <dt className="cq-caption text-(--cq-text-tertiary)">
-            Inbound from founders
+            {t("Inbound from founders")}
           </dt>
           <dd className="cq-body text-(--cq-text-primary)" data-handoff-inbound>
             {handoff?.inboundPreference === null || handoff === undefined
@@ -62,9 +67,10 @@ export function HandoffStep({
           </dd>
         </div>
       </dl>
-      <InlineNotice tone="info" title="What happens next">
-        Your mandate is stored and stays private to your organisation. You can
-        change it at any time.
+      <InlineNotice tone="info" title={t("What happens next")}>
+        {t(
+          "Your mandate is stored and stays private to your organisation. You can change it at any time.",
+        )}
       </InlineNotice>
     </form>
   );

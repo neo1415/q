@@ -6,6 +6,7 @@ import { NarrativeInput } from "@capital-q/ui/narrative-input";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Optional prose (portfolio names, extra context). Skipping is an explicit
@@ -17,6 +18,7 @@ export function NarrativeStep({
   busy,
   actions,
 }: StepProps<"narrative">) {
+  const t = useT();
   const [text, setText] = useState(step.response?.text ?? "");
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -39,7 +41,7 @@ export function NarrativeStep({
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
       {step.skipped && text.length === 0 ? (
         <InlineNotice tone="info">
-          Skipped for now. You can add this later.
+          {t("Skipped for now. You can add this later.")}
         </InlineNotice>
       ) : null}
       <NarrativeInput

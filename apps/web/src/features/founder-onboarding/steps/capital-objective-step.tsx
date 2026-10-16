@@ -8,6 +8,7 @@ import { MoneyInput, type MoneyValue } from "@capital-q/ui/money-input";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 const RAISING = new Set(["active", "preparing"]);
 
@@ -23,6 +24,7 @@ export function CapitalObjectiveStep({
   busy,
   actions,
 }: StepProps<"capital_objective">) {
+  const t = useT();
   const saved = step.response;
   const [raisingStatus, setRaisingStatus] = useState<string | undefined>(
     saved?.raisingStatus,
@@ -99,7 +101,7 @@ export function CapitalObjectiveStep({
       {raising ? (
         <>
           {step.existingObjective !== undefined ? (
-            <InlineNotice tone="info" title="Updating your raise">
+            <InlineNotice tone="info" title={t("Updating your raise")}>
               Your current raise is {step.existingObjective.currency}{" "}
               {step.existingObjective.amount}. Saving updates it; it never
               creates a second one.
@@ -107,8 +109,10 @@ export function CapitalObjectiveStep({
           ) : null}
           <MoneyInput
             id="raise-amount"
-            label="Target amount"
-            description="An exact figure. A range is fine; enter the midpoint."
+            label={t("Target amount")}
+            description={t(
+              "An exact figure. A range is fine; enter the midpoint.",
+            )}
             value={amount}
             currencies={step.currencies}
             disabled={busy}
@@ -122,7 +126,7 @@ export function CapitalObjectiveStep({
             id="raise-instrument"
             name="instrument"
             legend="Instrument"
-            description="Optional."
+            description={t("Optional.")}
             options={step.instrumentOptions}
             value={instrument}
             disabled={busy}
@@ -132,7 +136,7 @@ export function CapitalObjectiveStep({
             id="raise-timeframe"
             name="timeframe"
             legend="Target close"
-            description="Optional."
+            description={t("Optional.")}
             options={step.timeframeOptions}
             value={timeframe}
             disabled={busy}
@@ -142,7 +146,7 @@ export function CapitalObjectiveStep({
             id="raise-use"
             name="useOfFunds"
             legend="Main use of funds"
-            description="Optional. Choose any that apply."
+            description={t("Optional. Choose any that apply.")}
             options={step.useOfFundsOptions}
             values={useOfFunds}
             disabled={busy}
@@ -152,7 +156,7 @@ export function CapitalObjectiveStep({
             <Input
               id="raise-min-cheque"
               label={`Smallest cheque you would take (${amount.currency})`}
-              description="Optional. Leave empty if any size is welcome."
+              description={t("Optional. Leave empty if any size is welcome.")}
               type="text"
               inputMode="numeric"
               autoComplete="off"

@@ -13,6 +13,7 @@ import { UsageView } from "@/features/billing/usage-view";
 import { monthName } from "@/features/billing/usage-words";
 import { qApiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Usage · Settings" };
 
@@ -22,6 +23,7 @@ export const metadata: Metadata = { title: "Usage · Settings" };
  * their own usage only; nothing here is a charge.
  */
 export default async function UsagePage() {
+  const t = await serverT();
   const session = await qApiSession();
   const usage =
     session === null ? null : await getMyUsage(session).catch(() => null);
@@ -29,7 +31,7 @@ export default async function UsagePage() {
     <PageContainer>
       <QSection id="usage" kind="BILLING" label="usage">
         <PageHeader
-          title="Usage"
+          title={t("Usage")}
           description={
             usage === null
               ? undefined
@@ -38,14 +40,14 @@ export default async function UsagePage() {
         />
         {usage === null ? (
           <ErrorState
-            title="Usage couldn't load"
-            description="Nothing is charged either way."
+            title={t("Usage couldn't load")}
+            description={t("Nothing is charged either way.")}
             action={
               <Link
                 href="/settings/usage"
                 className={buttonClassName("secondary", "compact")}
               >
-                Try again
+                {t("Try again")}
               </Link>
             }
           />

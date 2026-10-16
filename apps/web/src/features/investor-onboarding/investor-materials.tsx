@@ -12,6 +12,7 @@ import {
   investorMaterialListAction,
   investorMaterialTargetAction,
 } from "./investor-material-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Optional investor materials in setup (owner directive 2026-10-16): a fund
@@ -66,6 +67,7 @@ export function InvestorMaterials({
   readonly firmReady: boolean;
   readonly ports?: InvestorMaterialPorts | undefined;
 }) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const kindId = useId();
   const [kind, setKind] = useState<string>(INVESTOR_MATERIAL_KINDS[0].value);
@@ -138,8 +140,9 @@ export function InvestorMaterials({
         className="cq-body-sm text-(--cq-text-secondary)"
         data-investor-materials="waiting"
       >
-        Once your firm is named you can add a fund deck, thesis or LP letter
-        here. Optional.
+        {t(
+          "Once your firm is named you can add a fund deck, thesis or LP letter here. Optional.",
+        )}
       </p>
     );
   }
@@ -151,12 +154,13 @@ export function InvestorMaterials({
       </summary>
       <div className="flex flex-col gap-4 pt-2">
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Private to your firm. Q can read them to help with your mandate, and
-          asks before anything it reads is saved.
+          {t(
+            "Private to your firm. Q can read them to help with your mandate, and asks before anything it reads is saved.",
+          )}
         </p>
         <Select
           id={kindId}
-          label="What is this?"
+          label={t("What is this?")}
           value={kind}
           onChange={(event) => setKind(event.target.value)}
           disabled={busy}
@@ -168,7 +172,7 @@ export function InvestorMaterials({
             disabled={busy}
             onClick={() => inputRef.current?.click()}
           >
-            Choose a file
+            {t("Choose a file")}
           </Button>
           <input
             ref={inputRef}
