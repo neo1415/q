@@ -396,6 +396,7 @@ export {
 export {
   getQStanding,
   getUiText,
+  localiseWords,
   setQLanguage,
   setQPersonality,
 } from "./standing.js";

@@ -99,7 +99,10 @@ import {
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
-import { ONBOARDING_ARABIC_NOTE, withArabicQuestions } from "./step-copy-ar.js";
+import {
+  onboardingLanguageNote,
+  withQuestionsInLanguage,
+} from "./step-copy-language.js";
 import { settleKnownAnswers } from "./known-answers.js";
 import { textStatedIn } from "./value-support.js";
 
@@ -340,6 +343,17 @@ export type InterviewAgentDependencies = {
    * saving (lane ob1). Absent: such a failure is reported, not held.
    */
   readonly heldWrites?: HeldWritesStore | undefined;
+  /**
+   * Any language: the questions code adds, through Q's shared translation
+   * layer (English product copy). Each entry, or null to keep the English.
+   */
+  readonly localiseWords?:
+    | ((
+        actor: ActorContext,
+        language: string,
+        texts: readonly string[],
+      ) => Promise<readonly (string | null)[]>)
+    | undefined;
 };
 
 export type RaisedChecks = {
@@ -793,7 +807,11 @@ export function createInterviewAgent(
     const personality = standing?.personality ?? "AUTO";
     // Multilingual Q: the language they chose for Q (Settings or by telling
     // Q), so the interview opens and asks in it.
-    const arabic = standing?.language === "ar";
+    const language =
+      standing === null || standing.language === "AUTO"
+        ? null
+        : standing.language;
+    const languageNote = onboardingLanguageNote(language);
     const conductBefore = standing?.conduct ?? INITIAL_CONDUCT;
     // A paused account talks to nobody until a person at Capital Q has
     // looked at it: refused here, before any model is called.
@@ -1372,10 +1390,7 @@ export function createInterviewAgent(
           approved: current().approved,
           declined: current().declined,
           turnNotes: current().turnNotes(state),
-          personality: [
-            PERSONALITY_NOTES[personality],
-            arabic ? ONBOARDING_ARABIC_NOTE : "",
-          ]
+          personality: [PERSONALITY_NOTES[personality], languageNote]
             .filter((note) => note.length > 0)
             .join(" ")
             .slice(0, 1_200),
@@ -1894,8 +1909,17 @@ export function createInterviewAgent(
 
     // Multilingual Q (live 2026-10-16): the questions code adds are the
     // journey's English; an Arabic speaker hears each step in Arabic.
-    if (arabic) {
-      reply = withArabicQuestions(reply, journeySteps, SPOKEN_QUESTIONS);
+    if (language !== null) {
+      reply = await withQuestionsInLanguage(
+        reply,
+        journeySteps,
+        SPOKEN_QUESTIONS,
+        language,
+        (lines) =>
+          dependencies.localiseWords === undefined
+            ? Promise.resolve(lines.map(() => null))
+            : dependencies.localiseWords(actor, language, lines),
+      );
     }
 
     // Kept: one exchange per turn, under one reference.

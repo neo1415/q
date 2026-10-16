@@ -1,10 +1,12 @@
+import { writtenLanguageNote } from "@capital-q/q-core";
+import { languageInfo } from "@capital-q/q-core/language";
+
 /**
- * Each onboarding step asked in Arabic (multilingual Q, live 2026-10-16:
- * an Arabic interview had "How many founders?" appended in English by the
- * code that adds the next question). Platform copy keyed by step, like
- * SPOKEN_QUESTIONS: the same question, written in Arabic, never a
- * translation of anything the person said. A step without Arabic here is
- * left for the model to ask in Arabic rather than appended in English.
+ * The questions code adds to an onboarding reply, in the person's language
+ * (live 2026-10-16: an Arabic interview had "How many founders?" appended
+ * in English). Any language goes through Q's shared translation layer
+ * (the step's English question is product copy); Arabic's hand-written
+ * questions below win, as Arabic's hand catalogue does for the screens.
  */
 export const SPOKEN_QUESTIONS_AR: Readonly<Record<string, string>> = {
   // Founder
@@ -85,14 +87,18 @@ export const SPOKEN_QUESTIONS_AR: Readonly<Record<string, string>> = {
 };
 
 /**
- * Said to the interviewing model when the person chose Arabic. The
- * journey's questions and notes reach it in English; it asks them in
- * Arabic. Short, since it shares the "who you are" slot.
+ * Said to the interviewing model when the person chose a language other
+ * than English: the generic written-language note, and that the journey's
+ * steps reach it in English.
  */
-export const ONBOARDING_ARABIC_NOTE =
-  "LANGUAGE: this person chose Arabic. Write every reply in clear Modern Standard Arabic, including your first words and every question; the steps and notes you are given are in English, so ask them in Arabic. Keep names, company names, figures and currencies exactly as they gave them. If they write to you in English, follow them.";
+export function onboardingLanguageNote(language: string | null): string {
+  const note = writtenLanguageNote(language);
+  return note === null
+    ? ""
+    : `${note} The steps and notes you are given are in English: ask each of them in their language, including your first words.`;
+}
 
-/** Optional-step and finish lines the code adds, in Arabic. */
+/** Optional-step and finish lines the code adds, in Arabic (hand-written). */
 export const ARABIC_OPTIONAL_TAIL = " يمكننا العودة إلى هذا إن فضّلت تخطيه.";
 export const ARABIC_FINISH_OR_CONTINUE =
   "هل تودّ الإنهاء الآن، أم المتابعة بالتفاصيل الاختيارية؟";
@@ -101,36 +107,82 @@ const OPTIONAL_TAIL_EN = " We can come back to this if you'd rather skip it.";
 const FINISH_OR_CONTINUE_EN =
   "Would you like to finish now, or keep going with the optional details?";
 
+type Step = {
+  readonly stepKey: string;
+  readonly configuration: { readonly prompt: string };
+};
+
+/** A hand-written step copy: questions by step key, and the two added lines. */
+type HandStepCopy = {
+  readonly questions: Readonly<Record<string, string>>;
+  readonly optionalTail: string;
+  readonly finishOrContinue: string;
+};
+
 /**
- * A reply for an Arabic speaker with the questions code added put in
- * Arabic: each step's English question (its spoken form or its prompt,
- * with or without "?") becomes the step's Arabic question. What the model
- * wrote itself is left as it is.
+ * Hand-written step copy by primary language subtag (like the web's hand
+ * catalogues and the email's hand locales): it wins over machine
+ * translation for that language. Another hand copy drops in here.
  */
-export function withArabicQuestions(
-  reply: string,
-  steps: readonly {
-    readonly stepKey: string;
-    readonly configuration: { readonly prompt: string };
-  }[],
+export const HAND_STEP_COPY: Readonly<Record<string, HandStepCopy>> = {
+  ar: {
+    questions: SPOKEN_QUESTIONS_AR,
+    optionalTail: ARABIC_OPTIONAL_TAIL.trim(),
+    finishOrContinue: ARABIC_FINISH_OR_CONTINUE,
+  },
+};
+
+/** English lines code may add, longest first, each with its hand copy. */
+function addedLines(
+  steps: readonly Step[],
   spoken: Readonly<Record<string, string>>,
-): string {
-  let out = reply
-    .split(OPTIONAL_TAIL_EN)
-    .join(ARABIC_OPTIONAL_TAIL)
-    .split(FINISH_OR_CONTINUE_EN)
-    .join(ARABIC_FINISH_OR_CONTINUE);
+  hand: HandStepCopy | undefined,
+): readonly { readonly english: string; readonly hand: string | null }[] {
+  const lines: { english: string; hand: string | null }[] = [
+    { english: OPTIONAL_TAIL_EN.trim(), hand: hand?.optionalTail ?? null },
+    { english: FINISH_OR_CONTINUE_EN, hand: hand?.finishOrContinue ?? null },
+  ];
   for (const step of steps) {
-    const arabic = SPOKEN_QUESTIONS_AR[step.stepKey];
-    if (arabic === undefined) continue;
     const prompt = step.configuration.prompt;
-    const forms = [
+    for (const english of [
       spoken[step.stepKey],
       prompt.endsWith("?") ? prompt : `${prompt}?`,
-    ]
-      .filter((form): form is string => form !== undefined && form.length > 3)
-      .sort((a, b) => b.length - a.length);
-    for (const form of forms) out = out.split(form).join(arabic);
+    ]) {
+      if (english === undefined || english.length <= 3) continue;
+      lines.push({ english, hand: hand?.questions[step.stepKey] ?? null });
+    }
   }
+  return lines.sort((a, b) => b.english.length - a.english.length);
+}
+
+/**
+ * The reply with each English question code added put in `language`: the
+ * language's hand step copy where there is one, otherwise `localise` (Q's
+ * shared translation layer). What the model wrote itself is left as it is; a line with no
+ * translation stays as it was.
+ */
+export async function withQuestionsInLanguage(
+  reply: string,
+  steps: readonly Step[],
+  spoken: Readonly<Record<string, string>>,
+  language: string | null,
+  localise: (lines: readonly string[]) => Promise<readonly (string | null)[]>,
+): Promise<string> {
+  const info = languageInfo(language ?? undefined);
+  if (info === null || info.primary === "en") return reply;
+  const present = addedLines(
+    steps,
+    spoken,
+    HAND_STEP_COPY[info.primary],
+  ).filter((line) => reply.includes(line.english));
+  if (present.length === 0) return reply;
+  const machine = present.every((line) => line.hand !== null)
+    ? []
+    : await localise(present.map((line) => line.english)).catch(() => []);
+  let out = reply;
+  present.forEach((line, i) => {
+    const words = line.hand ?? machine[i] ?? null;
+    if (words !== null) out = out.split(line.english).join(words);
+  });
   return out;
 }
