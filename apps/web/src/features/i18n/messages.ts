@@ -3,6 +3,8 @@ import {
   type QLanguagePreference,
 } from "@capital-q/contracts";
 
+import { CORE_AR } from "./catalog/core";
+
 /**
  * The interface's language (multilingual Q, Arabic first, 2026-10-16).
  *
@@ -16,6 +18,14 @@ import {
  */
 export type UiLanguage = "en" | "ar";
 
+/**
+ * Every area's Arabic, merged. An area adds `catalog/<area>.ts` and one
+ * line here; the same English string means the same thing everywhere.
+ */
+const ARABIC: Readonly<Record<string, string>> = {
+  ...CORE_AR,
+};
+
 export function uiLanguageOf(
   preference: QLanguagePreference | null | undefined,
 ): UiLanguage {
@@ -26,105 +36,9 @@ export function directionOf(language: UiLanguage): "ltr" | "rtl" {
   return Q_LANGUAGE_DIRECTION[language];
 }
 
-const AR: Readonly<Record<string, string>> = {
-  // Navigation
-  Discover: "اكتشف",
-  Explore: "استكشف",
-  CRM: "العلاقات",
-  Profile: "الملف الشخصي",
-  Settings: "الإعدادات",
-  "Pitch & media": "العرض والوسائط",
-  "Data room & deck": "غرفة البيانات والعرض",
-  "Company requests": "طلبات الشركات",
-  Rehearsals: "التدريبات",
-  Documents: "المستندات",
-  Work: "المهام",
-  Usage: "الاستخدام",
-  "Admin console": "لوحة الإدارة",
-  Workspace: "مساحة العمل",
-  You: "أنت",
-  Admin: "الإدارة",
-  More: "المزيد",
-  "More sections": "أقسام أخرى",
-  Current: "الحالية",
-  Primary: "التنقل الرئيسي",
-  // Settings
-  Account: "الحساب",
-  Team: "الفريق",
-  Appearance: "المظهر",
-  "How Q speaks for you": "كيف يتحدث Q نيابة عنك",
-  Notifications: "الإشعارات",
-  Connections: "الاتصالات",
-  "Plan and billing": "الخطة والفوترة",
-  Privacy: "الخصوصية",
-  "What investors and founders see": "ما يراه المستثمرون والمؤسسون",
-  "Edit profile": "تعديل الملف الشخصي",
-  Firm: "الشركة الاستثمارية",
-  Company: "الشركة",
-  "Set up when Q onboards you": "يُعدّ عندما يرحّب بك Q",
-  "Not set yet": "لم يُحدَّد بعد",
-  Email: "البريد الإلكتروني",
-  "Not available": "غير متاح",
-  Password: "كلمة المرور",
-  Change: "تغيير",
-  "This device": "هذا الجهاز",
-  "Signs you out on this device": "يسجّل خروجك من هذا الجهاز",
-  "Your team": "فريقك",
-  "Just you, for now": "أنت فقط حالياً",
-  "Invite your team": "ادعُ فريقك",
-  Open: "فتح",
-  "How Capital Q looks on this device.": "مظهر Capital Q على هذا الجهاز.",
-  Theme: "السمة",
-  "Q motion": "حركة Q",
-  "How much Q's light moves": "مقدار حركة ضوء Q",
-  Sounds: "الأصوات",
-  "Q's small sounds on this device": "أصوات Q الصغيرة على هذا الجهاز",
-  "How Q sounds and works with you.": "كيف يبدو Q وكيف يعمل معك.",
-  Language: "اللغة",
-  "For Q's replies, voice and these screens": "لردود Q وصوته وهذه الشاشات",
-  Voice: "الصوت",
-  "Listening sounds": "أصوات الإصغاء",
-  "Wake word": "كلمة التنبيه",
-  "On this device only": "على هذا الجهاز فقط",
-  Personality: "الشخصية",
-  "Your morning newspaper": "صحيفتك الصباحية",
-  "Outreach and stand-in": "التواصل والنيابة",
-  "What Q may do on your behalf": "ما يجوز لـ Q فعله نيابة عنك",
-  "In-app notices always show.": "تظهر تنبيهات التطبيق دائماً.",
-  "Gmail, Calendar and Meet": "Gmail والتقويم وMeet",
-  "Your Q email address": "عنوان بريد Q الخاص بك",
-  Plan: "الخطة",
-  Billing: "الفوترة",
-  Allowances: "المخصصات",
-  "What your plan includes": "ما تتضمنه خطتك",
-  "What Q used for you this month": "ما استخدمه Q لك هذا الشهر",
-  "What Q remembers": "ما يتذكره Q",
-  "See, correct or forget it": "اطّلع عليه أو صحّحه أو احذفه",
-  Review: "مراجعة",
-  // Language setting
-  Automatic: "تلقائي",
-  "Q's language": "لغة Q",
-  "Saved. Q uses this from your next message or call.":
-    "تم الحفظ. يستخدم Q هذه اللغة من رسالتك أو مكالمتك التالية.",
-  "Couldn't save that just now. Please try again.":
-    "تعذّر الحفظ الآن. يُرجى المحاولة مرة أخرى.",
-  "Video rehearsals in Arabic depend on the face's voice; if it does not sound right, use a voice or text rehearsal.":
-    "تعتمد التدريبات المرئية بالعربية على صوت الوجه المختار؛ إن لم يبدُ مناسباً فاستخدم التدريب الصوتي أو النصي.",
-  "In Arabic: your conversation with Q (typed and spoken), voice calls, rehearsals, and onboarding's frame and confirmations.":
-    "بالعربية: محادثتك مع Q (كتابةً وصوتاً)، والمكالمات الصوتية، والتدريبات، وإطار الإعداد وتأكيداته.",
-  "Still in English: other pages (Discover, Explore, CRM, company profiles, documents, Results) and some onboarding questions.":
-    "ما زال بالإنجليزية: الصفحات الأخرى (Discover وExplore وCRM وملفات الشركات والمستندات والنتائج) وبعض أسئلة الإعداد.",
-  // Onboarding shell
-  Back: "رجوع",
-  "Save & leave": "احفظ وغادر",
-  Saving: "جارٍ الحفظ",
-  Saved: "تم الحفظ",
-  Continue: "متابعة",
-};
-
 const CATALOGUE: Readonly<
   Record<UiLanguage, Readonly<Record<string, string>>>
-> = { en: {}, ar: AR };
+> = { en: {}, ar: ARABIC };
 
 /** The text in this language; the English source when there is none. */
 export function translate(language: UiLanguage, english: string): string {
