@@ -22,11 +22,14 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
   rows: GateqVideoSessionRow[];
   /** Stands in for the database's shared allowance and monthly safeguard. */
   limits: { remaining: number; platformFull: boolean };
+  /** When the provider was asked for each session's room. */
+  requested: Map<string, number>;
 } {
   const rows: GateqVideoSessionRow[] = [];
   const limits = { remaining: 5, platformFull: false };
   const hashes = new Map<string, string>();
   const eventHashes = new Map<string, string>();
+  const requested = new Map<string, number>();
   const GRACE_MS = 30_000;
   const open = (r: GateqVideoSessionRow) =>
     r.status !== "ENDED" && Date.parse(r.endsAt) > clock();
@@ -97,6 +100,13 @@ function memoryStore(clock: () => number): GateqVideoSessionStore & {
       rows[i] = live;
       return Promise.resolve(live);
     },
+    requested,
+    markProviderRequest: (id) => {
+      const row = rows.find((r) => r.id === id);
+      if (row?.status === "STARTING" && !requested.has(id))
+        requested.set(id, clock());
+      return Promise.resolve();
+    },
     markInRoom: (id) => {
       const i = rows.findIndex((r) => r.id === id);
       const row = rows[i];
@@ -162,6 +172,7 @@ function world(config: Partial<GateqVideoConfig> = {}) {
   let now = Date.parse("2026-10-15T09:00:00Z");
   const clock = () => now;
   const store = memoryStore(clock);
+  const timers: { at: number; run: () => void; cancelled: boolean }[] = [];
   const bearers: string[] = [];
   const eventTokens: string[] = [];
   const provider = {
@@ -218,9 +229,27 @@ function world(config: Partial<GateqVideoConfig> = {}) {
     bridgePath: "/v1/gateq/video/bridge",
     eventsPath: "/v1/gateq/video/events",
     now: clock,
+    setTimer: (run: () => void, ms: number) => {
+      const timer = { at: now + ms, run, cancelled: false };
+      timers.push(timer);
+      return {
+        cancel: () => {
+          timer.cancelled = true;
+        },
+      };
+    },
   });
   return {
     video,
+    timers,
+    /** Advance the clock and run every timer now due, as the process would. */
+    tick: async (ms: number) => {
+      now += ms;
+      for (const t of timers.splice(0))
+        if (!t.cancelled && t.at <= now) t.run();
+        else if (!t.cancelled) timers.push(t);
+      for (let i = 0; i < 20; i += 1) await Promise.resolve();
+    },
     store,
     provider,
     conversation,
@@ -413,6 +442,50 @@ describe("the GateQ video interview session", () => {
       }),
     ).toEqual({ kind: "UNKNOWN_SESSION" });
     expect(JSON.stringify(w.store.rows)).not.toContain(token);
+  });
+
+  it("stamps the provider request just before asking the provider, after our own setup (live 2026-10-16)", async () => {
+    const w = world();
+    w.conversation.openingFor.mockImplementationOnce(() => {
+      // Composing the opening takes time that the provider cannot bill.
+      w.advance(6_000);
+      return Promise.resolve("Hello, I'm Q.");
+    });
+    const session = await w.video.start({ token: TOKEN, correlationId: "c" });
+    const row = w.store.rows.find((r) => r.id === session.id);
+    expect(w.store.requested.get(session.id)).toBe(
+      Date.parse(row?.createdAt ?? "") + 6_000,
+    );
+    expect(w.provider.createRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it("ends the room at the cap itself, not at the next sweep", async () => {
+    const w = world();
+    const session = await w.video.start({ token: TOKEN, correlationId: "c" });
+    await w.tick(5_000);
+    await w.video.providerEvent({
+      token: w.eventTokens[0] ?? "",
+      eventType: "system.replica_joined",
+      conversationId: "c1",
+    });
+    // One second before the cap: still open.
+    await w.tick(179_000);
+    expect(w.provider.endRoom).not.toHaveBeenCalled();
+    await w.tick(1_000);
+    expect(w.provider.endRoom).toHaveBeenCalledWith("c1");
+    expect(w.store.rows.find((r) => r.id === session.id)).toMatchObject({
+      status: "ENDED",
+      endedReason: "TIME_LIMIT",
+    });
+  });
+
+  it("an applicant who ends first leaves no cap timer to fire", async () => {
+    const w = world();
+    await w.video.start({ token: TOKEN, correlationId: "c" });
+    await w.video.end({ token: TOKEN, continueByTyping: false });
+    expect(w.provider.endRoom).toHaveBeenCalledTimes(1);
+    await w.tick(400_000);
+    expect(w.provider.endRoom).toHaveBeenCalledTimes(1);
   });
 
   it("a retry or reconnect returns the same session and clock, never a second room", async () => {

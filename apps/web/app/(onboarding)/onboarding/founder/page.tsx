@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 
+import { accountDetails } from "@/auth/account-details";
+import { RegistrationDefaultsProvider } from "@/features/onboarding-kit/registration-defaults";
+import { registrationDefaultsFor } from "@/features/onboarding-kit/registration-defaults-for";
+
 import { FounderOnboardingScreen } from "@/features/founder-onboarding";
 
 export const metadata: Metadata = {
@@ -36,13 +40,19 @@ export default async function FounderOnboardingPage({
       ? rawSeed
       : undefined;
 
+  // Registration facts as the form's starting values (owner directive
+  // 2026-10-16): the organisation typed at sign-up is not asked again.
+  const defaults = registrationDefaultsFor("founder", await accountDetails());
+
   return (
-    <FounderOnboardingScreen
-      adapter={config.founderOnboardingAdapter}
-      seed={seed}
-      startTalking={startTalking}
-      greeted={greeted}
-      openReview={openReview}
-    />
+    <RegistrationDefaultsProvider value={defaults}>
+      <FounderOnboardingScreen
+        adapter={config.founderOnboardingAdapter}
+        seed={seed}
+        startTalking={startTalking}
+        greeted={greeted}
+        openReview={openReview}
+      />
+    </RegistrationDefaultsProvider>
   );
 }

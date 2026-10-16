@@ -12,7 +12,11 @@ import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
 import { createFounderOnboardingClient } from "./adapters/compose";
 import { FOUNDER_VOCABULARY } from "./conversation-adapter";
 import { QOnboardingWorkspace } from "../onboarding-conversation/q-onboarding-workspace";
+import { CoverageOverview } from "../onboarding-kit/components/coverage-overview";
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
+import { phasesFor } from "../onboarding-kit/coverage";
+import { useFormCoverage } from "../onboarding-kit/use-form-coverage";
+import { groupOf } from "./models/journey";
 import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
 import { VoiceHandover } from "../voice/voice-handover";
 import { useFounderOnboarding } from "./controller/use-founder-onboarding";
@@ -52,6 +56,8 @@ export function FounderOnboardingScreen({
     [adapter, seed],
   );
   const [state, actions] = useFounderOnboarding(client);
+  // The canonical coverage (lane ob1), the same picture Q works from.
+  const coverage = useFormCoverage("founder", state.session);
   // Q leads by default (CQ-PRE-REC-001 §16); the structured screens remain
   // for direct editing (§30) and as the fallback when a step needs them.
   // F15: a founder who chose the form resumes in the form; voice opens only
@@ -329,7 +335,25 @@ export function FounderOnboardingScreen({
   return (
     <OnboardingShell
       stepKey={step.id}
-      progress={<OnboardingProgress session={session} />}
+      progress={
+        <div className="flex flex-col gap-2">
+          <OnboardingProgress session={session} />
+          {coverage === null ? null : (
+            <CoverageOverview
+              coverage={coverage}
+              phases={phasesFor("founder")}
+              busy={state.busy}
+              onOpen={(fieldKey) => {
+                const group = groupOf(fieldKey);
+                if (group !== undefined) void actions.openStep(group.id);
+              }}
+              onResolve={(suggestionId, resolution) =>
+                actions.resolveSuggestion({ suggestionId, resolution })
+              }
+            />
+          )}
+        </div>
+      }
       onBack={isFirst ? undefined : () => void actions.back()}
       busy={state.busy}
       saveStatus={state.save}

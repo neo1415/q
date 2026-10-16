@@ -67,6 +67,10 @@ import {
   type FounderDomainDependencies,
   type FounderDomainServices,
 } from "./services.js";
+import {
+  founderMayReuseWorkspace,
+  readFounderWorkspaceFacts,
+} from "./workspace.js";
 
 /**
  * Founder write-target handlers. Each maps one semantic target onto the
@@ -277,13 +281,29 @@ async function bootstrapCompany(
     return;
   }
 
+  // Owner directive 2026-10-16: the active organisation is this company's
+  // workspace only when it is a company workspace this person may found a
+  // company in (`founderMayReuseWorkspace`). A firm's workspace, or a team
+  // somebody else founded, is left as it is and the founder gets their own.
+  const reusable =
+    actor.context?.organisationId !== undefined &&
+    founderMayReuseWorkspace(
+      (await readFounderWorkspaceFacts(context.tx.sql, actor.context)) ?? {
+        organisationType: "unknown",
+        isOwner: false,
+        holdsCompany: true,
+      },
+    )
+      ? actor.context
+      : null;
+
   // F3 (2026-10-08): one canonical company per real company. A founder
   // naming a company already on Capital Q (one the network may see, outside
   // their own organisation) claims it instead of creating a second record.
   const existing = await existingCanonicalCompany(
     context.tx.sql,
     name,
-    actor.context?.organisationId ?? null,
+    reusable?.organisationId ?? null,
   );
   if (existing !== null) {
     invalid(
@@ -294,16 +314,17 @@ async function bootstrapCompany(
   }
 
   let actorContext: ActorContext;
-  if (actor.context?.organisationId !== undefined) {
+  if (reusable !== null) {
     // An existing member creates the company in their active organisation;
     // the company service decides whether they may.
-    actorContext = actor.context;
+    actorContext = reusable;
   } else {
     if (actor.principal === undefined) {
       throw new OnboardingContextRequiredError();
     }
-    // First workspace: the organisation service creates tenant, organisation
-    // and the founder's admin membership, then activates the context.
+    // Their own workspace (the first, or one beside a firm or a team they
+    // joined): the organisation service creates tenant, organisation and the
+    // founder's owner membership, then activates the context.
     const membership = await services.organisations.createOrganisation({
       principal: actor.principal,
       input: parseContract(

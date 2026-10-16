@@ -1,4 +1,8 @@
-import { TavusError, type TavusKeyPool } from "@capital-q/integrations";
+import {
+  TavusError,
+  tavusParticipantLabel,
+  type TavusKeyPool,
+} from "@capital-q/integrations";
 import type { GateqVideoProvider } from "@capital-q/gateq-intake";
 
 /**
@@ -75,7 +79,10 @@ export function gateqVideoDisclosure(language: "ar" | null): {
 }
 
 /** What the applicant sees on the interviewer's tile in the room. */
-export const GATEQ_VIDEO_PARTICIPANT_NAME = "Q";
+/** Q's tile when the fund is not known: still Q, never the face's name. */
+export const GATEQ_VIDEO_PARTICIPANT_NAME = tavusParticipantLabel({
+  surface: "INTERVIEW",
+});
 
 export function createTavusGateqVideoProvider(deps: {
   readonly pool: TavusKeyPool;
@@ -89,9 +96,13 @@ export function createTavusGateqVideoProvider(deps: {
     createRoom: async (input) => {
       const { value } = await deps.pool.withHealthyKey(async (client) => {
         const { palId } = await client.createPal({
-          // The provider shows the PAL's name on the interviewer's tile: the
-          // applicant meets "Q", never an internal session id.
-          name: GATEQ_VIDEO_PARTICIPANT_NAME,
+          // The provider shows the PAL's name on Q's tile: the applicant
+          // meets "Q · <fund> (AI interviewer)", never the face's name or
+          // an internal session id.
+          name: tavusParticipantLabel({
+            surface: "INTERVIEW",
+            fund: input.fund,
+          }),
           systemPrompt:
             "You are the face and voice of Q, Capital Q's AI interviewer for an investment application. Speak exactly the lines you are given, naturally, and nothing else.",
           faceId: deps.faceId,
