@@ -309,6 +309,7 @@ export default async function DiscoverPage({
           />
           <QControl id="list.investors" kind="LIST">
             <DiscoverInvestors
+              translate={t}
               items={slate.items}
               notes={slate.notes}
               gates={gates}

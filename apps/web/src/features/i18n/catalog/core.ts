@@ -87,10 +87,10 @@ export const CORE_AR: Readonly<Record<string, string>> = {
     "تعذّر الحفظ الآن. يُرجى المحاولة مرة أخرى.",
   "Video rehearsals in Arabic depend on the face's voice; if it does not sound right, use a voice or text rehearsal.":
     "تعتمد التدريبات المرئية بالعربية على صوت الوجه المختار؛ إن لم يبدُ مناسباً فاستخدم التدريب الصوتي أو النصي.",
-  "In Arabic: your conversation with Q (typed and spoken), voice calls, rehearsals, Home, Discover, Explore, company and profile pages, onboarding and Settings.":
-    "بالعربية: محادثتك مع Q (كتابةً وصوتاً)، والمكالمات الصوتية، والتدريبات، والرئيسية، وDiscover، وExplore، وصفحات الشركات والملفات الشخصية، والإعداد، والإعدادات.",
-  "Still in English: CRM, documents and data rooms, GateQ, Work and notifications, The Q Daily and Results, and some smaller labels.":
-    "ما زال بالإنجليزية: العلاقات، والمستندات وغرف البيانات، وGateQ، والمهام والإشعارات، وThe Q Daily والنتائج، وبعض التسميات الصغيرة.",
+  "In Arabic: every page of Capital Q, your conversation with Q (typed and spoken), voice calls, rehearsals, video interviews, onboarding, notifications and emails.":
+    "بالعربية: كل صفحات Capital Q، ومحادثتك مع Q (كتابةً وصوتاً)، والمكالمات الصوتية، والتدريبات، والمقابلات المرئية، والإعداد، والإشعارات، والرسائل البريدية.",
+  "Still in English: Q's longer summary of what happened since your last visit, said once you choose to look. What people and companies wrote themselves stays in their own words.":
+    "ما زال بالإنجليزية: ملخص Q الأطول لما حدث منذ زيارتك الأخيرة، والذي يُقال حين تختار الاطلاع. وما كتبه الأشخاص والشركات بأنفسهم يبقى بكلماتهم.",
   // Onboarding shell
   Back: "رجوع",
   "Save & leave": "احفظ وغادر",

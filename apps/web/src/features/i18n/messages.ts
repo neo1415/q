@@ -15,6 +15,7 @@ import { Q_AR } from "./catalog/q";
 import { RELATIONSHIPS_AR } from "./catalog/relationships";
 import { SETUP_AR } from "./catalog/setup";
 import { SHELL_AR } from "./catalog/shell";
+import { TAXONOMY_AR } from "./catalog/taxonomy";
 import { WORK_AR } from "./catalog/work";
 import { indexPatterns, localiseDate, matchPattern } from "./patterns";
 
@@ -49,6 +50,9 @@ const ARABIC: Readonly<Record<string, string>> = {
   ...SETUP_AR,
   ...SHELL_AR,
   ...ANSWERS_AR,
+  // Last: a taxonomy name reads the same on every screen (one term for
+  // "Series A" everywhere), whatever an area catalogue says.
+  ...TAXONOMY_AR,
 };
 
 export function uiLanguageOf(
@@ -77,8 +81,23 @@ export function translate(language: UiLanguage, english: string): string {
     catalogue[english] ??
     matchPattern(PATTERNS[language], catalogue, english) ??
     (language === "ar" ? localiseDate(english) : undefined) ??
+    (language === "ar" ? translateList(english) : undefined) ??
     english
   );
+}
+
+/**
+ * A list a screen joined itself ("Financial Services, Fintech"): Arabic
+ * only when every item has Arabic, joined with the Arabic comma; a list
+ * with any unknown item (a name, say) stays exactly as written.
+ */
+function translateList(english: string): string | undefined {
+  if (!english.includes(", ")) return undefined;
+  const parts = english.split(", ");
+  const arabic = parts.map((part) => CATALOGUE.ar[part]);
+  return arabic.every((part): part is string => part !== undefined)
+    ? arabic.join("، ")
+    : undefined;
 }
 
 /** Strings this catalogue translates, for tests. */

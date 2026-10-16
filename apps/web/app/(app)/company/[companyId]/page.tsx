@@ -277,6 +277,7 @@ export default async function CompanyPage({
           <BackToDiscover />
         )}
         <CompanyProfileView
+          translate={t}
           profile={profile}
           tab={tab}
           interest={interest?.interest ?? null}

@@ -1,5 +1,40 @@
 /** Arabic for Discover and Explore (feed, filters, saved, passed, compare). */
 export const DISCOVER_AR: Readonly<Record<string, string>> = {
+  // Why a company is here (reason rows), evidence of a raise, and the
+  // exclusion notes; {stage}/{country}/{rules} are filled in at runtime.
+  Location: "الموقع",
+  "Nothing in common with your company yet.": "لا شيء مشترك مع شركتك بعد.",
+  Model: "النموذج",
+  Customers: "العملاء",
+  Status: "الحالة",
+  Profile: "الملف",
+  "In your stage range": "ضمن نطاق مراحلك",
+  "{stage}, in your range": "{stage}، ضمن نطاقك",
+  "A country you invest in": "دولة تستثمر فيها",
+  "{country}, a country you invest in": "{country}، دولة تستثمر فيها",
+  "In a region you invest in": "في منطقة تستثمر فيها",
+  "A category you named": "فئة حددتها",
+  "Close to a category you named": "قريبة من فئة حددتها",
+  "Said in their pitch": "قالوه في عرضهم",
+  "Said in your pitch": "قلته في عرضك",
+  "Your raise": "جولتك",
+  "Declared by the company": "أعلنته الشركة",
+  "Not added yet": "لم يُضَف بعد",
+  "Link copied": "نُسخ الرابط",
+  Share: "مشاركة",
+  "red-flag": "المؤشرات التحذيرية",
+  stage: "المرحلة",
+  country: "الدولة",
+  sector: "القطاع",
+  "{a} and {b}": "{a} و{b}",
+  "Your {rules} exclusion can't be checked automatically yet, so nobody is hidden because of it.":
+    "لا يمكن التحقق من استبعاد {rules} تلقائياً بعد، لذا لا يُخفى أحد بسببه.",
+  "Your {rules} exclusions can't be checked automatically yet, so nobody is hidden because of them.":
+    "لا يمكن التحقق من استبعادات {rules} تلقائياً بعد، لذا لا يُخفى أحد بسببها.",
+  "Your {rules} exclusion wasn't checked: this company hasn't stated it yet.":
+    "لم يُتحقق من استبعاد {rules}: لم تذكره هذه الشركة بعد.",
+  "Your {rules} exclusions weren't checked: this company hasn't stated it yet.":
+    "لم يُتحقق من استبعادات {rules}: لم تذكرها هذه الشركة بعد.",
   Actions: "الإجراءات",
   "All details": "كل التفاصيل",
   "Back in Discover from your next page": "عُد إلى Discover من صفحتك التالية",

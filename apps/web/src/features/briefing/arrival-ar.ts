@@ -9,7 +9,10 @@ import type { Opener } from "./opener";
  * only once the person chooses to look.
  */
 
-function partOfDay(now: Date, zone: string | null): "MORNING" | "AFTERNOON" | "EVENING" | "LATE" {
+function partOfDay(
+  now: Date,
+  zone: string | null,
+): "MORNING" | "AFTERNOON" | "EVENING" | "LATE" {
   let hour = now.getHours();
   try {
     const formatted = new Intl.DateTimeFormat("en-GB", {

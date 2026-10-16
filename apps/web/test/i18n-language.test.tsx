@@ -125,9 +125,8 @@ describe("Settings says what is Arabic today", () => {
     expect(ARABIC_NOW).toMatch(/voice/u);
     expect(ARABIC_NOW).toMatch(/rehearsals/u);
     expect(ARABIC_NOW).toMatch(/onboarding/u);
-    expect(ARABIC_NOW).toMatch(/Discover/u);
-    expect(STILL_ENGLISH).toMatch(/GateQ/u);
-    expect(STILL_ENGLISH).toMatch(/CRM/u);
+    expect(ARABIC_NOW).toMatch(/every page/u);
+    expect(STILL_ENGLISH).toMatch(/summary of what happened/u);
     for (const line of [ARABIC_NOW, STILL_ENGLISH, VIDEO_FALLBACK]) {
       expect(translate("ar", line)).not.toBe(line);
     }
@@ -184,5 +183,48 @@ describe("changing language by telling Q (live, no reload)", () => {
       performClientAction({ kind: "SET_LANGUAGE", language: "fr" }, effects),
     ).toBe(false);
     expect(seen).toEqual(["ar"]);
+  });
+});
+
+describe("data-bearing words in Arabic (taxonomy, reasons, sentences with names)", () => {
+  it("shows taxonomy display names in Arabic, keyed to their codes", async () => {
+    const { TAXONOMY_AR_BY_CODE } =
+      await import("../src/features/i18n/catalog/taxonomy");
+    expect(TAXONOMY_AR_BY_CODE["company_stage:seed"]).toBe("البذرة");
+    expect(translate("ar", "Fintech")).toBe("التقنية المالية");
+    expect(translate("ar", "Seed")).toBe("البذرة");
+  });
+
+  it("translates a joined list only when every item is known", () => {
+    expect(
+      translate("ar", "Financial Services, Digital Lending, Fintech"),
+    ).toBe("الخدمات المالية، الإقراض الرقمي، التقنية المالية");
+    // A name in the list: the list stays exactly as written.
+    expect(translate("ar", "Fintech, Harbourline Cargo")).toBe(
+      "Fintech, Harbourline Cargo",
+    );
+  });
+
+  it("fills fit reasons and notes from patterns, keeping names and figures", () => {
+    expect(translate("ar", "Seed, in your range")).toBe("البذرة، ضمن نطاقك");
+    expect(translate("ar", "Nigeria, a country you invest in")).toBe(
+      "نيجيريا، دولة تستثمر فيها",
+    );
+    expect(
+      translate(
+        "ar",
+        "Your red-flag exclusion can't be checked automatically yet, so nobody is hidden because of it.",
+      ),
+    ).toBe(
+      "لا يمكن التحقق من استبعاد المؤشرات التحذيرية تلقائياً بعد، لذا لا يُخفى أحد بسببه.",
+    );
+    expect(translate("ar", "You're connected with Harbourline Cargo")).toBe(
+      "أنت الآن على تواصل مع Harbourline Cargo",
+    );
+    expect(translate("ar", "3 pitches that match your mandate")).toBe(
+      "3 عروض تطابق تفويضك",
+    );
+    expect(translate("ar", "Said in their pitch")).toBe("قالوه في عرضهم");
+    expect(translate("en", "Seed, in your range")).toBe("Seed, in your range");
   });
 });

@@ -4,6 +4,27 @@
  */
 export const SHELL_AR: Readonly<Record<string, string>> = {
   "Look at it": "اطّلع عليه",
+  // Home briefing lines with a name or a figure in them (patterns.ts).
+  "{n} things wait for your approval": "{n} أمور بانتظار موافقتك",
+  "You're connected with {name}": "أنت الآن على تواصل مع {name}",
+  "{name} has decided not to proceed for now": "قرر {name} عدم المتابعة حالياً",
+  "{name} didn't take it forward": "لم يتابع {name} الأمر",
+  "{name} expressed interest": "أبدى {name} اهتماماً",
+  "{n} investors expressed interest": "أبدى {n} مستثمرين اهتماماً",
+  "{n} steps before investors can find you": "{n} خطوات قبل أن يجدك المستثمرون",
+  "A pitch from {name}": "عرض من {name}",
+  "{n} pitches that match your mandate": "{n} عروض تطابق تفويضك",
+  "Setup: {n} of {n2} done — {minutes}":
+    "الإعداد: اكتمل {n} من {n2} — {minutes}",
+  "about a minute left": "تبقّت دقيقة تقريباً",
+  "about {n} minutes left": "تبقّت {n} دقائق تقريباً",
+  "Rehearse your call with {name}": "تدرّب على مكالمتك مع {name}",
+  "It's {when}. Q plays them so you can practise first.":
+    "الموعد {when}. يؤدي Q دورهم لتتدرّب أولاً.",
+  "within a day": "خلال يوم",
+  tomorrow: "غداً",
+  "in {n} days": "بعد {n} أيام",
+  "Your call is booked for {date} UTC.": "مكالمتك محجوزة في {date} بتوقيت UTC.",
   "A few things need you.": "بضعة أمور تحتاجك.",
   "A first meeting is the natural next step.":
     "الاجتماع الأول هو الخطوة الطبيعية التالية.",

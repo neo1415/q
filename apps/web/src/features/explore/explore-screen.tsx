@@ -560,8 +560,8 @@ export function ExploreScreen({
                 : "border-(--cq-border) bg-(--cq-surface-raised) text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
             }`}
           >
-            {/* Sector names are taxonomy data, shown as recorded. */}
-            {topic.kind === "SECTOR" ? topic.label : t(topic.label)}
+            {/* Sectors by their taxonomy display name (catalog/taxonomy). */}
+            {t(topic.label)}
           </button>
         ))}
       </div>

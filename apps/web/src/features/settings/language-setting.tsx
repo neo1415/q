@@ -30,10 +30,10 @@ const NAMES: Readonly<Record<QLanguagePreference, string>> = {
 
 /** The surfaces that follow Arabic in full today (lane ml, 2026-10-16). */
 export const ARABIC_NOW =
-  "In Arabic: your conversation with Q (typed and spoken), voice calls, rehearsals, Home, Discover, Explore, company and profile pages, onboarding and Settings.";
+  "In Arabic: every page of Capital Q, your conversation with Q (typed and spoken), voice calls, rehearsals, video interviews, onboarding, notifications and emails.";
 /** What does not, yet. */
 export const STILL_ENGLISH =
-  "Still in English: CRM, documents and data rooms, GateQ, Work and notifications, The Q Daily and Results, and some smaller labels.";
+  "Still in English: Q's longer summary of what happened since your last visit, said once you choose to look. What people and companies wrote themselves stays in their own words.";
 export const VIDEO_FALLBACK =
   "Video rehearsals in Arabic depend on the face's voice; if it does not sound right, use a voice or text rehearsal.";
 

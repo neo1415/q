@@ -25,7 +25,7 @@ import {
 import { CompanyAvatar, CompanyAvatarLink } from "../company/company-avatar";
 import { moneyText } from "../company/money-text";
 import { RaiseFact } from "../company/raise-fact";
-import { raiseWords } from "../company/raise-words";
+import { raiseWords, translatedRaise } from "../company/raise-words";
 import { countryLabel, stageLabel } from "../company/declared-labels";
 import { ExpressInterest } from "../network/express-interest";
 import { useDockAvoid } from "../q-dock/dock-avoid";
@@ -139,10 +139,10 @@ function Reasons({
       {reasons.map((reason) => (
         <div key={`${reason.kind}-${reason.detail}`} className="flex gap-2">
           <dt className="cq-label text-(--cq-text-tertiary)">
-            {REASON_LABELS[reason.kind]}
+            {t(REASON_LABELS[reason.kind])}
           </dt>
           <dd className="cq-body-sm text-(--cq-text-secondary)">
-            {reason.detail}
+            {t(reason.detail)}
           </dd>
         </div>
       ))}
@@ -206,20 +206,22 @@ function CardFacts({
       {sectors.length === 0 ? null : (
         <>
           <dt>{t("Sector")}</dt>
-          <dd>{sectors.slice(0, 3).join(", ")}</dd>
+          <dd>{t(sectors.slice(0, 3).join(", "))}</dd>
         </>
       )}
       {stage === null ? null : (
         <>
           <dt>{t("Stage")}</dt>
-          <dd>{stage}</dd>
+          <dd>{t(stage)}</dd>
         </>
       )}
       <dt>{t("Raising")}</dt>
       <dd className="cq-numeric">
         {summary.raiseView !== undefined ? (
           // R2: the server's one raise read, in the profile's own words.
-          <RaiseFact words={raiseWords(summary.raiseView, false)} />
+          <RaiseFact
+            words={translatedRaise(raiseWords(summary.raiseView, false), t)}
+          />
         ) : summary.raise === null ? (
           <span className="cq-feed-fact-unknown">
             {t("Not shared with you")}
@@ -297,6 +299,7 @@ export function FeedCard({
     countryLabel(company.headquartersCountry),
   ]
     .filter((part): part is string => part !== null)
+    .map((part) => t(part))
     .join(" · ");
   const decisions = useRef<HTMLDivElement>(null);
   useDockAvoid(decisions);
@@ -458,9 +461,11 @@ export function FeedCard({
             <Reasons reasons={reasons} />
             {unverified.length === 0 ? null : (
               <p className="cq-caption cq-feed-muted">
-                Your {ruleList(unverified)} exclusion
-                {unverified.length === 1 ? " wasn't" : "s weren't"} checked:
-                this company hasn&apos;t stated it yet.
+                {t(
+                  unverified.length === 1
+                    ? `Your ${ruleList(unverified)} exclusion wasn't checked: this company hasn't stated it yet.`
+                    : `Your ${ruleList(unverified)} exclusions weren't checked: this company hasn't stated it yet.`,
+                )}
               </p>
             )}
           </div>
@@ -559,9 +564,11 @@ export function FeedCard({
               */}
               {unverified.length === 0 ? null : (
                 <p className="cq-caption text-(--cq-text-secondary)">
-                  Your {ruleList(unverified)} exclusion
-                  {unverified.length === 1 ? " wasn't" : "s weren't"} checked:
-                  this company hasn&apos;t stated it yet.
+                  {t(
+                    unverified.length === 1
+                      ? `Your ${ruleList(unverified)} exclusion wasn't checked: this company hasn't stated it yet.`
+                      : `Your ${ruleList(unverified)} exclusions weren't checked: this company hasn't stated it yet.`,
+                  )}
                 </p>
               )}
             </section>
@@ -698,7 +705,7 @@ export function FeedCard({
             strokeWidth={ICON_STROKE}
           />
           <span className="cq-feed-rail-label">
-            {shared === "COPIED" ? "Link copied" : "Share"}
+            {t(shared === "COPIED" ? "Link copied" : "Share")}
           </span>
         </Button>
         {videos === undefined || videos.count < 2 ? null : (

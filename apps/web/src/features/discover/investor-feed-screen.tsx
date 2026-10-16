@@ -435,10 +435,11 @@ function InvestorFeed({
   const unverifiableLine =
     unverifiableExclusions.length === 0 ? null : (
       <p className="cq-status-line">
-        Your {ruleList(unverifiableExclusions)} exclusion
-        {unverifiableExclusions.length === 1 ? " can't" : "s can't"} be checked
-        automatically yet, so nobody is hidden because of{" "}
-        {unverifiableExclusions.length === 1 ? "it" : "them"}.
+        {t(
+          unverifiableExclusions.length === 1
+            ? `Your ${ruleList(unverifiableExclusions)} exclusion can't be checked automatically yet, so nobody is hidden because of it.`
+            : `Your ${ruleList(unverifiableExclusions)} exclusions can't be checked automatically yet, so nobody is hidden because of them.`,
+        )}
       </p>
     );
 

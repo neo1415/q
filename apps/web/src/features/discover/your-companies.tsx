@@ -321,7 +321,7 @@ function YourCompanyCard({
               strokeWidth={ICON_STROKE}
             />
             <span className="cq-feed-rail-label">
-              {shared === "COPIED" ? "Link copied" : "Share"}
+              {t(shared === "COPIED" ? "Link copied" : "Share")}
             </span>
           </Button>
           {pitch === null || !active ? null : (

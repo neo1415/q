@@ -31,7 +31,7 @@ import {
 import { countryLabel, stageLabel } from "./declared-labels";
 import { compactMoneyText, moneyText } from "./money-text";
 import { RaiseFact } from "./raise-fact";
-import { raiseWords } from "./raise-words";
+import { raiseWords, translatedRaise } from "./raise-words";
 import {
   elevatorHref,
   Fold,
@@ -203,6 +203,7 @@ const TAB_IDLE =
   "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)";
 
 export function CompanyProfileView({
+  translate: t = (english: string) => english,
   profile,
   tab,
   interest,
@@ -217,6 +218,8 @@ export function CompanyProfileView({
   overviewExtraSummary,
   overviewStreamed = null,
 }: {
+  /** The reader's language (a server component: handed in, not a hook). */
+  readonly translate?: ((english: string) => string) | undefined;
   readonly profile: CompanyProfileDto;
   readonly tab: ProfileTab;
   readonly interest: InterestDto | null;
@@ -523,7 +526,10 @@ export function CompanyProfileView({
                         <AddYourRaise />
                       ) : (
                         <RaiseFact
-                          words={raiseWords(overview.raiseView, own)}
+                          words={translatedRaise(
+                            raiseWords(overview.raiseView, own),
+                            t,
+                          )}
                           {...(overview.raiseView.pitch === null
                             ? {}
                             : {
@@ -556,9 +562,10 @@ export function CompanyProfileView({
                           className="cq-caption block font-normal text-(--cq-text-secondary) underline underline-offset-4"
                           data-raise-source="PITCH_VIDEO"
                         >
-                          {own
-                            ? "Said in your pitch, "
-                            : "Said in their pitch, "}
+                          {t(
+                            own ? "Said in your pitch" : "Said in their pitch",
+                          )}
+                          {", "}
                           {pitchMoment(overview.raiseFromPitch.atSeconds)}
                         </ProfileTabLink>
                       </>
