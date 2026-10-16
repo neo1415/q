@@ -98,6 +98,7 @@ describe("a voice line in the chosen language", () => {
   it("refuses a chosen language no speech provider hears, and says to type instead", async () => {
     const response = await open(app("sw"));
     expect(response.statusCode).toBe(422);
+    expect(response.json<{ status: number }>().status).toBe(422);
     expect(response.json<{ detail: string }>().detail).toMatch(
       /^Q can't hold a voice conversation in Swahili yet.*Type to Q instead and Q answers in Swahili/u,
     );

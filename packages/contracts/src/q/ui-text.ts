@@ -16,7 +16,9 @@ import { QLanguageCodeSchema } from "./conduct.js";
  * as the new one. Shared by the translator (q-api) and every reader of
  * q_runtime.ui_translations (the email sender).
  */
-export const UI_TEXT_CATALOG_VERSION = "ui-text.v1" as const;
+// v2 (live 2026-10-16): a product glossary in the instructions; v1 read
+// "Board" (Q's board of cards) as a board of directors in French and Spanish.
+export const UI_TEXT_CATALOG_VERSION = "ui-text.v2" as const;
 
 export const Q_UI_TEXT_PATH = "/v1/q/ui-text/:language" as const;
 

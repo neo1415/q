@@ -3929,7 +3929,7 @@ const uiText = createUiTextService({
 });
 /**
  * Q's code-written lines in any language (lane ml): English skeletons with
- * names and figures lifted into {v1}…, cached under answer-words.v1.
+ * names and figures lifted into {v1}…, cached under answer-words.v2.
  */
 export const translateLines = createLineTranslator({
   store: uiTextStore,
