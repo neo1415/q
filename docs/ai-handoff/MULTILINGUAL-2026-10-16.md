@@ -71,3 +71,26 @@ Run as the fictional founder `babatunde.tunde-cargo` with `scratchpad/ml-live/li
 - **Cost:** 3 Q runs (about 6–12 gateway model calls), 1 ElevenLabs TTS, 1 voice-session open, about 9 s of Deepgram STT, 0 Tavus minutes, 0 GPT-Live.
 
 **Only a human can verify:** naturalness of Arabic speech per voice (marin, cedar, the ElevenLabs voices, Tavus faces), Gulf-dialect comprehension in real speech, code-switching mid-sentence in live audio, and lip-sync quality in Arabic.
+
+## Update — whole app in Arabic, language by talking to Q (later on 2026-10-16)
+
+- **By talking to Q:** `set_q_language` (q-tools, Zod in/out, the person's own conversation and row only; no person in its input) writes the same preference as Settings.
+  - Q's reply carries a `SET_LANGUAGE` client action. The page switches `lang`/`dir` and its words without a reload, Settings follows, and an open voice line reopens in the new language after 3.5 s.
+  - Q confirms in the new language.
+  - `PUT /v1/q/standing/language` sits in a named exemption in the route-parity test (approved).
+- **RTL:**
+  - Logical properties across `apps/web` and `packages/ui`.
+  - One rule mirrors direction icons.
+  - Paragraphs use `unicode-bidi: plaintext`, so mixed Arabic and English read correctly.
+  - The Q dock waits on the left, beside the right-hand rail.
+- **Catalogue:** one file per area in `apps/web/src/features/i18n/catalog/`. `@capital-q/ui` reads it through `UiTextProvider`. A test holds that every `t("…")` literal has Arabic.
+- **Arabic now (lane ml):**
+  - Home: Q's code-composed arrival opener and returning welcome.
+  - The Q conversation surfaces, Discover, Explore, company and profile pages, onboarding screens and frame, Settings, Rehearsals, the shell, sign-in and teams.
+- **Lane i18n2:** CRM, documents and data rooms, GateQ, Work and notifications, The Q Daily, Results, admin and emails.
+- **Still English in lane ml's areas:**
+  - Strings built at runtime with names inside (briefing lines such as "You're connected with X", recommendation reasons).
+  - The fuller arrival lowdown said once the person chooses to look.
+  - Taxonomy sector names.
+  - Labels in a few non-async server components.
+- **Browser check (local build of this branch against production APIs, Arabic injected by a read-only proxy):** screenshots at 390 and 1440 px under `scratchpad/ml-rtl/` — founder Home, Explore, Profile, Rehearsals and Settings; investor Home, Discover and Explore. No horizontal overflow on any of them.
