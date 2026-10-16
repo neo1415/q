@@ -4,6 +4,7 @@ import {
 } from "@capital-q/contracts";
 
 import { CORE_AR } from "./catalog/core";
+import { DISCOVER_AR } from "./catalog/discover";
 import { Q_AR } from "./catalog/q";
 
 /**
@@ -26,6 +27,7 @@ export type UiLanguage = "en" | "ar";
 const ARABIC: Readonly<Record<string, string>> = {
   ...CORE_AR,
   ...Q_AR,
+  ...DISCOVER_AR,
 };
 
 export function uiLanguageOf(

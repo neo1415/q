@@ -33,6 +33,7 @@ import {
   ExploreLimitedBanner,
   ExploreState,
 } from "./explore-state";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Explore (E1-E5, ADR 0055): search at the top, topic chips, the mosaic
@@ -150,6 +151,7 @@ export function ExploreScreen({
   /** Design review only: the opened feed shows posters, never a player. */
   readonly posterOnly?: boolean;
 }) {
+  const t = useT();
   const sectorLabels = useMemo(
     () => new Map(sectors.map((s) => [s.nodeId, s.label])),
     [sectors],
@@ -539,7 +541,7 @@ export function ExploreScreen({
       <ExploreSearchBar />
       <div
         role="group"
-        aria-label="Topics"
+        aria-label={t("Topics")}
         className="relative flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none]"
       >
         {topics.map((t) => (
@@ -604,7 +606,7 @@ export function ExploreScreen({
               role="status"
               className="cq-body-sm text-center text-(--cq-text-secondary)"
             >
-              Loading more pitches…
+              {t("Loading more pitches…")}
             </p>
           ) : null}
           {upToDate ? (

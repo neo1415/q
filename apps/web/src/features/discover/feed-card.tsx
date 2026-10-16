@@ -37,6 +37,7 @@ import { ruleList } from "./mandate-rules";
 import { shareCompany, type ShareOutcome } from "./share-company";
 import { attachHlsOrNativeSource } from "./player/hls-source";
 import { PitchPlayer } from "./player/pitch-player";
+import { useT } from "@/features/i18n/language";
 
 /** A swipe down this far on the details sheet closes it. */
 const SHEET_DISMISS_PX = 64;
@@ -125,9 +126,12 @@ function Reasons({
 }: {
   readonly reasons: readonly DiscoveryReasonDto[];
 }) {
+  const t = useT();
   if (reasons.length === 0) {
     return (
-      <p className="cq-status-line">Nothing in common with your mandate yet.</p>
+      <p className="cq-status-line">
+        {t("Nothing in common with your mandate yet.")}
+      </p>
     );
   }
   return (
@@ -190,6 +194,7 @@ function CardFacts({
   readonly company: DiscoveredCompanyDto;
   readonly sectorLabels: ReadonlyMap<string, string>;
 }) {
+  const t = useT();
   const summary = company.summary;
   if (summary === undefined) return null;
   const sectors = summary.sectorNodeIds
@@ -200,23 +205,25 @@ function CardFacts({
     <dl className="cq-feed-facts" data-feed-facts>
       {sectors.length === 0 ? null : (
         <>
-          <dt>Sector</dt>
+          <dt>{t("Sector")}</dt>
           <dd>{sectors.slice(0, 3).join(", ")}</dd>
         </>
       )}
       {stage === null ? null : (
         <>
-          <dt>Stage</dt>
+          <dt>{t("Stage")}</dt>
           <dd>{stage}</dd>
         </>
       )}
-      <dt>Raising</dt>
+      <dt>{t("Raising")}</dt>
       <dd className="cq-numeric">
         {summary.raiseView !== undefined ? (
           // R2: the server's one raise read, in the profile's own words.
           <RaiseFact words={raiseWords(summary.raiseView, false)} />
         ) : summary.raise === null ? (
-          <span className="cq-feed-fact-unknown">Not shared with you</span>
+          <span className="cq-feed-fact-unknown">
+            {t("Not shared with you")}
+          </span>
         ) : (
           <>
             {moneyText(summary.raise.money)}{" "}
@@ -283,6 +290,7 @@ export function FeedCard({
   /** The industry vocabulary's names, for the card's sector. */
   readonly sectorLabels?: ReadonlyMap<string, string> | undefined;
 }) {
+  const t = useT();
   // Stage first, then where: "Seed · Nigeria".
   const place = [
     stageLabel(company.currentStageCode),
@@ -445,7 +453,7 @@ export function FeedCard({
           <CardFacts company={company} sectorLabels={sectorLabels} />
           <div className="cq-feed-why flex flex-col gap-1" data-feed-why>
             <h3 className="cq-label text-(--cq-text-primary)">
-              Why it&apos;s here
+              {t("Why it's here")}
             </h3>
             <Reasons reasons={reasons} />
             {unverified.length === 0 ? null : (
@@ -463,7 +471,7 @@ export function FeedCard({
               className={buttonClassName("primary")}
               data-feed-open-profile
             >
-              Open profile
+              {t("Open profile")}
             </Link>
             {/* Everything else, with Express interest at its first step:
                 the website, the notes, and the server-confirmed decision. */}
@@ -474,7 +482,7 @@ export function FeedCard({
               aria-expanded={expanded}
               data-feed-all-details
             >
-              All details
+              {t("All details")}
             </Button>
           </div>
         </div>
@@ -531,14 +539,17 @@ export function FeedCard({
               )}
               {company.pitch === null ? (
                 <p className="cq-caption text-(--cq-text-secondary)">
-                  No pitch to show yet.
+                  {t("No pitch to show yet.")}
                 </p>
               ) : null}
             </div>
 
-            <section className="flex flex-col gap-2" aria-label="Why it's here">
+            <section
+              className="flex flex-col gap-2"
+              aria-label={t("Why it's here")}
+            >
               <h3 className="cq-label text-(--cq-text-secondary)">
-                Why it&apos;s here
+                {t("Why it's here")}
               </h3>
               <Reasons reasons={reasons} />
               {/*
@@ -596,7 +607,7 @@ export function FeedCard({
         ref={decisions}
         className="cq-feed-rail"
         role="group"
-        aria-label="Decide"
+        aria-label={t("Decide")}
       >
         <span className="cq-feed-rail-profile">
           <CompanyAvatarLink
@@ -605,7 +616,7 @@ export function FeedCard({
             photoUrl={company.photoUrl}
           />
           <span className="cq-feed-rail-label" aria-hidden="true">
-            Profile
+            {t("Profile")}
           </span>
         </span>
         <Button
@@ -620,7 +631,7 @@ export function FeedCard({
             size={ICON_SIZE.prominent}
             strokeWidth={ICON_STROKE}
           />
-          <span className="cq-feed-rail-label">Interest</span>
+          <span className="cq-feed-rail-label">{t("Interest")}</span>
         </Button>
         {/* Unsaved reads as a quiet choice like Pass; saved is marked by
             the filled icon and the word (demo audit 2026-10-03: a filled
@@ -659,7 +670,7 @@ export function FeedCard({
             size={ICON_SIZE.prominent}
             strokeWidth={ICON_STROKE}
           />
-          <span className="cq-feed-rail-label">Pass</span>
+          <span className="cq-feed-rail-label">{t("Pass")}</span>
         </Button>
         <Button
           variant="quiet"
@@ -669,7 +680,7 @@ export function FeedCard({
           data-feed-ask-q
         >
           {askQMark}
-          <span className="cq-feed-rail-label">Ask Q</span>
+          <span className="cq-feed-rail-label">{t("Ask Q")}</span>
         </Button>
         <Button
           variant="quiet"
@@ -703,7 +714,7 @@ export function FeedCard({
               size={ICON_SIZE.prominent}
               strokeWidth={ICON_STROKE}
             />
-            <span className="cq-feed-rail-label">Next video</span>
+            <span className="cq-feed-rail-label">{t("Next video")}</span>
           </Button>
         )}
         {onMore === undefined ? null : (
@@ -719,7 +730,7 @@ export function FeedCard({
               size={ICON_SIZE.prominent}
               strokeWidth={ICON_STROKE}
             />
-            <span className="cq-feed-rail-label">More</span>
+            <span className="cq-feed-rail-label">{t("More")}</span>
           </Button>
         )}
         <span className="sr-only" role="status">

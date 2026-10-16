@@ -58,6 +58,7 @@ import {
   SPLASH_DONE_EVENT,
   splashShowing,
 } from "@/features/splash/splash-policy";
+import { useT } from "@/features/i18n/language";
 
 function subscribeSplash(onChange: () => void): () => void {
   window.addEventListener(SPLASH_DONE_EVENT, onChange);
@@ -206,6 +207,7 @@ function InvestorFeed({
   readonly controls: FeedFilterControls;
   readonly sectorLabels: ReadonlyMap<string, string>;
 }) {
+  const t = useT();
   const transport = useMemo(() => actionFeedTransport(filters), [filters]);
   const reducedMotion = useReducedMotionPreference();
   const budget = useFeedBudget();
@@ -441,7 +443,7 @@ function InvestorFeed({
     );
 
   if (feed.state.status === "LOADING_FIRST") {
-    return <FeedSkeleton label="Loading your recommendations" />;
+    return <FeedSkeleton label={t("Loading your recommendations")} />;
   }
 
   if (
@@ -463,11 +465,13 @@ function InvestorFeed({
           <p className="cq-status-line">{controls.notice}</p>
         )}
         <EmptyState
-          title="No companies match these filters."
-          description="Your recommendations are unchanged; these filters leave none of them in view."
+          title={t("No companies match these filters.")}
+          description={t(
+            "Your recommendations are unchanged; these filters leave none of them in view.",
+          )}
           action={
             <Button variant="primary" onClick={controls.clear}>
-              Clear filters
+              {t("Clear filters")}
             </Button>
           }
         />
@@ -483,8 +487,10 @@ function InvestorFeed({
     */
     return feed.state.status === "FAILED" ? (
       <EmptyState
-        title="Discover couldn't load."
-        description="Nothing is wrong with your mandate. Try again in a moment."
+        title={t("Discover couldn't load.")}
+        description={t(
+          "Nothing is wrong with your mandate. Try again in a moment.",
+        )}
       />
     ) : notes.includes("NO_ACTIVE_MANDATE") ? (
       /*
@@ -496,18 +502,20 @@ function InvestorFeed({
       */
       <div className="flex flex-col gap-4">
         <EmptyState
-          title="Finish your mandate to see companies."
-          description="Discover ranks companies against what you told Q. Your mandate isn't active yet, so there is nothing to rank them against."
+          title={t("Finish your mandate to see companies.")}
+          description={t(
+            "Discover ranks companies against what you told Q. Your mandate isn't active yet, so there is nothing to rank them against.",
+          )}
           action={
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/onboarding/investor"
                 className={buttonClassName("primary")}
               >
-                Finish my mandate
+                {t("Finish my mandate")}
               </Link>
               <Button variant="secondary" onClick={() => setOpen(true)}>
-                Ask Q
+                {t("Ask Q")}
               </Button>
             </div>
           }
@@ -534,10 +542,10 @@ function InvestorFeed({
                 href="/onboarding/investor?review=1"
                 className={buttonClassName("primary")}
               >
-                Review my hard rules
+                {t("Review my hard rules")}
               </Link>
               <Button variant="secondary" onClick={() => setOpen(true)}>
-                Ask Q
+                {t("Ask Q")}
               </Button>
             </div>
           }
@@ -548,17 +556,19 @@ function InvestorFeed({
         {unverifiableLine}
         <EmptyState
           title={`${discoverableCompanies(discoverableCount)} discoverable. None has a pitch video yet.`}
-          description="This feed shows only companies with a pitch you can play. The others pass your hard rules and are in Search and Explore; they join the feed when they add a pitch."
+          description={t(
+            "This feed shows only companies with a pitch you can play. The others pass your hard rules and are in Search and Explore; they join the feed when they add a pitch.",
+          )}
           action={
             <div className="flex flex-wrap items-center gap-2">
               <Link href="/explore" className={buttonClassName("secondary")}>
-                Open Explore
+                {t("Open Explore")}
               </Link>
               <Link href="/search" className={buttonClassName("secondary")}>
-                Search companies
+                {t("Search companies")}
               </Link>
               <Button variant="secondary" onClick={() => setOpen(true)}>
-                Ask Q
+                {t("Ask Q")}
               </Button>
             </div>
           }
@@ -569,17 +579,19 @@ function InvestorFeed({
         {unverifiableLine}
         <EmptyState
           title={`${discoverableCompanies(discoverableCount)} discoverable. None matches your mandate yet.`}
-          description="They pass your hard rules, but none shares a stage, country or sector you named. Widening your mandate is what brings them in."
+          description={t(
+            "They pass your hard rules, but none shares a stage, country or sector you named. Widening your mandate is what brings them in.",
+          )}
           action={
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/onboarding/investor?review=1"
                 className={buttonClassName("secondary")}
               >
-                Review my mandate
+                {t("Review my mandate")}
               </Link>
               <Button variant="secondary" onClick={() => setOpen(true)}>
-                Ask Q
+                {t("Ask Q")}
               </Button>
             </div>
           }
@@ -590,20 +602,24 @@ function InvestorFeed({
         <Notes notes={notes} />
         {unverifiableLine}
         <EmptyState
-          title="Building your list."
-          description="Q is matching discoverable companies to your mandate. Check back in a moment."
+          title={t("Building your list.")}
+          description={t(
+            "Q is matching discoverable companies to your mandate. Check back in a moment.",
+          )}
         />
       </div>
     ) : (
       <div className="flex flex-col gap-4">
         <Notes notes={notes} />
         <EmptyState
-          title="Nothing to review yet."
-          description="Companies appear here as founders choose to be discoverable. Companies you saved or passed on are kept in Saved and Passed, with their pitches."
+          title={t("Nothing to review yet.")}
+          description={t(
+            "Companies appear here as founders choose to be discoverable. Companies you saved or passed on are kept in Saved and Passed, with their pitches.",
+          )}
           action={
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="secondary" onClick={() => setOpen(true)}>
-                Ask Q
+                {t("Ask Q")}
               </Button>
               <SavedAndPassedLinks className="flex" />
             </div>
@@ -642,7 +658,7 @@ function InvestorFeed({
       muted={effectiveMuted}
       onMutedChange={setMuted}
       initialAuthorization={initialAuthorization}
-      label="Companies to review"
+      label={t("Companies to review")}
       onStage={setStage}
       onDecide={onDecide}
       onNotInterested={() => {
@@ -774,16 +790,17 @@ function Notes({ notes }: { readonly notes: readonly DiscoveryNoteDto[] }) {
  * save takes a company out of the stream, never out of reach.
  */
 function SavedAndPassedLinks({ className }: { readonly className: string }) {
+  const t = useT();
   return (
     <nav
-      aria-label="Saved and passed companies"
+      aria-label={t("Saved and passed companies")}
       className={`${className} flex-wrap items-center gap-2`}
     >
       <Link href="/discover/saved" className={buttonClassName("quiet")}>
-        Saved
+        {t("Saved")}
       </Link>
       <Link href="/discover/passed" className={buttonClassName("quiet")}>
-        Passed
+        {t("Passed")}
       </Link>
     </nav>
   );
