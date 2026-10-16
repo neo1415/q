@@ -44,6 +44,7 @@ import {
   type DockSize,
   type DockViewport,
 } from "./dock-placement";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Q Dock (ADR 0017 F1; spec §6): Q, floating, on every page but the
@@ -94,13 +95,20 @@ function measureViewport(dockClass: DockClass): DockViewport {
   const header = rectOf(".cq-shell-header");
   const nav = rectOf(".cq-bottom-nav");
   const sidebar = rectOf(".cq-shell-sidebar");
+  const sidebarOnRight =
+    sidebar !== null && sidebar.left > document.documentElement.clientWidth / 2;
   return {
     width: document.documentElement.clientWidth,
     height: window.innerHeight,
     insetTop: header === null ? 0 : Math.max(0, header.bottom),
     insetBottom: nav === null ? 0 : Math.max(0, window.innerHeight - nav.top),
-    insetLeft: sidebar === null ? 0 : Math.max(0, sidebar.right),
-    insetRight: 0,
+    // The rail is on the reading side: the left, or the right under RTL.
+    insetLeft:
+      sidebar === null || sidebarOnRight ? 0 : Math.max(0, sidebar.right),
+    insetRight:
+      sidebar === null || !sidebarOnRight
+        ? 0
+        : Math.max(0, document.documentElement.clientWidth - sidebar.left),
     gutter: dockClass === "desktop" ? 24 : 12,
   };
 }
@@ -117,6 +125,7 @@ function useAnnouncement(text: string | undefined): string {
 }
 
 export function QDock() {
+  const t = useT();
   const session = useQSessionOptional();
   const pathname = usePathname();
   const { open: panelOpen, setOpen } = useGlobalQ();
@@ -369,7 +378,7 @@ export function QDock() {
       type="button"
       className="cq-q-dock-stash"
       data-side={chosen.side}
-      aria-label="Show Q"
+      aria-label={t("Show Q")}
       aria-describedby={hintId}
       onClick={() => move({ kind: "unstash" })}
       data-q-dock-stash
@@ -408,7 +417,7 @@ export function QDock() {
               size={ICON_SIZE.compact}
               strokeWidth={ICON_STROKE}
             />
-            <span className="sr-only">Microphone on</span>
+            <span className="sr-only">{t("Microphone on")}</span>
           </span>
         ) : null}
       </button>
@@ -416,7 +425,7 @@ export function QDock() {
         <button
           type="button"
           className="cq-q-dock-stop"
-          aria-label="End voice"
+          aria-label={t("End voice")}
           onClick={() => void voice.end()}
           data-q-dock-stop
         >
@@ -426,7 +435,7 @@ export function QDock() {
         <button
           type="button"
           className="cq-q-dock-stop"
-          aria-label="Stop"
+          aria-label={t("Stop")}
           onClick={() => void q.stop()}
           data-q-dock-stop
         >
@@ -452,7 +461,7 @@ export function QDock() {
   );
 
   return (
-    <aside aria-label="Q dock" className="cq-q-dock-layer" data-q-dock>
+    <aside aria-label={t("Q dock")} className="cq-q-dock-layer" data-q-dock>
       <LazyMotion features={features} strict>
         <ContextMenuRoot open={menuOpen} onOpenChange={setMenuOpen}>
           <ContextMenuTrigger>
@@ -492,7 +501,7 @@ export function QDock() {
         </ContextMenuRoot>
       </LazyMotion>
       <span id={hintId} className="sr-only">
-        Press Shift+F10 to move or hide Q. Control+K opens Q.
+        {t("Press Shift+F10 to move or hide Q. Control+K opens Q.")}
       </span>
       <div className="sr-only" role="status" aria-live="polite">
         {announcement}

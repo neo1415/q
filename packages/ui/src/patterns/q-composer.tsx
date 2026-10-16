@@ -16,6 +16,7 @@ import { cx } from "../primitives/class-names.js";
 import type { ContextScope } from "../tokens/index.js";
 import { ContextIndicator } from "./context-indicator.js";
 import { QMark } from "./q-mark.js";
+import { useUiText } from "../primitives/ui-text.js";
 
 /**
  * The Q composer: Q identity, a labelled growing input, a submit affordance
@@ -96,6 +97,7 @@ export function QComposer({
   showContext = true,
   actions,
 }: QComposerProps) {
+  const t = useUiText();
   const generatedId = useId();
   const inputId = id ?? `q-composer-${generatedId}`;
   const [value, setValue] = useState(initialValue);
@@ -166,12 +168,12 @@ export function QComposer({
           with what is typed up to a cap, then scrolls inside itself, so the
           composer never pushes a conversation off a phone's screen. */}
       <div className="flex items-end gap-1" data-q-composer-row>
-        <div className="flex h-11 flex-none items-center pl-1">
+        <div className="flex h-11 flex-none items-center ps-1">
           <QMark size="sm" state={submitting ? "WORKING" : "IDLE"} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <label id={`${inputId}-title`} htmlFor={inputId} className="sr-only">
-            Ask Q
+            {t("Ask Q")}
           </label>
           <textarea
             ref={textareaRef}
@@ -181,7 +183,7 @@ export function QComposer({
             value={value}
             autoFocus={autoFocus}
             disabled={disabled}
-            placeholder={placeholder}
+            placeholder={t(placeholder)}
             enterKeyHint="send"
             autoComplete="off"
             onChange={(event) => {
@@ -239,8 +241,8 @@ export function QComposer({
             <IconButton
               type="button"
               variant="quiet"
-              aria-label={voiceLabel}
-              title={voiceLabel}
+              aria-label={t(voiceLabel)}
+              title={t(voiceLabel)}
               disabled={disabled}
               onClick={onVoice}
               data-q-talk
@@ -255,7 +257,7 @@ export function QComposer({
           <IconButton
             type="submit"
             variant="primary"
-            aria-label="Send to Q"
+            aria-label={t("Send to Q")}
             disabled={!canSubmit}
           >
             <ArrowUp
@@ -276,7 +278,7 @@ export function QComposer({
       ) : null}
       {attachments.length > 0 ? (
         <ul
-          aria-label="Attached"
+          aria-label={t("Attached")}
           className="flex flex-wrap gap-2"
           data-q-attachments
         >
@@ -293,9 +295,11 @@ export function QComposer({
       {notice === "unavailable" ? (
         <InlineNotice
           tone="info"
-          title="Q isn't connected on this surface yet."
+          title={t("Q isn't connected on this surface yet.")}
         >
-          Nothing was sent. Your question is still here when Q is available.
+          {t(
+            "Nothing was sent. Your question is still here when Q is available.",
+          )}
         </InlineNotice>
       ) : null}
     </form>

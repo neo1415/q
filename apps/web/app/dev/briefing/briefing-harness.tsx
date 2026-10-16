@@ -204,7 +204,7 @@ export function BriefingHarness({
       {dock ? (
         <aside
           aria-label="Q's briefing"
-          className="fixed right-4 bottom-6 z-(--cq-z-presence) flex w-[min(380px,calc(100vw-32px))] flex-col border border-(--cq-border) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-overlay) empty:hidden"
+          className="fixed end-4 bottom-6 z-(--cq-z-presence) flex w-[min(380px,calc(100vw-32px))] flex-col border border-(--cq-border) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-overlay) empty:hidden"
           data-arrival-dock
         >
           <ArrivalBriefing

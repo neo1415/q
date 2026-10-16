@@ -16,6 +16,7 @@ import {
 import { IncomingInterest } from "@/features/network/incoming-interest";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Investor interest" };
 export const dynamic = "force-dynamic";
@@ -29,13 +30,14 @@ export const dynamic = "force-dynamic";
  * person with no company, has no inbox here.
  */
 export default async function InvestorInterestPage() {
+  const t = await serverT();
   const context = await resolveOwnContext();
   const session = await apiSession();
 
   const header = (
     <PageHeader
-      title="Investor interest"
-      description="Accepting connects you. It isn’t an investment."
+      title={t("Investor interest")}
+      description={t("Accepting connects you. It isn’t an investment.")}
     />
   );
 
@@ -47,18 +49,20 @@ export default async function InvestorInterestPage() {
           id="interest"
           kind="INTEREST_LIST"
           total={0}
-          label="investor interest"
+          label={t("investor interest")}
         >
           {header}
           <EmptyState
-            title="This is a founder's page."
-            description="Interest you have expressed, and each company's answer, is under Relationships."
+            title={t("This is a founder's page.")}
+            description={t(
+              "Interest you have expressed, and each company's answer, is under Relationships.",
+            )}
             action={
               <Link
                 href="/relationships"
                 className={buttonClassName("secondary")}
               >
-                Go to Relationships
+                {t("Go to Relationships")}
               </Link>
             }
           />
@@ -74,15 +78,17 @@ export default async function InvestorInterestPage() {
           id="interest"
           kind="INTEREST_LIST"
           total={0}
-          label="investor interest"
+          label={t("investor interest")}
         >
           {header}
           <EmptyState
-            title="Nothing to answer here."
-            description="Investor interest is addressed to a company. It appears here for the company's own team."
+            title={t("Nothing to answer here.")}
+            description={t(
+              "Investor interest is addressed to a company. It appears here for the company's own team.",
+            )}
             action={
               <Link href="/home" className={buttonClassName("secondary")}>
-                Back to Home
+                {t("Back to Home")}
               </Link>
             }
           />
@@ -113,19 +119,21 @@ export default async function InvestorInterestPage() {
           id: item.investorOrganisationId,
         }))}
         total={incoming?.items.length ?? 0}
-        label="investor interest"
+        label={t("investor interest")}
       >
         {header}
         {incoming === null ? (
           <EmptyState
-            title="Investor interest couldn't load."
-            description="Nothing is wrong with your company. Capital Q didn't answer just now; try again in a moment."
+            title={t("Investor interest couldn't load.")}
+            description={t(
+              "Nothing is wrong with your company. Capital Q didn't answer just now; try again in a moment.",
+            )}
             action={
               <Link
                 href="/company/interest"
                 className={buttonClassName("secondary")}
               >
-                Try again
+                {t("Try again")}
               </Link>
             }
           />

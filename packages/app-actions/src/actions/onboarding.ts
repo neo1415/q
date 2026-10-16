@@ -14,6 +14,7 @@ import {
   ONBOARDING_PATH,
   ONBOARDING_QUESTIONS_SEGMENT,
   ONBOARDING_RESOLVE_SEGMENT,
+  ONBOARDING_RESPONSES_BATCH_SEGMENT,
   ONBOARDING_RESPONSES_SEGMENT,
   ONBOARDING_REVISIONS_SEGMENT,
   ONBOARDING_SESSIONS_SEGMENT,
@@ -28,6 +29,8 @@ import {
   ResolveOnboardingSuggestionRequestSchema,
   SkipOnboardingStepRequestSchema,
   SubmitOnboardingResponseRequestSchema,
+  SubmitOnboardingResponsesRequestSchema,
+  SubmitOnboardingResponsesResultSchema,
   WithdrawOnboardingResponseRequestSchema,
 } from "@capital-q/contracts";
 import {
@@ -109,6 +112,46 @@ function answer(revision: boolean): AnyPersonAction {
     legacyTool: revision ? "propose_profile_answer_change" : "record_answers",
   });
 }
+
+/**
+ * Several answers given at once, committed in one transaction (lane ob1,
+ * 2026-10-16): the same validation and commit as one answer each, without
+ * a round trip per answer. Refused answers are reported; the rest commit.
+ */
+const ANSWERS_BATCH: AnyPersonAction = (() => {
+  const Input = z
+    .object({ ...Session, input: SubmitOnboardingResponsesRequestSchema })
+    .strict();
+  return definePersonAction<z.infer<typeof Input>, unknown>({
+    name: "onboarding.answers.submit",
+    short: "answer several setup steps",
+    area: "onboarding",
+    classification: "INSTANT",
+    does: "Records several answers to their setup in one save, each checked as a single answer is.",
+    input: Input,
+    output: z.unknown(),
+    run: (ports, context, input) =>
+      runtime(ports).submitResponses({
+        actor: context.person,
+        sessionId: input.sessionId,
+        responses: input.input.responses,
+        expectedSessionVersion: input.input.expectedSessionVersion,
+        idempotencyKey: input.idempotencyKey,
+        correlationId: context.correlationId,
+      }),
+    http: {
+      method: "POST",
+      path: `${byId}${ONBOARDING_RESPONSES_BATCH_SEGMENT}`,
+      fromRequest: (params, body, headers) => ({
+        sessionId: params["sessionId"],
+        idempotencyKey: keyOf(headers),
+        input: body,
+      }),
+      respond: (out) => SubmitOnboardingResponsesResultSchema.parse(out),
+    },
+    legacyTool: "record_answers",
+  });
+})();
 
 /** Setting a step aside, or withdrawing its answer. */
 function step(withdraw: boolean): AnyPersonAction {
@@ -321,6 +364,7 @@ const NUDGE_CHOICE = definePersonAction<z.infer<typeof Choice>, unknown>({
 
 export const ONBOARDING_ACTIONS: readonly AnyPersonAction[] = [
   answer(false),
+  ANSWERS_BATCH,
   answer(true),
   step(false),
   step(true),

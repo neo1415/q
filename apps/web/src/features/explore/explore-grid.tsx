@@ -19,6 +19,7 @@ import {
   type AuthorizePreview,
 } from "./grid-preview-player";
 import { mosaicCellStyle, mosaicLayouts } from "./mosaic";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Explore's grid (E2; owner 2026-10-16, "the Instagram Explore feel"): one
@@ -259,12 +260,13 @@ const SKELETON_TILES = 15;
 
 /** The loading grid: the same boxes, reserved, so nothing jumps on arrival. */
 export function ExploreGridSkeleton() {
+  const t = useT();
   const layouts = mosaicLayouts(SKELETON_TILES);
   return (
     <div
       className="cq-explore-mosaic-host"
       aria-busy="true"
-      aria-label="Loading pitches"
+      aria-label={t("Loading pitches")}
     >
       <div className="cq-explore-mosaic">
         {Array.from({ length: SKELETON_TILES }, (_, index) => (

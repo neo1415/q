@@ -22,6 +22,7 @@ import {
   stepUpAction,
   type ConsoleResult,
 } from "./console-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The console's client pieces: the step-up dialog every sensitive action
@@ -34,6 +35,8 @@ type Guard = (work: () => Promise<ConsoleResult>) => Promise<ConsoleResult>;
 const StepUpContext = createContext<Guard | null>(null);
 
 export function StepUpProvider({ children }: { readonly children: ReactNode }) {
+  const t = useT();
+
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"PASSWORD" | "CODE">("PASSWORD");
@@ -82,8 +85,10 @@ export function StepUpProvider({ children }: { readonly children: ReactNode }) {
         }}
       >
         <DialogContent
-          title="Confirm it's you"
-          description="Sensitive console actions need you to sign in again: your password, or a code sent to your email. It lasts 15 minutes."
+          title={t("Confirm it's you")}
+          description={t(
+            "Sensitive console actions need you to sign in again: your password, or a code sent to your email. It lasts 15 minutes.",
+          )}
           actions={
             <>
               <Button variant="quiet" onClick={() => close(false)}>
@@ -110,7 +115,9 @@ export function StepUpProvider({ children }: { readonly children: ReactNode }) {
           <div className="flex flex-col gap-3">
             <Input
               id={fieldId}
-              label={mode === "PASSWORD" ? "Password" : "Code from your email"}
+              label={
+                mode === "PASSWORD" ? t("Password") : t("Code from your email")
+              }
               type={mode === "PASSWORD" ? "password" : "text"}
               inputMode={mode === "PASSWORD" ? undefined : "numeric"}
               autoComplete={
@@ -137,7 +144,7 @@ export function StepUpProvider({ children }: { readonly children: ReactNode }) {
                   })
                 }
               >
-                Email me a code instead
+                {t("Email me a code instead")}
               </Button>
             ) : (
               <p
@@ -178,13 +185,15 @@ export function ResultLine({
 }: {
   readonly result: ConsoleResult | null;
 }) {
+  const t = useT();
+
   if (result === null || result.message === undefined) return null;
   return (
     <p
       role={result.ok ? "status" : "alert"}
       className="cq-caption text-(--cq-text-secondary)"
     >
-      {result.message}
+      {t(result.message)}
     </p>
   );
 }
@@ -220,6 +229,8 @@ export function ReasonAction({
   readonly disabled?: boolean | undefined;
   readonly run: (reason: string) => Promise<ConsoleResult>;
 }) {
+  const t = useT();
+
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const { perform, pending, result } = useConsoleAction();
@@ -241,12 +252,12 @@ export function ReasonAction({
           setOpen(true);
         }}
       >
-        {label}
+        {t(label)}
       </Button>
       <ResultLine result={result} />
       <DialogRoot open={open} onOpenChange={setOpen}>
         <DialogContent
-          title={title}
+          title={t(title)}
           description={description}
           actions={
             <>
@@ -268,8 +279,10 @@ export function ReasonAction({
         >
           <Textarea
             id={fieldId}
-            label={reasonLabel}
-            description={`At least ${String(minLength)} characters. It is kept in the audit log.`}
+            label={t(reasonLabel)}
+            description={t(
+              `At least ${String(minLength)} characters. It is kept in the audit log.`,
+            )}
             value={reason}
             onChange={(event) => setReason(event.target.value)}
           />
@@ -316,6 +329,8 @@ export function ConsoleNav({
 }: {
   readonly permissions: readonly string[];
 }) {
+  const t = useT();
+
   const pathname = usePathname();
   const allowed = SECTIONS.filter((section) =>
     typeof section.permission === "string"
@@ -324,7 +339,7 @@ export function ConsoleNav({
   );
   return (
     <nav
-      aria-label="Console sections"
+      aria-label={t("Console sections")}
       className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"
     >
       <ul className="flex gap-1 border-b border-(--cq-border-subtle)">
@@ -344,7 +359,7 @@ export function ConsoleNav({
                     : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
                 }`}
               >
-                {section.label}
+                {t(section.label)}
               </Link>
             </li>
           );

@@ -13,8 +13,12 @@ import { DailyAnchorFocus } from "@/features/daily/anchor-focus";
 import { Newspaper } from "@/features/daily/newspaper";
 import { qApiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "The Q Daily" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("The Q Daily") };
+}
 export const dynamic = "force-dynamic";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,6 +29,8 @@ export default async function DailyEditionPage({
 }: {
   readonly params: Promise<{ readonly editionId: string }>;
 }) {
+  const t = await serverT();
+
   const { editionId } = await params;
   if (!UUID.test(editionId)) notFound();
   const session = await qApiSession();
@@ -49,7 +55,7 @@ export default async function DailyEditionPage({
             className="cq-body text-(--cq-text-secondary)"
             data-state="unavailable"
           >
-            This edition couldn&apos;t load. Reload in a moment.
+            {t("This edition couldn't load. Reload in a moment.")}
           </p>
         </QSection>
       </PageContainer>
@@ -62,7 +68,7 @@ export default async function DailyEditionPage({
           href="/daily"
           className={buttonClassName("quiet", "compact", "self-start")}
         >
-          Latest edition
+          {t("Latest edition")}
         </Link>
         <DailyAnchorFocus />
         <Newspaper edition={edition} />

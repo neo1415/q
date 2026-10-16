@@ -136,7 +136,7 @@ function ReadyPanel({
                   {p.context === undefined ? null : (
                     <FitContextValues
                       context={p.context}
-                      className="pl-[26px]"
+                      className="ps-[26px]"
                     />
                   )}
                 </li>
@@ -164,7 +164,7 @@ function ReadyPanel({
             </span>
           </div>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            <span className="cq-title-sm mr-1.5 text-(--cq-text-primary)">
+            <span className="cq-title-sm me-1.5 text-(--cq-text-primary)">
               {Q_VIEW_VERDICT_LABELS[view.verdict]}.
             </span>
             {view.summary}
@@ -218,7 +218,7 @@ function OpenQuestions({
           <li key={question}>
             <button
               type="button"
-              className="cq-body-sm min-h-[44px] w-full py-1 text-left text-(--cq-text-primary) underline decoration-(--cq-border-strong) underline-offset-4 hover:decoration-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) sm:min-h-0"
+              className="cq-body-sm min-h-[44px] w-full py-1 text-start text-(--cq-text-primary) underline decoration-(--cq-border-strong) underline-offset-4 hover:decoration-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) sm:min-h-0"
               onClick={() =>
                 askNow(
                   `For ${name}: ${question} What does the evidence I can see say, and if it doesn't, how do I find out?`,

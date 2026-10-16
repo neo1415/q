@@ -19,6 +19,7 @@ import {
 
 import { switchOrganisationAction } from "./team-actions";
 import { teamWords } from "./team-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Who they act for (G2), for a person in two or more companies or firms:
@@ -77,11 +78,16 @@ function OrganisationList({
   readonly organisations: readonly MyOrganisationDto[];
   readonly onPicked?: (() => void) | undefined;
 }) {
+  const t = useT();
   const { pending, error, switchTo } = useSwitch();
   return (
-    <div role="menu" aria-label="Switch company or firm" data-org-switcher-list>
+    <div
+      role="menu"
+      aria-label={t("Switch company or firm")}
+      data-org-switcher-list
+    >
       <p className="px-2.5 pt-2 pb-1 cq-caption text-(--cq-text-tertiary)">
-        Acting for
+        {t("Acting for")}
       </p>
       {organisations.map((organisation) => (
         <button
@@ -95,7 +101,7 @@ function OrganisationList({
               switchTo(organisation.organisationId, onPicked);
           }}
           className={cx(
-            "flex min-h-13 w-full items-center gap-2.5 px-2.5 py-1.5 text-left transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
+            "flex min-h-13 w-full items-center gap-2.5 px-2.5 py-1.5 text-start transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
             organisation.active ? "bg-(--cq-surface-subtle)" : null,
           )}
         >
@@ -119,7 +125,7 @@ function OrganisationList({
         </button>
       ))}
       <p className="border-t border-(--cq-border-subtle) px-2.5 pt-2 pb-2 mt-1.5 cq-caption text-(--cq-text-tertiary)">
-        Q keeps each one&apos;s work and memory separate.
+        {t("Q keeps each one's work and memory separate.")}
       </p>
       {error === null ? null : (
         <p
@@ -152,7 +158,7 @@ export function SidebarOrganisationSwitcher({
           type="button"
           aria-label={`Acting for ${active.name}. Switch`}
           className={cx(
-            "flex min-h-12 items-center gap-2.5 text-left transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
+            "flex min-h-12 items-center gap-2.5 text-start transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
             compact ? "w-11 justify-center" : "w-full px-2.5 py-1.5",
           )}
           data-org-switcher

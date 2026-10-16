@@ -31,6 +31,7 @@ import { resolveBriefing } from "./briefing-facts";
 import { resolveReturningFacts } from "./returning-facts";
 import { ReturningWelcome } from "./returning-welcome";
 import { resolveSetupReminder } from "./setup-reminder";
+import { serverT, serverUiLanguage } from "@/features/i18n/server";
 
 /**
  * Home is Q (QX-001 §4; doc 17 §60-§63; acceptance A and K).
@@ -164,6 +165,7 @@ export async function HomeScreen({
   /** Arrived from the answer chip's Board (C6): open on the Board. */
   readonly openBoard?: boolean | undefined;
 } = {}) {
+  const t = await serverT();
   const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
   // Which subject Q's questions are about, if Capital Q knows of one. A
   // server fact, resolved once per render and never asked of the browser.
@@ -210,7 +212,7 @@ export async function HomeScreen({
               ? "WELCOME"
               : "BRIEFING",
       };
-      const greeting = returningGreeting(facts);
+      const greeting = returningGreeting(facts, await serverUiLanguage());
       welcome = (
         <>
           <ReturningWelcome
@@ -274,7 +276,7 @@ export async function HomeScreen({
         </div>
       ) : null}
       <section
-        aria-label="Ask Q"
+        aria-label={t("Ask Q")}
         className="flex min-h-0 flex-1 flex-col"
         data-q-surface
       >

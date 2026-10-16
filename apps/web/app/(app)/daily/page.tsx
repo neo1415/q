@@ -17,8 +17,12 @@ import {
 } from "@/features/daily/prepare-edition";
 import { qApiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "The Q Daily" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("The Q Daily") };
+}
 export const dynamic = "force-dynamic";
 
 /**
@@ -31,6 +35,8 @@ export default async function DailyPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await serverT();
+
   const raw = (await searchParams)["before"];
   const before =
     typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)
@@ -51,13 +57,13 @@ export default async function DailyPage({
             className="cq-body text-(--cq-text-secondary)"
             data-state="unavailable"
           >
-            Your editions couldn&apos;t load. None was used.
+            {t("Your editions couldn't load. None was used.")}
           </p>
           <Link
             href="/daily"
             className={buttonClassName("secondary", "regular", "self-start")}
           >
-            Try again
+            {t("Try again")}
           </Link>
         </QSection>
       </PageContainer>
@@ -68,13 +74,16 @@ export default async function DailyPage({
     return (
       <PageContainer width="reading" className="flex flex-col gap-6">
         <QSection id="daily" kind="DAILY" label="The Q Daily">
-          <PageHeader title="The Q Daily" description="Earlier editions." />
+          <PageHeader
+            title="The Q Daily"
+            description={t("Earlier editions.")}
+          />
           <DailyArchive items={home.archive} nextCursor={home.nextCursor} />
           <Link
             href="/daily"
             className={buttonClassName("quiet", "compact", "self-start")}
           >
-            Back to the latest edition
+            {t("Back to the latest edition")}
           </Link>
         </QSection>
       </PageContainer>
@@ -103,18 +112,18 @@ export default async function DailyPage({
       <QSection id="daily" kind="DAILY" label="The Q Daily">
         <PageHeader
           title="The Q Daily"
-          description="Your news, every story sourced."
+          description={t("Your news, every story sourced.")}
         />
         {preferences.frequency === "OFF" ? (
           <div className="flex flex-col gap-3" data-state="off">
             <p className="cq-body text-(--cq-text-secondary)">
-              The Q Daily is off.
+              {t("The Q Daily is off.")}
             </p>
             <Link
               href="/settings#q-daily"
               className={buttonClassName("primary", "regular", "self-start")}
             >
-              Turn it on
+              {t("Turn it on")}
             </Link>
           </div>
         ) : home.preparing ? (
@@ -123,10 +132,10 @@ export default async function DailyPage({
           <div className="flex flex-col gap-3" data-state="empty">
             <p className="cq-body text-(--cq-text-primary)">
               {preferences.nextDueAt === null
-                ? "First edition on its way"
-                : `First edition: ${formatDayTime(preferences.nextDueAt)}`}
+                ? t("First edition on its way")
+                : t(`First edition: ${formatDayTime(preferences.nextDueAt)}`)}
             </p>
-            <PrepareEditionButton label="Get it now" />
+            <PrepareEditionButton label={t("Get it now")} />
           </div>
         )}
       </QSection>

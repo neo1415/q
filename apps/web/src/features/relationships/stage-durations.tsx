@@ -2,6 +2,7 @@ import { cx } from "@capital-q/ui";
 
 import { STATE_WORDS, formatRelationshipDate } from "./relationship-words";
 import { durationWords, stageSpans } from "./stage-spans";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /**
  * Time in each stage, as one proportional strip (dataviz: a single
@@ -18,6 +19,8 @@ export function StageDurations({
   readonly milestones: Parameters<typeof stageSpans>[0];
   readonly now: number;
 }) {
+  const t = serverTNow();
+
   const spans = stageSpans(milestones, now);
   if (spans.length === 0) return null;
   const total = Math.max(
@@ -27,13 +30,13 @@ export function StageDurations({
   return (
     <figure className="flex flex-col gap-3" data-stage-durations>
       <figcaption className="cq-body-sm text-(--cq-text-secondary)">
-        Time in each stage
+        {t("Time in each stage")}
       </figcaption>
       <div aria-hidden="true" className="flex h-2 w-full gap-0.5">
         {spans.map((span) => (
           <span
             key={span.key}
-            title={`${STATE_WORDS[span.state]}: ${durationWords(span.ms)}`}
+            title={t(`${STATE_WORDS[span.state]}: ${durationWords(span.ms)}`)}
             className={cx(
               "h-2 min-w-1",
               span.to === null ? "bg-(--cq-accent)" : "bg-(--cq-text-tertiary)",
@@ -49,15 +52,18 @@ export function StageDurations({
             className="cq-body-sm flex items-baseline justify-between gap-3"
           >
             <span className="text-(--cq-text-primary)">
-              {STATE_WORDS[span.state]}
+              {t(STATE_WORDS[span.state])}
               {span.to === null ? (
-                <span className="text-(--cq-text-secondary)"> · now</span>
+                <span className="text-(--cq-text-secondary)">
+                  {" "}
+                  {t("· now")}
+                </span>
               ) : null}
             </span>
             <span className="cq-numeric whitespace-nowrap text-(--cq-text-secondary)">
-              {durationWords(span.ms)}
+              {t(durationWords(span.ms))}
               <span className="sr-only">
-                {`, from ${formatRelationshipDate(span.from)}`}
+                {t(`, from ${formatRelationshipDate(span.from)}`)}
               </span>
             </span>
           </li>

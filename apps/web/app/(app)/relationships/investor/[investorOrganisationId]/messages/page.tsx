@@ -9,8 +9,12 @@ import { RelationshipConversation } from "@/features/relationships/relationship-
 import { RelationshipUnavailable } from "@/features/relationships/relationship-detail";
 import { messageCountOf } from "@/features/relationships/brief-lines";
 import { loadCompanySideRelationship } from "@/features/relationships/relationship-page-data";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Messages" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Messages") };
+}
 export const dynamic = "force-dynamic";
 
 /** A company's conversation with one investor organisation (R34). */
@@ -19,6 +23,8 @@ export default async function CompanyConversationPage({
 }: {
   readonly params: Promise<{ readonly investorOrganisationId: string }>;
 }) {
+  const t = await serverT();
+
   const { investorOrganisationId } = await params;
   const loaded = await loadCompanySideRelationship(investorOrganisationId);
   if (loaded.kind === "UNAVAILABLE") {
@@ -49,7 +55,7 @@ export default async function CompanyConversationPage({
         kind="CHAT"
         refs={[{ kind: "INVESTOR_ORGANISATION", id: investorOrganisationId }]}
         total={messageCountOf(loaded)}
-        label={`chat with ${loaded.counterpart} open`}
+        label={t(`chat with ${loaded.counterpart} open`)}
       >
         <RelationshipConversation
           side="COMPANY"

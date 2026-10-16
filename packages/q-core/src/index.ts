@@ -81,6 +81,17 @@ export {
   type QPersonality,
   type QPersonalityCode,
 } from "./personality.js";
+export {
+  effectiveLocale,
+  spokenLanguageNote,
+  supportedLanguageOf,
+  writtenLanguageNote,
+} from "./language.js";
+export {
+  READINESS_LEAD_ARABIC_STEPS,
+  readinessLeadCopy,
+  type ReadinessLeadCopy,
+} from "./readiness-lead-copy.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { GATEQ_INTERVIEWER_V1 } from "./prompts/tasks/gateq-interviewer.v1.js";
 export {
@@ -384,6 +395,9 @@ export {
   TURN_READER_V49_SCHEMA_VERSION,
   TurnReaderV49ResultSchema,
   type TurnReaderV49Result,
+  TURN_READER_V52_SCHEMA_VERSION,
+  TurnReaderV52ResultSchema,
+  type TurnReaderV52Result,
   type TurnReference,
   type TurnReferenceOpenKind,
   TurnReaderV30ResultSchema,
@@ -1572,6 +1586,10 @@ export {
   TURN_READER_V51,
   V51_DECISION_WITH_WORK,
 } from "./prompts/tasks/turn-reader.v51.js";
+export {
+  TURN_READER_V52,
+  V52_NEXT_STEPS,
+} from "./prompts/tasks/turn-reader.v52.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 
 export {

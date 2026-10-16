@@ -21,6 +21,7 @@ import {
   speakerWords,
 } from "./inbox-model";
 import { summaryWords } from "./summary-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * GateQ slice 1: the dossier frozen with a submission, inside the existing
@@ -47,6 +48,8 @@ export function DossierSection({
 }: {
   readonly dossier: GateqDossierV1;
 }) {
+  const t = useT();
+
   const company = dossier.company;
   const contact = dossier.contact;
   const q = dossier.qualification;
@@ -63,10 +66,10 @@ export function DossierSection({
     >
       <div className="gq-sect-h">
         <h3 id="gq-dossier-h" className="cq-title-sm">
-          Dossier
+          {t("Dossier")}
         </h3>
         <span className="cq-caption gq-t3">
-          Frozen at submission · {dossier.application.reference}
+          {t("Frozen at submission ·")} {t(dossier.application.reference)}
         </span>
       </div>
 
@@ -75,33 +78,35 @@ export function DossierSection({
         style={{ gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))" }}
       >
         <div className="flex flex-col gap-1">
-          <h4 className="cq-label">Company</h4>
-          <p className="cq-body">{company.name ?? "Name not given"}</p>
+          <h4 className="cq-label">{t("Company")}</h4>
+          <p className="cq-body">{company.name ?? t("Name not given")}</p>
           {company.description === null ? null : (
-            <p className="cq-body-sm gq-t2">{company.description}</p>
+            <p className="cq-body-sm gq-t2">{t(company.description)}</p>
           )}
           <p className="cq-caption gq-t2">
-            {[
-              company.stage,
-              company.country,
-              company.sectorPhrases.join(", ") || null,
-              company.website,
-            ]
-              .filter((part) => part !== null && part !== "")
-              .join(" · ")}
+            {t(
+              [
+                company.stage,
+                company.country,
+                company.sectorPhrases.join(", ") || null,
+                company.website,
+              ]
+                .filter((part) => part !== null && part !== "")
+                .join(" · "),
+            )}
           </p>
         </div>
         <div className="flex flex-col gap-1">
-          <h4 className="cq-label">Contact</h4>
+          <h4 className="cq-label">{t("Contact")}</h4>
           {contact === null ? (
-            <p className="cq-body-sm gq-t2">No contact on record.</p>
+            <p className="cq-body-sm gq-t2">{t("No contact on record.")}</p>
           ) : (
             <>
               <p className="cq-body">
                 {contact.name}
                 <span className="gq-t2">
                   {" "}
-                  · {contact.role}, {contact.companyName}
+                  · {t(contact.role)}, {contact.companyName}
                 </span>
               </p>
               <p className="cq-body-sm">
@@ -109,19 +114,20 @@ export function DossierSection({
                 <span className="gq-t2">
                   {contact.emailConfirmed
                     ? contact.confirmedVia === "ACCOUNT"
-                      ? "(confirmed by their account)"
-                      : "(confirmed by email code)"
-                    : "(not confirmed)"}
+                      ? t("(confirmed by their account)")
+                      : t("(confirmed by email code)")
+                    : t("(not confirmed)")}
                 </span>
               </p>
               {contact.phone === null ? null : (
                 <p className="cq-body-sm">
-                  {contact.phone} <span className="gq-t2">(not confirmed)</span>
+                  {t(contact.phone)}{" "}
+                  <span className="gq-t2">{t("(not confirmed)")}</span>
                 </p>
               )}
               {contact.preferredChannel === null ? null : (
                 <p className="cq-caption gq-t2">
-                  Prefers {CHANNEL_WORDS[contact.preferredChannel]}
+                  {t("Prefers")} {t(CHANNEL_WORDS[contact.preferredChannel])}
                 </p>
               )}
             </>
@@ -130,27 +136,27 @@ export function DossierSection({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <h4 className="cq-label">Qualification</h4>
-        <p className="cq-body-sm">{OUTCOME_WORDS[q.outcome]}</p>
+        <h4 className="cq-label">{t("Qualification")}</h4>
+        <p className="cq-body-sm">{t(OUTCOME_WORDS[q.outcome])}</p>
         {q.criteria.length === 0 ? (
           <p className="cq-body-sm gq-t2">
-            No published rules, so nothing was checked.
+            {t("No published rules, so nothing was checked.")}
           </p>
         ) : (
           <table className="w-full text-sm">
             <caption className="sr-only">
-              Your published rules, criterion by criterion
+              {t("Your published rules, criterion by criterion")}
             </caption>
             <thead>
-              <tr className="gq-t2 text-left">
+              <tr className="gq-t2 text-start">
                 <th scope="col" className="py-1.5 font-medium">
-                  Rule
+                  {t("Rule")}
                 </th>
                 <th scope="col" className="py-1.5 font-medium">
-                  Type
+                  {t("Type")}
                 </th>
                 <th scope="col" className="py-1.5 font-medium">
-                  Status
+                  {t("Status")}
                 </th>
               </tr>
             </thead>
@@ -160,18 +166,18 @@ export function DossierSection({
                   key={criterion.label}
                   className="border-t border-(--cq-border-subtle)"
                 >
-                  <td className="py-2 pr-2">{criterion.label}</td>
-                  <td className="gq-t2 py-2 pr-2">
+                  <td className="py-2 pe-2">{t(criterion.label)}</td>
+                  <td className="gq-t2 py-2 pe-2">
                     {criterion.requiredness === "REQUIRED"
-                      ? "Required"
-                      : "Preferred"}
+                      ? t("Required")
+                      : t("Preferred")}
                   </td>
                   <td className="py-2">
                     <span className="flex items-center gap-1.5">
                       <FitGlyph
                         kind={CRITERION_STATUS_GLYPH[criterion.status]}
                       />
-                      {CRITERION_STATUS_WORDS[criterion.status]}
+                      {t(CRITERION_STATUS_WORDS[criterion.status])}
                     </span>
                   </td>
                 </tr>
@@ -182,13 +188,13 @@ export function DossierSection({
       </div>
 
       <div className="flex flex-col gap-3">
-        <h4 className="cq-label">What the founder told you</h4>
+        <h4 className="cq-label">{t("What the founder told you")}</h4>
         {dossier.dimensions.length === 0 ? (
-          <p className="cq-body-sm gq-t2">No facts recorded.</p>
+          <p className="cq-body-sm gq-t2">{t("No facts recorded.")}</p>
         ) : (
           dossier.dimensions.map((group) => (
             <div key={group.group} className="flex flex-col gap-1">
-              <h5 className="cq-caption gq-t2 font-medium">{group.label}</h5>
+              <h5 className="cq-caption gq-t2 font-medium">{t(group.label)}</h5>
               <ul className="gq-hair">
                 {group.facts.map((fact) => (
                   <li
@@ -196,22 +202,22 @@ export function DossierSection({
                     className="flex flex-col gap-0.5 py-2"
                   >
                     <span className="flex flex-wrap items-baseline gap-2">
-                      <b className="font-medium">{fact.label}</b>
+                      <b className="font-medium">{t(fact.label)}</b>
                       <span className="gq-prefill">
-                        {factProvenanceWords(fact)}
+                        {t(factProvenanceWords(fact))}
                       </span>
                       {fact.sourceTurnSeq === null ? null : (
                         <span className="cq-caption gq-t3">
-                          Interview turn {fact.sourceTurnSeq}
+                          {t("Interview turn")} {fact.sourceTurnSeq}
                         </span>
                       )}
                     </span>
                     <span className="cq-body-sm gq-t2">
-                      {summaryWords(fact.summary)}
+                      {t(summaryWords(fact.summary))}
                     </span>
                     {fact.derivation === undefined ? null : (
                       <span className="cq-caption gq-t3">
-                        {fact.derivation}
+                        {t(fact.derivation)}
                       </span>
                     )}
                   </li>
@@ -221,20 +227,21 @@ export function DossierSection({
           ))
         )}
         <p className="cq-caption gq-t3">
-          The founder&apos;s claims and documents. Capital Q hasn&apos;t
-          verified them.
+          {t(
+            "The founder's claims and documents. Capital Q hasn't verified them.",
+          )}
         </p>
       </div>
 
       {gaps === 0 ? null : (
         <div className="flex flex-col gap-1.5">
-          <h4 className="cq-label">Open questions</h4>
+          <h4 className="cq-label">{t("Open questions")}</h4>
           <ul className="gq-hair">
             {dossier.contradictions.map((line) => (
               <li key={`c-${line}`} className="flex items-start gap-2 py-2">
                 <FitGlyph kind="part" />
-                <span className="flex-1 text-sm">{line}</span>
-                <span className="gq-status">Answers disagree</span>
+                <span className="flex-1 text-sm">{t(line)}</span>
+                <span className="gq-status">{t("Answers disagree")}</span>
               </li>
             ))}
             {dossier.missing.map((gap) => (
@@ -243,9 +250,9 @@ export function DossierSection({
                 className="flex items-center gap-2 py-2"
               >
                 <FitGlyph kind="unk" />
-                <span className="flex-1 text-sm">{gap.label}</span>
+                <span className="flex-1 text-sm">{t(gap.label)}</span>
                 <span className="gq-status">
-                  Missing · {MISSING_WORDS[gap.reason]}
+                  {t("Missing ·")} {t(MISSING_WORDS[gap.reason])}
                 </span>
               </li>
             ))}
@@ -255,8 +262,8 @@ export function DossierSection({
                 className="flex items-center gap-2 py-2"
               >
                 <FitGlyph kind="unk" />
-                <span className="flex-1 text-sm">{gap.label}</span>
-                <span className="gq-status">Unknown to the founder</span>
+                <span className="flex-1 text-sm">{t(gap.label)}</span>
+                <span className="gq-status">{t("Unknown to the founder")}</span>
               </li>
             ))}
             {dossier.declined.map((gap) => (
@@ -265,8 +272,8 @@ export function DossierSection({
                 className="flex items-center gap-2 py-2"
               >
                 <FitGlyph kind="unk" />
-                <span className="flex-1 text-sm">{gap.label}</span>
-                <span className="gq-status">Preferred not to say</span>
+                <span className="flex-1 text-sm">{t(gap.label)}</span>
+                <span className="gq-status">{t("Preferred not to say")}</span>
               </li>
             ))}
           </ul>
@@ -274,9 +281,11 @@ export function DossierSection({
       )}
 
       <div className="flex flex-col gap-1.5">
-        <h4 className="cq-label">Documents</h4>
+        <h4 className="cq-label">{t("Documents")}</h4>
         {dossier.documents.length === 0 ? (
-          <p className="cq-body-sm gq-t2">No documents with the dossier.</p>
+          <p className="cq-body-sm gq-t2">
+            {t("No documents with the dossier.")}
+          </p>
         ) : (
           <ul className="gq-hair">
             {dossier.documents.map((document) => (
@@ -285,7 +294,7 @@ export function DossierSection({
                 className="flex min-h-11 items-center gap-3"
               >
                 <FileText {...icon} size={18} />
-                <span className="flex-1 text-sm">{document.title}</span>
+                <span className="flex-1 text-sm">{t(document.title)}</span>
               </li>
             ))}
           </ul>
@@ -294,13 +303,13 @@ export function DossierSection({
 
       {dossier.diligenceQuestions.length === 0 ? null : (
         <div className="flex flex-col gap-1.5">
-          <h4 className="cq-label">Suggested diligence questions</h4>
-          <ol className="flex list-decimal flex-col gap-1.5 pl-5">
+          <h4 className="cq-label">{t("Suggested diligence questions")}</h4>
+          <ol className="flex list-decimal flex-col gap-1.5 ps-5">
             {dossier.diligenceQuestions.map((question, index) => (
               <li key={`${question.basis}-${index}`} className="text-sm">
-                {question.question}{" "}
+                {t(question.question)}{" "}
                 <span className="cq-caption gq-t3">
-                  ({DILIGENCE_BASIS_WORDS[question.basis]})
+                  ({t(DILIGENCE_BASIS_WORDS[question.basis])})
                 </span>
               </li>
             ))}
@@ -310,7 +319,7 @@ export function DossierSection({
 
       {dossier.synthesis === null ? (
         <p className="cq-body-sm gq-t2" data-testid="gq-synthesis-placeholder">
-          Q synthesis: not yet available.
+          {t("Q synthesis: not yet available.")}
         </p>
       ) : null}
     </section>
@@ -322,25 +331,30 @@ export function TranscriptSection({
 }: {
   readonly turns: readonly ApplicationTranscriptTurnDto[];
 }) {
+  const t = useT();
+
   return (
     <section className="gq-sect">
       <details className="gq-transcript">
         <summary className="flex min-h-11 cursor-pointer items-center gap-2">
-          <h3 className="cq-title-sm">Interview transcript</h3>
+          <h3 className="cq-title-sm">{t("Interview transcript")}</h3>
           <span className="cq-caption gq-t3">
-            {turns.length} turn{turns.length === 1 ? "" : "s"}
+            {turns.length} {t("turn")}
+            {turns.length === 1 ? "" : "s"}
           </span>
           <ChevronDown {...icon} />
         </summary>
         {turns.length === 0 ? (
-          <p className="cq-body-sm gq-t2">The founder skipped the interview.</p>
+          <p className="cq-body-sm gq-t2">
+            {t("The founder skipped the interview.")}
+          </p>
         ) : (
           <ol className="flex flex-col gap-2.5 pt-2">
             {turns.map((turn) => (
               <li key={turn.seq} className="flex flex-col gap-0.5">
                 <span className="cq-caption gq-t3">
-                  <b className="font-medium">{speakerWords(turn.role)}</b> ·{" "}
-                  {receivedWords(turn.at)}
+                  <b className="font-medium">{t(speakerWords(turn.role))}</b> ·{" "}
+                  {t(receivedWords(turn.at))}
                 </span>
                 <span className="cq-body-sm whitespace-pre-line">
                   {turn.text}

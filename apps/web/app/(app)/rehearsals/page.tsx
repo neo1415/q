@@ -14,6 +14,7 @@ import { remainingOf, unitsOf } from "@/features/billing/plan-words";
 import { apiSession, qApiSession } from "@/features/q/context";
 import { RehearsalsHome } from "@/features/rehearsal/rehearsals-home";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Rehearsals" };
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function RehearsalsPage({
 }: {
   readonly searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  const t = await serverT();
   const params = await searchParams;
   const [session, billingSession] = await Promise.all([
     qApiSession(),
@@ -54,13 +56,13 @@ export default async function RehearsalsPage({
   if (partners === null) {
     return (
       <PageContainer>
-        <QSection id="rehearsals" kind="REHEARSAL" label="your rehearsals">
+        <QSection id="rehearsals" kind="REHEARSAL" label={t("your rehearsals")}>
           <EmptyState
-            title="Rehearsals couldn't load."
-            description="Try again in a moment."
+            title={t("Rehearsals couldn't load.")}
+            description={t("Try again in a moment.")}
             action={
               <Link href="/rehearsals" className={buttonClassName("secondary")}>
-                Try again
+                {t("Try again")}
               </Link>
             }
           />
@@ -71,13 +73,15 @@ export default async function RehearsalsPage({
   if (partners.role === null) {
     return (
       <PageContainer>
-        <QSection id="rehearsals" kind="REHEARSAL" label="your rehearsals">
+        <QSection id="rehearsals" kind="REHEARSAL" label={t("your rehearsals")}>
           <EmptyState
-            title="Rehearsals are for founders and investors."
-            description="Finish setting up your company or your fund, then rehearse your meetings here."
+            title={t("Rehearsals are for founders and investors.")}
+            description={t(
+              "Finish setting up your company or your fund, then rehearse your meetings here.",
+            )}
             action={
               <Link href="/home" className={buttonClassName("secondary")}>
-                Go to Q
+                {t("Go to Q")}
               </Link>
             }
           />
@@ -98,7 +102,7 @@ export default async function RehearsalsPage({
         };
   return (
     <PageContainer>
-      <QSection id="rehearsals" kind="REHEARSAL" label="your rehearsals">
+      <QSection id="rehearsals" kind="REHEARSAL" label={t("your rehearsals")}>
         <RehearsalsHome
           basePath="/rehearsals"
           partners={{ ...partners, role: partners.role }}

@@ -43,7 +43,7 @@ export function Panel({
       aria-labelledby={`${id}-title`}
       className={cx(
         "flex min-w-0 scroll-mt-4 flex-col border border-(--cq-border-subtle) bg-(--cq-surface)",
-        lead && "border-l-[3px] border-l-(--cq-accent)",
+        lead && "border-s-[3px] border-s-(--cq-accent)",
         className,
       )}
       {...rest}
@@ -59,7 +59,7 @@ export function Panel({
           >
             {title}
             {count === undefined ? null : (
-              <span className="cq-numeric ml-2 font-normal text-(--cq-text-tertiary)">
+              <span className="cq-numeric ms-2 font-normal text-(--cq-text-tertiary)">
                 {count}
               </span>
             )}

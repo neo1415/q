@@ -55,6 +55,7 @@ import { readPlan } from "./plan-words";
 import { listDoneAction } from "./work-page-actions";
 import { DoneJobDocuments } from "./workforce-documents";
 import { outOfTen } from "./workforce-view";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Work around decisions (Zino, 2026-10-08; design
@@ -224,6 +225,8 @@ export function DecisionQueue({
   /** How many rows `extra` holds: they wait on them too, so they count. */
   readonly extraCount?: number;
 }) {
+  const t = useT();
+
   const [all, setAll] = useState(false);
   // Live 2026-10-08: "Needs you 0 · Nothing waits on you" above two rows
   // saying an investor was waiting for a reply.
@@ -236,15 +239,17 @@ export function DecisionQueue({
         id="work-needs-you"
         className="flex items-baseline gap-2 cq-title-sm text-(--cq-text-primary)"
       >
-        Needs you
+        {t("Needs you")}
         <span className="cq-body font-normal cq-numeric text-(--cq-text-tertiary)">
           {count}
         </span>
       </h2>
       <p className="mt-0.5 mb-3 cq-label font-normal text-(--cq-text-tertiary)">
         {count === 0
-          ? "Nothing waits on you. When Q drafts a reply or wants your yes, it shows here first; nothing is sent until you decide."
-          : "Nothing below is sent until you decide."}
+          ? t(
+              "Nothing waits on you. When Q drafts a reply or wants your yes, it shows here first; nothing is sent until you decide.",
+            )
+          : t("Nothing below is sent until you decide.")}
       </p>
       {/* Recovery D6 / C: the decisions as one list Q can select from. */}
       <QControl id="list.work-decisions" kind="LIST" count={groups.length}>
@@ -262,7 +267,7 @@ export function DecisionQueue({
       </QControl>
       {all || groups.length <= QUEUE_PREVIEW ? null : (
         <MoreButton onClick={() => setAll(true)}>
-          Show {groups.length - QUEUE_PREVIEW} more
+          {t(`Show ${String(groups.length - QUEUE_PREVIEW)} more`)}
         </MoreButton>
       )}
       {extra}
@@ -311,6 +316,8 @@ function GroupView({
   readonly renderPlan: (approvalId: string, onDone: () => void) => ReactNode;
   readonly onDecided: (key: string) => void;
 }) {
+  const t = useT();
+
   const [threadOpen, setThreadOpen] = useState(false);
   const thread = useThread(group.relationshipId, readAhead || threadOpen);
   const name =
@@ -331,7 +338,7 @@ function GroupView({
           <p className="truncate cq-label font-normal text-(--cq-text-tertiary)">
             {group.items.length === 1
               ? "1 decision"
-              : `${String(group.items.length)} decisions`}
+              : t(`${String(group.items.length)} decisions`)}
           </p>
         </div>
         {group.relationshipId === null ? null : (
@@ -342,7 +349,7 @@ function GroupView({
             onClick={() => setThreadOpen((now) => !now)}
             className="text-(--cq-text-secondary)"
           >
-            {threadOpen ? "Hide thread" : "Thread"}
+            {threadOpen ? t("Hide thread") : t("Thread")}
           </Button>
         )}
       </div>
@@ -399,10 +406,14 @@ function Quote({ children }: { readonly children: ReactNode }) {
 }
 
 function Theirs({ text }: { readonly text: string }) {
+  const t = useT();
+
   return (
-    <p className="m-0 border-l-2 border-(--cq-border) pl-2.5 cq-body-sm text-(--cq-text-secondary)">
-      <span className="font-medium text-(--cq-text-tertiary)">They said </span>“
-      {text.length > 240 ? `${text.slice(0, 240)}…` : text}”
+    <p className="m-0 border-s-2 border-(--cq-border) ps-2.5 cq-body-sm text-(--cq-text-secondary)">
+      <span className="font-medium text-(--cq-text-tertiary)">
+        {t("They said")}{" "}
+      </span>
+      “{text.length > 240 ? t(`${text.slice(0, 240)}…`) : text}”
     </p>
   );
 }
@@ -440,6 +451,8 @@ function DecisionCard({
   readonly renderPlan: (approvalId: string, onDone: () => void) => ReactNode;
   readonly onDecided: () => void;
 }) {
+  const t = useT();
+
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -479,7 +492,7 @@ function DecisionCard({
     // screen readers so the card still announces what it decides.
     return (
       <Card>
-        <p className="sr-only">{decisionTitle(item)}</p>
+        <p className="sr-only">{t(decisionTitle(item))}</p>
         {renderPlan(item.approvalId, onDecided)}
         <Drafts drafts={item.drafts} />
       </Card>
@@ -489,7 +502,7 @@ function DecisionCard({
   return (
     <Card>
       <p className="m-0 cq-body-sm font-medium text-(--cq-text-primary)">
-        {decisionTitle(item)}
+        {t(decisionTitle(item))}
       </p>
       {theirs === null ? null : <Theirs text={theirs} />}
       {editing && relationshipId !== null ? (
@@ -506,8 +519,8 @@ function DecisionCard({
       ) : (
         <>
           <Quote>
-            <span className="sr-only">What Q will send: </span>
-            {message}
+            <span className="sr-only">{t("What Q will send:")} </span>
+            {t(message)}
           </Quote>
           <div className="flex flex-wrap items-center gap-1">
             <Button
@@ -515,7 +528,7 @@ function DecisionCard({
               disabled={pending || !canDecide}
               onClick={approve}
             >
-              Approve &amp; send
+              {t("Approve & send")}
             </Button>
             {relationshipId === null ? null : (
               <Button
@@ -523,7 +536,7 @@ function DecisionCard({
                 disabled={pending || !canDecide}
                 onClick={() => setEditing(true)}
               >
-                Edit &amp; send
+                {t("Edit & send")}
               </Button>
             )}
             <Button
@@ -532,7 +545,7 @@ function DecisionCard({
               onClick={dismiss}
               className="text-(--cq-text-secondary)"
             >
-              Dismiss
+              {t("Dismiss")}
             </Button>
             {ask === null ? null : (
               <Button
@@ -547,7 +560,7 @@ function DecisionCard({
                 }
                 className="text-(--cq-text-secondary)"
               >
-                Ask Q
+                {t("Ask Q")}
               </Button>
             )}
           </div>
@@ -573,6 +586,8 @@ function HeldCard({
   readonly relationshipId: string | null;
   readonly onDecided: () => void;
 }) {
+  const t = useT();
+
   const [mode, setMode] = useState<"READ" | "EDIT" | "CONFIRM">("READ");
   const [status, setStatus] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -624,7 +639,7 @@ function HeldCard({
     >
       <Card>
         <p className="m-0 cq-body-sm font-medium text-(--cq-text-primary)">
-          {decisionTitle(item)}
+          {t(decisionTitle(item))}
         </p>
         <p className="m-0 flex gap-1.5 cq-body-sm text-(--cq-text-secondary)">
           <span
@@ -633,7 +648,7 @@ function HeldCard({
           >
             !
           </span>
-          <span>{item.reason}</span>
+          <span>{t(item.reason)}</span>
         </p>
         {mode === "EDIT" && relationshipId !== null ? (
           <EditAndSend
@@ -648,22 +663,22 @@ function HeldCard({
         ) : mode === "CONFIRM" && relationshipId !== null ? (
           <div className="flex flex-col gap-2" data-held-confirm>
             <p className="m-0 cq-body-sm font-medium text-(--cq-text-primary)">
-              Send this exact message to {name}?
+              {t(`Send this exact message to ${name}?`)}
             </p>
             <Quote>
-              <span className="sr-only">What will be sent: </span>
+              <span className="sr-only">{t("What will be sent:")} </span>
               {item.body}
             </Quote>
             <div className="flex flex-wrap items-center gap-1">
               <Button variant="primary" disabled={pending} onClick={sendAsIs}>
-                Yes, send this
+                {t("Yes, send this")}
               </Button>
               <Button
                 variant="secondary"
                 disabled={pending}
                 onClick={() => setMode("EDIT")}
               >
-                Edit
+                {t("Edit")}
               </Button>
               <Button
                 variant="quiet"
@@ -671,11 +686,13 @@ function HeldCard({
                 onClick={() => setMode("READ")}
                 className="text-(--cq-text-secondary)"
               >
-                Cancel
+                {t("Cancel")}
               </Button>
             </div>
             <p className="m-0 cq-caption text-(--cq-text-tertiary)">
-              Nothing is sent until you say yes. It goes exactly as shown.
+              {t(
+                "Nothing is sent until you say yes. It goes exactly as shown.",
+              )}
             </p>
           </div>
         ) : (
@@ -688,7 +705,7 @@ function HeldCard({
                   disabled={pending}
                   onClick={() => setMode("CONFIRM")}
                 >
-                  Send as is
+                  {t("Send as is")}
                 </Button>
               )}
               {relationshipId === null ? null : (
@@ -697,7 +714,7 @@ function HeldCard({
                   disabled={pending}
                   onClick={() => setMode("EDIT")}
                 >
-                  Edit &amp; send
+                  {t("Edit & send")}
                 </Button>
               )}
               <Button
@@ -706,7 +723,7 @@ function HeldCard({
                 onClick={retry}
                 className="text-(--cq-text-secondary)"
               >
-                {pending ? "Q is trying again…" : "Ask Q to try again"}
+                {pending ? t("Q is trying again…") : t("Ask Q to try again")}
               </Button>
               <Button
                 variant="quiet"
@@ -717,7 +734,7 @@ function HeldCard({
                 }}
                 className="text-(--cq-text-secondary)"
               >
-                Dismiss
+                {t("Dismiss")}
               </Button>
               <Button
                 variant="quiet"
@@ -727,7 +744,7 @@ function HeldCard({
                 }
                 className="text-(--cq-text-secondary)"
               >
-                Later
+                {t("Later")}
               </Button>
             </div>
           </>
@@ -754,6 +771,8 @@ function EditAndSend({
   readonly onSent: () => void;
   readonly onCancel: () => void;
 }) {
+  const t = useT();
+
   const [text, setText] = useState(initial);
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<string | null>(null);
@@ -777,7 +796,7 @@ function EditAndSend({
   return (
     <div className="flex flex-col gap-2">
       <label className="sr-only" htmlFor={`edit-${relationshipId}`}>
-        Your message
+        {t("Your message")}
       </label>
       <textarea
         id={`edit-${relationshipId}`}
@@ -789,7 +808,7 @@ function EditAndSend({
       />
       <div className="flex flex-wrap items-center gap-1">
         <Button variant="primary" disabled={pending} onClick={send}>
-          Send as you
+          {t("Send as you")}
         </Button>
         <Button
           variant="quiet"
@@ -797,7 +816,7 @@ function EditAndSend({
           onClick={onCancel}
           className="text-(--cq-text-secondary)"
         >
-          Cancel
+          {t("Cancel")}
         </Button>
       </div>
       <Status text={status} />
@@ -807,6 +826,8 @@ function EditAndSend({
 
 /** "How Q wrote this (N drafts)": the writer and reviewer, in one place. */
 function Drafts({ drafts }: { readonly drafts: readonly WorkforceDraftDto[] }) {
+  const t = useT();
+
   const [open, setOpen] = useState(false);
   if (drafts.length === 0) return null;
   return (
@@ -827,37 +848,41 @@ function Drafts({ drafts }: { readonly drafts: readonly WorkforceDraftDto[] }) {
             open && "rotate-0",
           )}
         />
-        {draftsLabel(drafts)}
+        {t(draftsLabel(drafts))}
       </button>
       {open ? (
-        <ol className="m-0 mt-1 flex list-none flex-col gap-2.5 border-l border-(--cq-border-subtle) pl-3">
+        <ol className="m-0 mt-1 flex list-none flex-col gap-2.5 border-s border-(--cq-border-subtle) ps-3">
           {drafts.map((draft) => (
             <li key={draft.id}>
               <p className="m-0">
                 <span className="font-medium text-(--cq-text-primary)">
-                  Draft {draft.attempt}
+                  {t("Draft")} {draft.attempt}
                 </span>
                 {draft.grade === null ? null : (
                   <span className="cq-numeric text-(--cq-text-tertiary)">
                     {" "}
                     ·{" "}
                     {draft.grade.passed
-                      ? `passed, ${outOfTen(draft.grade.score)} against a bar of ${outOfTen(draft.grade.threshold)}`
-                      : `sent back, ${outOfTen(draft.grade.score)} against a bar of ${outOfTen(draft.grade.threshold)}`}
+                      ? t(
+                          `passed, ${outOfTen(draft.grade.score)} against a bar of ${outOfTen(draft.grade.threshold)}`,
+                        )
+                      : t(
+                          `sent back, ${outOfTen(draft.grade.score)} against a bar of ${outOfTen(draft.grade.threshold)}`,
+                        )}
                   </span>
                 )}
               </p>
               <p className="m-0 mt-0.5 whitespace-pre-wrap text-(--cq-text-tertiary)">
                 {draft.body.length > 280
-                  ? `${draft.body.slice(0, 280)}…`
+                  ? t(`${draft.body.slice(0, 280)}…`)
                   : draft.body}
               </p>
               {draft.grade !== null &&
               !draft.grade.passed &&
               draft.grade.feedback.trim() !== "" ? (
                 <p className="m-0 mt-1 whitespace-pre-wrap">
-                  <span className="font-medium">What to fix: </span>
-                  {draft.grade.feedback}
+                  <span className="font-medium">{t("What to fix:")} </span>
+                  {t(draft.grade.feedback)}
                 </p>
               ) : null}
             </li>
@@ -883,11 +908,13 @@ export function ThreadPanel({
   readonly jobs: readonly WorkforceJobDetailDto[];
   readonly done: readonly QWorkDoneItemDto[];
 }) {
+  const t = useT();
+
   if (thread === undefined) return <Skeleton lines={3} />;
   if (thread === null) {
     return (
       <p className="mb-3 cq-body-sm text-(--cq-text-secondary)" role="status">
-        The conversation couldn’t load. Try again in a moment.
+        {t("The conversation couldn’t load. Try again in a moment.")}
       </p>
     );
   }
@@ -906,7 +933,7 @@ export function ThreadPanel({
     >
       {lines.length === 0 ? (
         <p className="m-0 cq-body-sm text-(--cq-text-secondary)">
-          No messages yet. When either side writes, it shows here.
+          {t("No messages yet. When either side writes, it shows here.")}
         </p>
       ) : (
         lines.slice(-12).map((line) => (
@@ -918,13 +945,15 @@ export function ThreadPanel({
             )}
           >
             <p className="m-0 mb-1 cq-label font-normal text-(--cq-text-tertiary)">
-              {line.byQ === null ? line.who : "Sent by Q for you"} ·{" "}
+              {line.byQ === null ? line.who : t("Sent by Q for you")} ·{" "}
               <time dateTime={line.at} suppressHydrationWarning>
-                {new Intl.DateTimeFormat("en-GB", {
-                  weekday: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                }).format(new Date(line.at))}
+                {t(
+                  new Intl.DateTimeFormat("en-GB", {
+                    weekday: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(new Date(line.at)),
+                )}
               </time>
             </p>
             <p
@@ -938,15 +967,15 @@ export function ThreadPanel({
               {line.body}
             </p>
             {line.byQ === null ? null : (
-              <div className="mt-1.5 border-l-2 border-(--cq-accent) pl-2.5 cq-label font-normal text-(--cq-text-secondary)">
+              <div className="mt-1.5 border-s-2 border-(--cq-accent) ps-2.5 cq-label font-normal text-(--cq-text-secondary)">
                 {line.byQ.why === null ? null : (
                   <p className="m-0">
-                    <span className="font-medium">Why Q sent it: </span>
-                    {line.byQ.why}
+                    <span className="font-medium">{t("Why Q sent it:")} </span>
+                    {t(line.byQ.why)}
                   </p>
                 )}
                 {line.byQ.verdict === null ? null : (
-                  <p className="m-0">{line.byQ.verdict}</p>
+                  <p className="m-0">{t(line.byQ.verdict)}</p>
                 )}
                 <Drafts drafts={line.byQ.drafts} />
               </div>
@@ -972,6 +1001,8 @@ export function DoneForYou({
   /** The page's clock, for "this week" (render stays pure). */
   readonly now: number;
 }) {
+  const t = useT();
+
   const [items, setItems] = useState<readonly QWorkDoneItemDto[]>(
     initial?.items ?? [],
   );
@@ -1001,23 +1032,24 @@ export function DoneForYou({
         id="work-done"
         className="flex items-baseline gap-2 cq-title-sm text-(--cq-text-primary)"
       >
-        Done for you
+        {t("Done for you")}
         {initial === null ? null : (
           <span className="cq-body font-normal cq-numeric text-(--cq-text-tertiary)">
             {/* Jobs finished this week are listed here too, so they count
                 (live 2026-10-12: "0 this week" above a memo done 6h ago). */}
-            {initial.thisWeek + finished.length} this week
+            {initial.thisWeek + finished.length} {t("this week")}
           </span>
         )}
       </h2>
       {initial === null ? (
         <p className="mt-2 cq-body-sm text-(--cq-text-secondary)" role="status">
-          What Q did couldn’t load. Try again in a moment.
+          {t("What Q did couldn’t load. Try again in a moment.")}
         </p>
       ) : groups.length === 0 ? (
         <p className="mt-2 cq-body-sm text-(--cq-text-secondary)">
-          Nothing done yet. Messages Q sends and calls it books for you show
-          here, grouped by company.
+          {t(
+            "Nothing done yet. Messages Q sends and calls it books for you show here, grouped by company.",
+          )}
         </p>
       ) : (
         <ul className="mt-3 border-t border-(--cq-border-subtle)">
@@ -1038,11 +1070,13 @@ export function DoneForYou({
               data-work-job={one.job.id}
             >
               <p className="m-0 truncate cq-body-sm font-medium text-(--cq-text-primary)">
-                {one.job.goal}
+                {t(one.job.goal)}
               </p>
               <p className="m-0 cq-label font-normal text-(--cq-text-tertiary)">
-                Job done ·{" "}
-                <span suppressHydrationWarning>{ago(one.job.updatedAt)}</span>
+                {t("Job done ·")}{" "}
+                <span suppressHydrationWarning>
+                  {t(ago(one.job.updatedAt))}
+                </span>
               </p>
               {one.documents === undefined ? null : (
                 <DoneJobDocuments
@@ -1056,7 +1090,7 @@ export function DoneForYou({
       )}
       {cursor === null ? null : (
         <MoreButton onClick={more} disabled={pending}>
-          {failed ? "Couldn’t load more. Try again" : "Show more"}
+          {failed ? t("Couldn’t load more. Try again") : t("Show more")}
         </MoreButton>
       )}
     </section>
@@ -1072,6 +1106,8 @@ function DoneRow({
   readonly jobs: readonly WorkforceJobDetailDto[];
   readonly done: readonly QWorkDoneItemDto[];
 }) {
+  const t = useT();
+
   const [earlier, setEarlier] = useState(false);
   const [threadOpen, setThreadOpen] = useState(false);
   const thread = useThread(group.relationshipId, threadOpen);
@@ -1096,8 +1132,8 @@ function DoneRow({
                 : "text-(--cq-text-tertiary)",
             )}
           >
-            {latest.words} ·{" "}
-            <span suppressHydrationWarning>{ago(latest.at)}</span>
+            {t(latest.words)} ·{" "}
+            <span suppressHydrationWarning>{t(ago(latest.at))}</span>
           </p>
           {rest.length === 0 ? null : (
             <button
@@ -1106,18 +1142,20 @@ function DoneRow({
               onClick={() => setEarlier((now) => !now)}
               className="min-h-9 cq-label font-normal text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
             >
-              {earlier ? "Hide earlier" : `${String(rest.length)} earlier`}
+              {earlier
+                ? t("Hide earlier")
+                : t(`${String(rest.length)} earlier`)}
             </button>
           )}
           {earlier ? (
-            <ul className="m-0 list-none pl-0">
+            <ul className="m-0 list-none ps-0">
               {rest.map((item) => (
                 <li
                   key={item.id}
                   className="cq-label font-normal text-(--cq-text-tertiary)"
                 >
-                  {item.words} ·{" "}
-                  <span suppressHydrationWarning>{ago(item.at)}</span>
+                  {t(item.words)} ·{" "}
+                  <span suppressHydrationWarning>{t(ago(item.at))}</span>
                 </li>
               ))}
             </ul>
@@ -1129,7 +1167,7 @@ function DoneRow({
               href={group.linkPath}
               className="inline-flex min-h-11 items-center px-2 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
             >
-              Open
+              {t("Open")}
             </Link>
           )
         ) : (
@@ -1140,7 +1178,7 @@ function DoneRow({
             onClick={() => setThreadOpen((now) => !now)}
             className="text-(--cq-text-secondary)"
           >
-            {threadOpen ? "Hide thread" : "Thread"}
+            {threadOpen ? t("Hide thread") : t("Thread")}
           </Button>
         )}
       </div>
@@ -1157,7 +1195,7 @@ function DoneRow({
               href={`${group.linkPath}/messages`}
               className="inline-flex min-h-11 items-center cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
             >
-              Open the conversation
+              {t("Open the conversation")}
             </Link>
           )}
         </div>

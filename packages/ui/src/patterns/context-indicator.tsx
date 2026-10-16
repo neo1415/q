@@ -68,6 +68,8 @@ export type ContextIndicatorProps = {
    */
   readonly compact?: boolean | undefined;
   readonly className?: string | undefined;
+  /** The reader's language (multilingual Q); English when absent. */
+  readonly translate?: ((english: string) => string) | undefined;
 };
 
 export function ContextIndicator({
@@ -75,8 +77,10 @@ export function ContextIndicator({
   detail,
   compact = false,
   className,
+  translate = (english) => english,
 }: ContextIndicatorProps) {
-  const { label, Icon } = presentation[scope];
+  const { label: english, Icon } = presentation[scope];
+  const label = translate(english);
   if (compact) {
     const name = detail === undefined ? label : `${label} · ${detail}`;
     return (
@@ -95,7 +99,7 @@ export function ContextIndicator({
           size={ICON_SIZE.compact}
           strokeWidth={ICON_STROKE}
         />
-        <span aria-hidden="true">{SHORT[scope]}</span>
+        <span aria-hidden="true">{translate(SHORT[scope])}</span>
       </span>
     );
   }

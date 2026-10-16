@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Demo data names every invented company and person "… (fictional)"
@@ -140,6 +141,7 @@ function subscribe(onChange: () => void): () => void {
 }
 
 export function FictionalNames() {
+  const t = useT();
   const seen = useSyncExternalStore(subscribe, pageShowsOne, () => false);
   if (!seen) return null;
   return (
@@ -147,8 +149,9 @@ export function FictionalNames() {
       className="cq-caption px-4 pt-6 pb-4 text-center text-(--cq-text-tertiary)"
       data-fictional-note
     >
-      Companies, investors and people named here are fictional, for
-      demonstration.
+      {t(
+        "Companies, investors and people named here are fictional, for demonstration.",
+      )}
     </p>
   );
 }

@@ -30,7 +30,7 @@ export const TURN_READER_V51: PromptDefinition<
 > = {
   ...TURN_READER_V50,
   version: 51,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "A turn that states a relationship decision and asks for work of several steps is a team job; the plan offers the decision as a next action instead of recording it in place of the work.",
   effectiveFrom: "2026-10-16",

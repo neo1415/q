@@ -6,9 +6,12 @@ import { useState, useTransition } from "react";
 import { Button } from "@capital-q/ui/button";
 
 import { openGatewayAction } from "./gateway-actions";
+import { useT } from "@/features/i18n/language";
 
 /** One press opens the organisation's gateway, then the page shows it. */
 export function OpenGatewayButton() {
+  const t = useT();
+
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -28,11 +31,11 @@ export function OpenGatewayButton() {
           })
         }
       >
-        {pending ? "Opening…" : "Open my gateway"}
+        {pending ? t("Opening…") : t("Open my gateway")}
       </Button>
       {message === null ? null : (
         <span className="cq-caption text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </span>
       )}
     </div>
@@ -47,6 +50,8 @@ export function CopyButton({
   readonly text: string;
   readonly label: string;
 }) {
+  const t = useT();
+
   const [copied, setCopied] = useState(false);
   return (
     <Button
@@ -59,7 +64,7 @@ export function CopyButton({
         });
       }}
     >
-      {copied ? "Copied" : label}
+      {copied ? t("Copied") : t(label)}
     </Button>
   );
 }

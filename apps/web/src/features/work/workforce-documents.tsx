@@ -6,6 +6,7 @@ import type { QArtifactSummary } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { DialogRoot, DialogViewerContent } from "@capital-q/ui/dialog";
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { useT } from "@/features/i18n/language";
 
 const ArtifactViewer = dynamic(
   () =>
@@ -58,6 +59,8 @@ function DocumentDialog({
   readonly open: QArtifactSummary | null;
   readonly onClose: () => void;
 }) {
+  const t = useT();
+
   const { askNow } = useGlobalQ();
   return (
     <DialogRoot
@@ -67,7 +70,7 @@ function DocumentDialog({
       }}
     >
       {open === null ? null : (
-        <DialogViewerContent title={open.title} onSwipeDismiss={onClose}>
+        <DialogViewerContent title={t(open.title)} onSwipeDismiss={onClose}>
           <ArtifactViewer
             artifactId={open.artifactId}
             onClose={onClose}
@@ -94,6 +97,8 @@ export function DoneJobDocuments({
   readonly documents: readonly QArtifactSummary[];
   readonly unavailable: boolean;
 }) {
+  const t = useT();
+
   const [open, setOpen] = useState<QArtifactSummary | null>(null);
   const [more, setMore] = useState(false);
   const interactive = useHydrated();
@@ -114,13 +119,13 @@ export function DoneJobDocuments({
             size="compact"
             disabled={!interactive}
             data-workforce-document={primary.artifactId}
-            aria-label={`Open document: ${primary.title}`}
+            aria-label={t(`Open document: ${primary.title}`)}
             onClick={() => setOpen(primary)}
           >
-            Open document
+            {t("Open document")}
           </Button>
           <span className="cq-label font-normal text-(--cq-text-tertiary)">
-            {primary.title} · version {primary.currentVersion}
+            {t(primary.title)} {t("· version")} {primary.currentVersion}
           </span>
           {others.length === 0 ? null : (
             <button
@@ -130,21 +135,23 @@ export function DoneJobDocuments({
               className="min-h-11 cq-label font-normal text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
             >
               {more
-                ? "Hide other documents"
-                : `${String(others.length)} more ${others.length === 1 ? "document" : "documents"}`}
+                ? t("Hide other documents")
+                : t(
+                    `${String(others.length)} more ${others.length === 1 ? "document" : "documents"}`,
+                  )}
             </button>
           )}
         </div>
       )}
       {more && others.length > 0 ? (
-        <ul className="m-0 list-none pl-0">
+        <ul className="m-0 list-none ps-0">
           {others.map((document) => (
             <li
               key={document.artifactId}
               className="flex items-center justify-between gap-3"
             >
               <span className="min-w-0 truncate cq-label font-normal text-(--cq-text-secondary)">
-                {document.title} · version {document.currentVersion}
+                {t(document.title)} {t("· version")} {document.currentVersion}
               </span>
               <Button
                 type="button"
@@ -152,10 +159,10 @@ export function DoneJobDocuments({
                 size="compact"
                 disabled={!interactive}
                 data-workforce-document={document.artifactId}
-                aria-label={`Open document: ${document.title}`}
+                aria-label={t(`Open document: ${document.title}`)}
                 onClick={() => setOpen(document)}
               >
-                Open
+                {t("Open")}
               </Button>
             </li>
           ))}
@@ -163,7 +170,7 @@ export function DoneJobDocuments({
       ) : null}
       {missing ? (
         <p className="m-0 cq-label font-normal text-(--cq-text-tertiary)">
-          A prepared document isn’t available to open right now.
+          {t("A prepared document isn’t available to open right now.")}
         </p>
       ) : null}
       <DocumentDialog open={open} onClose={() => setOpen(null)} />
@@ -179,6 +186,8 @@ export function WorkforceDocuments({
   readonly documents: readonly QArtifactSummary[];
   readonly unavailable: boolean;
 }) {
+  const t = useT();
+
   const [open, setOpen] = useState<QArtifactSummary | null>(null);
   const interactive = useHydrated();
   const ready = readyDocuments(documents);
@@ -186,7 +195,7 @@ export function WorkforceDocuments({
   if (ready.length === 0 && !missing) return null;
   return (
     <section
-      aria-label="Prepared documents"
+      aria-label={t("Prepared documents")}
       data-workforce-documents
       className="border-t border-(--cq-border-subtle) px-4 py-3"
     >
@@ -196,9 +205,9 @@ export function WorkforceDocuments({
           className="flex items-center justify-between gap-3 py-1"
         >
           <div className="min-w-0">
-            <p className="cq-label truncate">{document.title}</p>
+            <p className="cq-label truncate">{t(document.title)}</p>
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              Version {document.currentVersion}
+              {t("Version")} {document.currentVersion}
             </p>
           </div>
           <Button
@@ -208,13 +217,13 @@ export function WorkforceDocuments({
             data-workforce-document={document.artifactId}
             onClick={() => setOpen(document)}
           >
-            Open document
+            {t("Open document")}
           </Button>
         </div>
       ))}
       {missing ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          A prepared document isn’t available to open right now.
+          {t("A prepared document isn’t available to open right now.")}
         </p>
       ) : null}
       <DocumentDialog open={open} onClose={() => setOpen(null)} />

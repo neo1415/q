@@ -7,6 +7,7 @@ import { INITIAL_AUTH_FORM_STATE } from "@/auth/form-state";
 
 import { FormNotice } from "./form-notice";
 import { SubmitButton } from "./submit-button";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Continue with Google (CQ-C5-R2A §35, §37).
@@ -20,6 +21,7 @@ import { SubmitButton } from "./submit-button";
  * Google's own guidance uses; "Google SSO" would describe something else.
  */
 export function GoogleSignIn({ next }: { readonly next: string }) {
+  const t = useT();
   const [state, action] = useActionState(
     signInWithGoogleAction,
     INITIAL_AUTH_FORM_STATE,
@@ -30,7 +32,7 @@ export function GoogleSignIn({ next }: { readonly next: string }) {
       <input type="hidden" name="next" value={next} />
       <SubmitButton variant="secondary" pendingLabel="Opening Google…">
         <GoogleMark />
-        Continue with Google
+        {t("Continue with Google")}
       </SubmitButton>
       {state.status === "error" ? (
         <FormNotice tone="danger">{state.message}</FormNotice>
@@ -75,10 +77,11 @@ function GoogleMark() {
 
 /** "or", with a rule either side. Separates the two ways in, ranks neither. */
 export function AuthDivider() {
+  const t = useT();
   return (
     <div className="flex items-center gap-3" aria-hidden="true">
       <span className="h-px flex-1 bg-(--cq-border-subtle)" />
-      <span className="cq-caption text-(--cq-text-tertiary)">or</span>
+      <span className="cq-caption text-(--cq-text-tertiary)">{t("or")}</span>
       <span className="h-px flex-1 bg-(--cq-border-subtle)" />
     </div>
   );

@@ -42,7 +42,7 @@ export function QSuggestion({
           <div className="cq-body text-(--cq-text-primary)">{children}</div>
         </div>
       </div>
-      <div className="flex gap-2 pl-9">
+      <div className="flex gap-2 ps-9">
         <Button variant="primary" size="compact" onClick={onUse}>
           {useLabel}
         </Button>

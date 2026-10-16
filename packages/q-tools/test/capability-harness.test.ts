@@ -134,6 +134,7 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     // Action parity (2026-10-02): Settings switches.
     notificationSettings: port(),
     personality: port(),
+    language: port(),
     // BILLING (ADR 0034): the plan gate.
     entitlements: port(),
   };

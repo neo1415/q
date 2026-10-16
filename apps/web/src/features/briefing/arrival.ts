@@ -1,4 +1,5 @@
 import {
+  arabicCardLine,
   arrivalGreeting,
   cardFactsForVoice,
   cardLine,
@@ -33,6 +34,7 @@ import { attentionLines, unreadWords } from "./attention";
 import { greetingSeed, warmGreeting } from "./greeting";
 import { matchesWords, type ArrivalMatches } from "./matches";
 import { openerOf, type Opener } from "./opener";
+import { arabicArrivalWords } from "./arrival-ar";
 
 /**
  * The arrival briefing as the page shows and Q says it (Zino, 2026-10-08):
@@ -118,12 +120,13 @@ export function focusSay(
   cards: readonly ArrivalCard[],
   state: SequenceState,
   lead?: string | null,
+  language: "en" | "ar" = "en",
 ): string | null {
   const focused = focusedCard(state);
   if (focused === null) return null;
   const card = cards.find((one) => one.key === focused.key);
   if (card === undefined) return null;
-  const line = cardLine(
+  const line = (language === "ar" ? arabicCardLine : cardLine)(
     decisionFactsOf(card),
     state.focus + 1,
     state.cards.length,
@@ -296,7 +299,7 @@ export type ArrivalWords = {
 };
 
 /** "Zino Aviation is waiting for a reply" -> "Zino Aviation". */
-const WAITING_NAME =
+export const WAITING_NAME =
   /^(.+?) (?:is waiting for (?:a|your) reply|sent you a message|wrote back|replied)\b/u;
 
 /**
@@ -338,6 +341,26 @@ export function waitingWords(
 
 /** What Q says on arrival, from the data alone. */
 export function arrivalWords(
+  data: ArrivalData,
+  now: Date,
+  browserZone: string | null,
+  /** Multilingual Q: "ar" opens in Arabic; anything else in English. */
+  language: "en" | "ar" = "en",
+): ArrivalWords {
+  const english = englishArrivalWords(data, now, browserZone);
+  if (language !== "ar") return english;
+  const zone = zoneFor(data, browserZone);
+  return arabicArrivalWords(english, data, {
+    firstName: data.firstName,
+    now,
+    timeZone: zone,
+    hoursAway: data.hoursAway,
+    seed: greetingSeed(`${data.firstName ?? ""}:${now.toDateString()}`),
+    atLeast: (data.attention?.unread ?? []).length > 0,
+  });
+}
+
+function englishArrivalWords(
   data: ArrivalData,
   now: Date,
   browserZone: string | null,

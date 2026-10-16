@@ -97,7 +97,7 @@ export default async function QPitchPage() {
             >
               <span className="cq-body text-(--cq-text-primary)">
                 {chapter.title}
-                <span className="ml-2 cq-body-sm text-(--cq-text-secondary)">
+                <span className="ms-2 cq-body-sm text-(--cq-text-secondary)">
                   {chapter.standing === "CERTIFIED"
                     ? "Certified"
                     : "Internal only"}

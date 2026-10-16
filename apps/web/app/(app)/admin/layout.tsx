@@ -8,6 +8,7 @@ import {
 import { ConsoleNav, StepUpProvider } from "@/features/admin/console-ui";
 import { ROLE_WORDS } from "@/features/admin/words";
 import { adminContext } from "@/features/admin/admin-context";
+import { serverT } from "@/features/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,18 +22,22 @@ export default async function AdminLayout({
 }: {
   readonly children: ReactNode;
 }) {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null) notFound();
   const { me } = context;
   return (
     <PageContainer>
       <PageHeader
-        title="Admin"
-        description={`${ROLE_WORDS[me.role] ?? me.role}${
-          me.stepUpExpiresAt === null
-            ? ""
-            : ` · confirmed until ${new Date(me.stepUpExpiresAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC`
-        }`}
+        title={t("Admin")}
+        description={t(
+          `${ROLE_WORDS[me.role] ?? me.role}${
+            me.stepUpExpiresAt === null
+              ? ""
+              : ` · confirmed until ${new Date(me.stepUpExpiresAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC`
+          }`,
+        )}
       />
       <StepUpProvider>
         <div className="flex flex-col gap-8">

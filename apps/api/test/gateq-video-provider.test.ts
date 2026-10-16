@@ -9,6 +9,7 @@ import { createTavusClient, createTavusKeyPool } from "@capital-q/integrations";
 import {
   bridgeBaseUrl,
   createTavusGateqVideoProvider,
+  gateqVideoDisclosure,
 } from "../src/gateq/video-provider.js";
 
 /** A provider that records what it was asked; no live Tavus call. */
@@ -93,5 +94,60 @@ describe("GateQ video provider bridge URL", () => {
 
   it("refuses a bridge route Tavus could not reach", () => {
     expect(() => bridgeBaseUrl("https://api.example", "/v1/x")).toThrow();
+  });
+});
+
+describe("GateQ video in Arabic (lane ml)", () => {
+  const room = (language?: "ar" | null) => ({
+    sessionId: "s1",
+    maxSeconds: 180,
+    testMode: false,
+    greeting: "Hello",
+    bridge: { path: GATEQ_VIDEO_BRIDGE_PATH, bearer: "b".repeat(43) },
+    joinGraceSeconds: 30,
+    events: { path: GATEQ_VIDEO_EVENTS_PATH, token: "e".repeat(43) },
+    ...(language === undefined ? {} : { language }),
+  });
+  const provider = (pool: ReturnType<typeof fakeTavus>["pool"]) =>
+    createTavusGateqVideoProvider({
+      pool,
+      publicBaseUrl: "https://api.example/",
+      faceId: "face_1",
+      keyCount: 1,
+    });
+
+  it("runs an Arabic applicant's room Arabic first, with the disclosure in Arabic", async () => {
+    const { bodies, pool } = fakeTavus();
+    await provider(pool).createRoom(room("ar"));
+    const pal = bodies.find((b) => b.url.endsWith("/v2/pals"))?.body as {
+      verbal_disclosure: string;
+      visual_disclosure: string;
+    };
+    expect(pal.verbal_disclosure).toBe(gateqVideoDisclosure("ar").spoken);
+    expect(pal.verbal_disclosure).toContain("الذكاء الاصطناعي");
+    expect(pal.visual_disclosure).toContain("Q");
+    const conversation = bodies.find((b) => b.url.endsWith("/v2/conversations"))
+      ?.body as { properties: { languages?: string[] } };
+    expect(conversation.properties.languages).toEqual(["ar", "en"]);
+  });
+
+  it("leaves an English room exactly as it was", async () => {
+    const { bodies, pool } = fakeTavus();
+    await provider(pool).createRoom(room());
+    const pal = bodies.find((b) => b.url.endsWith("/v2/pals"))?.body as {
+      verbal_disclosure: string;
+    };
+    expect(pal.verbal_disclosure).toMatch(/^Just so you know, I'm Q/u);
+    const conversation = bodies.find((b) => b.url.endsWith("/v2/conversations"))
+      ?.body as { properties: Record<string, unknown> };
+    expect(conversation.properties["languages"]).toBeUndefined();
+  });
+
+  it("both disclosures say the same two things", () => {
+    for (const language of ["ar", null] as const) {
+      const { spoken, shown } = gateqVideoDisclosure(language);
+      expect(spoken.length).toBeGreaterThan(20);
+      expect(shown).toContain("Q");
+    }
   });
 });

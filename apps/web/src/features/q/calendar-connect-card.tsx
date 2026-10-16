@@ -17,6 +17,7 @@ import {
   connectGoogleCalendar,
   readGmailConnection,
 } from "../integrations/integration-actions";
+import { useT } from "@/features/i18n/language";
 
 const NOT_CONNECTED: Readonly<Record<ConnectOutcome, string>> = {
   connected: "Google Calendar isn't connected yet. Try again.",
@@ -55,6 +56,7 @@ export function CalendarConnectCard({
 }: {
   readonly intent: QShowCalendarConnectIntent;
 }) {
+  const t = useT();
   const pathname = usePathname();
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
@@ -158,7 +160,7 @@ export function CalendarConnectCard({
   if (connected) {
     return (
       <section
-        aria-label="Google Calendar"
+        aria-label={t("Google Calendar")}
         className="flex flex-col gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
         data-q-calendar-connect="connected"
       >
@@ -166,11 +168,12 @@ export function CalendarConnectCard({
           role="status"
           className="cq-body font-medium text-(--cq-text-primary)"
         >
-          Google Calendar connected
+          {t("Google Calendar connected")}
         </p>
         <p className="cq-caption text-(--cq-text-secondary)">
-          I can check when you&rsquo;re free now. Ask me again and I&rsquo;ll
-          pick times from your calendar.
+          {t(
+            "I can check when you’re free now. Ask me again and I’ll pick times from your calendar.",
+          )}
         </p>
       </section>
     );
@@ -179,12 +182,12 @@ export function CalendarConnectCard({
     <div className="flex flex-col gap-3" data-q-calendar-connect>
       {intent.suggested.length === 0 ? null : (
         <section
-          aria-label="Suggested times"
+          aria-label={t("Suggested times")}
           className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
         >
           <div className="flex flex-col gap-1">
             <span className="cq-label text-(--cq-text-tertiary)">
-              Suggested without your calendar
+              {t("Suggested without your calendar")}
             </span>
             {intent.counterpartName === undefined ? null : (
               <p className="cq-body font-medium text-(--cq-text-primary)">
@@ -202,7 +205,7 @@ export function CalendarConnectCard({
                   {slot.local}
                 </span>
                 <span className="cq-caption text-(--cq-text-tertiary)">
-                  Not checked
+                  {t("Not checked")}
                 </span>
               </li>
             ))}
@@ -210,7 +213,7 @@ export function CalendarConnectCard({
         </section>
       )}
       <section
-        aria-label="Connect Google Calendar"
+        aria-label={t("Connect Google Calendar")}
         className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
       >
         <div className="flex flex-col gap-1">
@@ -218,8 +221,9 @@ export function CalendarConnectCard({
             {expired ? "Reconnect Google Calendar" : "Connect Google Calendar"}
           </p>
           <p className="cq-caption text-(--cq-text-secondary)">
-            So I can check when you&rsquo;re free and add the invite. Calendar
-            events only; disconnect any time in Settings.
+            {t(
+              "So I can check when you’re free and add the invite. Calendar events only; disconnect any time in Settings.",
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -238,7 +242,7 @@ export function CalendarConnectCard({
         </div>
         {waiting ? (
           <p role="status" className="cq-caption text-(--cq-text-secondary)">
-            Finish in the Google window; I&rsquo;ll pick up here.
+            {t("Finish in the Google window; I’ll pick up here.")}
           </p>
         ) : null}
         {message === null ? null : (

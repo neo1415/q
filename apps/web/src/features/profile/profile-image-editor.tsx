@@ -35,6 +35,7 @@ import {
   removeProfileImageAction,
   requestProfileImageUploadAction,
 } from "./profile-image-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Change a profile photo or cover, the LinkedIn way: the camera button
@@ -70,6 +71,7 @@ type Phase =
   | { readonly step: "SAVING"; readonly message: string };
 
 export function ProfileImageEditor(props: ProfileImageEditorProps) {
+  const t = useT();
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<Phase>({ step: "IDLE" });
@@ -214,7 +216,7 @@ export function ProfileImageEditor(props: ProfileImageEditorProps) {
       >
         <DialogContent
           title={capitalise(props.label)}
-          description="Upload a new one, or remove it."
+          description={t("Upload a new one, or remove it.")}
           actions={
             <>
               <Button
@@ -222,7 +224,7 @@ export function ProfileImageEditor(props: ProfileImageEditorProps) {
                 onClick={() => void remove()}
                 data-image-remove
               >
-                Remove
+                {t("Remove")}
               </Button>
               <Button
                 variant="primary"
@@ -231,7 +233,7 @@ export function ProfileImageEditor(props: ProfileImageEditorProps) {
                   fileInput.current?.click();
                 }}
               >
-                Upload new
+                {t("Upload new")}
               </Button>
             </>
           }
@@ -274,6 +276,7 @@ function Toast({
   readonly message: string;
   readonly onDismiss: () => void;
 }) {
+  const t = useT();
   useEffect(() => {
     if (tone === "error") return;
     const timer = setTimeout(onDismiss, 4000);
@@ -282,7 +285,7 @@ function Toast({
   return (
     <div
       role={tone === "error" ? "alert" : undefined}
-      className="fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+16px)] z-(--cq-z-toast) mx-auto flex max-w-md items-center justify-between gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2 pr-2 pl-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
+      className="fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+16px)] z-(--cq-z-toast) mx-auto flex max-w-md items-center justify-between gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2 pe-2 ps-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
       data-image-toast={tone}
       data-q-notice={tone === "error" ? "TOAST:FAILED" : "TOAST:DONE"}
     >
@@ -294,7 +297,7 @@ function Toast({
       <button
         type="button"
         onClick={onDismiss}
-        aria-label="Dismiss"
+        aria-label={t("Dismiss")}
         className="inline-flex size-11 shrink-0 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
       >
         <X size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} aria-hidden />
@@ -322,6 +325,7 @@ function CropDialog({
   readonly onCancel: () => void;
   readonly onCropped: (blob: Blob) => void;
 }) {
+  const t = useT();
   const id = useId();
   const [frame, setFrame] = useState<Size | null>(null);
   const [crop, setCrop] = useState<CropState | null>(null);
@@ -453,14 +457,14 @@ function CropDialog({
   return (
     <DialogContent
       title={`Position your ${label}`}
-      description="Drag to reposition. Use the slider to zoom."
+      description={t("Drag to reposition. Use the slider to zoom.")}
       // The dialog sets max-w-md itself and `cx` does not merge classes, so
       // the wider cover frame has to take precedence explicitly.
       className={kind === "COVER" ? "max-w-2xl!" : undefined}
       actions={
         <>
           <Button variant="quiet" onClick={onCancel}>
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button variant="primary" onClick={apply} disabled={crop === null}>
             Save {label}
@@ -490,7 +494,7 @@ function CropDialog({
               src={src}
               alt=""
               draggable={false}
-              className="pointer-events-none absolute top-0 left-0 max-w-none origin-top-left"
+              className="pointer-events-none absolute top-0 start-0 max-w-none origin-top-left"
               style={{
                 width: image.width * scale,
                 height: image.height * scale,
@@ -507,7 +511,9 @@ function CropDialog({
           ) : null}
         </div>
         <label htmlFor={`${id}-zoom`} className="flex items-center gap-3">
-          <span className="cq-label text-(--cq-text-secondary)">Zoom</span>
+          <span className="cq-label text-(--cq-text-secondary)">
+            {t("Zoom")}
+          </span>
           <input
             id={`${id}-zoom`}
             type="range"

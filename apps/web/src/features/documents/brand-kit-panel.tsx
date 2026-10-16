@@ -19,6 +19,7 @@ import {
   setBrandKitAction,
   suggestBrandKitAction,
 } from "./actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The brand a person's documents are drawn in (DOCS spec §3 F4; BIZ-005).
@@ -52,6 +53,8 @@ function Swatch({
   readonly label: string;
   readonly hex: string;
 }) {
+  const t = useT();
+
   return (
     <li className="flex items-center gap-2" data-brand-swatch={label}>
       <span
@@ -60,40 +63,42 @@ function Swatch({
         // Content about their company, drawn only as a sample.
         style={{ background: hex }}
       />
-      <span className="cq-body-sm text-(--cq-text-primary)">{label}</span>
+      <span className="cq-body-sm text-(--cq-text-primary)">{t(label)}</span>
       <span className="cq-caption font-mono text-(--cq-text-tertiary)">
-        {hex.toLowerCase()}
+        {t(hex.toLowerCase())}
       </span>
     </li>
   );
 }
 
 function KitSummary({ kit }: { readonly kit: QBrandKit }) {
+  const t = useT();
+
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-6">
       {kit.hasLogo ? (
         // eslint-disable-next-line @next/next/no-img-element -- a private, session-scoped image route; next/image would cache it publicly.
         <img
           src={`/api/q-brand-kit/logo?version=${String(kit.version)}`}
-          alt="Your logo"
+          alt={t("Your logo")}
           className="h-12 w-auto max-w-40 object-contain"
         />
       ) : null}
       <div className="flex flex-col gap-2">
         <ul className="flex flex-wrap gap-x-5 gap-y-2">
-          <Swatch label="Primary" hex={kit.palette.primary} />
+          <Swatch label={t("Primary")} hex={kit.palette.primary} />
           {kit.palette.secondary === undefined ? null : (
-            <Swatch label="Secondary" hex={kit.palette.secondary} />
+            <Swatch label={t("Secondary")} hex={kit.palette.secondary} />
           )}
           {kit.palette.background === undefined ? null : (
-            <Swatch label="Page" hex={kit.palette.background} />
+            <Swatch label={t("Page")} hex={kit.palette.background} />
           )}
           {kit.palette.ink === undefined ? null : (
-            <Swatch label="Text" hex={kit.palette.ink} />
+            <Swatch label={t("Text")} hex={kit.palette.ink} />
           )}
         </ul>
         <p className="cq-caption text-(--cq-text-secondary)">
-          {pairingLabel(kit.pairing)}
+          {t(pairingLabel(kit.pairing))}
         </p>
       </div>
     </div>
@@ -116,6 +121,8 @@ function BrandForm({
   readonly onSaved: (kit: QBrandKit) => void;
   readonly onCancel: () => void;
 }) {
+  const t = useT();
+
   const id = useId();
   const [primary, setPrimary] = useState(from?.palette.primary ?? "#1f4f7a");
   const [secondary, setSecondary] = useState(from?.palette.secondary ?? "");
@@ -174,13 +181,13 @@ function BrandForm({
         className="cq-label text-(--cq-text-secondary)"
         htmlFor={`${id}-${label}`}
       >
-        {label}
+        {t(label)}
         {optional ? " (optional)" : ""}
       </label>
       <span className="flex items-center gap-2">
         <input
           type="color"
-          aria-label={`${label} colour picker`}
+          aria-label={t(`${label} colour picker`)}
           value={HEX.test(value) ? value : "#ffffff"}
           onChange={(event) => set(event.target.value)}
           className="h-11 w-11 shrink-0 cursor-pointer border border-(--cq-border-subtle) bg-transparent"
@@ -213,7 +220,9 @@ function BrandForm({
         {colourField("Secondary", secondary, setSecondary, true)}
       </div>
       <fieldset className="flex flex-col gap-2">
-        <legend className="cq-label text-(--cq-text-secondary)">Fonts</legend>
+        <legend className="cq-label text-(--cq-text-secondary)">
+          {t("Fonts")}
+        </legend>
         {Q_FONT_PAIRINGS.map((code) => (
           <label
             key={code}
@@ -226,7 +235,7 @@ function BrandForm({
               checked={pairing === code}
               onChange={() => setPairing(code)}
             />
-            {PAIRING_LABELS[code]}
+            {t(PAIRING_LABELS[code])}
           </label>
         ))}
       </fieldset>
@@ -235,7 +244,7 @@ function BrandForm({
           className="cq-label text-(--cq-text-secondary)"
           htmlFor={`${id}-logo`}
         >
-          Logo (PNG or JPEG, up to 512 KB)
+          {t("Logo (PNG or JPEG, up to 512 KB)")}
         </label>
         <input
           id={`${id}-logo`}
@@ -251,12 +260,12 @@ function BrandForm({
               checked={removeLogo}
               onChange={(event) => setRemoveLogo(event.target.checked)}
             />
-            Remove the current logo
+            {t("Remove the current logo")}
           </label>
         ) : null}
       </div>
       {message === null ? null : (
-        <InlineNotice tone="warning">{message}</InlineNotice>
+        <InlineNotice tone="warning">{t(message)}</InlineNotice>
       )}
       <div className="flex flex-wrap gap-2">
         <button
@@ -265,14 +274,14 @@ function BrandForm({
           disabled={busy}
           data-brand-save
         >
-          {busy ? "Saving…" : "Save brand"}
+          {busy ? t("Saving…") : t("Save brand")}
         </button>
         <button
           type="button"
           className={buttonClassName("quiet", "regular")}
           onClick={onCancel}
         >
-          Cancel
+          {t("Cancel")}
         </button>
       </div>
     </form>
@@ -294,6 +303,8 @@ export function BrandKitPanel({
   /** Null when the brand could not be read. */
   readonly initial: QBrandKitState | null;
 }) {
+  const t = useT();
+
   const [state, setState] = useState<QBrandKitState | null>(initial);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState<"suggest" | "answer" | null>(null);
@@ -339,7 +350,7 @@ export function BrandKitPanel({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="brand-kit" className="cq-title-sm text-(--cq-text-primary)">
-          Brand
+          {t("Brand")}
         </h2>
         {editing ? null : (
           <div className="flex flex-wrap gap-2">
@@ -350,7 +361,9 @@ export function BrandKitPanel({
               disabled={busy !== null}
               data-brand-suggest
             >
-              {busy === "suggest" ? "Reading your website…" : "Read my website"}
+              {busy === "suggest"
+                ? t("Reading your website…")
+                : t("Read my website")}
             </button>
             <button
               type="button"
@@ -358,7 +371,7 @@ export function BrandKitPanel({
               onClick={() => setEditing(true)}
               data-brand-edit
             >
-              {effective === undefined ? "Set my brand" : "Edit"}
+              {effective === undefined ? t("Set my brand") : t("Edit")}
             </button>
           </div>
         )}
@@ -369,7 +382,7 @@ export function BrandKitPanel({
           className="cq-body text-(--cq-text-secondary)"
           data-state="unavailable"
         >
-          Your brand couldn&apos;t be read just now. Reload in a moment.
+          {t("Your brand couldn't be read just now. Reload in a moment.")}
         </p>
       ) : editing ? (
         <BrandForm
@@ -389,8 +402,12 @@ export function BrandKitPanel({
             >
               <p className="cq-body-sm text-(--cq-text-secondary)">
                 {suggestion.source === "WEBSITE"
-                  ? `Q found these on ${host ?? "your website"}. Nothing changes until you use them.`
-                  : "Q suggests this look. Nothing changes until you use it."}
+                  ? t(
+                      `Q found these on ${host ?? "your website"}. Nothing changes until you use them.`,
+                    )
+                  : t(
+                      "Q suggests this look. Nothing changes until you use it.",
+                    )}
               </p>
               <KitSummary kit={suggestion} />
               <div className="flex flex-wrap gap-2">
@@ -401,7 +418,7 @@ export function BrandKitPanel({
                   onClick={() => void answer(suggestion.version, "CONFIRM")}
                   data-brand-confirm
                 >
-                  Use this brand
+                  {t("Use this brand")}
                 </button>
                 <button
                   type="button"
@@ -410,7 +427,7 @@ export function BrandKitPanel({
                   onClick={() => void answer(suggestion.version, "DECLINE")}
                   data-brand-decline
                 >
-                  Not now
+                  {t("Not now")}
                 </button>
               </div>
             </div>
@@ -421,24 +438,25 @@ export function BrandKitPanel({
                 className="cq-body text-(--cq-text-secondary)"
                 data-state="empty"
               >
-                No brand yet. Q can read your website for your colours and logo,
-                or set them yourself. Your documents use Capital Q&apos;s calm
-                default until then.
+                {t(
+                  "No brand yet. Q can read your website for your colours and logo, or set them yourself. Your documents use Capital Q's calm default until then.",
+                )}
               </p>
             ) : null
           ) : (
             <div data-brand-effective={effective.version}>
               <KitSummary kit={effective} />
               <p className="cq-caption mt-2 text-(--cq-text-tertiary)">
-                New decks use this brand. Ask Q to apply it to one you already
-                have.
+                {t(
+                  "New decks use this brand. Ask Q to apply it to one you already have.",
+                )}
               </p>
             </div>
           )}
         </>
       )}
       {message === null ? null : (
-        <InlineNotice tone="warning">{message}</InlineNotice>
+        <InlineNotice tone="warning">{t(message)}</InlineNotice>
       )}
     </section>
   );

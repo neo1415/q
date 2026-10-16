@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { hideQMessageAction } from "./actions";
+import { useT } from "@/features/i18n/language";
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -20,6 +21,7 @@ export function HideFromQ({
   readonly conversationId: string | null | undefined;
   readonly messageId: string;
 }) {
+  const t = useT();
   const [state, setState] = useState<"IDLE" | "PENDING" | "HIDDEN" | "FAILED">(
     "IDLE",
   );
@@ -36,7 +38,7 @@ export function HideFromQ({
         className="cq-caption self-end text-(--cq-text-secondary)"
         role="status"
       >
-        Hidden from Q. It stays in your history.
+        {t("Hidden from Q. It stays in your history.")}
       </span>
     );
   }

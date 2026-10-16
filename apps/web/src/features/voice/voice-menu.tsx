@@ -9,6 +9,7 @@ import {
   MenuRoot,
   MenuTrigger,
 } from "@capital-q/ui/menu";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q's voice, behind one small icon (R24): chosen rarely, so it is not two
@@ -33,6 +34,7 @@ export function VoiceMenu({
   readonly onChoose: (voice: QVoiceChoice) => void;
   readonly className?: string | undefined;
 }) {
+  const t = useT();
   return (
     <MenuRoot>
       <MenuTrigger>
@@ -51,7 +53,7 @@ export function VoiceMenu({
       </MenuTrigger>
       <MenuContent align="end" className="min-w-44">
         <MenuRadioGroup
-          label="Q's voice"
+          label={t("Q's voice")}
           value={voice}
           onValueChange={(next) => {
             if (isVoice(next)) onChoose(next);

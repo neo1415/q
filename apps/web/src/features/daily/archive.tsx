@@ -4,6 +4,7 @@ import type { QDailyEditionSummary } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { formatDay } from "@/components/date-format";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /** Earlier editions of The Q Daily, newest first, a page at a time. */
 export function DailyArchive({
@@ -13,6 +14,8 @@ export function DailyArchive({
   readonly items: readonly QDailyEditionSummary[];
   readonly nextCursor: string | null;
 }) {
+  const t = serverTNow();
+
   if (items.length === 0) return null;
   return (
     <section
@@ -21,7 +24,7 @@ export function DailyArchive({
       data-daily-archive
     >
       <h2 id="daily-archive" className="cq-title-sm text-(--cq-text-primary)">
-        Earlier editions
+        {t("Earlier editions")}
       </h2>
       <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
         {items.map((item) => (
@@ -31,10 +34,10 @@ export function DailyArchive({
               className="flex min-h-11 flex-col gap-0.5 py-3 hover:bg-(--cq-surface-subtle) sm:flex-row sm:items-baseline sm:gap-4"
             >
               <span className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-44">
-                {formatDay(item.editionDate)} · No. {item.number}
+                {t(formatDay(item.editionDate))} {t("· No.")} {item.number}
               </span>
               <span className="cq-body-sm text-(--cq-text-primary)">
-                {item.headline ?? "A quiet edition"}
+                {item.headline ?? t("A quiet edition")}
               </span>
             </Link>
           </li>
@@ -45,7 +48,7 @@ export function DailyArchive({
           href={`/daily?before=${nextCursor}`}
           className={buttonClassName("secondary", "compact", "self-start")}
         >
-          Older editions
+          {t("Older editions")}
         </Link>
       )}
     </section>

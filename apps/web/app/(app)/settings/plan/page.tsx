@@ -26,6 +26,7 @@ import {
 } from "@/features/billing/plan-words";
 import { apiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Your plan · Settings" };
 
@@ -41,6 +42,7 @@ export default async function PlanPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await serverT();
   const checkout = (await searchParams)["checkout"];
   const session = await apiSession();
   const [plan, catalogue] =
@@ -52,27 +54,28 @@ export default async function PlanPage({
         ]);
   return (
     <PageContainer width="reading">
-      <QSection id="plan" kind="BILLING" label="your plan">
-        <PageHeader title="Plan" />
+      <QSection id="plan" kind="BILLING" label={t("your plan")}>
+        <PageHeader title={t("Plan")} />
         {plan === null ? (
           <ErrorState
-            title="Your plan couldn't load"
-            description="Nothing changed and nothing was charged."
+            title={t("Your plan couldn't load")}
+            description={t("Nothing changed and nothing was charged.")}
             action={
               <Link
                 href="/settings/plan"
                 className={buttonClassName("secondary", "compact")}
               >
-                Try again
+                {t("Try again")}
               </Link>
             }
           />
         ) : (
           <div className="flex flex-col gap-10">
             {checkout === "done" ? (
-              <InlineNotice tone="positive" title="Thank you">
-                Your payment went through. Your plan changes as soon as the
-                payment provider confirms it, usually within a minute.
+              <InlineNotice tone="positive" title={t("Thank you")}>
+                {t(
+                  "Your payment went through. Your plan changes as soon as the payment provider confirms it, usually within a minute.",
+                )}
               </InlineNotice>
             ) : null}
             <CurrentPlan plan={plan} />

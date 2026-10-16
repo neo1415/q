@@ -11,8 +11,12 @@ import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
 import { auditFiltersFrom } from "@/features/admin/audit-filters";
 import { ROLE_WORDS, when, words } from "@/features/admin/words";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Audit · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Audit · Admin") };
+}
 
 const ACTOR_WORDS: Readonly<Record<string, string>> = {
   human: "Person",
@@ -29,6 +33,8 @@ export default async function AdminAuditPage({
 }: {
   readonly searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("audit.read")) notFound();
   const params = await searchParams;
@@ -49,8 +55,10 @@ export default async function AdminAuditPage({
   return (
     <PageSection
       id="audit"
-      title="Audit"
-      description="Who acted, under whose authority, on what. Q always acts under a person's authority; admin actions show the role held."
+      title={t("Audit")}
+      description={t(
+        "Who acted, under whose authority, on what. Q always acts under a person's authority; admin actions show the role held.",
+      )}
     >
       <div className="flex flex-col gap-4">
         <form
@@ -60,21 +68,21 @@ export default async function AdminAuditPage({
         >
           <label className="flex flex-col gap-1">
             <span className="cq-caption text-(--cq-text-secondary)">
-              Source
+              {t("Source")}
             </span>
             <select
               name="source"
               defaultValue={params["source"] ?? ""}
               className={control}
             >
-              <option value="">All</option>
-              <option value="TENANT">People and Q</option>
-              <option value="PLATFORM">Admin console</option>
+              <option value="">{t("All")}</option>
+              <option value="TENANT">{t("People and Q")}</option>
+              <option value="PLATFORM">{t("Admin console")}</option>
             </select>
           </label>
           <label className="flex flex-col gap-1">
             <span className="cq-caption text-(--cq-text-secondary)">
-              Action starts with
+              {t("Action starts with")}
             </span>
             <input
               name="action"
@@ -85,7 +93,7 @@ export default async function AdminAuditPage({
           </label>
           <label className="flex flex-col gap-1">
             <span className="cq-caption text-(--cq-text-secondary)">
-              Resource id
+              {t("Resource id")}
             </span>
             <input
               name="resourceId"
@@ -95,21 +103,23 @@ export default async function AdminAuditPage({
           </label>
           <label className="flex flex-col gap-1">
             <span className="cq-caption text-(--cq-text-secondary)">
-              Outcome
+              {t("Outcome")}
             </span>
             <select
               name="outcome"
               defaultValue={params["outcome"] ?? ""}
               className={control}
             >
-              <option value="">Any</option>
-              <option value="SUCCEEDED">Succeeded</option>
-              <option value="FAILED">Failed</option>
-              <option value="DENIED">Denied</option>
+              <option value="">{t("Any")}</option>
+              <option value="SUCCEEDED">{t("Succeeded")}</option>
+              <option value="FAILED">{t("Failed")}</option>
+              <option value="DENIED">{t("Denied")}</option>
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="cq-caption text-(--cq-text-secondary)">From</span>
+            <span className="cq-caption text-(--cq-text-secondary)">
+              {t("From")}
+            </span>
             <input
               type="date"
               name="from"
@@ -119,7 +129,7 @@ export default async function AdminAuditPage({
           </label>
           <label className="flex flex-col gap-1">
             <span className="cq-caption text-(--cq-text-secondary)">
-              Before
+              {t("Before")}
             </span>
             <input
               type="date"
@@ -130,27 +140,27 @@ export default async function AdminAuditPage({
           </label>
           <div className="flex items-end gap-2">
             <button type="submit" className={buttonClassName("secondary")}>
-              Filter
+              {t("Filter")}
             </button>
             <a
               href={`/admin/audit/audit.csv?${query.toString()}`}
               className={buttonClassName("quiet")}
               download
             >
-              Download CSV
+              {t("Download CSV")}
             </a>
           </div>
         </form>
         {page === null ? (
           <ErrorState
-            title="The audit log couldn't load"
-            description="Check the filters and try again."
+            title={t("The audit log couldn't load")}
+            description={t("Check the filters and try again.")}
           />
         ) : page.rows.length === 0 ? (
           <EmptyState
             compact
-            title="No entries"
-            description="Nothing matches these filters."
+            title={t("No entries")}
+            description={t("Nothing matches these filters.")}
           />
         ) : (
           <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
@@ -160,23 +170,24 @@ export default async function AdminAuditPage({
                 className="flex flex-col gap-0.5 py-3"
               >
                 <span className="cq-body-sm text-(--cq-text-primary)">
-                  {words(row.actionType)} · {words(row.outcome)}
+                  {t(words(row.actionType))} · {t(words(row.outcome))}
                   {row.breakGlass ? " · Break-glass" : ""}
                 </span>
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  {ACTOR_WORDS[row.actorType] ?? words(row.actorType)}
-                  {row.actorName === null ? "" : ` ${row.actorName}`}
+                  {t(ACTOR_WORDS[row.actorType] ?? words(row.actorType))}
+                  {row.actorName === null ? "" : t(` ${row.actorName}`)}
                   {row.actorRole === null
                     ? ""
-                    : ` (${ROLE_WORDS[row.actorRole] ?? row.actorRole})`}
+                    : t(` (${ROLE_WORDS[row.actorRole] ?? row.actorRole})`)}
                   {row.authorityName !== null && row.actorType === "q"
-                    ? ` for ${row.authorityName}`
+                    ? t(` for ${row.authorityName}`)
                     : ""}{" "}
-                  · {words(row.resourceType)} {row.resourceId} · {when(row.at)}
+                  · {t(words(row.resourceType))} {row.resourceId} ·{" "}
+                  {t(when(row.at))}
                 </span>
                 {row.reason === null ? null : (
                   <span className="cq-caption text-(--cq-text-primary)">
-                    &ldquo;{row.reason}&rdquo;
+                    &ldquo;{t(row.reason)}&rdquo;
                   </span>
                 )}
               </li>
@@ -188,7 +199,7 @@ export default async function AdminAuditPage({
             href={`/admin/audit?${new URLSearchParams([...query.entries(), ["cursor", next]]).toString()}`}
             className={`${buttonClassName("secondary")} self-start`}
           >
-            Older entries
+            {t("Older entries")}
           </Link>
         )}
       </div>

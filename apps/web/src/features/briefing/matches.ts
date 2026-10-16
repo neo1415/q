@@ -194,10 +194,21 @@ export function matchesWords(matches: ArrivalMatches | null): string | null {
     matches.total === 1
       ? `${matches.label === "SINCE_LAST_VISIT" ? "A new company" : "One company in your feed"} fits your mandate: ${matches.items[0]?.name ?? ""}.`
       : `${count} ${fresh}companies in your feed fit your mandate: ${list(matches.items.map((item) => item.name))}${matches.total > matches.items.length ? ", and more" : ""}.`;
-  // The best fit, only when it is a real fit (D10, 2026-10-12): ordered
-  // as Q and Discover order (fit-order.v1): the canonical score out of 10
-  // first, then the band, then the slate's own order. A tie at the top is
-  // not a "best", so nothing is claimed.
+  const best = bestFit(matches);
+  const strongest =
+    best === null
+      ? null
+      : `${best.name} fits best. ${best.take.split(". ")[0]?.replace(/\.$/u, "") ?? ""}.`;
+  return [head, strongest].filter((part) => part !== null).join(" ");
+}
+
+/**
+ * The best fit, only when it is a real fit (D10, 2026-10-12): ordered as Q
+ * and Discover order (fit-order.v1): the canonical score out of 10 first,
+ * then the band, then the slate's own order. A tie at the top is not a
+ * "best", so nothing is claimed (null). Shared by every language.
+ */
+export function bestFit(matches: ArrivalMatches): ArrivalMatch | null {
   const ordered = [...matches.items].sort(
     (a, b) =>
       (b.score ?? -1) - (a.score ?? -1) ||
@@ -210,14 +221,12 @@ export function matchesWords(matches: ArrivalMatches | null): string | null {
     next !== undefined &&
     best.band === next.band &&
     (best.score ?? null) === (next.score ?? null);
-  const strongest =
-    best !== undefined &&
+  return best !== undefined &&
     matches.items.length > 1 &&
     !tiedAtTop &&
     (best.band === "STRONG_FIT" || best.band === "GOOD_FIT")
-      ? `${best.name} fits best. ${best.take.split(". ")[0]?.replace(/\.$/u, "") ?? ""}.`
-      : null;
-  return [head, strongest].filter((part) => part !== null).join(" ");
+    ? best
+    : null;
 }
 
 const SEEN_KEY = "cq.arrival.seen-matches";

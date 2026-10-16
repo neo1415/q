@@ -22,6 +22,7 @@ import {
 } from "./outcome-actions";
 import type { RelationshipSide } from "./relationship-words";
 import type { CallToRecord } from "./call-to-record";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Where a match goes after a meeting (2026-10-02). The investor's side
@@ -94,16 +95,18 @@ function HowDidItGo({
   /** Names the call: answering also marks it held (no bot needed). */
   readonly meetingId?: string | undefined;
 }) {
+  const t = useT();
+
   return (
     <div className="flex flex-col gap-2">
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        How did the call go? Record what was agreed.
+        {t("How did the call go? Record what was agreed.")}
       </p>
       {MEETING_OUTCOMES.map((option) => (
         <OutcomeButton
           key={option.outcome}
-          label={option.label}
-          busyLabel="Recording…"
+          label={t(option.label)}
+          busyLabel={t("Recording…")}
           run={() =>
             meetingOutcomeAction(relationshipId, {
               outcome: option.outcome,
@@ -127,6 +130,8 @@ function SideOutcome({
   readonly side: RelationshipSide;
   readonly counterpart: string;
 }) {
+  const t = useT();
+
   if (side === "COMPANY") {
     return state === "PASSED" ? (
       <SharedPassReason relationshipId={relationshipId} />
@@ -136,13 +141,14 @@ function SideOutcome({
     return (
       <div className="flex flex-col gap-2">
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          You decided not to proceed for now. {counterpart} only comes back to
-          your Discover with something new: a new pitch, a new raise, or a
-          change to your mandate.
+          {t("You decided not to proceed for now.")} {counterpart}{" "}
+          {t(
+            "only comes back to your Discover with something new: a new pitch, a new raise, or a change to your mandate.",
+          )}
         </p>
         <OutcomeButton
-          label="Reconsider"
-          busyLabel="Reopening…"
+          label={t("Reconsider")}
+          busyLabel={t("Reopening…")}
           primary
           run={() => resumeAction(relationshipId)}
         />
@@ -154,15 +160,15 @@ function SideOutcome({
     <div className="flex flex-col items-stretch gap-2">
       {state === "PAUSED" ? (
         <OutcomeButton
-          label="Resume"
-          busyLabel="Resuming…"
+          label={t("Resume")}
+          busyLabel={t("Resuming…")}
           primary
           run={() => resumeAction(relationshipId)}
         />
       ) : (
         <OutcomeButton
-          label="Pause for now"
-          busyLabel="Pausing…"
+          label={t("Pause for now")}
+          busyLabel={t("Pausing…")}
           run={() => pauseAction(relationshipId)}
         />
       )}
@@ -185,6 +191,8 @@ function OutcomeButton({
     { readonly ok: true } | { readonly ok: false; readonly message: string }
   >;
 }) {
+  const t = useT();
+
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -204,11 +212,11 @@ function OutcomeButton({
           });
         }}
       >
-        {busy ? busyLabel : label}
+        {busy ? t(busyLabel) : t(label)}
       </Button>
       {error === null ? null : (
         <p role="alert" className="cq-body-sm">
-          {error}
+          {t(error)}
         </p>
       )}
     </>
@@ -222,6 +230,8 @@ function PassDialog({
   readonly relationshipId: string;
   readonly counterpart: string;
 }) {
+  const t = useT();
+
   const router = useRouter();
   const noteId = useId();
   const [open, setOpen] = useState(false);
@@ -257,12 +267,14 @@ function PassDialog({
         className="min-h-11"
         onClick={() => setOpen(true)}
       >
-        Not proceeding for now
+        {t("Not proceeding for now")}
       </Button>
       {open ? (
         <DialogContent
-          title={`Not proceed with ${counterpart} for now?`}
-          description={`${counterpart} is told you've decided not to proceed for now. A reason is optional and stays private to your organisation unless you share it.`}
+          title={t(`Not proceed with ${counterpart} for now?`)}
+          description={t(
+            `${counterpart} is told you've decided not to proceed for now. A reason is optional and stays private to your organisation unless you share it.`,
+          )}
           actions={
             <>
               <Button
@@ -306,7 +318,7 @@ function PassDialog({
         >
           <fieldset className="flex flex-col gap-1">
             <legend className="cq-body-sm mb-1 text-(--cq-text-secondary)">
-              Reason (optional)
+              {t("Reason (optional)")}
             </legend>
             <div className="flex flex-wrap gap-2">
               {reasons.map((option) => (
@@ -322,7 +334,7 @@ function PassDialog({
                     onChange={() => setReason(option.code)}
                     className="size-4 accent-(--cq-accent)"
                   />
-                  <span className="cq-body">{option.label}</span>
+                  <span className="cq-body">{t(option.label)}</span>
                 </label>
               ))}
             </div>
@@ -332,7 +344,7 @@ function PassDialog({
               htmlFor={noteId}
               className="cq-body-sm block text-(--cq-text-secondary)"
             >
-              A note (private to your organisation unless you share it)
+              {t("A note (private to your organisation unless you share it)")}
             </label>
             <Button
               variant="quiet"
@@ -351,7 +363,7 @@ function PassDialog({
                 setShare(true);
               }}
             >
-              Draft a respectful note
+              {t("Draft a respectful note")}
             </Button>
           </div>
           <textarea
@@ -370,11 +382,13 @@ function PassDialog({
               onChange={(event) => setShare(event.target.checked)}
               className="size-4 accent-(--cq-accent)"
             />
-            <span className="cq-body">Share this reason with the founder</span>
+            <span className="cq-body">
+              {t("Share this reason with the founder")}
+            </span>
           </label>
           {error === null ? null : (
             <p role="alert" className="mt-2">
-              {error}
+              {t(error)}
             </p>
           )}
         </DialogContent>
@@ -389,6 +403,8 @@ function SharedPassReason({
 }: {
   readonly relationshipId: string;
 }) {
+  const t = useT();
+
   const [pass, setPass] = useState<RelationshipPassResponseDto["pass"]>(null);
   useEffect(() => {
     void readPassAction(relationshipId).then((result) => {
@@ -399,9 +415,9 @@ function SharedPassReason({
   return (
     <p className="cq-body-sm text-(--cq-text-secondary)">
       {pass.reasonLabel === null
-        ? "Their note"
-        : `Their reason: ${pass.reasonLabel}`}
-      {pass.note === null ? "." : ` — "${pass.note}"`}
+        ? t("Their note")
+        : t(`Their reason: ${pass.reasonLabel}`)}
+      {pass.note === null ? "." : t(` — "${pass.note}"`)}
     </p>
   );
 }

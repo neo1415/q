@@ -59,6 +59,7 @@ import type { OwnReadPorts } from "@capital-q/app-actions";
 import type { AppApprovalPort } from "./tools/app-actions.js";
 import type {
   NotificationSettingsPort,
+  QLanguagePort,
   QPersonalityPort,
 } from "./tools/own-settings.js";
 
@@ -568,6 +569,8 @@ export type QToolPorts = {
   readonly notificationSettings?: NotificationSettingsPort | undefined;
   /** Action parity 2026-10-02: Settings' choice of Q's personality. */
   readonly personality?: QPersonalityPort | undefined;
+  /** Multilingual Q: Settings' Language, by asking in any language. */
+  readonly language?: QLanguagePort | undefined;
   /** R33: their own documents. */
   readonly documents?: OwnDocumentsPort | undefined;
   /** Revising one of their own documents into a new version. */

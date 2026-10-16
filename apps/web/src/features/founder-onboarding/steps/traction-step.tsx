@@ -7,6 +7,7 @@ import { Input } from "@capital-q/ui/input";
 
 import type { MetricQuestion, StepResponse } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 type MetricAnswer = { readonly value: string } | { readonly unknown: true };
 
@@ -100,6 +101,7 @@ function MetricField({
   readonly busy: boolean;
   readonly onChange: (answer: MetricAnswer | undefined) => void;
 }) {
+  const t = useT();
   const unknown = answer !== undefined && "unknown" in answer;
   const unknownToggle = metric.optional ? (
     <label className="flex min-h-11 items-center gap-2 cq-body-sm text-(--cq-text-secondary)">
@@ -112,7 +114,7 @@ function MetricField({
         }
         className="size-4 accent-(--cq-accent)"
       />
-      Not sure / not tracked
+      {t("Not sure / not tracked")}
     </label>
   ) : null;
 

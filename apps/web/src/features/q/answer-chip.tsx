@@ -13,6 +13,7 @@ import { QAperture } from "@/features/q-aperture";
 import { answerChipFor, type AnswerChipContent } from "./answer-canvas-logic";
 import type { QTurn } from "./conversation";
 import { useQSessionOptional } from "./q-session";
+import { useT } from "@/features/i18n/language";
 
 const Q_PAGE = "/home";
 
@@ -96,11 +97,12 @@ export function AnswerChipView({
   readonly home: string;
   readonly onDismiss: () => void;
 }) {
+  const t = useT();
   const board = `${home}${home.includes("?") ? "&" : "?"}board=1`;
   return (
     <aside
       className="cq-answer-chip"
-      aria-label="Q answer ready"
+      aria-label={t("Q answer ready")}
       data-answer-chip
     >
       <span className="mark">
@@ -116,22 +118,26 @@ export function AnswerChipView({
         </div>
       </div>
       <span className="acts">
-        <Link href={board} className="cq-ac-btn" aria-label="Open in the Board">
+        <Link
+          href={board}
+          className="cq-ac-btn"
+          aria-label={t("Open in the Board")}
+        >
           <PanelRight
             aria-hidden="true"
             size={ICON_SIZE.compact}
             strokeWidth={ICON_STROKE}
           />
-          Board
+          {t("Board")}
         </Link>
         <Link href={home} className="open inline-flex items-center">
-          Open in Q
+          {t("Open in Q")}
         </Link>
       </span>
       <button
         type="button"
         className="cq-ac-x chip-x"
-        aria-label="Dismiss"
+        aria-label={t("Dismiss")}
         onClick={onDismiss}
       >
         <X

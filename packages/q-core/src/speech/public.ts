@@ -22,6 +22,23 @@ export {
   type PartOfDay,
 } from "./arrival.js";
 export {
+  ARABIC_CARDS_CLOSE,
+  ARABIC_QUIET_PREFIX,
+  arabicArrivalGreeting,
+  arabicCardLine,
+  arabicCount,
+  arabicJobsDoneWords,
+  arabicList,
+  arabicLowdownOf,
+  arabicMatchesWords,
+  arabicQuestionsWords,
+  arabicSummaryOfCards,
+  arabicUnreadWords,
+  arabicWaitingWords,
+  arabicQuietDayNewsWords,
+  type ArabicDailyStory,
+} from "./arrival-ar.js";
+export {
   applyCardEdit,
   bodyDigest,
   focusedCard,

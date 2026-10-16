@@ -45,6 +45,8 @@ export type InvestorWorld = {
   readonly skippedSteps: () => readonly string[];
   /** Every submission attempt, accepted or not, in order. */
   readonly attempts: () => readonly string[];
+  /** Each batch submission, by the steps it carried. */
+  readonly batches: () => readonly (readonly string[])[];
   /**
    * Q's recommendations as the onboarding service keeps them (P0-2): a
    * durable store the world owns, so a second interviewer instance (a
@@ -137,6 +139,8 @@ export function investorSession(options: WorldOptions): InvestorWorld {
   /** Notes kept with the current response, by step. */
   const notes = new Map<string, string>();
   const tried: string[] = [];
+  /** Each batch submission, by the steps it carried. */
+  const batches: string[][] = [];
   let version = 1;
   let currentStepKey = options.currentStepKey;
   type Kept = {
@@ -431,11 +435,10 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       return Promise.resolve(Response.json(view()));
     }
 
-    if (method === "POST" && url.endsWith("/responses")) {
-      const body = JSON.parse(readBody(init)) as {
-        stepKey: string;
-        response: { value: OnboardingResponseValue; note?: string };
-      };
+    const submitOne = (body: {
+      stepKey: string;
+      response: { value: OnboardingResponseValue; note?: string };
+    }): Promise<Response> => {
       tried.push(body.stepKey);
       const needs = options.refuseUntil?.[body.stepKey];
       if (needs !== undefined && !held.has(needs)) {
@@ -489,6 +492,69 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       );
       currentStepKey = next?.stepKey ?? currentStepKey;
       return Promise.resolve(Response.json(view()));
+    };
+    if (method === "POST" && url.endsWith("/responses/batch")) {
+      // One transaction in the service: each answer as a single submission
+      // would be, refused ones reported, the rest committed together; a
+      // refused one retried once another has landed.
+      const body = JSON.parse(readBody(init)) as {
+        responses: {
+          stepKey: string;
+          response: { value: OnboardingResponseValue; note?: string };
+        }[];
+      };
+      batches.push(body.responses.map((r) => r.stepKey));
+      return (async () => {
+        const results = new Map<
+          number,
+          { stepKey: string; outcome: string; refusal?: unknown }
+        >();
+        let open = body.responses.map((_, index) => index);
+        for (let pass = 0; open.length > 0; pass += 1) {
+          const refusedNow: number[] = [];
+          for (const index of open) {
+            const item = body.responses[index];
+            if (item === undefined) continue;
+            const response = await submitOne(item);
+            if (response.ok) {
+              results.set(index, {
+                stepKey: item.stepKey,
+                outcome: "COMMITTED",
+              });
+            } else {
+              const problem = (await response.json()) as {
+                detail?: string;
+                errors?: unknown[];
+              };
+              results.set(index, {
+                stepKey: item.stepKey,
+                outcome: "REFUSED",
+                refusal: {
+                  detail: problem.detail ?? null,
+                  errors: problem.errors ?? [],
+                },
+              });
+              refusedNow.push(index);
+            }
+          }
+          if (refusedNow.length === open.length || pass > body.responses.length)
+            break;
+          open = refusedNow;
+        }
+        return Response.json({
+          view: view(),
+          results: body.responses.map((_, index) => results.get(index)),
+        });
+      })();
+    }
+
+    if (method === "POST" && url.endsWith("/responses")) {
+      return submitOne(
+        JSON.parse(readBody(init)) as {
+          stepKey: string;
+          response: { value: OnboardingResponseValue; note?: string };
+        },
+      );
     }
 
     return Promise.resolve(Response.json(view()));
@@ -505,6 +571,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     },
     skippedSteps: () => [...setAside],
     attempts: () => [...tried],
+    batches: () => batches.map((b) => [...b]),
     recommendations: {
       recommend: (input) => {
         for (const earlier of kept) {

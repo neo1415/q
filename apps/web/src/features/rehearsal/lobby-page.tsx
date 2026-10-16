@@ -10,6 +10,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { resolveOwnContext } from "@/features/q/context";
 import { RehearsalLobby } from "@/features/rehearsal/rehearsal-lobby";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 /**
  * A rehearsal's lobby (REHEARSE): a founder rehearses with an investor, an
@@ -28,6 +29,7 @@ export async function RehearsalLobbyPage({
   readonly meeting: string | undefined;
   readonly requestedVideo?: boolean;
 }) {
+  const t = await serverT();
   const context = await resolveOwnContext();
   // A researched external person is rehearsed by a founder, who pitches.
   const needs = kind === "COMPANY" ? "INVESTOR" : "FOUNDER";
@@ -36,9 +38,14 @@ export async function RehearsalLobbyPage({
   if (context.kind !== needs || !id.success) {
     return (
       <PageContainer>
-        <QSection id="rehearsal" kind="REHEARSAL" total={0} label="a rehearsal">
+        <QSection
+          id="rehearsal"
+          kind="REHEARSAL"
+          total={0}
+          label={t("a rehearsal")}
+        >
           <EmptyState
-            title="This rehearsal isn't available."
+            title={t("This rehearsal isn't available.")}
             description={
               needs === "FOUNDER"
                 ? "A founder rehearses a meeting with an investor they can see or are connected to."
@@ -46,7 +53,7 @@ export async function RehearsalLobbyPage({
             }
             action={
               <Link href="/rehearsals" className={buttonClassName("secondary")}>
-                Rehearsals
+                {t("Rehearsals")}
               </Link>
             }
           />
@@ -65,7 +72,7 @@ export async function RehearsalLobbyPage({
             : []
         }
         total={1}
-        label="a rehearsal lobby"
+        label={t("a rehearsal lobby")}
       >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
           <Link
@@ -73,7 +80,7 @@ export async function RehearsalLobbyPage({
             className="cq-body-sm inline-flex min-h-11 items-center gap-1 text-(--cq-text-secondary)"
           >
             <ChevronLeft size={ICON_SIZE.compact} aria-hidden="true" />
-            Rehearsals
+            {t("Rehearsals")}
           </Link>
           <RehearsalLobby
             requestedVideo={requestedVideo}

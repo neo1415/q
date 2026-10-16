@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { z } from "zod";
+
 import {
   appendOnboardingInterviewTurns,
   listOnboardingInterviewTurns,
@@ -56,6 +58,7 @@ import {
   createQToolExecutor,
   createQToolRegistry,
   HOME_Q_CAPABILITY_GROUPS,
+  OnboardingRecordResultSchema,
   type QCapabilityGroup,
 } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
@@ -80,7 +83,12 @@ import {
   type RecommendationStore,
 } from "./onboarding-port.js";
 import type { HeldWritesStore } from "./held-writes.js";
+import { codeReading } from "./code-reading.js";
 import { createReplySentenceStream } from "./reply-stream.js";
+import {
+  quickAcknowledgement,
+  writtenInLatinScript,
+} from "./quick-acknowledgement.js";
 import {
   firstNameOf,
   onboardingFlowFor,
@@ -105,6 +113,13 @@ import { textStatedIn } from "./value-support.js";
  */
 
 const MAX_ROUNDS = 4;
+/** A record_answers result as the round saw it (the tool's own JSON body). */
+const RecordedResultsSchema = z
+  .object({
+    ok: z.literal(true),
+    data: z.object({ results: z.array(OnboardingRecordResultSchema) }),
+  })
+  .transform((body) => ({ results: body.data.results }));
 const MAX_CALLS = 8;
 
 /**
@@ -300,6 +315,19 @@ export type InterviewAgentDependencies = {
     ((actor: ActorContext, strikes: number) => Promise<void>) | undefined;
   /** Milliseconds now; injectable so a test can run out the clock. */
   readonly now?: (() => number) | undefined;
+  /**
+   * Whether code writes the reply after a round that only saved answers,
+   * all committed, with nothing else for Q to judge (owner 2026-10-16:
+   * typed-turn latency). Production composes it on; absent, the model
+   * always writes the reply, as before.
+   */
+  readonly replyByCodeAfterCleanSave?: boolean | undefined;
+  /**
+   * Whether code reads a turn whose whole reply is exactly one choice (or
+   * a bare figure) of the step just asked, instead of the delegation
+   * reader. Production composes it on; absent, the reader reads every turn.
+   */
+  readonly readingByCodeWhereExact?: boolean | undefined;
   /** The whole turn's deadline; tests shorten it. */
   readonly turnDeadlineMs?: number | undefined;
   /**
@@ -842,28 +870,43 @@ export function createInterviewAgent(
     const reader = dependencies.delegation;
     if (!opening && reader !== undefined) {
       const pending = await port.pendingRecommendations().catch(() => []);
-      delegationRead = reader.read({
-        utterance,
-        lastQ: lastQTurn ?? "",
-        askedStep: lastAsked.get(input.onboardingSessionId) ?? null,
-        steps: journeySteps.map((step) => ({
-          stepKey: step.stepKey,
-          question: SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt,
-          about: step.configuration.supportingText ?? "",
-          required: step.required,
-        })),
-        pending: pending.map((item) => ({
-          stepKey: item.stepKey,
-          recommended: item.value,
-        })),
-        attribution: {
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          qRunId: runId,
-          correlationId,
-        },
-        signal: input.signal,
-      });
+      const askedKey = lastAsked.get(input.onboardingSessionId) ?? null;
+      // Their whole reply is exactly a choice (or a bare figure) of the step
+      // just asked: code reads that, with no model call (owner 2026-10-16).
+      const decided =
+        dependencies.readingByCodeWhereExact === true
+          ? codeReading({
+              utterance,
+              asked: journeySteps.find((step) => step.stepKey === askedKey),
+              pendingCount: pending.length,
+            })
+          : null;
+      delegationRead =
+        decided !== null
+          ? Promise.resolve(decided)
+          : reader.read({
+              utterance,
+              lastQ: lastQTurn ?? "",
+              askedStep: lastAsked.get(input.onboardingSessionId) ?? null,
+              steps: journeySteps.map((step) => ({
+                stepKey: step.stepKey,
+                question:
+                  SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt,
+                about: step.configuration.supportingText ?? "",
+                required: step.required,
+              })),
+              pending: pending.map((item) => ({
+                stepKey: item.stepKey,
+                recommended: item.value,
+              })),
+              attribution: {
+                tenantId: actor.tenantId,
+                userId: actor.userId,
+                qRunId: runId,
+                correlationId,
+              },
+              signal: input.signal,
+            });
     }
     const memory = dependencies.memory;
     const loop =
@@ -1378,6 +1421,80 @@ export function createInterviewAgent(
         "approved findings recorded by code",
       );
     };
+    /**
+     * The reply after a round that only recorded answers, all COMMITTED,
+     * when nothing else is for Q to judge (owner 2026-10-16): what was
+     * saved, then the next question from coverage. Null hands the reply to
+     * the model as before: a refusal or held save, a finding or check to
+     * put to them, a reading that asks more (a pause, a look-up, a
+     * delegation, an approval, a decline, finishing), the essentials done,
+     * or words not in English (the reply's language is the model's).
+     */
+    const codeWrittenReply =
+      async (): Promise<InterviewAgentV16Result | null> => {
+        if (dependencies.replyByCodeAfterCleanSave !== true) return null;
+        if (opening || !writtenInLatinScript(utterance)) return null;
+        if (
+          actions.length === 0 ||
+          actions.some((action) => action.tool !== "record_answers")
+        ) {
+          return null;
+        }
+        if (
+          researchNote !== null ||
+          heldNote !== undefined ||
+          unsaidShown.size > 0
+        ) {
+          return null;
+        }
+        const settled = reading ?? (await readingDone);
+        const { authority } = settled;
+        if (
+          settled.pausing ||
+          settled.lookup !== null ||
+          settled.pronounce !== null ||
+          authority.handed.size > 0 ||
+          authority.approved.size > 0 ||
+          authority.declined.size > 0 ||
+          authority.finishing
+        ) {
+          return null;
+        }
+        const raised = raisedChecks.get(input.onboardingSessionId);
+        if (state.checks.some((check) => raised?.has(check.checkId) !== true)) {
+          return null;
+        }
+        if (
+          state.steps.some(
+            (step) =>
+              step.offered !== undefined ||
+              step.pendingRecommendation !== undefined ||
+              step.savePending === true,
+          )
+        ) {
+          return null;
+        }
+        const results = actions.flatMap((action) => {
+          const parsed = RecordedResultsSchema.safeParse(action.result);
+          return parsed.success ? parsed.data.results : [];
+        });
+        const flow = flowFor(state);
+        if (flow.next === null || flow.next.confirming) return null;
+        const profile = coverageProfileFor(input.journeyType);
+        const reply = quickAcknowledgement({
+          results,
+          labelOf: (stepKey) => profile.fields[stepKey]?.label,
+          next: flow.next,
+          // One person turn and one of Q's per exchange.
+          turnIndex: Math.floor(thread.length / 2),
+        });
+        if (reply === null) return null;
+        const parsed = InterviewAgentV16ResultSchema.safeParse({
+          reply,
+          asking: flow.next.stepKey,
+        });
+        return parsed.success ? parsed.data : null;
+      };
     try {
       while (
         result === undefined &&
@@ -1450,6 +1567,15 @@ export function createInterviewAgent(
         }
         await prefillFromSignup();
         state = await port.state();
+        // Everything they said is saved and their words ask nothing else:
+        // the reply is decided, so code writes it (no second model round).
+        const written = rounds === 1 ? await codeWrittenReply() : null;
+        if (written !== null) {
+          stream?.push(written.reply);
+          result = written;
+          logger.info({}, "interview reply written by code after a clean save");
+          break;
+        }
       }
       if (result === undefined && remaining() > MIN_REPLY_MS) {
         // The reply, written after every result so far, with no tools left.

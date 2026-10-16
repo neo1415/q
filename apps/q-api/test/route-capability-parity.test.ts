@@ -705,6 +705,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/standing.ts PUT Q_STANDING_PERSONALITY_PATH": cap(
     "tool.set_q_personality",
   ),
+  "q-api/http/standing.ts PUT Q_STANDING_LANGUAGE_PATH": cap(
+    "tool.set_q_language",
+  ),
   // RECOVERY B1: the same reader as Q's what_needs_me.
   "q-api/http/q-attention.ts GET Q_ATTENTION_PATH": cap("tool.what_needs_me"),
   "q-api/http/q-arrival-snapshot.ts GET Q_ARRIVAL_SNAPSHOT_PATH":
@@ -1160,6 +1163,18 @@ const LEGACY_MUTATION_ROUTES_MAX = 77;
  * Named here rather than lifting the legacy ceiling; pending the lead's
  * decision on declaring q-api artifact actions in the registry.
  */
+/**
+ * Multilingual Q (lane ml, 2026-10-16): the person's language for Q, kept
+ * on their q_runtime standing beside the personality. That context lives in
+ * q-api, where the registry's generated routes (apps/api) cannot reach it;
+ * Q and Settings already share one capability (set_q_language). Named here
+ * rather than lifting the legacy ceiling; pending the lead's decision, as
+ * the Q room drop below.
+ */
+const Q_STANDING_SETTINGS: ReadonlySet<string> = new Set([
+  "q-api/http/standing.ts PUT Q_STANDING_LANGUAGE_PATH",
+]);
+
 const Q_ROOM_DOCUMENT_DROPS: ReadonlySet<string> = new Set([
   "q-api/http/q-artifacts.ts POST `${artifactPath}${Q_ARTIFACT_PLACEHOLDERS_SUFFIX}`",
 ]);
@@ -1349,6 +1364,7 @@ describe("every route and page is something Q can do, or exempt with a reason (R
         !Q_TRANSPORT_NOT_ACTIONS.has(key) &&
         !GATEQ_GUEST_NOT_ACTIONS.has(key) &&
         !Q_ROOM_DOCUMENT_DROPS.has(key) &&
+        !Q_STANDING_SETTINGS.has(key) &&
         !HELD_RETRY.has(key) &&
         // ADR 0040: the operations console stays exempt (never Q's to act
         // on), so its writes are not legacy waiting to migrate.

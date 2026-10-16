@@ -84,6 +84,7 @@ const EVERY_PORT: QToolPorts = {
   // Action parity (2026-10-02): Settings switches.
   notificationSettings: STUB,
   personality: STUB,
+  language: STUB,
   // BILLING (ADR 0034)
   entitlements: STUB,
 };

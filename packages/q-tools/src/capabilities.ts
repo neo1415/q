@@ -1298,6 +1298,12 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     { acts: true },
   ),
   tool(
+    "set_q_language",
+    "SETTINGS",
+    "Sets the language Q and their screens use (Arabic, English or automatic), at once and reversibly, as Settings does; asked in any language.",
+    { acts: true },
+  ),
+  tool(
     "set_q_personality",
     "SETTINGS",
     "Sets the personality Q speaks with for them (auto, warm, witty, sharp or calm), as Settings does.",

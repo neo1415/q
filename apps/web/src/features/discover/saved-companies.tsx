@@ -21,6 +21,7 @@ import {
   sideBySideHref,
   toggleSelection,
 } from "./saved-compare";
+import { useT } from "@/features/i18n/language";
 
 export type SavedCompanyRow = {
   readonly companyId: string;
@@ -41,6 +42,7 @@ export function SavedCompanies({
 }: {
   readonly companies: readonly SavedCompanyRow[];
 }) {
+  const t = useT();
   const { askNow } = useGlobalQ();
   const [selected, setSelected] = useState<readonly string[]>([]);
   const names = companies
@@ -72,7 +74,7 @@ export function SavedCompanies({
               </Link>
             ) : (
               <Button variant="primary" disabled>
-                Compare side by side
+                {t("Compare side by side")}
               </Button>
             )}
             <Button
@@ -80,7 +82,7 @@ export function SavedCompanies({
               disabled={!canCompare(selected.length)}
               onClick={() => askNow(compareQuestion(names))}
             >
-              Compare with Q
+              {t("Compare with Q")}
             </Button>
           </span>
         </div>

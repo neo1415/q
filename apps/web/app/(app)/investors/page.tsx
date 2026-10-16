@@ -26,6 +26,7 @@ import {
   qApiSession,
   resolveOwnContext,
 } from "@/features/q/context";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Investors" };
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ export const dynamic = "force-dynamic";
  * which; every list is the API's, read under their own session.
  */
 export default async function InvestorsPage() {
+  const t = await serverT();
   const context = await resolveOwnContext();
   const session = await apiSession();
 
@@ -65,7 +67,7 @@ export default async function InvestorsPage() {
     return (
       <PageContainer>
         <PageHeader
-          title="Company requests"
+          title={t("Company requests")}
           description={`Companies that asked to connect with ${context.label ?? "you"}. Accepting connects you; it isn’t an investment.`}
         >
           {inbox === null || inbox.items.length === 0 ? null : (
@@ -75,17 +77,19 @@ export default async function InvestorsPage() {
               data-top-three
             >
               <QViewMark />
-              Q, give me the top three
+              {t("Q, give me the top three")}
             </Link>
           )}
         </PageHeader>
         {inbox === null ? (
           <EmptyState
-            title="Requests couldn't load."
-            description="Nothing is wrong with your setup. Try again in a moment."
+            title={t("Requests couldn't load.")}
+            description={t(
+              "Nothing is wrong with your setup. Try again in a moment.",
+            )}
             action={
               <Link href="/investors" className={buttonClassName("secondary")}>
-                Try again
+                {t("Try again")}
               </Link>
             }
           />
@@ -102,7 +106,7 @@ export default async function InvestorsPage() {
             href="/company/visibility"
             className="text-(--cq-text-primary) underline underline-offset-4"
           >
-            Visibility
+            {t("Visibility")}
           </Link>
           .
         </p>
@@ -113,7 +117,7 @@ export default async function InvestorsPage() {
   if (context.kind !== "FOUNDER" || session === null) {
     return (
       <PageContainer>
-        <PageHeader title="Investors" />
+        <PageHeader title={t("Investors")} />
         <EmptyState
           title={
             context.kind === "NONE" && context.unavailable === true
@@ -127,7 +131,7 @@ export default async function InvestorsPage() {
           }
           action={
             <Link href="/home" className={buttonClassName("secondary")}>
-              Go to Q
+              {t("Go to Q")}
             </Link>
           }
         />
@@ -143,11 +147,11 @@ export default async function InvestorsPage() {
     <PageContainer>
       <GoToDiscover />
       <EmptyState
-        title="Investors are on Discover."
-        description="Your investor list lives on Discover's Investors tab."
+        title={t("Investors are on Discover.")}
+        description={t("Your investor list lives on Discover's Investors tab.")}
         action={
           <Link href="/discover" className={buttonClassName("secondary")}>
-            Open Discover
+            {t("Open Discover")}
           </Link>
         }
       />

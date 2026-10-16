@@ -17,6 +17,7 @@ import {
   MenuTrigger,
 } from "@capital-q/ui/menu";
 import { InlineNotice } from "@capital-q/ui/states";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Downloading what Q composed (BIZ-001).
@@ -168,6 +169,7 @@ export function ArtifactDownloads({
    */
   readonly layer?: "page" | "modal" | undefined;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState<QArtifactExportFormat | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -234,7 +236,7 @@ export function ArtifactDownloads({
             // in the accessible name ("Download PDF"); at the start of the
             // visible line it collapses away.
             <span>
-              <span className="sr-only">Download</span> {LABELS[only]}
+              <span className="sr-only">{t("Download")}</span> {LABELS[only]}
             </span>
           )}
         </a>
@@ -276,7 +278,7 @@ export function ArtifactDownloads({
       {failure === null ? null : (
         <InlineNotice
           tone="warning"
-          title="That file didn't download"
+          title={t("That file didn't download")}
           className="basis-full"
         >
           <span data-q-artifact-download-failure>{failure}</span>

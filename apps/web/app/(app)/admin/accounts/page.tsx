@@ -9,14 +9,20 @@ import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
 import { SearchForm } from "@/features/admin/search-form";
 import { when } from "@/features/admin/words";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Accounts · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Accounts · Admin") };
+}
 
 export default async function AdminAccountsPage({
   searchParams,
 }: {
   readonly searchParams: Promise<{ readonly q?: string | undefined }>;
 }) {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("accounts.read")) notFound();
   const q = ((await searchParams).q ?? "").trim();
@@ -29,32 +35,34 @@ export default async function AdminAccountsPage({
   return (
     <PageSection
       id="accounts"
-      title="Accounts"
-      description="Search by name, email or handle. Private chats are never shown here."
+      title={t("Accounts")}
+      description={t(
+        "Search by name, email or handle. Private chats are never shown here.",
+      )}
     >
       <div className="flex flex-col gap-4">
         <SearchForm
           action="/admin/accounts"
           value={q}
-          label="Search accounts"
-          placeholder="Name, email or handle"
+          label={t("Search accounts")}
+          placeholder={t("Name, email or handle")}
         />
         {rows === null ? (
           <ErrorState
-            title="Accounts couldn't load"
-            description="Try again in a moment."
+            title={t("Accounts couldn't load")}
+            description={t("Try again in a moment.")}
           />
         ) : q.length < 2 ? (
           <EmptyState
             compact
-            title="Search for an account"
-            description="Type at least 2 characters."
+            title={t("Search for an account")}
+            description={t("Type at least 2 characters.")}
           />
         ) : rows.length === 0 ? (
           <EmptyState
             compact
-            title="No accounts match"
-            description={`Nothing found for "${q}".`}
+            title={t("No accounts match")}
+            description={t(`Nothing found for "${q}".`)}
           />
         ) : (
           <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
@@ -65,17 +73,19 @@ export default async function AdminAccountsPage({
                   className="flex min-h-11 flex-col gap-0.5 py-3 hover:bg-(--cq-surface-subtle)"
                 >
                   <span className="cq-body text-(--cq-text-primary)">
-                    {row.name ?? "Unnamed member"}
+                    {row.name ?? t("Unnamed member")}
                     {row.suspended ? " · Suspended" : ""}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {[
-                      row.email,
-                      row.organisations.join(", "),
-                      `joined ${when(row.createdAt)}`,
-                    ]
-                      .filter((part) => part !== null && part !== "")
-                      .join(" · ")}
+                    {t(
+                      [
+                        row.email,
+                        row.organisations.join(", "),
+                        `joined ${when(row.createdAt)}`,
+                      ]
+                        .filter((part) => part !== null && part !== "")
+                        .join(" · "),
+                    )}
                   </span>
                 </Link>
               </li>

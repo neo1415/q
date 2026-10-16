@@ -51,6 +51,7 @@ import {
 } from "./relationship-words";
 import { QControl } from "@/features/q/control/q-control";
 import { QSection } from "@/features/q/q-section";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /** States whose next step is the outcome itself, shown above More. */
 export const OUTCOME_FIRST: ReadonlySet<string> = new Set([
@@ -148,6 +149,8 @@ export function RelationshipDetail({
   /** The latest decision with why and how much (CRM S5); null: none. */
   readonly decision?: ReactNode;
 }) {
+  const t = serverTNow();
+
   // The match outlives CONNECTED (relationship-state.v2).
   const connected =
     relationship !== null && isMatchedRelationshipState(relationship.state);
@@ -165,7 +168,7 @@ export function RelationshipDetail({
         counterpart={counterpart}
         relationship={relationship}
         profile={profile}
-        note={relationship === null ? absentSentence : undefined}
+        note={relationship === null ? t(absentSentence) : undefined}
         step={heroStep({
           side,
           relationship,
@@ -199,8 +202,8 @@ export function RelationshipDetail({
             className="cq-title-sm text-(--cq-text-primary)"
           >
             {WAY_BACK.has(relationship.state)
-              ? "Where this stands"
-              : "How did it go?"}
+              ? t("Where this stands")
+              : t("How did it go?")}
           </h2>
           <DockAvoidZone className="flex flex-col items-stretch gap-2">
             <RelationshipOutcome
@@ -219,7 +222,7 @@ export function RelationshipDetail({
           {relationship === null || !connected ? null : (
             // Deal close (2026-10-08): the stage strip both sides see, the
             // next step, the terms, the reports and the final state.
-            <Card title="Deal" id="deal">
+            <Card title={t("Deal")} id="deal">
               <RelationshipDeal
                 relationshipId={relationship.relationshipId}
                 counterpart={counterpart}
@@ -229,13 +232,13 @@ export function RelationshipDetail({
           )}
 
           {media === null || media === undefined ? null : (
-            <Card title="Pitch" id="pitch">
+            <Card title={t("Pitch")} id="pitch">
               {media}
             </Card>
           )}
 
           {relationship === null || !connected ? null : (
-            <Card title="Commitment" id="commitment">
+            <Card title={t("Commitment")} id="commitment">
               <RelationshipCommitment
                 relationshipId={relationship.relationshipId}
                 counterpart={counterpart}
@@ -247,14 +250,14 @@ export function RelationshipDetail({
           !relationship.milestones.some(
             (milestone) => milestone.state === "IN_DILIGENCE",
           ) ? null : (
-            <Card title="Diligence" id="diligence">
+            <Card title={t("Diligence")} id="diligence">
               <Link
                 href={`${basePath}/diligence`}
                 className="flex min-h-14 items-center justify-between gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-3 hover:border-(--cq-border) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                 data-diligence-summary
               >
                 <span className="cq-body text-(--cq-text-primary)">
-                  {diligenceLine(side, diligence)}
+                  {t(diligenceLine(side, diligence))}
                 </span>
                 <ArrowUpRight
                   size={ICON_SIZE.compact}
@@ -270,7 +273,7 @@ export function RelationshipDetail({
             // Q's SCROLL_TO (premiere v5): the dated history, on screen.
             <QControl id="section.relationship-history" kind="SECTION">
               <Card
-                title="What happened"
+                title={t("What happened")}
                 id="history"
                 collapsible
                 count={relationship.milestones.length}
@@ -303,13 +306,13 @@ export function RelationshipDetail({
           )}
 
           {decision === null || decision === undefined ? null : (
-            <Card title="Decision" id="decision">
+            <Card title={t("Decision")} id="decision">
               {decision}
             </Card>
           )}
 
           {notes === null || notes === undefined ? null : (
-            <Card title="Private notes" id="notes">
+            <Card title={t("Private notes")} id="notes">
               {notes}
             </Card>
           )}
@@ -330,9 +333,9 @@ export function RelationshipDetail({
         */}
         <aside
           className="flex min-w-0 flex-col gap-6 max-lg:contents lg:sticky lg:top-6 lg:self-start"
-          aria-label="Next"
+          aria-label={t("Next")}
         >
-          <Card title="Next" id="next" className="max-lg:order-first">
+          <Card title={t("Next")} id="next" className="max-lg:order-first">
             {/*
               The whole next-step block, its brief included, is kept clear
               of the Q dock (16 Oct run: "Voice paused" sat over the brief
@@ -342,11 +345,11 @@ export function RelationshipDetail({
               {standing.length === 0 ? null : (
                 <ul
                   className="cq-body-sm mb-3 flex flex-col gap-1 text-(--cq-text-secondary)"
-                  aria-label="Where this stands"
+                  aria-label={t("Where this stands")}
                   data-relationship-brief
                 >
                   {standing.map((line) => (
-                    <li key={line}>{line}</li>
+                    <li key={line}>{t(line)}</li>
                   ))}
                 </ul>
               )}
@@ -376,7 +379,7 @@ export function RelationshipDetail({
                       size={ICON_SIZE.regular}
                       aria-hidden="true"
                     />
-                    Send a message
+                    {t("Send a message")}
                   </Link>
                 ) : null}
                 {relationship !== null &&
@@ -387,7 +390,7 @@ export function RelationshipDetail({
                   call !== null,
                 ) ? (
                   <p className="cq-body-sm text-(--cq-text-secondary)">
-                    Nothing needs you right now.
+                    {t("Nothing needs you right now.")}
                   </p>
                 ) : null}
                 {relationship === null ? null : (
@@ -398,7 +401,7 @@ export function RelationshipDetail({
                   */}
                     <details className="group" data-next-more>
                       <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
-                        More
+                        {t("More")}
                         <ChevronDown
                           size={ICON_SIZE.compact}
                           aria-hidden="true"
@@ -445,7 +448,7 @@ export function RelationshipDetail({
           </Card>
 
           {fitAndInterest === null || fitAndInterest === undefined ? null : (
-            <Card title="Fit and interest" id="fit">
+            <Card title={t("Fit and interest")} id="fit">
               {fitAndInterest}
             </Card>
           )}
@@ -453,18 +456,20 @@ export function RelationshipDetail({
           <Card
             className="max-lg:order-last"
             title={
-              side === "INVESTOR" ? "About the company" : "About the investor"
+              side === "INVESTOR"
+                ? t("About the company")
+                : t("About the investor")
             }
             id="context"
           >
             <div className="flex flex-col gap-3">
               {profile.about === null ? (
                 <p className="cq-body-sm text-(--cq-text-secondary)">
-                  {counterpart} hasn&apos;t shared a description you can see.
+                  {t(`${counterpart} hasn't shared a description you can see.`)}
                 </p>
               ) : (
                 <p className="cq-body-sm line-clamp-6 text-(--cq-text-secondary)">
-                  {profile.about}
+                  {t(profile.about)}
                 </p>
               )}
               <ProfileChips profile={profile} />
@@ -477,7 +482,7 @@ export function RelationshipDetail({
                     "self-start",
                   )}
                 >
-                  View profile
+                  {t("View profile")}
                   <ArrowUpRight size={ICON_SIZE.compact} aria-hidden="true" />
                 </Link>
               )}
@@ -486,7 +491,7 @@ export function RelationshipDetail({
 
           {askQ ? (
             <section
-              aria-label="Ask Q"
+              aria-label={t("Ask Q")}
               className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-5 max-lg:order-last"
             >
               <AskQAboutRelationship counterpart={counterpart} />
@@ -527,6 +532,8 @@ export function RelationshipSection({
   readonly readAt: number;
   readonly children: ReactNode;
 }) {
+  const t = serverTNow();
+
   const connected = isMatchedRelationshipState(relationship.state);
   return (
     <PageContainer className="flex flex-col gap-6">
@@ -570,7 +577,9 @@ export function RelationshipSection({
             : []),
         ]}
         total={current === "CALLS" ? meetings.length : 1}
-        label={`${current === "CALLS" ? "calls" : "diligence"} with ${counterpart}`}
+        label={t(
+          `${current === "CALLS" ? "calls" : "diligence"} with ${counterpart}`,
+        )}
       >
         {children}
       </QSection>
@@ -598,6 +607,8 @@ export function RelationshipHero({
   /** The one next step (the list row's own), as the hero's button. */
   readonly step?: NextStep | null | undefined;
 }) {
+  const t = serverTNow();
+
   const step = relationship === null ? null : journeyStep(relationship);
   const action =
     next === null || next.label === null || next.href === null ? null : next;
@@ -613,7 +624,7 @@ export function RelationshipHero({
             : null;
   return (
     <section
-      aria-label={`${counterpart} at a glance`}
+      aria-label={t(`${counterpart} at a glance`)}
       className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-end lg:gap-x-8"
       data-relationship-hero
     >
@@ -654,7 +665,7 @@ export function RelationshipHero({
             {step === null ? null : (
               <ol
                 className="grid grid-cols-5 gap-1"
-                aria-label="Progress"
+                aria-label={t("Progress")}
                 data-journey-step={step}
               >
                 {JOURNEY.map((entry, index) => (
@@ -680,7 +691,7 @@ export function RelationshipHero({
                           : "text-(--cq-text-tertiary)"
                       }`}
                     >
-                      {entry.label}
+                      {t(entry.label)}
                     </span>
                   </li>
                 ))}
@@ -691,16 +702,16 @@ export function RelationshipHero({
               data-relationship-state
             >
               <span className="font-medium text-(--cq-text-primary)">
-                {STATE_WORDS[relationship.state]}
+                {t(STATE_WORDS[relationship.state])}
               </span>
               {step === null ? null : (
                 <span className="cq-numeric">
-                  {` · ${String(step)} of ${String(JOURNEY.length)}`}
+                  {t(` · ${String(step)} of ${String(JOURNEY.length)}`)}
                 </span>
               )}
               {action === null ? (
                 <span className="max-sm:sr-only">
-                  {` · Next: ${NEXT_STEP_WORDS[relationship.nextStep]}`}
+                  {t(` · Next: ${NEXT_STEP_WORDS[relationship.nextStep]}`)}
                 </span>
               ) : null}
             </p>
@@ -724,7 +735,7 @@ export function RelationshipHero({
           </Link>
           {action.why === "" ? null : (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              {action.why}
+              {t(action.why)}
             </p>
           )}
         </div>
@@ -819,6 +830,8 @@ export function RelationshipTabs({
   /** Offered once connected. */
   readonly calls?: boolean | undefined;
 }) {
+  const t = serverTNow();
+
   const waiting =
     diligence === null
       ? 0
@@ -834,7 +847,7 @@ export function RelationshipTabs({
     }`;
   return (
     <nav
-      aria-label="Relationship"
+      aria-label={t("Relationship")}
       className="relative -mx-4 flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
     >
       <Link
@@ -842,7 +855,7 @@ export function RelationshipTabs({
         aria-current={current === "OVERVIEW" ? "page" : undefined}
         className={tab(current === "OVERVIEW")}
       >
-        Overview
+        {t("Overview")}
       </Link>
       {diligence === null ? null : (
         <Link
@@ -850,7 +863,7 @@ export function RelationshipTabs({
           aria-current={current === "DILIGENCE" ? "page" : undefined}
           className={tab(current === "DILIGENCE")}
         >
-          Diligence
+          {t("Diligence")}
           {waiting > 0 ? (
             <span className="cq-caption cq-numeric bg-(--cq-accent) px-2 text-(--cq-text-inverse)">
               {waiting}
@@ -864,7 +877,7 @@ export function RelationshipTabs({
           aria-current={current === "MESSAGES" ? "page" : undefined}
           className={tab(current === "MESSAGES")}
         >
-          Messages
+          {t("Messages")}
           {messageCount > 0 ? (
             <span className="cq-caption cq-numeric bg-(--cq-surface-subtle) px-2">
               {messageCount}
@@ -878,7 +891,7 @@ export function RelationshipTabs({
           aria-current={current === "CALLS" ? "page" : undefined}
           className={tab(current === "CALLS")}
         >
-          Calls
+          {t("Calls")}
         </Link>
       ) : null}
     </nav>
@@ -886,6 +899,8 @@ export function RelationshipTabs({
 }
 
 function ProfileChips({ profile }: { readonly profile: CounterpartProfile }) {
+  const t = serverTNow();
+
   if (
     profile.location === null &&
     profile.websiteUrl === null &&
@@ -898,7 +913,7 @@ function ProfileChips({ profile }: { readonly profile: CounterpartProfile }) {
       {profile.location === null ? null : (
         <span className="cq-caption inline-flex items-center gap-1 text-(--cq-text-secondary)">
           <MapPin size={ICON_SIZE.compact} aria-hidden="true" />
-          {profile.location}
+          {t(profile.location)}
         </span>
       )}
       {profile.websiteUrl === null ? null : (
@@ -909,7 +924,9 @@ function ProfileChips({ profile }: { readonly profile: CounterpartProfile }) {
           className="cq-caption inline-flex min-h-8 items-center gap-1 text-(--cq-text-secondary) underline-offset-4 hover:underline"
         >
           <Globe size={ICON_SIZE.compact} aria-hidden="true" />
-          {profile.websiteUrl.replace(/^https?:\/\//i, "").replace(/\/$/, "")}
+          {t(
+            profile.websiteUrl.replace(/^https?:\/\//i, "").replace(/\/$/, ""),
+          )}
         </a>
       )}
       {profile.chips.map((chip) => (
@@ -917,7 +934,7 @@ function ProfileChips({ profile }: { readonly profile: CounterpartProfile }) {
           key={chip}
           className="cq-caption bg-(--cq-surface-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)"
         >
-          {chip}
+          {t(chip)}
         </span>
       ))}
     </div>
@@ -947,15 +964,17 @@ function Card({
   readonly count?: number | undefined;
   readonly children: ReactNode;
 }) {
+  const t = serverTNow();
+
   const heading = (
     <h2
       id={`relationship-${id}`}
       className="cq-title-sm text-(--cq-text-primary)"
     >
-      {title}
+      {t(title)}
       {count === undefined ? null : (
         <span className="cq-numeric font-normal text-(--cq-text-secondary) lg:hidden">
-          {` · ${String(count)}`}
+          {t(` · ${String(count)}`)}
         </span>
       )}
     </h2>
@@ -1003,13 +1022,15 @@ export function BackToRelationships({
   readonly href?: string;
   readonly label?: string;
 }) {
+  const t = serverTNow();
+
   return (
     <Link
       href={href}
-      className={buttonClassName("quiet", "regular", "-ml-4 self-start")}
+      className={buttonClassName("quiet", "regular", "-ms-4 self-start")}
     >
       <ArrowLeft size={ICON_SIZE.regular} aria-hidden="true" />
-      {label}
+      {t(label)}
     </Link>
   );
 }
@@ -1020,12 +1041,16 @@ export function RelationshipUnavailable({
 }: {
   readonly sentence: string;
 }) {
+  const t = serverTNow();
+
   return (
     <PageContainer className="flex flex-col gap-6">
       <BackToRelationships />
-      <h1 className="cq-title-lg text-(--cq-text-primary)">Relationship</h1>
+      <h1 className="cq-title-lg text-(--cq-text-primary)">
+        {t("Relationship")}
+      </h1>
       <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
-        {sentence}
+        {t(sentence)}
       </p>
     </PageContainer>
   );

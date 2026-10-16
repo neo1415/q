@@ -394,3 +394,62 @@ describe("all of it up front, then any words (Zino, 2026-10-08)", () => {
     ]);
   });
 });
+
+describe("the arrival in Arabic is composed from the same facts", () => {
+  const now = new Date("2026-10-08T13:30:00Z");
+  // Latin words that would mean an English sentence leaked through.
+  const ENGLISH = /\b(the|you|your|and|replied|sent|waiting|things?)\b/iu;
+
+  it("every field is Arabic, with names and their words kept as written", () => {
+    const words = arrivalWords(DATA, now, null, "ar");
+    expect(words.greeting).toBe("مساء الخير، Zino.");
+    expect(words.lowdown).toContain("رددتُ على Nimbus Grid");
+    expect(words.lowdown).toContain("ردّ Halyard Security");
+    expect(words.lowdown).toMatch(/أمران/u);
+    expect(words.summary).toMatch(/^أمران: /u);
+    expect(words.summary).toContain(
+      "Halyard Security يريد مكالمة الأسبوع المقبل",
+    );
+    expect(words.firstCard).toMatch(
+      /^أولاً، كتب Halyard Security: «Could we find 30 minutes next week\?»/u,
+    );
+    expect(words.briefing).toContain("أخبرني بما تريد فعله بأي منها.");
+    for (const field of [words.lowdown, words.summary ?? "", words.spoken]) {
+      expect(field.replace(/«[^»]*»/gu, "")).not.toMatch(ENGLISH);
+    }
+    // The same flags as the English: only the words differ.
+    const english = arrivalWords(DATA, now, null);
+    expect(words.quiet).toBe(english.quiet);
+    expect(words.opener.pending).toBe(english.opener.pending);
+  });
+
+  it("who is waiting and what could not be read are said in Arabic", () => {
+    const words = arrivalWords(
+      {
+        ...DATA,
+        activity: {},
+        cards: [],
+        waiting: ["Zino Aviation is waiting for a reply"],
+      },
+      now,
+      null,
+      "ar",
+    );
+    expect(words.lowdown).toBe("Zino Aviation بانتظار ردّك.");
+  });
+
+  it("a quiet day stays a plain Arabic greeting", () => {
+    const words = arrivalWords(
+      { ...DATA, activity: {}, cards: [] },
+      now,
+      null,
+      "ar",
+    );
+    expect(words.quiet).toBe(true);
+    expect(words.firstCard).toBeNull();
+    expect(words.summary).toBeNull();
+    expect(words.spoken).toMatch(
+      /^مساء الخير، Zino\. .+ ما الذي تودّ الاطلاع عليه؟$/u,
+    );
+  });
+});
