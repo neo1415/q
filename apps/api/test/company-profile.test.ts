@@ -961,3 +961,80 @@ describe("GET /v1/companies/:id/profile — what the pitch says", () => {
     expect(read).toEqual([]);
   });
 });
+
+describe("GET /v1/companies/:id/profile — the pitch, section by section (lane ov)", () => {
+  const stored = [
+    {
+      key: "go_to_market",
+      facts: [
+        { label: "Channel", value: "Freight forwarders", atSeconds: 34 },
+        // Malformed in storage: dropped, never shown.
+        { label: "", value: "x", atSeconds: 1 },
+      ],
+    },
+  ];
+
+  function sectionPorts(investor: boolean, playable?: readonly string[]) {
+    const { profile } = pitchPorts({
+      investor,
+      declared: false,
+      sharing: "PRIVATE",
+      ...(playable === undefined ? {} : { playable }),
+    });
+    const asked: string[] = [];
+    return {
+      asked,
+      profile: {
+        ...profile,
+        pitchSections: (
+          _actor: unknown,
+          _companyId: string,
+          mediaAssetId: string,
+        ) => {
+          asked.push(mediaAssetId);
+          return Promise.resolve(
+            mediaAssetId === INVESTORS_VIDEO ? stored : null,
+          );
+        },
+      } as CompanyProfilePorts,
+    };
+  }
+
+  it("serves Q's stored reading as the founder's claims, each with its pitch and moment", async () => {
+    const { profile } = sectionPorts(true);
+    const body = (await pitchBody(profile)) as PitchBody & {
+      overview: { pitchSections?: unknown[] } | null;
+    };
+    expect(body.overview?.pitchSections).toHaveLength(1);
+    expect(body.overview?.pitchSections).toMatchObject([
+      {
+        sectionKey: "go_to_market",
+        label: "Channel",
+        value: "Freight forwarders",
+        pitchId: INVESTORS_VIDEO,
+        atSeconds: 34,
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        source: "PITCH_VIDEO",
+      },
+    ]);
+  });
+
+  it("asks only about videos the reader may play (Context Firewall)", async () => {
+    const { profile, asked } = sectionPorts(true, [NETWORK_VIDEO]);
+    const body = (await pitchBody(profile)) as PitchBody & {
+      overview: { pitchSections?: unknown[] } | null;
+    };
+    expect(asked).toEqual([NETWORK_VIDEO]);
+    expect(body.overview?.pitchSections).toEqual([]);
+  });
+
+  it("gives a founder viewing another company none", async () => {
+    const { profile, asked } = sectionPorts(false);
+    const body = (await pitchBody(profile)) as PitchBody & {
+      overview: { pitchSections?: unknown[] } | null;
+    };
+    expect(asked).toEqual([]);
+    expect(body.overview?.pitchSections ?? []).toEqual([]);
+  });
+});

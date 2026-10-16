@@ -5,6 +5,7 @@ import type {
   DeckSectionCode,
   PitchClaimDto,
   PitchClaimKind,
+  PitchSectionFactDto,
 } from "@capital-q/contracts";
 import {
   FOUNDER_PROFILE_SECTIONS,
@@ -184,6 +185,11 @@ export type PitchProfileInput = {
   /** Q's read of the deck as this reader may see it; null: none. */
   readonly deckSections: readonly DeckSection[] | null;
   readonly pitchClaims: readonly PitchClaimDto[];
+  /**
+   * Q's stored reading of the pitches this reader may play, by section
+   * (`sectionKey` is the section's factKey, else its key). Absent: none.
+   */
+  readonly pitchSections?: readonly PitchSectionFactDto[];
   readonly answers: {
     readonly shortDescription: string | null;
     readonly sectorLabels: readonly string[];
@@ -305,8 +311,25 @@ export function pitchProfileSections(
       }
     }
 
-    // 2. The pitch videos this reader may play, where the deck lacks it.
-    for (const kind of sources.pitch) {
+    // 2. The pitch videos this reader may play, where the deck lacks it:
+    // Q's reading of each transcript for this section, else (for the few
+    // topics it covers) the code-read claims.
+    const sectionKey = spec.factKey ?? spec.key;
+    const spoken = fromDeck
+      ? []
+      : (input.pitchSections ?? []).filter(
+          (fact) => fact.sectionKey === sectionKey,
+        );
+    for (const fact of spoken) {
+      rows.push({
+        key: `said-${fact.pitchId}-${String(fact.atSeconds)}-${fact.label}`,
+        label: fact.label,
+        value: fact.value,
+        source: `Founder's claim · Pitch video ${pitchMoment(fact.atSeconds)}`,
+        group: null,
+      });
+    }
+    for (const kind of spoken.length > 0 ? [] : sources.pitch) {
       const covered =
         kind === "TRACTION"
           ? rows.some((row) => row.group === "Traction")

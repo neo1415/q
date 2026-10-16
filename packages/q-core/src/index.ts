@@ -1425,6 +1425,21 @@ export {
 } from "./prompts/schemas/workforce.js";
 // PROFILE block (overnight A5): the deck into twelve sections.
 export { DECK_EXTRACTION_V1 } from "./prompts/tasks/deck-extraction.v1.js";
+export { PITCH_SECTION_EXTRACTION_V1 } from "./prompts/tasks/pitch-section-extraction.v1.js";
+export {
+  PITCH_SECTION_EXTRACTION_SCHEMA_NAME,
+  PITCH_SECTION_EXTRACTION_SCHEMA_VERSION,
+  PITCH_SECTION_EXTRACTION_UNTRUSTED,
+  PITCH_SECTION_FACTS_MAX,
+  PITCH_SECTION_SECTIONS_MAX,
+  PITCH_SECTION_TRANSCRIPT_MAX,
+  PitchSectionExtractionResultSchema,
+  PitchSectionExtractionVariablesSchema,
+  PitchSectionFactSchema,
+  type PitchSectionExtractionResult,
+  type PitchSectionExtractionVariables,
+  type PitchSectionFact,
+} from "./prompts/schemas/pitch-section-extraction.js";
 export {
   SPEAK_FROM_FACTS_V1,
   SPOKEN_REPLY_V1,

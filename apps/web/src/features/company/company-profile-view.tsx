@@ -1060,6 +1060,7 @@ function PitchProfilePanel({
     own,
     deckSections: deck?.extraction?.sections ?? null,
     pitchClaims: overview?.pitchClaims ?? [],
+    pitchSections: overview?.pitchSections ?? [],
     answers: {
       shortDescription: profile.shortDescription,
       sectorLabels,

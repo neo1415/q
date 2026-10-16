@@ -603,3 +603,63 @@ describe("Q navigation lands on the exact tab, section and CRM view", () => {
     ).toBe(`/relationships/company/${COMPANY}`);
   });
 });
+
+describe("the pitch transcript fills every section the deck lacks (lane ov, step 2)", () => {
+  const said = (sectionKey: string, label: string, atSeconds: number) => ({
+    sectionKey,
+    label,
+    value: `${label} as said`,
+    pitchId: PITCH,
+    pitchTitle: null,
+    atSeconds,
+    truthClass: "USER_CLAIM" as const,
+    evidenceStatus: "SELF_REPORTED" as const,
+    source: "PITCH_VIDEO" as const,
+  });
+
+  it("files Q's transcript reading under each section, as the founder's claim at its moment", () => {
+    const keys = FOUNDER_PROFILE_SECTIONS.map(
+      (section) => section.factKey ?? section.key,
+    );
+    const sections = build({
+      deckSections: null,
+      pitchClaims: [],
+      answers: {
+        shortDescription: null,
+        sectorLabels: [],
+        team: [],
+        raise: null,
+      },
+      pitchSections: keys.map((key, at) =>
+        said(key, `Said for ${key}`, at * 10 + 5),
+      ),
+    });
+    // All fourteen, Closing included now that the pitch has one.
+    expect(sections).toHaveLength(FOUNDER_PROFILE_SECTIONS.length);
+    for (const [at, section] of sections.entries()) {
+      expect(section.provided).toBe(true);
+      expect(section.facts[0]?.source).toBe(
+        `Founder's claim · Pitch video ${at === 0 ? "0:05" : `${String(Math.floor((at * 10 + 5) / 60))}:${String((at * 10 + 5) % 60).padStart(2, "0")}`}`,
+      );
+      expect(section.statusWords).toBe("No deck read yet");
+    }
+  });
+
+  it("keeps the deck first: a section the deck covers ignores the transcript", () => {
+    const sections = build({
+      pitchSections: [
+        said("problem", "Ports wait", 3),
+        said("go_to_market", "Forwarders", 34),
+      ],
+    });
+    expect(byKey(sections, "problem").facts.map((row) => row.label)).toEqual([
+      "Delay per container",
+    ]);
+    expect(byKey(sections, "go_to_market").facts).toEqual([
+      expect.objectContaining({
+        label: "Forwarders",
+        source: "Founder's claim · Pitch video 0:34",
+      }),
+    ]);
+  });
+});
