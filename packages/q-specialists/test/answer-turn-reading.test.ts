@@ -3241,6 +3241,74 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
     ]);
   });
 
+  it("a city given to Q's own city question continues the reminder it was asked for (live 2026-10-16)", async () => {
+    const reading = (kind: string) =>
+      ({
+        kind,
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        handOver: null,
+        appAction: null,
+        askedAction: null,
+      }) as unknown as TurnReaderResult;
+    const ran: TurnAppAction[] = [];
+    const read: { tool: string; utterance: string }[] = [];
+    const run = seam({
+      said: "Lagos.",
+      earlier: [
+        {
+          role: "USER",
+          content:
+            "Set me a reminder for Friday at 10am to review the cash forecast.",
+        },
+        {
+          role: "Q",
+          content:
+            "Which city or time zone should I use for Friday at 10:00? I can also save it to your profile.",
+        },
+      ],
+      reading: () => reading("ANSWER"),
+      outcomes: [],
+      appActions: {
+        tools: new Set(["propose_reminder"]),
+        run: (_request, action) => {
+          ran.push(action);
+          return Promise.resolve({
+            prepared: "Reminder: Review the cash forecast",
+          });
+        },
+      },
+      appActionArguments: (_request, input) => {
+        read.push(input);
+        return Promise.resolve({
+          title: "Review the cash forecast",
+          when: { day: "friday", time: "10:00" },
+        });
+      },
+    });
+    await run.answer.answer(request());
+    expect(read).toEqual([
+      {
+        tool: "propose_reminder",
+        utterance:
+          "Set me a reminder for Friday at 10am to review the cash forecast.",
+      },
+    ]);
+    expect(ran).toEqual([
+      {
+        tool: "propose_reminder",
+        arguments: {
+          title: "Review the cash forecast",
+          when: { day: "friday", time: "10:00" },
+          timeZone: "Africa/Lagos",
+        },
+      },
+    ]);
+  });
+
   it("a legacy proposal tool's PREPARED output is a prepared card (QA run 4e3b1903)", async () => {
     const port = createToolAppActionPort({
       names: ["propose_express_interest"],

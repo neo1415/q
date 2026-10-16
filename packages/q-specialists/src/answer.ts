@@ -4016,6 +4016,43 @@ export function createSpecialistQAnswer(
         return saidByAction(request, conversationId, action, continued);
       }
     }
+    // The city they gave to a city question Q asked itself, not through
+    // the action's tool (live 2026-10-16: the turn was unread, the answer
+    // asked "Which city or time zone should I use…?", and "Lagos." was
+    // answered as small talk). The request it was asked about is read
+    // again against its declared action's own schema, with the zone.
+    if (
+      waiting === null &&
+      dependencies.appActions !== undefined &&
+      dependencies.appActionArguments !== undefined &&
+      (read === null || read.kind === "ANSWER" || read.kind === "CLARIFICATION")
+    ) {
+      const continued = cityForAskedAction(history, latest);
+      if (continued !== null && appTools.has(continued.tool)) {
+        const args = await dependencies
+          .appActionArguments(request, {
+            tool: continued.tool,
+            utterance: continued.utterance,
+          })
+          .catch(() => null);
+        if (args !== null && args !== undefined && typeof args === "object") {
+          const action: TurnAppAction = {
+            tool: continued.tool,
+            arguments: { ...args, timeZone: continued.zone },
+          };
+          logger?.info(
+            { qRunId: request.runId, tool: action.tool },
+            "the city they gave continues the action Q asked it for",
+          );
+          const said = await dependencies.appActions
+            .run(request, action)
+            .catch(() => null);
+          if (said !== null) {
+            return saidByAction(request, conversationId, action, said);
+          }
+        }
+      }
+    }
     const readerNamed =
       read !== null &&
       read.kind === "TOOL_REQUEST" &&
@@ -4949,4 +4986,45 @@ export function asksForWorkProducts(text: string): boolean {
     /\b(risks?|missing information|red flags)\b/u,
   ];
   return kinds.filter((kind) => kind.test(said)).length >= 2;
+}
+
+/** Q's own question for their city or time zone. */
+const ASKS_CITY =
+  /\b(?:which|what)\s+(?:city|time\s?zone|timezone)\b|\bwhere are you (?:based|located)\b/iu;
+
+/**
+ * Their reply names a place, Q's last line asked for their city, and the
+ * turn before asked for a reminder or a call: that request, its declared
+ * tool and the zone. Null otherwise. Code only: the request is read again
+ * against the tool's own schema by the caller.
+ */
+export function cityForAskedAction(
+  history: readonly {
+    readonly id: string;
+    readonly role: string;
+    readonly content: string;
+  }[],
+  latest: { readonly id: string; readonly content: string },
+): {
+  readonly tool: string;
+  readonly utterance: string;
+  readonly zone: string;
+} | null {
+  const zone = zoneFromWords(latest.content);
+  if (zone === null) return null;
+  const before = history.filter((message) => message.id !== latest.id);
+  const askedAt = before.findLastIndex((message) => message.role !== "USER");
+  const asked = before[askedAt];
+  if (asked === undefined || !ASKS_CITY.test(asked.content)) return null;
+  const request = before
+    .slice(0, askedAt)
+    .findLast((message) => message.role === "USER");
+  if (request === undefined) return null;
+  const tool = /\bremind/iu.test(request.content)
+    ? "propose_reminder"
+    : /\b(?:call|meeting)\b/iu.test(request.content) &&
+        /\b(?:book|schedule|set up|arrange)\b/iu.test(request.content)
+      ? "propose_meeting"
+      : null;
+  return tool === null ? null : { tool, utterance: request.content, zone };
 }

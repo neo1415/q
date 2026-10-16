@@ -1134,7 +1134,7 @@ export const NAME_NOTE =
  * reminders and rehearsals.
  */
 export const OWN_DAY_NOTE =
-  "Their tasks, day, agenda or what's next mean their own day among the facts (calls, reminders, approvals, Q's work), told in their time; how they are doing or their rehearsals means their last rehearsals there (get_my_results for more). Never say a record is unavailable when it is among the facts. If their time zone is not known, say times as UTC once, ask which city they are in, and offer to save it (update_my_profile, timeZone).";
+  "Their tasks, day, agenda or what's next mean their own day among the facts (calls, reminders, approvals, Q's work), told in their time; how they are doing or their rehearsals means their last rehearsals there (get_my_results for more). Never say a record is unavailable when it is among the facts. If their time zone is not known, say times as UTC once, ask which city they are in, and offer to save it (update_my_profile, timeZone). A reminder or call they ask for is prepared with its own tool even then: the tool asks for the city and keeps it, so never ask for it yourself first.";
 
 /**
  * Saving is not verifying (ADR-001; founder live 2026-10-02: "regardless
