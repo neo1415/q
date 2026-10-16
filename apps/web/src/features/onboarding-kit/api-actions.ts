@@ -328,6 +328,11 @@ const SayInput = z.object({
     )
     .max(16)
     .default([]),
+  // The founder profile section they came to fill (Overview link).
+  focus: z
+    .string()
+    .regex(/^[a-z][a-z_]{0,39}$/)
+    .optional(),
 });
 
 /** The conversational interview (CQ-PRE-REC-001 §16-§21): one turn to Q about the current step. */
@@ -343,6 +348,7 @@ export async function onboardingSayAction(
         text: input.text,
         expectedSessionVersion: input.expectedSessionVersion,
         recentTurns: input.recentTurns,
+        ...(input.focus === undefined ? {} : { focus: input.focus }),
       },
       input.idempotencyKey,
     ),

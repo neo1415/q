@@ -161,8 +161,15 @@ export function isTransientOnboardingFailure(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return true;
   const status = (error as { readonly status?: unknown }).status;
   if (typeof status === "number") {
-    // 409: the session moved under us (another write landed first); retry later.
-    return status >= 500 || status === 429 || status === 408 || status === 409;
+    // 409 VERSION_CONFLICT: the session moved under us; retry later. Any
+    // other 409 is the journey refusing this answer as it stands (a step
+    // not on their path), which no retry changes (live 2026-10-16: "raise
+    // USD 1.5m" held as a "temporary fault" for a step not yet on the path).
+    if (status === 409) {
+      const code = (error as { readonly code?: unknown }).code;
+      return code === undefined || code === "VERSION_CONFLICT";
+    }
+    return status >= 500 || status === 429 || status === 408;
   }
   // No HTTP status: the request never got an answer (network, abort).
   return true;

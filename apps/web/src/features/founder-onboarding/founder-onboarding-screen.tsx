@@ -46,7 +46,10 @@ export function FounderOnboardingScreen({
   startTalking = false,
   greeted: arrivedGreeted = false,
   openReview = false,
+  focusSection,
 }: {
+  /** The profile section to talk about first (lane ov's Overview link). */
+  readonly focusSection?: string | undefined;
   /** Open already talking with Q (arrival hands over with the voice on). */
   readonly startTalking?: boolean | undefined;
   /** Q welcomed them on the way here; the screen does not welcome again. */
@@ -240,6 +243,7 @@ export function FounderOnboardingScreen({
           errorMessage={state.errorMessage}
           talkOnOpen={talkOnOpen}
           greeted={greeted}
+          focus={focusSection}
           onEdit={(editorId) => {
             setTalkOnOpen(false);
             setMode("form");

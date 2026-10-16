@@ -507,6 +507,17 @@ export const SayOnboardingRequestSchema = z
     text: z.string().trim().max(2000),
     expectedSessionVersion: SessionVersionSchema,
     /**
+     * A section of the founder profile the person came to fill (lane ov's
+     * Overview links "/onboarding/founder?talk=1&section=<key>"): Q opens on
+     * that section's question. A key of the shared profile-sections config;
+     * unknown keys are ignored. Data, never authority.
+     */
+    focus: z
+      .string()
+      .regex(/^[a-z][a-z_]{0,39}$/)
+      .optional(),
+
+    /**
      * The exchange so far, oldest first, so a typed turn carries the same
      * context a spoken one does (QX-004 core gate: one Q). Untrusted --
      * these are words the conversation produced, never authority over what

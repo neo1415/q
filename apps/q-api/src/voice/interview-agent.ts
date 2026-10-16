@@ -15,6 +15,7 @@ import {
 import {
   COUNTRY_OPTIONS_V5,
   FOUNDER_STEPS,
+  FOUNDER_PROFILE_SECTIONS,
 } from "@capital-q/founder-onboarding";
 import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
 import {
@@ -1073,8 +1074,23 @@ export function createInterviewAgent(
     await settleKnownAnswers(port, input.journeyType);
     await prefillFromSignup();
     let state = await port.state();
+    // The profile section they came to fill (lane ov's Overview link): its
+    // first open step is asked first. A key of the shared config only.
+    const focusSection =
+      input.journeyType === "founder" && input.focus !== undefined
+        ? FOUNDER_PROFILE_SECTIONS.find(
+            (section) => section.key === input.focus,
+          )
+        : undefined;
+    const focusStepOf = (current: typeof state): string | null =>
+      focusSection?.stepKeys.find((key) =>
+        current.steps.some(
+          (row) => row.stepKey === key && row.status === "OPEN",
+        ),
+      ) ?? null;
     const flowFor = (current: typeof state) =>
       onboardingFlowFor({
+        focusStepKey: focusStepOf(current),
         journey: input.journeyType,
         opening,
         state: current,
@@ -1353,7 +1369,7 @@ export function createInterviewAgent(
         // their explicit delegation, is scoped delegation, not an action on
         // Q's own account. Trusted text in the charter's frame.
         environmentNotes:
-          "You change the person's onboarding only through your tools; a tool result is what happened. Capital Q grants scoped delegation here: when the person explicitly hands you a choice about their own onboarding and asks you to go ahead, recording your choice is acting on their instruction, reversible and theirs to change, and is permitted without a further approval step.",
+          "Never ask the person to answer in a particular format, wording or unit; understand whatever way they say it, and record it. You change the person's onboarding only through your tools; a tool result is what happened. Capital Q grants scoped delegation here: when the person explicitly hands you a choice about their own onboarding and asks you to go ahead, recording your choice is acting on their instruction, reversible and theirs to change, and is permitted without a further approval step.",
         variables: {
           journey: input.journeyType,
           channel: input.channel,
@@ -1718,6 +1734,9 @@ export function createInterviewAgent(
     const backedReply = withoutUnbackedSaveClaims(
       replyWritten,
       opening || recorded.length > 0 || (heldNote?.applied.length ?? 0) > 0,
+      // Code's own words only in English; in any other language the claim
+      // is taken out and the model's reply speaks for itself.
+      writtenInLatinScript(utterance) ? undefined : "",
     );
     if (backedReply !== replyWritten) {
       logger.info({}, "interview reply claimed a save nothing backed; removed");

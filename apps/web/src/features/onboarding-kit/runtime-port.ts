@@ -97,6 +97,8 @@ export type RuntimePort = {
           readonly role: "person" | "q";
           readonly text: string;
         }[];
+        /** The founder profile section they came to fill (Overview link). */
+        readonly focus?: string | undefined;
       }) => Promise<SayOnboardingResponse>)
     | undefined;
   /**
@@ -502,6 +504,7 @@ export function createRuntimeClient<
               readonly role: "person" | "q";
               readonly text: string;
             }[];
+            readonly focus?: string | undefined;
           }) =>
             guarded(async () => {
               const say = port.say;
@@ -518,6 +521,7 @@ export function createRuntimeClient<
                 expectedSessionVersion: view.session.version,
                 idempotencyKey: crypto.randomUUID(),
                 recentTurns: input.recentTurns,
+                ...(input.focus === undefined ? {} : { focus: input.focus }),
               });
               return {
                 view: await present(remember(outcome.view)),

@@ -399,3 +399,40 @@ describe("QFOR-007 · passages carry where they came from", () => {
     expect(passages).toHaveLength(5);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Owner template 2026-10-16 · the company profile sections
+// ---------------------------------------------------------------------------
+
+describe("company profile sections are filled from the material first", () => {
+  it("a deck's problem, solution and moats become proposals for their v6 steps", async () => {
+    const { plan } = await prepare(
+      outcome({
+        candidates: [
+          candidate("problem", "Clinics lose a third of test results."),
+          candidate("solution", "A strip reader that files results itself."),
+          candidate("moats", "Exclusive data from 40 clinics."),
+        ],
+      }),
+      NOTHING_ANSWERED,
+    );
+    expect(plan.suggestions.map((s) => s.stepKey).sort()).toEqual(
+      ["F9.moats", "F9.problem", "F9.solution"].sort(),
+    );
+    expect(plan.suggestions[0]?.suggestedValue).toMatchObject({ type: "TEXT" });
+  });
+
+  it("a section the deck already proposed is not proposed again from the transcript", async () => {
+    const { plan } = await prepare(
+      outcome({
+        candidates: [candidate("problem", "Said again in the pitch.")],
+      }),
+      {
+        responses: [],
+        pendingSuggestionSteps: ["F9.problem"],
+        narrative: null,
+      },
+    );
+    expect(plan.suggestions.map((s) => s.stepKey)).not.toContain("F9.problem");
+  });
+});

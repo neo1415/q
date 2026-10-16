@@ -43,6 +43,17 @@ export const QInterviewTurnRequestSchema = z
      * how a first screen asks Q for its greeting.
      */
     utterance: z.string().max(2_000),
+    /**
+     * A section of the founder profile the person came to fill (lane ov's
+     * Overview links "/onboarding/founder?talk=1&section=<key>"): Q opens on
+     * that section's question. A key of the shared profile-sections config;
+     * unknown keys are ignored. Data, never authority.
+     */
+    focus: z
+      .string()
+      .regex(/^[a-z][a-z_]{0,39}$/)
+      .optional(),
+
     /** How it arrived. Transport only: it changes nothing about the rules. */
     channel: z.enum(["text", "voice"]).default("text"),
     /** The conversation so far, oldest first. Untrusted: words, not authority. */

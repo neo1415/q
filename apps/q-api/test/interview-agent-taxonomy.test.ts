@@ -109,8 +109,8 @@ function worldFor(stepKey: string) {
   });
 }
 
-describe("words that name no category get the categories, not a refusal", () => {
-  it("returns every category, records nothing, and records the one the model then chooses", async () => {
+describe("words that name no category are saved as they said them (owner 2026-10-16)", () => {
+  it("saves their words at once, and a category named later supersedes them", async () => {
     const said =
       "we back companies that help smallholder farmers grow more food";
     const world = worldFor("I3.sectors");
@@ -126,8 +126,8 @@ describe("words that name no category get the categories, not a refusal", () => 
     }).turn({ ...turn(world, said), actor });
 
     const afterFirst = seen[1] ?? "";
-    expect(afterFirst).toContain('"outcome":"UNMATCHED"');
-    for (const name of Object.keys(ROOTS)) expect(afterFirst).toContain(name);
+    expect(afterFirst).toContain('"outcome":"COMMITTED"');
+    expect(afterFirst).not.toContain('"outcome":"UNMATCHED"');
     expect(world.recordedValue("I3.sectors")).toEqual({
       type: "RESOURCE_REFERENCE",
       resourceType: "TAXONOMY_NODE",
@@ -135,7 +135,7 @@ describe("words that name no category get the categories, not a refusal", () => 
     });
   });
 
-  it("any phrasing without a named category is UNMATCHED with candidates, never REJECTED, never recorded", async () => {
+  it("any phrasing without a named category is saved in their words, never refused or dropped", async () => {
     for (const said of [
       "helps smallholder farmers grow more food",
       "stuff that feeds people in rural areas",
@@ -152,16 +152,17 @@ describe("words that name no category get the categories, not a refusal", () => 
       }).turn({ ...turn(world, said), actor });
 
       const after = seen[1] ?? "";
-      expect(after, said).toContain('"outcome":"UNMATCHED"');
       expect(after, said).not.toContain('"outcome":"REJECTED"');
-      expect(after, said).toContain("Agriculture");
-      expect(world.recordedValue("I3.sectors"), said).toBeUndefined();
+      expect(world.recordedValue("I3.sectors"), said).toEqual({
+        type: "TEXT",
+        text: said,
+      });
     }
   });
 });
 
-describe("words that name no option get the options, not a refusal", () => {
-  it("offers every option by label and key, and records the one the model then chooses", async () => {
+describe("words that name no option are kept as 'Other: their words'", () => {
+  it("a near-miss is the step's own Other with their words; a named option later supersedes it", async () => {
     const said =
       "we invest through our employer's venture arm, it's a big telco";
     const world = investorSession({ currentStepKey: "I0.investor_type" });
@@ -175,19 +176,17 @@ describe("words that name no option get the options, not a refusal", () => {
     }).turn({ ...turn(world, said), actor });
 
     const afterFirst = seen[1] ?? "";
-    expect(afterFirst).toContain('"outcome":"UNMATCHED"');
-    expect(afterFirst).toContain("Corporate venture (cvc)");
+    expect(afterFirst).toContain('"outcome":"COMMITTED"');
     expect(world.recordedValue("I0.investor_type")).toEqual({
       type: "SINGLE_SELECT",
       optionKey: "cvc",
     });
   });
 
-  it("an unnamed option is never recorded as the catch-all, or as anything", async () => {
+  it("their words are saved as Other, never as an option they did not name", async () => {
     for (const said of [
       "we invest through our employer's venture arm, it's a big telco",
-      "honestly it's complicated",
-      "not an angel",
+      "a mix of my own money and a small club of friends",
     ]) {
       const world = investorSession({ currentStepKey: "I0.investor_type" });
       const { gateway } = twoTries("I0.investor_type", said, said, null);
@@ -198,7 +197,11 @@ describe("words that name no option get the options, not a refusal", () => {
         recommendations: world.recommendations,
         delegation: readerOf(reading({ stated: ["I0.investor_type"] })),
       }).turn({ ...turn(world, said), actor });
-      expect(world.recordedValue("I0.investor_type"), said).toBeUndefined();
+      expect(world.recordedValue("I0.investor_type"), said).toEqual({
+        type: "SINGLE_SELECT",
+        optionKey: "other",
+      });
+      expect(world.recordedNote("I0.investor_type"), said).toBe(said);
     }
   });
 });

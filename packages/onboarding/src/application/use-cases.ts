@@ -93,7 +93,10 @@ import {
   previousVisitedStep,
   requiredStepsComplete,
 } from "../runtime/path.js";
-import { validateOnboardingResponse } from "../runtime/validate-response.js";
+import {
+  isOwnWordsAnswer,
+  validateOnboardingResponse,
+} from "../runtime/validate-response.js";
 import {
   followUpQuickAnswers,
   followUpResponse,
@@ -650,19 +653,36 @@ async function commitResponse(
     }
     return handler;
   });
-  for (const handler of handlers) {
-    await handler.apply(
-      {
-        tx,
-        actor,
-        session: currentSession,
-        step,
-        correlationId,
-        currentResponses: aggregate.currentResponses,
-        bindContext,
-      },
-      validated,
-    );
+  const applyAll = async (unit: TransactionContext) => {
+    for (const handler of handlers) {
+      await handler.apply(
+        {
+          tx: unit,
+          actor,
+          session: currentSession,
+          step,
+          correlationId,
+          currentResponses: aggregate.currentResponses,
+          bindContext,
+        },
+        validated,
+      );
+    }
+  };
+  if (isOwnWordsAnswer(step.stepType, validated.responseType)) {
+    // Their own words for a choice, a number or a category (owner
+    // 2026-10-16): the targets read no structured value from them (unknown
+    // stays unknown). A target that cannot take an unknown here leaves its
+    // record as it was; the words are kept either way, never refused.
+    try {
+      await tx.sql.savepoint(async (inner) => {
+        await applyAll({ sql: inner });
+      });
+    } catch (error: unknown) {
+      if (!(error instanceof ContractValidationError)) throw error;
+    }
+  } else {
+    await applyAll(tx);
   }
 
   // The old row links forward first (deferred FK), then the replacement is

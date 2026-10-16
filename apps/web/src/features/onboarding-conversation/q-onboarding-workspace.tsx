@@ -107,6 +107,7 @@ export type QOnboardingWorkspaceActions = {
       readonly role: "person" | "q";
       readonly text: string;
     }[],
+    focus?: string,
   ) => Promise<OnboardingTurn | null>;
   readonly skip: () => Promise<void>;
   /** A tapped option, as the value it stands for (CQ-Q-VOICE-001 B §17). */
@@ -153,6 +154,11 @@ export type QOnboardingWorkspaceProps = {
    * else (the form, say), so the stage starts without another tap.
    */
   readonly talkOnOpen?: boolean | undefined;
+  /**
+   * The founder profile section the person came to fill (lane ov's
+   * Overview links "?talk=1&section=<key>"): Q opens on its question.
+   */
+  readonly focus?: string | undefined;
   /**
    * Q has already welcomed this person on the way here -- Home's resume
    * greeting, or a spoken conversation that brought them. The screen then
@@ -219,6 +225,7 @@ export function QOnboardingWorkspace({
   contextLabel,
   talkOnOpen = false,
   greeted = false,
+  focus,
 }: QOnboardingWorkspaceProps) {
   const view = session.raw;
   const router = useRouter();
@@ -598,7 +605,10 @@ export function QOnboardingWorkspace({
         // Q is still asking what it last said: that line is the question,
         // and the interview is not opened a second time (see
         // `pendingQuestion`). A reload redraws; it does not re-greet.
-        const pending = pendingQuestion(kept, lastActivityAt);
+        // Came for one section of their profile: Q opens on it, whatever
+        // it was last waiting on.
+        const pending =
+          focus === undefined ? pendingQuestion(kept, lastActivityAt) : null;
         if (pending !== null) {
           return pending;
         }
@@ -609,6 +619,7 @@ export function QOnboardingWorkspace({
               role: turn.kind === "Q" ? ("q" as const) : ("person" as const),
               text: turn.text.slice(0, 1500),
             })),
+            focus,
           )
           .then((turn) => {
             if (turn !== null) setQAsking(turn.askingAbout ?? null);
@@ -631,6 +642,7 @@ export function QOnboardingWorkspace({
     prompt,
     turns.length,
     actions,
+    focus,
   ]);
 
   const settleReading = useCallback(() => {

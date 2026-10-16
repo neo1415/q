@@ -173,6 +173,17 @@ export type FounderDocumentReview = {
     readonly documentId: string;
     readonly documentVersionId: string;
   }) => Promise<FounderReviewResult>;
+  /**
+   * Their pitch video's transcript is ready (owner 2026-10-16): read like
+   * their own words, after the deck. A step the deck already proposed or
+   * they already answered is not proposed again; what is left becomes
+   * proposals they confirm, then Q asks only for the gaps.
+   */
+  readonly onPitchTranscript: (event: {
+    readonly sessionId: string;
+    readonly transcriptId: string;
+    readonly text: string;
+  }) => Promise<FounderReviewResult>;
   /** A free-text turn of the conversational interview (CQ-PRE-REC-001 §20). */
   readonly onUtterance: (event: {
     readonly sessionId: string;
@@ -181,6 +192,11 @@ export type FounderDocumentReview = {
 };
 
 type SourceRef = { readonly sourceType: string; readonly sourceId: string };
+
+/** How a pitch transcript is named in a proposal's sources. */
+export const PITCH_TRANSCRIPT_SOURCE = "PITCH_TRANSCRIPT" as const;
+/** The most of a transcript one reading takes (the narrative bound). */
+const PITCH_TRANSCRIPT_MAX_CHARS = 60_000;
 
 export function createFounderDocumentReview(
   dependencies: FounderReviewServiceDependencies,
@@ -437,6 +453,33 @@ export function createFounderDocumentReview(
       });
     },
 
+    onPitchTranscript: async (event): Promise<FounderReviewResult> => {
+      const session = await sessions.findById(sql, event.sessionId as never);
+      if (
+        session === null ||
+        session.journeyType !== FOUNDER_JOURNEY_TYPE ||
+        session.status !== "ACTIVE" ||
+        session.tenantId === null
+      ) {
+        return { kind: "SKIPPED", reason: "NO_ACTIVE_SESSION" };
+      }
+      const text = event.text.trim().slice(0, PITCH_TRANSCRIPT_MAX_CHARS);
+      if (text.length === 0) {
+        return { kind: "SKIPPED", reason: "NO_UTTERANCE" };
+      }
+      return read({
+        tenantId: session.tenantId,
+        userId: session.userId,
+        sessionId: session.id,
+        sources: [],
+        narrative: text,
+        sourceRef: {
+          sourceType: PITCH_TRANSCRIPT_SOURCE,
+          sourceId: event.transcriptId,
+        },
+        context: { transcriptId: event.transcriptId, passages: 0 },
+      });
+    },
     onUtterance: async (event): Promise<FounderReviewResult> => {
       if (utterances === undefined) {
         return { kind: "SKIPPED", reason: "NO_UTTERANCE" };

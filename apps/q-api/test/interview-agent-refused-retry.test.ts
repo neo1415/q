@@ -209,8 +209,8 @@ describe("a required question pressed twice running is rested (HANDOVER §5.1)",
   });
 });
 
-describe("an answer no option holds, on a step that cannot keep other words", () => {
-  it("is told to recommend the closest once, never to ask the same choice again", async () => {
+describe("an answer no option holds, on a step with no Other option", () => {
+  it("is saved in their words at once (owner 2026-10-16), never refused", async () => {
     const world = investorSession({ currentStepKey: "I2.currency" });
     const prompts: string[] = [];
     let round = 0;
@@ -259,6 +259,10 @@ describe("an answer no option holds, on a step that cannot keep other words", ()
       recommendations: world.recommendations,
       delegation: readerOf(reading({ stated: ["I2.currency"] })),
     }).turn({ ...turn(world, "We write cheques in seashells."), actor });
-    expect(prompts[1]).toContain("this step cannot keep other words");
+    expect(prompts[1]).toContain('"outcome":"COMMITTED"');
+    expect(world.recordedValue("I2.currency")).toEqual({
+      type: "TEXT",
+      text: "We write cheques in seashells.",
+    });
   });
 });

@@ -148,6 +148,8 @@ export const OnboardingCoverageFieldSchema = z
      * a priority (lower first); absent: the definition's order.
      */
     rank: z.number().int().min(0).max(999).optional(),
+    /** False: filled from documents or the pitch only, never asked as a gap. */
+    askable: z.boolean().optional(),
     /** Steps whose answers decide whether this one applies. */
     dependsOn: z.array(OnboardingStepKeySchema).max(8),
   })

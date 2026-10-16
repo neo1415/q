@@ -133,6 +133,8 @@ export type OnboardingActions<TResponse> = {
       readonly role: "person" | "q";
       readonly text: string;
     }[],
+    /** The founder profile section they came to fill (Overview link). */
+    focus?: string,
   ) => Promise<OnboardingTurn | null>;
   /** Re-read the session from the runtime (Q's reading may have landed). */
   readonly refresh: () => Promise<void>;
@@ -363,7 +365,7 @@ export function useOnboardingJourney<
       }
       return run(() => submit(input), true);
     },
-    say: async (text, recentTurns) => {
+    say: async (text, recentTurns, focus) => {
       const say = requireClient().say;
       if (say === undefined) {
         return null;
@@ -384,7 +386,11 @@ export function useOnboardingJourney<
         // came back a conflict the screen could not show.
         setBusy(true);
         try {
-          const outcome = await say({ text, recentTurns });
+          const outcome = await say({
+            text,
+            recentTurns,
+            ...(focus === undefined ? {} : { focus }),
+          });
           setSession(outcome.view);
           return {
             understood: outcome.understood,
@@ -402,7 +408,11 @@ export function useOnboardingJourney<
         }
       }
       const ok = await run(async () => {
-        const outcome = await say({ text, recentTurns });
+        const outcome = await say({
+          text,
+          recentTurns,
+          ...(focus === undefined ? {} : { focus }),
+        });
         turn = {
           understood: outcome.understood,
           reply: outcome.reply,

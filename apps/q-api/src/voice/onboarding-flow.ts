@@ -50,10 +50,22 @@ export function onboardingFlowFor(input: {
   readonly firstName: string | null;
   /** What the platform already holds that is worth saying (the company or firm). */
   readonly knownName: string | null;
+  /**
+   * The open step of the profile section they came to fill (lane ov's
+   * Overview link): asked first, before coverage's own next question.
+   */
+  readonly focusStepKey?: string | null | undefined;
 }): OnboardingFlow {
   const { state } = input;
   const byKey = new Map(state.steps.map((s) => [s.stepKey, s]));
-  const [top] = state.next ?? [];
+  const focused =
+    input.focusStepKey === null || input.focusStepKey === undefined
+      ? undefined
+      : byKey.get(input.focusStepKey);
+  const [top] =
+    focused !== undefined && focused.status === "OPEN"
+      ? [{ stepKey: focused.stepKey, reason: "IMPORTANT_MISSING" as const }]
+      : (state.next ?? []);
   const topStep = top === undefined ? undefined : byKey.get(top.stepKey);
   const essentialsOpen = state.steps.some(
     (s) =>
@@ -110,6 +122,11 @@ export function onboardingFlowFor(input: {
   } else {
     lines.push(
       "First acknowledge, in one short line, only what a tool result says was saved this turn (never more).",
+    );
+  }
+  if (focused !== undefined && next?.stepKey === focused.stepKey) {
+    lines.push(
+      "They came here to fill this part of their company profile: ask about it now, before anything else.",
     );
   }
   if (next !== null) {
@@ -249,6 +266,8 @@ const SAVE_CLAIM =
 export function withoutUnbackedSaveClaims(
   reply: string,
   committedThisTurn: boolean,
+  /** Said in their place, in the person's language; empty says nothing. */
+  notSavedYet = "I haven't saved that yet.",
 ): string {
   if (committedThisTurn) return reply;
   const sentences = reply.match(/[^.?!]+[.?!]*/g) ?? [reply];
@@ -260,5 +279,5 @@ export function withoutUnbackedSaveClaims(
       /\b(already|earlier|before|previously)\b/iu.test(sentence),
   );
   if (kept.length === sentences.length) return reply;
-  return `I haven't saved that yet. ${kept.join("").trim()}`.trim();
+  return `${notSavedYet} ${kept.join("").trim()}`.trim();
 }
