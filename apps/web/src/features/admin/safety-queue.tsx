@@ -90,7 +90,10 @@ function ReviewReport({ report }: { readonly report: AdminSafetyReportDto }) {
               id={outcomeId}
               label={t("Decision")}
               value={outcome}
-              options={OUTCOMES}
+              options={OUTCOMES.map((option) => ({
+                ...option,
+                label: t(option.label),
+              }))}
               onChange={(event) => setOutcome(event.target.value as Outcome)}
             />
             {needsMember ? (
@@ -105,7 +108,7 @@ function ReviewReport({ report }: { readonly report: AdminSafetyReportDto }) {
                   value={member}
                   options={report.reportedMembers.map((m) => ({
                     value: m.userId,
-                    label: m.name ?? "Unnamed member",
+                    label: m.name ?? t("Unnamed member"),
                   }))}
                   onChange={(event) => setMember(event.target.value)}
                 />

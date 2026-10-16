@@ -92,24 +92,30 @@ const money = (amount: string, currency: string) =>
 
 const shortDoc = (id: string) => `Shared document ${id.slice(0, 8)}`;
 
-export function termsLine(terms: NonNullable<DealViewDto["terms"]>): string {
+/** The terms in one line; `t` puts the words in the reader's language. */
+export function termsLine(
+  terms: NonNullable<DealViewDto["terms"]>,
+  t: (english: string) => string = (english) => english,
+): string {
   const parts = [
-    `${INSTRUMENTS.find((i) => i.code === terms.instrument)?.label ?? terms.instrument} · ${money(terms.amount, terms.currencyCode)}`,
+    `${t(INSTRUMENTS.find((i) => i.code === terms.instrument)?.label ?? terms.instrument)} · ${money(terms.amount, terms.currencyCode)}`,
   ];
   if (terms.valuationCap !== null) {
     parts.push(
-      `cap ${money(terms.valuationCap, terms.currencyCode)}${terms.valuationBasis === "PRE_MONEY" ? " pre-money" : " post-money"}`,
+      t(
+        `cap ${money(terms.valuationCap, terms.currencyCode)}${terms.valuationBasis === "PRE_MONEY" ? " pre-money" : " post-money"}`,
+      ),
     );
   }
   if (terms.preMoneyValuation !== null) {
     parts.push(
-      `pre-money ${money(terms.preMoneyValuation, terms.currencyCode)}`,
+      t(`pre-money ${money(terms.preMoneyValuation, terms.currencyCode)}`),
     );
   }
   if (terms.discountPercent !== null)
-    parts.push(`${terms.discountPercent}% discount`);
+    parts.push(t(`${terms.discountPercent}% discount`));
   if (terms.proRata !== null)
-    parts.push(terms.proRata ? "pro-rata" : "no pro-rata");
+    parts.push(t(terms.proRata ? "pro-rata" : "no pro-rata"));
   return parts.join(" · ");
 }
 
@@ -253,25 +259,29 @@ function TermsForm({
     ...(document === "" ? {} : { termsDocumentId: document }),
   };
   const preview = [
-    `${INSTRUMENTS.find((i) => i.code === instrument)?.label ?? instrument}, ${amount.amount === "" ? "no amount" : money(amount.amount, amount.currency)}`,
+    `${t(INSTRUMENTS.find((i) => i.code === instrument)?.label ?? instrument)}, ${amount.amount === "" ? t("no amount") : money(amount.amount, amount.currency)}`,
     terms.valuationCap === undefined
       ? null
-      : `cap ${money(terms.valuationCap, amount.currency)} ${basis === "PRE_MONEY" ? "pre-money" : "post-money"}`,
+      : t(
+          `cap ${money(terms.valuationCap, amount.currency)} ${basis === "PRE_MONEY" ? "pre-money" : "post-money"}`,
+        ),
     terms.preMoneyValuation === undefined
       ? null
-      : `pre-money valuation ${money(terms.preMoneyValuation, amount.currency)}`,
+      : t(
+          `pre-money valuation ${money(terms.preMoneyValuation, amount.currency)}`,
+        ),
     terms.discountPercent === undefined
       ? null
-      : `${terms.discountPercent}% discount`,
+      : t(`${terms.discountPercent}% discount`),
     terms.proRata === undefined
-      ? "pro-rata not stated"
+      ? t("pro-rata not stated")
       : terms.proRata
-        ? "pro-rata right"
-        : "no pro-rata right",
+        ? t("pro-rata right")
+        : t("no pro-rata right"),
     terms.otherTerms ?? null,
     terms.termsDocumentId === undefined
-      ? "no document attached"
-      : shortDoc(terms.termsDocumentId),
+      ? t("no document attached")
+      : t(shortDoc(terms.termsDocumentId)),
   ].filter((part): part is string => part !== null);
 
   return (
@@ -514,7 +524,7 @@ export function RelationshipDeal({
           <p className="cq-body text-(--cq-text-primary)">
             <strong>{t("Investment closed")}</strong> {t("on")}{" "}
             {t(dealDay(view.end.at))}
-            {view.terms === null ? "" : t(`: ${termsLine(view.terms)}`)}
+            {view.terms === null ? "" : `: ${termsLine(view.terms, t)}`}
             {t(". This is the final state; the history and reports stay.")}
           </p>
           {side === "INVESTOR" ? (
@@ -595,7 +605,7 @@ export function RelationshipDeal({
             {t("on")} {t(dealDay(view.terms.recordedAt))}
           </span>
           <span className="cq-body text-(--cq-text-primary)">
-            {t(termsLine(view.terms))}
+            {termsLine(view.terms, t)}
           </span>
           <span className="cq-body-sm text-(--cq-text-secondary)">
             {view.terms.signedAt === null
@@ -688,7 +698,7 @@ export function RelationshipDeal({
                 }
               >
                 <p className="cq-body text-(--cq-text-primary)">
-                  {t(termsLine(view.terms))}
+                  {termsLine(view.terms, t)}
                 </p>
                 <p className="cq-body-sm text-(--cq-text-secondary)">
                   {signedDoc === "" ? "" : t(shortDoc(signedDoc))}

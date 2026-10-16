@@ -169,4 +169,8 @@ export const DAILY_AR: Readonly<Record<string, string>> = {
   Calls: "المكالمات",
   Discover: "اكتشف",
   Relationships: "العلاقات",
+  CSV: "CSV",
+  "{n} coming up": "{n} قادمة",
+  "{n}% confirmed, {n2}% with soft commitments":
+    "{n}% مؤكد، و{n2}% بالتزامات مبدئية",
 };

@@ -499,4 +499,8 @@ export const DOCUMENTS_AR: Readonly<Record<string, string>> = {
   "Loading…": "جارٍ التحميل…",
   Home: "الرئيسية",
   End: "النهاية",
+  days: "أيام",
+  "{n} questions from {name}": "{n} أسئلة من {name}",
+  "1 question from {name}": "سؤال واحد من {name}",
+  "From your profile.": "من ملفك.",
 };

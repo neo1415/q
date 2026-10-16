@@ -85,7 +85,10 @@ function DeckChoice({ deck }: { readonly deck: DeckRow }) {
         id={`${id}-audience`}
         label={t("Who can download it")}
         description={t(deckAudienceDescription(audience))}
-        options={DECK_AUDIENCE_OPTIONS}
+        options={DECK_AUDIENCE_OPTIONS.map((option) => ({
+          ...option,
+          label: t(option.label),
+        }))}
         value={audience}
         onChange={(event) =>
           setAudience(

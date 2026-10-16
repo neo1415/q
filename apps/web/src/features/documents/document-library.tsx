@@ -697,9 +697,9 @@ export function DocumentLibrary({
               value={sort}
               onChange={(event) => setSort(event.target.value as LibrarySort)}
               options={[
-                { value: "RECENT", label: "Recent" },
-                { value: "NAME", label: "Name" },
-                { value: "TYPE", label: "Type" },
+                { value: "RECENT", label: t("Recent") },
+                { value: "NAME", label: t("Name") },
+                { value: "TYPE", label: t("Type") },
               ]}
               data-documents-sort
             />
@@ -1134,7 +1134,7 @@ function DeckShareDialog({
           }
           options={DECK_AUDIENCE_OPTIONS.map((option) => ({
             value: option.value,
-            label: option.label,
+            label: t(option.label),
           }))}
         />
         {error === null ? null : (

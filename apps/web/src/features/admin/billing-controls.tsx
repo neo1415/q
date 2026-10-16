@@ -58,7 +58,10 @@ export function AssignPlan({
         id={trialId}
         label={t("Ends")}
         value={trial}
-        options={TRIALS}
+        options={TRIALS.map((option) => ({
+          ...option,
+          label: t(option.label),
+        }))}
         onChange={(event) => setTrial(event.target.value)}
       />
       <ReasonAction

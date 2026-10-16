@@ -52,7 +52,10 @@ export function GrantRole() {
         id={roleId}
         label={t("Role")}
         value={role}
-        options={ROLE_OPTIONS}
+        options={ROLE_OPTIONS.map((option) => ({
+          ...option,
+          label: t(option.label),
+        }))}
         onChange={(e) => setRole(e.target.value)}
       />
       <Textarea

@@ -203,8 +203,11 @@ export function FindView({
         <>
           <div className="gq-sect-h">
             <h2 className="cq-label gq-t2">
-              {results.length} {t("compan")}
-              {results.length === 1 ? "y matches" : "ies match"}
+              {t(
+                results.length === 1
+                  ? "1 company matches"
+                  : `${String(results.length)} companies match`,
+              )}
             </h2>
             <Button
               size="compact"
