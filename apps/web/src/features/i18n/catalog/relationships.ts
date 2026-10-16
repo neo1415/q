@@ -312,8 +312,8 @@ export const RELATIONSHIPS_AR: Readonly<Record<string, string>> = {
   "Q's work couldn't be read right now. Nothing is lost.":
     "تعذّرت قراءة عمل Q الآن. لم يُفقد شيء.",
   "Read the report": "اقرأ التقرير",
-  "Fit and interest": "الملاءمة والاهتمام",
-  "Fit with your mandate": "الملاءمة مع تفويضك الاستثماري",
+  "Fit and interest": "التوافق والاهتمام",
+  "Fit with your mandate": "التوافق مع تفويضك",
   "From your declared mandate and what the company has shared. Unknown stays unknown.":
     "بناءً على تفويضك المُعلَن وما شاركته الشركة. ما هو غير معروف يبقى غير معروف.",
   "Your interest": "اهتمامك",

@@ -25,6 +25,7 @@ import { useFeedSound } from "../discover/player/sound-policy";
 import { useReducedMotionPreference } from "../discover/player/use-pitch-playback";
 import { KeyHints, PitchStage } from "../discover/stage/pitch-stage";
 import { REASON_WORDS, RELATED_WORDS } from "./explore-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The opened pitch (E3): Discover's own stage (founder 2026-10-08: "when
@@ -102,6 +103,7 @@ export function ExploreFeed({
   /** Design review with fixtures: posters only. */
   readonly posterOnly?: boolean;
 }) {
+  const t = useT();
   const anchor = items[0];
   const [active, setActive] = useState(() =>
     Math.max(0, Math.min(initialIndex, items.length - 1)),
@@ -214,7 +216,7 @@ export function ExploreFeed({
               type="button"
               className="cq-explore-stage-button"
               onClick={onClose}
-              aria-label="Back to Explore"
+              aria-label={t("Back to Explore")}
               data-explore-back
             >
               <ArrowLeft

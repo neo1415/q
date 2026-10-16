@@ -1,4 +1,6 @@
 import type { ProfileMaterialPort } from "./tools/profile-material.js";
+import type { OnboardingTranscriptPort } from "./tools/onboarding-transcript.js";
+import type { PreferenceLearningPort } from "./tools/preference-learning.js";
 import type { AttentionPort } from "./tools/attention.js";
 import type { InvestorGateFitDto } from "@capital-q/contracts";
 
@@ -581,6 +583,10 @@ export type QToolPorts = {
   readonly recordChanges?: RecordChangePort | undefined;
   /** R33: reads of their own records. */
   readonly ownRecords?: OwnRecordsPort | undefined;
+  /** Lane ob1: their own setup conversation, for their own later questions. */
+  readonly onboardingTranscript?: OnboardingTranscriptPort | undefined;
+  /** Lane ob1: their answer to "may Q learn how you like to work?". */
+  readonly preferenceLearning?: PreferenceLearningPort | undefined;
   /** Overnight A8: a company's deck and data room, as the person's tabs show them. */
   readonly profileMaterial?: ProfileMaterialPort | undefined;
   /** R33: their organisation's uploaded documents (metadata). */
@@ -665,12 +671,17 @@ export type PendingProposalPort = {
   /**
    * Approves exactly this proposal's stored payload and reports its status
    * afterwards. CHANGED: the stored payload no longer matches what was
-   * proposed, so nothing was approved.
+   * proposed, so nothing was approved. CARD_ONLY: a kind that keeps the
+   * card's own Approve (money, terms, sharing a private document), so
+   * nothing was approved by words. PENDING: nothing the person said since
+   * the card was shown stands as their approval, so nothing was approved.
    */
   readonly approve: (
     context: PendingProposalContext,
     proposalId: string,
-  ) => Promise<{ readonly status: ProposalPlainStatus | "CHANGED" }>;
+  ) => Promise<{
+    readonly status: ProposalPlainStatus | "CHANGED" | "CARD_ONLY";
+  }>;
   /**
    * R33: declines exactly this proposal through the Approval Engine's own
    * reject, the call the card's Decline button makes, and reports its

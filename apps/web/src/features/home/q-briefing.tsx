@@ -9,6 +9,7 @@ import type { Briefing, BriefingItem } from "./briefing";
 import { decideBriefing } from "./briefing-gate";
 import { remindSetupLaterAction } from "./setup-nudge-actions";
 import { useClaimWhenSeen } from "./use-claim-when-seen";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q's briefing on arrival (R35): one short line and a few cards, each a
@@ -46,6 +47,7 @@ function SetupNudgeCard({
   readonly item: BriefingItem;
   readonly onLater: () => void;
 }) {
+  const t = useT();
   // Today's reminder is counted once this card is really seen.
   const ref = useRef<HTMLDivElement>(null);
   useClaimWhenSeen(ref, true);
@@ -68,7 +70,7 @@ function SetupNudgeCard({
           href={item.href}
           className={`${QUIET_CONTROL_CLASS} font-medium text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)`}
         >
-          Continue
+          {t("Continue")}
         </Link>
         <button
           type="button"
@@ -76,7 +78,7 @@ function SetupNudgeCard({
           className={`${QUIET_CONTROL_CLASS} text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)`}
           data-setup-nudge-later
         >
-          Later
+          {t("Remind me next week")}
         </button>
       </span>
     </div>
@@ -85,8 +87,11 @@ function SetupNudgeCard({
 
 export function QBriefing({
   briefing,
+  onlyReminder = false,
 }: {
   readonly briefing: Promise<Briefing | null>;
+  /** Only today's setup reminder card, without the line (the arrival's). */
+  readonly onlyReminder?: boolean | undefined;
 }) {
   const [shown, setShown] = useState<Briefing | null>(null);
   const [putOff, setPutOff] = useState<ReadonlySet<string>>(new Set());
@@ -105,7 +110,9 @@ export function QBriefing({
   }, [briefing]);
 
   if (shown === null) return null;
-  const items = shown.items.filter((item) => !putOff.has(item.id));
+  const items = shown.items.filter(
+    (item) => !putOff.has(item.id) && (!onlyReminder || item.later === true),
+  );
   if (items.length === 0) return null;
   const later = (id: string) => {
     setPutOff((before) => new Set([...before, id]));
@@ -113,13 +120,17 @@ export function QBriefing({
   };
   return (
     <section
-      aria-labelledby="q-briefing-line"
+      {...(onlyReminder
+        ? { "aria-label": "Your setup" }
+        : { "aria-labelledby": "q-briefing-line" })}
       className="flex w-full flex-col gap-2"
       data-q-briefing
     >
-      <p id="q-briefing-line" className="cq-body text-(--cq-text-primary)">
-        {shown.line}
-      </p>
+      {onlyReminder ? null : (
+        <p id="q-briefing-line" className="cq-body text-(--cq-text-primary)">
+          {shown.line}
+        </p>
+      )}
       <ul className="grid w-full gap-2 sm:grid-cols-2">
         {items.map((item) => (
           <li key={item.id} className="flex">

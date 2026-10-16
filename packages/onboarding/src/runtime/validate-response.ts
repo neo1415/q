@@ -354,5 +354,6 @@ export function validateOnboardingResponse(
     rawText: value.type === "TEXT" ? value.text : null,
     note: input.note ?? null,
     sourceModality,
+    channel: input.channel ?? null,
   };
 }

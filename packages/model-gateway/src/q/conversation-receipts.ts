@@ -562,6 +562,8 @@ export function approvalStatusLine(data: unknown): string | null {
       return "Not saved: that change is no longer exactly what you were shown, so I didn't approve it. Ask me to prepare it again.";
     case "EXPIRED":
       return "Not saved: that approval has lapsed. Ask me to prepare it again.";
+    case "CARD_ONLY":
+      return "Not approved yet: this one involves money, terms or sharing a private document, so it needs your tap on Approve on its card.";
     case "ALREADY_DECIDED":
       switch (proposal?.status ?? "") {
         case "SAVED":

@@ -216,6 +216,7 @@ export function registerQApprovalRoutes(
         actor,
         approvalId: approvalIdParam(request),
         correlationId,
+        via: { channel: "CARD" },
       });
       if (result.decided) {
         void dependencies

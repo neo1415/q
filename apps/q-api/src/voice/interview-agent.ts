@@ -10,7 +10,10 @@ import {
   type ModelMessage,
   type OnboardingSessionView,
 } from "@capital-q/contracts";
-import { FOUNDER_STEPS } from "@capital-q/founder-onboarding";
+import {
+  COUNTRY_OPTIONS_V5,
+  FOUNDER_STEPS,
+} from "@capital-q/founder-onboarding";
 import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
 import {
   acceptStructuredOutput,
@@ -23,6 +26,7 @@ import {
   type QTurnAuthority,
 } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
+import { knownFactsFromRegistration } from "@capital-q/onboarding";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
@@ -71,10 +75,17 @@ import {
   type StandingStore,
 } from "./standing.js";
 import {
+  coverageProfileFor,
   createOnboardingPort,
   type RecommendationStore,
 } from "./onboarding-port.js";
+import type { HeldWritesStore } from "./held-writes.js";
 import { createReplySentenceStream } from "./reply-stream.js";
+import {
+  firstNameOf,
+  onboardingFlowFor,
+  withNextQuestion,
+} from "./onboarding-flow.js";
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
@@ -290,6 +301,11 @@ export type InterviewAgentDependencies = {
   readonly now?: (() => number) | undefined;
   /** The whole turn's deadline; tests shorten it. */
   readonly turnDeadlineMs?: number | undefined;
+  /**
+   * Durable hold for confirmed answers a temporary failure kept from
+   * saving (lane ob1). Absent: such a failure is reported, not held.
+   */
+  readonly heldWrites?: HeldWritesStore | undefined;
 };
 
 export type RaisedChecks = {
@@ -400,6 +416,20 @@ export type JourneyOpenings = {
     readonly { readonly stepKey: string; readonly words: string }[] | undefined;
 };
 
+/** The company's country on the record, in words: a research anchor (lane ob1). */
+function countryLabelOf(view: OnboardingSessionView | null): string | null {
+  const value = view?.responses.find(
+    (r) => r.stepKey === FOUNDER_STEPS.country,
+  )?.value;
+  if (value?.type !== "SINGLE_SELECT" || value.optionKey === "other") {
+    return null;
+  }
+  return (
+    COUNTRY_OPTIONS_V5.find((o) => o.optionKey === value.optionKey)?.label ??
+    null
+  );
+}
+
 export function turnNotesFor(input: {
   readonly pausing: boolean;
   /** Research first (BIZ-009): what to say about it this turn, once. */
@@ -417,8 +447,44 @@ export function turnNotesFor(input: {
    * the website, description and pitch deck never asked).
    */
   readonly open?: JourneyOpenings | undefined;
+  /**
+   * Held changes replayed before this turn (lane ob1), by question: now
+   * saved, refused on replay, or still held because a service is down.
+   */
+  /** Proactive flow guidance (owner 2026-10-16), first among the notes. */
+  readonly flow?: string | undefined;
+  readonly held?:
+    | {
+        readonly applied: readonly string[];
+        readonly refused: readonly string[];
+        readonly stillPending: readonly string[];
+      }
+    | undefined;
 }): string {
   const notes: string[] = [];
+  if (input.flow !== undefined && input.flow.length > 0) {
+    notes.push(input.flow);
+  }
+  const held = input.held;
+  if (held !== undefined) {
+    const list = (items: readonly string[]) =>
+      items.map((q) => `"${q.slice(0, 80)}"`).join(", ");
+    if (held.applied.length > 0) {
+      notes.push(
+        `What they confirmed earlier that could not be saved at the time is now saved: ${list(held.applied)}. Say so in one short sentence.`,
+      );
+    }
+    if (held.refused.length > 0) {
+      notes.push(
+        `What they confirmed earlier could not be saved after all, because it was not accepted: ${list(held.refused)}. Say so plainly and ask for it again.`,
+      );
+    }
+    if (held.stillPending.length > 0) {
+      notes.push(
+        `Still held and NOT saved yet (a service is briefly unavailable): ${list(held.stillPending)}. Never say these are saved, and do not ask them again.`,
+      );
+    }
+  }
   if (input.pausing) {
     notes.push(
       "They want to pause and come back later: acknowledge it in one short sentence, say their answers are kept, and ask nothing.",
@@ -744,6 +810,14 @@ export function createInterviewAgent(
         ? dependencies.investorResearch
         : dependencies.founderResearch
       )?.unsaid(input.onboardingSessionId),
+      held: dependencies.heldWrites?.bind({
+        userId: actor.userId,
+        sessionId: input.onboardingSessionId,
+      }),
+      knownFacts: knownFactsFromRegistration(
+        coverageProfileFor(input.journeyType),
+        input.signup ?? null,
+      ),
     });
     // The newest turns verbatim, the older ones as a bounded summary
     // (P0-5): the whole conversation, within a fixed budget.
@@ -848,6 +922,8 @@ export function createInterviewAgent(
               : textAnswerOf(view, FOUNDER_STEPS.website) || null),
           profileUrls: links?.profileUrls ?? [],
           personName: input.signup?.displayName ?? null,
+          country:
+            input.journeyType === "founder" ? countryLabelOf(view) : null,
         },
       }) ?? false;
     const linksTool =
@@ -905,9 +981,42 @@ export function createInterviewAgent(
     // No stuck steps: what the platform already holds (the journey they
     // chose answers F0.intent) is on the record before any model reads the
     // turn. Every turn, so a session already stuck on one is repaired.
+    // Held changes first (lane ob1): what they confirmed while a service
+    // was down is saved now, through the ordinary submit, before anything
+    // reads the record; never twice, never claimed early.
+    const replay = await port.replayHeld().catch(() => null);
+    const questionOf = (stepKey: string): string =>
+      SPOKEN_QUESTIONS[stepKey] ??
+      journeySteps.find((s) => s.stepKey === stepKey)?.configuration.prompt ??
+      stepKey;
+    const heldNote =
+      replay === null ||
+      replay.applied.length +
+        replay.refused.length +
+        replay.stillPending.length ===
+        0
+        ? undefined
+        : {
+            applied: replay.applied.map(questionOf),
+            refused: replay.refused.map((r) => questionOf(r.stepKey)),
+            stillPending: replay.stillPending.map(questionOf),
+          };
     await settleKnownAnswers(port, input.journeyType);
     await prefillFromSignup();
     let state = await port.state();
+    const flowFor = (current: typeof state) =>
+      onboardingFlowFor({
+        journey: input.journeyType,
+        opening,
+        state: current,
+        firstName: firstNameOf(input.signup?.displayName ?? null),
+        knownName:
+          (input.journeyType === "founder"
+            ? textAnswerOf(port.view(), FOUNDER_STEPS.companyName)
+            : firmNameOf(port.view(), null)) ||
+          (input.signup?.organisationName?.trim() ?? "") ||
+          null,
+      });
     if (research !== undefined) {
       considerResearch(port.view());
       // What research found and can now be offered is held before the
@@ -1099,11 +1208,13 @@ export function createInterviewAgent(
           : null;
       const pausing = authority.pausing && !opening;
       const turnNotes = turnNotesFor({
+        flow: pausing ? undefined : flowFor(state).note,
         pausing,
         lookup,
         pronounce,
         research: researchNote,
         open,
+        held: heldNote,
       });
       return {
         authority,
@@ -1427,7 +1538,7 @@ export function createInterviewAgent(
         : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.");
     // Never the previous question word for word (QA 2026-10-03): what they
     // said is acknowledged first, and the question comes in other words.
-    const reply = notVerbatim(replyWritten, lastQTurn ?? null, {
+    let reply = notVerbatim(replyWritten, lastQTurn ?? null, {
       asking: result?.asking ?? null,
       alternate: (stepKey) => {
         const step = journeySteps.find((s) => s.stepKey === stepKey);
@@ -1492,8 +1603,9 @@ export function createInterviewAgent(
         : steps.get(result.asking);
     // A step whose concept is settled is never offered as the question,
     // whatever the reply asked (one concept, one answer).
+    const stateAfter = await port.state().catch(() => null);
     const covered = new Set(
-      (await port.state().catch(() => null))?.steps
+      stateAfter?.steps
         .filter((row) => row.coveredBy !== undefined)
         .map((row) => row.stepKey) ?? [],
     );
@@ -1546,6 +1658,36 @@ export function createInterviewAgent(
           e.status !== "COMPLETED" &&
           e.status !== "SKIPPED",
       );
+
+    // Proactive (owner 2026-10-16): a turn that is not the last never ends
+    // without the next most valuable question, from coverage. Not while a
+    // look-up takes over the line, they are pausing, or the model failed.
+    if (
+      result !== undefined &&
+      !handingOver &&
+      !pausing &&
+      stateAfter !== null &&
+      !stateAfter.completed
+    ) {
+      const backed = withNextQuestion(
+        reply,
+        onboardingFlowFor({
+          journey: input.journeyType,
+          opening: false,
+          state: stateAfter,
+          firstName: null,
+          knownName: null,
+        }),
+        stateAfter.completed,
+      );
+      if (backed !== reply) {
+        logger.info(
+          {},
+          "interview reply asked nothing; the next question was added",
+        );
+        reply = backed;
+      }
+    }
 
     // Kept: one exchange per turn, under one reference.
     const turns = [
@@ -1642,7 +1784,12 @@ export function createInterviewAgent(
             : "PROFILE"
           : conduct.action === "ROUTE_AWAY"
             ? "DISCOVER"
-            : null,
+            : // Owner 2026-10-16, "continue later": Q has acknowledged it
+              // in one line (the pausing note), and the person is let
+              // into the app; their saved answers wait where they are.
+              pausing
+              ? "HOME"
+              : null,
       handoff: null,
       pronounce,
       warnings: conduct.state.strikes,

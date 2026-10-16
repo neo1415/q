@@ -1,8 +1,9 @@
 "use client";
 
+import { PreferenceLearningAsk } from "@/features/settings/preference-learning";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ChevronRight, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
@@ -10,13 +11,18 @@ import { askQAction, type QSubjectInput } from "@/features/q/actions";
 import { useQSurfaceTools } from "@/features/q/q-surface-tools";
 
 import { ArrivalBriefing } from "@/features/briefing/arrival-briefing";
-import { useArrivalStatus } from "@/features/briefing/arrival-store";
+import {
+  setArrivalSetupReminders,
+  useArrivalStatus,
+  useOpener,
+} from "@/features/briefing/arrival-store";
 
 import type { Briefing } from "./briefing";
 import { QBriefing } from "./q-briefing";
 import type { ReturningCard, ReturningGreeting } from "./returning";
 import { remindSetupLaterAction } from "./setup-nudge-actions";
 import { useClaimWhenSeen } from "./use-claim-when-seen";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q welcoming somebody back (CQ-WEB-030; acceptance A and K).
@@ -67,6 +73,7 @@ export function ReturningWelcome({
   cards,
   subject,
   briefing,
+  setupReminders = 0,
 }: {
   readonly greeting: ReturningGreeting;
   readonly cards: readonly ReturningCard[];
@@ -74,22 +81,36 @@ export function ReturningWelcome({
   readonly subject: QSubjectInput | undefined;
   /** Q's briefing (R35), streamed from the server after the page. */
   readonly briefing?: Promise<Briefing | null> | undefined;
+  /** Today's setup reminder, as `setupRemindersWaiting` counts it. */
+  readonly setupReminders?: 0 | 1 | undefined;
 }) {
+  const t = useT();
   const router = useRouter();
   const tools = useQSurfaceTools();
   const arrival = useArrivalStatus();
-  const arrived = arrival.kind === "READY" && !arrival.nudge;
+  // Still being read counts as arrived: on sign-in Q greets and asks
+  // before anything is listed (owner 2026-10-16), so the older briefing's
+  // cards never flash up first.
+  const arrived =
+    arrival.kind === "PENDING" || (arrival.kind === "READY" && !arrival.nudge);
   const [asking, setAsking] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Today's setup reminder, when this welcome carries it: counted once the
   // cards are really seen, and gone at once on Later.
   const [putOff, setPutOff] = useState(false);
-  const reminding = !putOff && cards.some((card) => card.reminder === true);
+  // Owner 2026-10-16: the reminder is one of the things Q's opener counts,
+  // and shows with the rest only once they choose to look.
+  useEffect(() => {
+    setArrivalSetupReminders(setupReminders);
+  }, [setupReminders]);
+  const looking = useOpener().choice === "SHOW";
+  const held = arrived && !looking;
+  const reminding =
+    !putOff && !held && cards.some((card) => card.reminder === true);
   const cardsRef = useRef<HTMLUListElement>(null);
   useClaimWhenSeen(cardsRef, reminding);
-  const shownCards = putOff
-    ? cards.filter((card) => card.reminder !== true)
-    : cards;
+  const shownCards =
+    putOff || held ? cards.filter((card) => card.reminder !== true) : cards;
 
   const ask = async (card: ReturningCard, prompt: string) => {
     if (asking !== null) return;
@@ -147,7 +168,7 @@ export function ReturningWelcome({
         }
       />
 
-      {greeting.leftOff === null || putOff ? null : (
+      {greeting.leftOff === null || putOff || held ? null : (
         // Q's own last question, as Q asked it: where they left off is
         // shown, not paraphrased.
         <figure
@@ -155,7 +176,7 @@ export function ReturningWelcome({
           data-q-left-off
         >
           <figcaption className="cq-caption text-(--cq-text-tertiary)">
-            Where we left off
+            {t("Where we left off")}
           </figcaption>
           <blockquote className="cq-body text-(--cq-text-primary)">
             {greeting.leftOff}
@@ -164,14 +185,18 @@ export function ReturningWelcome({
       )}
 
       {/* The arrival briefing carries what waits on them; not said twice. */}
-      {briefing === undefined || arrived ? null : (
+      {briefing === undefined ? null : !arrived ? (
         <QBriefing briefing={briefing} />
-      )}
+      ) : looking && setupReminders > 0 ? (
+        // The reminder the briefing carries, now they chose to look; the
+        // rest of what waits is on the stage already, not said twice.
+        <QBriefing briefing={briefing} onlyReminder />
+      ) : null}
 
       {shownCards.length > 0 ? (
         <ul
           ref={cardsRef}
-          aria-label="Where to start"
+          aria-label={t("Where to start")}
           className="grid w-full gap-2 sm:grid-cols-2"
           data-q-returning-cards
         >
@@ -231,9 +256,16 @@ export function ReturningWelcome({
           className="inline-flex min-h-11 items-center px-3 cq-body-sm text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           data-setup-reminder-later
         >
-          Remind me later
+          {t("Remind me next week")}
         </button>
       ) : null}
+
+      {/*
+        Lane ob1: once, after the greeting and its choices, never before:
+        may Q learn how they like to work? Renders nothing unless asking
+        is due (never answered, or "Not now" more than 30 days ago).
+      */}
+      <PreferenceLearningAsk />
 
       {/* Polite, so a failed ask is read out without taking focus. */}
       <p

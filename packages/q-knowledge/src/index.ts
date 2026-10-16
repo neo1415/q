@@ -351,3 +351,15 @@ export {
   type CompactThreadOptions,
   type ThreadTurn,
 } from "./memory/thread.js";
+
+export {
+  createPostgresPreferenceLearningConsent,
+  NOT_NOW_DAYS,
+  PREFERENCE_LEARNING_POLICY_VERSION,
+  preferenceLearningState,
+  type PreferenceLearningChoice,
+  type PreferenceLearningConsent,
+  type PreferenceLearningState,
+  type PreferenceLearningStatus,
+  type PreferenceLearningVia,
+} from "./memory/learning-consent.js";

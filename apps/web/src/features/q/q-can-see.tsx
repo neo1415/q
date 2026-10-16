@@ -8,6 +8,7 @@ import { Eye, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import { manifestVersion, seeingNow, subscribeManifest } from "./manifest";
 import { screenOf } from "./screen";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q room R1: a subtle "Q can see: …" line on the Q page and in the dock,
@@ -130,6 +131,7 @@ function seeingSnapshot(pathname: string): string {
 }
 
 export function QCanSee({ className }: { readonly className?: string }) {
+  const t = useT();
   const pathname = usePathname();
   // The line is a string, so React compares it by value: it re-renders
   // only when what Q can see has changed. Nothing on the server render.
@@ -151,7 +153,7 @@ export function QCanSee({ className }: { readonly className?: string }) {
         strokeWidth={ICON_STROKE}
         className="flex-none"
       />
-      <span className="flex-none">Q can see:</span>
+      <span className="flex-none">{t("Q can see:")}</span>
       <span className="min-w-0 truncate">{line}</span>
     </p>
   );

@@ -13,6 +13,11 @@ import {
 } from "../src/domain/nudge-policy.js";
 
 const DAY = 24 * 60 * 60 * 1000;
+/** The pre-2026-10-16 surfaces, to keep the Q-conversation mechanics tested. */
+const BOTH = {
+  ...ONBOARDING_NUDGE_POLICY,
+  surfaces: ["BRIEFING", "Q_NOTE"] as const,
+};
 const START = Date.parse("2026-09-01T09:00:00Z");
 const at = (days: number, hours = 0) =>
   new Date(START + days * DAY + hours * 60 * 60 * 1000);
@@ -46,6 +51,7 @@ function simulate(
       state: current,
       now,
       surface,
+      config: BOTH,
     });
     if (decision.due) {
       shown.push(day);
@@ -100,12 +106,25 @@ describe("onboarding nudge policy", () => {
     }
   });
 
-  it("backs off: daily, then every 2, 4, then weekly at most (≤50%)", () => {
-    expect(simulate(progress(2), 40)).toEqual([0, 1, 3, 7, 14, 21, 28, 35]);
+  it("backs off (owner 2026-10-16): daily for three days, then every 3-4 days, then weekly", () => {
+    expect(simulate(progress(2), 40)).toEqual([0, 1, 2, 5, 9, 16, 23, 30, 37]);
   });
 
-  it("starts lighter past halfway", () => {
-    expect(simulate(progress(6), 30)).toEqual([0, 2, 6, 13, 20, 27]);
+  it("keeps the same schedule past halfway (lighter words, not fewer days)", () => {
+    expect(simulate(progress(6), 40)).toEqual([0, 1, 2, 5, 9, 16, 23, 30, 37]);
+  });
+
+  it("is given only on Home arrival, never inside a Q conversation", () => {
+    expect(
+      decideOnboardingNudge({
+        progress: progress(2),
+        state: EMPTY_NUDGE_STATE,
+        now: at(0),
+        surface: "Q_NOTE",
+        conversationId: "c-1",
+      }),
+    ).toEqual({ due: false, reason: "SURFACE_OFF" });
+    expect(ONBOARDING_NUDGE_POLICY.surfaces).toEqual(["BRIEFING"]);
   });
 
   it("never twice in one calendar day, whichever surface", () => {
@@ -118,7 +137,13 @@ describe("onboarding nudge policy", () => {
     });
     for (const surface of ["BRIEFING", "Q_NOTE"] as const) {
       expect(
-        decideOnboardingNudge({ progress: p, state, now: at(0, 10), surface }),
+        decideOnboardingNudge({
+          progress: p,
+          state,
+          now: at(0, 10),
+          surface,
+          config: BOTH,
+        }),
       ).toEqual({ due: false, reason: "ALREADY_TODAY" });
     }
   });
@@ -139,6 +164,7 @@ describe("onboarding nudge policy", () => {
         now: at(9),
         surface: "Q_NOTE",
         conversationId: "c-1",
+        config: BOTH,
       }),
     ).toEqual({ due: false, reason: "ALREADY_IN_CONVERSATION" });
     expect(
@@ -148,6 +174,7 @@ describe("onboarding nudge policy", () => {
         now: at(9),
         surface: "Q_NOTE",
         conversationId: "c-2",
+        config: BOTH,
       }).due,
     ).toBe(true);
   });
@@ -195,14 +222,14 @@ describe("onboarding nudge policy", () => {
     ).toBe(1);
   });
 
-  it("'remind me later' holds for three days", () => {
+  it("'remind me next week' holds for seven days", () => {
     const p = progress(2);
     const state = recordNudgeChoice({
       state: EMPTY_NUDGE_STATE,
       choice: "LATER",
       now: at(0),
     });
-    for (const day of [0, 1, 2]) {
+    for (const day of [0, 1, 2, 3, 4, 5, 6]) {
       expect(
         decideOnboardingNudge({
           progress: p,
@@ -216,7 +243,7 @@ describe("onboarding nudge policy", () => {
       decideOnboardingNudge({
         progress: p,
         state,
-        now: at(3, 1),
+        now: at(7, 1),
         surface: "BRIEFING",
       }).due,
     ).toBe(true);

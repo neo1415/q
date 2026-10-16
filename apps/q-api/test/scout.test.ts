@@ -18,7 +18,7 @@ describe("the scout", () => {
     expect(scoutQuery("Kazikit", "not a url")).toBe('"Kazikit" news');
   });
 
-  it("opens with what it found when there is no call or notes first", () => {
+  it("a finding is something waiting, said as such, never read out", () => {
     expect(
       composeReturningOpener(
         "Zino",
@@ -33,7 +33,8 @@ describe("the scout", () => {
         new Date("2026-09-30T08:00:00Z"),
       ),
     ).toBe(
-      'Hi Zino. I spotted something new about your company: "Zino Aviation opens a Lagos hangar". Want the gist?',
+      // Owner 2026-10-16: the opener says things wait, never what.
+      "Hi Zino. You have a few things waiting. Would you like to look at them now, or talk about something else?",
     );
   });
 });

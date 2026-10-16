@@ -3,12 +3,13 @@ import { randomUUID } from "node:crypto";
 import type { OnboardingResponseValue } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
-import type {
-  OnboardingResponseRepository,
-  OnboardingSession,
-  OnboardingSessionRepository,
-  OnboardingSuggestionRepository,
-  OnboardingUtteranceRepository,
+import {
+  onboardingDocumentTreatment,
+  type OnboardingResponseRepository,
+  type OnboardingSession,
+  type OnboardingSessionRepository,
+  type OnboardingSuggestionRepository,
+  type OnboardingUtteranceRepository,
 } from "@capital-q/onboarding";
 import type { MandateDimension } from "@capital-q/q-core";
 import type { TenantId } from "@capital-q/security";
@@ -16,6 +17,8 @@ import type { TenantId } from "@capital-q/security";
 import {
   CURRENCY_OPTIONS,
   DISCOVERY_MODE_OPTIONS,
+  INVESTOR_COVERAGE_PROFILE,
+  INVESTOR_DOCUMENT_FIELDS,
   GEOGRAPHY_VOCABULARIES,
   INVESTMENT_ROLE_OPTIONS,
   INVESTOR_JOURNEY_TYPE,
@@ -67,6 +70,8 @@ export const MANDATE_REVIEW_SKIP_REASONS = [
   "SESSION_NOT_ACTIVE",
   /** The utterance belongs to no active investor session, or was read already. */
   "NO_UTTERANCE",
+  /** Lane ob1: not a readable investor upload (an LP letter, or sensitive). */
+  "NOT_FOR_ONBOARDING_READING",
 ] as const;
 export type MandateReviewSkipReason =
   (typeof MANDATE_REVIEW_SKIP_REASONS)[number];
@@ -80,6 +85,18 @@ export type MandateReviewResult =
       readonly blocked: MandateSynthesis["blocked"];
     }
   | { readonly kind: "SKIPPED"; readonly reason: MandateReviewSkipReason };
+
+/** Lane ob1: the investor uploads onboarding may read; LP_LETTER never. */
+const INVESTOR_READABLE_UPLOADS: ReadonlySet<string> = new Set([
+  "FUND_DECK",
+  "INVESTMENT_THESIS",
+]);
+
+/** The mandate fields a readable upload may propose for (coverage `informs`). */
+const INVESTOR_DOCUMENT_INFORMS: ReadonlySet<string> = new Set(
+  INVESTOR_COVERAGE_PROFILE.documentFields?.[INVESTOR_DOCUMENT_FIELDS.materials]
+    ?.informs ?? [],
+);
 
 /** The narrative steps whose commit triggers a reading. */
 export const MANDATE_NARRATIVE_STEP_KEYS: readonly string[] = [
@@ -155,7 +172,39 @@ export type MandateReviewServiceDependencies = {
     }[];
   }) => Promise<unknown>;
   readonly logger?: Logger | undefined;
+  /**
+   * Lane ob1: an investor's own fund deck or investment thesis, read by
+   * the same path as their narrative. Structural ports (the evidence and
+   * knowledge repositories satisfy them). Absent: uploads are not read.
+   */
+  readonly documents?:
+    | {
+        readonly findInTenant: (
+          executor: DatabaseExecutor,
+          tenantId: TenantId,
+          documentId: never,
+        ) => Promise<{
+          readonly documentType: string;
+          readonly sensitivityClass: string;
+          readonly companyId: string | null;
+          readonly createdByUserId: string;
+        } | null>;
+      }
+    | undefined;
+  readonly chunks?:
+    | {
+        readonly listActiveByVersion: (
+          executor: DatabaseExecutor,
+          tenantId: TenantId,
+          documentVersionId: never,
+        ) => Promise<readonly { readonly content: string }[]>;
+      }
+    | undefined;
 };
+
+/** How much of an investor document is read: the first passages, bounded. */
+const DOCUMENT_PASSAGES = 24;
+const DOCUMENT_CHARS = 12_000;
 
 export type MandateReview = {
   readonly onResponseCommitted: (event: {
@@ -167,6 +216,17 @@ export type MandateReview = {
   readonly onUtterance: (event: {
     readonly sessionId: string;
     readonly utteranceId: string;
+  }) => Promise<MandateReviewResult>;
+  /**
+   * Lane ob1: a processed upload. Only the investor's own FUND_DECK or
+   * INVESTMENT_THESIS is read, and only into proposals for the mandate
+   * fields an upload may inform; an LP letter, or anything highly
+   * confidential, is never read.
+   */
+  readonly onDocumentReady: (event: {
+    readonly tenantId: string;
+    readonly documentId: string;
+    readonly documentVersionId: string;
   }) => Promise<MandateReviewResult>;
 };
 
@@ -377,6 +437,8 @@ export function createMandateReview(
     tenantId: TenantId,
     narrative: string,
     sourceRefs: readonly { sourceType: string; sourceId: string }[],
+    /** Only these steps may be proposed for (a document's reading). Absent: any. */
+    allowedSteps?: ReadonlySet<string>,
   ): Promise<MandateReviewResult> => {
     const [current, pending] = await Promise.all([
       responses.listCurrent(sql, session.id),
@@ -735,6 +797,9 @@ export function createMandateReview(
 
     let created = 0;
     for (const draft of drafts) {
+      if (allowedSteps !== undefined && !allowedSteps.has(draft.stepKey)) {
+        continue;
+      }
       try {
         await createSuggestion({
           sessionId: session.id,
@@ -753,6 +818,11 @@ export function createMandateReview(
       }
     }
     let recorded = 0;
+    if (allowedSteps !== undefined) {
+      // A document's reading proposes; it never raises exclusion or
+      // ambiguity questions of its own.
+      questions.length = 0;
+    }
     if (questions.length > 0) {
       try {
         await recordQuestions({ sessionId: session.id, questions });
@@ -811,6 +881,58 @@ export function createMandateReview(
       return read(active.session, active.tenantId, narrative, [
         { sourceType: "ONBOARDING_RESPONSE", sourceId: event.responseId },
       ]);
+    },
+
+    onDocumentReady: async (event): Promise<MandateReviewResult> => {
+      const { documents, chunks } = dependencies;
+      if (documents === undefined || chunks === undefined) {
+        return { kind: "SKIPPED", reason: "NOT_FOR_ONBOARDING_READING" };
+      }
+      const document = await documents.findInTenant(
+        sql,
+        event.tenantId as TenantId,
+        event.documentId as never,
+      );
+      if (
+        document === null ||
+        document.companyId !== null ||
+        !INVESTOR_READABLE_UPLOADS.has(document.documentType) ||
+        onboardingDocumentTreatment(document) !== "READ_FOR_COVERAGE"
+      ) {
+        return { kind: "SKIPPED", reason: "NOT_FOR_ONBOARDING_READING" };
+      }
+      const session = await sessions.findLatestActive(
+        sql,
+        document.createdByUserId as never,
+        INVESTOR_JOURNEY_TYPE,
+      );
+      if (session === null) {
+        return { kind: "SKIPPED", reason: "NOT_AN_INVESTOR_SESSION" };
+      }
+      const active = await activeInvestorSession(session.id);
+      if (active.kind === "SKIPPED") {
+        return active;
+      }
+      const passages = await chunks.listActiveByVersion(
+        sql,
+        event.tenantId as TenantId,
+        event.documentVersionId as never,
+      );
+      const text = passages
+        .slice(0, DOCUMENT_PASSAGES)
+        .map((p) => p.content)
+        .join("\n\n")
+        .slice(0, DOCUMENT_CHARS);
+      if (text.trim().length === 0) {
+        return { kind: "SKIPPED", reason: "NO_NARRATIVE" };
+      }
+      return read(
+        active.session,
+        active.tenantId,
+        text,
+        [{ sourceType: "EVIDENCE_DOCUMENT", sourceId: event.documentId }],
+        INVESTOR_DOCUMENT_INFORMS,
+      );
     },
 
     onUtterance: async (event): Promise<MandateReviewResult> => {

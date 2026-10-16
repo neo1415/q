@@ -15,6 +15,7 @@ import {
   summaryWords,
   visibleFields,
 } from "../coverage";
+import type { FormCoverage } from "../use-form-coverage";
 
 /**
  * What the form knows, all of it, in one place (owner directive 2026-10-16:
@@ -49,10 +50,20 @@ export function CoverageOverview({
 }) {
   const [open, setOpen] = useState(false);
   const fields = visibleFields(coverage);
-  const byPhase = phases
+  const known = new Set(phases.map((phase) => phase.phaseKey));
+  const byPhase = [
+    ...phases,
+    // Fields no definition step holds (an optional upload such as the
+    // investor's I.materials) are listed last, under their own heading.
+    { phaseKey: "", label: "Materials" },
+  ]
     .map((phase) => ({
       phase,
-      fields: fields.filter((field) => field.phaseKey === phase.phaseKey),
+      fields: fields.filter((field) =>
+        phase.phaseKey === ""
+          ? field.phaseKey === null || !known.has(field.phaseKey)
+          : field.phaseKey === phase.phaseKey,
+      ),
     }))
     .filter((group) => group.fields.length > 0);
 
@@ -96,7 +107,7 @@ export function CoverageOverview({
                       field={field}
                       busy={busy}
                       onOpen={
-                        onOpen === undefined
+                        onOpen === undefined || phase.phaseKey === ""
                           ? undefined
                           : () => {
                               setOpen(false);
@@ -224,4 +235,81 @@ function CoverageRow({
       )}
     </li>
   );
+}
+
+/**
+ * The coverage line in the form's header, in every state the read can be
+ * in: a quiet line while it loads, the overview when it is ready, and on a
+ * failed read the last good overview (if any) with a plain retry. Nothing
+ * here blocks the form: answering never waits on coverage.
+ */
+export function FormCoverageArea({
+  coverage,
+  phases,
+  busy,
+  onOpen,
+  onResolve,
+}: {
+  readonly coverage: FormCoverage & { readonly retry: () => void };
+  readonly phases: readonly {
+    readonly phaseKey: string;
+    readonly label: string;
+  }[];
+  readonly busy: boolean;
+  readonly onOpen: ((fieldKey: string) => void) | undefined;
+  readonly onResolve: (
+    suggestionId: string,
+    resolution: "ACCEPT" | "REJECT",
+  ) => Promise<boolean>;
+}) {
+  switch (coverage.status) {
+    case "NONE":
+      return null;
+    case "LOADING":
+      return (
+        <span
+          className="cq-caption text-(--cq-text-tertiary)"
+          data-coverage-loading
+        >
+          Checking what Q has…
+        </span>
+      );
+    case "READY":
+      return (
+        <CoverageOverview
+          coverage={coverage.coverage}
+          phases={phases}
+          busy={busy}
+          onOpen={onOpen}
+          onResolve={onResolve}
+        />
+      );
+    case "ERROR":
+      return (
+        <div className="flex flex-col gap-1" data-coverage-error>
+          {coverage.stale === null ? null : (
+            <CoverageOverview
+              coverage={coverage.stale}
+              phases={phases}
+              busy={busy}
+              onOpen={onOpen}
+              onResolve={onResolve}
+            />
+          )}
+          <span className="cq-caption flex items-center gap-2 text-(--cq-text-secondary)">
+            {coverage.stale === null
+              ? "Couldn't load what Q has. Your answers are unaffected."
+              : "This may be out of date."}
+            <Button
+              size="compact"
+              variant="quiet"
+              className="px-1"
+              onClick={coverage.retry}
+            >
+              Try again
+            </Button>
+          </span>
+        </div>
+      );
+  }
 }

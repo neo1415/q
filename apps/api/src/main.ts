@@ -7,6 +7,7 @@
  * import business logic from domain packages rather than defining it here.
  */
 
+import { createOnboardingCoverageReader } from "./onboarding-coverage.js";
 import {
   createCompanyClaims,
   createPlatformCompanyPublishing,
@@ -2976,6 +2977,7 @@ const { app, logger } = createApp(config, security, {
   // Setup reminders over the person's own sessions (founder directive
   // 2026-09-27): the versioned policy decides, the table remembers.
   onboardingNudges: createOnboardingNudges({ sql: database.sql }),
+  onboardingCoverage: createOnboardingCoverageReader({ sql: database.sql }),
   evidence,
   // P3: the owner's own file from the documents page. The route has
   // already authorised the owner; Evidence checks the object (active, the

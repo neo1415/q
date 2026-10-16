@@ -3,10 +3,16 @@ import { z } from "zod";
 
 import {
   Q_MEMORY_FORGET_PATH,
+  Q_MEMORY_LEARNING_PATH,
   Q_MEMORY_PATH,
   QMemoryListDtoSchema,
+  QPreferenceLearningChoiceRequestSchema,
+  QPreferenceLearningDtoSchema,
 } from "@capital-q/contracts";
-import type { MemoryService } from "@capital-q/q-knowledge";
+import type {
+  MemoryService,
+  PreferenceLearningConsent,
+} from "@capital-q/q-knowledge";
 
 import {
   getActorContext,
@@ -23,6 +29,8 @@ import {
 
 export type MemoryRoutesDependencies = ActorContextDependencies & {
   readonly memory: Pick<MemoryService, "list" | "forget">;
+  /** Lane ob1: consent to learn how they like to work. Absent: no routes. */
+  readonly learningConsent?: PreferenceLearningConsent | undefined;
 };
 
 const ForgetParamsSchema = z
@@ -49,6 +57,48 @@ export function registerMemoryRoutes(
       })),
     });
   });
+
+  const consent = dependencies.learningConsent;
+  if (consent !== undefined) {
+    // The caller's own decision, in their current workspace: the actor
+    // is the session's, never the request's.
+    app.get(
+      Q_MEMORY_LEARNING_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        void reply.header("Cache-Control", "no-store");
+        return QPreferenceLearningDtoSchema.parse(
+          await consent.state(getActorContext(request)),
+        );
+      },
+    );
+    // Safe to repeat: the same choice sets the same thing.
+    app.post(
+      Q_MEMORY_LEARNING_PATH,
+      { onRequest: withContext },
+      async (request, reply) => {
+        const body = QPreferenceLearningChoiceRequestSchema.safeParse(
+          request.body,
+        );
+        if (!body.success) {
+          return reply.status(400).send({
+            type: "about:blank",
+            title: "Invalid request",
+            status: 400,
+            detail: "The choice is not valid.",
+          });
+        }
+        void reply.header("Cache-Control", "no-store");
+        return QPreferenceLearningDtoSchema.parse(
+          await consent.decide(
+            getActorContext(request),
+            body.data.choice,
+            body.data.via,
+          ),
+        );
+      },
+    );
+  }
 
   app.post(
     Q_MEMORY_FORGET_PATH,

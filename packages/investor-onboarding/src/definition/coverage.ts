@@ -13,18 +13,65 @@ import { INVESTOR_STEPS } from "./investor-v1.js";
  * whether they deploy, stages, cheque currency, where and what). IMPORTANT:
  * sharper fit. OPTIONAL: nuance, offered once and never pressed.
  */
+/** Coverage keys an upload satisfies (no definition step holds them). */
+export const INVESTOR_DOCUMENT_FIELDS = {
+  materials: "I.materials",
+} as const;
+
+/** How the optional investor upload is filed, by what the person says it is. */
+export const INVESTOR_UPLOAD_DOCUMENT_TYPES = {
+  FUND_DECK: "FUND_DECK",
+  THESIS: "INVESTMENT_THESIS",
+  LP_LETTER: "LP_LETTER",
+} as const;
+
 export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
   journeyType: "investor",
   version: "investor-coverage-2026-10-16",
   registrationSeeds: { organisationName: INVESTOR_STEPS.organisationName },
+  // The optional investor upload (ob2's form and the conversation alike).
+  // A fund deck or investment thesis is readable material whose content
+  // may only PROPOSE values for the mandate fields below; an LP letter is
+  // private and is acknowledged by metadata only, never read.
+  documentFields: {
+    [INVESTOR_DOCUMENT_FIELDS.materials]: {
+      concept: "investor.materials",
+      label: "Fund deck, thesis or LP letter",
+      priority: "OPTIONAL",
+      // ob2's explicit investor types; the older filings still count.
+      documentTypes: [
+        "FUND_DECK",
+        "INVESTMENT_THESIS",
+        "LP_LETTER",
+        "COMPANY_PROFILE",
+        "PITCH_DECK",
+        "OTHER",
+      ],
+      informs: [
+        INVESTOR_STEPS.stages,
+        INVESTOR_STEPS.currency,
+        INVESTOR_STEPS.chequeMin,
+        INVESTOR_STEPS.chequeTypical,
+        INVESTOR_STEPS.chequeMax,
+        INVESTOR_STEPS.geography,
+        INVESTOR_STEPS.sectors,
+        INVESTOR_STEPS.businessModels,
+        INVESTOR_STEPS.customerTypes,
+        INVESTOR_STEPS.customCriteria,
+        INVESTOR_STEPS.portfolio,
+      ],
+    },
+  },
   fields: {
     [INVESTOR_STEPS.investorType]: {
+      rank: 1,
       concept: "investor.type",
       priority: "ESSENTIAL",
       label: "How you invest",
       seconds: 10,
     },
     [INVESTOR_STEPS.organisationName]: {
+      rank: 0,
       concept: "organisation.name",
       priority: "ESSENTIAL",
       label: "Firm",
@@ -37,24 +84,28 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 10,
     },
     [INVESTOR_STEPS.deploymentStatus]: {
+      rank: 6,
       concept: "investor.deployment_status",
       priority: "ESSENTIAL",
       label: "Deploying now",
       seconds: 10,
     },
     [INVESTOR_STEPS.mandateContext]: {
+      rank: 7,
       concept: "mandate.context",
       priority: "ESSENTIAL",
       label: "Mandate",
       seconds: 10,
     },
     [INVESTOR_STEPS.stages]: {
+      rank: 2,
       concept: "mandate.stages",
       priority: "ESSENTIAL",
       label: "Stages",
       seconds: 15,
     },
     [INVESTOR_STEPS.currency]: {
+      rank: 5,
       concept: "mandate.currency",
       priority: "ESSENTIAL",
       label: "Cheque currency",
@@ -85,6 +136,7 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 10,
     },
     [INVESTOR_STEPS.geography]: {
+      rank: 4,
       concept: "mandate.geography",
       priority: "ESSENTIAL",
       label: "Geography",
@@ -97,6 +149,7 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 5,
     },
     [INVESTOR_STEPS.sectors]: {
+      rank: 3,
       concept: "mandate.sectors",
       priority: "ESSENTIAL",
       label: "Sectors",
@@ -199,12 +252,14 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 30,
     },
     [INVESTOR_STEPS.discoveryMode]: {
+      rank: 8,
       concept: "discovery.mode",
       priority: "ESSENTIAL",
       label: "Discovery",
       seconds: 10,
     },
     [INVESTOR_STEPS.inboundPreference]: {
+      rank: 9,
       concept: "discovery.inbound_preference",
       priority: "ESSENTIAL",
       label: "Inbound",

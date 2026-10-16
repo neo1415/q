@@ -28,6 +28,7 @@ export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
   registrationSeeds: { organisationName: FOUNDER_STEPS.companyName },
   fields: {
     [FOUNDER_STEPS.companyName]: {
+      rank: 0,
       concept: "company.name",
       priority: "ESSENTIAL",
       label: "Company name",
@@ -40,18 +41,21 @@ export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 10,
     },
     [FOUNDER_STEPS.country]: {
+      rank: 3,
       concept: "company.country",
       priority: "ESSENTIAL",
       label: "Country",
       seconds: 10,
     },
     [FOUNDER_STEPS.stage]: {
+      rank: 2,
       concept: "company.stage",
       priority: "ESSENTIAL",
       label: "Stage",
       seconds: 15,
     },
     [FOUNDER_STEPS.description]: {
+      rank: 1,
       concept: "company.description",
       priority: "ESSENTIAL",
       label: "What the company does",
@@ -70,24 +74,28 @@ export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 20,
     },
     [FOUNDER_STEPS.founderRole]: {
+      rank: 4,
       concept: "person.role",
       priority: "ESSENTIAL",
       label: "Your role",
       seconds: 10,
     },
     [FOUNDER_STEPS.founderCount]: {
+      rank: 6,
       concept: "team.founder_count",
       priority: "ESSENTIAL",
       label: "Founders",
       seconds: 10,
     },
     [FOUNDER_STEPS.fullTime]: {
+      rank: 7,
       concept: "team.full_time",
       priority: "ESSENTIAL",
       label: "Full-time",
       seconds: 10,
     },
     [FOUNDER_STEPS.teamSize]: {
+      rank: 5,
       concept: "team.size",
       priority: "ESSENTIAL",
       label: "Team size",
@@ -100,6 +108,7 @@ export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 20,
     },
     [FOUNDER_STEPS.signal]: {
+      rank: 8,
       concept: "traction.signal",
       priority: "ESSENTIAL",
       label: "Early signal",
@@ -112,6 +121,7 @@ export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 10,
     },
     [FOUNDER_STEPS.revenueStatus]: {
+      rank: 8,
       concept: "traction.revenue_status",
       priority: "ESSENTIAL",
       label: "Revenue",
@@ -174,18 +184,21 @@ export const FOUNDER_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 10,
     },
     [FOUNDER_STEPS.raising]: {
+      rank: 9,
       concept: "capital.raising",
       priority: "ESSENTIAL",
       label: "Raising now",
       seconds: 10,
     },
     [FOUNDER_STEPS.currency]: {
+      rank: 11,
       concept: "capital.currency",
       priority: "ESSENTIAL",
       label: "Raise currency",
       seconds: 5,
     },
     [FOUNDER_STEPS.targetAmount]: {
+      rank: 10,
       concept: "capital.target_amount",
       priority: "ESSENTIAL",
       label: "Raise target",

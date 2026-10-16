@@ -15,14 +15,16 @@ import {
   type ProfileResult,
 } from "./explore-search-view";
 import { ExploreState } from "./explore-state";
+import { useT } from "@/features/i18n/language";
 
 /** The box at the top of Explore; a plain GET form, so it works before hydration. */
 export function ExploreSearchBar({ value = "" }: { readonly value?: string }) {
+  const t = useT();
   return (
     <form action="/explore" method="get" role="search" className="w-full">
       <label className="relative block">
         <span className="sr-only">
-          Search companies, investors, people and pitches
+          {t("Search companies, investors, people and pitches")}
         </span>
         <Search
           size={ICON_SIZE.prominent}
@@ -36,7 +38,7 @@ export function ExploreSearchBar({ value = "" }: { readonly value?: string }) {
           autoComplete="off"
           spellCheck={false}
           maxLength={80}
-          placeholder="Search companies, investors, people"
+          placeholder={t("Search companies, investors, people")}
           className="cq-body min-h-12 w-full border border-transparent bg-(--cq-surface-subtle) pe-4 ps-11 text-[16px] text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           data-explore-search
         />
@@ -93,6 +95,7 @@ function Section({
   readonly seeAll?: string | undefined;
   readonly children: React.ReactNode;
 }) {
+  const t = useT();
   return (
     <section className="flex flex-col gap-3" aria-label={title}>
       <div className="flex items-baseline justify-between gap-3">
@@ -102,7 +105,7 @@ function Section({
             href={seeAll}
             className="cq-body-sm text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
           >
-            See all
+            {t("See all")}
           </Link>
         )}
       </div>
@@ -114,7 +117,6 @@ function Section({
 export function ExploreSearchResults({
   view,
   state = "ready",
-  columns,
   posters,
   sectorLabels,
   limited,
@@ -122,12 +124,12 @@ export function ExploreSearchResults({
 }: {
   readonly view: ExploreSearchView;
   readonly state?: "ready" | "loading" | "error";
-  readonly columns: number | null;
   readonly posters: Readonly<Record<string, string>>;
   readonly sectorLabels: ReadonlyMap<string, string>;
   readonly limited: React.ReactNode;
   readonly onOpen: (tiles: readonly ExploreTileDto[], index: number) => void;
 }) {
+  const t = useT();
   const { query, tab } = view;
   const head = (
     <>
@@ -135,7 +137,7 @@ export function ExploreSearchResults({
       {view.chips.length === 0 ? null : (
         <div className="flex flex-wrap items-center gap-1.5" data-explore-chips>
           <span className="cq-caption text-(--cq-text-secondary)">
-            Searching for
+            {t("Searching for")}
           </span>
           {view.chips.map((chip) => (
             <span
@@ -155,7 +157,7 @@ export function ExploreSearchResults({
         </div>
       )}
       <nav
-        aria-label="Result types"
+        aria-label={t("Result types")}
         className="relative flex gap-[22px] overflow-x-auto border-b border-(--cq-border-subtle) [scrollbar-width:none]"
       >
         {EXPLORE_SEARCH_TABS.map((option) => (
@@ -225,17 +227,15 @@ export function ExploreSearchResults({
     );
   }
 
-  const grid = (tiles: readonly ExploreTileDto[]) =>
-    columns === null ? null : (
-      <ExploreGrid
-        tiles={tiles}
-        posters={posters}
-        columns={columns}
-        sectorLabels={sectorLabels}
-        label="Pitches"
-        onOpen={(index) => onOpen(tiles, index)}
-      />
-    );
+  const grid = (tiles: readonly ExploreTileDto[]) => (
+    <ExploreGrid
+      tiles={tiles}
+      posters={posters}
+      sectorLabels={sectorLabels}
+      label={t("Pitches")}
+      onOpen={(index) => onOpen(tiles, index)}
+    />
+  );
   const list = (results: readonly ProfileResult[], empty: string) =>
     results.length === 0 ? (
       <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
@@ -260,7 +260,7 @@ export function ExploreSearchResults({
         <>
           {view.companies.length === 0 ? null : (
             <Section
-              title="Companies"
+              title={t("Companies")}
               seeAll={
                 view.companies.length > 3
                   ? searchHref(query, "companies")
@@ -272,7 +272,7 @@ export function ExploreSearchResults({
           )}
           {view.investors.length === 0 ? null : (
             <Section
-              title="Investors"
+              title={t("Investors")}
               seeAll={
                 view.investors.length > 3
                   ? searchHref(query, "investors")
@@ -284,7 +284,7 @@ export function ExploreSearchResults({
           )}
           {view.pitches.length === 0 ? null : (
             <Section
-              title="Pitches"
+              title={t("Pitches")}
               seeAll={
                 view.pitches.length > 6
                   ? searchHref(query, "pitches")

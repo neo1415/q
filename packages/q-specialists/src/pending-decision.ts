@@ -1,4 +1,4 @@
-import { closestByName } from "@capital-q/q-tools";
+import { closestByName, readApprovalWords } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
 
 /**
@@ -51,7 +51,9 @@ export type PendingDecisionStatus =
   | "NOT_SAVED"
   | "DECLINED"
   | "EXPIRED"
-  | "CHANGED";
+  | "CHANGED"
+  /** A kind that keeps its card's Approve: nothing approved by words. */
+  | "CARD_ONLY";
 
 export type PendingDecisionContext = {
   readonly actor: ActorContext;
@@ -273,6 +275,8 @@ export function statusLine(
       return `That change was altered after it was prepared, so I didn't approve it: ${what}. I can prepare it again for your approval.`;
     case "PENDING":
       return `Not saved yet: ${what} is waiting for your approval. Tap Approve on the card, or tell me to go ahead.`;
+    case "CARD_ONLY":
+      return `Not approved yet: ${what}. It involves money, terms or sharing a private document, so it needs your tap on Approve on its card.`;
   }
 }
 
@@ -315,6 +319,8 @@ type PendingStage =
   | {
       readonly kind: "WAITING";
       readonly pending: readonly DecisionProposal[];
+      /** Every waiting card, before a name narrowed them to one. */
+      readonly allPending: readonly DecisionProposal[];
       readonly only: DecisionProposal | undefined;
       readonly elsewhere: boolean;
       readonly namedElsewhere: boolean;
@@ -349,6 +355,7 @@ async function stagePending(
   // Several: a name they said picks one ("Nixon" for Nixo). Elsewhere, the
   // words must point to the card: its counterpart named, or the first
   // words of a conversation opened to answer it.
+  const allPending = pending;
   const chosen = namedIn(input.utterance, pending);
   const namedElsewhere = elsewhere && chosen !== null;
   if (chosen !== null && (elsewhere || pending.length > 1)) pending = [chosen];
@@ -362,6 +369,7 @@ async function stagePending(
   return {
     kind: "WAITING",
     pending,
+    allPending,
     only,
     elsewhere,
     namedElsewhere,
@@ -418,7 +426,20 @@ export function startPendingDecision(
     // Never an unhandled rejection: conclude re-awaits the same promises.
     staged
       .then((stage) => {
-        if (stage.kind !== "NOTHING") readFor(stage.question).catch(() => null);
+        if (stage.kind === "NOTHING") return;
+        // Plain decision words need no model reading: none is started.
+        if (stage.kind === "WAITING") {
+          const words = readApprovalWords(input.utterance, {
+            summaries: stage.allPending.map((proposal) => proposal.summary),
+          });
+          if (
+            (words.kind === "APPROVE" || words.kind === "DECLINE") &&
+            words.strength === "EXPLICIT"
+          ) {
+            return;
+          }
+        }
+        readFor(stage.question).catch(() => null);
       })
       .catch(() => undefined);
   }
@@ -446,7 +467,16 @@ export function startPendingDecision(
         if (outcome.kind === "NONE") controller.abort();
         return outcome;
       }
-      return concludeWaiting(port, input, stage, turn, readFor);
+      // A decision in plain words is read by code first, with no model
+      // call (owner 2026-10-16); anything else is read by meaning below.
+      const byWords = await decideByWords(port, input, stage, turn);
+      if (byWords !== null && byWords !== ASKS_CHANGE) {
+        controller.abort();
+        return byWords;
+      }
+      return concludeWaiting(port, input, stage, turn, readFor, {
+        asksChange: byWords === ASKS_CHANGE,
+      });
     },
   };
 }
@@ -470,6 +500,10 @@ async function concludeWaiting(
   stage: Extract<PendingStage, { kind: "WAITING" }>,
   turn: PendingTurnReading | null | undefined,
   readFor: (question: string) => Promise<DecisionReading | null>,
+  options: {
+    /** Their words ask for a change: whatever the reading, no approval. */
+    readonly asksChange?: boolean | undefined;
+  } = {},
 ): Promise<PendingDecisionOutcome> {
   const { pending, only, elsewhere, namedElsewhere } = stage;
   // One reading of meaning decides it (J7): never a list of words.
@@ -481,6 +515,19 @@ async function concludeWaiting(
       : heard;
   if (read === null || read.decision === "UNRELATED") {
     return { kind: "NONE" };
+  }
+  // "Sounds good, but change the date": not this card as it is. The turn
+  // is answered as any other (the change is prepared again, for its own
+  // approval) and this card is said to be still waiting.
+  if (options.asksChange === true && read.decision === "YES") {
+    if (only === undefined) return { kind: "NONE" };
+    return {
+      kind: "ANSWER_THEN",
+      before: null,
+      after: `Still waiting for your approval: ${named(only.summary)}.`,
+      about: only.summary,
+      aboutId: only.proposalId,
+    };
   }
   // Only a reply decides; a request or a statement in its own right, even
   // one that restates the card, approves and declines nothing.
@@ -551,6 +598,131 @@ async function concludeWaiting(
   return read.remainder === null
     ? { kind: "REPLY", line }
     : { kind: "ANSWER_THEN", before: line, after: null };
+}
+
+/** How Q asks which card a decision in words is about. */
+export const WHICH_TO_APPROVE = "Which one should I approve:";
+export const WHICH_TO_DECLINE = "Which one should I decline:";
+
+function quotedList(summaries: readonly string[]): string {
+  const shown = summaries.slice(0, 4).map((summary) => `"${named(summary)}"`);
+  return shown.length <= 1
+    ? (shown[0] ?? "")
+    : `${shown.slice(0, -1).join(", ")} or ${shown.at(-1) ?? ""}`;
+}
+
+/** "Which one should I approve: "A" or "B"? Or say both." */
+export function whichToDecideLine(
+  decision: "APPROVE" | "DECLINE",
+  summaries: readonly string[],
+): string {
+  const lead = decision === "APPROVE" ? WHICH_TO_APPROVE : WHICH_TO_DECLINE;
+  const all =
+    summaries.length === 2 ? `Or say "both".` : `Or say "all of them".`;
+  return `${lead} ${quotedList(summaries)}? ${all}`;
+}
+
+/**
+ * The person's own words decide the waiting card(s), read by code
+ * (`readApprovalWords`), with no model call. Null: not decided by words;
+ * the readings of meaning decide, as before.
+ *
+ * - An explicit approval ("I approve", "yes, send it", "go ahead",
+ *   "confirmed") or refusal ("no, don't send it", "cancel that") of the
+ *   one card waiting decides it.
+ * - "Both" / "all": every card waiting here, each approved on its own
+ *   through the engine against its own stored payload.
+ * - Several waiting and nothing saying which: Q asks which, and nothing
+ *   is decided until they answer; the answer ("the Harbourline one",
+ *   "the second", "both") decides it.
+ * - A change asked for ("sounds good, but change the date") is never an
+ *   approval: the turn is answered as any other, so the change is
+ *   prepared again for its own approval.
+ * - A plain "yes" or "ok" alone is left to the readings of meaning.
+ *
+ * Every approval goes through the port, which checks again that their
+ * words since the card was shown stand as approval, and records the
+ * decision as theirs with its channel and evidence.
+ */
+const ASKS_CHANGE = "ASKS_CHANGE" as const;
+
+async function decideByWords(
+  port: PendingDecisionPort,
+  input: PendingDecisionInput,
+  stage: Extract<PendingStage, { kind: "WAITING" }>,
+  turn: PendingTurnReading | null | undefined,
+): Promise<PendingDecisionOutcome | typeof ASKS_CHANGE | null> {
+  // Said to someone in the room, never to Q: decides nothing.
+  if (turn !== undefined && turn !== null && !turn.addressedToQ) return null;
+  const all = stage.allPending;
+  const words = readApprovalWords(input.utterance, {
+    summaries: all.map((proposal) => proposal.summary),
+  });
+  // Asks for something different: never this card as it is.
+  if (words.kind === "EDIT") return ASKS_CHANGE;
+  if (words.kind === "NONE") return null;
+  const lastQ =
+    [...input.recentTurns].reverse().find((t) => t.role === "Q")?.text ?? "";
+  const asked: "APPROVE" | "DECLINE" | null = lastQ.startsWith(WHICH_TO_APPROVE)
+    ? "APPROVE"
+    : lastQ.startsWith(WHICH_TO_DECLINE)
+      ? "DECLINE"
+      : null;
+  let decision: "APPROVE" | "DECLINE";
+  if (words.kind === "REFER") {
+    // Only an answer to "which one?" Q itself asked.
+    if (asked === null) return null;
+    decision = asked;
+  } else if (words.strength === "EXPLICIT" || asked === words.kind) {
+    decision = words.kind;
+  } else {
+    return null;
+  }
+  // In another conversation: only when the words point at it (its name,
+  // or the first words of a conversation opened to answer it), as below.
+  if (stage.elsewhere) {
+    const points = stage.namedElsewhere || input.recentTurns.length === 0;
+    if (!points || stage.only === undefined || words.scope !== "ONE") {
+      return null;
+    }
+  }
+  const scope = words.scope;
+  let targets: readonly DecisionProposal[];
+  if (words.ordinal !== null) {
+    const at = all[words.ordinal - 1];
+    if (at === undefined) {
+      return {
+        kind: "REPLY",
+        line: whichToDecideLine(
+          decision,
+          all.map((p) => p.summary),
+        ),
+      };
+    }
+    targets = [at];
+  } else if (scope === "ALL" || (scope === "BOTH" && all.length <= 2)) {
+    targets = all;
+  } else if (scope === "BOTH" || stage.only === undefined) {
+    // "Both" of three, or one of several with nothing saying which.
+    return {
+      kind: "REPLY",
+      line: whichToDecideLine(
+        decision,
+        all.map((p) => p.summary),
+      ),
+    };
+  } else {
+    targets = [stage.only];
+  }
+  const lines: string[] = [];
+  for (const target of targets) {
+    const { status } =
+      decision === "APPROVE"
+        ? await port.approve(input.context, target.proposalId)
+        : await port.decline(input.context, target.proposalId);
+    lines.push(statusLine(status, target.summary));
+  }
+  return { kind: "REPLY", line: lines.join(" ") };
 }
 
 /** Said when the same change is asked for again: ready, waiting for a yes. */

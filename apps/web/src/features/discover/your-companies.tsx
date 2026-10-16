@@ -54,6 +54,7 @@ import {
   type PlaybackRate,
 } from "./stage/playback-rate";
 import { PitchScrubber, SEEK_STEP_SECONDS, seekBy } from "./stage/scrubber";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Your companies" (founder decisions 2026-10-02 and 2026-10-04):
@@ -118,6 +119,7 @@ function YourCompanyCard({
   /** The feed's shared playback choices; the progress bar is the card in view's. */
   readonly stage: YourStage;
 }) {
+  const t = useT();
   const place = [
     stageLabel(item.currentStageCode),
     countryLabel(item.headquartersCountry),
@@ -185,7 +187,7 @@ function YourCompanyCard({
             {/* Unknown stays unknown: the API cannot say whether a pitch
                 exists and is withheld, so the card never says it is. */}
             <p className="cq-body font-medium text-(--cq-stage-text)">
-              No pitch to show yet
+              {t("No pitch to show yet")}
             </p>
             <p className="cq-body-sm max-w-[32ch] text-(--cq-stage-text-muted)">
               Their profile has everything {item.canonicalName} shares with you.
@@ -259,21 +261,21 @@ function YourCompanyCard({
             className={buttonClassName("primary")}
             data-your-company-profile
           >
-            Open profile
+            {t("Open profile")}
           </Link>
           {item.label === "SAVED" ? null : (
             <Link
               href={`/relationships/company/${item.companyId}`}
               className={buttonClassName("secondary")}
             >
-              Relationship
+              {t("Relationship")}
             </Link>
           )}
         </div>
 
         {/* The rail, as on For you: the company first, then what the
             person can do with a company that is already theirs. */}
-        <div className="cq-feed-rail" role="group" aria-label="Actions">
+        <div className="cq-feed-rail" role="group" aria-label={t("Actions")}>
           <span className="cq-feed-rail-profile">
             <CompanyAvatarLink
               companyId={item.companyId}
@@ -281,7 +283,7 @@ function YourCompanyCard({
               photoUrl={item.photoUrl}
             />
             <span className="cq-feed-rail-label" aria-hidden="true">
-              Profile
+              {t("Profile")}
             </span>
           </span>
           {item.label === "SAVED" ? null : (
@@ -295,7 +297,7 @@ function YourCompanyCard({
                 size={ICON_SIZE.prominent}
                 strokeWidth={ICON_STROKE}
               />
-              <span className="cq-feed-rail-label">Relationship</span>
+              <span className="cq-feed-rail-label">{t("Relationship")}</span>
             </Link>
           )}
           <Button
@@ -304,7 +306,7 @@ function YourCompanyCard({
             onClick={() => setOpen(true)}
           >
             <QAperture state="IDLE" size={24} />
-            <span className="cq-feed-rail-label">Ask Q</span>
+            <span className="cq-feed-rail-label">{t("Ask Q")}</span>
           </Button>
           <Button
             variant="quiet"
@@ -334,7 +336,7 @@ function YourCompanyCard({
                 size={ICON_SIZE.prominent}
                 strokeWidth={ICON_STROKE}
               />
-              <span className="cq-feed-rail-label">More</span>
+              <span className="cq-feed-rail-label">{t("More")}</span>
             </Button>
           )}
         </div>
@@ -366,6 +368,7 @@ export function YourCompaniesFeed({
   /** "Show me Nixo's pitch": the company whose card to open on. */
   readonly focusCompanyId?: string | null;
 }) {
+  const t = useT();
   const [items, setItems] = useState<readonly YourCompanyPitchItemDto[]>(
     initial?.items ?? [],
   );
@@ -506,7 +509,7 @@ export function YourCompaniesFeed({
   }, [focusCompanyId, items, nextCursor, loadMore]);
 
   if (!loaded) {
-    return <FeedSkeleton label="Loading your companies" />;
+    return <FeedSkeleton label={t("Loading your companies")} />;
   }
   if (items.length === 0) {
     return (
@@ -524,7 +527,7 @@ export function YourCompaniesFeed({
           action={
             failed === null ? null : (
               <Button variant="secondary" onClick={() => loadMore(null)}>
-                Try again
+                {t("Try again")}
               </Button>
             )
           }
@@ -537,7 +540,7 @@ export function YourCompaniesFeed({
     <div
       className="cq-yours-feed"
       role="feed"
-      aria-label="Your companies"
+      aria-label={t("Your companies")}
       // Focusable so the arrow keys scroll it; its links are the tab stops.
       tabIndex={-1}
       data-your-companies-feed
@@ -613,7 +616,7 @@ export function YourCompaniesFeed({
         <div className="flex items-center gap-3 p-6">
           <p className="cq-body-sm text-(--cq-stage-text-muted)">{failed}</p>
           <Button variant="secondary" onClick={() => loadMore(nextCursor)}>
-            Try again
+            {t("Try again")}
           </Button>
         </div>
       )}

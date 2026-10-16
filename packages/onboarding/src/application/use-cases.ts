@@ -143,6 +143,7 @@ import {
   type OnboardingSessionAggregate,
   presentationOf,
 } from "./view.js";
+import { sameResponseValue } from "./pending-writes.js";
 
 /**
  * Onboarding runtime use cases.
@@ -1579,6 +1580,17 @@ export function createOnboardingUseCases(
         { value: command.suggestedValue },
         { sourceModality: "SUGGESTION_ACCEPT" },
       );
+      // Rejected once, discarded for good (lane ob1): a document re-read or
+      // a research pass never offers the person what they already refused.
+      const rejected =
+        (await suggestions.listRejectedValues?.(
+          tx.sql,
+          session.id,
+          step.stepKey,
+        )) ?? [];
+      if (rejected.some((v) => sameResponseValue(v, command.suggestedValue))) {
+        throw new OnboardingSessionStateError("SUGGESTION_REJECTED_BEFORE");
+      }
       return suggestions.insert(tx, {
         sessionId: session.id,
         stepKey: step.stepKey,

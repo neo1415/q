@@ -291,7 +291,7 @@ describe("investor matches: grounded take, fit is not quality", () => {
       AFTERNOON,
       null,
     );
-    expect(said.spoken).toContain(
+    expect(said.briefing).toContain(
       "One company in your feed fits your mandate: Tamu Pay.",
     );
   });

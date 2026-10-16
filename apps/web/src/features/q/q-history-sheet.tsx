@@ -3,6 +3,7 @@
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { ChatsList } from "./chats-list";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The person's previous conversations, one control away from the Q
@@ -19,13 +20,14 @@ export function QHistorySheet({
   readonly onOpenChange: (open: boolean) => void;
   readonly active: string | null;
 }) {
+  const t = useT();
   return (
     <SheetRoot open={open} onOpenChange={onOpenChange}>
       {open ? (
         <SheetContent
           side="side"
-          title="Previous conversations"
-          description="Everything you and Q have said, by conversation."
+          title={t("Previous conversations")}
+          description={t("Everything you and Q have said, by conversation.")}
         >
           <ChatsList variant="inline" active={active} />
         </SheetContent>

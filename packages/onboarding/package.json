@@ -16,6 +16,10 @@
     "./events": {
       "types": "./dist/events/index.d.ts",
       "default": "./dist/events/index.js"
+    },
+    "./documents": {
+      "types": "./dist/application/documents.d.ts",
+      "default": "./dist/application/documents.js"
     }
   },
   "main": "./dist/index.js",

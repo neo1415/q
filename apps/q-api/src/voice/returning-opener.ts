@@ -5,14 +5,12 @@ import type { ActorContext } from "@capital-q/security";
 import { narrationOf } from "../composition/instructions/digest.js";
 
 /**
- * What Q opens with for somebody coming back (founder direction
- * 2026-09-29: "a very proactive Q"). Not "I'm listening": the one or two
- * things that are theirs to deal with now -- a call coming up, a reminder
- * due, notes from a call, notices waiting -- and an offer to help with the
- * first. Read from the person's own rows, composed without a model, so the
- * greeting is neither slower nor costlier than it was.
+ * What Q opens with for somebody coming back, when the web's arrival read
+ * has not landed before the call opens. Read from the person's own rows,
+ * composed without a model, so the greeting is neither slower nor
+ * costlier. Since 2026-10-16 (owner) it says only that things are waiting
+ * and offers to look at them; the facts are what decide whether they are.
  */
-
 export type OpenerFacts = {
   readonly nextCall: {
     readonly purpose: string;
@@ -41,23 +39,22 @@ export type OpenerFacts = {
   readonly timeZone?: string | null | undefined;
 };
 
-const TRIM = 70;
+/**
+ * The opener's question with nothing known to be waiting, and with no read
+ * at all (unknown is not "nothing": it claims nothing either way).
+ */
+export const NOTHING_WAITING_QUESTION = "What would you like to look at?";
 
-function clip(text: string): string {
-  const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length > TRIM ? `${flat.slice(0, TRIM - 1)}…` : flat;
-}
-
-function whenFrom(startsAt: Date, now: Date): string {
-  const minutes = Math.round((startsAt.getTime() - now.getTime()) / 60_000);
-  if (minutes <= 5) return "starting now";
-  if (minutes < 60) return `in ${String(minutes)} minutes`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 20)
-    return `in about ${String(hours)} hour${hours === 1 ? "" : "s"}`;
-  return "tomorrow";
-}
-
+/**
+ * Owner 2026-10-16: on sign-in Q greets, says that things are waiting in
+ * one sentence, and asks whether to look at them now or talk about
+ * something else -- never the list. The same opener the web composes from
+ * the arrival's cards (apps/web briefing/opener.ts); this is the server's
+ * fallback when a call opens before those are read. Its sources (the
+ * person's notices, reminders, calls) are not the cards' sources, so it
+ * never says a number it cannot stand behind: "a few things", never a
+ * wrong count, and no item, name or detail.
+ */
 export function composeReturningOpener(
   name: string | null,
   facts: OpenerFacts,
@@ -70,32 +67,22 @@ export function composeReturningOpener(
     : name === null
       ? "Welcome back."
       : `Hi ${name}.`;
-  if (facts.nextCall !== null) {
-    const call = `You have "${clip(facts.nextCall.purpose)}" ${whenFrom(facts.nextCall.startsAt, now)}.`;
-    const also =
-      facts.remindersDue > 0
-        ? ` And ${String(facts.remindersDue)} reminder${facts.remindersDue === 1 ? "" : "s"} due today.`
-        : "";
-    return `${hello} ${call}${also} Want me to prep you for it?`;
-  }
-  if (facts.instructionNews !== undefined && facts.instructionNews !== null) {
-    return `${hello} ${facts.instructionNews}`;
-  }
-  if (facts.notesReady > 0) {
-    return facts.notesQuestion === undefined || facts.notesQuestion === null
-      ? `${hello} My notes from your last call are ready. Want the short version?`
-      : `${hello} My notes from your last call are ready. ${facts.notesQuestion}`;
-  }
-  if (facts.scoutFinding !== undefined && facts.scoutFinding !== null) {
-    return `${hello} I spotted something new about your company: "${clip(facts.scoutFinding)}". Want the gist?`;
-  }
-  if (facts.remindersDue > 0 && facts.firstReminder !== null) {
-    return `${hello} You asked me to remind you: "${clip(facts.firstReminder)}". Want to deal with it now?`;
-  }
-  if (facts.unreadNotices > 0) {
-    return `${hello} ${String(facts.unreadNotices)} thing${facts.unreadNotices === 1 ? "" : "s"} came in since you were last here. Want me to go through them?`;
-  }
-  return `${hello} Want me to see what's new for you, or is there something on your mind?`;
+  const scout = facts.scoutFinding?.trim() ?? "";
+  // What Q did for them under a standing instruction is news, not
+  // something waiting; its NEEDS_YOU notices are counted as notices.
+  const waiting =
+    facts.nextCall !== null ||
+    facts.remindersDue > 0 ||
+    facts.notesReady > 0 ||
+    facts.unreadNotices > 0 ||
+    scout.length > 0;
+  if (!waiting) return `${hello} ${NOTHING_WAITING_QUESTION}`;
+  return `${hello} You have a few things waiting. Would you like to look at them now, or talk about something else?`;
+}
+
+/** The opener when the facts could not be read in time: the plain hello. */
+export function plainOpener(name: string | null): string {
+  return `${name === null ? "Hi." : `Hi ${name}.`} ${NOTHING_WAITING_QUESTION}`;
 }
 
 /** The person's own rows only: every predicate is their user id. */

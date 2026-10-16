@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ExploreMode,
@@ -40,10 +33,10 @@ import {
   ExploreLimitedBanner,
   ExploreState,
 } from "./explore-state";
-import { columnsForWidth } from "./masonry";
+import { useT } from "@/features/i18n/language";
 
 /**
- * Explore (E1-E5, ADR 0055): search at the top, topic chips, the masonry
+ * Explore (E1-E5, ADR 0055): search at the top, topic chips, the mosaic
  * grid of every pitch the viewer may see, and the opened pitch's
  * "Related to X" feed. The slate is the server's, deterministic and
  * explained tile by tile; this screen only lays it out, pages it by
@@ -108,32 +101,6 @@ export const LIVE_EXPLORE_SOURCE: ExploreDataSource = {
 const POSTER_BATCH = 12;
 const FRESH_DAYS = 7;
 
-/** Columns from the viewport, read only in the browser (no layout guess on the server). */
-const WIDTH_QUERIES = [
-  "(min-width: 640px)",
-  "(min-width: 1024px)",
-  "(min-width: 1400px)",
-] as const;
-function subscribeColumns(onChange: () => void): () => void {
-  if (
-    typeof window === "undefined" ||
-    typeof window.matchMedia !== "function"
-  ) {
-    return () => {};
-  }
-  const lists = WIDTH_QUERIES.map((q) => window.matchMedia(q));
-  for (const list of lists) list.addEventListener("change", onChange);
-  return () => {
-    for (const list of lists) list.removeEventListener("change", onChange);
-  };
-}
-function columnsNow(): number {
-  return columnsForWidth(window.innerWidth);
-}
-function useColumns(): number | null {
-  return useSyncExternalStore(subscribeColumns, columnsNow, () => null);
-}
-
 type Topic =
   | { readonly kind: "FOR_YOU" }
   | { readonly kind: "EVERYTHING" }
@@ -184,7 +151,7 @@ export function ExploreScreen({
   /** Design review only: the opened feed shows posters, never a player. */
   readonly posterOnly?: boolean;
 }) {
-  const columns = useColumns();
+  const t = useT();
   const sectorLabels = useMemo(
     () => new Map(sectors.map((s) => [s.nodeId, s.label])),
     [sectors],
@@ -228,6 +195,7 @@ export function ExploreScreen({
     if (loadedFor.current === key) return;
     loadedFor.current = key;
     let cancelled = false;
+    let settled = false;
     setTiles(null);
     setError(false);
     // P9: a dropped connection is retried with backoff; one that never
@@ -237,6 +205,7 @@ export function ExploreScreen({
       .catch(() => ({ ok: false as const, message: "" }))
       .then((result) => {
         if (cancelled) return;
+        settled = true;
         if (!result.ok) {
           setError(true);
           return;
@@ -255,6 +224,10 @@ export function ExploreScreen({
       });
     return () => {
       cancelled = true;
+      // A read dropped before it answered (React's development double
+      // effect, or a fast mode switch) is asked again by the next run,
+      // never left as a skeleton that waits forever.
+      if (!settled) loadedFor.current = null;
     };
   }, [mode, reload, search, source, forceLoading, openOnArrival]);
 
@@ -541,7 +514,6 @@ export function ExploreScreen({
         <ExploreSearchResults
           view={search}
           state={searchState}
-          columns={columns}
           posters={posters}
           sectorLabels={sectorLabels}
           limited={limited}
@@ -569,7 +541,7 @@ export function ExploreScreen({
       <ExploreSearchBar />
       <div
         role="group"
-        aria-label="Topics"
+        aria-label={t("Topics")}
         className="relative flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none]"
       >
         {topics.map((t) => (
@@ -595,7 +567,7 @@ export function ExploreScreen({
           onRetry={() => setReload((n) => n + 1)}
         />
       ) : tiles === null || forceLoading ? (
-        <ExploreGridSkeleton columns={columns ?? 2} />
+        <ExploreGridSkeleton />
       ) : tiles.length === 0 ? (
         <ExploreState
           kind="empty"
@@ -609,9 +581,12 @@ export function ExploreScreen({
           <ExploreGrid
             tiles={shown}
             posters={posters}
-            columns={columns}
             sectorLabels={sectorLabels}
             onOpen={(index) => open(shown, index)}
+            preview={{
+              authorize: source.authorize,
+              suspended: opened !== null,
+            }}
             onIntent={(index) => {
               const tile = shown[index];
               if (tile !== undefined)
@@ -631,7 +606,7 @@ export function ExploreScreen({
               role="status"
               className="cq-body-sm text-center text-(--cq-text-secondary)"
             >
-              Loading more pitches…
+              {t("Loading more pitches…")}
             </p>
           ) : null}
           {upToDate ? (

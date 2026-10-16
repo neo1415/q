@@ -575,7 +575,10 @@ export function createLiveBridge(deps: LiveBridgeDependencies): LiveBridge {
             send(
               "session.commentary.append",
               null,
-              `${opening.greeting} Then give them this opening in your own words, naturally. If it is a briefing, summarise it as a colleague would: how much is waiting, the top two or three items by name and what each needs from them. If it asks them something, ask it. Never read it out word for word and never repeat card or screen text. Opening: ${opening.content}`,
+              // Owner 2026-10-16: the opening greets, says how many things
+              // wait and asks whether to look at them now; the voice says
+              // that much and no more (never the list), then waits.
+              `${opening.greeting} Then give them this opening in your own words, naturally and briefly. Say only what it says: if it counts what is waiting, give the count and never the items, names or details; if it asks them something, ask it and stop to hear their answer; never repeat card or screen text. Opening: ${opening.content}`,
             );
             return;
           }
