@@ -80,6 +80,7 @@ function actionWords(snapshot: TourSnapshot): string | null {
     case "openCompany":
     case "openRecord":
     case "openInvestor":
+    case "openTourPage":
     case "showReview":
     case "showQJob":
       return "Waiting for the page to open";

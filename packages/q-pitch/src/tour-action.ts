@@ -216,6 +216,19 @@ export const OpenInvestorActionSchema = z
   })
   .strict();
 
+/**
+ * v6: a page that exists for the tour itself, by name (never a URL in a
+ * script): the founder track's Capital Q pitch page.
+ */
+export const TOUR_PAGES = { CAPITAL_Q_PITCH: "/q-pitch/capital-q" } as const;
+export const OpenTourPageActionSchema = z
+  .object({
+    ...base,
+    kind: z.literal("openTourPage"),
+    page: z.enum(["CAPITAL_Q_PITCH"]),
+  })
+  .strict();
+
 export const TourActionSchema = z.discriminatedUnion("kind", [
   OpenRouteActionSchema,
   OpenCompanyActionSchema,
@@ -229,6 +242,7 @@ export const TourActionSchema = z.discriminatedUnion("kind", [
   UiActActionSchema,
   OpenRecordActionSchema,
   OpenInvestorActionSchema,
+  OpenTourPageActionSchema,
 ]);
 export type TourAction = z.infer<typeof TourActionSchema>;
 export type TourActionKind = TourAction["kind"];
@@ -246,6 +260,7 @@ export const TOUR_ACTION_KINDS = [
   "uiAct",
   "openRecord",
   "openInvestor",
+  "openTourPage",
 ] as const satisfies readonly TourActionKind[];
 export const TourActionKindSchema = z.enum(TOUR_ACTION_KINDS);
 

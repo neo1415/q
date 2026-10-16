@@ -41,6 +41,8 @@ describe("TourAction v1", () => {
         "openRecord",
         // v6 founder track: a fictional investor's page by fixture key.
         "openInvestor",
+        // v6: a tour-owned page by name (founder track's Capital Q pitch).
+        "openTourPage",
       ].sort(),
     );
     // Consequential acts are never tour actions, and a uiAct is limited

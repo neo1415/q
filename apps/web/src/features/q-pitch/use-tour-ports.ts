@@ -14,6 +14,7 @@ import {
   type TourActor,
   demoApplication,
   demoInvestor,
+  TOUR_PAGES,
   type TourPorts,
   type TourScript,
 } from "@capital-q/q-pitch";
@@ -538,6 +539,8 @@ export function useTourPorts(
             ? outcome(false, "FIXTURE_UNRESOLVED")
             : navigate(path, signal);
         }
+        case "openTourPage":
+          return navigate(TOUR_PAGES[action.page], signal);
         case "askApprovedQuestion": {
           const text = questionText(action.question);
           if (text === null) return outcome(false, "FIXTURE_UNRESOLVED");
@@ -674,7 +677,9 @@ export function useTourPorts(
                     ? recordPath(action.record, action.key, companyOf)
                     : action.kind === "openInvestor"
                       ? investorPath(action.page, action.investor)
-                      : null;
+                      : action.kind === "openTourPage"
+                        ? TOUR_PAGES[action.page]
+                        : null;
             if (path !== null) router.prefetch(path);
           }
         }
