@@ -11,7 +11,11 @@ import {
   type VideoAllowanceDto,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
-import { SecretToken, type TokenCipher } from "@capital-q/integrations";
+import {
+  SecretToken,
+  tavusParticipantLabel,
+  type TokenCipher,
+} from "@capital-q/integrations";
 import type { Logger } from "@capital-q/observability";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
@@ -442,8 +446,11 @@ export function createPostgresRehearsalVideoStore(
         update q_runtime.rehearsal_video_sessions
            set status = ${input.status}, ended_reason = ${input.reason},
                ended_at = ${input.at},
+               -- What the provider can bill: from asking it for the room
+               -- (never our own earlier setup), rounded up, never under.
                seconds = least(86400, greatest(0,
-                 floor(extract(epoch from (${input.at}::timestamptz - created_at)))::int))
+                 ceil(extract(epoch from (${input.at}::timestamptz
+                   - coalesce(provider_request_started_at, created_at))))::int))
          where id = ${row.id} and tenant_id = ${row.tenantId}
            and user_id = ${row.userId} and status in ('STARTING', 'LIVE')
         returning ${columns}`;
@@ -579,11 +586,16 @@ export function isTavusConnectivityCheck(
 }
 
 /** The interviewer's name on their tile in the room, e.g. "Steve, Fund One". */
+/**
+ * The name on Q's tile: who Q plays (lead 2026-10-16), never the stock
+ * face's own name ("Steve"). The persona has no canonical person name yet,
+ * so the counterpart Q plays is the label until it does.
+ */
 export function rehearsalParticipantName(
-  interviewer: string,
   counterpart: string,
+  person?: string | null,
 ): string {
-  return `${interviewer}, ${counterpart}`.slice(0, 100);
+  return tavusParticipantLabel({ surface: "REHEARSAL", counterpart, person });
 }
 
 /** Only a private room on the provider's own video host is ever embedded. */
@@ -1106,12 +1118,9 @@ export function createRehearsalVideoService(dependencies: {
         const { value, keyIndex } = await pool.withHealthyKey(
           async (client, providerKeyIndex) => {
             const { palId } = await client.createPal({
-              // The provider shows the PAL's name on the interviewer's tile:
-              // the founder meets "Steve, <fund>", never an internal id.
-              name: rehearsalParticipantName(
-                interviewer.name,
-                rehearsal.counterpart.name,
-              ),
+              // The provider shows the PAL's name on Q's tile: who Q plays
+              // ("Harbourline Cargo (Q rehearsal)"), never the face's name.
+              name: rehearsalParticipantName(rehearsal.counterpart.name),
               // Conduct and disclosure only: what is said comes from Q.
               systemPrompt:
                 "You are the face and voice of a practice meeting run by Capital Q. Speak exactly the lines you are given, naturally, and nothing else.",

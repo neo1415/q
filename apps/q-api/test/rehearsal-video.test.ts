@@ -545,7 +545,11 @@ describe("starting a video rehearsal", () => {
     expect(harness.tavus.calls.conversations[0]?.input.maxCallSeconds).toBe(
       180,
     );
-    expect(harness.tavus.calls.pals[0]?.input.name).toMatch(/^Steve, \S/u);
+    // Who Q plays, never the stock face's own name (lead 2026-10-16).
+    expect(harness.tavus.calls.pals[0]?.input.name).toMatch(
+      /^\S.* \(Q rehearsal\)$/u,
+    );
+    expect(harness.tavus.calls.pals[0]?.input.name).not.toMatch(/Steve/u);
     expect(harness.tavus.calls.pals[0]?.input.name).not.toMatch(
       /cq-|[0-9a-f]{8}-/u,
     );

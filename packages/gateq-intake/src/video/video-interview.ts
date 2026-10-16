@@ -174,6 +174,12 @@ export type GateqVideoSessionStore = {
    * Null when the session is not live, already running, or past its end.
    */
   readonly markInRoom: (id: string) => Promise<GateqVideoSessionRow | null>;
+  /**
+   * Stamp the moment the provider is asked for a room, once, while the
+   * session is starting: settlement bills from here, never from our own
+   * earlier setup (live 2026-10-16: 93 s settled for 84 s in the room).
+   */
+  readonly markProviderRequest: (id: string) => Promise<void>;
   readonly byEventsTokenHash: (
     hash: string,
   ) => Promise<GateqVideoSessionRow | null>;
@@ -203,6 +209,8 @@ export type GateqVideoProvider = {
     readonly testMode: boolean;
     /** Q's natural opening, from the canonical interview. */
     readonly greeting: string;
+    /** The fund Q interviews for, for Q's tile; null when unknown. */
+    readonly fund?: string | null | undefined;
     /** Where the provider sends each heard line, and the bearer it presents. */
     readonly bridge: { readonly path: string; readonly bearer: string };
     /** Added to the provider's own cap for the interviewer to join. */
@@ -259,9 +267,25 @@ export function createGateqVideoInterview(deps: {
   readonly conversation: Pick<ConversationService, "turn" | "openingFor">;
   readonly bridgePath: string;
   readonly eventsPath: string;
+  /** The fund's public display name, for Q's tile (never authority). */
+  readonly fundFor?:
+    ((gatewayId: string) => Promise<string | null>) | undefined;
   readonly now?: (() => number) | undefined;
+  /** Timers for the end at the cap (tests drive them). */
+  readonly setTimer?:
+    | ((run: () => void, ms: number) => { readonly cancel: () => void })
+    | undefined;
 }) {
   const now = deps.now ?? (() => Date.now());
+  const setTimer =
+    deps.setTimer ??
+    ((run: () => void, ms: number) => {
+      const handle = setTimeout(run, ms);
+      handle.unref();
+      return { cancel: () => clearTimeout(handle) };
+    });
+  /** One end-at-cap timer per open session in this process. */
+  const capTimers = new Map<string, { readonly cancel: () => void }>();
   const view = (row: GateqVideoSessionRow): GateqVideoSessionView => ({
     id: row.id,
     status: row.status,
@@ -282,7 +306,10 @@ export function createGateqVideoInterview(deps: {
     row: GateqVideoSessionRow,
   ): Promise<GateqVideoSessionRow> => {
     if (row.status !== "LIVE" || row.liveAt !== null) return row;
-    return (await deps.store.markInRoom(row.id)) ?? row;
+    const started = await deps.store.markInRoom(row.id);
+    if (started === null) return row;
+    scheduleCap(started);
+    return started;
   };
 
   const endRow = async (
@@ -293,7 +320,12 @@ export function createGateqVideoInterview(deps: {
     // end leaves the row open for the sweep to retry, never forgotten.
     if (row.providerConversationId !== null && deps.provider !== null)
       await deps.provider.endRoom(row.providerConversationId);
-    return deps.store.end({ id: row.id, reason });
+    const ended = await deps.store.end({ id: row.id, reason });
+    if (ended !== null) {
+      capTimers.get(row.id)?.cancel();
+      capTimers.delete(row.id);
+    }
+    return ended;
   };
 
   /**
@@ -325,6 +357,33 @@ export function createGateqVideoInterview(deps: {
     return allowance === null || allowance.remaining > 0
       ? { available: true, reason: null }
       : { available: false, reason: "WEEKLY_ALLOWANCE_USED" };
+  };
+
+  /**
+   * End the room at its cap, not at the next sweep (which stays the
+   * backstop after a restart): the room must not outlive the applicant's
+   * time by up to a sweep interval. Rescheduled when the end moves
+   * earlier (Q joined); a session already ended is left alone.
+   */
+  const scheduleCap = (row: GateqVideoSessionRow) => {
+    capTimers.get(row.id)?.cancel();
+    if (row.status !== "LIVE") return;
+    const ms = Math.max(0, Date.parse(row.endsAt) - now());
+    capTimers.set(
+      row.id,
+      setTimer(() => {
+        capTimers.delete(row.id);
+        void (async () => {
+          const open = await deps.store.openForApplication(row.applicationId);
+          if (open === null || open.id !== row.id) return;
+          if (Date.parse(open.endsAt) > now()) {
+            scheduleCap(open);
+            return;
+          }
+          await endRow(open, "TIME_LIMIT");
+        })().catch(() => undefined);
+      }, ms),
+    );
   };
 
   return {
@@ -389,8 +448,15 @@ export function createGateqVideoInterview(deps: {
           channel: "voice",
           correlationId: input.correlationId,
         });
+        const fund =
+          deps.fundFor === undefined
+            ? null
+            : await deps.fundFor(guest.application.gatewayId).catch(() => null);
+        // From here the provider may bill: settlement counts from now.
+        await deps.store.markProviderRequest(row.id);
         const room = await deps.provider.createRoom({
           sessionId: row.id,
+          fund,
           maxSeconds: row.maxSeconds,
           testMode: deps.config.testMode,
           greeting,
@@ -407,6 +473,7 @@ export function createGateqVideoInterview(deps: {
           joinUrlSealed,
         });
         if (live === null) throw new Error("video session no longer starting");
+        scheduleCap(live);
         return view(live);
       } catch {
         // The allowance is spent by the attempt (no retry-to-mint), the
