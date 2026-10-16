@@ -774,6 +774,12 @@ export const OnboardingSuggestionViewSchema = z.object({
     )
     .max(20)
     .default([]),
+  /**
+   * What the person should know about this proposal, in plain words (ob2):
+   * e.g. the names in their list that matched nothing and so are not in
+   * it. Null when there is nothing to add.
+   */
+  rationale: z.string().max(300).nullable().default(null),
 });
 export type OnboardingSuggestionView = z.infer<
   typeof OnboardingSuggestionViewSchema

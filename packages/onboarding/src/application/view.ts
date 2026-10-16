@@ -269,6 +269,7 @@ export function toSuggestionView(
     })),
     status: suggestion.status,
     createdAt: suggestion.createdAt,
+    rationale: suggestion.rationale ?? null,
   };
 }
 

@@ -56,6 +56,9 @@ const LIFT = new RegExp(
     // A run of capitalised words: a name (Rimal Freight, AlRayan Investment
     // LLC, Bank of Kigali), an acronym (SAFE, AED), a handle (@zino).
     String.raw`@[\w.]+`,
+    // Words in another script inside an English answer are data (a name
+    // written in Arabic, a quote in Chinese): lifted whole.
+    String.raw`[^\s\p{P}\p{S}\p{N}\u0000-\u024F]+(?:\s+[^\s\p{P}\p{S}\p{N}\u0000-\u024F]+)*`,
     // A full stop belongs to a name only inside it ("U.S."), so a name
     // never runs on into the next sentence.
     String.raw`[\p{Lu}](?:[\p{L}\p{N}'’&\-]|\.(?=\p{L}))*(?:\s+(?:(?:of|de|del|da|al|el|bin|van|von|&)\s+)?[\p{Lu}(](?:[\p{L}\p{N}'’&\-)]|\.(?=\p{L}))*)*`,

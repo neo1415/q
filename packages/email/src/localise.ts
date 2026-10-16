@@ -24,28 +24,39 @@ export type EmailLocale = {
 };
 
 /**
- * The recipient's language: English (unchanged), "ar" (the hand-written
- * Arabic catalogue, kept as a shorthand), or any language as a locale.
+ * The recipient's language: English (unchanged), the tag of a language
+ * with a hand-written catalogue (its primary subtag, e.g. "ar"), or any
+ * language as a locale the sender assembled.
  */
-export type EmailLanguage = "en" | "ar" | EmailLocale;
+export type EmailLanguage = string | EmailLocale;
 
-/** Hand-written email catalogues by primary subtag; they win over machine output. */
+/**
+ * Hand-written email catalogues by primary subtag, with their direction;
+ * they win over machine output.
+ */
+export const EMAIL_HAND_LOCALES: Readonly<Record<string, EmailLocale>> = {
+  ar: { tag: "ar", direction: "rtl", catalogue: EMAIL_ARABIC },
+};
+
+/** The hand-written catalogues alone, by primary subtag. */
 export const EMAIL_HAND_CATALOGUES: Readonly<
   Record<string, Readonly<Record<string, string>>>
-> = { ar: EMAIL_ARABIC };
+> = Object.fromEntries(
+  Object.entries(EMAIL_HAND_LOCALES).map(([primary, locale]) => [
+    primary,
+    locale.catalogue,
+  ]),
+);
 
 /** Every English string the email catalogue translates (the machine source). */
 export const EMAIL_SOURCE_STRINGS: readonly string[] =
   Object.keys(EMAIL_ARABIC);
 
-const ARABIC_LOCALE: EmailLocale = {
-  tag: "ar",
-  direction: "rtl",
-  catalogue: EMAIL_ARABIC,
-};
-
-function localeOf(language: Exclude<EmailLanguage, "en">): EmailLocale {
-  return language === "ar" ? ARABIC_LOCALE : language;
+/** A tag's hand-written locale, or null (then the message stays English). */
+function localeOf(language: EmailLanguage): EmailLocale | null {
+  if (typeof language !== "string") return language;
+  const primary = (language.split("-")[0] ?? language).toLowerCase();
+  return EMAIL_HAND_LOCALES[primary] ?? null;
 }
 
 type Pattern = {
@@ -206,8 +217,8 @@ export function localiseEmail<M extends LocalisableMessage>(
   message: M,
   language: EmailLanguage,
 ): M {
-  if (language === "en") return message;
   const locale = localeOf(language);
+  if (locale === null) return message;
   const { catalogue } = locale;
   return {
     ...message,

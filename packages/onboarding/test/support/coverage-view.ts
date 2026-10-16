@@ -1,5 +1,6 @@
 import type {
   OnboardingResponseValue,
+  OnboardingResponseView,
   OnboardingSessionView,
 } from "@capital-q/contracts";
 import {
@@ -24,7 +25,12 @@ export function viewOf(
       stepKey: string;
       value: OnboardingResponseValue;
       sourceType: string;
+      rationale?: string | null;
     }[];
+    /** How each answer was given; voice when unsaid. */
+    readonly modalities?: Readonly<
+      Record<string, OnboardingResponseView["sourceModality"]>
+    >;
     readonly contradictions?: readonly {
       stepKey: string;
       readings: string[];
@@ -96,6 +102,7 @@ export function viewOf(
       status: "PENDING" as const,
       createdAt: NOW.toISOString(),
       sourceRefs: [{ sourceType: s.sourceType, sourceId: "ref-1" }],
+      rationale: s.rationale ?? null,
     })),
     responses: Object.entries(answers)
       .filter(([key]) => snapshot.has(key))
@@ -104,7 +111,7 @@ export function viewOf(
         stepKey,
         responseType: value.type,
         value,
-        sourceModality: "VOICE_TRANSCRIPT" as const,
+        sourceModality: extra.modalities?.[stepKey] ?? "VOICE_TRANSCRIPT",
         note: null,
         channel: null,
         createdAt: NOW.toISOString(),

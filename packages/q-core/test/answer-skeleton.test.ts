@@ -91,3 +91,13 @@ describe("lists of names keep the language's own joining word", () => {
     ).toEqual(["It fits {v1}.", "{v1} raised {v2}."]);
   });
 });
+
+describe("data in another script is lifted too (no person's data in a skeleton)", () => {
+  it("an Arabic company name inside an English answer", () => {
+    const { skeleton, values } = skeletonOf(
+      "رمال للشحن is waiting for your reply.",
+    );
+    expect(skeleton).toBe("{v1} is waiting for your reply.");
+    expect(values).toEqual(["رمال للشحن"]);
+  });
+});

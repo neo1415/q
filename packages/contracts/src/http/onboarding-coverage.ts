@@ -109,6 +109,8 @@ export const OnboardingCoverageProposalSchema = z
     display: z.string().max(600),
     source: OnboardingCoverageSourceSchema,
     sourceRefs: z.array(SourceRefSchema).max(20),
+    /** The proposal's rationale, e.g. names not matched (ob2). */
+    note: z.string().max(300).nullable().default(null),
   })
   .strict();
 export type OnboardingCoverageProposal = z.infer<

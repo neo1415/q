@@ -127,4 +127,82 @@ describe("investor coverage", () => {
       INVESTOR_COVERAGE_PROFILE.fields[INVESTOR_STEPS.businessTitle]?.priority,
     ).toBe("IMPORTANT");
   });
+
+  describe("an accepted document proposal keeps its provenance (ob2)", () => {
+    const geography = {
+      [INVESTOR_STEPS.geography]: {
+        type: "RESOURCE_REFERENCE" as const,
+        resourceType: "TAXONOMY_NODE" as const,
+        resourceIds: ["00000000-0000-4000-8000-0000000000ke"],
+      },
+    };
+    const sourceOf = (
+      modality: "SUGGESTION_ACCEPT" | "SUGGESTION_EDIT",
+      accepted?: readonly { sourceType: string }[],
+    ) =>
+      deriveOnboardingCoverage({
+        profile: INVESTOR_COVERAGE_PROFILE,
+        definition: INVESTOR_DEFINITION_V1,
+        view: viewOf(INVESTOR_DEFINITION_V1, geography, {
+          modalities: { [INVESTOR_STEPS.geography]: modality },
+        }),
+        ...(accepted === undefined
+          ? {}
+          : {
+              acceptedSuggestions: [
+                { stepKey: INVESTOR_STEPS.geography, sourceRefs: accepted },
+              ],
+            }),
+        now: NOW,
+      }).fields.find((f) => f.fieldKey === INVESTOR_STEPS.geography)?.source;
+
+    it("accepted from the person's document: from the document", () => {
+      expect(
+        sourceOf("SUGGESTION_ACCEPT", [{ sourceType: "EVIDENCE_DOCUMENT" }]),
+      ).toBe("DOCUMENT");
+    });
+
+    it("accepted from Q's own recommendation, or unknown provenance: Q's suggestion", () => {
+      expect(
+        sourceOf("SUGGESTION_ACCEPT", [{ sourceType: "Q_RECOMMENDATION" }]),
+      ).toBe("Q_RECOMMENDATION");
+      expect(sourceOf("SUGGESTION_ACCEPT")).toBe("Q_RECOMMENDATION");
+    });
+
+    it("edited by the person: still reached through Q's suggestion", () => {
+      expect(
+        sourceOf("SUGGESTION_EDIT", [{ sourceType: "EVIDENCE_DOCUMENT" }]),
+      ).toBe("Q_RECOMMENDATION");
+    });
+
+    it("a pending proposal carries its note (names not matched)", () => {
+      const c = deriveOnboardingCoverage({
+        profile: INVESTOR_COVERAGE_PROFILE,
+        definition: INVESTOR_DEFINITION_V1,
+        view: viewOf(
+          INVESTOR_DEFINITION_V1,
+          {},
+          {
+            suggestions: [
+              {
+                stepKey: INVESTOR_STEPS.geography,
+                value: geography[INVESTOR_STEPS.geography],
+                sourceType: "EVIDENCE_DOCUMENT",
+                rationale:
+                  "Not matched to Capital Q's list, so not included: Atlantis.",
+              },
+            ],
+          },
+        ),
+        now: NOW,
+      });
+      const proposal = c.fields.find(
+        (f) => f.fieldKey === INVESTOR_STEPS.geography,
+      )?.proposals[0];
+      expect(proposal).toMatchObject({
+        source: "DOCUMENT",
+        note: "Not matched to Capital Q's list, so not included: Atlantis.",
+      });
+    });
+  });
 });

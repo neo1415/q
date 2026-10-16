@@ -93,12 +93,16 @@ import {
   firstNameOf,
   onboardingFlowFor,
   withNextQuestion,
+  withoutUnbackedSaveClaims,
   withoutAnsweredQuestions,
 } from "./onboarding-flow.js";
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
-import { ONBOARDING_ARABIC_NOTE, withArabicQuestions } from "./step-copy-ar.js";
+import {
+  onboardingLanguageNote,
+  withQuestionsInLanguage,
+} from "./step-copy-language.js";
 import { settleKnownAnswers } from "./known-answers.js";
 import { textStatedIn } from "./value-support.js";
 
@@ -114,6 +118,9 @@ import { textStatedIn } from "./value-support.js";
  */
 
 const MAX_ROUNDS = 4;
+/** Words that point at something they uploaded, not the open web. */
+const ABOUT_THEIR_UPLOAD =
+  /\b(deck|decks|document|documents|upload|uploaded|file|files|pdf|attachment|slides)\b/iu;
 /** A record_answers result as the round saw it (the tool's own JSON body). */
 const RecordedResultsSchema = z
   .object({
@@ -336,6 +343,17 @@ export type InterviewAgentDependencies = {
    * saving (lane ob1). Absent: such a failure is reported, not held.
    */
   readonly heldWrites?: HeldWritesStore | undefined;
+  /**
+   * Any language: the questions code adds, through Q's shared translation
+   * layer (English product copy). Each entry, or null to keep the English.
+   */
+  readonly localiseWords?:
+    | ((
+        actor: ActorContext,
+        language: string,
+        texts: readonly string[],
+      ) => Promise<readonly (string | null)[]>)
+    | undefined;
 };
 
 export type RaisedChecks = {
@@ -668,6 +686,8 @@ export function createInterviewAgent(
   // The step each session's last reply asked, for the independent reading
   // of the answer to it (DELEGATION_READER v4).
   const lastAsked = new Map<string, string>();
+  /** The step asked the turn before the last, per session (code reading). */
+  const askedBeforeLast = new Map<string, string>();
   // The steps each session's last replies asked, newest last ("" for a
   // reply that asked nothing), to rest a question pressed twice running.
   const recentAsks = new Map<string, string[]>();
@@ -787,7 +807,11 @@ export function createInterviewAgent(
     const personality = standing?.personality ?? "AUTO";
     // Multilingual Q: the language they chose for Q (Settings or by telling
     // Q), so the interview opens and asks in it.
-    const arabic = standing?.language === "ar";
+    const language =
+      standing === null || standing.language === "AUTO"
+        ? null
+        : standing.language;
+    const languageNote = onboardingLanguageNote(language);
     const conductBefore = standing?.conduct ?? INITIAL_CONDUCT;
     // A paused account talks to nobody until a person at Capital Q has
     // looked at it: refused here, before any model is called.
@@ -879,11 +903,30 @@ export function createInterviewAgent(
       // just asked: code reads that, with no model call (owner 2026-10-16).
       const decided =
         dependencies.readingByCodeWhereExact === true
-          ? codeReading({
-              utterance,
-              asked: journeySteps.find((step) => step.stepKey === askedKey),
-              pendingCount: pending.length,
-            })
+          ? await (async () => {
+              const view = (await port.state().catch(() => null)) ?? null;
+              const open = new Set(
+                view?.steps
+                  .filter((row) => row.status === "OPEN")
+                  .map((row) => row.stepKey) ?? [],
+              );
+              const beforeKey =
+                askedBeforeLast.get(input.onboardingSessionId) ?? null;
+              return codeReading({
+                utterance,
+                asked: journeySteps.find((step) => step.stepKey === askedKey),
+                askedBefore:
+                  beforeKey !== null && open.has(beforeKey)
+                    ? journeySteps.find((step) => step.stepKey === beforeKey)
+                    : undefined,
+                openChoices: journeySteps.filter(
+                  (step) =>
+                    open.has(step.stepKey) &&
+                    step.configuration.stepType === "single_select",
+                ),
+                pendingCount: pending.length,
+              });
+            })()
           : null;
       delegationRead =
         decided !== null
@@ -1206,7 +1249,7 @@ export function createInterviewAgent(
           })),
       };
     };
-    const open = await journeyOpenings();
+    let open = await journeyOpenings();
     const ledger = conversationOf(input.onboardingSessionId);
     // Everything the turn takes from the independent reading of their
     // words, once that reading is in.
@@ -1231,8 +1274,11 @@ export function createInterviewAgent(
       // What else the turn asks, from the independent reading. A look-up
       // question goes on in the person's own words, never a model's; the
       // research ledger decides whether it may run.
+      // A question about their own upload is answered from what the deck
+      // gave (its proposals, on the record or on offer), never handed to a
+      // web look-up (live 2026-10-16: "what did you find in the deck?").
       const lookupWords =
-        authority.lookup === null
+        authority.lookup === null || ABOUT_THEIR_UPLOAD.test(utterance)
           ? null
           : textStatedIn(authority.lookup, utterance)
             ? authority.lookup
@@ -1255,15 +1301,19 @@ export function createInterviewAgent(
           ? authority.pronounce
           : null;
       const pausing = authority.pausing && !opening;
-      const turnNotes = turnNotesFor({
-        flow: pausing ? undefined : flowFor(state).note,
-        pausing,
-        lookup,
-        pronounce,
-        research: researchNote,
-        open,
-        held: heldNote,
-      });
+      // Rendered against the state of each round, never the state when the
+      // reading landed (live 2026-10-16: findings accepted by code this
+      // turn, and the round was still told to ask for the description).
+      const turnNotes = (now: typeof state) =>
+        turnNotesFor({
+          flow: pausing ? undefined : flowFor(now).note,
+          pausing,
+          lookup,
+          pronounce,
+          research: researchNote,
+          open,
+          held: heldNote,
+        });
       return {
         authority,
         delegated,
@@ -1339,11 +1389,8 @@ export function createInterviewAgent(
           delegated: current().delegated,
           approved: current().approved,
           declined: current().declined,
-          turnNotes: current().turnNotes,
-          personality: [
-            PERSONALITY_NOTES[personality],
-            arabic ? ONBOARDING_ARABIC_NOTE : "",
-          ]
+          turnNotes: current().turnNotes(state),
+          personality: [PERSONALITY_NOTES[personality], languageNote]
             .filter((note) => note.length > 0)
             .join(" ")
             .slice(0, 1_200),
@@ -1515,10 +1562,13 @@ export function createInterviewAgent(
         rounds += 1;
         const unread = reading === null;
         if (reading !== null) {
+          const before = actions.length;
           await recordApproved(
             (reading as ReturnType<typeof readingOf>).authority.approved,
           );
           state = await port.state();
+          // What code just accepted is no longer an opening to raise.
+          if (actions.length !== before) open = await journeyOpenings();
         }
         const response = await gateway.execute(
           {
@@ -1645,6 +1695,16 @@ export function createInterviewAgent(
       lastAsked.delete(input.onboardingSessionId);
     }
     if (result?.asking !== undefined && result.asking !== null) {
+      const previous = lastAsked.get(input.onboardingSessionId);
+      if (previous !== undefined && previous !== result.asking) {
+        askedBeforeLast.delete(input.onboardingSessionId);
+        askedBeforeLast.set(input.onboardingSessionId, previous);
+        while (askedBeforeLast.size > 2_000) {
+          const oldest = askedBeforeLast.keys().next().value;
+          if (oldest === undefined) break;
+          askedBeforeLast.delete(oldest);
+        }
+      }
       lastAsked.delete(input.onboardingSessionId);
       lastAsked.set(input.onboardingSessionId, result.asking);
       while (lastAsked.size > 2_000) {
@@ -1678,7 +1738,16 @@ export function createInterviewAgent(
         : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.");
     // Never the previous question word for word (QA 2026-10-03): what they
     // said is acknowledged first, and the question comes in other words.
-    let reply = notVerbatim(replyWritten, lastQTurn ?? null, {
+    // Never "saved" when nothing was (owner 2026-10-16): the claim is
+    // checked against what this turn actually committed.
+    const backedReply = withoutUnbackedSaveClaims(
+      replyWritten,
+      opening || recorded.length > 0 || (heldNote?.applied.length ?? 0) > 0,
+    );
+    if (backedReply !== replyWritten) {
+      logger.info({}, "interview reply claimed a save nothing backed; removed");
+    }
+    let reply = notVerbatim(backedReply, lastQTurn ?? null, {
       asking: result?.asking ?? null,
       alternate: (stepKey) => {
         const step = journeySteps.find((s) => s.stepKey === stepKey);
@@ -1695,7 +1764,7 @@ export function createInterviewAgent(
         );
       },
     });
-    if (reply !== replyWritten) {
+    if (reply !== backedReply) {
       logger.info(
         { asking: result?.asking ?? null },
         "interview reply repeated the last question verbatim; reworded",
@@ -1778,7 +1847,16 @@ export function createInterviewAgent(
           )
           .sort((a, b) => Number(b.required) - Number(a.required))
           .map((e) => steps.get(e.stepKey))
-          .find((step) => step !== undefined) ?? null)
+          // The journey settles its own platform steps (the mandate); never
+          // the question the conversation returns to.
+          .find(
+            (step) =>
+              step !== undefined &&
+              !(
+                step.configuration.stepType === "reference_select" &&
+                step.configuration.resourceType !== "TAXONOMY_NODE"
+              ),
+          ) ?? null)
       : null;
     if (handingOver) {
       remember(
@@ -1831,8 +1909,17 @@ export function createInterviewAgent(
 
     // Multilingual Q (live 2026-10-16): the questions code adds are the
     // journey's English; an Arabic speaker hears each step in Arabic.
-    if (arabic) {
-      reply = withArabicQuestions(reply, journeySteps, SPOKEN_QUESTIONS);
+    if (language !== null) {
+      reply = await withQuestionsInLanguage(
+        reply,
+        journeySteps,
+        SPOKEN_QUESTIONS,
+        language,
+        (lines) =>
+          dependencies.localiseWords === undefined
+            ? Promise.resolve(lines.map(() => null))
+            : dependencies.localiseWords(actor, language, lines),
+      );
     }
 
     // Kept: one exchange per turn, under one reference.
