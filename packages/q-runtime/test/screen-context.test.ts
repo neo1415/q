@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CreateQRunRequestSchema,
+  QConversationIdSchema,
   type QScreenContext,
   type QSubjectRef,
 } from "@capital-q/contracts";
@@ -42,7 +43,7 @@ function harness(
   resolves: (ref: QSubjectRef) => boolean | "throws",
   carried: readonly QSubjectRef[] = [],
 ) {
-  const conversationId = randomUUID();
+  const conversationId = QConversationIdSchema.parse(randomUUID());
   const runs: {
     subjects: readonly QSubjectRef[];
     screen?: QScreenContext | null;
