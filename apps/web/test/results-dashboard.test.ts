@@ -30,7 +30,7 @@ describe("results words", () => {
         { state: "INTEREST_EXPRESSED", count: 1 },
       ]).map((s) => s.state),
     ).toEqual(["INTEREST_EXPRESSED", "CONNECTED", "DECLINED"]);
-    expect(stateWord("INTEREST_EXPRESSED", "INVESTOR")).toBe("Interest sent");
+    expect(stateWord("INTEREST_EXPRESSED", "INVESTOR")).toBe("Awaiting reply");
     expect(stateWord("INTEREST_EXPRESSED", "FOUNDER")).toBe(
       "Interested in you",
     );

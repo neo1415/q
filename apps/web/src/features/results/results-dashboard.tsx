@@ -74,6 +74,7 @@ export type ResultsDashboardProps = {
 function Panel({
   id,
   title,
+  description,
   action,
   children,
   className,
@@ -81,6 +82,7 @@ function Panel({
 }: {
   readonly id: string;
   readonly title: string;
+  readonly description?: string | undefined;
   readonly action?: ReactNode;
   readonly children: ReactNode;
   readonly className?: string;
@@ -90,6 +92,7 @@ function Panel({
     <SurfacePanel
       id={id}
       title={title}
+      description={description}
       headingLevel={3}
       action={action}
       flush={flush}
@@ -105,16 +108,23 @@ function Tile({
   value,
   note,
   href,
+  figure = /^\d/.test(value),
 }: {
   readonly label: string;
   readonly value: string;
   readonly note?: string | undefined;
   readonly href?: string | undefined;
+  /**
+   * A known measure, drawn as a figure even in words ("Under 1 h"; live
+   * check 2026-10-16: it sat smaller than its neighbours). Unknowns stay
+   * small words.
+   */
+  readonly figure?: boolean | undefined;
 }) {
   const body = (
     <>
       <span className="cq-body-sm text-(--cq-text-secondary)">{label}</span>
-      {/^\d/.test(value) ? (
+      {figure ? (
         <span className="text-[1.625rem] leading-tight font-semibold tracking-[-0.01em] tabular-nums text-(--cq-text-primary) sm:text-[1.875rem]">
           {value}
         </span>
@@ -311,6 +321,9 @@ function Pipeline({
     <Panel
       id="pipeline"
       title="Pipeline"
+      // Now, not the period: "Interest sent" above counts the period's
+      // interest; this counts where each relationship stands today.
+      description="Where each relationship stands now."
       action={
         picked === null ? null : (
           <Link
@@ -470,10 +483,11 @@ function responseTile(
   response: InvestorResults["responseTime"],
 ) {
   if (response === undefined) {
-    return { label, value: "Unknown", note: undefined };
+    return { label, value: "Unknown", note: undefined, figure: false };
   }
   return {
     label,
+    figure: response.medianHours !== null,
     value:
       response.medianHours === null
         ? "No answers yet"
@@ -485,6 +499,26 @@ function responseTile(
           : `${plural(response.waiting, "waiting", "waiting")}`
         : `Median of ${String(response.answered)}${response.waiting === 0 ? "" : ` · ${String(response.waiting)} waiting`}`,
   };
+}
+
+/**
+ * The investor's funnel for the period. "Seen" counts feed views only;
+ * when fewer companies were seen than saved or sent interest, the views
+ * were not all recorded and Seen is unknown (null), never a 0.
+ */
+export function funnelSteps(f: InvestorResults["funnel"]): {
+  readonly label: string;
+  readonly value: number | null;
+}[] {
+  const acted = Math.max(f.saved, f.interest);
+  return [
+    { label: "Seen", value: f.seen < acted ? null : f.seen },
+    { label: "Saved", value: f.saved },
+    { label: "Interest", value: f.interest },
+    { label: "Connected", value: f.connected },
+    { label: "Met", value: f.met },
+    { label: "Committed", value: f.committed },
+  ];
 }
 
 function InvestorDashboard(
@@ -596,23 +630,29 @@ function InvestorDashboard(
             rows={rows}
             unlisted={["DECLINED", "CLOSED"]}
           />
-          <Panel id="deal-flow" title="From your feed">
+          <Panel
+            id="deal-flow"
+            title="Funnel"
+            description="Companies this period, each counted once."
+          >
             <ol className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-              {[
-                ["Seen", f.seen],
-                ["Saved", f.saved],
-                ["Interest", f.interest],
-                ["Connected", f.connected],
-                ["Met", f.met],
-                ["Committed", f.committed],
-              ].map(([label, value]) => (
-                <li key={String(label)} className="flex flex-col gap-0.5">
+              {funnelSteps(f).map(({ label, value }) => (
+                <li key={label} className="flex flex-col gap-0.5">
                   <span className="cq-caption text-(--cq-text-secondary)">
                     {label}
                   </span>
-                  <span className="cq-title-sm tabular-nums text-(--cq-text-primary)">
-                    {value}
-                  </span>
+                  {value === null ? (
+                    // Fewer seen than acted on: views are not all recorded
+                    // (interest also comes from search, profiles and Q), so
+                    // the count is unknown, never a 0 beside 10.
+                    <span className="cq-body-sm min-h-7 text-(--cq-text-secondary)">
+                      Not recorded
+                    </span>
+                  ) : (
+                    <span className="cq-title-sm tabular-nums text-(--cq-text-primary)">
+                      {value}
+                    </span>
+                  )}
                 </li>
               ))}
             </ol>
