@@ -41,7 +41,7 @@ export type ClientActionEffects = {
    * Multilingual Q: the language they just chose by telling Q, already
    * saved; the screen follows it at once. Absent: nothing to switch.
    */
-  readonly setLanguage?: ((language: "AUTO" | "en" | "ar") => void) | undefined;
+  readonly setLanguage?: ((language: string) => void) | undefined;
   readonly signOut: () => void;
   /** Goes to an in-app path built below from the fixed route map. */
   readonly goTo: (path: string) => void;

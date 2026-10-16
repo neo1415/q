@@ -28,8 +28,15 @@ import {
 } from "@/features/video-room/video-allowance";
 
 import { GateqVideoRoom } from "./gateq-video-room";
+import {
+  isEnglish,
+  languageChannels,
+  languageInfo,
+  languageNameIn,
+} from "@capital-q/q-core/language";
+
 import { deviceLocale } from "@/features/voice/device-locale";
-import { useT } from "@/features/i18n/language";
+import { useT, useUiLanguage } from "@/features/i18n/language";
 
 /**
  * The way into the GateQ video interview (C3). It appears only when the
@@ -83,13 +90,29 @@ export function GateqVideoEntry({
   const [message, setMessage] = useState<string | null>(null);
   const [why, setWhy] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
-  // Lane ml: an Arabic device is told how an Arabic video room behaves.
+  // Any language: a device in another language is told how the room
+  // behaves in it (the video provider lists it, or the room is English).
   // Read after mount: the server has no device language.
-  const arabic = useSyncExternalStore(
+  const deviceLanguage = useSyncExternalStore(
     noLanguageChanges,
-    () => /^ar\b/iu.test(deviceLocale().locale ?? ""),
-    () => false,
+    () => languageInfo(deviceLocale().locale)?.tag ?? null,
+    () => null,
   );
+  const screenLanguage = useUiLanguage();
+  const roomNote = (() => {
+    if (deviceLanguage === null || isEnglish(deviceLanguage)) return null;
+    const name =
+      languageNameIn(deviceLanguage, screenLanguage) ??
+      languageInfo(deviceLanguage)?.englishName ??
+      deviceLanguage;
+    return languageChannels(deviceLanguage).video !== null
+      ? t(
+          `The video interview runs in ${name}. How clear it sounds depends on the face's voice; if it doesn't sound right, you can continue by typing.`,
+        )
+      : t(
+          `Video interviews aren't available in ${name} yet, so this one runs in English. You can continue by typing in your language instead.`,
+        );
+  })();
   // Pressed Start before ticking consent: ask for it, beside the box.
   const [askConsent, setAskConsent] = useState(false);
   const consentRef = useRef<HTMLInputElement>(null);
@@ -246,16 +269,9 @@ export function GateqVideoEntry({
           )}
         </span>
       </label>
-      {arabic ? (
-        <p
-          lang="ar"
-          dir="rtl"
-          className="cq-body-sm text-(--cq-text-secondary)"
-        >
-          تجري المقابلة المرئية بالعربية، ويعتمد وضوحها على صوت الوجه المختار؛
-          إن لم يبدُ مناسباً فيمكنك المتابعة بالكتابة.
-        </p>
-      ) : null}
+      {roomNote === null ? null : (
+        <p className="cq-body-sm text-(--cq-text-secondary)">{roomNote}</p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant={primary ? "primary" : "secondary"}

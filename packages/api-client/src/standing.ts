@@ -1,4 +1,6 @@
 import {
+  qUiTextPath,
+  QUiTextDtoSchema,
   Q_STANDING_LANGUAGE_PATH,
   Q_STANDING_PATH,
   Q_STANDING_PERSONALITY_PATH,
@@ -32,4 +34,13 @@ export function setQLanguage(
   return call(session, "PUT", Q_STANDING_LANGUAGE_PATH, QStandingDtoSchema, {
     body: { language },
   });
+}
+
+/**
+ * The interface's machine translations for a language (any-language
+ * interface): what is cached so far; the server translates the rest in the
+ * background. A Q API session.
+ */
+export function getUiText(session: ApiSession, language: string) {
+  return call(session, "GET", qUiTextPath(language), QUiTextDtoSchema);
 }

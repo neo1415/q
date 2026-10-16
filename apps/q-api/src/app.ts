@@ -1,3 +1,7 @@
+import {
+  registerUiTextRoutes,
+  type UiTextRoutesDependencies,
+} from "./composition/ui-text.js";
 import type { DatabaseHealth } from "@capital-q/database";
 import type { OwnUsage } from "./composition/usage.js";
 import { registerUsageRoutes } from "./http/usage.js";
@@ -226,6 +230,8 @@ export type QApiModules = {
   // end BILLING-2 block
   /** Q's standing with each person: personality and patience. */
   readonly standing?: StandingRoutesDependencies["standing"] | undefined;
+  /** Any-language interface: machine translations of the UI catalogue. */
+  readonly uiText?: UiTextRoutesDependencies["uiText"] | undefined;
   /** RECOVERY B1: what needs the person, every source (unread ≠ empty). */
   readonly attention?: AttentionRoutesDependencies["attention"] | undefined;
   /** W1: the Arrival Snapshot (what Q told them on arrival), one read for every surface. */
@@ -840,6 +846,14 @@ export function createApp(
         resolver: security.resolver,
         identity: security.identity,
         standing: modules.standing,
+      });
+    }
+    if (modules.uiText !== undefined) {
+      registerUiTextRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        uiText: modules.uiText,
       });
     }
     if (

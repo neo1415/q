@@ -8,12 +8,24 @@ import type { DatabaseExecutor } from "@capital-q/database";
  */
 export function createPostgresDailySpendReader(options: {
   readonly sql: DatabaseExecutor;
+  /**
+   * Only this task class's spend: a class with its own daily ceiling
+   * (UI_TRANSLATION) counts itself; absent, everything is counted.
+   */
+  readonly taskClass?: string | undefined;
 }): (dayStart: Date) => Promise<number> {
   return async (dayStart) => {
-    const rows = await options.sql<{ usd: string }[]>`
+    const rows =
+      options.taskClass === undefined
+        ? await options.sql<{ usd: string }[]>`
       select coalesce(sum(cost_usd), 0)::text as usd
         from ai_ops.model_usage
-       where occurred_at >= ${dayStart.toISOString()}::timestamptz`;
+       where occurred_at >= ${dayStart.toISOString()}::timestamptz`
+        : await options.sql<{ usd: string }[]>`
+      select coalesce(sum(cost_usd), 0)::text as usd
+        from ai_ops.model_usage
+       where occurred_at >= ${dayStart.toISOString()}::timestamptz
+         and task_class = ${options.taskClass}`;
     return Number(rows[0]?.usd ?? "0");
   };
 }

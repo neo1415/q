@@ -13,6 +13,15 @@ import { SOMETHING_ELSE_QUESTION, type OpenerChoice } from "./opener";
  * what they chose, so it follows on (the standard line, which has no model
  * in the browser, says the ready line as it is). Nothing when no line.
  */
+/** "Here's what's waiting.", hand-written by primary subtag. */
+const WAITING: Readonly<Record<string, string>> = { ar: "إليك ما ينتظرك." };
+
+function pageLanguage(): string {
+  const lang =
+    typeof document === "undefined" ? "" : document.documentElement.lang;
+  return (lang.split("-")[0] ?? "").toLowerCase();
+}
+
 export function tellLineOpenerAnswer(choice: OpenerChoice): void {
   if (choice === "SHOW") {
     const briefing = arrivalBriefingWords() ?? "";
@@ -20,11 +29,9 @@ export function tellLineOpenerAnswer(choice: OpenerChoice): void {
       `Screen note (data, not the person's words): they chose to look at what's waiting, and it is on screen now. Go through it briefly, the way a colleague would, one thing at a time; don't read the screen out.${briefing.length === 0 ? "" : ` What's waiting: "${briefing}"`}`,
       true,
       briefing.length === 0
-        ? // The page's language is the line's (multilingual Q).
-          typeof document !== "undefined" &&
-          document.documentElement.lang === "ar"
-          ? "إليك ما ينتظرك."
-          : "Here's what's waiting."
+        ? // The page's language is the line's: a hand-written line where
+          // one exists (by primary subtag), else English.
+          (WAITING[pageLanguage()] ?? "Here's what's waiting.")
         : briefing,
     );
     return;

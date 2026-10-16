@@ -572,6 +572,7 @@ export {
   SET_Q_LANGUAGE,
   LANGUAGE_CONFIRMATIONS,
   SetQLanguageInputSchema,
+  SetQLanguageOutputSchema,
   createSetQLanguageTool,
   type QLanguagePort,
   SET_Q_PERSONALITY,

@@ -36,6 +36,19 @@ import { matchesWords, type ArrivalMatches } from "./matches";
 import { openerOf, type Opener } from "./opener";
 import { arabicArrivalWords } from "./arrival-ar";
 
+const primaryOf = (language: string): string =>
+  (language.split("-")[0] ?? language).toLowerCase();
+
+/** Hand-composed card lines by primary subtag (Arabic: number agreement). */
+const CARD_LINES: Readonly<Record<string, typeof cardLine>> = {
+  ar: arabicCardLine,
+};
+
+/** Hand-composed arrivals by primary subtag. */
+const ARRIVAL_COMPOSERS: Readonly<Record<string, typeof arabicArrivalWords>> = {
+  ar: arabicArrivalWords,
+};
+
 /**
  * The arrival briefing as the page shows and Q says it (Zino, 2026-10-08):
  * a greeting by their clock, a lowdown from what was recorded, then the
@@ -120,13 +133,13 @@ export function focusSay(
   cards: readonly ArrivalCard[],
   state: SequenceState,
   lead?: string | null,
-  language: "en" | "ar" = "en",
+  language: string = "en",
 ): string | null {
   const focused = focusedCard(state);
   if (focused === null) return null;
   const card = cards.find((one) => one.key === focused.key);
   if (card === undefined) return null;
-  const line = (language === "ar" ? arabicCardLine : cardLine)(
+  const line = (CARD_LINES[primaryOf(language)] ?? cardLine)(
     decisionFactsOf(card),
     state.focus + 1,
     state.cards.length,
@@ -344,13 +357,18 @@ export function arrivalWords(
   data: ArrivalData,
   now: Date,
   browserZone: string | null,
-  /** Multilingual Q: "ar" opens in Arabic; anything else in English. */
-  language: "en" | "ar" = "en",
+  /**
+   * Any language: a language with a hand-composed arrival (Arabic: number
+   * agreement and whole sentences, never English fragments) opens in it;
+   * any other in English, which Q's voice then says in their language.
+   */
+  language: string = "en",
 ): ArrivalWords {
   const english = englishArrivalWords(data, now, browserZone);
-  if (language !== "ar") return english;
+  const compose = ARRIVAL_COMPOSERS[primaryOf(language)];
+  if (compose === undefined) return english;
   const zone = zoneFor(data, browserZone);
-  return arabicArrivalWords(english, data, {
+  return compose(english, data, {
     firstName: data.firstName,
     now,
     timeZone: zone,

@@ -37,6 +37,16 @@ export type QLanguagePort = {
     actor: ActorContext,
     language: QLanguagePreference,
   ) => Promise<void>;
+  /**
+   * What they asked for ("fr", "French", "français", "الفرنسية") as an
+   * offered language, or null when Capital Q cannot offer it. Composition
+   * passes q-core's registry (Intl data); nothing here lists languages.
+   */
+  readonly resolve: (asked: string) => {
+    readonly tag: string;
+    readonly nativeName: string;
+    readonly englishName: string;
+  } | null;
 };
 
 export type NotificationSettingsPort = {
@@ -191,31 +201,42 @@ export function createSetQPersonalityTool(
 
 export const SetQLanguageInputSchema = z
   .object({
-    language: QLanguagePreferenceSchema.describe(
-      "ar (Arabic), en (English) or AUTO (follow their device): the language they asked Q and Capital Q to use, however and in whatever language they asked.",
-    ),
+    language: z
+      .string()
+      .min(1)
+      .max(60)
+      .describe(
+        "The language they asked for: its BCP 47 tag when you know it (fr, es, pt-BR, sw, ur, ja), else its name exactly as they said it (français, Kiswahili, الفرنسية), or AUTO to follow their device.",
+      ),
   })
   .strict();
 
 export const SetQLanguageOutputSchema = z
   .object({
-    language: QLanguagePreferenceSchema,
+    /** The saved choice (canonical tag or AUTO); null when nothing changed. */
+    language: QLanguagePreferenceSchema.nullable(),
     done: z.boolean(),
     /** The screen switches language and direction at once (no reload). */
-    clientAction: QSetLanguageIntentSchema,
-    /** What Q says back, in the new language: the confirmation is in it. */
-    confirm: z.string().max(240),
+    clientAction: QSetLanguageIntentSchema.nullable(),
+    /** What Q says back. */
+    confirm: z.string().max(400),
   })
   .strict();
 
-/** Q's confirmation, in the language just chosen (trusted product copy). */
-export const LANGUAGE_CONFIRMATIONS: Readonly<
-  Record<QLanguagePreference, string>
-> = {
+/**
+ * Q's confirmation where a hand-written line exists (trusted product copy,
+ * keyed by primary subtag); any other language gets the English line with
+ * the instruction to say it in the new language, which Q's reply then is.
+ */
+export const LANGUAGE_CONFIRMATIONS: Readonly<Record<string, string>> = {
   ar: "تم. سأتحدث معك بالعربية من الآن، وتتحول الشاشات إلى العربية.",
   en: "Done. I'll speak English with you from now on, and your screens are in English.",
   AUTO: "Done. I'll follow your device's language from now on.",
 };
+
+/** Examples named in a refusal: an illustration, not the list (any offered language works). */
+const REFUSAL_EXAMPLES =
+  "French, Spanish, Portuguese, Arabic, Swahili, Hindi or Japanese";
 
 export function createSetQLanguageTool(
   port: QLanguagePort,
@@ -229,7 +250,7 @@ export function createSetQLanguageTool(
     id: SET_Q_LANGUAGE,
     providerName: "set_q_language",
     description:
-      'Sets the language Q and Capital Q use with them (Arabic, English, or automatic from their device), at once and reversibly, exactly as Language in Settings does: their screens, Q\'s replies and voice switch. Call it when they ask to change language or to be spoken to in a language, in any words and any language ("switch to Arabic", "speak English please", "غيّر اللغة إلى العربية"). Their own setting only; it takes no person. After it, say its confirm line as your whole reply.',
+      'Sets the language Q and Capital Q use with them (any language, or automatic from their device), at once and reversibly, exactly as Language in Settings does: their screens, Q\'s replies and voice switch. Call it when they ask to change language or to be spoken to in a language, in any words and any language ("switch to French", "parle-moi en français", "تكلم فرنسي", "speak English please"). Their own setting only; it takes no person. After it, reply with its confirm line as your whole reply, in the language it names; if done is false, say the confirm line and change nothing.',
     input: SetQLanguageInputSchema,
     output: SetQLanguageOutputSchema,
     // Their own conversation and their own row: the input names nobody,
@@ -241,12 +262,36 @@ export function createSetQLanguageTool(
           : deny<ActorContext>("NOT_AVAILABLE"),
       ),
     execute: async (input, _context, actor) => {
-      await port.set(actor, input.language);
+      const asked = input.language.trim();
+      if (asked.toUpperCase() === "AUTO") {
+        await port.set(actor, "AUTO");
+        return {
+          language: "AUTO",
+          done: true,
+          clientAction: { kind: "SET_LANGUAGE", language: "AUTO" },
+          confirm: LANGUAGE_CONFIRMATIONS["AUTO"] ?? "Done.",
+        };
+      }
+      const resolved = port.resolve(asked);
+      if (resolved === null) {
+        // Honest: nothing is saved, and the person hears what Q can do.
+        return {
+          language: null,
+          done: false,
+          clientAction: null,
+          confirm: `I can't do ${asked.slice(0, 60)} yet: it isn't a language Capital Q can offer. I can use almost any other, for example ${REFUSAL_EXAMPLES}; you can also choose one in Settings, under Language.`,
+        };
+      }
+      await port.set(actor, resolved.tag);
+      const primary = resolved.tag.split("-")[0] ?? resolved.tag;
+      const handWritten = LANGUAGE_CONFIRMATIONS[primary];
       return {
-        language: input.language,
+        language: resolved.tag,
         done: true,
-        clientAction: { kind: "SET_LANGUAGE", language: input.language },
-        confirm: LANGUAGE_CONFIRMATIONS[input.language],
+        clientAction: { kind: "SET_LANGUAGE", language: resolved.tag },
+        confirm:
+          handWritten ??
+          `Say this in ${resolved.englishName} (${resolved.nativeName}): "Done. I'll speak ${resolved.englishName} with you from now on, and your screens switch to ${resolved.englishName}; anything not yet translated stays in English for a moment."`,
       };
     },
   });
