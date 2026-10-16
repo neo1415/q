@@ -53,6 +53,7 @@ import { createResultsTools } from "./tools/results.js";
 import { createProposeHumanReviewTool } from "./tools/human-review.js";
 // DOCS block.
 import { createDocumentStudioTools } from "./tools/documents.js";
+import { createRecallMySetupTool } from "./tools/onboarding-transcript.js";
 import { createOwnRecordTools } from "./tools/own-records.js";
 import { createRecordChangeTools } from "./tools/record-changes.js";
 import { createFillProfileGapsTool } from "./tools/profile-gaps.js";
@@ -297,6 +298,10 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
       ? []
       : createRecordChangeTools(ports, ports.recordChanges)),
     ...createOwnRecordTools(ports),
+    // Lane ob1: what they told Q while setting up, kept apart from what is confirmed.
+    ...(ports.onboardingTranscript === undefined
+      ? []
+      : [createRecallMySetupTool(ports.onboardingTranscript)]),
     // ADMIN block: "how is my raise going", "download my pipeline report".
     ...createResultsTools(ports),
     // ADMIN-3: "want a person to look at this?"

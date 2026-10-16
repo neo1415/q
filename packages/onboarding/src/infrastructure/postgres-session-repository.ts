@@ -279,6 +279,7 @@ const ResponseRow = z.object({
   raw_text: z.string().nullable(),
   note: z.string().nullable(),
   source_modality: OnboardingSourceModalitySchema,
+  channel: z.enum(["FORM", "CONVERSATION"]).nullable().default(null),
   created_at: Timestamp,
   superseded_by_response_id: OnboardingResponseIdSchema.nullable(),
   withdrawn_at: Timestamp.nullable(),
@@ -295,6 +296,7 @@ function toResponse(row: unknown): OnboardingResponse {
     rawText: r.raw_text,
     note: r.note,
     sourceModality: r.source_modality,
+    channel: r.channel,
     createdAt: r.created_at,
     supersededByResponseId: r.superseded_by_response_id,
     withdrawnAt: r.withdrawn_at,
@@ -304,7 +306,7 @@ function toResponse(row: unknown): OnboardingResponse {
 function responseSelect(executor: DatabaseExecutor) {
   return executor`
     select r.id, r.session_id, r.step_key, r.response_type, r.response_jsonb, r.raw_text,
-           r.note, r.source_modality, r.created_at, r.superseded_by_response_id,
+           r.note, r.source_modality, r.channel, r.created_at, r.superseded_by_response_id,
            r.withdrawn_at
       from onboarding.responses r`;
 }
@@ -336,11 +338,12 @@ export function createPostgresOnboardingResponseRepository(): OnboardingResponse
       const { response } = input;
       const rows = await tx.sql`
         insert into onboarding.responses
-          (id, session_id, step_key, response_type, response_jsonb, raw_text, note, source_modality)
+          (id, session_id, step_key, response_type, response_jsonb, raw_text, note, source_modality, channel)
         values
           (${input.responseId}, ${input.sessionId}, ${response.stepKey}, ${response.responseType},
-           ${JSON.stringify(response.value)}::text::jsonb, ${response.rawText}, ${response.note}, ${response.sourceModality})
-        returning id, session_id, step_key, response_type, response_jsonb, raw_text, note, source_modality,
+           ${JSON.stringify(response.value)}::text::jsonb, ${response.rawText}, ${response.note}, ${response.sourceModality},
+           ${response.channel ?? null})
+        returning id, session_id, step_key, response_type, response_jsonb, raw_text, note, source_modality, channel,
                   created_at, superseded_by_response_id, withdrawn_at`;
       return toResponse(rows[0]);
     },
@@ -447,6 +450,19 @@ export function createPostgresOnboardingSuggestionRepository(): OnboardingSugges
          where g.id = ${suggestionId} and g.status = 'PENDING'
         returning g.id`;
       return rows.length === 1;
+    },
+    listRejectedValues: async (executor, sessionId, stepKey) => {
+      const rows = await executor`
+        select g.suggested_value
+          from onboarding.suggestions g
+         where g.session_id = ${sessionId}
+           and g.step_key = ${stepKey}
+           and g.status = 'REJECTED'
+         limit 50`;
+      return rows.map(
+        (row) =>
+          z.object({ suggested_value: z.unknown() }).parse(row).suggested_value,
+      );
     },
   };
 }

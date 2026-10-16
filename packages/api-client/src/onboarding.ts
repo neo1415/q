@@ -1,5 +1,7 @@
 import {
   AppendOnboardingInterviewTurnsResponseSchema,
+  GetOnboardingCoverageResponseSchema,
+  ONBOARDING_COVERAGE_SEGMENT,
   IDEMPOTENCY_KEY_HEADER,
   ListOnboardingInterviewTurnsResponseSchema,
   ONBOARDING_TURNS_SEGMENT,
@@ -328,5 +330,20 @@ export function chooseOnboardingNudge(
     `${nudge}${ONBOARDING_NUDGE_CHOICE_SEGMENT}`,
     OnboardingNudgeChoiceResponseSchema,
     { body: { choice } },
+  );
+}
+
+/**
+ * `GET /v1/onboarding/sessions/:sessionId/coverage` -- the canonical
+ * coverage of the caller's own session (lane ob1): per field, what is
+ * known, offered, saved, missing, contradictory, inapplicable, evidence-
+ * needed or deferrable, and what to cover next. The same picture Q reads.
+ */
+export function getOnboardingCoverage(session: ApiSession, sessionId: string) {
+  return call(
+    session,
+    "GET",
+    `${byId(sessionId)}${ONBOARDING_COVERAGE_SEGMENT}`,
+    GetOnboardingCoverageResponseSchema,
   );
 }

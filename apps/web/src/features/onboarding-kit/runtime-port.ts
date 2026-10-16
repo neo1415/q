@@ -1,4 +1,5 @@
 import type {
+  OnboardingResponseChannel,
   OnboardingResponseValue,
   OnboardingSessionView,
   SayOnboardingResponse,
@@ -29,6 +30,12 @@ export type RuntimePort = {
     readonly value: OnboardingResponseValue;
     readonly expectedSessionVersion: number;
     readonly idempotencyKey: string;
+    /**
+     * Which surface the answer was given in (lane ob1's response channel):
+     * provenance so coverage can say "from the form" or "from your
+     * conversation with Q". Absent when re-sending an answer already held.
+     */
+    readonly channel?: OnboardingResponseChannel | undefined;
   }) => Promise<OnboardingSessionView>;
   readonly skip: (input: {
     readonly sessionId: string;
@@ -479,6 +486,8 @@ export function createRuntimeClient<
               value: input.value,
               expectedSessionVersion: view.session.version,
               idempotencyKey: crypto.randomUUID(),
+              // A tapped option in the conversation with Q.
+              channel: "CONVERSATION",
             }),
           ),
         );
@@ -586,6 +595,7 @@ export function createRuntimeClient<
                 value: submission.value,
                 expectedSessionVersion: view.session.version,
                 idempotencyKey: crypto.randomUUID(),
+                channel: "FORM",
               }),
             );
           } else if (status !== "SKIPPED") {

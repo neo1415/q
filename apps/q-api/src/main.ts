@@ -313,6 +313,7 @@ import {
   createOnboardingNudges,
   createOnboardingQRecommendations,
   createOnboardingService,
+  createPostgresPendingWriteRepository,
   OnboardingSessionIdSchema,
   createOwnOnboardingSummaryReader,
   type OwnOnboardingSummaryReader,
@@ -598,6 +599,8 @@ import { createSupabaseRequestAuthenticator } from "./security/supabase-authenti
 import { attachVoiceChannel } from "./voice/attach.js";
 import { createVoiceSessionBindings } from "./voice/bindings.js";
 import { createVoiceSessionSealer } from "./voice/session-token.js";
+import { createHeldWritesStore } from "./voice/held-writes.js";
+import { createOnboardingTranscriptPort } from "./composition/onboarding-transcript.js";
 import { createInterviewAgent } from "./voice/interview-agent.js";
 import { createOnboardingConductor } from "./voice/onboarding-conductor.js";
 import { createLoggingPronunciationTeacher } from "./voice/pronunciation.js";
@@ -3165,6 +3168,8 @@ const qTools = createQTools({
           profileMaterial.dataRoom.view(actor, companyId),
       }),
     },
+    // Lane ob1: their own setup conversation, recalled for their own questions.
+    onboardingTranscript: createOnboardingTranscriptPort({ sql: database.sql }),
     ownRecords: {
       read: (actor, query) => ownRecords.read(actor, query),
       reassessReadiness: (actor, companyId, correlationId) =>
@@ -5903,6 +5908,13 @@ const reportPausedAccount = async (
   }
 };
 const interviewLoop = createInterviewAgent({
+  // Lane ob1: a confirmed answer a brief API outage kept from saving is
+  // held in onboarding.pending_writes and replayed on the next turn.
+  heldWrites: createHeldWritesStore({
+    sql: database.sql,
+    repository: createPostgresPendingWriteRepository(),
+    newKey: randomUUID,
+  }),
   standing: standingStore,
   onPaused: reportPausedAccount,
   gateway: modelGateway,

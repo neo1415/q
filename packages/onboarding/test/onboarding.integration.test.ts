@@ -1291,6 +1291,71 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
   // Suggestions
   // -------------------------------------------------------------------------
 
+  it("a rejected proposal is discarded for good: never offered again, by Q or a document re-read (lane ob1)", async () => {
+    await withWorld(async (world) => {
+      const { tx, service, adminA } = world;
+      const { view } = await start(world, adminA);
+      const id = view.session.id as OnboardingSessionId;
+      await submit(world, adminA, id, "intent", select("exploring"), 1);
+      const recommendations = createOnboardingQRecommendations({
+        transactions: nestedTransactions(tx),
+      });
+      const found = await recommendations.recommend({
+        userId: adminA.userId,
+        sessionId: id,
+        stepKey: "sectors",
+        value: { type: "MULTI_SELECT", optionKeys: ["health"] },
+        rationale: "Found on a public page.",
+        runId: null,
+        sources: [
+          { sourceType: "PUBLIC_WEB", url: "https://example.test/about" },
+        ],
+      });
+      const v = await service.runtime.getSession({
+        actor: adminA,
+        sessionId: id,
+      });
+      await service.runtime.resolveSuggestion({
+        actor: adminA,
+        sessionId: id,
+        suggestionId: found.id,
+        resolution: "REJECT",
+        expectedSessionVersion: v.session.version,
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      await expect(
+        recommendations.recommend({
+          userId: adminA.userId,
+          sessionId: id,
+          stepKey: "sectors",
+          value: { type: "MULTI_SELECT", optionKeys: ["health"] },
+          rationale: "Found it again.",
+          runId: null,
+        }),
+      ).rejects.toMatchObject({ reason: "SUGGESTION_REJECTED_BEFORE" });
+      await expect(
+        service.internal.createSuggestion({
+          sessionId: id,
+          stepKey: "sectors",
+          targetField: "sectors",
+          suggestedValue: { type: "MULTI_SELECT", optionKeys: ["health"] },
+        }),
+      ).rejects.toMatchObject({ reason: "SUGGESTION_REJECTED_BEFORE" });
+      // A different value is still offerable.
+      await expect(
+        recommendations.recommend({
+          userId: adminA.userId,
+          sessionId: id,
+          stepKey: "sectors",
+          value: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
+          rationale: "Payments fit.",
+          runId: null,
+        }),
+      ).resolves.toMatchObject({ stepKey: "sectors" });
+    });
+  });
+
   it("Q's recommendations survive a restart and an approval writes exactly the recommended payload (CQ-QX-008 P0-2)", async () => {
     await withWorld(async (world) => {
       const { tx, service, adminA, adminC } = world;

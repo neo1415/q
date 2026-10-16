@@ -24,7 +24,16 @@ import { QComposer } from "@capital-q/ui/q-composer";
 import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice, Progress } from "@capital-q/ui/states";
 
+import {
+  classifyOnboardingUpload,
+  onboardingDocumentTreatment,
+} from "@capital-q/onboarding/documents";
+
 import type { TaxonomyCandidateView } from "../onboarding-kit/client";
+import {
+  CoverageSummary,
+  useOnboardingCoverage,
+} from "../onboarding-kit/components/coverage-summary";
 import type { OnboardingTurn } from "../onboarding-kit/controller";
 import type { SessionPresentation } from "../onboarding-kit/session";
 import { askQAction, readQRunAction } from "../q/actions";
@@ -41,6 +50,8 @@ import {
   materialUploadCompleteAction,
   materialUploadTargetAction,
 } from "../onboarding-kit/material-actions";
+import { CONTINUE_LATER_PAUSE_MS } from "../onboarding-kit/components/continue-later";
+import { writeLastMode } from "../onboarding-kit/last-mode";
 import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { requestMove } from "../q/ui-act-controller";
@@ -285,6 +296,19 @@ export function QOnboardingWorkspace({
     },
   });
   const voiceActive = voice.active;
+  // Owner 2026-10-16: the reminder's one tap reopens the mode last used.
+  // Talking with Q is remembered as voice; typing to Q (below) as the
+  // conversation.
+  const rawJourney = session.raw?.session.journeyType;
+  const journeyName =
+    rawJourney === "founder" || rawJourney === "investor"
+      ? rawJourney
+      : undefined;
+  useEffect(() => {
+    if (voiceActive && journeyName !== undefined) {
+      writeLastMode(journeyName, "voice");
+    }
+  }, [voiceActive, journeyName]);
   /**
    * Arriving by voice (Q's first minute handed over): the voice stage
    * holds until the interview's line is up, or until it fails and the
@@ -372,6 +396,11 @@ export function QOnboardingWorkspace({
   const progress = useMemo(
     () => (view === undefined ? [] : progressLines(view, vocabulary)),
     [view, vocabulary],
+  );
+  // Lane ob1: the canonical coverage, read again whenever the session moves.
+  const coverage = useOnboardingCoverage(
+    view?.session.id,
+    view?.session.version,
   );
   const remaining = view === undefined ? 0 : remainingCount(view);
   const isFinal =
@@ -751,6 +780,9 @@ export function QOnboardingWorkspace({
         }
       }
       push("PERSON", trimmed);
+      if (journeyName !== undefined) {
+        writeLastMode(journeyName, "conversation");
+      }
       settleReading();
       setNarrowedTo(null);
       // A pause or a return to the interview is read by the loop like any
@@ -839,6 +871,16 @@ export function QOnboardingWorkspace({
       // does from a spoken one (QX-004 D): the same destination map, the
       // same hand-over to the form. Before this a typed "open Discover"
       // reached this seam and went nowhere.
+      if (turn.navigate === "HOME" && turn.reply !== null) {
+        // "Let's finish this later" (owner 2026-10-16): Q's one-line
+        // acknowledgement stays readable, then they are let into the app.
+        pendingReply.current = null;
+        push("Q", turn.reply);
+        window.setTimeout(() => {
+          router.push("/home");
+        }, CONTINUE_LATER_PAUSE_MS);
+        return;
+      }
       if (turn.navigate === "FORM") {
         const editor =
           prompt === null ? undefined : vocabulary.editorFor(prompt.stepKey);
@@ -876,6 +918,7 @@ export function QOnboardingWorkspace({
       voiceActive,
       voiceConnected,
       voiceSendText,
+      journeyName,
     ],
   );
 
@@ -1210,16 +1253,30 @@ export function QOnboardingWorkspace({
     qSubject !== undefined && "companyId" in qSubject
       ? qSubject.companyId
       : undefined;
+  /** An upload whose name says nothing: the person says what it is first. */
+  const [askKind, setAskKind] = useState<File | null>(null);
   const uploadWhileTalking = useCallback(
-    async (file: File) => {
+    async (file: File, chosenType?: string) => {
+      // Lane ob1: filed by its name (never its bytes). Only a deck or a
+      // company or product profile is read during onboarding; anything
+      // else is private: acknowledged and recorded by its details only.
+      const documentType = chosenType ?? classifyOnboardingUpload(file.name);
+      if (documentType === "UNCLASSIFIED" && chosenType === undefined) {
+        setAskKind(file);
+        return;
+      }
+      setAskKind(null);
+      const readable =
+        onboardingDocumentTreatment({
+          documentType,
+          sensitivityClass: "CONFIDENTIAL",
+        }) === "READ_FOR_COVERAGE";
       setUploadNote(`Uploading ${file.name}`);
       const target = await materialUploadTargetAction({
         ...(companyIdForUpload === undefined
           ? {}
           : { companyId: companyIdForUpload }),
-        documentType: /deck/i.test(file.name)
-          ? "PITCH_DECK"
-          : "COMPANY_PROFILE",
+        documentType,
         filename: file.name,
         mimeType: file.type.length > 0 ? file.type : "application/octet-stream",
         sizeBytes: file.size,
@@ -1247,6 +1304,20 @@ export function QOnboardingWorkspace({
       );
       if (!done.ok) {
         setUploadNote(done.message);
+        return;
+      }
+      if (!readable) {
+        // Private material: never waited on, never read back. Q is told
+        // it arrived, by its name only, so it can say what is outstanding.
+        setUploadNote(null);
+        await actions.refresh();
+        const private_ = `I've just uploaded ${file.name}. It's a private document: just note that I've shared it, don't read it, and tell me what's still outstanding.`;
+        if (voiceActive) {
+          setUploadNote(`${file.name} is kept private.`);
+          setHeldUpload(private_);
+        } else {
+          await say(private_);
+        }
         return;
       }
       setUploadNote(`Reading ${file.name}`);
@@ -1458,7 +1529,44 @@ export function QOnboardingWorkspace({
           </Button>
         </InlineNotice>
       ) : null}
-      <ProgressStrip lines={progress} />
+      {coverage === null ? (
+        <ProgressStrip lines={progress} />
+      ) : (
+        <CoverageSummary coverage={coverage} />
+      )}
+      {askKind === null ? null : (
+        <div
+          role="group"
+          aria-label={`What is ${askKind.name}?`}
+          className="flex flex-wrap items-center gap-2"
+          data-q-upload-kind
+        >
+          <span className="cq-body-sm text-(--cq-text-secondary)">
+            What is {askKind.name}?
+          </span>
+          <Button
+            size="compact"
+            variant="secondary"
+            onClick={() => void uploadWhileTalking(askKind, "PITCH_DECK")}
+          >
+            Pitch deck
+          </Button>
+          <Button
+            size="compact"
+            variant="secondary"
+            onClick={() => void uploadWhileTalking(askKind, "COMPANY_PROFILE")}
+          >
+            Company or product profile
+          </Button>
+          <Button
+            size="compact"
+            variant="quiet"
+            onClick={() => void uploadWhileTalking(askKind, "OTHER")}
+          >
+            Something private
+          </Button>
+        </div>
+      )}
 
       <ol className="flex flex-col gap-4" aria-live="polite">
         {greeting === null ? null : (

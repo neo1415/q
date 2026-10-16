@@ -65,6 +65,8 @@ export type InvestorResearchIdentity = {
    * 2026-09-30: "Greenbox" found an unrelated solar maker).
    */
   readonly personName?: string | null | undefined;
+  /** The company's country in words, when on the record: a disambiguating anchor (lane ob1). */
+  readonly country?: string | null | undefined;
 };
 
 export type InvestorResearchDependencies = {

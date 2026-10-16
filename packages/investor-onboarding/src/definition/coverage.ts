@@ -13,10 +13,55 @@ import { INVESTOR_STEPS } from "./investor-v1.js";
  * whether they deploy, stages, cheque currency, where and what). IMPORTANT:
  * sharper fit. OPTIONAL: nuance, offered once and never pressed.
  */
+/** Coverage keys an upload satisfies (no definition step holds them). */
+export const INVESTOR_DOCUMENT_FIELDS = {
+  materials: "I.materials",
+} as const;
+
+/** How the optional investor upload is filed, by what the person says it is. */
+export const INVESTOR_UPLOAD_DOCUMENT_TYPES = {
+  FUND_DECK: "FUND_DECK",
+  THESIS: "INVESTMENT_THESIS",
+  LP_LETTER: "LP_LETTER",
+} as const;
+
 export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
   journeyType: "investor",
   version: "investor-coverage-2026-10-16",
   registrationSeeds: { organisationName: INVESTOR_STEPS.organisationName },
+  // The optional investor upload (ob2's form and the conversation alike).
+  // A fund deck or investment thesis is readable material whose content
+  // may only PROPOSE values for the mandate fields below; an LP letter is
+  // private and is acknowledged by metadata only, never read.
+  documentFields: {
+    [INVESTOR_DOCUMENT_FIELDS.materials]: {
+      concept: "investor.materials",
+      label: "Fund deck, thesis or LP letter",
+      priority: "OPTIONAL",
+      // ob2's explicit investor types; the older filings still count.
+      documentTypes: [
+        "FUND_DECK",
+        "INVESTMENT_THESIS",
+        "LP_LETTER",
+        "COMPANY_PROFILE",
+        "PITCH_DECK",
+        "OTHER",
+      ],
+      informs: [
+        INVESTOR_STEPS.stages,
+        INVESTOR_STEPS.currency,
+        INVESTOR_STEPS.chequeMin,
+        INVESTOR_STEPS.chequeTypical,
+        INVESTOR_STEPS.chequeMax,
+        INVESTOR_STEPS.geography,
+        INVESTOR_STEPS.sectors,
+        INVESTOR_STEPS.businessModels,
+        INVESTOR_STEPS.customerTypes,
+        INVESTOR_STEPS.customCriteria,
+        INVESTOR_STEPS.portfolio,
+      ],
+    },
+  },
   fields: {
     [INVESTOR_STEPS.investorType]: {
       concept: "investor.type",

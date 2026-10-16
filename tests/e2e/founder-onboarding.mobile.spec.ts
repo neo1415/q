@@ -42,7 +42,7 @@ test.describe("founder onboarding (mobile, real API)", () => {
     await expect(heading(page, "What brings you to Capital Q?")).toBeVisible();
     await expect(progressText(page)).toHaveText("Company, step 1 of 7");
     await expect(
-      page.getByRole("link", { name: "Save & leave" }),
+      page.getByRole("button", { name: "Continue later" }),
     ).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(
       0,
@@ -87,7 +87,7 @@ test.describe("founder onboarding (mobile, real API)", () => {
     await page.reload();
     await useTheForm(page);
     await expect(heading(page, "Here's what I understood")).toBeVisible();
-    await page.getByRole("link", { name: "Save & leave" }).tap();
+    await page.getByRole("button", { name: "Continue later" }).tap();
     await expect(page).toHaveURL(/\/home$/);
     // Home no longer offers "Set up as a founder" once the company exists;
     // it offers the way back into the unfinished setup instead.

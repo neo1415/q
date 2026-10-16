@@ -9,6 +9,8 @@ import { viewOf } from "../../onboarding/test/support/coverage-view.js";
 import {
   INVESTOR_COVERAGE_PROFILE,
   INVESTOR_DEFINITION_V1,
+  INVESTOR_DOCUMENT_FIELDS,
+  INVESTOR_UPLOAD_DOCUMENT_TYPES,
   INVESTOR_STEPS,
 } from "../src/definition/index.js";
 
@@ -61,5 +63,59 @@ describe("investor coverage", () => {
     expect(
       c.fields.find((f) => f.fieldKey === INVESTOR_STEPS.greenFlags)?.state,
     ).toBe("DEFERRABLE");
+  });
+
+  it("the optional investor upload settles its own coverage key, never a required one", () => {
+    const without = deriveOnboardingCoverage({
+      profile: INVESTOR_COVERAGE_PROFILE,
+      definition: INVESTOR_DEFINITION_V1,
+      view: viewOf(INVESTOR_DEFINITION_V1, {}),
+      now: NOW,
+    });
+    const field = (c: typeof without) =>
+      c.fields.find((f) => f.fieldKey === INVESTOR_DOCUMENT_FIELDS.materials);
+    expect(field(without)).toMatchObject({
+      state: "DEFERRABLE",
+      required: false,
+    });
+    const withDeck = deriveOnboardingCoverage({
+      profile: INVESTOR_COVERAGE_PROFILE,
+      definition: INVESTOR_DEFINITION_V1,
+      view: viewOf(INVESTOR_DEFINITION_V1, {}),
+      documents: [{ documentType: INVESTOR_UPLOAD_DOCUMENT_TYPES.FUND_DECK }],
+      now: NOW,
+    });
+    expect(field(withDeck)).toMatchObject({
+      state: "CONFIRMED_SAVED",
+      source: "DOCUMENT",
+    });
+    for (const documentType of [
+      "INVESTMENT_THESIS",
+      "LP_LETTER",
+      "COMPANY_PROFILE",
+    ]) {
+      expect(
+        field(
+          deriveOnboardingCoverage({
+            profile: INVESTOR_COVERAGE_PROFILE,
+            definition: INVESTOR_DEFINITION_V1,
+            view: viewOf(INVESTOR_DEFINITION_V1, {}),
+            documents: [{ documentType }],
+            now: NOW,
+          }),
+        )?.state,
+        documentType,
+      ).toBe("CONFIRMED_SAVED");
+    }
+    const informs =
+      INVESTOR_COVERAGE_PROFILE.documentFields?.[
+        INVESTOR_DOCUMENT_FIELDS.materials
+      ]?.informs ?? [];
+    for (const key of informs) {
+      expect(
+        INVESTOR_DEFINITION_V1.steps.some((s) => s.stepKey === key),
+        key,
+      ).toBe(true);
+    }
   });
 });
