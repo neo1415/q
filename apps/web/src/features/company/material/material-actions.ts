@@ -64,6 +64,8 @@ export type OpenedFile = {
   readonly downloadUrl?: string | null | undefined;
 };
 
+const OPEN_TIMEOUT_MS = 15_000;
+
 export async function openDocumentAction(
   rawCompanyId: string,
   rawDocumentId: string,
@@ -74,11 +76,18 @@ export async function openDocumentAction(
   if (!companyId.success || !documentId.success || api === null)
     return failed("That couldn't be opened. Try again.");
   try {
-    const link = await openDataRoomDocument(
-      api,
-      companyId.data,
-      documentId.data,
-    );
+    // Bounded: server actions run one after another from the page, so an
+    // open that never answers would hold every later open behind it.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const link = await Promise.race([
+      openDataRoomDocument(api, companyId.data, documentId.data),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("open timed out")),
+          OPEN_TIMEOUT_MS,
+        );
+      }),
+    ]).finally(() => clearTimeout(timer));
     return {
       ok: true,
       value: {
