@@ -196,6 +196,14 @@ function CoverageRow({
               · from {sourceWords(proposal.source)}
             </span>
           </span>
+          {proposal.note === null ? null : (
+            <span
+              className="cq-caption text-(--cq-text-secondary)"
+              data-coverage-proposal-note
+            >
+              {proposal.note}
+            </span>
+          )}
           <div className="flex flex-wrap gap-2">
             <Button
               size="compact"

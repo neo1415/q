@@ -139,6 +139,18 @@ export type DeriveOnboardingCoverageInput = {
   readonly checks?: readonly OnboardingCoverageCheck[] | undefined;
   /** Field keys whose confirmed change is held for retry, not yet saved. */
   readonly pendingSaves?: readonly string[] | undefined;
+  /**
+   * The provenance of each step's most recently accepted suggestion (ob2
+   * 2026-10-16), so an answer the person accepted is credited to what the
+   * suggestion rested on: a fund deck they shared is "from your document",
+   * not "Q's suggestion". References only, never contents.
+   */
+  readonly acceptedSuggestions?:
+    | readonly {
+        readonly stepKey: string;
+        readonly sourceRefs: readonly { readonly sourceType: string }[];
+      }[]
+    | undefined;
   readonly locale?: string | undefined;
   readonly now: Date;
   /** Labels a value the step's options cannot (e.g. taxonomy ids). */
@@ -253,10 +265,23 @@ function sourceOfModality(
  * (form or conversation) first; the modality only for older answers that
  * carry no channel. Accepted suggestions are Q's recommendation.
  */
-function sourceOfResponse(response: {
-  readonly sourceModality: OnboardingSourceModality;
-  readonly channel?: "FORM" | "CONVERSATION" | null | undefined;
-}): OnboardingCoverageSource {
+function sourceOfResponse(
+  response: {
+    readonly sourceModality: OnboardingSourceModality;
+    readonly channel?: "FORM" | "CONVERSATION" | null | undefined;
+  },
+  accepted?: readonly { readonly sourceType: string }[],
+): OnboardingCoverageSource {
+  // An accepted proposal read from the person's own document is credited
+  // to that document. An edited one is the person's own value, still
+  // reached through Q's suggestion, so it keeps that label.
+  if (
+    response.sourceModality === "SUGGESTION_ACCEPT" &&
+    accepted !== undefined &&
+    proposalSource(accepted) === "DOCUMENT"
+  ) {
+    return "DOCUMENT";
+  }
   if (
     response.sourceModality === "SUGGESTION_ACCEPT" ||
     response.sourceModality === "SUGGESTION_EDIT"
@@ -317,6 +342,9 @@ export function deriveOnboardingCoverage(
     (input.documents ?? []).map((d) => d.documentType),
   );
   const pendingSaves = new Set(input.pendingSaves ?? []);
+  const acceptedRefs = new Map(
+    (input.acceptedSuggestions ?? []).map((a) => [a.stepKey, a.sourceRefs]),
+  );
 
   const readingsByStep = new Map<string, string[]>();
   for (const question of view.pendingQuestions ?? []) {
@@ -352,6 +380,7 @@ export function deriveOnboardingCoverage(
       ),
       source: proposalSource(suggestion.sourceRefs),
       sourceRefs: suggestion.sourceRefs.slice(0, 20),
+      note: suggestion.rationale ?? null,
     });
     proposalsByStep.set(suggestion.stepKey, list);
   }
@@ -388,7 +417,7 @@ export function deriveOnboardingCoverage(
         display = displayOnboardingValue(step, response.value, input.labelFor);
         // Saved is saved: once on the record, the answer is the person's,
         // credited to where they gave it, whatever registration offered.
-        source = sourceOfResponse(response);
+        source = sourceOfResponse(response, acceptedRefs.get(step.stepKey));
       } else if (seed !== undefined) {
         display = seed.display.slice(0, 600);
         source = seed.source;
