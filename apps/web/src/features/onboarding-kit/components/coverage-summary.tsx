@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import type {
@@ -7,6 +8,7 @@ import type {
   OnboardingCoverageField,
   OnboardingCoverageState,
 } from "@capital-q/contracts";
+import { linkClassName } from "@capital-q/ui/link";
 import { Progress } from "@capital-q/ui/states";
 
 import { onboardingCoverageAction } from "../api-actions";
@@ -134,6 +136,14 @@ export function CoverageSummary({
               </ul>
             </section>
           )}
+          <p>
+            How Q talks to you (concise or detailed, your language) is yours to
+            see and change in{" "}
+            <Link href="/settings/memory" className={linkClassName()}>
+              What Q remembers
+            </Link>
+            .
+          </p>
           {GROUPS.map((group) => {
             const fields = applicable.filter(
               (f) => group.states.includes(f.state) && !f.savePending,
