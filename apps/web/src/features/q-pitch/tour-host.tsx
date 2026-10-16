@@ -19,7 +19,9 @@ import {
   SHORT_SCRIPT,
   TourActorSchema,
   TourRunner,
+  buildQaIndex,
   certifyTour,
+  type QaEntry,
   type DuplexState,
   type TourActor,
   type TourControlKind,
@@ -28,9 +30,17 @@ import {
 } from "@capital-q/q-pitch";
 
 import { useQSessionOptional } from "@/features/q/q-session";
+import { setTypedInterceptor } from "@/features/q/typed-intercept";
 
 import type { TourSubject } from "./subject-model";
-import { setNarrationVoice, standardVoicePlaying } from "./narrator";
+import {
+  abortableWait,
+  readingMs,
+  spokenPart,
+  setNarrationVoice,
+  standardVoiceLine,
+  standardVoicePlaying,
+} from "./narrator";
 import { RESUME_KEY } from "./resume";
 import { unlightAll } from "./section-light";
 import { openTourVoice } from "./tour-voice";
@@ -131,6 +141,25 @@ const TOURS = {
       "Internal rehearsal · premiere v5 · includes code-verified scenes without a browser receipt · demonstration data",
   },
 } as const;
+
+/** Phases in which nothing is running, so an answer interrupts nothing. */
+const HALTED: ReadonlySet<string> = new Set([
+  "PAUSED",
+  "INTERRUPTED",
+  "COMPLETE",
+]);
+
+/** A bank answer in Q's standard voice, or its reading time without one. */
+async function answerAloud(text: string, signal: AbortSignal): Promise<void> {
+  const started = Date.now();
+  const spoken = await standardVoiceLine(
+    spokenPart(text),
+    "FEMALE",
+    signal,
+  ).catch(() => false);
+  if (!spoken)
+    await abortableWait(readingMs(text) - (Date.now() - started), signal);
+}
 
 /** How long "Tour complete" shows before normal Q takes over. */
 const HANDOVER_MS = 4_000;
@@ -412,6 +441,7 @@ export function QPitchHost({
       simulation={simulation}
       voiceHint={session?.voice.active === true}
       tour={tour}
+      side={actor.role === "FOUNDER" ? "FOUNDER" : "INVESTOR"}
       onExit={onExit}
     />
   );
@@ -479,9 +509,12 @@ function TourOverlay({
   simulation,
   voiceHint,
   tour,
+  side,
   onExit,
 }: {
   readonly runner: TourRunner;
+  /** Whose Q&A bank answers: the actor's side. */
+  readonly side: "INVESTOR" | "FOUNDER";
   readonly label: string;
   readonly simulation: TranscriptSegment | null;
   /** A voice line is open, so the audience can steer by speaking. */
@@ -493,13 +526,79 @@ function TourOverlay({
   const snapshot = useSnapshot(runner);
   const [menuOpen, setMenuOpen] = useState(false);
   // After the finale, normal Q (owner 16 Oct): the tour hands over and ends
-  // itself, so nothing of the tour stays on screen or holds the voice.
+  // itself, so nothing of the tour stays on screen or holds the voice. A
+  // v6 tour stays for questions instead (Q&A afterwards, owner 16 Oct)
+  // until the person ends it; what the bank does not hold goes to Q.
   const complete = snapshot.phase === "COMPLETE";
+  const qaAfter = tour.endsWith("-v6");
   useEffect(() => {
-    if (!complete) return;
+    if (!complete || qaAfter) return;
     const timer = window.setTimeout(onExit, HANDOVER_MS);
     return () => window.clearTimeout(timer);
-  }, [complete, onExit]);
+  }, [complete, qaAfter, onExit]);
+
+  // v6: what the viewer types is read by code first. A step command moves
+  // the tour; a question the bank holds is answered at once, in Q's voice;
+  // anything else goes to Q as before. No model call for either.
+  const qa = useMemo(() => buildQaIndex(side), [side]);
+  const [qaShown, setQaShown] = useState<QaEntry | null>(null);
+  const [stepNotice, setStepNotice] = useState<string | null>(null);
+  const speaking = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const release = setTypedInterceptor((text) => {
+      const stepped = runner.stepCommand(
+        text,
+        { intentId: `qp-typed-${String(Date.now())}`, modality: "KEYBOARD" },
+        NO_AUDIO,
+      );
+      if (stepped !== null) {
+        setQaShown(null);
+        setStepNotice(
+          stepped.move.kind === "OUT_OF_RANGE"
+            ? `There is no such step. This tour has ${String(runner.snapshot().sceneCount)} steps.`
+            : null,
+        );
+        return true;
+      }
+      const entry = qa.answer(text);
+      if (entry === null) return false;
+      setStepNotice(null);
+      setQaShown(entry);
+      speaking.current?.abort();
+      const controller = new AbortController();
+      speaking.current = controller;
+      const running = !HALTED.has(runner.snapshot().phase);
+      if (running) {
+        runner.control(
+          {
+            intentId: `qp-qa-${String(Date.now())}`,
+            source: "AUDIENCE_MIC",
+            modality: "KEYBOARD",
+            kind: "INTERRUPT",
+          },
+          NO_AUDIO,
+        );
+      }
+      void answerAloud(entry.answer, controller.signal).then(() => {
+        if (controller.signal.aborted || !running) return;
+        if (runner.snapshot().phase !== "INTERRUPTED") return;
+        runner.control(
+          {
+            intentId: `qp-qa-resume-${String(Date.now())}`,
+            source: "AUDIENCE_MIC",
+            modality: "POINTER",
+            kind: "RESUME",
+          },
+          NO_AUDIO,
+        );
+      });
+      return true;
+    });
+    return () => {
+      release();
+      speaking.current?.abort();
+    };
+  }, [runner, qa]);
   const chapterNow = snapshot.scene?.chapterId ?? null;
   useEffect(() => {
     if (chapterNow === null) return;
@@ -637,6 +736,24 @@ function TourOverlay({
             : {simulation.text}
           </p>
         )}
+        {stepNotice === null ? null : (
+          <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
+            {stepNotice}
+          </p>
+        )}
+        {qaShown === null ? null : (
+          <div className="flex flex-col gap-1" data-q-pitch-answer>
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {qaShown.question}
+            </p>
+            <p className="cq-body text-(--cq-text-primary)">{qaShown.answer}</p>
+          </div>
+        )}
+        {complete && qaAfter && qaShown === null ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Ask me anything about Capital Q, or end the tour.
+          </p>
+        ) : null}
         {fallback === null ? null : (
           <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
             Q stopped here and won&apos;t describe it ({fallback}).

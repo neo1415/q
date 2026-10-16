@@ -71,6 +71,7 @@ import {
   workingLabel,
   type QTurn,
 } from "./conversation";
+import { interceptTyped } from "./typed-intercept";
 import { CardsControls } from "./cards/cards-controls";
 import { announceQGestures } from "@/features/q-swarm/q-gestures";
 import { announceQSaid } from "@/features/q-swarm/q-said";
@@ -788,6 +789,7 @@ export function QConversationPanel({
   // question of its own is answered as asked.
   const submitTyped = useCallback(
     async (text: string) => {
+      if (interceptTyped(text)) return;
       if (typedOpenerAnswer(text, lineOpen)) return;
       if (lineOpen) {
         sendText(text);

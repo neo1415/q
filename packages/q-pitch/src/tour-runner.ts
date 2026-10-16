@@ -6,6 +6,11 @@ import {
   type DuplexState,
 } from "./control-channel.js";
 import { cursorOf, startTour, transition } from "./director.js";
+import {
+  parseStepCommand,
+  resolveStepCommand,
+  type StepMove,
+} from "./step-commands.js";
 import type { DirectorState } from "./director.js";
 import type {
   GuideEffect,
@@ -229,6 +234,21 @@ export class TourRunner {
   hearAudience(raw: unknown, duplex: DuplexState): ControlDecision | null {
     const segment = this.#gate.noteSegment(raw);
     if (segment === null) return null;
+    // v6: a spoken step command, numbers and all, before the phrase set.
+    if (segment.source === "AUDIENCE_MIC" && segment.final) {
+      const stepped = this.stepCommand(
+        segment.text,
+        {
+          intentId: `voice-${segment.segmentId}`,
+          modality: "VOICE",
+          segmentId: segment.segmentId,
+        },
+        duplex,
+      );
+      if (stepped !== null) {
+        return stepped.decision ?? { admitted: false, reason: "INVALID" };
+      }
+    }
     const spoken = classifyAudienceSpeech(segment);
     if (spoken === null) return null;
     // "Show me GateQ": a jump, when it names one of this tour's chapters.
@@ -265,6 +285,48 @@ export class TourRunner {
       },
       duplex,
     );
+  }
+
+  /**
+   * v6: a step command, typed or spoken ("next", "back two", "go to step
+   * 7"), resolved against the step on screen and offered to the gate.
+   * Null when the text is not a whole command (it stays a question).
+   * OUT_OF_RANGE is returned undecided, so the host can say there is no
+   * such step instead of landing anywhere else.
+   */
+  stepCommand(
+    text: string,
+    input: {
+      readonly intentId: string;
+      readonly modality: "KEYBOARD" | "VOICE";
+      readonly segmentId?: string | undefined;
+    },
+    duplex: DuplexState,
+  ): {
+    readonly move: StepMove;
+    readonly decision: ControlDecision | null;
+  } | null {
+    const command = parseStepCommand(text);
+    if (command === null) return null;
+    const move = resolveStepCommand(
+      command,
+      this.#state.sceneIndex,
+      this.#state.scenes.length,
+    );
+    if (move.kind === "OUT_OF_RANGE") return { move, decision: null };
+    const base = {
+      intentId: input.intentId.slice(0, 128),
+      source: "AUDIENCE_MIC" as const,
+      modality: input.modality,
+      ...(input.segmentId === undefined ? {} : { segmentId: input.segmentId }),
+    };
+    const decision = this.control(
+      move.kind === "STEP"
+        ? { ...base, kind: "STEP", step: move.step }
+        : { ...base, kind: move.kind },
+      duplex,
+    );
+    return { move, decision };
   }
 
   /** A server-confirmed workspace switch (QP-F10); never a UI toggle. */
