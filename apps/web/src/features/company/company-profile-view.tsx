@@ -51,6 +51,8 @@ import {
   ProfileFitProvider,
 } from "./material/fit-panel-slot";
 import { TeamTab } from "./material/team";
+import { pitchProfileSections } from "./pitch-profile";
+import { PitchProfileOverview } from "./pitch-profile-view";
 import type { ProfileTab } from "./profile-tab";
 import {
   ProfilePanelSkeleton,
@@ -217,6 +219,7 @@ export function CompanyProfileView({
   overviewExtra = null,
   overviewExtraSummary,
   overviewStreamed = null,
+  scores = null,
 }: {
   /** The reader's language (a server component: handed in, not a hook). */
   readonly translate?: ((english: string) => string) | undefined;
@@ -250,6 +253,12 @@ export function CompanyProfileView({
    * (its own fold, behind its own placeholder).
    */
   readonly overviewStreamed?: ReactNode;
+  /**
+   * Lane iq's Suitability and Investability scores, rendered at the top of
+   * the Overview beside "Fit with you". This view computes no score; it
+   * only places what it is given. Null: nothing shown.
+   */
+  readonly scores?: ReactNode;
 }) {
   const { overview } = profile;
   const investor = profile.viewer === "INVESTOR";
@@ -351,6 +360,7 @@ export function CompanyProfileView({
       ? [["elevator", "Elevator", profile.videos.length]]
       : [
           ["overview", "Overview", null],
+          ["diligence", "Diligence", null],
           ["elevator", "Elevator", profile.videos.length],
           ["dataroom", "Data room", visibleDocuments],
           ["deck", "Pitch deck", null],
@@ -499,14 +509,7 @@ export function CompanyProfileView({
         {overview === null ? null : (
           <>
             <ProfileTabPanel tab="overview" serverTab={tab}>
-              <div className="flex flex-col" data-profile-overview>
-                {/* The owner is told when their pitch and their raise disagree. */}
-                {overview.pitchRaiseNotice === null ? null : (
-                  <div className="pb-6">
-                    <OwnerPitchNotice notice={overview.pitchRaiseNotice} />
-                  </div>
-                )}
-
+              <div className="flex flex-col gap-6" data-profile-overview>
                 {/*
                 The summary strip: four facts in words, one hairline -- not a
                 metric-card grid, no score. The raise names where it came from.
@@ -584,6 +587,35 @@ export function CompanyProfileView({
                   </StripCell>
                   {investor ? <FitStripCell /> : null}
                 </dl>
+
+                {/* Lane iq's Suitability and Investability, beside the fit. */}
+                {scores === null || scores === undefined ? null : (
+                  <CompanyProfileScoresSlot>{scores}</CompanyProfileScoresSlot>
+                )}
+
+                {/*
+                  The pitch-deck-shaped profile (owner 2026-10-16): the same
+                  sections for every company, from the deck, then the pitch
+                  videos, then the founder's confirmed answers.
+                */}
+                <Suspense fallback={<ProfilePanelSkeleton />}>
+                  <PitchProfilePanel
+                    deck={deck}
+                    profile={profile}
+                    own={own}
+                    sectorLabels={sectorLabels}
+                  />
+                </Suspense>
+              </div>
+            </ProfileTabPanel>
+            <ProfileTabPanel tab="diligence" serverTab={tab}>
+              <div className="flex flex-col" data-profile-diligence>
+                {/* The owner is told when their pitch and their raise disagree. */}
+                {overview.pitchRaiseNotice === null ? null : (
+                  <div className="pb-6">
+                    <OwnerPitchNotice notice={overview.pitchRaiseNotice} />
+                  </div>
+                )}
 
                 {overviewExtra === null ||
                 overviewExtra === undefined ? null : (
@@ -985,6 +1017,62 @@ function DeckPanel({
       companyId={companyId}
       companyName={companyName}
       view={deck}
+    />
+  );
+}
+
+/**
+ * The slot at the top of the Overview where lane iq places its scores. A
+ * named wrapper so the layout (and tests) find one place, whatever fills it.
+ */
+export function CompanyProfileScoresSlot({
+  children,
+}: {
+  readonly children: ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2" data-profile-scores>
+      {children}
+    </div>
+  );
+}
+
+/** Where a founder's "tell Q" goes: Q's onboarding, at that section. */
+export function tellQHref(section: { readonly key: string }): string {
+  return `/onboarding/founder?talk=1&section=${encodeURIComponent(section.key)}`;
+}
+
+function PitchProfilePanel({
+  deck: eventually,
+  profile,
+  own,
+  sectorLabels,
+}: {
+  readonly deck: Eventually<CompanyDeckView | null>;
+  readonly profile: CompanyProfileDto;
+  readonly own: boolean;
+  readonly sectorLabels: readonly string[];
+}) {
+  const deck = useSettled(eventually);
+  const overview = profile.overview;
+  const sections = pitchProfileSections({
+    companyName: profile.canonicalName,
+    own,
+    deckSections: deck?.extraction?.sections ?? null,
+    pitchClaims: overview?.pitchClaims ?? [],
+    answers: {
+      shortDescription: profile.shortDescription,
+      sectorLabels,
+      team: overview?.team ?? [],
+      raise: overview?.raise ?? null,
+    },
+    tellQHref,
+  });
+  return (
+    <PitchProfileOverview
+      sections={sections}
+      companyName={profile.canonicalName}
+      own={own}
     />
   );
 }

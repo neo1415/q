@@ -146,6 +146,7 @@ const COMPANY_PROFILE_PAGES: readonly QRecordPage[] = [
 ];
 const COMPANY_PROFILE_TAB_NAMES: readonly string[] = [
   "overview",
+  "diligence",
   "elevator",
   "dataroom",
   "deck",
@@ -170,8 +171,15 @@ export function recordIntentPath(
   if (intent.page === "DAILY_EDITION") {
     return intent.anchor === undefined ? base : `${base}#${intent.anchor}`;
   }
-  if (intent.tab === undefined) return base;
   const safe = encodeURIComponent(intent.id.toLowerCase());
+  if (
+    intent.tab === undefined &&
+    intent.page === "COMPANY" &&
+    intent.section !== undefined
+  ) {
+    return `/company/${safe}?${new URLSearchParams({ tab: "overview", sub: intent.section }).toString()}`;
+  }
+  if (intent.tab === undefined) return base;
   const { page, tab } = intent;
   if (COMPANY_PROFILE_PAGES.includes(page)) {
     // The server checked the tab against the page (the contract); the
@@ -182,6 +190,11 @@ export function recordIntentPath(
       params.set("sub", intent.subTab.toLowerCase());
     }
     if (tab === "deck" && intent.viewer === "OPEN") params.set("open", "1");
+    // Lane ov: one section of the Overview; the page follows only the keys
+    // its own section list has.
+    if (tab === "overview" && intent.section !== undefined) {
+      params.set("sub", intent.section);
+    }
     return `/company/${safe}?${params.toString()}`;
   }
   if (!RELATIONSHIP_TAB_NAMES.includes(tab)) return base;
