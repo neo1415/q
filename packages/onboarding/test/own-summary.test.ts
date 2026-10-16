@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { settleOwnCompletion } from "../src/index.js";
+import { answeredLine, settleOwnCompletion } from "../src/index.js";
 
 /**
  * "Who am I" reads completion from the authoritative record, not from the
@@ -62,5 +62,48 @@ describe("own onboarding completion follows the authoritative state", () => {
         });
       }
     }
+  });
+});
+
+describe("answeredLine (live 2026-10-16: the raise read back as 'not recorded')", () => {
+  const step = (stepKey: string, configuration: unknown) =>
+    ({ stepKey, configuration }) as unknown as Parameters<
+      typeof answeredLine
+    >[1];
+
+  it("carries what they answered: amount, currency and instrument", () => {
+    expect(
+      answeredLine(
+        "How much are you raising?",
+        step("F6.target_amount", {
+          stepType: "range",
+          prompt: "How much are you raising?",
+          min: "0",
+          max: "1000000000",
+        }),
+        { type: "RANGE", value: "750000" },
+      ),
+    ).toMatch(/^How much are you raising\? -> .*750/);
+    expect(
+      answeredLine(
+        "Which instrument?",
+        step("F6.instrument", {
+          stepType: "single_select",
+          prompt: "Which instrument?",
+          options: [{ optionKey: "safe", label: "SAFE" }],
+        }),
+        { type: "SINGLE_SELECT", optionKey: "safe" },
+      ),
+    ).toBe("Which instrument? -> SAFE");
+  });
+
+  it("a confirmation is the question alone", () => {
+    expect(
+      answeredLine(
+        "Does this look right?",
+        step("F6.confirm", { stepType: "confirmation", prompt: "x" }),
+        { type: "CONFIRMATION", confirmed: true },
+      ),
+    ).toBe("Does this look right?");
   });
 });

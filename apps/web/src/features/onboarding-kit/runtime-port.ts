@@ -525,6 +525,7 @@ export function createRuntimeClient<
                 reply: outcome.reply,
                 navigate: outcome.navigate,
                 researching: outcome.researching,
+                askingAbout: outcome.askingAbout,
                 conduct: outcome.conduct,
                 gestures: outcome.gestures,
               };

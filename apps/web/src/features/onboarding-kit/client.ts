@@ -89,6 +89,8 @@ export type OnboardingClient<TView, TResponse> = {
         readonly navigate: string | null;
         /** What Q said it would look into (CQ-QX-005); null when nothing. */
         readonly researching: string | null;
+        /** The steps Q's reply asks about (not the form's step cursor). */
+        readonly askingAbout?: readonly string[] | undefined;
         /** Q's patience after the turn (founder direction 2026-09-30). */
         readonly conduct?: QConduct | undefined;
         /** PRESENCE: what Q's particles form for which sentence. */

@@ -555,6 +555,7 @@ describe("a spoken category confirmation", () => {
           confidence: "0.9",
           status: "PENDING",
           sourceRefs: [],
+          rationale: null,
           createdAt: NOW,
         },
       ],

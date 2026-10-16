@@ -43,6 +43,26 @@ function textOf(row: unknown, column: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
+/** A row's `source_refs` as references; anything malformed is dropped. */
+function sourceRefsOf(row: unknown): { readonly sourceType: string }[] {
+  if (typeof row !== "object" || row === null) return [];
+  const raw = (row as Record<string, unknown>)["source_refs"];
+  let refs: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      refs = JSON.parse(raw) as unknown;
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(refs)) return [];
+  return refs.flatMap((ref: unknown) => {
+    if (typeof ref !== "object" || ref === null) return [];
+    const sourceType = (ref as Record<string, unknown>)["sourceType"];
+    return typeof sourceType === "string" ? [{ sourceType }] : [];
+  });
+}
+
 export function createOnboardingCoverageReader(dependencies: {
   readonly sql: DatabaseExecutor;
   readonly now?: (() => Date) | undefined;
@@ -65,34 +85,45 @@ export function createOnboardingCoverageReader(dependencies: {
           : null;
     if (setup === null) return null;
 
-    const [registrationRows, documentRows, held] = await Promise.all([
-      sql`
+    const [registrationRows, documentRows, held, acceptedRows] =
+      await Promise.all([
+        sql`
         select u.raw_user_meta_data ->> 'display_name' as display_name,
                u.raw_user_meta_data ->> 'organisation_name' as organisation_name
           from identity.user_profiles p
           join auth.users u on u.id = p.auth_user_id
          where p.id = ${actor.userId}
          limit 1`.catch(() => []),
-      view.session.subject?.type === "COMPANY"
-        ? sql`
+        view.session.subject?.type === "COMPANY"
+          ? sql`
             select distinct d.document_type
               from evidence.documents d
              where d.company_id = ${view.session.subject.id}
                and d.status = 'ACTIVE'
              limit 40`
-        : view.session.subject?.type === "INVESTOR_ORGANISATION"
-          ? // An investor's own uploads (fund deck, thesis, LP letter):
-            // types only, theirs only.
-            sql`
+          : view.session.subject?.type === "INVESTOR_ORGANISATION"
+            ? // An investor's own uploads (fund deck, thesis, LP letter):
+              // types only, theirs only.
+              sql`
               select distinct d.document_type
                 from evidence.documents d
                where d.created_by_user_id = ${actor.userId}
                  and d.company_id is null
                  and d.status = 'ACTIVE'
                limit 40`
-          : Promise.resolve([]),
-      pending.listPending(sql, view.session.id, actor.userId),
-    ]);
+            : Promise.resolve([]),
+        pending.listPending(sql, view.session.id, actor.userId),
+        // ob2: where each accepted suggestion came from (references only),
+        // the newest per step, so an accepted reading of a document is
+        // credited to the document. The session is the actor's own.
+        sql`
+        select distinct on (s.step_key) s.step_key, s.source_refs
+          from onboarding.suggestions s
+         where s.session_id = ${view.session.id}
+           and s.status = 'ACCEPTED'
+         order by s.step_key, s.resolved_at desc nulls last, s.created_at desc
+         limit 200`.catch(() => []),
+      ]);
     const registration = registrationRows[0];
     return deriveOnboardingCoverage({
       profile: setup.profile,
@@ -112,6 +143,12 @@ export function createOnboardingCoverageReader(dependencies: {
         return documentType === null ? [] : [{ documentType }];
       }),
       pendingSaves: held.map((w) => w.stepKey),
+      acceptedSuggestions: acceptedRows.flatMap((row) => {
+        const stepKey = textOf(row, "step_key");
+        return stepKey === null
+          ? []
+          : [{ stepKey, sourceRefs: sourceRefsOf(row) }];
+      }),
       now: (dependencies.now ?? (() => new Date()))(),
     });
   };

@@ -15,6 +15,7 @@ import type {
 } from "../contracts/index.js";
 import { computeProgress } from "../runtime/path.js";
 import { createPostgresOnboardingDefinitionRepository } from "../infrastructure/postgres-definition-repository.js";
+import { displayOnboardingValue } from "./coverage.js";
 import {
   createPostgresOnboardingResponseRepository,
   createPostgresOnboardingSessionRepository,
@@ -55,7 +56,7 @@ export type OwnOnboardingSummary = {
   readonly eligibleCount: number;
   /** The question they are on now, in the journey's own words. */
   readonly currentStep: string | null;
-  /** Questions answered, in the journey's own words, path order. */
+  /** Questions answered, in the journey's own words, path order, each with what they answered ("question -> answer"); confirmations and record references as the question alone. */
   readonly answered: readonly string[];
   /** Questions on their path not answered yet (skipped ones included). */
   readonly open: readonly string[];
@@ -109,10 +110,36 @@ const JOURNEYS: readonly OnboardingJourneyType[] = ["investor", "founder"];
 
 const PROMPT_MAX = 160;
 const LIST_MAX = 40;
+/** How much of one answer the summary carries. */
+const ANSWER_MAX = 160;
 
 function promptOf(step: OnboardingStepDefinition | undefined): string | null {
   const prompt = step?.configuration.prompt?.trim() ?? "";
   return prompt.length === 0 ? null : prompt.slice(0, PROMPT_MAX);
+}
+
+/**
+ * An answered question with what they answered, "question -> answer"
+ * (live 2026-10-16: "what did I tell you about our raise?" got "not
+ * recorded" for a US$750k SAFE on the record, because only the questions
+ * were listed). Confirmations and platform references are the question
+ * alone: there is nothing of theirs to say back.
+ */
+export function answeredLine(
+  prompt: string,
+  step: OnboardingStepDefinition | undefined,
+  value: OnboardingResponseValue | undefined,
+): string {
+  if (
+    step === undefined ||
+    value === undefined ||
+    step.configuration.stepType === "confirmation" ||
+    step.configuration.stepType === "reference_select"
+  ) {
+    return prompt;
+  }
+  const said = displayOnboardingValue(step, value).slice(0, ANSWER_MAX);
+  return said.length === 0 ? prompt : `${prompt} -> ${said}`;
 }
 
 /** A role answer as the person gave it: their words, or the option's label. */
@@ -255,8 +282,18 @@ export function createOwnOnboardingSummaryReader(options: {
         for (const step of progress.eligibleSteps) {
           const prompt = promptOf(aggregate.stepsByKey.get(step.stepKey));
           if (prompt === null) continue;
-          if (step.status === "COMPLETED") answered.push(prompt);
-          else open.push(prompt);
+          if (step.status === "COMPLETED") {
+            // With what they answered (live 2026-10-16: "what did I tell you
+            // about our raise?" got "not recorded" for a US$750k SAFE that
+            // was on the record, because only the questions were listed).
+            answered.push(
+              answeredLine(
+                prompt,
+                aggregate.stepsByKey.get(step.stepKey),
+                aggregate.currentResponses.get(step.stepKey)?.value,
+              ),
+            );
+          } else open.push(prompt);
         }
         const roleKey = ROLE_STEP_KEYS[journeyType];
         const completion = settleOwnCompletion({
