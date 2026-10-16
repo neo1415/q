@@ -144,30 +144,70 @@ console.log(
 );
 if (!apply) process.exit(0);
 
+// Health guard (lead 2026-10-16): every 50 confirmations, read active
+// connections; pause 5 minutes when > 40 active or any call took > 5 s;
+// stop after two such pauses in a row.
+const HEALTH_EVERY = 50;
+const MAX_ACTIVE = 40;
+const SLOW_MS = 5000;
+let slowSeen = false;
+let pausesInARow = 0;
+const timed = async (work) => {
+  const t0 = Date.now();
+  const out = await work();
+  if (Date.now() - t0 > SLOW_MS) slowSeen = true;
+  return out;
+};
+async function healthGate(done) {
+  const t0 = Date.now();
+  const [row] = await lib.sql(
+    "select count(*)::int as active from pg_stat_activity where state = 'active'",
+  );
+  const ms = Date.now() - t0;
+  const active = row?.active ?? 0;
+  const bad = active > MAX_ACTIVE || ms > SLOW_MS || slowSeen;
+  console.log(JSON.stringify({ health: { done, active, ms, slowSeen, bad } }));
+  slowSeen = false;
+  if (!bad) {
+    pausesInARow = 0;
+    return;
+  }
+  pausesInARow += 1;
+  if (pausesInARow >= 2) {
+    console.log(
+      JSON.stringify({ stopped: "two unhealthy pauses in a row", done }),
+    );
+    process.exit(3);
+  }
+  await sleep(BACKOFF_MS);
+}
+
 const write = (line) => appendFileSync(receipt, `${JSON.stringify(line)}\n`);
 let confirmed = 0;
 let refused = 0;
 let inBatch = 0;
 for (const t of targets) {
-  const session = await signIn(t.founder_email, API);
+  const session = await timed(() => signIn(t.founder_email, API));
   for (const section of t.sections) {
     let attempt = 0;
     for (;;) {
-      const response = await fetch(
-        `${API}/v1/documents/${encodeURIComponent(t.document_id)}/deck-extractions/${encodeURIComponent(t.extraction_id)}/sections/${encodeURIComponent(section)}/review`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${session.accessToken}`,
-            "x-organisation-id": t.organisation_id,
-            "content-type": "application/json",
+      const response = await timed(() =>
+        fetch(
+          `${API}/v1/documents/${encodeURIComponent(t.document_id)}/deck-extractions/${encodeURIComponent(t.extraction_id)}/sections/${encodeURIComponent(section)}/review`,
+          {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${session.accessToken}`,
+              "x-organisation-id": t.organisation_id,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              companyId: t.company_id,
+              action: "CONFIRM",
+              correction: null,
+            }),
           },
-          body: JSON.stringify({
-            companyId: t.company_id,
-            action: "CONFIRM",
-            correction: null,
-          }),
-        },
+        ),
       );
       if (response.status >= 500 && attempt < 3) {
         attempt += 1;
@@ -184,6 +224,15 @@ for (const t of targets) {
       const ok = response.ok;
       if (ok) confirmed += 1;
       else refused += 1;
+      if (!ok && confirmed === 0 && refused >= 5) {
+        console.log(
+          JSON.stringify({
+            stopped: "first five refused",
+            last: response.status,
+          }),
+        );
+        process.exit(4);
+      }
       write({
         seed_reason: SEED_REASON,
         companyId: t.company_id,
@@ -195,6 +244,9 @@ for (const t of targets) {
       break;
     }
     inBatch += 1;
+    if ((confirmed + refused) % HEALTH_EVERY === 0) {
+      await healthGate(confirmed + refused);
+    }
     if (inBatch >= BATCH) {
       inBatch = 0;
       await sleep(PAUSE_MS);
