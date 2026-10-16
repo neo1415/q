@@ -702,9 +702,39 @@ const CONTRADICTION: WorkforceScenario = {
   },
 };
 
+/**
+ * A decision stated with the work (live 2026-10-16): the team prepares the
+ * diligence, and recording "into diligence" is the person's first next
+ * action, needing their approval -- never done instead of the work.
+ */
+const DECISION_WITH_WORK: WorkforceScenario = {
+  ...DILIGENCE_PREP,
+  id: "investor.decision-with-work",
+  title: "A relationship decision stated with preparation work",
+  goal: "We're going into diligence on Harbourline Cargo next week. Get the team ready.",
+  scripted: {
+    ...DILIGENCE_PREP.scripted,
+    nextActions: [
+      {
+        action: "Record that Harbourline Cargo has moved into diligence",
+        why: "You stated the decision; recording it is yours to approve.",
+        evidence: ["F2"],
+        tool: "relationship.outcome.change",
+      },
+      ...DILIGENCE_PREP.scripted.nextActions.filter((one) => one.tool !== null),
+    ],
+  },
+  expect: {
+    ...DILIGENCE_PREP.expect,
+    next: [/moved into diligence/iu],
+    approvalFor: ["relationship.outcome.change", "diligence.questions.prepare"],
+  },
+};
+
 export const WORKFORCE_SCENARIOS: readonly WorkforceScenario[] = [
   DILIGENCE_PREP,
   GATEQ_FOLLOW_UP,
   ROUND_PREP,
   CONTRADICTION,
+  DECISION_WITH_WORK,
 ];
