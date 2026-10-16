@@ -102,6 +102,8 @@ export const DOCUMENTS_AR: Readonly<Record<string, string>> = {
   "LP letter": "رسالة إلى الشركاء المحدودين",
   // Document-ready card
   "Opening the document": "جارٍ فتح المستند",
+  Opening: "جارٍ الفتح",
+  "That couldn't be opened. Try again.": "تعذّر فتحه. حاول مرة أخرى.",
   "Version {n} ready": "النسخة {n} جاهزة",
   Ready: "جاهز",
   "PDF ready": "ملف PDF جاهز",
