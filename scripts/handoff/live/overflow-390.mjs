@@ -139,7 +139,8 @@ for (const { email, paths } of ACCOUNTS) {
             break;
           }
         }
-        const absolute = window.getComputedStyle(element).position === "absolute";
+        const absolute =
+          window.getComputedStyle(element).position === "absolute";
         if (!clipped || absolute) {
           culprits.push(
             `${element.tagName.toLowerCase()}.${String(element.className).slice(0, 60)} right=${String(Math.round(box.right))}`,
