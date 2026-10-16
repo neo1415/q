@@ -30,7 +30,7 @@ describe("results words", () => {
         { state: "INTEREST_EXPRESSED", count: 1 },
       ]).map((s) => s.state),
     ).toEqual(["INTEREST_EXPRESSED", "CONNECTED", "DECLINED"]);
-    expect(stateWord("INTEREST_EXPRESSED", "INVESTOR")).toBe("Interest sent");
+    expect(stateWord("INTEREST_EXPRESSED", "INVESTOR")).toBe("Awaiting reply");
     expect(stateWord("INTEREST_EXPRESSED", "FOUNDER")).toBe(
       "Interested in you",
     );
@@ -76,7 +76,7 @@ describe("results words", () => {
     ]);
     expect(lines[0]).toEqual({
       status: "CONFIRMED",
-      label: "Confirmed",
+      label: "Confirmed, not yet received",
       count: 3,
       amounts: ["USD 250,000", "NGN 1,000,000.50"],
     });

@@ -402,6 +402,19 @@ export function dimensionWord(dimension: string): string {
   return DIMENSION_WORDS[dimension] ?? "Rule";
 }
 
+/**
+ * The investor's own label under the topic, unless it only repeats it
+ * (live check 2026-10-16: "Stage / Stage").
+ */
+export function ownLabel(
+  line: Pick<RuleLine, "dimension" | "label">,
+): string | null {
+  const said = line.label.trim();
+  return said.toLowerCase() === dimensionWord(line.dimension).toLowerCase()
+    ? null
+    : said;
+}
+
 export function ruleLines(
   gateway: Pick<PublicGatewayDto, "criteria">,
   application: Pick<ApplicationSummaryDto, "unmet" | "stillNeeded"> | null,

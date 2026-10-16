@@ -1,39 +1,41 @@
 import type { PromptDefinition } from "../definition.js";
-import {
-  TURN_READER_SCHEMA_NAME,
-  TURN_READER_V51_SCHEMA_VERSION,
-  TurnReaderV51ResultSchema,
-  type TurnReaderV7Variables,
-  type TurnReaderV51Result,
+import type {
+  TurnReaderV7Variables,
+  TurnReaderV49Result,
 } from "../schemas/turn-reader.js";
-import { TURN_READER_V50, V50_FIT } from "./turn-reader.v50.js";
+import { V49_TEAM_JOB } from "./turn-reader.v49.js";
+import { TURN_READER_V50 } from "./turn-reader.v50.js";
 
 /**
- * v51 (lane ml, live 2026-10-16): nextSteps, read from meaning. Code opens
- * an answer with the person's own readiness gaps only when they ask for
- * them; an ADVICE question about anything else (what a SAFE is, whether a
- * valuation is fair) is answered without that list.
+ * TURN_READER v51 -- A DECISION WITH WORK ATTACHED (wf, live 2026-10-16).
+ *
+ * "We're going into diligence on Harbourline Cargo next week. Get the team
+ * ready." was read as a relationship decision alone: Q offered to record
+ * the outcome and the request for preparation was lost. When a turn both
+ * states a decision about a relationship and asks for work of several
+ * steps, it is a team job; the lead's plan carries the decision as the
+ * person's next action, so nothing is recorded instead of the work. Read
+ * from meaning, in any words; a decision stated on its own is unchanged.
  */
-export const V51_NEXT_STEPS = `NEXT STEPS: nextSteps is true only when they ask what they themselves should do next, what is missing or holding back their raise, profile or visibility to investors, or how ready they are, in any words and any language ("what should I do next?", "what's missing before investors see us?", "how ready am I?", "ما الخطوة التالية؟"). It is false for every other question, including advice or explanation on a topic ("explain a SAFE", "is USD 2.5m sensible for us?"), questions about other people or companies, and requests to do something.\n`;
+export const V51_DECISION_WITH_WORK =
+  "A turn that states a decision about one of their relationships (moving it into diligence, passing, pausing, investing) and also asks for that kind of work to be prepared or carried out is a team job: teamJob is true. The decision belongs to the work; recording it is offered inside the team's plan, never instead of the work. A decision stated on its own, with no work asked for, is not a team job.\n";
+
+if (TURN_READER_V50.template.split(V49_TEAM_JOB).length !== 2) {
+  throw new Error("TURN_READER v51 extends v49's TEAM JOB rule, which changed");
+}
 
 export const TURN_READER_V51: PromptDefinition<
   TurnReaderV7Variables,
-  TurnReaderV51Result
+  TurnReaderV49Result
 > = {
   ...TURN_READER_V50,
   version: 51,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
-    "Lane ml live 2026-10-16: nextSteps, read from meaning, so code's readiness list opens only answers that ask what to do next or how ready they are, not every ADVICE question.",
+    "A turn that states a relationship decision and asks for work of several steps is a team job; the plan offers the decision as a next action instead of recording it in place of the work.",
   effectiveFrom: "2026-10-16",
-  output: {
-    kind: "STRUCTURED",
-    schemaName: TURN_READER_SCHEMA_NAME,
-    schemaVersion: TURN_READER_V51_SCHEMA_VERSION,
-    schema: TurnReaderV51ResultSchema,
-  },
   template: TURN_READER_V50.template.replace(
-    V50_FIT,
-    `${V50_FIT}${V51_NEXT_STEPS}`,
+    V49_TEAM_JOB,
+    `${V49_TEAM_JOB}${V51_DECISION_WITH_WORK}`,
   ),
 };

@@ -318,7 +318,7 @@ export function ConnectionRequestsInbox({
         <div
           role="group"
           aria-label="Sort"
-          className="flex gap-2 overflow-x-auto py-0.5"
+          className="relative flex gap-2 overflow-x-auto py-0.5"
         >
           {SORTS.map(([value, label]) => (
             <button

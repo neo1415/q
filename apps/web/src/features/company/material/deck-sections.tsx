@@ -363,7 +363,7 @@ export function DeckCarousel({
     >
       <div
         ref={chips}
-        className="flex gap-2 overflow-x-auto pb-1"
+        className="relative flex gap-2 overflow-x-auto pb-1"
         role="tablist"
         aria-label="Sections"
       >
@@ -390,7 +390,7 @@ export function DeckCarousel({
           tabIndex={0}
           onKeyDown={onKey}
           aria-live="polite"
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) motion-reduce:scroll-auto"
+          className="relative flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) motion-reduce:scroll-auto"
         >
           {sections.map((section, at) => (
             <div

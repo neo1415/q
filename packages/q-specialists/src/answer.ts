@@ -4290,7 +4290,7 @@ export function createSpecialistQAnswer(
     // the conversational path answers the rest (lead 2026-10-03, run
     // 2cba241a: the company analysis led with an operating-market detail).
     // Live 2026-10-16 (lane ml): only when the turn asks for next steps
-    // or readiness (TURN_READER v51 nextSteps, by meaning); an ADVICE
+    // or readiness (TURN_READER v52 nextSteps, by meaning); an ADVICE
     // question about anything else, such as what a SAFE is, was answered
     // under the readiness list.
     const readinessLead =

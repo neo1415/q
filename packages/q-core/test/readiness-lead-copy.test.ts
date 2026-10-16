@@ -4,7 +4,7 @@ import {
   createDefaultPromptRegistry,
   READINESS_LEAD_ARABIC_STEPS,
   readinessLeadCopy,
-  V51_NEXT_STEPS,
+  V52_NEXT_STEPS,
 } from "../src/index.js";
 
 describe("the readiness lead's copy (lane ml)", () => {
@@ -36,12 +36,12 @@ describe("the readiness lead's copy (lane ml)", () => {
   });
 });
 
-describe("TURN_READER v51: next steps read by meaning", () => {
+describe("TURN_READER v52: next steps read by meaning", () => {
   it("is the active reader and carries the nextSteps rule", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(51);
-    expect(active.definition.template).toContain(V51_NEXT_STEPS);
-    expect(V51_NEXT_STEPS).toMatch(/false for every other question/u);
-    expect(V51_NEXT_STEPS).toMatch(/explain a SAFE/u);
+    expect(active.definition.version).toBe(52);
+    expect(active.definition.template).toContain(V52_NEXT_STEPS);
+    expect(V52_NEXT_STEPS).toMatch(/false for every other question/u);
+    expect(V52_NEXT_STEPS).toMatch(/explain a SAFE/u);
   });
 });

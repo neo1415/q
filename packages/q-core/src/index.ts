@@ -395,9 +395,9 @@ export {
   TURN_READER_V49_SCHEMA_VERSION,
   TurnReaderV49ResultSchema,
   type TurnReaderV49Result,
-  TURN_READER_V51_SCHEMA_VERSION,
-  TurnReaderV51ResultSchema,
-  type TurnReaderV51Result,
+  TURN_READER_V52_SCHEMA_VERSION,
+  TurnReaderV52ResultSchema,
+  type TurnReaderV52Result,
   type TurnReference,
   type TurnReferenceOpenKind,
   TurnReaderV30ResultSchema,
@@ -1342,6 +1342,7 @@ export {
   JOB_PLAN_V3,
   JOB_PLAN_V5,
   JOB_PLAN_V6,
+  JOB_PLAN_V7,
   REPLY_READER_V1,
 } from "./prompts/tasks/workforce.v1.js";
 export {
@@ -1583,8 +1584,12 @@ export {
 export { TURN_READER_V50, V50_FIT } from "./prompts/tasks/turn-reader.v50.js";
 export {
   TURN_READER_V51,
-  V51_NEXT_STEPS,
+  V51_DECISION_WITH_WORK,
 } from "./prompts/tasks/turn-reader.v51.js";
+export {
+  TURN_READER_V52,
+  V52_NEXT_STEPS,
+} from "./prompts/tasks/turn-reader.v52.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 
 export {

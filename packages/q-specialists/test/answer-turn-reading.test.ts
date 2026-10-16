@@ -4027,6 +4027,83 @@ describe("a request the reader named nothing for is routed (APP_ACTION_ROUTER)",
     expect(run.delegated()).toBe(0);
   });
 
+  // wf, live 2026-10-16: "We're going into diligence on Harbourline Cargo
+  // next week. Get the team ready." recorded the outcome and lost the work.
+  it("a decision stated with work attached goes to the team as one plan, never to the outcome card (TURN_READER v51)", async () => {
+    let routed = 0;
+    const ran: unknown[] = [];
+    const goals: string[] = [];
+    const said =
+      "We're going into diligence on Harbourline Cargo next week. Get the team ready.";
+    const run = seam({
+      said,
+      reading: { ...untold(), teamJob: true } as TurnReaderResult,
+      outcomes: [],
+      offeredTools: [...TOOLS, "relationship_outcome"],
+      appActionRouter: () => {
+        routed += 1;
+        return Promise.resolve("relationship_outcome");
+      },
+      appActions: {
+        tools: new Set([...TOOLS, "relationship_outcome"]),
+        run: (_request, action) => {
+          ran.push(action);
+          return Promise.resolve({ prepared: "the card" });
+        },
+      },
+      teamJob: {
+        propose: (_request, goal) => {
+          goals.push(goal);
+          return Promise.resolve({ status: "NOT_PLANNED" });
+        },
+      },
+    });
+    await run.answer.answer(request());
+    // The whole turn, decision included, is the lead's to plan; the
+    // decision comes back inside the plan as the person's next action.
+    expect(goals).toEqual([said]);
+    expect(routed).toBe(0);
+    expect(ran).toEqual([]);
+  });
+
+  it("a decision stated on its own is the relationship's action, never a team job", async () => {
+    let planned = 0;
+    const ran: unknown[] = [];
+    const run = seam({
+      said: "We're going into diligence on Harbourline Cargo.",
+      reading: untold(),
+      outcomes: [],
+      offeredTools: [...TOOLS, "relationship_outcome"],
+      appActionRouter: () => Promise.resolve("relationship_outcome"),
+      appActionArguments: () =>
+        Promise.resolve({
+          relationship: "Harbourline Cargo",
+          outcome: "DILIGENCE",
+        }),
+      appActions: {
+        tools: new Set([...TOOLS, "relationship_outcome"]),
+        run: (_request, action) => {
+          ran.push(action);
+          return Promise.resolve({ prepared: "the card" });
+        },
+      },
+      teamJob: {
+        propose: () => {
+          planned += 1;
+          return Promise.resolve({ status: "NOT_PLANNED" });
+        },
+      },
+    });
+    await run.answer.answer(request());
+    expect(planned).toBe(0);
+    expect(ran).toEqual([
+      {
+        tool: "relationship_outcome",
+        arguments: { relationship: "Harbourline Cargo", outcome: "DILIGENCE" },
+      },
+    ]);
+  });
+
   it("a reader that named the action is not routed again; NONE answers as before", async () => {
     let routed = 0;
     const none = seam({

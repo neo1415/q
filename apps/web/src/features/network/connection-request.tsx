@@ -12,6 +12,8 @@ import { Button, buttonClassName } from "@capital-q/ui/button";
 
 import { formatDay } from "@/components/date-format";
 
+import { REQUEST_WORDS } from "./connect-cta";
+
 import {
   requestConnectionAction,
   type ConnectionActionResult,
@@ -188,7 +190,7 @@ export function ConnectionRequest({
             }
             data-connection-request
           >
-            {phase.kind === "REFUSED" ? "Try again" : "Request connection"}
+            {phase.kind === "REFUSED" ? "Try again" : REQUEST_WORDS}
           </Button>
         </div>
       )}

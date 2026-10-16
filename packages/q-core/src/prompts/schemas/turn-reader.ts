@@ -686,16 +686,16 @@ export const TurnReaderV49ResultSchema = TurnReaderV44ResultSchema.extend({
 }).strict();
 export type TurnReaderV49Result = z.infer<typeof TurnReaderV49ResultSchema>;
 
-export const TURN_READER_V51_SCHEMA_VERSION = 51;
+export const TURN_READER_V52_SCHEMA_VERSION = 52;
 
 /**
- * v51 (lane ml, live 2026-10-16): whether the turn asks what to do next,
+ * v52 (lane ml, live 2026-10-16): whether the turn asks what to do next,
  * how ready they are or what is missing for their raise. Code opens such an
  * answer with their readiness gaps; before this, every ADVICE question got
  * that list (an Arabic "explain a SAFE" was answered under it). Read from
  * meaning in any language; false keeps the list off.
  */
-export const TurnReaderV51ResultSchema = TurnReaderV49ResultSchema.extend({
+export const TurnReaderV52ResultSchema = TurnReaderV49ResultSchema.extend({
   nextSteps: z.boolean().default(false),
 }).strict();
-export type TurnReaderV51Result = z.infer<typeof TurnReaderV51ResultSchema>;
+export type TurnReaderV52Result = z.infer<typeof TurnReaderV52ResultSchema>;

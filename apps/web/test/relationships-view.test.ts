@@ -7,7 +7,9 @@ import type {
 } from "@capital-q/contracts";
 
 import {
+  commitmentFacts,
   cursorOf,
+  isOwnStep,
   listOrder,
   needsYouCards,
   nextStepFor,
@@ -229,5 +231,126 @@ describe("Needs you", () => {
     ]);
     expect(cards[1]?.relationship?.counterpart.name).toBe("Fund 1");
     expect(cards[1]?.noticeIds).toHaveLength(2);
+  });
+});
+
+describe("one Needs you everywhere (live check 2026-10-16)", () => {
+  const commitment = {
+    next: "MARK_SENT" as const,
+    amount: "250000",
+    currencyCode: "USD",
+  };
+
+  it("a commitment waiting on this side is the row's own step, done on Capital", () => {
+    const step = nextStepFor(
+      item(1),
+      { ...facts, commitment },
+      "INVESTOR",
+      NOW,
+      "/r/1",
+    );
+    expect(step).toMatchObject({
+      label: "Mark as sent",
+      href: "/relationships?view=capital#commitments",
+      why: "Commitment USD 250,000",
+      urgent: true,
+    });
+    expect(isOwnStep(step)).toBe(true);
+    expect(
+      nextStepFor(item(1), { ...facts, commitment }, "COMPANY", NOW, "/r/1")
+        .href,
+    ).toBe("/relationships?view=capital&tab=raise#commitments");
+  });
+
+  it("keeps the newest waiting commitment per relationship, and none that waits on the other side", () => {
+    const facts = commitmentFacts([
+      {
+        relationshipId: "r1",
+        next: null,
+        amount: "5",
+        currencyCode: "USD",
+        at: "2026-10-05T00:00:00Z",
+      },
+      {
+        relationshipId: "r1",
+        next: "CONFIRM_AMOUNT",
+        amount: "10",
+        currencyCode: "USD",
+        at: "2026-10-01T00:00:00Z",
+      },
+      {
+        relationshipId: "r1",
+        next: "MARK_SENT",
+        amount: "20",
+        currencyCode: "EUR",
+        at: "2026-10-03T00:00:00Z",
+      },
+      {
+        relationshipId: "r2",
+        next: null,
+        amount: "30",
+        currencyCode: "USD",
+        at: "2026-10-03T00:00:00Z",
+      },
+    ]);
+    expect(facts).toEqual({
+      r1: { next: "MARK_SENT", amount: "20", currencyCode: "EUR" },
+    });
+  });
+
+  it("adds each relationship's own step beside the notices, one card when a notice already says it", () => {
+    const answering = item(2, { nextStep: "ANSWER_INTEREST" });
+    const deciding = item(3, { nextStep: "DECIDE_NEXT_STEP" });
+    const waiting = item(4, { nextStep: "AWAIT_ANSWER" });
+    const steps = [answering, deciding, waiting].map((one) => ({
+      item: one,
+      step: nextStepFor(
+        one,
+        undefined,
+        "INVESTOR",
+        NOW,
+        `/r/${one.relationshipId}`,
+      ),
+      at: one.stateSince,
+    }));
+    const cards = needsYouCards({
+      side: "INVESTOR",
+      now: NOW,
+      items: [answering, deciding, waiting],
+      reminders: [],
+      notices: [
+        notice(1, {
+          kind: "INTEREST_RECEIVED",
+          title: "Fund 2 wants to connect",
+          linkPath: `/relationships/investor/${answering.counterpart.id}`,
+          priority: "NEEDS_YOU",
+        }),
+      ],
+      steps,
+    });
+    expect(
+      cards.map((c) => [
+        c.relationship?.counterpart.name,
+        c.action.label,
+        c.step === true,
+      ]),
+    ).toEqual([
+      ["Fund 3", "Decide next step", true],
+      ["Fund 2", "Answer", false],
+    ]);
+  });
+
+  it("is never a row with nothing to press", () => {
+    expect(
+      isOwnStep(
+        nextStepFor(
+          item(1, { nextStep: "AWAIT_ANSWER" }),
+          undefined,
+          "INVESTOR",
+          NOW,
+          "/r",
+        ),
+      ),
+    ).toBe(false);
   });
 });

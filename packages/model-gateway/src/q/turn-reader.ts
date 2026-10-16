@@ -4,13 +4,13 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV51ResultSchema,
+  TurnReaderV52ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
   type TurnReaderV40Result,
-  type TurnReaderV51Result,
+  type TurnReaderV52Result,
   type TurnReaderV7Variables,
 } from "@capital-q/q-core";
 
@@ -92,7 +92,7 @@ export type QTurnReading = Omit<
   readonly reference?: TurnReaderV40Result["reference"] | undefined;
   /** v49: they hand Q's team a piece of work of several steps. */
   readonly teamJob?: boolean | undefined;
-  /** v51: they ask what to do next, what is missing, or how ready they are. */
+  /** v52: they ask what to do next, what is missing, or how ready they are. */
   readonly nextSteps?: boolean | undefined;
   /** v44: garbled spoken words, read by sound; null when read as written. */
   readonly heardAs?: string | null | undefined;
@@ -292,7 +292,7 @@ export function createQTurnReader(dependencies: {
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
           variables,
         });
-        const response = await gateway.execute<TurnReaderV51Result>(
+        const response = await gateway.execute<TurnReaderV52Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             // A closed classification needs little thought; left unset, a
@@ -308,7 +308,7 @@ export function createQTurnReader(dependencies: {
             attribution: input.attribution,
           },
           {
-            schema: TurnReaderV51ResultSchema,
+            schema: TurnReaderV52ResultSchema,
             // Live 2026-10-13: a reading that wrote a tool's own fields at
             // the root was refused and re-asked (~3.3 s of a ~6 s wait
             // before the answer started). Those keys mean nothing at the
@@ -321,7 +321,7 @@ export function createQTurnReader(dependencies: {
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV51ResultSchema.safeParse(
+        const parsed = TurnReaderV52ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

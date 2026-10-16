@@ -65,7 +65,7 @@ describe("ConnectionRequest", () => {
         send={send}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Request connection" }));
+    fireEvent.click(screen.getByRole("button", { name: "Request to connect" }));
     expect(send).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Send request" }));
     expect(await screen.findByText(/Request sent/)).toBeTruthy();
@@ -99,7 +99,7 @@ describe("ConnectionRequest", () => {
         send={send}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Request connection" }));
+    fireEvent.click(screen.getByRole("button", { name: "Request to connect" }));
     fireEvent.click(screen.getByRole("button", { name: "Send request" }));
     fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
     expect(await screen.findByText(/Request sent/)).toBeTruthy();

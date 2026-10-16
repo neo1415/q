@@ -128,14 +128,20 @@ export function NeedsYouQueue({
             {card.action.label}
           </Link>
         )}
-        <button
-          type="button"
-          onClick={() => clear(card)}
-          aria-label={`Dismiss ${card.title}`}
-          className="inline-flex size-11 flex-none items-center justify-center text-(--cq-text-tertiary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-        >
-          <X size={ICON_SIZE.compact} aria-hidden="true" />
-        </button>
+        {card.step === true ? (
+          // A step leaves when it is done, not when it is dismissed; the
+          // empty slot keeps the action column aligned.
+          <span aria-hidden="true" className="size-11 flex-none" />
+        ) : (
+          <button
+            type="button"
+            onClick={() => clear(card)}
+            aria-label={`Dismiss ${card.title}`}
+            className="inline-flex size-11 flex-none items-center justify-center text-(--cq-text-tertiary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          >
+            <X size={ICON_SIZE.compact} aria-hidden="true" />
+          </button>
+        )}
       </div>
     </div>
   );

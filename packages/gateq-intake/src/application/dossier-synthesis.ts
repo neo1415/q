@@ -69,6 +69,25 @@ export type SynthesisStore = {
 };
 
 const FINDINGS_MAX = 14_000;
+
+/**
+ * What a published criterion is about, from its label, and the recorded
+ * application facts it is checked against (the gate's criterion types:
+ * geography, stage, sector classifications and exclusions, raise size and
+ * cheque compatibility).
+ */
+const CRITERION_TOPICS: readonly (readonly [RegExp, readonly string[]])[] = [
+  [
+    /\b(based|locat\w*|countr\w*|geograph\w*|region\w*|headquarter\w*|hq)\b/iu,
+    ["company.country"],
+  ],
+  [/\bstages?\b/iu, ["company.stage"]],
+  [
+    /\b(sectors?|industr\w*|verticals?|exclu\w*)\b/iu,
+    ["company.sector_phrases"],
+  ],
+  [/\b(cheques?|checks?|tickets?|round|raise\w*)\b/iu, ["raise.amount"]],
+];
 const TRANSCRIPT_MAX = 14_000;
 
 /** What the model may read: the frozen findings, with ids, no contact. */
@@ -92,8 +111,28 @@ export function synthesisContext(input: {
       );
     }
   }
+  // Each criterion names the recorded fact it reads (live check 2026-10-16:
+  // with bare labels, a location mismatch was cited to the stage, sector
+  // and raise facts). The frozen dossier keeps only the investor's label,
+  // so the topic is read from it; a label naming no topic cites nothing.
+  const factOf = new Map(
+    dossier.dimensions.flatMap((group) =>
+      group.facts.map((fact) => [fact.dimension, fact.sourceFactId] as const),
+    ),
+  );
+  const checked = (label: string): string => {
+    const ids = CRITERION_TOPICS.filter(([pattern]) => pattern.test(label))
+      .flatMap(([, dimensions]) => dimensions)
+      .flatMap((dimension) => {
+        const id = factOf.get(dimension);
+        return id === undefined ? [] : [id];
+      });
+    return ids.length === 0
+      ? ""
+      : ` (checked against sourceFactId=${[...new Set(ids)].join(", sourceFactId=")})`;
+  };
   lines.push(
-    `Published mandate check (not an investment decision): ${dossier.qualification.criteria.map((c) => `${c.label} ${c.status}`).join("; ") || "no rules"}.`,
+    `Published mandate check (not an investment decision): ${dossier.qualification.criteria.map((c) => `${c.label} ${c.status}${checked(c.label)}`).join("; ") || "no rules"}.`,
     `Unknown: ${dossier.unknowns.map((g) => g.label).join("; ") || "none"}.`,
     `Declined: ${dossier.declined.map((g) => g.label).join("; ") || "none"}.`,
     `Missing: ${dossier.missing.map((g) => g.label).join("; ") || "none"}.`,

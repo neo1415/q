@@ -82,21 +82,28 @@ export function gateRows(gate: InvestorGateFitDto | null): LooksForRow[] {
   }));
 }
 
-/** Discover's reasons are public-profile matches: each is a "met". */
+/**
+ * Discover's reasons that are matches WITH the founder: each is a "met".
+ * "Deploying now" is a fact about the investor, not a match with anyone,
+ * and the hero already says it (live check 2026-10-16: it was the only
+ * "match" ever listed). A topic the investor's gate already covers is
+ * said there, once.
+ */
 export function profileRows(
   reasons: readonly DiscoveryReasonDto[],
+  covered: readonly LooksForRow[] = [],
 ): LooksForRow[] {
+  const said = new Set(covered.map((row) => row.label.toLowerCase()));
   const LABEL: Partial<Record<DiscoveryReasonDto["kind"], string>> = {
     STAGE_IN_RANGE: "Stage",
     SECTOR_MATCH: "Sector",
     GEOGRAPHY_MATCH: "Geography",
     BUSINESS_MODEL_MATCH: "Business model",
     CUSTOMER_TYPE_MATCH: "Customer type",
-    DECLARED_DEPLOYING: "Deploying now",
   };
   return reasons.flatMap((reason) => {
     const label = LABEL[reason.kind];
-    return label === undefined
+    return label === undefined || said.has(label.toLowerCase())
       ? []
       : [
           {
