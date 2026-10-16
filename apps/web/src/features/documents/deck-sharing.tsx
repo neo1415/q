@@ -8,6 +8,7 @@ import { Select } from "@capital-q/ui/select";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import { setDeckAudienceAction } from "./deck-sharing-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Who can download a pitch deck (ADR 0041; founder decision 2026-10-02):
@@ -40,6 +41,8 @@ export function deckAudienceDescription(
 }
 
 function DeckChoice({ deck }: { readonly deck: DeckRow }) {
+  const t = useT();
+
   const id = useId();
   const [record, setRecord] = useState(deck);
   const [audience, setAudience] = useState(deck.downloadAudience);
@@ -76,12 +79,12 @@ function DeckChoice({ deck }: { readonly deck: DeckRow }) {
       data-deck-sharing={deck.documentId}
     >
       <p className="cq-body font-medium text-(--cq-text-primary)">
-        {deck.title}
+        {t(deck.title)}
       </p>
       <Select
         id={`${id}-audience`}
-        label="Who can download it"
-        description={deckAudienceDescription(audience)}
+        label={t("Who can download it")}
+        description={t(deckAudienceDescription(audience))}
         options={DECK_AUDIENCE_OPTIONS}
         value={audience}
         onChange={(event) =>
@@ -99,7 +102,7 @@ function DeckChoice({ deck }: { readonly deck: DeckRow }) {
           disabled={audience === record.downloadAudience || saving}
           onClick={() => void save()}
         >
-          {saving ? "Saving…" : "Save"}
+          {saving ? t("Saving…") : t("Save")}
         </Button>
       </div>
     </li>
@@ -107,11 +110,13 @@ function DeckChoice({ deck }: { readonly deck: DeckRow }) {
 }
 
 export function DeckSharing({ decks }: { readonly decks: readonly DeckRow[] }) {
+  const t = useT();
+
   if (decks.length === 0) return null;
   return (
     <section className="flex flex-col gap-2" aria-labelledby="deck-sharing">
       <h2 id="deck-sharing" className="cq-title-sm text-(--cq-text-primary)">
-        Pitch deck
+        {t("Pitch deck")}
       </h2>
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
         {decks.map((deck) => (

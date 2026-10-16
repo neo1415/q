@@ -5,6 +5,7 @@ import { ICON_SIZE } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import type { OpenedFile } from "./material-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The reader's name over every page of a view-only file (A3/A4). It deters
@@ -12,6 +13,8 @@ import type { OpenedFile } from "./material-actions";
  * it does. Pointer events pass through to the document underneath.
  */
 export function Watermark({ words }: { readonly words: string }) {
+  const t = useT();
+
   return (
     <div
       aria-hidden="true"
@@ -23,7 +26,7 @@ export function Watermark({ words }: { readonly words: string }) {
           key={row}
           className="cq-caption -rotate-12 text-center whitespace-nowrap text-(--cq-text-tertiary) opacity-40"
         >
-          {words} &nbsp; · &nbsp; {words}
+          {t(words)} &nbsp; · &nbsp; {t(words)}
         </p>
       ))}
     </div>
@@ -40,6 +43,8 @@ export function FileViewer({
   readonly file: OpenedFile | null;
   readonly onClose: () => void;
 }) {
+  const t = useT();
+
   return (
     <SheetRoot
       open={file !== null}
@@ -47,9 +52,9 @@ export function FileViewer({
     >
       {file === null ? null : (
         <SheetContent
-          title={title}
+          title={t(title)}
           side="full"
-          description={file.downloadable ? undefined : "View only"}
+          description={file.downloadable ? undefined : t("View only")}
         >
           <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4">
             <div className="relative min-h-0 flex-1 overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
@@ -59,7 +64,7 @@ export function FileViewer({
                     ? file.url
                     : `${file.url}#toolbar=0&navpanes=0`
                 }
-                title={title}
+                title={t(title)}
                 className="h-full min-h-[60dvh] w-full"
                 referrerPolicy="no-referrer"
               />
@@ -75,12 +80,12 @@ export function FileViewer({
                   className="inline-flex min-h-11 items-center gap-1.5 underline underline-offset-4"
                 >
                   <Download size={ICON_SIZE.compact} aria-hidden="true" />{" "}
-                  Download
+                  {t("Download")}
                 </a>
               ) : (
                 <>
                   <Lock size={ICON_SIZE.compact} aria-hidden="true" />
-                  View only. Your name is shown on every page.
+                  {t("View only. Your name is shown on every page.")}
                 </>
               )}
             </p>

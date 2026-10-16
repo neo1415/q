@@ -7,6 +7,7 @@ import { Download, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import { exportAnswerAction } from "./actions";
 import { announceDocument } from "./document-ready";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Any of Q's answers as a PDF (DOCS spec §3 F5; founder directive
@@ -25,6 +26,8 @@ export function AnswerPdf({
   readonly runId: string;
   readonly messageId: string;
 }) {
+  const t = useT();
+
   const [state, setState] = useState<
     | { readonly kind: "idle" }
     | { readonly kind: "busy" }
@@ -73,7 +76,7 @@ export function AnswerPdf({
       </button>
       {state.kind === "failed" ? (
         <p className="cq-caption text-(--cq-text-secondary)" role="status">
-          {state.message}
+          {t(state.message)}
         </p>
       ) : null}
     </div>

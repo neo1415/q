@@ -4,6 +4,7 @@ import {
 } from "@capital-q/contracts";
 
 import { CORE_AR } from "./catalog/core";
+import { DOCUMENTS_AR } from "./catalog/documents";
 import { RELATIONSHIPS_AR } from "./catalog/relationships";
 import { indexPatterns, localiseDate, matchPattern } from "./patterns";
 
@@ -27,6 +28,7 @@ export type UiLanguage = "en" | "ar";
 const ARABIC: Readonly<Record<string, string>> = {
   ...CORE_AR,
   ...RELATIONSHIPS_AR,
+  ...DOCUMENTS_AR,
 };
 
 export function uiLanguageOf(

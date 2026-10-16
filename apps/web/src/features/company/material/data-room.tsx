@@ -50,6 +50,7 @@ import {
   setOutlineAction,
   type OpenedFile,
 } from "./material-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Data room tab (overnight plan A3; design-a "dataroom-*" mockups).
@@ -110,6 +111,8 @@ function FolderHeader({
   readonly detail: string;
   readonly onToggle: () => void;
 }) {
+  const t = useT();
+
   const Icon = FOLDER_ICONS[folder.code] ?? FileText;
   return (
     <button
@@ -124,9 +127,11 @@ function FolderHeader({
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="cq-body font-medium text-(--cq-text-primary)">
-          {folder.label}
+          {t(folder.label)}
         </span>
-        <span className="cq-caption text-(--cq-text-secondary)">{detail}</span>
+        <span className="cq-caption text-(--cq-text-secondary)">
+          {t(detail)}
+        </span>
       </span>
       <ChevronDown
         size={ICON_SIZE.regular}
@@ -165,13 +170,15 @@ function LevelChip({
 }: {
   readonly shownAs: DataRoomInvestorDocument["shownAs"];
 }) {
+  const t = useT();
+
   const { label, icon: Icon, tone } = SHOWN_AS[shownAs];
   return (
     <span
       className={`cq-caption inline-flex items-center gap-1 border px-2 py-0.5 ${tone}`}
     >
       <Icon size={ICON_SIZE.compact} aria-hidden="true" />
-      {label}
+      {t(label)}
     </span>
   );
 }
@@ -202,11 +209,13 @@ export function LockedDataRoom({
   readonly interest?: InterestDto | null | undefined;
   readonly relationshipState?: RelationshipStateV2 | null | undefined;
 }) {
+  const t = useT();
+
   const pending = locked.reason === "INTEREST_PENDING";
   return (
     <section
       className="flex flex-col gap-4 py-2"
-      aria-label="Data room"
+      aria-label={t("Data room")}
       data-data-room="investor-locked"
       data-locked-reason={locked.reason}
     >
@@ -219,13 +228,17 @@ export function LockedDataRoom({
         <div className="flex flex-col gap-1">
           <p className="cq-body text-(--cq-text-primary)">
             {pending
-              ? `Your interest is with ${companyName}.`
-              : `${companyName}'s data room opens once you're connected.`}
+              ? t(`Your interest is with ${companyName}.`)
+              : t(`${companyName}'s data room opens once you're connected.`)}
           </p>
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {pending
-              ? "Once they accept it, their data room opens here and you can request documents."
-              : "Express interest to request data-room access. Once the founders accept, you can see their data room and ask for documents."}
+              ? t(
+                  "Once they accept it, their data room opens here and you can request documents.",
+                )
+              : t(
+                  "Express interest to request data-room access. Once the founders accept, you can see their data room and ask for documents.",
+                )}
           </p>
         </div>
       </div>
@@ -243,7 +256,7 @@ export function LockedDataRoom({
       {locked.outline === null || locked.outline.length === 0 ? null : (
         <div className="flex flex-col gap-2" data-locked-outline>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            What&rsquo;s in it, folder by folder:
+            {t("What’s in it, folder by folder:")}
           </p>
           <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
             {locked.outline.map((folder) => (
@@ -252,10 +265,10 @@ export function LockedDataRoom({
                 className="flex min-h-11 items-center justify-between gap-3 py-2"
               >
                 <span className="cq-body-sm text-(--cq-text-primary)">
-                  {folder.label}
+                  {t(folder.label)}
                 </span>
                 <span className="cq-body-sm text-(--cq-text-secondary)">
-                  {plural(folder.documents, "document")}
+                  {t(plural(folder.documents, "document"))}
                 </span>
               </li>
             ))}
@@ -308,6 +321,8 @@ function ConnectedDataRoom({
   readonly companyName: string;
   readonly view: DataRoomInvestorView;
 }) {
+  const t = useT();
+
   const [filter, setFilter] = useState<Filter>("ALL");
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const [asking, setAsking] = useState<DataRoomInvestorDocument | "ALL" | null>(
@@ -347,12 +362,12 @@ function ConnectedDataRoom({
     return (
       <div className="flex flex-col gap-2 py-6" data-data-room="investor-empty">
         <p className="cq-body text-(--cq-text-primary)">
-          Nothing in {companyName}&rsquo;s data room is open to you yet.
+          {t(`Nothing in ${companyName}’s data room is open to you yet.`)}
         </p>
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Documents they share with you, or list for you to request, appear
-          here. Nothing here means nothing is shared with you yet, not that
-          nothing exists.
+          {t(
+            "Documents they share with you, or list for you to request, appear here. Nothing here means nothing is shared with you yet, not that nothing exists.",
+          )}
         </p>
       </div>
     );
@@ -368,14 +383,14 @@ function ConnectedDataRoom({
   return (
     <section
       className="flex flex-col gap-4"
-      aria-label="Data room"
+      aria-label={t("Data room")}
       data-data-room="investor"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          {plural(documents.length, "document")} you can see, in{" "}
-          {plural(view.folders.length, "folder")}. {openCount} are open to you
-          now.
+          {t(
+            `${plural(documents.length, "document")} you can see, in ${plural(view.folders.length, "folder")}. ${String(openCount)} are open to you now.`,
+          )}
         </p>
         {requestable ? (
           <button
@@ -383,14 +398,14 @@ function ConnectedDataRoom({
             className={buttonClassName("secondary", "regular")}
             onClick={() => setAsking("ALL")}
           >
-            Request all on-request documents
+            {t("Request all on-request documents")}
           </button>
         ) : null}
       </div>
       <div
         className="relative flex gap-2 overflow-x-auto pb-1"
         role="group"
-        aria-label="Show"
+        aria-label={t("Show")}
       >
         {FILTERS.map(([value, label]) => (
           <button
@@ -404,13 +419,13 @@ function ConnectedDataRoom({
                 : "border-(--cq-border) text-(--cq-text-primary)"
             }`}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>
       {message === null ? null : (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-          {message}
+          {t(message)}
         </p>
       )}
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-t border-(--cq-border-subtle)">
@@ -428,7 +443,9 @@ function ConnectedDataRoom({
               <FolderHeader
                 folder={folder}
                 open={isOpen}
-                detail={`${plural(all.length, "document")} · ${String(all.filter((d) => d.access === "OPEN").length)} open to you`}
+                detail={t(
+                  `${plural(all.length, "document")} · ${String(all.filter((d) => d.access === "OPEN").length)} open to you`,
+                )}
                 onToggle={() =>
                   setClosed((previous) => {
                     const next = new Set(previous);
@@ -453,32 +470,37 @@ function ConnectedDataRoom({
                       />
                       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                         <p className="cq-body text-(--cq-text-primary)">
-                          {document.title}
+                          {t(document.title)}
                         </p>
                         <p className="cq-caption flex flex-wrap items-center gap-x-2 gap-y-1 text-(--cq-text-secondary)">
                           <LevelChip shownAs={document.shownAs} />
-                          {[
-                            document.kind,
-                            document.pageCount === null
-                              ? null
-                              : plural(document.pageCount, "page"),
-                            document.validUntil === null
-                              ? monthYear(document.updatedAt)
-                              : `Valid to ${monthYear(document.validUntil)}`,
-                          ]
-                            .filter((part): part is string => part !== null)
-                            .join(" · ")}
+                          {t(
+                            [
+                              document.kind,
+                              document.pageCount === null
+                                ? null
+                                : plural(document.pageCount, "page"),
+                              document.validUntil === null
+                                ? monthYear(document.updatedAt)
+                                : `Valid to ${monthYear(document.validUntil)}`,
+                            ]
+                              .filter((part): part is string => part !== null)
+                              .join(" · "),
+                          )}
                           {document.openedAt === null ? null : (
                             <span className="inline-flex items-center gap-1">
                               <Eye
                                 size={ICON_SIZE.compact}
                                 aria-hidden="true"
                               />{" "}
-                              You opened it {dayMonth(document.openedAt)}
+                              {t("You opened it")}{" "}
+                              {t(dayMonth(document.openedAt))}
                             </span>
                           )}
                           {document.accessEndsAt === null ? null : (
-                            <span>Until {dayMonth(document.accessEndsAt)}</span>
+                            <span>
+                              {t("Until")} {t(dayMonth(document.accessEndsAt))}
+                            </span>
                           )}
                         </p>
                         {document.declined === undefined ||
@@ -487,10 +509,10 @@ function ConnectedDataRoom({
                             className="cq-caption text-(--cq-text-secondary)"
                             data-room-declined
                           >
-                            Declined
+                            {t("Declined")}
                             {document.declined.note === null
-                              ? ". You can ask again."
-                              : `: “${document.declined.note}”`}
+                              ? t(". You can ask again.")
+                              : t(`: “${document.declined.note}”`)}
                           </p>
                         )}
                       </div>
@@ -505,7 +527,7 @@ function ConnectedDataRoom({
                           )}
                           onClick={() => open(document)}
                         >
-                          Open
+                          {t("Open")}
                         </button>
                       ) : document.access === "REQUESTED" ? (
                         <span className="cq-caption inline-flex min-h-11 items-center gap-1 text-(--cq-text-secondary)">
@@ -513,7 +535,7 @@ function ConnectedDataRoom({
                             size={ICON_SIZE.compact}
                             aria-hidden="true"
                           />{" "}
-                          Requested
+                          {t("Requested")}
                         </span>
                       ) : (
                         <button
@@ -525,7 +547,7 @@ function ConnectedDataRoom({
                           )}
                           onClick={() => setAsking(document)}
                         >
-                          Request
+                          {t("Request")}
                         </button>
                       )}
                     </li>
@@ -537,8 +559,9 @@ function ConnectedDataRoom({
         })}
       </ul>
       <p className="cq-caption text-(--cq-text-secondary)">
-        {companyName} can see when you open a document. Documents that
-        can&rsquo;t be downloaded show your name on every page.
+        {t(
+          `${companyName} can see when you open a document. Documents that can’t be downloaded show your name on every page.`,
+        )}
       </p>
       <RequestSheet
         companyId={companyId}
@@ -557,7 +580,7 @@ function ConnectedDataRoom({
         }}
       />
       <FileViewer
-        title={opened?.title ?? ""}
+        title={t(opened?.title ?? "")}
         file={opened?.file ?? null}
         onClose={() => setOpened(null)}
       />
@@ -578,6 +601,8 @@ function RequestSheet({
   readonly onClose: () => void;
   readonly onSent: (target: DataRoomInvestorDocument | "ALL") => void;
 }) {
+  const t = useT();
+
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -604,44 +629,47 @@ function RequestSheet({
         <SheetContent
           title={
             target === "ALL"
-              ? "Request every on-request document"
-              : "Request this document"
+              ? t("Request every on-request document")
+              : t("Request this document")
           }
           side="side"
         >
           <div className="flex flex-col gap-4 px-4 pb-6" data-request-sheet>
             {target === "ALL" ? (
               <p className="cq-body-sm text-(--cq-text-secondary)">
-                This asks for the documents {companyName} lists here as
-                available on request. It does not reach anything they
-                haven&rsquo;t listed for you.
+                {t(
+                  `This asks for the documents ${companyName} lists here as available on request. It does not reach anything they haven’t listed for you.`,
+                )}
               </p>
             ) : (
               <p className="cq-body flex items-center gap-2 text-(--cq-text-primary)">
                 <FileText size={ICON_SIZE.regular} aria-hidden="true" />{" "}
-                {target.title}
+                {t(target.title)}
               </p>
             )}
             <label className="flex flex-col gap-2">
               <span className="cq-label text-(--cq-text-primary)">
-                A note to {companyName} (optional)
+                {t(`A note to ${companyName} (optional)`)}
               </span>
               <textarea
                 value={note}
                 maxLength={1000}
                 rows={3}
                 onChange={(event) => setNote(event.target.value)}
-                placeholder="For example: we're preparing for our investment committee on 20 October."
+                placeholder={t(
+                  "For example: we're preparing for our investment committee on 20 October.",
+                )}
                 className="cq-body border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
               />
             </label>
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              The founders will see your name, your firm and your note.
-              You&rsquo;ll get a message here when they answer.
+              {t(
+                "The founders will see your name, your firm and your note. You’ll get a message here when they answer.",
+              )}
             </p>
             {error === null ? null : (
               <p role="alert" className="cq-body-sm text-(--cq-text-primary)">
-                {error}
+                {t(error)}
               </p>
             )}
             <div className="flex items-center gap-3">
@@ -651,14 +679,14 @@ function RequestSheet({
                 onClick={send}
                 className={buttonClassName("primary", "large")}
               >
-                Send request
+                {t("Send request")}
               </button>
               <button
                 type="button"
                 onClick={onClose}
                 className={buttonClassName("quiet", "large")}
               >
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>
@@ -686,10 +714,12 @@ function LevelControl({
   readonly onChange: (level: DataRoomLevel) => void;
   readonly disabled: boolean;
 }) {
+  const t = useT();
+
   return (
     <div
       role="radiogroup"
-      aria-label={`Who can see ${document.title}`}
+      aria-label={t(`Who can see ${document.title}`)}
       className="grid w-full shrink-0 grid-cols-4 gap-1 bg-(--cq-surface-subtle) p-1 lg:flex lg:w-auto"
     >
       {LEVELS.map(([level, label, Icon]) => {
@@ -709,7 +739,7 @@ function LevelControl({
             }`}
           >
             <Icon size={ICON_SIZE.compact} aria-hidden="true" />
-            {label}
+            {t(label)}
           </button>
         );
       })}
@@ -752,6 +782,8 @@ export function OwnerDataRoom({
    */
   readonly inDocuments?: boolean | undefined;
 }) {
+  const t = useT();
+
   const [documents, setDocuments] = useState(view.documents);
   const [closed, setClosed] = useState<ReadonlySet<string>>(
     new Set(view.folders.map((folder) => folder.code).slice(3)),
@@ -895,18 +927,20 @@ export function OwnerDataRoom({
             id="data-room-title"
             className="cq-title-md text-(--cq-text-primary)"
           >
-            Data room
+            {t("Data room")}
           </h2>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            What investors can see, folder by folder. You choose for each
-            document. Investors see it once you accept their interest.
+            {t(
+              "What investors can see, folder by folder. You choose for each document. Investors see it once you accept their interest.",
+            )}
           </p>
         </div>
         <Link
           href={inDocuments ? "/documents?tab=mine" : "/documents"}
           className={buttonClassName("primary", "regular")}
         >
-          <Upload size={ICON_SIZE.compact} aria-hidden="true" /> Upload files
+          <Upload size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+          {t("Upload files")}
         </Link>
       </div>
 
@@ -916,12 +950,16 @@ export function OwnerDataRoom({
       >
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="cq-body-sm text-(--cq-text-primary)">
-            Before you connect
+            {t("Before you connect")}
           </p>
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {outline
-              ? "Investors not yet connected see folder names and counts. Titles and documents stay hidden."
-              : "Investors not yet connected see only that your data room opens once you accept their interest."}
+              ? t(
+                  "Investors not yet connected see folder names and counts. Titles and documents stay hidden.",
+                )
+              : t(
+                  "Investors not yet connected see only that your data room opens once you accept their interest.",
+                )}
           </p>
         </div>
         <button
@@ -933,13 +971,13 @@ export function OwnerDataRoom({
         >
           {outline ? (
             <>
-              <EyeOff size={ICON_SIZE.compact} aria-hidden="true" /> Hide folder
-              names
+              <EyeOff size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+              {t("Hide folder names")}
             </>
           ) : (
             <>
-              <Eye size={ICON_SIZE.compact} aria-hidden="true" /> Show folder
-              names
+              <Eye size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+              {t("Show folder names")}
             </>
           )}
         </button>
@@ -951,8 +989,9 @@ export function OwnerDataRoom({
           data-readiness
         >
           <p className="cq-title-sm text-(--cq-text-primary)">
-            {present} of {view.checklist.length} recommended for a{" "}
-            {stage.toLowerCase()} round
+            {t(
+              `${String(present)} of ${String(view.checklist.length)} recommended for a ${stage.toLowerCase()} round`,
+            )}
           </p>
           <div className="flex gap-1" aria-hidden="true">
             {view.checklist.map((item) => (
@@ -964,22 +1003,24 @@ export function OwnerDataRoom({
           </div>
           {missing.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              Everything investors usually ask for at this stage is here.
+              {t("Everything investors usually ask for at this stage is here.")}
             </p>
           ) : (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              Still to add:{" "}
-              {missing
-                .slice(0, 3)
-                .map(
-                  (item) =>
-                    item.label.charAt(0).toLowerCase() + item.label.slice(1),
-                )
-                .join(", ")}
+              {t("Still to add:")}{" "}
+              {t(
+                missing
+                  .slice(0, 3)
+                  .map(
+                    (item) =>
+                      item.label.charAt(0).toLowerCase() + item.label.slice(1),
+                  )
+                  .join(", "),
+              )}
               {missing.length > 3
-                ? `, and ${String(missing.length - 3)} more`
+                ? t(`, and ${String(missing.length - 3)} more`)
                 : ""}
-              . A recommendation, not a requirement.
+              {t(". A recommendation, not a requirement.")}
             </p>
           )}
         </div>
@@ -987,12 +1028,12 @@ export function OwnerDataRoom({
 
       {waiting.length === 0 ? null : inDocuments ? (
         <p className="cq-body-sm text-(--cq-text-secondary)" data-room-waiting>
-          {plural(waiting.length, "request")} waiting for you.{" "}
+          {t(plural(waiting.length, "request"))} {t("waiting for you.")}{" "}
           <Link
             href="/documents?tab=requested"
             className="text-(--cq-text-primary) underline underline-offset-2"
           >
-            Answer on Requested
+            {t("Answer on Requested")}
           </Link>
         </p>
       ) : (
@@ -1004,7 +1045,7 @@ export function OwnerDataRoom({
             id="waiting-title"
             className="cq-title-sm text-(--cq-text-primary)"
           >
-            Waiting for you
+            {t("Waiting for you")}
           </h3>
           <ul className="flex flex-col gap-2">
             {waiting.map((request) => (
@@ -1017,19 +1058,19 @@ export function OwnerDataRoom({
                   <p className="cq-body font-medium text-(--cq-text-primary)">
                     {[request.requesterName, request.requesterOrganisationName]
                       .filter(Boolean)
-                      .join(", ") || "An investor"}
+                      .join(", ") || t("An investor")}
                   </p>
                   <p className="cq-body-sm text-(--cq-text-secondary)">
-                    Asked for{" "}
+                    {t("Asked for")}{" "}
                     <strong className="text-(--cq-text-primary)">
-                      {request.documentTitle ?? "everything on request"}
+                      {t(request.documentTitle ?? "everything on request")}
                     </strong>
-                    {request.note === null ? "." : `. “${request.note}”`}
+                    {request.note === null ? "." : t(`. “${request.note}”`)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="cq-caption flex items-center gap-1 text-(--cq-text-secondary)">
-                    <span className="sr-only">How long</span>
+                    <span className="sr-only">{t("How long")}</span>
                     <select
                       value={
                         days[request.requestId] ?? DATA_ROOM_GRANT_DEFAULT_DAYS
@@ -1044,7 +1085,7 @@ export function OwnerDataRoom({
                     >
                       {DATA_ROOM_GRANT_DAYS.map((n) => (
                         <option key={n} value={n}>
-                          {n} days
+                          {n} {t("days")}
                         </option>
                       ))}
                     </select>
@@ -1059,7 +1100,7 @@ export function OwnerDataRoom({
                       "min-h-11",
                     )}
                   >
-                    Share
+                    {t("Share")}
                   </button>
                   <button
                     type="button"
@@ -1071,7 +1112,7 @@ export function OwnerDataRoom({
                       "min-h-11",
                     )}
                   >
-                    Not now
+                    {t("Not now")}
                   </button>
                 </div>
               </li>
@@ -1081,13 +1122,13 @@ export function OwnerDataRoom({
       )}
       {message === null ? null : (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-          {message}
+          {t(message)}
         </p>
       )}
 
       {documents.length === 0 && missing.length === 0 ? (
         <p className="cq-body text-(--cq-text-secondary)">
-          Nothing here yet. Upload anything; you decide who sees it.
+          {t("Nothing here yet. Upload anything; you decide who sees it.")}
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-t border-(--cq-border-subtle)">
@@ -1106,7 +1147,9 @@ export function OwnerDataRoom({
                     <FolderHeader
                       folder={folder}
                       open={isOpen}
-                      detail={`${plural(inFolder.length, "document")}${gaps.length === 0 ? "" : ` · ${String(gaps.length)} usually expected`}`}
+                      detail={t(
+                        `${plural(inFolder.length, "document")}${gaps.length === 0 ? "" : ` · ${String(gaps.length)} usually expected`}`,
+                      )}
                       onToggle={() =>
                         setClosed((previous) => {
                           const next = new Set(previous);
@@ -1131,9 +1174,9 @@ export function OwnerDataRoom({
                     >
                       <Users size={ICON_SIZE.compact} aria-hidden="true" />
                       <span className="hidden sm:inline">
-                        Who can see this folder
+                        {t("Who can see this folder")}
                       </span>
-                      <span className="sm:hidden">Access</span>
+                      <span className="sm:hidden">{t("Access")}</span>
                     </button>
                   )}
                 </div>
@@ -1153,30 +1196,38 @@ export function OwnerDataRoom({
                           />
                           <div className="flex min-w-0 flex-col gap-0.5">
                             <p className="cq-body text-(--cq-text-primary)">
-                              {document.title}
+                              {t(document.title)}
                             </p>
                             <p className="cq-caption flex flex-wrap items-center gap-x-2 text-(--cq-text-secondary)">
-                              {[
-                                document.kind,
-                                document.pageCount === null
-                                  ? null
-                                  : plural(document.pageCount, "page"),
-                                monthYear(document.updatedAt),
-                              ]
-                                .filter((part): part is string => part !== null)
-                                .join(" · ")}
+                              {t(
+                                [
+                                  document.kind,
+                                  document.pageCount === null
+                                    ? null
+                                    : plural(document.pageCount, "page"),
+                                  monthYear(document.updatedAt),
+                                ]
+                                  .filter(
+                                    (part): part is string => part !== null,
+                                  )
+                                  .join(" · "),
+                              )}
                               <span className="inline-flex items-center gap-1">
                                 <Eye
                                   size={ICON_SIZE.compact}
                                   aria-hidden="true"
                                 />
                                 {document.level === "PRIVATE"
-                                  ? "Only your team"
+                                  ? t("Only your team")
                                   : document.openedBy > 0
-                                    ? `Opened by ${plural(document.openedBy, "investor")}`
+                                    ? t(
+                                        `Opened by ${plural(document.openedBy, "investor")}`,
+                                      )
                                     : document.sharedWith > 0
-                                      ? `Shared with ${plural(document.sharedWith, "investor")}`
-                                      : "Not opened yet"}
+                                      ? t(
+                                          `Shared with ${plural(document.sharedWith, "investor")}`,
+                                        )
+                                      : t("Not opened yet")}
                               </span>
                             </p>
                             {(requested?.get(document.documentId) ?? []).map(
@@ -1190,8 +1241,8 @@ export function OwnerDataRoom({
                                     size={ICON_SIZE.compact}
                                     aria-hidden="true"
                                   />
-                                  Requested by {mark.who} ·{" "}
-                                  {REQUESTED_WORDS[mark.status]}
+                                  {t("Requested by")} {mark.who} ·{" "}
+                                  {t(REQUESTED_WORDS[mark.status])}
                                 </span>
                               ),
                             )}
@@ -1220,7 +1271,7 @@ export function OwnerDataRoom({
                             )}
                             data-document-access={document.documentId}
                           >
-                            Access
+                            {t("Access")}
                           </button>
                         )}
                       </li>
@@ -1238,10 +1289,10 @@ export function OwnerDataRoom({
                         />
                         <div className="flex min-w-0 flex-1 flex-col">
                           <p className="cq-body text-(--cq-text-secondary)">
-                            {item.label}
+                            {t(item.label)}
                           </p>
                           <p className="cq-caption text-(--cq-text-tertiary)">
-                            Usually expected
+                            {t("Usually expected")}
                           </p>
                         </div>
                         <Link
@@ -1252,7 +1303,7 @@ export function OwnerDataRoom({
                             "min-h-11",
                           )}
                         >
-                          Add
+                          {t("Add")}
                         </Link>
                       </li>
                     ))}
@@ -1304,13 +1355,17 @@ function FolderControl({
   readonly disabled: boolean;
   readonly onChange: (choice: string) => void;
 }) {
+  const t = useT();
+
   const value =
     document.checklistItemCode === null
       ? `folder:${document.folderCode}`
       : `item:${document.checklistItemCode}`;
   return (
     <label className="cq-caption flex items-center gap-1 text-(--cq-text-secondary)">
-      <span className="sr-only">File {document.title} in</span>
+      <span className="sr-only">
+        {t("File")} {t(document.title)} {t("in")}
+      </span>
       <select
         value={value}
         disabled={disabled}
@@ -1319,16 +1374,16 @@ function FolderControl({
         data-folder-control
       >
         {folders.map((folder) => (
-          <optgroup key={folder.code} label={folder.label}>
+          <optgroup key={folder.code} label={t(folder.label)}>
             {checklist
               .filter((item) => item.folderCode === folder.code)
               .map((item) => (
                 <option key={item.code} value={`item:${item.code}`}>
-                  {item.label}
+                  {t(item.label)}
                 </option>
               ))}
             <option value={`folder:${folder.code}`}>
-              Other in {folder.label}
+              {t("Other in")} {t(folder.label)}
             </option>
           </optgroup>
         ))}

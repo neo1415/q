@@ -20,6 +20,7 @@ import { RequestsInbox } from "@/features/documents/requests/requests-inbox";
 import { documentsTabOf } from "@/features/documents/requests/requests-model";
 import { resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Documents" };
 export const dynamic = "force-dynamic";
@@ -41,6 +42,8 @@ export default async function DocumentsPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await serverT();
+
   const params = await searchParams;
   // A deep link Q opens (`?open=<artifact id>`); the screen opens it only
   // when it is one of the person's own listed documents.
@@ -94,7 +97,7 @@ export default async function DocumentsPage({
         }
         label="your documents"
       >
-        <PageHeader title="Documents" />
+        <PageHeader title={t("Documents")} />
         {companyId === null ? null : (
           <DocumentsTabBar
             active={tab}

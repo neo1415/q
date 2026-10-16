@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { dealFixture } from "../app/dev/deal-close/fixtures";
+import { DOCUMENTS_AR } from "../src/features/i18n/catalog/documents";
 import { RELATIONSHIPS_AR } from "../src/features/i18n/catalog/relationships";
 import { LanguageProvider } from "../src/features/i18n/language";
 import { translate } from "../src/features/i18n/messages";
@@ -17,6 +18,7 @@ import {
   DealGuide,
   DealStageStrip,
 } from "../src/features/relationships/deal-stage-strip";
+import { NotScannedNote } from "../src/features/documents/not-scanned-note";
 import { RelationshipsEmpty } from "../src/features/relationships/relationships-empty";
 
 /**
@@ -33,6 +35,7 @@ const PLACEHOLDERS = /\{[A-Za-z][A-Za-z0-9]*\}/gu;
 
 const AREAS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   relationships: RELATIONSHIPS_AR,
+  documents: DOCUMENTS_AR,
 };
 
 describe("the area catalogues", () => {
@@ -41,7 +44,10 @@ describe("the area catalogues", () => {
       for (const [english, arabic] of Object.entries(catalogue)) {
         // A product name or a code (SAFE, CSV) may stay as it is.
         if (arabic === english) continue;
-        expect(ARABIC_LETTER.test(arabic), english).toBe(true);
+        // Words become Arabic; punctuation around a quote may only change.
+        if (/[A-Za-z]{2}/u.test(english.replace(PLACEHOLDERS, ""))) {
+          expect(ARABIC_LETTER.test(arabic), english).toBe(true);
+        }
         const keys = (english.match(PLACEHOLDERS) ?? []).toSorted();
         const values = (arabic.match(PLACEHOLDERS) ?? []).toSorted();
         expect(values, english).toEqual(keys);
@@ -132,5 +138,31 @@ describe("CRM in Arabic", () => {
     );
     expect(screen.getByRole("link", { name: "افتح اكتشف" })).toBeTruthy();
     expect(screen.getByText(/لا توجد علاقات بعد/u)).toBeTruthy();
+  });
+});
+
+describe("Documents and data rooms in Arabic", () => {
+  it("says a file is not virus-scanned, in Arabic", () => {
+    render(
+      <LanguageProvider language="ar">
+        <NotScannedNote />
+      </LanguageProvider>,
+    );
+    expect(screen.getByText("لم يُفحص من الفيروسات بعد")).toBeTruthy();
+  });
+
+  it("translates a sentence whose parts are themselves sentences", () => {
+    expect(translate("ar", "asked 18 Sept · waiting 3 days")).toBe(
+      "طُلب 18 سبتمبر · بالانتظار منذ 3 أيام",
+    );
+    expect(
+      translate(
+        "ar",
+        "4 documents you can see, in 2 folders. 1 are open to you now.",
+      ),
+    ).toBe("4 مستندات يمكنك رؤيتها، في 2 مجلدات. 1 منها مفتوحة لك الآن.");
+    expect(translate("ar", "Cap table and equity")).toBe(
+      "جدول الرسملة وحقوق الملكية",
+    );
   });
 });

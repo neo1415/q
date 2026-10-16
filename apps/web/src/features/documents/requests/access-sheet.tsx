@@ -29,6 +29,7 @@ import {
   shareFolderAction,
 } from "./request-actions";
 import { shortDate } from "./requests-model";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The access editor (founder documents, 2026-10-08): who can see one
@@ -69,19 +70,21 @@ function AwaitingConnection({
 }: {
   readonly awaiting: readonly AccessCandidate[];
 }) {
+  const t = useT();
+
   if (awaiting.length === 0) return null;
   return (
     <div className="flex flex-col gap-1" data-access-awaiting>
       <p className="cq-caption text-(--cq-text-secondary)">
-        Waiting for you to accept their interest:{" "}
-        {awaiting.map((a) => a.investorOrganisationName).join(", ")}. Connect
-        first, then share.
+        {t("Waiting for you to accept their interest:")}{" "}
+        {t(awaiting.map((a) => a.investorOrganisationName).join(", "))}
+        {t(". Connect first, then share.")}
       </p>
       <Link
         href="/company/interest"
         className="cq-caption inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-2"
       >
-        Review their interest
+        {t("Review their interest")}
       </Link>
     </div>
   );
@@ -104,6 +107,8 @@ function AddInvestor({
     readonly days: number;
   }) => void;
 }) {
+  const t = useT();
+
   const [relationshipId, setRelationshipId] = useState("");
   const [accessLevel, setAccessLevel] = useState<DocumentAccessLevel>("view");
   const [days, setDays] = useState<number>(DATA_ROOM_GRANT_DEFAULT_DAYS);
@@ -111,7 +116,7 @@ function AddInvestor({
     return (
       <div className="flex flex-col gap-2">
         <p className="cq-caption text-(--cq-text-tertiary)" data-access-none>
-          You can share with investors you&apos;re connected to. None yet.
+          {t("You can share with investors you're connected to. None yet.")}
         </p>
         <AwaitingConnection awaiting={awaiting} />
       </div>
@@ -123,17 +128,17 @@ function AddInvestor({
         className="cq-caption text-(--cq-text-tertiary) sm:col-span-2"
         data-access-explain
       >
-        You can share with investors you&apos;re connected to.
+        {t("You can share with investors you're connected to.")}
       </p>
       <label className="cq-caption flex flex-col gap-1 text-(--cq-text-secondary) sm:col-span-2">
-        Add an investor
+        {t("Add an investor")}
         <select
           value={relationshipId}
           onChange={(event) => setRelationshipId(event.target.value)}
           className={selectClass}
           data-access-candidate
         >
-          <option value="">Choose an investor</option>
+          <option value="">{t("Choose an investor")}</option>
           {candidates.map((candidate) => (
             <option
               key={candidate.relationshipId}
@@ -145,7 +150,7 @@ function AddInvestor({
         </select>
       </label>
       <label className="cq-caption flex flex-col gap-1 text-(--cq-text-secondary)">
-        They can
+        {t("They can")}
         <select
           value={accessLevel}
           onChange={(event) =>
@@ -153,14 +158,14 @@ function AddInvestor({
           }
           className={selectClass}
         >
-          <option value="view">{DOCUMENT_ACCESS_LEVEL_WORDS.view}</option>
+          <option value="view">{t(DOCUMENT_ACCESS_LEVEL_WORDS.view)}</option>
           <option value="view_download">
-            {DOCUMENT_ACCESS_LEVEL_WORDS.view_download}
+            {t(DOCUMENT_ACCESS_LEVEL_WORDS.view_download)}
           </option>
         </select>
       </label>
       <label className="cq-caption flex flex-col gap-1 text-(--cq-text-secondary)">
-        For
+        {t("For")}
         <select
           value={days}
           onChange={(event) => setDays(Number(event.target.value))}
@@ -168,7 +173,7 @@ function AddInvestor({
         >
           {DATA_ROOM_GRANT_DAYS.map((n) => (
             <option key={n} value={n}>
-              {n} days
+              {n} {t("days")}
             </option>
           ))}
         </select>
@@ -181,7 +186,7 @@ function AddInvestor({
           className={buttonClassName("primary", "regular", "min-h-11")}
           data-access-share
         >
-          {label}
+          {t(label)}
         </button>
       </div>
       <div className="sm:col-span-2">
@@ -200,10 +205,12 @@ function ScopeChoices({
   readonly busy: boolean;
   readonly onChoose: (level: DataRoomLevel) => void;
 }) {
+  const t = useT();
+
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="cq-title-sm mb-2 text-(--cq-text-primary)">
-        Who can see it
+        {t("Who can see it")}
       </legend>
       {DOCUMENT_SCOPE_CHOICES.map((choice) => {
         const on = current === choice.level;
@@ -223,10 +230,10 @@ function ScopeChoices({
             />
             <span className="flex flex-col">
               <span className="cq-body text-(--cq-text-primary)">
-                {choice.words}
+                {t(choice.words)}
               </span>
               <span className="cq-caption text-(--cq-text-secondary)">
-                {choice.detail}
+                {t(choice.detail)}
               </span>
             </span>
           </label>
@@ -234,14 +241,15 @@ function ScopeChoices({
       })}
       <details className="cq-caption text-(--cq-text-secondary)">
         <summary className="min-h-11 cursor-pointer py-2">
-          {DOCUMENT_SCOPES_NOT_OFFERED.length} more aren&apos;t offered for
-          company documents
+          {t(
+            `${DOCUMENT_SCOPES_NOT_OFFERED.length} more aren't offered for company documents`,
+          )}
         </summary>
         <ul className="flex flex-col gap-1 pb-2">
           {DOCUMENT_SCOPES_NOT_OFFERED.map((scope) => (
             <li key={scope.scope}>
-              <span className="text-(--cq-text-primary)">{scope.words}</span>:{" "}
-              {scope.reason}
+              <span className="text-(--cq-text-primary)">{t(scope.words)}</span>
+              : {t(scope.reason)}
             </li>
           ))}
         </ul>
@@ -261,6 +269,8 @@ function DocumentAccess({
   readonly reload: () => Promise<void>;
   readonly say: (words: string) => void;
 }) {
+  const t = useT();
+
   const [busy, setBusy] = useState(false);
   const run = async (
     work: () => Promise<{ ok: boolean; message?: string }>,
@@ -295,11 +305,11 @@ function DocumentAccess({
       />
       <section className="flex flex-col gap-2">
         <h3 className="cq-title-sm text-(--cq-text-primary)">
-          People with access
+          {t("People with access")}
         </h3>
         {access.grants.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            No investor has it shared with them now.
+            {t("No investor has it shared with them now.")}
           </p>
         ) : (
           <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
@@ -311,13 +321,13 @@ function DocumentAccess({
               >
                 <span className="flex flex-col">
                   <span className="cq-body text-(--cq-text-primary)">
-                    {grant.investorOrganisationName ?? "An investor"}
+                    {grant.investorOrganisationName ?? t("An investor")}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {DOCUMENT_ACCESS_LEVEL_WORDS[grant.accessLevel]}
+                    {t(DOCUMENT_ACCESS_LEVEL_WORDS[grant.accessLevel])}
                     {grant.expiresAt === null
-                      ? " · no end date"
-                      : ` · until ${shortDate(grant.expiresAt)}`}
+                      ? t(" · no end date")
+                      : t(` · until ${shortDate(grant.expiresAt)}`)}
                   </span>
                 </span>
                 <button
@@ -336,7 +346,7 @@ function DocumentAccess({
                   )}
                   data-access-revoke
                 >
-                  Revoke
+                  {t("Revoke")}
                 </button>
               </li>
             ))}
@@ -345,7 +355,7 @@ function DocumentAccess({
         <AddInvestor
           candidates={access.candidates}
           awaiting={access.awaitingConnection}
-          label="Share"
+          label={t("Share")}
           busy={busy}
           onShare={(input) =>
             void run(
@@ -356,10 +366,10 @@ function DocumentAccess({
         />
       </section>
       <section className="flex flex-col gap-1">
-        <h3 className="cq-title-sm text-(--cq-text-primary)">History</h3>
+        <h3 className="cq-title-sm text-(--cq-text-primary)">{t("History")}</h3>
         {access.history.length === 0 ? (
           <p className="cq-caption text-(--cq-text-tertiary)">
-            Never shared with an investor.
+            {t("Never shared with an investor.")}
           </p>
         ) : (
           <ul className="flex flex-col gap-1" data-access-history>
@@ -368,9 +378,11 @@ function DocumentAccess({
                 key={`${entry.at}:${String(index)}`}
                 className="cq-caption text-(--cq-text-secondary)"
               >
-                {shortDate(entry.at)} · {HISTORY_WORDS[entry.what]}{" "}
-                {entry.investorOrganisationName ?? "an investor"},{" "}
-                {DOCUMENT_ACCESS_LEVEL_WORDS[entry.accessLevel].toLowerCase()}
+                {t(shortDate(entry.at))} · {t(HISTORY_WORDS[entry.what])}{" "}
+                {t(entry.investorOrganisationName ?? "an investor")},{" "}
+                {t(
+                  DOCUMENT_ACCESS_LEVEL_WORDS[entry.accessLevel].toLowerCase(),
+                )}
               </li>
             ))}
           </ul>
@@ -391,6 +403,8 @@ function FolderAccess({
   readonly reload: () => Promise<void>;
   readonly say: (words: string) => void;
 }) {
+  const t = useT();
+
   const [busy, setBusy] = useState(false);
   const levels = new Set(access.documents.map((document) => document.level));
   const current =
@@ -412,7 +426,7 @@ function FolderAccess({
     <div className="flex flex-col gap-5" data-folder-access-sheet>
       {current === null ? (
         <p className="cq-caption text-(--cq-text-secondary)">
-          Its documents are set differently. Choosing one below sets all{" "}
+          {t("Its documents are set differently. Choosing one below sets all")}{" "}
           {access.documents.length}.
         </p>
       ) : null}
@@ -428,33 +442,34 @@ function FolderAccess({
       />
       <section className="flex flex-col gap-2">
         <h3 className="cq-title-sm text-(--cq-text-primary)">
-          Investors with access
+          {t("Investors with access")}
         </h3>
         {access.investors.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            No investor has any of it shared with them now.
+            {t("No investor has any of it shared with them now.")}
           </p>
         ) : (
           <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
             {access.investors.map((investor) => (
               <li key={investor.relationshipId} className="py-2">
                 <span className="cq-body text-(--cq-text-primary)">
-                  {investor.investorOrganisationName ?? "An investor"}
+                  {investor.investorOrganisationName ?? t("An investor")}
                 </span>{" "}
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  · {investor.documents} of {access.documents.length} documents
+                  · {investor.documents}{" "}
+                  {t(`of ${access.documents.length} documents`)}
                 </span>
               </li>
             ))}
           </ul>
         )}
         <p className="cq-caption text-(--cq-text-tertiary)">
-          To take one document back, open its Access.
+          {t("To take one document back, open its Access.")}
         </p>
         <AddInvestor
           candidates={access.candidates}
           awaiting={access.awaitingConnection}
-          label="Share the folder"
+          label={t("Share the folder")}
           busy={busy}
           onShare={(input) =>
             void run(
@@ -465,16 +480,18 @@ function FolderAccess({
         />
       </section>
       <section className="flex flex-col gap-1">
-        <h3 className="cq-title-sm text-(--cq-text-primary)">In this folder</h3>
+        <h3 className="cq-title-sm text-(--cq-text-primary)">
+          {t("In this folder")}
+        </h3>
         <ul className="flex flex-col gap-1">
           {access.documents.map((document) => (
             <li
               key={document.documentId}
               className="cq-caption text-(--cq-text-secondary)"
             >
-              {document.title} ·{" "}
+              {t(document.title)} ·{" "}
               {DOCUMENT_SCOPE_CHOICES.find((c) => c.level === document.level)
-                ?.words ?? "Only my team"}
+                ?.words ?? t("Only my team")}
             </li>
           ))}
         </ul>
@@ -495,6 +512,8 @@ export function AccessSheet({
   /** Already read (the design harness); otherwise read on open. */
   readonly initial?: DocumentAccessDto | FolderAccessDto | null;
 }) {
+  const t = useT();
+
   const [documentAccess, setDocumentAccess] =
     useState<DocumentAccessDto | null>(
       initial !== null && "grants" in initial ? initial : null,
@@ -557,11 +576,11 @@ export function AccessSheet({
       {target === null ? null : (
         <SheetContent
           side="side"
-          title={target.kind === "DOCUMENT" ? target.title : target.label}
+          title={target.kind === "DOCUMENT" ? t(target.title) : t(target.label)}
           description={
             target.kind === "DOCUMENT"
-              ? "Who can see this document"
-              : "Who can see this folder"
+              ? t("Who can see this document")
+              : t("Who can see this folder")
           }
         >
           {message === null ? null : (
@@ -569,12 +588,14 @@ export function AccessSheet({
               role="status"
               className="cq-body-sm mb-3 text-(--cq-text-secondary)"
             >
-              {message}
+              {t(message)}
             </p>
           )}
           {target.kind === "DOCUMENT" ? (
             documentAccess === null ? (
-              <p className="cq-body-sm text-(--cq-text-tertiary)">Loading…</p>
+              <p className="cq-body-sm text-(--cq-text-tertiary)">
+                {t("Loading…")}
+              </p>
             ) : (
               <DocumentAccess
                 companyId={companyId}
@@ -584,7 +605,9 @@ export function AccessSheet({
               />
             )
           ) : folderAccess === null ? (
-            <p className="cq-body-sm text-(--cq-text-tertiary)">Loading…</p>
+            <p className="cq-body-sm text-(--cq-text-tertiary)">
+              {t("Loading…")}
+            </p>
           ) : (
             <FolderAccess
               companyId={companyId}

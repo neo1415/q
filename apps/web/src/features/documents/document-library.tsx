@@ -67,6 +67,7 @@ import {
   type LibraryPage,
   type LibrarySort,
 } from "./library-model";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The documents page (P3, lead 2026-10-04): everything Q made and
@@ -148,6 +149,8 @@ function putWithProgress(
 
 /** A first page drawn from what is known: the title on a sheet of paper. */
 function PagePreview({ item }: { readonly item: LibraryItem }) {
+  const t = useT();
+
   return (
     <div className="relative grid aspect-[4/3] place-items-center overflow-hidden bg-(--cq-surface-subtle)">
       <div
@@ -159,7 +162,7 @@ function PagePreview({ item }: { readonly item: LibraryItem }) {
         }
       >
         <span className="line-clamp-3 font-(family-name:--cq-font-editorial) text-[13px] leading-tight text-(--cq-text-primary)">
-          {item.title}
+          {t(item.title)}
         </span>
         <span className="mt-1 h-[3px] w-full bg-(--cq-border-subtle)" />
         <span className="h-[3px] w-4/5 bg-(--cq-border-subtle)" />
@@ -169,12 +172,13 @@ function PagePreview({ item }: { readonly item: LibraryItem }) {
       </div>
       {item.state === "PREPARING" ? (
         <span className="absolute bottom-2 start-2 bg-(--cq-surface-raised) px-2 py-0.5 cq-caption text-(--cq-text-secondary)">
-          Q is writing this
+          {t("Q is writing this")}
         </span>
       ) : null}
       {item.state === "FAILED" ? (
         <span className="absolute bottom-2 start-2 inline-flex items-center gap-1 bg-(--cq-surface-raised) px-2 py-0.5 cq-caption text-(--cq-danger)">
-          <CircleAlert size={14} aria-hidden="true" /> Couldn&apos;t be finished
+          <CircleAlert size={14} aria-hidden="true" />{" "}
+          {t("Couldn't be finished")}
         </span>
       ) : null}
     </div>
@@ -193,6 +197,8 @@ function metaOf(item: LibraryItem): string {
 }
 
 function QRead({ item }: { readonly item: LibraryItem }) {
+  const t = useT();
+
   if (item.qRead === null) return null;
   const read = item.qRead === "READ";
   return (
@@ -205,7 +211,7 @@ function QRead({ item }: { readonly item: LibraryItem }) {
       data-q-read={item.qRead}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
-      {Q_READ_LABEL[item.qRead]}
+      {t(Q_READ_LABEL[item.qRead])}
     </span>
   );
 }
@@ -226,6 +232,8 @@ function ItemMenu({
   readonly item: LibraryItem;
   readonly actions: Actions;
 }) {
+  const t = useT();
+
   const ready = item.state === "READY";
   const upload = item.source === "UPLOAD";
   return (
@@ -233,7 +241,7 @@ function ItemMenu({
       <MenuTrigger>
         <button
           type="button"
-          aria-label={`Actions for ${item.title}`}
+          aria-label={t(`Actions for ${item.title}`)}
           className="grid size-11 place-items-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) lg:size-9"
           data-document-menu
         >
@@ -242,21 +250,25 @@ function ItemMenu({
       </MenuTrigger>
       <MenuContent align="end">
         <MenuItem disabled={!ready} onClick={() => actions.open(item)}>
-          Open
+          {t("Open")}
         </MenuItem>
-        <MenuItem onClick={() => actions.share(item)}>Share…</MenuItem>
+        <MenuItem onClick={() => actions.share(item)}>{t("Share…")}</MenuItem>
         <MenuItem disabled={!ready} onClick={() => actions.download(item)}>
-          Download
+          {t("Download")}
         </MenuItem>
         {upload ? (
-          <MenuItem onClick={() => actions.rename(item)}>Rename…</MenuItem>
+          <MenuItem onClick={() => actions.rename(item)}>
+            {t("Rename…")}
+          </MenuItem>
         ) : null}
-        <MenuItem onClick={() => actions.ask(item)}>Ask Q about it</MenuItem>
+        <MenuItem onClick={() => actions.ask(item)}>
+          {t("Ask Q about it")}
+        </MenuItem>
         {upload ? (
           <>
             <MenuSeparator />
             <MenuItem tone="danger" onClick={() => actions.remove(item)}>
-              Delete
+              {t("Delete")}
             </MenuItem>
           </>
         ) : null}
@@ -272,6 +284,8 @@ function Card({
   readonly item: LibraryItem;
   readonly actions: Actions;
 }) {
+  const t = useT();
+
   return (
     <li
       className="group relative flex flex-col gap-2.5"
@@ -284,7 +298,7 @@ function Card({
         className="text-start transition-transform duration-(--cq-motion-fast) active:scale-[0.98] disabled:active:scale-100"
         onClick={() => actions.open(item)}
         disabled={item.state !== "READY"}
-        aria-label={`Open ${item.title}`}
+        aria-label={t(`Open ${item.title}`)}
         data-document-open
       >
         <PagePreview item={item} />
@@ -294,13 +308,15 @@ function Card({
       </div>
       <div className="flex min-w-0 flex-col gap-0.5">
         <p className="cq-body line-clamp-2 font-medium text-(--cq-text-primary)">
-          {item.title}
+          {t(item.title)}
         </p>
-        <p className="cq-caption text-(--cq-text-tertiary)">{metaOf(item)}</p>
+        <p className="cq-caption text-(--cq-text-tertiary)">
+          {t(metaOf(item))}
+        </p>
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="cq-caption text-(--cq-text-secondary)">
-          {item.sharing}
+          {t(item.sharing)}
         </span>
         <QRead item={item} />
       </div>
@@ -315,6 +331,8 @@ function Row({
   readonly item: LibraryItem;
   readonly actions: Actions;
 }) {
+  const t = useT();
+
   return (
     <li
       className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-(--cq-border-subtle) py-2 md:grid-cols-[minmax(0,1fr)_9rem_6rem_7rem_11rem_auto]"
@@ -339,25 +357,25 @@ function Row({
         />
         <span className="flex min-w-0 flex-col">
           <span className="cq-body truncate font-medium text-(--cq-text-primary)">
-            {item.title}
+            {t(item.title)}
           </span>
           <span className="cq-caption truncate text-(--cq-text-tertiary) md:hidden">
-            {metaOf(item)}
+            {t(metaOf(item))}
           </span>
         </span>
       </button>
       <span className="hidden cq-body-sm text-(--cq-text-secondary) md:block">
-        {item.source === "Q" ? "Made by Q" : item.typeLabel}
+        {item.source === "Q" ? t("Made by Q") : t(item.typeLabel)}
       </span>
       <span className="hidden cq-body-sm text-(--cq-text-tertiary) md:block">
-        {sizeLabel(item.sizeBytes) ?? ""}
+        {t(sizeLabel(item.sizeBytes) ?? "")}
       </span>
       <span className="hidden cq-body-sm text-(--cq-text-tertiary) md:block">
-        {updatedLabel(item.updatedAt)}
+        {t(updatedLabel(item.updatedAt))}
       </span>
       <span className="hidden flex-col md:flex">
         <span className="cq-caption text-(--cq-text-secondary)">
-          {item.sharing}
+          {t(item.sharing)}
         </span>
         <QRead item={item} />
       </span>
@@ -385,6 +403,8 @@ export function DocumentLibrary({
   readonly companyId: string | null;
   readonly openOnArrival?: string | null;
 }) {
+  const t = useT();
+
   const { askAbout, askNow } = useGlobalQ();
   const searchId = useId();
   const sortId = useId();
@@ -643,7 +663,7 @@ export function DocumentLibrary({
       data-documents-library
     >
       <h2 id="documents-list" className="sr-only">
-        Your documents
+        {t("Your documents")}
       </h2>
 
       <div className="flex flex-col gap-3">
@@ -658,13 +678,13 @@ export function DocumentLibrary({
               aria-hidden="true"
               className="text-(--cq-text-tertiary)"
             />
-            <span className="sr-only">Search documents</span>
+            <span className="sr-only">{t("Search documents")}</span>
             <input
               id={searchId}
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search documents"
+              placeholder={t("Search documents")}
               className="min-w-0 flex-1 bg-transparent cq-body-sm text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary)"
               data-documents-search
             />
@@ -672,7 +692,7 @@ export function DocumentLibrary({
           <div className="flex items-center gap-2">
             <Select
               id={sortId}
-              label="Sort"
+              label={t("Sort")}
               labelHidden
               value={sort}
               onChange={(event) => setSort(event.target.value as LibrarySort)}
@@ -685,7 +705,7 @@ export function DocumentLibrary({
             />
             <div
               role="group"
-              aria-label="View"
+              aria-label={t("View")}
               className="inline-flex shrink-0 overflow-hidden border border-(--cq-border)"
             >
               {(
@@ -698,7 +718,7 @@ export function DocumentLibrary({
                   key={value}
                   type="button"
                   aria-pressed={view === value}
-                  aria-label={label}
+                  aria-label={t(label)}
                   onClick={() => chooseView(value)}
                   className={
                     view === value
@@ -723,7 +743,7 @@ export function DocumentLibrary({
                   strokeWidth={ICON_STROKE}
                   aria-hidden="true"
                 />
-                Upload
+                {t("Upload")}
               </button>
             )}
             <input
@@ -740,7 +760,7 @@ export function DocumentLibrary({
         </div>
         <div
           role="group"
-          aria-label="Show"
+          aria-label={t("Show")}
           className="relative -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1"
         >
           {LIBRARY_FILTERS.map((option) => (
@@ -757,14 +777,14 @@ export function DocumentLibrary({
               data-documents-filter={option.value}
               ref={option.value === "BY_Q" ? byQRef : undefined}
             >
-              {option.label}
+              {t(option.label)}
             </button>
           ))}
         </div>
       </div>
 
       {uploads.length > 0 ? (
-        <ul className="flex flex-col gap-2" aria-label="Uploading">
+        <ul className="flex flex-col gap-2" aria-label={t("Uploading")}>
           {uploads.map((entry) => (
             <li
               key={entry.id}
@@ -778,7 +798,7 @@ export function DocumentLibrary({
                 <>
                   <span
                     role="progressbar"
-                    aria-label={`Uploading ${entry.name}`}
+                    aria-label={t(`Uploading ${entry.name}`)}
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={Math.round(entry.progress * 100)}
@@ -795,13 +815,13 @@ export function DocumentLibrary({
                 </>
               ) : (
                 <span className="cq-caption flex-1 text-(--cq-danger)">
-                  {entry.error}
+                  {t(entry.error)}
                 </span>
               )}
               {entry.error === null ? null : (
                 <button
                   type="button"
-                  aria-label={`Dismiss ${entry.name}`}
+                  aria-label={t(`Dismiss ${entry.name}`)}
                   className="grid size-9 place-items-center text-(--cq-text-tertiary) hover:bg-(--cq-surface-subtle)"
                   onClick={() =>
                     setUploads((current) =>
@@ -823,17 +843,17 @@ export function DocumentLibrary({
           data-state="unavailable"
         >
           <p className="cq-body font-medium text-(--cq-text-primary)">
-            Your documents didn&apos;t load
+            {t("Your documents didn't load")}
           </p>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Who can see them hasn&apos;t changed.
+            {t("Who can see them hasn't changed.")}
           </p>
           <button
             type="button"
             className={buttonClassName("secondary")}
             onClick={() => void reload()}
           >
-            Try again
+            {t("Try again")}
           </button>
         </div>
       ) : items.length === 0 && !more ? (
@@ -842,12 +862,14 @@ export function DocumentLibrary({
           data-state="empty"
         >
           <p className="cq-body font-medium text-(--cq-text-primary)">
-            No documents yet
+            {t("No documents yet")}
           </p>
           <p className="cq-body-sm max-w-prose text-(--cq-text-secondary)">
             {companyId === null
-              ? "Q's decks, briefs and reports land here."
-              : "Drop a deck, model or contract here. Q reads it and tells you what's missing."}
+              ? t("Q's decks, briefs and reports land here.")
+              : t(
+                  "Drop a deck, model or contract here. Q reads it and tells you what's missing.",
+                )}
           </p>
           <div className="flex flex-wrap gap-2">
             {companyId === null ? null : (
@@ -856,7 +878,7 @@ export function DocumentLibrary({
                 className={buttonClassName("primary")}
                 onClick={() => fileInput.current?.click()}
               >
-                Upload
+                {t("Upload")}
               </button>
             )}
             <button
@@ -865,7 +887,7 @@ export function DocumentLibrary({
               onClick={() => askNow("Make me a pitch deck.")}
               data-documents-ask
             >
-              Ask Q for a deck
+              {t("Ask Q for a deck")}
             </button>
           </div>
         </div>
@@ -876,8 +898,8 @@ export function DocumentLibrary({
         >
           <p className="cq-body font-medium text-(--cq-text-primary)">
             {query.trim().length > 0
-              ? `No matches for "${query.trim()}"`
-              : "Nothing here yet"}
+              ? t(`No matches for "${query.trim()}"`)
+              : t("Nothing here yet")}
           </p>
           <button
             type="button"
@@ -887,7 +909,7 @@ export function DocumentLibrary({
               setFilter("ALL");
             }}
           >
-            Show everything
+            {t("Show everything")}
           </button>
         </div>
       ) : view === "grid" ? (
@@ -936,7 +958,7 @@ export function DocumentLibrary({
             disabled={loading}
             data-documents-more
           >
-            {loading ? "Loading…" : "Show more"}
+            {loading ? t("Loading…") : t("Show more")}
           </button>
         </div>
       ) : null}
@@ -946,7 +968,7 @@ export function DocumentLibrary({
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-(--cq-z-sticky) grid place-items-center border-2 border-dashed border-(--cq-accent) bg-(--cq-accent-soft)/90 cq-body font-medium text-(--cq-accent)"
         >
-          Drop to upload
+          {t("Drop to upload")}
         </div>
       ) : null}
 
@@ -961,7 +983,7 @@ export function DocumentLibrary({
                 onClick={notice.undo}
                 data-documents-undo
               >
-                Undo
+                {t("Undo")}
               </button>
             )}
           </span>
@@ -975,7 +997,7 @@ export function DocumentLibrary({
         }}
       >
         {renaming === null ? null : (
-          <DialogContent title="Rename">
+          <DialogContent title={t("Rename")}>
             <form
               className="flex flex-col gap-4"
               onSubmit={(event) => {
@@ -1018,7 +1040,7 @@ export function DocumentLibrary({
               <Input
                 id={renameId}
                 name="title"
-                label="Name"
+                label={t("Name")}
                 defaultValue={renaming.title}
                 maxLength={200}
                 autoFocus
@@ -1029,10 +1051,10 @@ export function DocumentLibrary({
                   className={buttonClassName("secondary")}
                   onClick={() => setRenaming(null)}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
                 <button type="submit" className={buttonClassName("primary")}>
-                  Save name
+                  {t("Save name")}
                 </button>
               </div>
             </form>
@@ -1089,6 +1111,8 @@ function DeckShareDialog({
   ) => void;
   readonly onCancel: () => void;
 }) {
+  const t = useT();
+
   const id = useId();
   const [audience, setAudience] = useState(
     item.downloadAudience ?? "ORGANISATION",
@@ -1096,12 +1120,12 @@ function DeckShareDialog({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
-    <DialogContent title={`Share "${item.title}"`}>
+    <DialogContent title={t(`Share "${item.title}"`)}>
       <div className="flex flex-col gap-4">
         <Select
           id={id}
-          label="Who can download it"
-          description={deckAudienceDescription(audience)}
+          label={t("Who can download it")}
+          description={t(deckAudienceDescription(audience))}
           value={audience}
           onChange={(event) =>
             setAudience(
@@ -1114,7 +1138,7 @@ function DeckShareDialog({
           }))}
         />
         {error === null ? null : (
-          <p className="cq-body-sm text-(--cq-danger)">{error}</p>
+          <p className="cq-body-sm text-(--cq-danger)">{t(error)}</p>
         )}
         <div className="flex justify-end gap-2">
           <button
@@ -1122,7 +1146,7 @@ function DeckShareDialog({
             className={buttonClassName("secondary")}
             onClick={onCancel}
           >
-            Cancel
+            {t("Cancel")}
           </button>
           <button
             type="button"
@@ -1142,7 +1166,7 @@ function DeckShareDialog({
               });
             }}
           >
-            Save
+            {t("Save")}
           </button>
         </div>
       </div>

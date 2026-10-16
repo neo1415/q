@@ -5,7 +5,8 @@
  * screen can pass its finished English sentence to `t()` and still get
  * Arabic: the sentence is matched against the pattern keys and the
  * captured parts are put into the Arabic template. A captured part that is
- * itself a catalogue string (a stage, a status) is translated too; names,
+ * itself a catalogue string or pattern (a stage, "3 documents") is
+ * translated too; names,
  * figures and dates pass through unchanged. `{n}` (and `{n2}`, `{count}`)
  * matches a figure only.
  */
@@ -87,7 +88,15 @@ export function matchPattern(
     const values = new Map<string, string>();
     pattern.names.forEach((name, i) => {
       const value = match[i + 1] ?? "";
-      values.set(name, catalogue[value] ?? localiseDate(value) ?? value);
+      values.set(
+        name,
+        catalogue[value] ??
+          (value.length < english.length
+            ? matchPattern(index, catalogue, value)
+            : undefined) ??
+          localiseDate(value) ??
+          value,
+      );
     });
     return pattern.template.replace(
       PLACEHOLDER,
