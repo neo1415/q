@@ -2,6 +2,7 @@ import type { QRecordPage } from "@capital-q/contracts";
 import { scoreOrgNames, scorePersonNames } from "@capital-q/q-core/names";
 import { spokenNameScore } from "@capital-q/q-tools";
 import { asksForDrawing, isDrawingObject } from "@capital-q/q-core/speech";
+import { resolveLanguage } from "@capital-q/q-core/language";
 
 import {
   PAGE_VERB,
@@ -155,12 +156,22 @@ function fromObject(object: string): NamedRecordRequest | null {
   return { name, facet: "PAGE", explicit: proper };
 }
 
-const LANGUAGE_NAME =
-  /^(?:the\s+)?(?:english|arabic|انجليزي(?:ة)?|إنجليزي(?:ة)?|الإنجليزي(?:ة)?|الانجليزي(?:ة)?|عربي(?:ة)?|العربي(?:ة)?)(?:\s+(?:language|please|now|instead|for\s+me))*$/iu;
+/** Filler a language request carries ("French please", "the Swahili language"). */
+const LANGUAGE_FILLER =
+  /^(?:the\s+)?(.+?)(?:\s+(?:language|please|now|instead|for\s+me))*$/iu;
 
-/** "English", "Arabic please", "the English language": a language. */
+/**
+ * "French", "Swahili please", "the English language", "العربية": a
+ * language by the registry (any language the runtime can name, named in
+ * any language), never a record to look up.
+ */
 function namesLanguage(object: string): boolean {
-  return LANGUAGE_NAME.test(object.trim().replace(/[.!?]+$/u, ""));
+  const bare =
+    LANGUAGE_FILLER.exec(object.trim().replace(/[.!?]+$/u, ""))?.[1] ?? "";
+  // A name, not a code: "it", "no", "my", "id" are words before they are
+  // Italian, Norwegian, Burmese or Indonesian.
+  const aName = bare.length >= 4 || /[^\p{Script=Latin}\s]/u.test(bare);
+  return aName && resolveLanguage(bare).ok;
 }
 
 /**

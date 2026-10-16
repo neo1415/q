@@ -466,7 +466,8 @@ export function registerUiTextRoutes(
 }
 
 /** The catalogue version code-written answer lines are cached under, apart from the UI's. */
-export const ANSWER_WORDS_VERSION = "answer-words.v1" as const;
+// v2: the same glossary as ui-text.v2 (one set of instructions).
+export const ANSWER_WORDS_VERSION = "answer-words.v2" as const;
 
 /**
  * Q's code-written lines in any language (lane ml's answers: attention,
