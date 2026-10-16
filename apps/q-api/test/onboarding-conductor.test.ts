@@ -668,3 +668,78 @@ describe("the typed contract carries the conductor's additions", () => {
     ).toBe(false);
   });
 });
+
+describe("the conductor's own lines in the person's language (ob1 live on AF)", () => {
+  const view = stuckView({ answered: ["F0.intent", "F1.company_name"] });
+  const next = nextUnansweredStep(view, "founder");
+
+  it("a chosen language: the hand step copy for its subtag, translateLines for the rest", async () => {
+    const asked: string[] = [];
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("تم الحفظ."))),
+      portFor: fakePorts().portFor,
+      logger,
+      languageOf: () => Promise.resolve("ar"),
+      localiseWords: (_actor, _language, texts) => {
+        asked.push(...texts);
+        return Promise.resolve(texts.map((text) => `[ar] ${text}`));
+      },
+    });
+    const outcome = await conductor.turn(input(api({}).fetch, "نعم"));
+    expect(outcome.reply).not.toContain(next?.question ?? "@@");
+    expect(outcome.reply.startsWith("تم الحفظ. ")).toBe(true);
+    // The step has hand Arabic: nothing needed translating.
+    expect(asked).toEqual([]);
+  });
+
+  it("any other chosen language: through translateLines", async () => {
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("C'est noté."))),
+      portFor: fakePorts().portFor,
+      logger,
+      languageOf: () => Promise.resolve("fr"),
+      localiseWords: (_actor, _language, texts) =>
+        Promise.resolve(texts.map((text) => `[fr] ${text}`)),
+    });
+    const outcome = await conductor.turn(input(api({}).fetch, "Oui."));
+    expect(outcome.reply).toBe(`C'est noté. [fr] ${next?.question ?? ""}`);
+  });
+
+  it("Automatic and their words not in English: no English line is added", async () => {
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("C'est noté."))),
+      portFor: fakePorts().portFor,
+      logger,
+      languageOf: () => Promise.resolve(null),
+    });
+    const outcome = await conductor.turn(
+      input(api({}).fetch, "Nous sommes une fintech basée à Nairobi."),
+    );
+    expect(outcome.reply).toBe("C'est noté.");
+  });
+
+  it("the resume is said in the chosen language too", async () => {
+    const { fetch: f } = api({
+      kept: [
+        { role: "Q", text: "Bienvenue." },
+        { role: "PERSON", text: "Bonjour." },
+      ],
+    });
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("unused"))),
+      portFor: fakePorts().portFor,
+      logger,
+      languageOf: () => Promise.resolve("fr"),
+      localiseWords: (_actor, _language, texts) =>
+        Promise.resolve(texts.map((text) => `[fr] ${text}`)),
+    });
+    const outcome = await conductor.turn(input(f, "", { channel: "voice" }));
+    expect(outcome.resumed).toBe(true);
+    expect(outcome.reply).toBe(
+      resumeLine(stuckView(), "founder").replace(
+        "Picking up where we left off. ",
+        "[fr] Picking up where we left off. [fr] ",
+      ),
+    );
+  });
+});
