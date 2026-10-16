@@ -25,6 +25,7 @@ import {
 } from "./document-use-cases.js";
 import {
   createBackfillDocumentPages,
+  createReadOwnDocumentText,
   createFindDocumentExtraction,
   createRecordDocumentExtraction,
 } from "./extraction-use-cases.js";
@@ -217,6 +218,8 @@ export type DocumentProcessingService = {
   readonly backfillDocumentPages: ReturnType<
     typeof createBackfillDocumentPages
   >;
+  /** ob2: an organisation's own unpaged document as text, from its artifact. */
+  readonly readOwnDocumentText: ReturnType<typeof createReadOwnDocumentText>;
 };
 
 export type DocumentProcessingServiceOptions = Omit<
@@ -243,5 +246,6 @@ export function createDocumentProcessingService(
     recordDocumentExtraction: createRecordDocumentExtraction(dependencies),
     findDocumentExtraction: createFindDocumentExtraction(dependencies),
     backfillDocumentPages: createBackfillDocumentPages(dependencies),
+    readOwnDocumentText: createReadOwnDocumentText(dependencies),
   };
 }

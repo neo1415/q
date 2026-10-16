@@ -62,6 +62,10 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       ],
     },
   },
+  // I1.mandate_context is not a field: the journey resolves which mandate
+  // is being defined itself, and its label is an implementation term no
+  // person should be asked (live acceptance 2026-10-16: "main strategy or a
+  // different one?" asked three times).
   fields: {
     [INVESTOR_STEPS.investorType]: {
       rank: 1,
@@ -78,8 +82,11 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 10,
     },
     [INVESTOR_STEPS.businessTitle]: {
+      // Asked (or declined) early: the journey resolves the mandate step
+      // only once the cursor passes this one (live acceptance 2026-10-16).
       concept: "person.title",
-      priority: "OPTIONAL",
+      priority: "IMPORTANT",
+      rank: 7,
       label: "Your role",
       seconds: 10,
     },
@@ -88,13 +95,6 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       concept: "investor.deployment_status",
       priority: "ESSENTIAL",
       label: "Deploying now",
-      seconds: 10,
-    },
-    [INVESTOR_STEPS.mandateContext]: {
-      rank: 7,
-      concept: "mandate.context",
-      priority: "ESSENTIAL",
-      label: "Mandate",
       seconds: 10,
     },
     [INVESTOR_STEPS.stages]: {

@@ -285,4 +285,16 @@ describe("deriveOnboardingCoverage (founder)", () => {
       ).source,
     ).toBe("FORM");
   });
+
+  it("an uploaded deck settles the materials field (live 2026-10-16)", () => {
+    const c = coverageOf(
+      {},
+      {},
+      { documents: [{ documentType: "PITCH_DECK" }] },
+    );
+    expect(field(c, FOUNDER_STEPS.materials)).toMatchObject({
+      state: "CONFIRMED_SAVED",
+      source: "DOCUMENT",
+    });
+  });
 });

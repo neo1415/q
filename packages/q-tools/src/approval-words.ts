@@ -612,6 +612,94 @@ export function readApprovalWords(
   return { kind: "NONE" };
 }
 
+/** What an edit names as the thing to change ("change the date"). */
+const FIELD_WORDS: ReadonlySet<string> = new Set([
+  "date",
+  "day",
+  "time",
+  "hour",
+  "amount",
+  "title",
+  "wording",
+  "words",
+  "text",
+  "subject",
+  "recipient",
+  "place",
+  "location",
+  "duration",
+  "length",
+  "name",
+  "التاريخ",
+  "اليوم",
+  "الوقت",
+  "الساعه",
+  "المبلغ",
+  "العنوان",
+  "النص",
+  "المكان",
+]);
+
+/** Words an edit request may hold that carry no new value. */
+const EDIT_FILLER: ReadonlySet<string> = new Set(
+  [
+    ...TABLE.flatMap(([phrase]) => phrase),
+    "can",
+    "could",
+    "would",
+    "want",
+    "wanna",
+    "need",
+    "needs",
+    "like",
+    "let's",
+    "lets",
+    "us",
+    "me",
+    "maybe",
+    "different",
+    "another",
+    "new",
+    "bit",
+    "little",
+  ].map((word) => tokens(word)[0] ?? word),
+);
+
+/**
+ * An edit request read by code (owner 2026-10-16): what it asks to change,
+ * and whether it says the new value. "Sounds good but change the date"
+ * names the date and gives none, so Q asks for it; "change it to Friday"
+ * gives one, so the change is prepared again with it. Null: not an edit.
+ */
+export function readEditRequest(
+  utterance: string,
+  options: { readonly summaries?: readonly string[] | undefined } = {},
+): { readonly field: string | null; readonly valueGiven: boolean } | null {
+  if (readApprovalWords(utterance, options).kind !== "EDIT") return null;
+  const named = summaryWords(options.summaries ?? []);
+  let field: string | null = null;
+  let valueGiven = false;
+  for (const word of tokens(utterance)) {
+    if (FIELD_WORDS.has(word)) {
+      field ??= word;
+      continue;
+    }
+    if (/\p{N}/u.test(word)) {
+      valueGiven = true;
+      continue;
+    }
+    if (EDIT_WORDS.has(word) || EDIT_FILLER.has(word) || named.has(word)) {
+      continue;
+    }
+    const bare = arabicPrefixed(word);
+    if (bare !== null && (EDIT_WORDS.has(bare) || EDIT_FILLER.has(bare))) {
+      continue;
+    }
+    valueGiven = true;
+  }
+  return { field, valueGiven };
+}
+
 /** An explicit approval, read by code: the words alone may approve. */
 export function explicitlyApproves(words: ApprovalWords): boolean {
   return words.kind === "APPROVE" && words.strength === "EXPLICIT";

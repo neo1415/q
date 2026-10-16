@@ -365,12 +365,18 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
       validUntil: { invalidatedBy: "Next relationship hub release" },
     },
     ...v5Entries(),
-    codeEntry({
+    {
       featureId: "QP-SUBJECT",
+      status: "PRODUCTION_LIVE_VERIFIED",
+      actorContext: PILOT_ACTOR,
       fixture:
         "Capital Q's own company record (CQ_Q_PITCH_SUBJECT_COMPANY_ID ee75a7d8-d457-4b59-9ad8-0d64b3026a3d), re-read per viewer",
+      appCommit:
+        "web production 6d7b521d (release Y) + migration 20261228141700",
+      verifiedAt: "2026-10-16 13:10 UTC",
+      verifierType: "BROWSER",
       receipt:
-        "apps/web/test/q-pitch-host.test.ts 'the tour's subject company' (2) PASS; browser receipt pending (production auth 504/500 at 13:48-13:51 UTC)",
+        "v5 run 7 scene 16 complete; badge recheck on 6d7b521d as savanna-seed: profile and scene 16 show no verification badge, org standing REVOKED rev 3; scratchpad v5-acc/badge",
       claimsAllowed: [
         {
           claimId: "QP-SUBJECT.c1",
@@ -380,12 +386,13 @@ export const PREMIERE_CERTIFICATION_LEDGER: CertificationLedger =
       claimsForbidden: [
         "The raise, valuation or any figure as verified (the USD 2,000,000 raise is the founder's claim)",
         "That Capital Q is assessed more favourably than other companies",
+        "Verified traction, customers, revenue or investors",
       ],
       validUntil: {
         invalidatedBy:
           "Next change to subject resolution or the subject record",
       },
-    }),
+    },
     codeEntry({
       featureId: "GATEQ-INBOX-DOSSIER",
       fixture:

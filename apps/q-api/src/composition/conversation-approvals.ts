@@ -167,7 +167,47 @@ export type ConversationApprovalDependencies = {
   /** How long an approval waits for the change to be applied before answering "saving". */
   readonly applyWithinMs?: number | undefined;
   readonly logger?: Logger | undefined;
+  /**
+   * Where the action's outcome line is handed while this approval waits
+   * for it, so the turn that decided it says it once. Absent: the paused
+   * run says it, and this answer says the engine's status.
+   */
+  readonly relay?: DecisionRelay | undefined;
 };
+
+/**
+ * One outcome line per action decided in words (owner 2026-10-16: "Done.
+ * I'll remind you: X." and "Done: Reminder: X." for one approval). The
+ * turn that approved claims the action while it waits on the execution;
+ * the narrator, finding it claimed, hands its line over instead of writing
+ * it on the paused run. Released when the wait ends, whatever happened: an
+ * execution that settles later is narrated on its run as before.
+ */
+export type DecisionRelay = {
+  readonly claim: (actionId: string) => void;
+  readonly heldFor: (actionId: string) => boolean;
+  readonly hold: (actionId: string, line: string) => void;
+  /** The line handed over, if any; the claim ends. */
+  readonly release: (actionId: string) => string | null;
+};
+
+export function createDecisionRelay(): DecisionRelay {
+  const claimed = new Map<string, string | null>();
+  return {
+    claim: (actionId) => {
+      claimed.set(actionId, null);
+    },
+    heldFor: (actionId) => claimed.has(actionId),
+    hold: (actionId, line) => {
+      if (claimed.has(actionId)) claimed.set(actionId, line);
+    },
+    release: (actionId) => {
+      const line = claimed.get(actionId) ?? null;
+      claimed.delete(actionId);
+      return line;
+    },
+  };
+}
 
 const APPLY_WITHIN_MS = 12_000;
 const PROPOSALS_MAX = 12;
@@ -310,6 +350,7 @@ export function createConversationApprovalPort(
     proposalId: string,
   ): Promise<{
     readonly status: ProposalPlainStatus | "CHANGED" | "CARD_ONLY";
+    readonly line?: string | undefined;
   }> => {
     const { actor } = context;
     const correlationId = CorrelationIdSchema.parse(context.correlationId);
@@ -351,6 +392,7 @@ export function createConversationApprovalPort(
     // "It's being applied now" about an action whose continuation had
     // already failed, and it stayed APPROVED).
     let continued: "WAITING" | "DONE" | "FAILED" = "WAITING";
+    let said: string | null = null;
     try {
       const result = await actions.approve({
         actor,
@@ -380,6 +422,10 @@ export function createConversationApprovalPort(
                   .then(() => undefined)
             : undefined;
       if (waiting && continuation !== undefined) {
+        // Only a decision in words is answered here; a repeat of one
+        // already decided is reported as it stands.
+        const relay = via === undefined ? undefined : dependencies.relay;
+        relay?.claim(result.action.id);
         // The same continuation the card's Approve starts. It runs on its
         // own; this answer waits a bounded time to report what happened.
         const resumed = continuation()
@@ -406,6 +452,7 @@ export function createConversationApprovalPort(
           }),
         ]);
         if (timer !== undefined) clearTimeout(timer);
+        said = relay?.release(result.action.id) ?? null;
       }
     } catch (error: unknown) {
       if (error instanceof QActionPayloadMismatchError) {
@@ -427,9 +474,9 @@ export function createConversationApprovalPort(
       continued !== "WAITING" &&
       after.action.actionStatus === "APPROVED"
     ) {
-      return { status: "NOT_SAVED" };
+      return said === null ? { status: "NOT_SAVED" } : { status, line: said };
     }
-    return { status };
+    return said === null ? { status } : { status, line: said };
   };
 
   /**

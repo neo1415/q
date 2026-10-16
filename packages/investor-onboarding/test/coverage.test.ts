@@ -118,4 +118,13 @@ describe("investor coverage", () => {
       ).toBe(true);
     }
   });
+
+  it("never asks which mandate is being defined: the journey resolves it (live 2026-10-16)", () => {
+    expect(
+      INVESTOR_COVERAGE_PROFILE.fields[INVESTOR_STEPS.mandateContext],
+    ).toBeUndefined();
+    expect(
+      INVESTOR_COVERAGE_PROFILE.fields[INVESTOR_STEPS.businessTitle]?.priority,
+    ).toBe("IMPORTANT");
+  });
 });

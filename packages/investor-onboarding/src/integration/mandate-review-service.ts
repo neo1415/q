@@ -174,8 +174,8 @@ export type MandateReviewServiceDependencies = {
   readonly logger?: Logger | undefined;
   /**
    * Lane ob1: an investor's own fund deck or investment thesis, read by
-   * the same path as their narrative. Structural ports (the evidence and
-   * knowledge repositories satisfy them). Absent: uploads are not read.
+   * the same path as their narrative. Structural ports (the evidence
+   * repositories satisfy them). Absent: uploads are not read.
    */
   readonly documents?:
     | {
@@ -187,23 +187,52 @@ export type MandateReviewServiceDependencies = {
           readonly documentType: string;
           readonly sensitivityClass: string;
           readonly companyId: string | null;
+          readonly ownerOrganisationId: string | null;
           readonly createdByUserId: string;
         } | null>;
       }
     | undefined;
-  readonly chunks?:
+  /**
+   * The document's own extracted text, page by page (evidence pages,
+   * written with the extraction). Not the knowledge passages: those are cut
+   * only for a company's documents and feed retrieval, and a firm's fund
+   * deck has no company (ob2 2026-10-16). Scoped by the owning
+   * organisation, so naming another organisation's document reads nothing.
+   */
+  readonly pages?:
     | {
-        readonly listActiveByVersion: (
+        readonly listByVersion: (
           executor: DatabaseExecutor,
           tenantId: TenantId,
-          documentVersionId: never,
-        ) => Promise<readonly { readonly content: string }[]>;
+          document: {
+            readonly documentId: string;
+            readonly documentVersionId: string;
+            readonly ownerOrganisationId: string;
+          },
+        ) => Promise<readonly { readonly text: string }[]>;
+      }
+    | undefined;
+  /**
+   * The same document's text from its stored extraction, for a document
+   * with no pages (a Word or plain-text thesis). Asked only when the pages
+   * hold nothing, and only after the type, firm and session checks; scoped
+   * by the same tenant, document, version and owner.
+   */
+  readonly extractionText?:
+    | {
+        readonly read: (document: {
+          readonly tenantId: string;
+          readonly documentId: string;
+          readonly documentVersionId: string;
+          readonly ownerOrganisationId: string;
+          readonly maxChars: number;
+        }) => Promise<string>;
       }
     | undefined;
 };
 
-/** How much of an investor document is read: the first passages, bounded. */
-const DOCUMENT_PASSAGES = 24;
+/** How much of an investor document is read: the first pages, bounded. */
+const DOCUMENT_PAGES = 24;
 const DOCUMENT_CHARS = 12_000;
 
 export type MandateReview = {
@@ -884,8 +913,8 @@ export function createMandateReview(
     },
 
     onDocumentReady: async (event): Promise<MandateReviewResult> => {
-      const { documents, chunks } = dependencies;
-      if (documents === undefined || chunks === undefined) {
+      const { documents, pages } = dependencies;
+      if (documents === undefined || pages === undefined) {
         return { kind: "SKIPPED", reason: "NOT_FOR_ONBOARDING_READING" };
       }
       const document = await documents.findInTenant(
@@ -913,16 +942,39 @@ export function createMandateReview(
       if (active.kind === "SKIPPED") {
         return active;
       }
-      const passages = await chunks.listActiveByVersion(
-        sql,
-        event.tenantId as TenantId,
-        event.documentVersionId as never,
-      );
-      const text = passages
-        .slice(0, DOCUMENT_PASSAGES)
-        .map((p) => p.content)
+      // The firm's own document only: it must belong to the organisation
+      // this setup is for. An uploader who also acts for another firm (or a
+      // company) never has that organisation's document read into this
+      // mandate.
+      const owner = document.ownerOrganisationId;
+      if (owner === null || active.session.organisationId !== owner) {
+        return { kind: "SKIPPED", reason: "NOT_FOR_ONBOARDING_READING" };
+      }
+      const documentPages = await pages.listByVersion(sql, active.tenantId, {
+        documentId: event.documentId,
+        documentVersionId: event.documentVersionId,
+        ownerOrganisationId: owner,
+      });
+      let text = documentPages
+        .slice(0, DOCUMENT_PAGES)
+        .map((page) => page.text)
         .join("\n\n")
         .slice(0, DOCUMENT_CHARS);
+      if (
+        text.trim().length === 0 &&
+        dependencies.extractionText !== undefined
+      ) {
+        // No pages: an unpaged document's text lives only in its extraction.
+        text = (
+          await dependencies.extractionText.read({
+            tenantId: active.tenantId,
+            documentId: event.documentId,
+            documentVersionId: event.documentVersionId,
+            ownerOrganisationId: owner,
+            maxChars: DOCUMENT_CHARS,
+          })
+        ).slice(0, DOCUMENT_CHARS);
+      }
       if (text.trim().length === 0) {
         return { kind: "SKIPPED", reason: "NO_NARRATIVE" };
       }

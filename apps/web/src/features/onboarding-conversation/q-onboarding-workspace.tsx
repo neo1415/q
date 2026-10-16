@@ -243,6 +243,13 @@ export function QOnboardingWorkspace({
   const [qQuestion, setQQuestion] = useState<{
     readonly stepKey: string;
     readonly text: string;
+    /**
+     * Q's opening (live acceptance 2026-10-16): shown whatever step the
+     * session settles on while it opens. The opening itself records what
+     * registration gave (the company name), which moves the step, and the
+     * opener was being discarded for the next step's column heading.
+     */
+    readonly sticky?: boolean;
   } | null>(null);
   const [reading, setReading] = useState(false);
   const [readingPolls, setReadingPolls] = useState(0);
@@ -364,7 +371,9 @@ export function QOnboardingWorkspace({
     prompt === null
       ? null
       : qQuestion !== null &&
-          (qQuestion.stepKey === prompt.stepKey || silentStep)
+          (qQuestion.stepKey === prompt.stepKey ||
+            silentStep ||
+            qQuestion.sticky === true)
         ? qQuestion.text
         : silentStep
           ? null
@@ -601,7 +610,7 @@ export function QOnboardingWorkspace({
           pendingReply.current = reply;
           // The prompt may not change, so bind it here as well as in the
           // effect that watches for a new step.
-          setQQuestion({ stepKey: prompt.stepKey, text: reply });
+          setQQuestion({ stepKey: prompt.stepKey, text: reply, sticky: true });
           pendingReply.current = null;
         }
       })
@@ -1196,7 +1205,9 @@ export function QOnboardingWorkspace({
       prompt !== null &&
       !isFinal &&
       qQuestion !== null &&
-      (qQuestion.stepKey === prompt.stepKey || silentStep)
+      (qQuestion.stepKey === prompt.stepKey ||
+        silentStep ||
+        qQuestion.sticky === true)
         ? qQuestion.text
         : greeted && !isFinal && liveQuestion !== null
           ? liveQuestion

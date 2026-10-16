@@ -161,15 +161,30 @@ describe("approval by words, read by code", () => {
     expect(calls.read).toBe(1);
   });
 
-  it("'sounds good, but change the date' is not an approval: answered as a new request, the card still waits", async () => {
+  it("'sounds good, but change the date' is not an approval: Q asks for the new date, the card unchanged (live 2026-10-16)", async () => {
     const { value, calls } = port([FOLLOW_UP]);
     const outcome = await decidePending(
       value,
       turn("sounds good, but change the date"),
     );
-    // Even with a model reading that says yes.
     expect(calls.approve).toEqual([]);
     expect(calls.decline).toEqual([]);
+    // No model reading is needed to ask, and never "waiting for your yes".
+    expect(calls.read).toBe(0);
+    expect(outcome).toEqual({
+      kind: "REPLY",
+      line: 'What should the new date be for "Send the follow-up to Harbourline"? It stays as it is until you tell me.',
+    });
+    expect(JSON.stringify(outcome)).not.toMatch(/waiting for your yes/);
+  });
+
+  it("an edit that gives the new value is answered as a request, so it is prepared again; never approved", async () => {
+    const { value, calls } = port([FOLLOW_UP]);
+    const outcome = await decidePending(
+      value,
+      turn("yes but change the date to Friday"),
+    );
+    expect(calls.approve).toEqual([]);
     expect(outcome).toEqual({
       kind: "ANSWER_THEN",
       before: null,
@@ -177,6 +192,23 @@ describe("approval by words, read by code", () => {
         "Still waiting for your approval: Send the follow-up to Harbourline.",
       about: "Send the follow-up to Harbourline",
       aboutId: "f1",
+    });
+  });
+
+  it("one line per action: the action's own outcome line, when it settled, replaces the status line", async () => {
+    const made = port([FOLLOW_UP, MEETING]);
+    const value: PendingDecisionPort = {
+      ...made.value,
+      approve: (_c, id) =>
+        Promise.resolve(
+          id === "f1"
+            ? { status: "SAVED", line: "Done. Sent to Harbourline." }
+            : { status: "SAVED" },
+        ),
+    };
+    expect(await decidePending(value, turn("approve both"))).toEqual({
+      kind: "REPLY",
+      line: "Done. Sent to Harbourline. Done: Book a call with Nixo, Tue 14:00.",
     });
   });
 
@@ -230,5 +262,24 @@ describe("approval by words, read by code", () => {
     const { value, calls } = port([FOLLOW_UP]);
     await decidePending(value, turn("yes"));
     expect(calls.read).toBe(1);
+  });
+});
+
+describe("the question back, answered (live 2026-10-16)", () => {
+  it("a plain 'yes' to two cards asks in words the next turn reads, and 'both' then approves both", async () => {
+    const first = port([FOLLOW_UP, MEETING]);
+    const asked = await decidePending(first.value, turn("yes"));
+    expect(first.calls.approve).toEqual([]);
+    const line = asked.kind === "REPLY" ? asked.line : "";
+    expect(line.startsWith(WHICH_TO_APPROVE)).toBe(true);
+    const second = port([FOLLOW_UP, MEETING]);
+    await decidePending(
+      second.value,
+      turn("both", [
+        { role: "USER", text: "yes" },
+        { role: "Q", text: line },
+      ]),
+    );
+    expect(second.calls.approve).toEqual(["f1", "m1"]);
   });
 });

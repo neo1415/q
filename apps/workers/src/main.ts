@@ -69,6 +69,7 @@ import {
 import { createOutboxWriter, DOMAIN_EVENTS_QUEUE } from "@capital-q/eventing";
 import {
   createDocumentProcessingService,
+  createPostgresDocumentPageTextReader,
   createPostgresEvidenceRepositories,
   createSupabaseDocumentStorageProvider,
   createPostgresDataRoom,
@@ -403,9 +404,25 @@ const mandateReview =
         responses: createPostgresOnboardingResponseRepository(),
         suggestions: createPostgresOnboardingSuggestionRepository(),
         utterances: createPostgresOnboardingUtteranceRepository(),
-        // Lane ob1: an investor's fund deck or thesis feeds mandate proposals.
+        // Lane ob1: an investor's fund deck or thesis feeds mandate proposals,
+        // read from the firm's own extracted pages (ob2): a firm's document
+        // has no company, so it is never cut into knowledge passages.
         documents: createPostgresEvidenceRepositories().documents,
-        chunks: createPostgresChunkRepository(),
+        pages: createPostgresDocumentPageTextReader(),
+        // An unpaged deck or thesis (Word, plain text): its own extraction,
+        // read only when it has no pages. `storage` is resolved per call
+        // (it is composed further down); without it, nothing is read.
+        extractionText: {
+          read: (query) =>
+            storage === undefined
+              ? Promise.resolve("")
+              : createDocumentProcessingService({
+                  sql: database.sql,
+                  transactions: database.transactions,
+                  outbox: createOutboxWriter({ registry }),
+                  storage,
+                }).readOwnDocumentText(query),
+        },
         synthesis: createMandateSynthesis({
           gateway: {
             execute: (request, options) =>
@@ -503,8 +520,9 @@ const presenceResearch =
         // fictional-world seed's own; a read failure keeps the old behaviour.
         isFictionalAccount: async (userId) => {
           const rows = await database.sql<{ fictional: boolean }[]>`
-            select coalesce(u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb
-                        and u.raw_app_meta_data -> 'fictional_demo' = 'true'::jsonb,
+            select coalesce((u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb
+                         and u.raw_app_meta_data -> 'fictional_demo' = 'true'::jsonb)
+                        or u.email like '%@fictional.capitalq.local',
                         false) as fictional
               from identity.user_profiles p
               join auth.users u on u.id = p.auth_user_id

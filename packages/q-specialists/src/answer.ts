@@ -3795,10 +3795,15 @@ export function createSpecialistQAnswer(
       );
       if (opened !== null) return opened;
     }
+    // An action waiting on their reply is continued with it below, never
+    // repeated with its old inputs (live 2026-10-16: "Lagos. Set both
+    // reminders." re-ran the reminder without the zone, and Q asked for
+    // the city again).
     if (
       reference !== null &&
       reference.retryLast &&
       lastAction !== null &&
+      lastAction.outcome !== "WAITING" &&
       dependencies.appActions !== undefined &&
       dependencies.appActions.tools.has(lastAction.tool)
     ) {

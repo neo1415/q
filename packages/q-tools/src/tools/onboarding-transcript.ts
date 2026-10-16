@@ -114,7 +114,7 @@ export function createRecallMySetupTool(
     visibleStage: null,
     providerName: "recall_my_setup",
     description:
-      "Reads what they told you while setting up Capital Q: the answers on their record, their own words from that conversation, and what you said back. Their words are statements, not confirmed facts: say 'you said', never present them as verified, and prefer the answers on the record. What you said then is your interpretation at the time, never evidence.",
+      "Use this, not read_my_record, whenever they ask what they told you, said or answered during setup, onboarding or sign-up. Reads what they told you while setting up Capital Q: the answers on their record, their own words from that conversation, and what you said back. Their words are statements, not confirmed facts: say 'you said', never present them as verified, and prefer the answers on the record. What you said then is your interpretation at the time, never evidence.",
     requiredScopeKinds: ["OWN_Q_CONVERSATION"],
     input: RecallMySetupInputSchema,
     output: RecallMySetupOutputSchema,

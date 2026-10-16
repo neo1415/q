@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { proposalBlocks } from "../src/application/narrator.js";
+import { proposalBlocks, proposedLine } from "../src/application/narrator.js";
 
 /**
  * QA 2026-10-01: a reminder proposed in a turn whose answer structure was
@@ -40,5 +40,14 @@ describe("the waiting line carries its proposal", () => {
 
   it("not at all without the approval it is bound to", () => {
     expect(proposalBlocks(action, undefined)).toBeUndefined();
+  });
+});
+
+describe("proposedLine (owner 2026-10-16)", () => {
+  it("invites words only for a kind words may approve", () => {
+    expect(proposedLine("Update your raise")).toMatch(/tell me to go ahead/);
+    expect(proposedLine("Update your raise", true)).toBe(
+      "Update your raise. Not saved yet: it needs your tap on Approve on the card.",
+    );
   });
 });

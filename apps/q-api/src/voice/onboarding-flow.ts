@@ -116,7 +116,7 @@ export function onboardingFlowFor(input: {
     lines.push(
       next.confirming
         ? `Then ask them to confirm, in one grouped question, the values on offer (${quoted(next.question)} first).`
-        : `Then ask exactly one question, the most valuable one now: ${quoted(next.question)}.`,
+        : `Then ask exactly one question, the most valuable one still open after your writes. Before this turn that was ${quoted(next.question)}; if you have just recorded it, ask the next one the tool results list as still open instead, never one already answered.`,
     );
     if (next.optional) {
       lines.push(
@@ -164,4 +164,27 @@ export function withNextQuestion(
     return `${trimmed} Would you like to finish now, or keep going with the optional details?`.trim();
   }
   return reply;
+}
+
+/**
+ * A question the reply asks that the record already answers (live
+ * acceptance 2026-10-16: "...description noted. In a sentence or two, what
+ * does the company do?"). Each such sentence, in the journey's own wording,
+ * is taken out; the backstop then asks what is really next.
+ */
+export function withoutAnsweredQuestions(
+  reply: string,
+  state: OnboardingState,
+  spoken: Readonly<Record<string, string>>,
+): string {
+  let out = reply;
+  for (const step of state.steps) {
+    if (step.status !== "ANSWERED") continue;
+    for (const wording of [spoken[step.stepKey], step.question]) {
+      if (wording === undefined || wording.length < 12) continue;
+      const at = out.indexOf(wording);
+      if (at >= 0) out = `${out.slice(0, at)}${out.slice(at + wording.length)}`;
+    }
+  }
+  return out.replace(/\s{2,}/g, " ").trim();
 }
