@@ -1,9 +1,12 @@
 import type {
+  CommitmentNextStep,
   NotificationDto,
   RelationshipStateV2,
   RelationshipSummaryDto,
   ReminderDto,
 } from "@capital-q/contracts";
+
+import { money } from "@/features/capital/money";
 
 /**
  * The Relationships list's view model (founder critique 2026-10-04: "next
@@ -31,13 +34,114 @@ export type RowFacts = {
     readonly firstOpenTitle: string | null;
     readonly unopenedShares: number;
   } | null;
+  /**
+   * A commitment on it waiting on this side (Capital's "Needs you"): the
+   * server's own next step for the viewing side, never inferred here.
+   */
+  readonly commitment?: CommitmentFact | null | undefined;
+};
+
+/** The money step a commitment waits on this side for. */
+export type CommitmentFact = {
+  readonly next: CommitmentNextStep;
+  readonly amount: string;
+  readonly currencyCode: string;
+};
+
+/**
+ * The commitment waiting on this side for each relationship, from the
+ * Capital read (LedgerCommitmentDto.next). One per relationship: the
+ * newest, since only one button fits a row.
+ */
+export function commitmentFacts(
+  commitments: readonly {
+    readonly relationshipId: string;
+    readonly next: CommitmentNextStep | null;
+    readonly amount: string;
+    readonly currencyCode: string;
+    readonly at: string;
+  }[],
+): Readonly<Record<string, CommitmentFact>> {
+  const out: Record<string, CommitmentFact & { at: string }> = {};
+  for (const one of commitments) {
+    if (one.next === null) continue;
+    const held = out[one.relationshipId];
+    if (held !== undefined && Date.parse(held.at) >= Date.parse(one.at)) {
+      continue;
+    }
+    out[one.relationshipId] = {
+      next: one.next,
+      amount: one.amount,
+      currencyCode: one.currencyCode,
+      at: one.at,
+    };
+  }
+  return Object.fromEntries(
+    Object.entries(out).map(([id, { next, amount, currencyCode }]) => [
+      id,
+      { next, amount, currencyCode },
+    ]),
+  );
+}
+
+/**
+ * A row's facts from what was read about it: the card digest (when this
+ * relationship was among those read in full), its unread chat count and
+ * the commitment waiting on this side. Undefined: nothing is known beyond
+ * the summary row.
+ */
+export function rowFacts(
+  digest:
+    | {
+        readonly followUpDue: boolean;
+        readonly nextCall: { readonly startsAt: string } | null;
+        readonly callsRead?: boolean | undefined;
+        readonly messages: {
+          readonly last: { readonly sentAt: string } | null;
+        } | null;
+        readonly diligence?: RowFacts["diligence"] | undefined;
+      }
+    | undefined,
+  unread: number,
+  commitment: CommitmentFact | undefined = undefined,
+): RowFacts | undefined {
+  if (digest === undefined) {
+    return unread > 0 || commitment !== undefined
+      ? {
+          unread,
+          followUpDue: false,
+          nextCallAt: null,
+          // Unknown, so no "Book a call" over a call we could not see.
+          callsRead: false,
+          lastMessageAt: null,
+          diligence: null,
+          commitment: commitment ?? null,
+        }
+      : undefined;
+  }
+  return {
+    unread,
+    followUpDue: digest.followUpDue,
+    nextCallAt: digest.nextCall?.startsAt ?? null,
+    callsRead: digest.callsRead,
+    lastMessageAt: digest.messages?.last?.sentAt ?? null,
+    diligence: digest.diligence ?? null,
+    commitment: commitment ?? null,
+  };
+}
+
+const COMMITMENT_STEP: Readonly<Record<CommitmentNextStep, string>> = {
+  CONFIRM_AMOUNT: "Confirm amount",
+  MARK_SENT: "Mark as sent",
+  CONFIRM_RECEIVED: "Confirm received",
 };
 
 export type NextStep = {
   /** The button's words; null when nothing is theirs to do. */
   readonly label: string | null;
   readonly href: string | null;
-  readonly icon: "upload" | "file" | "reply" | "calendar" | "answer" | null;
+  readonly icon:
+    "upload" | "file" | "reply" | "calendar" | "answer" | "money" | null;
   /** One short line under the name on a phone. */
   readonly why: string;
   /** Theirs to do now: sorts first under Needs you and gets the strong button. */
@@ -144,6 +248,18 @@ export function nextStepFor(
       true,
     );
   }
+  const commitment = facts?.commitment ?? null;
+  if (commitment !== null) {
+    // Money waits on this side: done on Capital, where the card asks once
+    // more before anything is recorded.
+    return step(
+      COMMITMENT_STEP[commitment.next],
+      capitalHref(side),
+      "money",
+      `Commitment ${money(commitment.amount, commitment.currencyCode)}`,
+      true,
+    );
+  }
   if (item.nextStep === "ANSWER_INTEREST") {
     return step(
       "Answer",
@@ -208,6 +324,13 @@ export function nextStepFor(
     return step("Express interest", base, null, "Not yet in touch", false);
   }
   return step(null, null, null, "", false);
+}
+
+/** Where a commitment's step is done: the side's commitments on Capital. */
+function capitalHref(side: ListSide): string {
+  return side === "COMPANY"
+    ? "/relationships?view=capital&tab=raise#commitments"
+    : "/relationships?view=capital#commitments";
 }
 
 // ---------------------------------------------------------------------------
@@ -275,7 +398,53 @@ export type NeedsYouCard = {
   readonly noticeIds: readonly string[];
   readonly reminderId: string | null;
   readonly action: { readonly label: string; readonly href: string | null };
+  /**
+   * A relationship's own next step (not a notice): it leaves when the step
+   * is done, so it has no dismiss.
+   */
+  readonly step?: boolean;
 };
+
+type Family = "reply" | "answer" | "files" | "money" | "other";
+
+/** What a notice is about, so a step and its notice make one card. */
+const NOTICE_FAMILY: Partial<Record<NotificationDto["kind"], Family>> = {
+  CHAT_MESSAGE: "reply",
+  Q_MESSAGE: "reply",
+  EMAIL_RECEIVED: "reply",
+  INTEREST_RECEIVED: "answer",
+  CONNECTION_REQUESTED: "answer",
+  DILIGENCE: "files",
+  COMMITMENT: "money",
+  COMMITMENT_DETECTED: "money",
+};
+
+const STEP_FAMILY: Partial<Record<NonNullable<NextStep["icon"]>, Family>> = {
+  reply: "reply",
+  answer: "answer",
+  upload: "files",
+  file: "files",
+  money: "money",
+};
+
+function noticeFamily(kind: NotificationDto["kind"]): Family {
+  return NOTICE_FAMILY[kind] ?? "other";
+}
+
+function stepFamily(step: NextStep): Family {
+  return step.icon === null ? "other" : (STEP_FAMILY[step.icon] ?? "other");
+}
+
+/**
+ * The one definition of "Needs you" for a relationship (live check
+ * 2026-10-16: the Overview said nothing while Pipeline and Capital each
+ * listed steps): its next step is the person's own to do now. Pipeline's
+ * filter counts these; the Overview lists every one of them beside the
+ * notices; Capital's commitments reach it through `RowFacts.commitment`.
+ */
+export function isOwnStep(step: NextStep): boolean {
+  return step.urgent && step.label !== null;
+}
 
 const LINK =
   /^\/relationships\/(company|investor)\/([0-9a-f-]{36})(?:\/(messages|diligence))?/i;
@@ -355,6 +524,13 @@ export function needsYouCards(input: {
   readonly items: readonly RelationshipSummaryDto[];
   readonly side: ListSide;
   readonly now: number;
+  /** Each relationship's own next step, from nextStepFor. */
+  readonly steps?: readonly {
+    readonly item: RelationshipSummaryDto;
+    readonly step: NextStep;
+    /** When it last moved: a message, else the state change. */
+    readonly at: string;
+  }[];
 }): readonly NeedsYouCard[] {
   const byCounterpart = new Map(
     input.items.map((item) => [item.counterpart.id.toLowerCase(), item]),
@@ -366,6 +542,8 @@ export function needsYouCards(input: {
     string,
     NeedsYouCard & { noticeIds: string[]; count: number }
   >();
+  /** relationship|family pairs a card already stands for. */
+  const families = new Set<string>();
   const ordered = input.notices
     .filter((notice) => !notice.read)
     .toSorted((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
@@ -398,6 +576,11 @@ export function needsYouCards(input: {
       reminderId: null,
       action: actionFor(notice.kind, input.side, notice.linkPath),
     });
+    if (relationship !== null) {
+      families.add(
+        `${relationship.relationshipId}|${noticeFamily(notice.kind)}`,
+      );
+    }
   }
   for (const reminder of input.reminders) {
     const due =
@@ -418,6 +601,34 @@ export function needsYouCards(input: {
       noticeIds: [],
       reminderId: reminder.id,
       action: { label: "Done", href: null },
+    });
+    if (relationship !== null) {
+      // A due reminder is the relationship's follow-up.
+      families.add(`${relationship.relationshipId}|follow-up`);
+    }
+  }
+  for (const { item, step, at } of input.steps ?? []) {
+    if (!isOwnStep(step)) continue;
+    const family = stepFamily(step);
+    const followUp = step.label === "Follow up";
+    if (
+      (family !== "other" &&
+        families.has(`${item.relationshipId}|${family}`)) ||
+      (followUp && families.has(`${item.relationshipId}|follow-up`))
+    ) {
+      continue;
+    }
+    const key = `${item.relationshipId}|step`;
+    cards.set(key, {
+      key,
+      title: step.why,
+      relationship: item,
+      latestAt: at,
+      count: 1,
+      noticeIds: [],
+      reminderId: null,
+      action: { label: step.label ?? "Open", href: step.href },
+      step: true,
     });
   }
   return [...cards.values()].toSorted(

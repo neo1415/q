@@ -8,7 +8,6 @@ import {
   getResults,
   listRelationshipViews,
   queryRelationshipPipeline,
-  getChatUnread,
   getFitProfiles,
   listNotifications,
   listReminders,
@@ -42,8 +41,11 @@ import {
   resolveOwnContext,
 } from "@/features/q/context";
 import {
+  ownCommitmentFacts,
   ownRelationships,
   relationshipDigests,
+  relationshipSteps,
+  unreadByRelationship,
 } from "@/features/relationships/relationship-data";
 import { HubHeader } from "@/features/relationships/hub-header";
 import {
@@ -250,18 +252,28 @@ export default async function RelationshipsPage({
       );
       return { items, portfolio, commitments };
     });
-    const [results, usage, { items, portfolio, commitments }, needs] =
+    const now = readClock();
+    const needsRead =
+      side === "NONE"
+        ? Promise.resolve({ notices: [], reminders: [], unavailable: false })
+        : noticesAndReminders();
+    // Each relationship's own next step, decided as Pipeline decides it,
+    // so "Needs you" is one list everywhere (live check 2026-10-16).
+    const stepsRead = Promise.all([listed, needsRead]).then(([items, needs]) =>
+      items === undefined
+        ? []
+        : relationshipSteps(context, items, needs.reminders, now),
+    );
+    const [results, usage, { items, portfolio, commitments }, needs, steps] =
       await Promise.all([
         session === null ? null : getResults(session, period).catch(() => null),
         qSession === null || side !== "INVESTOR"
           ? null
           : getMyUsage(qSession).catch(() => null),
         withCommitments,
-        side === "NONE"
-          ? { notices: [], reminders: [], unavailable: false }
-          : noticesAndReminders(),
+        needsRead,
+        stepsRead,
       ]);
-    const now = readClock();
     // The Results endpoint authorises each projection. A conflicting role read
     // is unavailable, never silently rendered as the other party's perspective.
     const available =
@@ -299,6 +311,7 @@ export default async function RelationshipsPage({
               items: items ?? [],
               side,
               now,
+              steps,
             })}
             now={now}
             unavailable={needs.unavailable}
@@ -346,9 +359,10 @@ export default async function RelationshipsPage({
       </PageContainer>
     );
   }
-  const [items, unread] = await Promise.all([
+  const [items, unread, commitments] = await Promise.all([
     ownRelationships(context),
     unreadByRelationship(),
+    ownCommitmentFacts(context),
   ]);
   // The first page's cards are read in full (later pages by cursor), beside
   // the investor's fit read: both need only the list (L1 latency sweep).
@@ -428,6 +442,7 @@ export default async function RelationshipsPage({
           digests={digests}
           now={now}
           fits={fits}
+          commitments={commitments}
         />
       </QSection>
     </PageContainer>
@@ -442,18 +457,6 @@ function hubSideOf(
     : context.kind === "INVESTOR"
       ? "INVESTOR"
       : "NONE";
-}
-
-/** R34: unread chat per relationship; an unreadable count is simply none. */
-async function unreadByRelationship(): Promise<ReadonlyMap<string, number>> {
-  const session = await apiSession();
-  if (session === null) return new Map();
-  try {
-    const { items } = await getChatUnread(session);
-    return new Map(items.map((item) => [item.relationshipId, item.unread]));
-  } catch {
-    return new Map();
-  }
 }
 
 /** When the page was read: rows say "2h" from here, on server and browser alike. */

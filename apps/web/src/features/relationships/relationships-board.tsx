@@ -27,15 +27,17 @@ import type { RelationshipDigest } from "./relationship-data";
 import { relationshipHref, STATE_WORDS } from "./relationship-words";
 import { moreRelationshipDigestsAction } from "./relationships-actions";
 import {
+  isOwnStep,
   lastActivityAt,
   listOrder,
   nextStepFor,
   pageAfter,
+  rowFacts,
   since,
   stageTone,
+  type CommitmentFact,
   type ListSide,
   type NextStep,
-  type RowFacts,
 } from "./relationships-view";
 import { StatusPill, type StatusTone } from "./status-pill";
 
@@ -95,38 +97,15 @@ const ICONS = {
   reply: MessageSquare,
   calendar: CalendarDays,
   answer: null,
+  money: null,
 } as const;
-
-function factsOf(
-  digest: RelationshipDigest | undefined,
-  unread: number,
-): RowFacts | undefined {
-  if (digest === undefined) {
-    return unread > 0
-      ? {
-          unread,
-          followUpDue: false,
-          nextCallAt: null,
-          lastMessageAt: null,
-          diligence: null,
-        }
-      : undefined;
-  }
-  return {
-    unread,
-    followUpDue: digest.followUpDue,
-    nextCallAt: digest.nextCall?.startsAt ?? null,
-    callsRead: digest.callsRead,
-    lastMessageAt: digest.messages?.last?.sentAt ?? null,
-    diligence: digest.diligence ?? null,
-  };
-}
 
 export function RelationshipsBoard({
   side,
   items,
   digests: initialDigests,
   unread,
+  commitments = {},
   firstCursor,
   now,
   fits,
@@ -141,6 +120,8 @@ export function RelationshipsBoard({
   readonly digests: Readonly<Record<string, RelationshipDigest>>;
   /** R34: unread chat messages per relationship id. */
   readonly unread: Readonly<Record<string, number>>;
+  /** Commitments waiting on this side, by relationship id (Capital). */
+  readonly commitments?: Readonly<Record<string, CommitmentFact>> | undefined;
   /** The cursor after the first page; null when it is the whole list. */
   readonly firstCursor: string | null;
   /** When the page was read, so server and browser say the same "2h". */
@@ -186,9 +167,10 @@ export function RelationshipsBoard({
   const rows = useMemo(
     () =>
       ordered.map((item) => {
-        const facts = factsOf(
+        const facts = rowFacts(
           digests[item.relationshipId],
           unread[item.relationshipId] ?? 0,
+          commitments[item.relationshipId],
         );
         return {
           item,
@@ -197,7 +179,7 @@ export function RelationshipsBoard({
           activity: lastActivityAt(item, facts),
         };
       }),
-    [ordered, digests, unread, side, now],
+    [ordered, digests, unread, commitments, side, now],
   );
 
   const counts = useMemo(() => {
@@ -209,7 +191,7 @@ export function RelationshipsBoard({
           key === "ALL"
             ? true
             : key === "NEEDS_YOU"
-              ? row.step.urgent
+              ? isOwnStep(row.step)
               : row.item.state === key,
         ).length,
       );
@@ -222,7 +204,7 @@ export function RelationshipsBoard({
     (row) =>
       (filter === "ALL" ||
         (filter === "NEEDS_YOU"
-          ? row.step.urgent
+          ? isOwnStep(row.step)
           : row.item.state === filter)) &&
       (needle.length === 0 ||
         row.item.counterpart.name.toLowerCase().includes(needle) ||
