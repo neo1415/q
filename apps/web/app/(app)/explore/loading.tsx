@@ -1,6 +1,8 @@
+import { ExploreGridSkeleton } from "@/features/explore/explore-grid";
+
 /**
  * Explore while it loads (P9): the page's own frame -- search, topics and
- * poster boxes in the grid's column counts -- instead of a spinner.
+ * the mosaic's own reserved boxes -- instead of a spinner.
  */
 export default function ExploreLoading() {
   return (
@@ -21,17 +23,7 @@ export default function ExploreLoading() {
             />
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 min-[1400px]:grid-cols-5">
-          {[1.5, 1.2, 1.3, 1.6, 1.4, 1.2, 1.5, 1.3, 1.4, 1.6].map(
-            (ratio, index) => (
-              <div
-                key={index}
-                className="w-full bg-(--cq-surface-strong) motion-safe:animate-pulse"
-                style={{ aspectRatio: `1 / ${String(ratio)}` }}
-              />
-            ),
-          )}
-        </div>
+        <ExploreGridSkeleton />
       </div>
     </div>
   );
