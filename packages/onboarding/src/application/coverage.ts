@@ -56,6 +56,30 @@ export type OnboardingCoverageProfile = {
   /** Which field a registration fact answers, so it is never asked again. */
   readonly registrationSeeds?:
     { readonly organisationName?: string | undefined } | undefined;
+  /**
+   * Coverage satisfied by an upload rather than an answer, where the
+   * definition has no step for it (lane ob1: an investor's fund deck,
+   * thesis or LP letter). Keyed by a synthetic field key; settled
+   * (CONFIRMED_SAVED, source DOCUMENT) when a document of one of the
+   * listed types is held, DEFERRABLE otherwise. Never required. What a
+   * readable upload says about other fields arrives as suggestions on
+   * those fields (`informs`), confirmed by the person like any other.
+   */
+  readonly documentFields?:
+    | Readonly<
+        Record<
+          string,
+          {
+            readonly concept: string;
+            readonly label: string;
+            readonly priority: OnboardingCoveragePriority;
+            readonly documentTypes: readonly string[];
+            /** Field keys a readable upload of this kind may propose values for. */
+            readonly informs: readonly string[];
+          }
+        >
+      >
+    | undefined;
 };
 
 /** What the person gave at registration (auth metadata). Their own words. */
@@ -217,6 +241,26 @@ function sourceOfModality(
   }
 }
 
+/**
+ * Where an answer on the record was given: the channel the client declared
+ * (form or conversation) first; the modality only for older answers that
+ * carry no channel. Accepted suggestions are Q's recommendation.
+ */
+function sourceOfResponse(response: {
+  readonly sourceModality: OnboardingSourceModality;
+  readonly channel?: "FORM" | "CONVERSATION" | null | undefined;
+}): OnboardingCoverageSource {
+  if (
+    response.sourceModality === "SUGGESTION_ACCEPT" ||
+    response.sourceModality === "SUGGESTION_EDIT"
+  ) {
+    return "Q_RECOMMENDATION";
+  }
+  if (response.channel === "CONVERSATION") return "CONVERSATION";
+  if (response.channel === "FORM") return "FORM";
+  return sourceOfModality(response.sourceModality);
+}
+
 const PUBLIC_SOURCE_TYPES = new Set([
   "PUBLIC_WEBSITE",
   "PUBLIC_PROFILE",
@@ -335,7 +379,9 @@ export function deriveOnboardingCoverage(
 
       if (response !== undefined) {
         display = displayOnboardingValue(step, response.value, input.labelFor);
-        source = seed?.source ?? sourceOfModality(response.sourceModality);
+        // Saved is saved: once on the record, the answer is the person's,
+        // credited to where they gave it, whatever registration offered.
+        source = sourceOfResponse(response);
       } else if (seed !== undefined) {
         display = seed.display.slice(0, 600);
         source = seed.source;
@@ -352,7 +398,7 @@ export function deriveOnboardingCoverage(
           state = "EVIDENCE_NEEDED";
           evidenceWanted = [...wanted].slice(0, 8);
         } else {
-          state = seed !== undefined ? "KNOWN" : "CONFIRMED_SAVED";
+          state = "CONFIRMED_SAVED";
         }
       } else if (declined) {
         state = "DEFERRABLE";
@@ -387,6 +433,29 @@ export function deriveOnboardingCoverage(
       };
     },
   );
+
+  for (const [fieldKey, doc] of Object.entries(profile.documentFields ?? {})) {
+    const held = doc.documentTypes.some((t) => heldDocTypes.has(t));
+    fields.push({
+      fieldKey,
+      concept: doc.concept,
+      label: doc.label.slice(0, 160),
+      phaseKey: null,
+      state: held ? "CONFIRMED_SAVED" : "DEFERRABLE",
+      priority: doc.priority,
+      required: false,
+      applicable: true,
+      deferrable: true,
+      declined: false,
+      display: held ? "Uploaded" : null,
+      source: held ? "DOCUMENT" : null,
+      proposals: [],
+      readings: [],
+      evidenceWanted: [],
+      savePending: false,
+      dependsOn: [],
+    });
+  }
 
   const applicableFields = fields.filter((f) => f.applicable);
   const count = (pred: (f: OnboardingCoverageField) => boolean) =>

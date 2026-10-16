@@ -902,6 +902,11 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Reads their own records as their screens show them: verification, readiness, network and audience previews, team, raise history, Q's public findings, their investor organisation, role and mandates.",
   ),
   tool(
+    "recall_my_setup",
+    "RECORDS",
+    "Recalls what they told Q while setting up: the answers on their record, their own words (statements, not confirmed facts) and what Q said back.",
+  ),
+  tool(
     "reassess_marketplace_readiness",
     "RECORDS",
     "Checks their company's marketplace readiness again.",

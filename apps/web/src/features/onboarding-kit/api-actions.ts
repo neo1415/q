@@ -11,6 +11,7 @@ import {
   dismissOnboardingQuestion,
   findTaxonomyCandidates,
   getCurrentOnboardingSession,
+  getOnboardingCoverage,
   getOnboardingSession,
   resolveOnboardingSuggestion,
   sayToOnboarding,
@@ -30,6 +31,7 @@ import {
   type SayOnboardingResponse,
   TAXONOMY_CLASSIFICATION_TEXT_MAX_LENGTH,
   TaxonomyVocabularyCodeSchema,
+  type OnboardingCoverage,
   type OnboardingJourneyType,
   type OnboardingSessionView,
 } from "@capital-q/contracts";
@@ -165,6 +167,27 @@ export async function onboardingGetAction(
 ): Promise<ActionResult<OnboardingSessionView>> {
   const sessionId = Uuid.parse(rawSessionId);
   return run((session) => getOnboardingSession(session, sessionId));
+}
+
+/**
+ * The canonical coverage of the caller's own session (lane ob1): the same
+ * picture Q reads, for the quiet progress view. Null when the API does not
+ * offer it (an older deployment): the screen keeps its step progress.
+ */
+export async function onboardingCoverageAction(
+  rawSessionId: string,
+): Promise<ActionResult<OnboardingCoverage | null>> {
+  const sessionId = Uuid.parse(rawSessionId);
+  return run(async (session) => {
+    try {
+      return (await getOnboardingCoverage(session, sessionId)).coverage;
+    } catch (error) {
+      if (error instanceof ApiProblemError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  });
 }
 
 const SubmitInput = z.object({

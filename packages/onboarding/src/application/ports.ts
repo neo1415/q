@@ -274,6 +274,16 @@ export type OnboardingSuggestionRepository = {
     suggestionId: OnboardingSuggestionId,
     status: Exclude<OnboardingSuggestionStatus, "PENDING">,
   ) => Promise<boolean>;
+  /**
+   * Values the person REJECTED for one step in this session (lane ob1),
+   * so a rejected proposal is never offered again. Optional for adapters
+   * that predate it; absent means nothing is remembered.
+   */
+  readonly listRejectedValues?: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    stepKey: string,
+  ) => Promise<readonly unknown[]>;
 };
 
 export type NewOnboardingInterviewQuestion = Omit<

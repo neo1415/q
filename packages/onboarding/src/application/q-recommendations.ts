@@ -23,6 +23,7 @@ import {
   createPostgresOnboardingSessionRepository,
   createPostgresOnboardingSuggestionRepository,
 } from "../infrastructure/postgres-session-repository.js";
+import { sameResponseValue } from "./pending-writes.js";
 import { createDefinitionCache } from "./view.js";
 
 /**
@@ -159,6 +160,17 @@ export function createOnboardingQRecommendations(options: {
           { value },
           { sourceModality: "SUGGESTION_ACCEPT" },
         );
+        // Rejected once, discarded for good (lane ob1): research found it
+        // again, or Q read it again, and the person already said no.
+        const rejected =
+          (await suggestions.listRejectedValues?.(
+            tx.sql,
+            sessionId,
+            step.stepKey,
+          )) ?? [];
+        if (rejected.some((v) => sameResponseValue(v, value))) {
+          throw new OnboardingSessionStateError("SUGGESTION_REJECTED_BEFORE");
+        }
         for (const earlier of await suggestions.listPending(
           tx.sql,
           sessionId,

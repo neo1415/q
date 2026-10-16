@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   AppendOnboardingInterviewTurnsRequestSchema,
+  GetOnboardingCoverageResponseSchema,
+  ONBOARDING_COVERAGE_SEGMENT,
   AppendOnboardingInterviewTurnsResponseSchema,
   ListOnboardingInterviewTurnsQuerySchema,
   ListOnboardingInterviewTurnsResponseSchema,
@@ -34,6 +36,7 @@ import {
   type OnboardingSessionId,
 } from "@capital-q/onboarding";
 import { createCorrelationId } from "@capital-q/observability";
+import type { OnboardingCoverageReader } from "../onboarding-coverage.js";
 import {
   QInterviewUnavailableError,
   type QInterviewClient,
@@ -66,6 +69,11 @@ export type OnboardingRoutesDependencies = OnboardingActorDependencies & {
    * interview is closed, not degraded.
    */
   readonly qInterview: QInterviewClient | undefined;
+  /**
+   * The canonical coverage projection of the caller's own session (lane
+   * ob1). Absent: the coverage route is not registered.
+   */
+  readonly coverage?: OnboardingCoverageReader | undefined;
   /** Setup reminders (founder directive 2026-09-27). Absent: none are given. */
   readonly nudges?:
     Pick<OnboardingNudges, "peek" | "claimBriefing" | "choose"> | undefined;
@@ -248,6 +256,33 @@ export function registerOnboardingRoutes(
       });
     },
   );
+
+  // Coverage (lane ob1): what the journey knows, per field, for the form
+  // and the conversation alike. Ownership is the runtime's check (the view
+  // is read under the actor first); the projection reads nothing else of
+  // anyone's but the caller's own.
+  const coverage = dependencies.coverage;
+  if (coverage !== undefined) {
+    app.get(
+      `${byId}${ONBOARDING_COVERAGE_SEGMENT}`,
+      { onRequest: withActor },
+      async (request, reply) => {
+        const actor = getOnboardingActor(request);
+        const view = await runtime.getSession({
+          actor,
+          sessionId: sessionIdParam(request),
+        });
+        const projected = await coverage(actor, view);
+        if (projected === null) {
+          throw new OnboardingSessionNotFoundError();
+        }
+        void reply.header("Cache-Control", "no-store");
+        return GetOnboardingCoverageResponseSchema.parse({
+          coverage: projected,
+        });
+      },
+    );
+  }
 
   // The interview thread (CQ-QX-006): what was said on screen, both sides
   // and both modalities, so a reload redraws the conversation. Ownership is
