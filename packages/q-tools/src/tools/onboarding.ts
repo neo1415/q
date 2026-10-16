@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import {
+  OnboardingCoveragePrioritySchema,
+  OnboardingCoverageStateSchema,
+  OnboardingNextReasonSchema,
+} from "@capital-q/contracts";
+
 import { capability } from "@capital-q/security";
 
 import {
@@ -70,6 +76,35 @@ export const OnboardingStepStateSchema = z
      * to, never a question to ask again.
      */
     coveredBy: StepKeySchema.optional(),
+    /**
+     * The canonical coverage state of this field (lane ob1): KNOWN and
+     * CONFIRMED_SAVED are never asked again; SUPPLIED_UNCONFIRMED waits for
+     * their confirmation; CONTRADICTORY is theirs to settle; DEFERRABLE may
+     * wait; EVIDENCE_NEEDED is saved but wants a document.
+     */
+    coverage: OnboardingCoverageStateSchema.optional().describe(
+      "KNOWN or CONFIRMED_SAVED: never ask again. SUPPLIED_UNCONFIRMED: a value is on offer; confirm it with them, grouped with others. CONTRADICTORY: let them choose. DEFERRABLE: may wait; do not press. EVIDENCE_NEEDED: saved; a document would support it. INAPPLICABLE: not on their path.",
+    ),
+    priority: OnboardingCoveragePrioritySchema.optional(),
+    /** A change they confirmed is held for retry: NOT saved yet. Never claim it is. */
+    savePending: z
+      .boolean()
+      .optional()
+      .describe(
+        "True: what they confirmed is held and will be saved when the service is back; it is not saved yet. Do not ask it again and never say it is saved.",
+      ),
+    /**
+     * Values on offer from their document or public pages, with where they
+     * came from: put them to the person in one grouped confirmation; never
+     * treat them as answers or as verified.
+     */
+    offered: z
+      .string()
+      .max(600)
+      .optional()
+      .describe(
+        "A value on offer from their document or a public page, with its source. Never an answer and never verified: put it to them, grouped with the others, and record it only once they confirm.",
+      ),
   })
   .strict();
 export type OnboardingStepState = z.infer<typeof OnboardingStepStateSchema>;
@@ -102,6 +137,24 @@ export const OnboardingStateSchema = z
       )
       .max(8)
       .default([]),
+    /**
+     * What coverage says to cover next, most material first (contradictions,
+     * then essentials, then confirmations of what is on offer, then the
+     * rest). A hint, not a route: follow the person.
+     */
+    next: z
+      .array(
+        z
+          .object({
+            stepKey: StepKeySchema,
+            reason: OnboardingNextReasonSchema,
+          })
+          .strict(),
+      )
+      .max(12)
+      .optional(),
+    /** A rough estimate of the minutes left on essentials and important fields. */
+    minutesLeft: z.number().int().min(0).optional(),
   })
   .strict();
 export type OnboardingState = z.infer<typeof OnboardingStateSchema>;
@@ -176,6 +229,12 @@ export const OnboardingRecordResultSchema = z
       "AMBIGUOUS",
       "UNMATCHED",
       "NEEDS_FIRST",
+      /**
+       * The person confirmed it, but the save could not complete because a
+       * service is temporarily down. It is held durably and retried; it is
+       * NOT saved yet. Say so plainly; never say it is saved.
+       */
+      "HELD_FOR_RETRY",
     ]),
     /** COMMITTED: what is now on the record, as a person would say it. */
     recorded: z.string().max(600).optional(),

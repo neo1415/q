@@ -45,6 +45,7 @@ import type {
 } from "@capital-q/q-runtime";
 
 import type { ApprovedContinuation } from "../composition/approved-continuation.js";
+import { keepsItsCard } from "../composition/conversation-approvals.js";
 import type { VoiceSessionBinding } from "./bindings.js";
 import {
   signupContextFromToken,
@@ -106,6 +107,7 @@ import {
   statusLine,
   type PendingTurnReading,
 } from "@capital-q/q-specialists";
+import { readApprovalWords } from "@capital-q/q-tools";
 
 /**
  * One spoken turn (CQ-Q-VOICE-001 C §35-§40).
@@ -157,7 +159,10 @@ export type VoiceTurnDependencies = {
    * a spoken conversation: the person's yes or no is the same decision a
    * tap on screen records, under the same actor.
    */
-  readonly approvals?: Pick<QActionService, "approve" | "reject"> | undefined;
+  readonly approvals?:
+    | (Pick<QActionService, "approve" | "reject"> &
+        Partial<Pick<QActionService, "readProposal">>)
+    | undefined;
   /** Resume, or execute through the gate when the run cannot resume. */
   readonly continueApproved?: ApprovedContinuation | undefined;
   /**
@@ -294,7 +299,13 @@ const lastRunFailed = new WeakMap<VoiceSessionBinding, boolean>();
 /** A proposal Q made in this conversation and has not yet heard yes or no to. */
 const pendingApproval = new WeakMap<
   VoiceSessionBinding,
-  { readonly approvalId: string; readonly summary: string | null }
+  {
+    readonly approvalId: string;
+    readonly summary: string | null;
+    /** The proposal's kind and class: some keep their card's Approve. */
+    readonly actionType?: string | undefined;
+    readonly actionClass?: string | undefined;
+  }
 >();
 
 /** What Q says when a chat is ended aloud; the screen stays on the typed thread. */
@@ -859,24 +870,66 @@ export function createVoiceTurnHandler(
 
   const decideApproval = async (
     binding: VoiceSessionBinding,
-    waiting: { readonly approvalId: string; readonly summary: string | null },
+    waiting: {
+      readonly approvalId: string;
+      readonly summary: string | null;
+      readonly actionType?: string | undefined;
+      readonly actionClass?: string | undefined;
+    },
     decision: "APPROVE" | "REJECT",
     signal: AbortSignal,
     speaker: VoiceSpeaker,
+    /** Where in the transcript their deciding words are (the audit's evidence). */
+    evidenceRef: string,
   ): Promise<VoiceTurnOutcome> => {
     const approvals = dependencies.approvals;
     if (approvals === undefined) {
       return { kind: "NOTHING" };
     }
     const correlationId = correlation();
+    // Spoken: the decision is theirs, by voice, with where they said it.
+    const via = { channel: "VOICE" as const, evidenceRef };
     let line: string;
     try {
       const approvalId = QApprovalIdSchema.parse(waiting.approvalId);
       if (decision === "APPROVE") {
+        // Money, terms and private-document shares keep their card's
+        // Approve: words never approve them (owner 2026-10-16).
+        const proposal =
+          approvals.readProposal === undefined
+            ? null
+            : await approvals
+                .readProposal({
+                  actor: binding.actor,
+                  approvalId,
+                  correlationId,
+                })
+                .catch(() => null);
+        if (
+          keepsItsCard({
+            actionType: proposal?.actionType ?? waiting.actionType ?? "",
+            actionClass:
+              proposal?.view.action.actionClass ?? waiting.actionClass ?? "",
+            payload: proposal?.payload,
+          })
+        ) {
+          return (await speakLine(
+            speaker,
+            statusLine(
+              "CARD_ONLY",
+              waiting.summary ?? "That change needs your approval",
+            ),
+            signal,
+            binding,
+          ))
+            ? { kind: "SPOKEN", path: "MOVE" }
+            : { kind: "INTERRUPTED", path: "MOVE" };
+        }
         const result = await approvals.approve({
           actor: binding.actor,
           approvalId,
           correlationId,
+          via,
         });
         const continueApproved = dependencies.continueApproved;
         if (
@@ -937,6 +990,7 @@ export function createVoiceTurnHandler(
           actor: binding.actor,
           approvalId,
           correlationId,
+          via,
         });
         line =
           waiting.summary === null
@@ -1183,6 +1237,7 @@ export function createVoiceTurnHandler(
     let streamedRaw = "";
     let laughed = false;
     let proposedSummary: string | null = null;
+    let proposedKind: { actionType: string; actionClass: string } | null = null;
     /** The run's stage as it arrives, for the silence ladder (ADR 0062). */
     const silence: SilenceLive = { stage: null, approvalWaiting: false };
     const record = await qStream.authorize(actor, runId, correlationId);
@@ -1351,6 +1406,10 @@ export function createVoiceTurnHandler(
             silence.approvalWaiting = true;
             // What Q would do, in the words the approver reads on screen.
             proposedSummary = event.data.proposal.summary;
+            proposedKind = {
+              actionType: event.data.proposal.actionType,
+              actionClass: event.data.proposal.actionClass,
+            };
             break;
           case "q.approval.required":
             // Held until yes or no; the next thing the person says
@@ -1358,6 +1417,7 @@ export function createVoiceTurnHandler(
             pendingApproval.set(binding, {
               approvalId: event.data.approvalId,
               summary: proposedSummary,
+              ...(proposedKind === null ? {} : proposedKind),
             });
             yield proposedSummary === null
               ? `I've prepared something that needs your approval. ${APPROVAL_QUESTION}`
@@ -2056,14 +2116,28 @@ export function createVoiceTurnHandler(
       // Both readings side by side (J7): the decision, with what kind of
       // reply it is, and whether the turn is a reply at all. Neither waits
       // on the other, and no list of yes or no words stands in for them.
-      const [heard, reading] = fragment
-        ? [null, null]
-        : await Promise.all([
-            decide(binding, `${summary} Shall I go ahead?`, text, signal),
-            dependencies.turns === undefined
-              ? Promise.resolve(null)
-              : readTurnForCard(binding, text, signal),
-          ]);
+      // A decision in plain words ("I approve", "yes, send it", "no,
+      // don't send it", "موافق") is read by code, with no model call; a
+      // change asked for ("yes, but change the date") never approves.
+      const byWords = fragment
+        ? null
+        : readApprovalWords(text, { summaries: [summary] });
+      const plainDecision =
+        byWords !== null &&
+        (byWords.kind === "APPROVE" || byWords.kind === "DECLINE") &&
+        byWords.strength === "EXPLICIT"
+          ? byWords.kind
+          : null;
+      const asksChange = byWords?.kind === "EDIT";
+      const [heard, reading] =
+        fragment || plainDecision !== null || asksChange
+          ? [null, null]
+          : await Promise.all([
+              decide(binding, `${summary} Shall I go ahead?`, text, signal),
+              dependencies.turns === undefined
+                ? Promise.resolve(null)
+                : readTurnForCard(binding, text, signal),
+            ]);
       // "Yes, approve the meeting with Nixo for the next five minutes":
       // the rest restates the card, so there is no rest to answer.
       const read =
@@ -2079,17 +2153,21 @@ export function createVoiceTurnHandler(
           ? read.onlyDecision || restatesCard(read) || !read.asksSomethingElse
           : isReplyToCard(read, reading, { unreadMayReply: false }));
       const decision =
-        read === null || !reply
-          ? "UNRELATED"
-          : read.decision === "YES"
-            ? approvesByWords(read)
-              ? "APPROVE"
-              : "WAITING"
-            : read.decision === "NO"
-              ? declinesByWords(read, text, { summary })
-                ? "REJECT"
-                : "UNRELATED"
-              : "UNRELATED";
+        plainDecision === "APPROVE"
+          ? "APPROVE"
+          : plainDecision === "DECLINE"
+            ? "REJECT"
+            : asksChange || read === null || !reply
+              ? "UNRELATED"
+              : read.decision === "YES"
+                ? approvesByWords(read)
+                  ? "APPROVE"
+                  : "WAITING"
+                : read.decision === "NO"
+                  ? declinesByWords(read, text, { summary })
+                    ? "REJECT"
+                    : "UNRELATED"
+                  : "UNRELATED";
       if (read !== null) {
         logger.info(
           {
@@ -2112,6 +2190,7 @@ export function createVoiceTurnHandler(
             decision,
             signal,
             speaker,
+            `${binding.voiceSessionId}:${String(transcript.length - 1)}`,
           ),
         );
       }

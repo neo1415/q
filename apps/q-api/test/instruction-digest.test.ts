@@ -94,8 +94,9 @@ describe("the digest, from recorded steps only", () => {
       },
       new Date(),
     );
+    // Owner 2026-10-16: the opener says things wait, never the rundown.
     expect(opener).toBe(
-      "Hi Zino. While you were away, I sent 4 messages. Want the rundown?",
+      "Hi Zino. You have a few things waiting. Would you like to look at them now, or talk about something else?",
     );
     expect(opener).not.toMatch(/standing instruction|"/u);
   });

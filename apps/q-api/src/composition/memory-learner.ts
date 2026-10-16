@@ -27,6 +27,7 @@ import {
   type MemoryCandidate,
   type MemoryConversationDigestPort,
   type MemoryService,
+  type PreferenceLearningConsent,
 } from "@capital-q/q-knowledge";
 import type {
   QConversationMessage,
@@ -69,6 +70,15 @@ export type MemoryLearnerDependencies = {
   };
   readonly registry?: PromptRegistry | undefined;
   readonly logger: Logger;
+  /**
+   * Lane ob1: whether this person allowed Q to learn how they like to work.
+   * Without a grant, no communication preference is INFERRED from a
+   * conversation (facts, corrections and pronunciations are unaffected; a
+   * preference they state is kept by note_preference). Absent: legacy
+   * compositions and tests, which infer as before.
+   */
+  readonly learningConsent?:
+    Pick<PreferenceLearningConsent, "granted"> | undefined;
 };
 
 export type MemoryLearner = {
@@ -389,8 +399,19 @@ export function createMemoryLearner(
           run.id,
         );
         if (result === null) return;
-        const counts = { remembered: 0, refused: 0, unchanged: 0 };
+        const counts = { remembered: 0, refused: 0, unchanged: 0, withheld: 0 };
+        const mayInferPreferences =
+          dependencies.learningConsent === undefined
+            ? true
+            : await dependencies.learningConsent
+                .granted(actor)
+                .catch(() => false);
         for (const item of result.items) {
+          if (item.type === "PREFERENCE" && !mayInferPreferences) {
+            // No consent: nothing about how they like to work is learned.
+            counts.withheld += 1;
+            continue;
+          }
           const outcome = await memory.remember({
             actor,
             candidate: candidateOf(item, companyId),

@@ -221,6 +221,7 @@ export function toResponseView(
     value: response.value,
     sourceModality: response.sourceModality,
     note: response.note,
+    channel: response.channel ?? null,
     createdAt: response.createdAt,
   };
 }

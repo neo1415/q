@@ -70,6 +70,7 @@ import type { VoiceTurnBoard } from "./turn-board.js";
 import type { WelcomeHost } from "./welcome.js";
 import {
   composeReturningOpener,
+  plainOpener,
   type OpenerFacts,
 } from "./returning-opener.js";
 import type { ActorContext } from "@capital-q/security";
@@ -848,12 +849,11 @@ export function registerQVoiceRoutes(
                   setTimeout(() => resolve(null), 1_200),
                 ),
               ]);
+        // Owner 2026-10-16: the same opener as the web's, never a list.
         firstMessage =
           facts !== null
             ? composeReturningOpener(name, facts, new Date())
-            : name !== null
-              ? `Hi ${name}. What's on your mind?`
-              : "Hi. What's on your mind?";
+            : plainOpener(name);
       }
 
       // Names the person has taught Q to hear, before the recogniser

@@ -403,6 +403,9 @@ const mandateReview =
         responses: createPostgresOnboardingResponseRepository(),
         suggestions: createPostgresOnboardingSuggestionRepository(),
         utterances: createPostgresOnboardingUtteranceRepository(),
+        // Lane ob1: an investor's fund deck or thesis feeds mandate proposals.
+        documents: createPostgresEvidenceRepositories().documents,
+        chunks: createPostgresChunkRepository(),
         synthesis: createMandateSynthesis({
           gateway: {
             execute: (request, options) =>

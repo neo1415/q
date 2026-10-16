@@ -1,18 +1,68 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding/definition";
-import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding/definition";
+import type { OnboardingSessionView } from "@capital-q/contracts";
+import {
+  FOUNDER_COVERAGE_PROFILE,
+  FOUNDER_DEFINITION_CURRENT,
+} from "@capital-q/founder-onboarding/definition";
+import {
+  INVESTOR_COVERAGE_PROFILE,
+  INVESTOR_DEFINITION_V1,
+} from "@capital-q/investor-onboarding/definition";
+import {
+  deriveOnboardingCoverage,
+  knownFactsFromRegistration,
+} from "@capital-q/onboarding";
 
 import { viewOf } from "../../../packages/onboarding/test/support/coverage-view";
-import { CoverageOverview } from "../src/features/onboarding-kit/components/coverage-overview";
-import {
-  coverageFor,
-  phasesFor,
-  summaryWords,
-} from "../src/features/onboarding-kit/coverage";
+
+const onboardingCoverageAction = vi.fn();
+vi.mock("../src/features/onboarding-kit/api-actions", () => ({
+  onboardingCoverageAction: (id: string) =>
+    onboardingCoverageAction(id) as unknown,
+}));
+
+const { CoverageOverview, FormCoverageArea } =
+  await import("../src/features/onboarding-kit/components/coverage-overview");
+const { phasesFor, summaryWords } =
+  await import("../src/features/onboarding-kit/coverage");
+const { useFormCoverage } =
+  await import("../src/features/onboarding-kit/use-form-coverage");
+
+/**
+ * Coverage as ob1's route returns it: the same pure derivation the server
+ * runs (`apps/api/src/onboarding-coverage.ts`), built here for fixtures.
+ */
+function coverageFor(input: {
+  journey: "founder" | "investor";
+  view: OnboardingSessionView;
+  registeredOrganisation: string | null;
+  now: Date;
+}) {
+  const [profile, definition] =
+    input.journey === "founder"
+      ? [FOUNDER_COVERAGE_PROFILE, FOUNDER_DEFINITION_CURRENT]
+      : [INVESTOR_COVERAGE_PROFILE, INVESTOR_DEFINITION_V1];
+  return deriveOnboardingCoverage({
+    profile,
+    definition,
+    view: input.view,
+    known: knownFactsFromRegistration(profile, {
+      organisationName: input.registeredOrganisation,
+    }),
+    now: input.now,
+  });
+}
 
 /**
  * Owner directive 2026-10-16, "Form onboarding equally capable": the form
@@ -167,5 +217,65 @@ describe("the overview", () => {
     await userEvent.click(screen.getByRole("button", { name: "What Q has" }));
     await userEvent.click(screen.getByRole("button", { name: /Not right/ }));
     expect(screen.getByRole("alert").textContent).toContain("wasn't recorded");
+  });
+});
+
+describe("the form reads coverage from the route, in every state", () => {
+  const SESSION = "00000000-0000-4000-8000-000000000001";
+  const ready = founderCoverage({}, {}, "Harbourline Cargo");
+  const session = (version: number) => ({
+    raw: { session: { id: SESSION, version } },
+  });
+
+  it("loads, then is ready; asks again when the session moves", async () => {
+    onboardingCoverageAction.mockReset();
+    onboardingCoverageAction.mockResolvedValue({ ok: true, value: ready });
+    const { result, rerender } = renderHook(
+      ({ v }: { v: number }) => useFormCoverage(session(v)),
+      { initialProps: { v: 1 } },
+    );
+    expect(result.current.status).toBe("LOADING");
+    await waitFor(() => expect(result.current.status).toBe("READY"));
+    rerender({ v: 2 });
+    // The last good coverage stays on screen while the new version is read.
+    expect(result.current.status).toBe("READY");
+    await waitFor(() =>
+      expect(onboardingCoverageAction).toHaveBeenCalledTimes(2),
+    );
+    expect(onboardingCoverageAction).toHaveBeenCalledWith(SESSION);
+  });
+
+  it("says so when coverage cannot be read, and retries on request", async () => {
+    onboardingCoverageAction.mockReset();
+    onboardingCoverageAction.mockResolvedValueOnce({
+      ok: false,
+      kind: "NETWORK",
+      message: "Couldn't reach Capital Q. Try again.",
+    });
+    onboardingCoverageAction.mockResolvedValue({ ok: true, value: ready });
+    function Area() {
+      const coverage = useFormCoverage(session(1));
+      return (
+        <FormCoverageArea
+          coverage={coverage}
+          phases={phasesFor("founder")}
+          busy={false}
+          onOpen={undefined}
+          onResolve={() => Promise.resolve(true)}
+        />
+      );
+    }
+    render(<Area />);
+    expect(screen.getByText("Checking what Q has…")).toBeTruthy();
+    await screen.findByText(/Couldn't load what Q has/);
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await screen.findByRole("button", { name: "What Q has" });
+  });
+
+  it("shows nothing extra without a runtime session (fixture previews)", () => {
+    onboardingCoverageAction.mockReset();
+    const { result } = renderHook(() => useFormCoverage({}));
+    expect(result.current.status).toBe("NONE");
+    expect(onboardingCoverageAction).not.toHaveBeenCalled();
   });
 });

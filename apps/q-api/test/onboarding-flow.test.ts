@@ -1,0 +1,91 @@
+import { describe, expect, it } from "vitest";
+
+import type { OnboardingState } from "@capital-q/q-tools";
+
+import {
+  firstNameOf,
+  onboardingFlowFor,
+  withNextQuestion,
+} from "../src/voice/onboarding-flow.js";
+
+const step = (
+  stepKey: string,
+  over: Partial<OnboardingState["steps"][number]> = {},
+): OnboardingState["steps"][number] => ({
+  stepKey,
+  question: `Question ${stepKey}?`,
+  kind: "TEXT",
+  required: false,
+  status: "OPEN",
+  value: null,
+  ...over,
+});
+
+const state = (
+  steps: OnboardingState["steps"],
+  next: OnboardingState["next"],
+): OnboardingState => ({
+  journey: "founder",
+  currentStepKey: null,
+  canComplete: false,
+  completed: false,
+  steps,
+  checks: [],
+  next,
+  minutesLeft: 6,
+});
+
+describe("onboarding flow (owner 2026-10-16)", () => {
+  it("offers a skip on an optional next question", () => {
+    const flow = onboardingFlowFor({
+      journey: "founder",
+      opening: false,
+      state: state(
+        [step("F1.website", { priority: "IMPORTANT", coverage: "MISSING" })],
+        [{ stepKey: "F1.website", reason: "IMPORTANT_MISSING" }],
+      ),
+      firstName: null,
+      knownName: null,
+    });
+    expect(flow.note).toMatch(/we can come back to this/);
+    expect(withNextQuestion("Saved.", flow, false)).toMatch(/\?.*skip it\.$/);
+  });
+
+  it("when essentials are done: says so, names what is optional, offers to finish or go on", () => {
+    const flow = onboardingFlowFor({
+      journey: "founder",
+      opening: false,
+      state: state(
+        [
+          step("F1.stage", {
+            required: true,
+            priority: "ESSENTIAL",
+            status: "ANSWERED",
+            coverage: "CONFIRMED_SAVED",
+          }),
+          step("F4.functions", {
+            priority: "OPTIONAL",
+            coverage: "DEFERRABLE",
+          }),
+        ],
+        [{ stepKey: "F4.functions", reason: "OPTIONAL_OFFER" }],
+      ),
+      firstName: null,
+      knownName: null,
+    });
+    expect(flow.essentialsDone).toBe(true);
+    expect(flow.next).toBeNull();
+    expect(flow.note).toMatch(/Every essential is covered/);
+    expect(flow.note).toContain("Question F4.functions?");
+    expect(withNextQuestion("All saved.", flow, false)).toMatch(
+      /finish now, or keep going/,
+    );
+    expect(withNextQuestion("All done.", flow, true)).toBe("All done.");
+  });
+
+  it("reads a first name, never a whole name or an email", () => {
+    expect(firstNameOf("Ines Duarte")).toBe("Ines");
+    expect(firstNameOf("  ")).toBeNull();
+    expect(firstNameOf(null)).toBeNull();
+  });
+});

@@ -827,6 +827,9 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "decline_pending_proposal",
   "reassess_marketplace_readiness",
   "set_onboarding_reminders",
+  // Lane ob1: their own answer to "may Q learn how you like to work?",
+  // reversible in What Q remembers.
+  "set_preference_learning",
   // A new version of their own private document; the earlier one is kept.
   "revise_my_document",
   // Q room W5: a typed edit of their own private draft, a new version.

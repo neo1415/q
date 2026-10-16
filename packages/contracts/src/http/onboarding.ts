@@ -259,6 +259,15 @@ export type OnboardingResponseValue = z.infer<
   typeof OnboardingResponseValueSchema
 >;
 
+/** The surface an answer was given in. Provenance, never authority. */
+export const ONBOARDING_RESPONSE_CHANNELS = ["FORM", "CONVERSATION"] as const;
+export const OnboardingResponseChannelSchema = z.enum(
+  ONBOARDING_RESPONSE_CHANNELS,
+);
+export type OnboardingResponseChannel = z.infer<
+  typeof OnboardingResponseChannelSchema
+>;
+
 /** What a client submits for a step. Modality is a declaration, not authority. */
 export const OnboardingResponseInputSchema = z
   .object({
@@ -270,6 +279,12 @@ export const OnboardingResponseInputSchema = z
      * filter or a mandate value.
      */
     note: z.string().trim().min(1).max(500).optional(),
+    /**
+     * Which surface the answer was given in (lane ob1): the form or the
+     * conversation with Q. Provenance for people, never authority; absent
+     * on older clients.
+     */
+    channel: OnboardingResponseChannelSchema.optional(),
   })
   .strict();
 export type OnboardingResponseInput = z.infer<
@@ -628,6 +643,8 @@ export const OnboardingResponseViewSchema = z.object({
   sourceModality: OnboardingSourceModalitySchema,
   /** See `OnboardingResponseInputSchema.note`. Null when the options held everything. */
   note: z.string().max(500).nullable().default(null),
+  /** FORM or CONVERSATION; null when the client did not say (older answers). */
+  channel: OnboardingResponseChannelSchema.nullable().default(null),
   createdAt: UtcTimestampSchema,
 });
 export type OnboardingResponseView = z.infer<

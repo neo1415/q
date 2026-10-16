@@ -221,6 +221,8 @@ describe("a pause, read as a concept", () => {
     expect(outcome.asking).toBeNull();
     expect(outcome.questionForQ).toBeNull();
     expect(seen[0]).toContain("They want to pause");
+    // Owner 2026-10-16, "continue later": they are let into the app.
+    expect(outcome.navigate).toBe("HOME");
   });
 
   it("without the reading, a turn is not a pause, whatever its words", async () => {
@@ -238,6 +240,7 @@ describe("a pause, read as a concept", () => {
     }).turn({ ...turn(world, "Let's pick this up tomorrow."), actor });
     expect(outcome.asking?.stepKey).toBe("I2.stages");
     expect(seen[0]).not.toContain("They want to pause");
+    expect(outcome.navigate).toBeNull();
   });
 });
 

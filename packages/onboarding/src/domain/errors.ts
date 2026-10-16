@@ -102,6 +102,11 @@ export const ONBOARDING_STATE_REASONS = [
   /** Only a completed session's revisable answers can be revised (ADR 0024). */
   "SESSION_NOT_COMPLETED",
   "STEP_NOT_REVISABLE",
+  /**
+   * The person already rejected this exact value for this step (lane ob1):
+   * a rejected proposal is discarded for good and never offered again.
+   */
+  "SUGGESTION_REJECTED_BEFORE",
 ] as const;
 export type OnboardingStateReason = (typeof ONBOARDING_STATE_REASONS)[number];
 

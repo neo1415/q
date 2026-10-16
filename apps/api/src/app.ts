@@ -373,6 +373,7 @@ export type ApiModules = {
   readonly taxonomy?: TaxonomyRoutesDependencies["taxonomy"] | undefined;
   readonly onboarding?: OnboardingRoutesDependencies["onboarding"] | undefined;
   readonly onboardingNudges?: OnboardingRoutesDependencies["nudges"];
+  readonly onboardingCoverage?: OnboardingRoutesDependencies["coverage"];
   readonly evidence?: DocumentRoutesDependencies["evidence"] | undefined;
   /** P3: the owner's own file, a short-lived link (needs storage). */
   readonly documentFileLink?: DocumentRoutesDependencies["fileLink"];
@@ -1020,6 +1021,7 @@ export function createApp(
       identities: security.identities,
       onboarding: modules.onboarding,
       nudges: modules.onboardingNudges,
+      coverage: modules.onboardingCoverage,
       // One Q (QX-004 core gate). The conversational turn belongs to the
       // interviewer in q-api; this service carries it there and adapts the
       // answer into the shape the onboarding screen already reads.

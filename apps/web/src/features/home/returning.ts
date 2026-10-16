@@ -51,6 +51,20 @@ export type ReturningFacts = {
   readonly setupReminder?: "WELCOME" | "BRIEFING" | undefined;
 };
 
+/**
+ * The setup reminder as one of the things waiting in the arrival greeting
+ * (owner 2026-10-16; lane gr's opener counts it): at most one a day, only
+ * on Home arrival, never a popup. Its card is the `continue-setup` card
+ * below, whose one tap resumes where they left off in the mode they last
+ * used; "Remind me next week" snoozes it for seven days.
+ */
+export const SETUP_REMINDER_ITEM_KIND = "SETUP_REMINDER" as const;
+
+/** How many waiting items the setup reminder adds today: 0 or 1. */
+export function setupRemindersWaiting(facts: ReturningFacts): 0 | 1 {
+  return facts.unfinished !== null && facts.setupReminder !== undefined ? 1 : 0;
+}
+
 /** Whether this welcome is where today's setup reminder is given. */
 export function welcomeReminds(facts: ReturningFacts): boolean {
   return facts.unfinished !== null && facts.setupReminder === "WELCOME";
@@ -245,7 +259,7 @@ function continueCards(journey: "founder" | "investor"): ReturningCard[] {
       id: "continue-setup",
       title:
         journey === "investor" ? "Continue your mandate" : "Continue setup",
-      description: "Pick up at the question we were on.",
+      description: "Pick up where you left off, the way you were doing it.",
       action: { kind: "NAVIGATE", href: `${path}?from=home` },
       reminder: true,
     },
