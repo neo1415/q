@@ -227,6 +227,11 @@ import {
   runCompanyEmbeddingRefresh,
 } from "./recommendations/embeddings.js";
 import { runDocumentJobTicker } from "./documents/document-jobs.js";
+import { composeInvestability } from "./investability/composition.js";
+import {
+  runInvestabilitySweepTicker,
+  withInvestabilityRecompute,
+} from "./investability/handler.js";
 
 const SERVICE_NAME = "workers";
 
@@ -871,10 +876,13 @@ const withDocumentReadings = (
   inner: Parameters<typeof withDeckReadings>[0],
 ): Parameters<typeof withDeckReadings>[0] =>
   withDiligenceSummary(withDeckReading(inner));
+// Investability (owner 2026-10-16): InvestIQ over investor-eligible inputs,
+// recomputed on the events that change them, and swept for the rest.
+const investability = composeInvestability(database.sql);
 const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,
-  handle: withRelationshipProjection(
+  handle: withInvestabilityRecompute(withRelationshipProjection(
     // QA run 8a1d57b9: a chat message wakes the standing instructions
     // covering its relationship.
     withChatMessageEvents(
@@ -1017,7 +1025,7 @@ const documentEvents = createQueueRunner({
       },
     ),
     { registry, projector: relationshipProjector, logger },
-  ),
+  ), { registry, sql: database.sql, service: investability.service, logger }),
   batchSize: config.documents.batchSize,
   pollIntervalMs: config.documents.pollIntervalMs,
   visibilityTimeoutSeconds: 60,
@@ -1417,6 +1425,11 @@ await Promise.all([
   }),
   runDocumentJobTicker({
     runner: documentJobs,
+    signal: shutdownController.signal,
+    logger,
+  }),
+  runInvestabilitySweepTicker({
+    service: investability.service,
     signal: shutdownController.signal,
     logger,
   }),
