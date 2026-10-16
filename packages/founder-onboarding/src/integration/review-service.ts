@@ -13,7 +13,11 @@ import {
 import type { ChunkRepository } from "@capital-q/q-knowledge";
 import type { TenantId, UserId } from "@capital-q/security";
 
-import { FOUNDER_JOURNEY_TYPE, FOUNDER_STEPS } from "../definition/index.js";
+import {
+  FOUNDER_JOURNEY_TYPE,
+  FOUNDER_PROFILE_SECTIONS,
+  FOUNDER_STEPS,
+} from "../definition/index.js";
 import type { FounderExtractionOutcome } from "../intelligence/contracts.js";
 import type {
   FounderExtractionRequest,
@@ -150,6 +154,8 @@ export type FounderReviewServiceDependencies = {
       }) => Promise<unknown>)
     | undefined;
   readonly logger?: Logger | undefined;
+  /** Lane ov's pitch section readings; absent: no pitch proposals. */
+  readonly pitchSections?: FounderPitchSectionsPort | undefined;
 };
 
 /** How many of a document's chunks the model reads. Bounded (CQ-Q-021 §79). */
@@ -174,15 +180,16 @@ export type FounderDocumentReview = {
     readonly documentVersionId: string;
   }) => Promise<FounderReviewResult>;
   /**
-   * Their pitch video's transcript is ready (owner 2026-10-16): read like
-   * their own words, after the deck. A step the deck already proposed or
-   * they already answered is not proposed again; what is left becomes
-   * proposals they confirm, then Q asks only for the gaps.
+   * Their pitch video was read into the profile's sections (lane ov's
+   * reading, event media.pitch_sections.read; owner 2026-10-16). No model
+   * here: each section the reading filled becomes a proposal for its v6
+   * step, sourced to the pitch, unless they answered it or the deck
+   * already proposed it. Q then asks only for the gaps.
    */
-  readonly onPitchTranscript: (event: {
-    readonly sessionId: string;
-    readonly transcriptId: string;
-    readonly text: string;
+  readonly onPitchSectionsRead: (event: {
+    readonly tenantId: TenantId;
+    readonly companyId: string;
+    readonly readingId: string;
   }) => Promise<FounderReviewResult>;
   /** A free-text turn of the conversational interview (CQ-PRE-REC-001 §20). */
   readonly onUtterance: (event: {
@@ -195,8 +202,31 @@ type SourceRef = { readonly sourceType: string; readonly sourceId: string };
 
 /** How a pitch transcript is named in a proposal's sources. */
 export const PITCH_TRANSCRIPT_SOURCE = "PITCH_TRANSCRIPT" as const;
-/** The most of a transcript one reading takes (the narrative bound). */
-const PITCH_TRANSCRIPT_MAX_CHARS = 60_000;
+/**
+ * Lane ov's stored pitch reading, by id, as founder onboarding reads it
+ * (the composition reads media's table; this package owns no media data).
+ */
+export type FounderPitchSectionsPort = {
+  /**
+   * The reading's sections (of the company's pitch, in this tenant) and the
+   * company's active founder onboarding session, if any. Null: no such
+   * reading for that company.
+   */
+  readonly read: (
+    tenantId: TenantId,
+    readingId: string,
+    companyId: string,
+  ) => Promise<{
+    readonly sessionId: string | null;
+    readonly sections: readonly {
+      readonly key: string;
+      readonly facts: readonly {
+        readonly label: string;
+        readonly value: string;
+      }[];
+    }[];
+  } | null>;
+};
 
 export function createFounderDocumentReview(
   dependencies: FounderReviewServiceDependencies,
@@ -213,6 +243,7 @@ export function createFounderDocumentReview(
     extraction,
     recordQuestions,
     logger,
+    pitchSections,
   } = dependencies;
 
   /** One reading of the session against some material, then its offers. */
@@ -453,32 +484,83 @@ export function createFounderDocumentReview(
       });
     },
 
-    onPitchTranscript: async (event): Promise<FounderReviewResult> => {
-      const session = await sessions.findById(sql, event.sessionId as never);
+    onPitchSectionsRead: async (event): Promise<FounderReviewResult> => {
+      if (pitchSections === undefined) {
+        return { kind: "SKIPPED", reason: "NO_UTTERANCE" };
+      }
+      const found = await pitchSections.read(
+        event.tenantId,
+        event.readingId,
+        event.companyId,
+      );
+      if (found === null) {
+        return { kind: "SKIPPED", reason: "NO_UTTERANCE" };
+      }
+      const session =
+        found.sessionId === null
+          ? null
+          : await sessions.findById(sql, found.sessionId as never);
       if (
         session === null ||
         session.journeyType !== FOUNDER_JOURNEY_TYPE ||
         session.status !== "ACTIVE" ||
-        session.tenantId === null
+        session.tenantId !== event.tenantId ||
+        session.subject?.subjectId !== event.companyId
       ) {
         return { kind: "SKIPPED", reason: "NO_ACTIVE_SESSION" };
       }
-      const text = event.text.trim().slice(0, PITCH_TRANSCRIPT_MAX_CHARS);
-      if (text.length === 0) {
-        return { kind: "SKIPPED", reason: "NO_UTTERANCE" };
+      const reading = found.sections;
+      const [current, pending] = await Promise.all([
+        responses.listCurrent(sql, session.id),
+        suggestions.listPending(sql, session.id),
+      ]);
+      // Deck first: a section the deck proposed, or they answered, stays.
+      const settled = new Set([
+        ...current.map((response) => response.stepKey),
+        ...pending.map((suggestion) => suggestion.stepKey),
+      ]);
+      let created = 0;
+      for (const section of reading) {
+        const profile = FOUNDER_PROFILE_SECTIONS.find(
+          (candidate) => (candidate.factKey ?? candidate.key) === section.key,
+        );
+        const stepKey = profile?.stepKeys.find((key) => key.startsWith("F9."));
+        if (stepKey === undefined || settled.has(stepKey)) continue;
+        const text = section.facts
+          .map((fact) => `${fact.label}: ${fact.value}`)
+          .join("\n")
+          .trim()
+          .slice(0, 2000);
+        if (text.length === 0) continue;
+        try {
+          await createSuggestion({
+            sessionId: session.id,
+            stepKey,
+            targetField: profile?.factKey ?? section.key,
+            suggestedValue: { type: "TEXT", text },
+            sourceRefs: [
+              {
+                sourceType: PITCH_TRANSCRIPT_SOURCE,
+                sourceId: event.readingId,
+              },
+            ],
+            confidence: null,
+          });
+          created += 1;
+        } catch (error: unknown) {
+          logger?.warn(
+            { err: error, sessionId: session.id, stepKey },
+            "pitch section proposal refused by the onboarding runtime",
+          );
+        }
       }
-      return read({
-        tenantId: session.tenantId,
-        userId: session.userId,
+      return {
+        kind: "PREPARED",
         sessionId: session.id,
-        sources: [],
-        narrative: text,
-        sourceRef: {
-          sourceType: PITCH_TRANSCRIPT_SOURCE,
-          sourceId: event.transcriptId,
-        },
-        context: { transcriptId: event.transcriptId, passages: 0 },
-      });
+        suggestionsCreated: created,
+        questionsPlanned: 0,
+        blocked: null,
+      };
     },
     onUtterance: async (event): Promise<FounderReviewResult> => {
       if (utterances === undefined) {
