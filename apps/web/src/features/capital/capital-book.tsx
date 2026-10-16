@@ -14,13 +14,11 @@ import { apiSession } from "@/features/q/context";
 import { CommitmentCard } from "./commitment-card";
 import { money } from "./money";
 import { OpenRound, type RoundDraft } from "./open-round";
-import {
-  instrumentLabel,
-  RoundCard,
-  RoundTimeline,
-  TotalCard,
-} from "./round-card";
+import { RoundCard, RoundTimeline, TotalCard } from "./round-card";
 import type { LeadOption } from "./round-terms-fields";
+// From round-labels, not round-card: round-card is a client module, and this
+// server component calls the function.
+import { instrumentLabel } from "./round-labels";
 import { PRO_RATA_WORDS, STATUS_WORDS } from "./round-words";
 
 /**
