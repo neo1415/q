@@ -10,6 +10,7 @@ import {
   SetQLanguageRequestSchema,
   SetQPersonalityRequestSchema,
 } from "@capital-q/contracts";
+import { isOfferedLanguage } from "@capital-q/q-core";
 
 import {
   getActorContext,
@@ -105,7 +106,12 @@ export function registerStandingRoutes(
     { onRequest: withContext },
     async (request, reply) => {
       const body = SetQLanguageRequestSchema.safeParse(request.body);
-      if (!body.success) {
+      // Any language the registry offers (Intl names and scripts it); a
+      // well-formed tag it cannot name or script is refused, not stored.
+      if (
+        !body.success ||
+        (body.data.language !== "AUTO" && !isOfferedLanguage(body.data.language))
+      ) {
         const problem = createProblemDetails({
           code: "INVALID_REQUEST",
           requestId: request.id,

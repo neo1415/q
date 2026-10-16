@@ -22,10 +22,13 @@ describe("the language Q uses", () => {
     expect(effectiveLocale("AUTO", "ar; drop")).toBeUndefined();
   });
 
-  it("knows Arabic and English by their primary subtag", () => {
-    expect(supportedLanguageOf("ar-SA")).toBe("ar");
-    expect(supportedLanguageOf("EN-us")).toBe("en");
-    expect(supportedLanguageOf("fr")).toBeNull();
+  it("knows any language the runtime can name and script, region kept", () => {
+    expect(supportedLanguageOf("ar-SA")).toBe("ar-SA");
+    expect(supportedLanguageOf("EN-us")).toBe("en-US");
+    expect(supportedLanguageOf("fr")).toBe("fr");
+    expect(supportedLanguageOf("sw")).toBe("sw");
+    expect(supportedLanguageOf("tlh")).toBeNull();
+    expect(supportedLanguageOf("xx")).toBeNull();
     expect(supportedLanguageOf(undefined)).toBeNull();
   });
 });
@@ -38,11 +41,18 @@ describe("the notes Q is told", () => {
     expect(spokenLanguageNote(undefined)).toBeNull();
   });
 
-  it("asks for Modern Standard Arabic and follows a switch", () => {
+  it("names the language (no per-language branch), asks for its standard written form and follows a switch", () => {
     const note = writtenLanguageNote("ar") ?? "";
-    expect(note).toContain("Modern Standard Arabic");
+    expect(note).toContain("this person chose Arabic (العربية)");
+    expect(note).toContain("standard written form professionals use at work");
     expect(note).toMatch(/ask you to switch, follow them/u);
-    expect(note).toMatch(/mix Arabic and English/u);
+    expect(note).toMatch(/mix it with English/u);
+    expect(writtenLanguageNote("sw")).toContain("Swahili (Kiswahili)");
+    expect(writtenLanguageNote("ja")).toContain("Japanese (日本語)");
+    expect(spokenLanguageNote("fr")).toContain("Speak natural, clear French (français)");
+    // English in any region needs no note; an unknown tag gets none.
+    expect(writtenLanguageNote("en-GB")).toBeNull();
+    expect(writtenLanguageNote("tlh")).toBeNull();
   });
 
   it("keeps names, figures, currencies and terms exact", () => {

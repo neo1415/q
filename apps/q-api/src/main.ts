@@ -218,6 +218,7 @@ import {
 } from "./composition/workforce/store.js";
 import {
   houseEtiquetteOf,
+  resolveLanguage,
   spokenLanguageNote,
   stanceDeclines,
   writtenLanguageNote,
@@ -2874,10 +2875,15 @@ const qTools = createQTools({
       set: (actor, personality) =>
         standingStore.setPersonality(actor.userId, actor.tenantId, personality),
     },
-    // Multilingual Q: "switch to Arabic", in any language, as Settings does.
+    // Any language: "switch to French", in any language, as Settings does.
+    // The registry (Intl data) resolves the name; nothing lists languages.
     language: {
       set: (actor, language) =>
         standingStore.setLanguage(actor.userId, actor.tenantId, language),
+      resolve: (asked) => {
+        const resolved = resolveLanguage(asked);
+        return resolved.ok ? resolved.info : null;
+      },
     },
     companies,
     capital,

@@ -81,6 +81,7 @@ export {
   type QPersonality,
   type QPersonalityCode,
 } from "./personality.js";
+export * from "./language/public.js";
 export {
   effectiveLocale,
   spokenLanguageNote,
