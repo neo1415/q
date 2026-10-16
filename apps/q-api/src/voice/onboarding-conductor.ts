@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   appendOnboardingInterviewTurns,
@@ -7,7 +7,10 @@ import {
   type ApiSession,
 } from "@capital-q/api-client";
 import type { OnboardingSessionView } from "@capital-q/contracts";
-import { FOUNDER_STEPS } from "@capital-q/founder-onboarding";
+import {
+  FOUNDER_PROFILE_SECTIONS,
+  FOUNDER_STEPS,
+} from "@capital-q/founder-onboarding";
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 
@@ -110,6 +113,8 @@ export type NextStep = {
 export function nextUnansweredStep(
   view: OnboardingSessionView,
   journeyType: "founder" | "investor",
+  /** Only these steps, in this order (a profile section they came to fill). */
+  among?: readonly string[],
 ): NextStep | null {
   if (view.session.status === "COMPLETED") return null;
   const steps = new Map(
@@ -128,7 +133,12 @@ export function nextUnansweredStep(
       steps.has(e.stepKey),
   );
   // Required before optional, otherwise the journey's own order.
-  const chosen = open.find((e) => e.required) ?? open[0];
+  const chosen =
+    among === undefined
+      ? (open.find((e) => e.required) ?? open[0])
+      : among
+          .map((key) => open.find((e) => e.stepKey === key))
+          .find((e) => e !== undefined);
   if (chosen === undefined) return null;
   const step = steps.get(chosen.stepKey);
   if (step === undefined) return null;
@@ -560,13 +570,14 @@ export function createOnboardingConductor(
     input: InterviewAgentTurnInput,
     text: string,
     stepKey: string | null,
+    turnRef: string = randomUUID(),
   ) => {
     if (text.length === 0) return;
     void appendOnboardingInterviewTurns(
       input.session,
       input.onboardingSessionId,
       {
-        turnRef: randomUUID(),
+        turnRef,
         turns: [
           {
             role: "Q",
@@ -685,8 +696,26 @@ export function createOnboardingConductor(
       input.session,
       input.onboardingSessionId,
     );
-    const next = nextUnansweredStep(view, input.journeyType);
-    let lines = resumeLines(view, input.journeyType);
+    // The profile section they came to fill (lane ov's Overview link,
+    // ?section=): its first open step is asked on resume too (live AG
+    // 2026-10-16: a resumed conversation ignored the section). A line with
+    // its step key, so it is said in their language like any other.
+    const section =
+      input.journeyType === "founder" && input.focus !== undefined
+        ? FOUNDER_PROFILE_SECTIONS.find((s) => s.key === input.focus)
+        : undefined;
+    const focused =
+      section === undefined
+        ? null
+        : nextUnansweredStep(view, input.journeyType, section.stepKeys);
+    const next = focused ?? nextUnansweredStep(view, input.journeyType);
+    let lines: readonly Line[] =
+      focused === null
+        ? resumeLines(view, input.journeyType)
+        : [
+            { text: PICKING_UP },
+            { text: focused.question, stepKey: focused.stepKey },
+          ];
     let asking =
       next === null ? null : askingFor(next.stepKey, input.journeyType, view);
     // What research found while they were away is the first thing said.
@@ -708,7 +737,23 @@ export function createOnboardingConductor(
       (await sayIn(input, lines, lastWords)) ?? lines.map((line) => line.text)
     ).join(" ");
     searchByName(input, view);
-    keep(input, reply, asking?.stepKey ?? null);
+    // Once per reopening (live AG 2026-10-16: each load kept the resume line
+    // twice). The same line already last in the conversation is not kept
+    // again, and two opens of the same conversation state at once share
+    // one idempotent reference, so the API keeps one.
+    const items = kept?.items ?? [];
+    const last = items.at(-1);
+    if (!(last?.role === "Q" && last.text === reply)) {
+      keep(
+        input,
+        reply,
+        asking?.stepKey ?? null,
+        resumeTurnRef(
+          input.onboardingSessionId,
+          `${items.length}|${last?.createdAt ?? ""}|${reply}`,
+        ),
+      );
+    }
     return {
       reply,
       intent: "RESUME",
@@ -867,4 +912,13 @@ export function createOnboardingConductor(
     researchEnded: agent.researchEnded,
     enqueueFound,
   };
+}
+
+/** A stable UUID for one resume line over one conversation state. */
+export function resumeTurnRef(sessionId: string, state: string): string {
+  const hex = createHash("sha256")
+    .update(`resume|${sessionId}|${state}`)
+    .digest("hex");
+  // Shaped as a version-4-style UUID: the API checks the form only.
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }

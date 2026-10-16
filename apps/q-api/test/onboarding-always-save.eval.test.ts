@@ -28,12 +28,120 @@ type Case = {
   readonly quote: string;
   /** Off their path: kept with the journey's notes, never refused. */
   readonly offPath?: boolean;
+  /**
+   * The words were said in an earlier turn (read then as stating this
+   * step); `said` is their latest words, about something else.
+   */
+  readonly before?: string;
+  /** The acting model passes nothing for it: code alone records it. */
+  readonly byCode?: true;
+  /** What the saved value must hold, and must not (only this field's part). */
+  readonly holds?: string;
+  readonly notHolds?: string;
 };
 
 const F = "founder" as const;
 const I = "investor" as const;
 
+const AG_FOUNDER =
+  "So basically we run cold-chain trucking software for fishermen around Lake Victoria, connecting them to buyers in Kampala. We're kind of pre-seed. Based in Uganda. I'm the chief everything officer, honestly, plus I write code. Three founders, two full time, about 11 people. We already have first revenue only, from two co-ops. We're actively raising about 500 thousand dollars, probably on a SAFE.";
+const AG_INVESTOR =
+  "Hey, so I'm a partner at Corvo Ventures, it's a small VC fund out of Lisbon. We're actively investing, cheques usually 150k to 400k euros, typical maybe 250k, mostly seed, sometimes pre-seed. We like climate, logistics and anything that makes ports less painful. Europe and North Africa. Honestly we also back a lot of second-time founders, and we never do gambling or tobacco.";
+
 export const ALWAYS_SAVE_CASES: readonly Case[] = [
+  // Logged misses (live AG, 2026-10-16).
+  {
+    id: "ag-uganda",
+    journey: F,
+    said: AG_FOUNDER,
+    stepKey: "F1.country",
+    value: "Uganda",
+    quote: "Based in Uganda",
+  },
+  {
+    id: "ag-chief-everything",
+    journey: F,
+    said: AG_FOUNDER,
+    stepKey: "F4.founder_role",
+    value: "chief everything officer",
+    quote: "I'm the chief everything officer",
+  },
+  {
+    id: "ag-dollars-by-code",
+    journey: F,
+    said: AG_FOUNDER,
+    stepKey: "F6.currency",
+    value: "usd",
+    quote: "dollars",
+    byCode: true,
+  },
+  {
+    id: "ag-dollars-earlier-by-code",
+    journey: F,
+    said: "Paying customers, the two co-ops.",
+    before: AG_FOUNDER,
+    stepKey: "F6.currency",
+    value: "usd",
+    quote: "dollars",
+    byCode: true,
+  },
+  {
+    id: "ag-revenue-kept",
+    journey: F,
+    said: AG_FOUNDER,
+    stepKey: "F5.revenue_status",
+    value: "first revenue only",
+    quote: AG_FOUNDER.slice(0, 300),
+    offPath: true,
+    holds: "first revenue only",
+    notHolds: "cold-chain",
+  },
+  {
+    id: "ag-geography",
+    journey: I,
+    said: AG_INVESTOR,
+    stepKey: "I3.geography",
+    value: ["Europe", "North Africa"],
+    quote: "Europe and North Africa",
+  },
+  {
+    id: "ag-geography-earlier",
+    journey: I,
+    said: "Balanced.",
+    before: AG_INVESTOR,
+    stepKey: "I3.geography",
+    value: ["Europe", "North Africa"],
+    quote: "Europe and North Africa",
+  },
+  {
+    id: "ag-sectors-earlier",
+    journey: I,
+    said: "Balanced.",
+    before: AG_INVESTOR,
+    stepKey: "I3.sectors",
+    value: ["climate", "logistics"],
+    quote:
+      "We like climate, logistics and anything that makes ports less painful",
+  },
+  {
+    id: "ag-sectors-unmapped-kept",
+    journey: I,
+    said: AG_INVESTOR,
+    stepKey: "I3.sectors",
+    value: ["climate", "logistics", "ports"],
+    quote:
+      "We like climate, logistics and anything that makes ports less painful",
+  },
+  {
+    id: "ag-exclusions-own-part",
+    journey: I,
+    said: AG_INVESTOR,
+    stepKey: "I7.sector_exclusions",
+    value: ["gambling", "tobacco"],
+    quote: AG_INVESTOR.slice(0, 300),
+    holds: "gambling or tobacco",
+    notHolds: "Lisbon",
+  },
   // Logged misses (live 2026-10-16).
   {
     id: "live-usd",
@@ -419,7 +527,13 @@ async function persisted(c: Case): Promise<{
       c.journey === "founder"
         ? { "F0.intent": "raising_now", "F1.company_name": "Lumora Grid" }
         : { "I0.investor_type": "vc" },
-    taxonomy: { fintech: FINTECH },
+    taxonomy: {
+      fintech: FINTECH,
+      europe: "a0000000-0000-4000-8000-0000000000e1",
+      "north africa": "a0000000-0000-4000-8000-0000000000e2",
+      climate: "a0000000-0000-4000-8000-0000000000c1",
+      logistics: "a0000000-0000-4000-8000-0000000000c2",
+    },
     ...(c.offPath === true ? { ineligible: [c.stepKey] } : {}),
   });
   const port = createOnboardingPort({
@@ -427,7 +541,15 @@ async function persisted(c: Case): Promise<{
     onboardingSessionId: turn(world, c.said).onboardingSessionId,
     journeyType: c.journey,
     ownerUserId: "b0000000-0000-4000-8000-000000000001",
-    personTurns: [c.said],
+    personTurns: c.before === undefined ? [c.said] : [c.said, c.before],
+    // Words said earlier were read then, as stating this step (live AG:
+    // the earlier reading named geography and sectors).
+    ...(c.before === undefined
+      ? {}
+      : {
+          statedEarlier: (stepKey: string, quote: string) =>
+            stepKey === c.stepKey && (c.before ?? "").includes(quote),
+        }),
     // The reading notices nothing: code alone must save it.
     // (CQ_EVAL_READER=1: it notices the step, to measure that case too.)
     authority: () =>
@@ -437,30 +559,42 @@ async function persisted(c: Case): Promise<{
         ),
       ),
   });
-  const results = await port
-    .record([
-      {
-        stepKey: c.stepKey,
-        value: typeof c.value === "object" ? [...c.value] : c.value,
-        quote: c.quote,
-        basis: "STATED",
-        ownWords: false,
-      },
-    ])
-    .catch(() => []);
+  const results =
+    c.byCode === true
+      ? [await (async () => port.recordStatedCurrency())().catch(() => null)]
+      : await port
+          .record([
+            {
+              stepKey: c.stepKey,
+              value: typeof c.value === "object" ? [...c.value] : c.value,
+              quote: c.quote,
+              basis: "STATED",
+              ownWords: false,
+            },
+          ])
+          .catch(() => []);
   const notes =
     c.journey === "founder" ? "F7.follow_up" : "I11.additional_context";
   const held =
     c.offPath === true
       ? world.recordedValue(notes)
       : world.recordedValue(c.stepKey);
+  const text =
+    held === undefined
+      ? ""
+      : held.type === "TEXT"
+        ? held.text
+        : JSON.stringify(held);
   const saved =
     held !== undefined &&
-    (c.offPath !== true ||
-      (held.type === "TEXT" && held.text.includes(c.quote)));
+    (c.offPath !== true || text.includes(c.holds ?? c.quote)) &&
+    (c.holds === undefined || text.includes(c.holds)) &&
+    (c.notHolds === undefined || !text.includes(c.notHolds)) &&
+    (c.byCode !== true ||
+      (held.type === "SINGLE_SELECT" && held.optionKey === c.value));
   const tries = world.attempts().filter((key) => key === c.stepKey).length;
-  if (process.env["CQ_EVAL_TRACE"] === "1" && !(held !== undefined)) {
-    console.log(c.id, JSON.stringify(results));
+  if (process.env["CQ_EVAL_TRACE"] === "1" && !saved) {
+    console.log(c.id, JSON.stringify(results), text);
   }
   return { saved, duplicated: c.offPath !== true && tries > 1 };
 }
