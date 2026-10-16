@@ -117,14 +117,21 @@ Resolution order for an anchor: `[data-qp-anchor=id]`, then a mapped existing ma
 5. **Tavus** is paid and fragile; it is the last option.
 6. **The trigger** changes a prompt and a contract enum; it needs evals and the lead's merge.
 
-## 10. Shared interfaces (for a second agent)
+## 10. Shared interfaces (for a second agent) — pushed
 
-- `StepGraph`: `buildStepGraph(script) → { steps: readonly StepNode[]; byId(id); next(id); prev(id) }`.
-- `StepNode`: `{ stepId; number; prevId|null; nextId|null; route|null; anchors: readonly AnchorRef[] }`.
-- `AnchorRef`: `{ anchorId; label; expand?: boolean }`, with `anchorId` matching `/^(inv|fdr)\.\d{2}(\.[a-z0-9-]+)+$/`.
-- `uiAct SECTION { anchor, expand? }` and `UNLIGHT`.
-- `QaEntry`: `{ id; side: "INVESTOR"|"FOUNDER"|"BOTH"; question; paraphrases; answer; sources }`, plus `answerFromBank(text, side) → QaEntry | null`.
-- Tracks are `TourScript`s; ledger entries follow the v5 CERTIFICATION approach.
+All in `packages/q-pitch` (exported from its index):
+
+- **Steps** (`step-graph.ts`): `buildStepGraph(script) → { steps; byId(id); byNumber(n) }`. `StepNode` is `{ stepId; number; title; prevId; nextId; route; anchors }`. A step is a `SceneScript` whose `sceneId` is `s.<track>.<NN>.<page>[.<part>]`.
+- **Sections** (`script.ts`): `SceneLine.anchor?: AnchorId` (`/^(inv|fdr)\.\d{2}(\.[a-z0-9-]+){1,5}$/`) and `SceneLine.open?: boolean`, for AFTER_ACK lines only.
+  - The web host (`apps/web/src/features/q-pitch/section-light.ts`) scrolls to `[data-qp-anchor="<id>"]`, opens or closes it, and lights it before the line is spoken.
+  - A page section gets its anchor as a plain `data-qp-anchor` attribute, which is not a Q control and not in the capability catalog.
+- **Step commands** (`step-commands.ts`): `parseStepCommand(text)` and `resolveStepCommand(cmd, current, total)`. A `STEP` control intent becomes `GO_TO_STEP` in the director.
+- **Q&A** (`qa-bank.ts`):
+  - `QaEntry { id; side: INVESTOR | FOUNDER | BOTH; question; paraphrases (≥2); answer; sources (≥1) }` and `QA_BANK`;
+  - `buildQaIndex(side).answer(text) → QaEntry | null`, BM25 in memory with no model;
+  - tests refuse invented traction, customers, revenue, investors or team size, and missing source files.
+- **Tracks** are `TourScript`s with ledger entries, as in v5 (`premiere.ts` is the model). The founder track's file is `packages/q-pitch/src/founder-v6.ts` (second agent), with its own `fdr.*` anchors and FOUNDER Q&A entries added to `QA_BANK`.
+- **Ownership:** this lane owns `step-*`, `qa-bank.ts`'s shape and index, `section-light.ts`, the host, and the investor track (`investor-v6.ts`). The second agent owns `founder-v6.ts`, its anchors on founder-side pages, and Q-to-Q.
 
 ## 11. Spend
 
