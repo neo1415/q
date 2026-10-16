@@ -667,7 +667,14 @@ describe("moving between a profile's tabs", () => {
       <ProfileTabs
         base={base}
         initial="overview"
-        available={["overview", "diligence", "elevator", "dataroom", "deck", "team"]}
+        available={[
+          "overview",
+          "diligence",
+          "elevator",
+          "dataroom",
+          "deck",
+          "team",
+        ]}
       >
         <CompanyProfileView
           profile={profile}
@@ -731,7 +738,14 @@ describe("moving between a profile's tabs", () => {
       <ProfileTabs
         base={base}
         initial="overview"
-        available={["overview", "diligence", "elevator", "dataroom", "deck", "team"]}
+        available={[
+          "overview",
+          "diligence",
+          "elevator",
+          "dataroom",
+          "deck",
+          "team",
+        ]}
       >
         <CompanyProfileView
           profile={profile}

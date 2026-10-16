@@ -71,9 +71,12 @@ describe("the diligence tab", () => {
     const ask = tabAskOf("open the diligence tab");
     expect(ask).toMatchObject({ tab: "diligence", name: null });
     expect(
-      screenTabTarget({ route: "COMPANY", companyId: HARBOURLINE }, {
-        tab: "diligence",
-      }),
+      screenTabTarget(
+        { route: "COMPANY", companyId: HARBOURLINE },
+        {
+          tab: "diligence",
+        },
+      ),
     ).toEqual({ page: "COMPANY", id: HARBOURLINE });
   });
 

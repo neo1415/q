@@ -370,8 +370,7 @@ export const Q_RECORD_TABS = [
   "messages",
   "calls",
 ] as const satisfies readonly (
-  | (typeof Q_COMPANY_PROFILE_TABS)[number]
-  | (typeof Q_RELATIONSHIP_TABS)[number]
+  (typeof Q_COMPANY_PROFILE_TABS)[number] | (typeof Q_RELATIONSHIP_TABS)[number]
 )[];
 export const QRecordTabSchema = z.enum(Q_RECORD_TABS);
 export type QRecordTab = z.infer<typeof QRecordTabSchema>;

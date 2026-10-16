@@ -226,7 +226,6 @@ export function ReadSectionCard({
   readonly attribute: "deck" | "profile";
 }) {
   const t = useT();
-  let group: string | null = null;
   return (
     <article
       className="flex h-full flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
@@ -261,14 +260,14 @@ export function ReadSectionCard({
       )}
       {section.facts.length === 0 ? null : (
         <dl className="flex flex-col divide-y divide-(--cq-border-subtle) border-t border-(--cq-border-subtle)">
-          {section.facts.map((fact) => {
+          {section.facts.map((fact, at) => {
+            const previous = section.facts[at - 1]?.group ?? null;
             const heading =
               fact.group !== undefined &&
               fact.group !== null &&
-              fact.group !== group
+              fact.group !== previous
                 ? fact.group
                 : null;
-            if (fact.group !== undefined) group = fact.group;
             return (
               <div key={fact.key} className="flex flex-col">
                 {heading === null ? null : (

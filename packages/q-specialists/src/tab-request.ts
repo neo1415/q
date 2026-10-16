@@ -79,9 +79,18 @@ const ANY_SECTION = SECTION_WORDS.map(([, words]) => `(?:${words})`).join("|");
  * through.
  */
 export const PROFILE_SECTION_WORDS: readonly (readonly [string, string])[] = [
-  ["why_us_why_now", "why\\s+us\\??(?:[\\s,]+why\\s+now\\??)?|why\\s+now\\??|timing"],
-  ["go_to_market", "go[\\s-]*to[\\s-]*market(?:\\s+strategy)?|gtm|distribution"],
-  ["opportunity", "opportunity(?:\\s+(?:and|&)\\s+economics)?|economics|unit\\s+economics|market(?:\\s+size)?|traction|value\\s+prop(?:osition)?"],
+  [
+    "why_us_why_now",
+    "why\\s+us\\??(?:[\\s,]+why\\s+now\\??)?|why\\s+now\\??|timing",
+  ],
+  [
+    "go_to_market",
+    "go[\\s-]*to[\\s-]*market(?:\\s+strategy)?|gtm|distribution",
+  ],
+  [
+    "opportunity",
+    "opportunity(?:\\s+(?:and|&)\\s+economics)?|economics|unit\\s+economics|market(?:\\s+size)?|traction|value\\s+prop(?:osition)?",
+  ],
   ["business_model", "business\\s+model|revenue\\s+model|pricing"],
   ["how_it_works", "how\\s+it\\s+works|product"],
   ["competition", "competitive\\s+landscape|competition|competitors"],
