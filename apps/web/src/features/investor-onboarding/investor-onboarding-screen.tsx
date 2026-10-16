@@ -13,7 +13,11 @@ import { createInvestorOnboardingClient } from "./adapters/compose";
 import { INVESTOR_VOCABULARY } from "./conversation-adapter";
 import { reviewLines } from "../onboarding-conversation/conversation";
 import { QOnboardingWorkspace } from "../onboarding-conversation/q-onboarding-workspace";
+import { CoverageOverview } from "../onboarding-kit/components/coverage-overview";
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
+import { phasesFor } from "../onboarding-kit/coverage";
+import { useFormCoverage } from "../onboarding-kit/use-form-coverage";
+import { groupOf } from "./models/journey";
 import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
 import { VoiceHandover } from "../voice/voice-handover";
 import { useOnboardingJourney } from "../onboarding-kit/controller";
@@ -52,6 +56,8 @@ export function InvestorOnboardingScreen({
     InvestorOnboardingSessionView,
     StepResponse
   >(client);
+  // The canonical coverage (lane ob1), the same picture Q works from.
+  const coverage = useFormCoverage("investor", state.session);
   // Q leads by default (CQ-PRE-REC-001 §16); the structured screens remain
   // for direct editing (§30) and as the fallback when a step needs them.
   const [mode, setMode] = useState<"conversation" | "form">("conversation");
@@ -327,7 +333,25 @@ export function InvestorOnboardingScreen({
   return (
     <OnboardingShell
       stepKey={step.id}
-      progress={<OnboardingProgress session={session} />}
+      progress={
+        <div className="flex flex-col gap-2">
+          <OnboardingProgress session={session} />
+          {coverage === null ? null : (
+            <CoverageOverview
+              coverage={coverage}
+              phases={phasesFor("investor")}
+              busy={state.busy}
+              onOpen={(fieldKey) => {
+                const group = groupOf(fieldKey);
+                if (group !== undefined) void actions.openStep(group.id);
+              }}
+              onResolve={(suggestionId, resolution) =>
+                actions.resolveSuggestion({ suggestionId, resolution })
+              }
+            />
+          )}
+        </div>
+      }
       onBack={isFirst ? undefined : () => void actions.back()}
       busy={state.busy}
       saveStatus={state.save}
