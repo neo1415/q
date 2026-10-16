@@ -256,7 +256,10 @@ export {
   scanInstructionRisk,
   type InstructionRiskReport,
 } from "./domain/instruction-risk.js";
-export { createPostgresDocumentExtractionRepository } from "./infrastructure/postgres-extraction-repository.js";
+export {
+  createPostgresDocumentExtractionRepository,
+  createPostgresDocumentPageTextReader,
+} from "./infrastructure/postgres-extraction-repository.js";
 
 export const PACKAGE_NAME = "@capital-q/evidence" as const;
 export {

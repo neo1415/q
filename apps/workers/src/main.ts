@@ -69,6 +69,7 @@ import {
 import { createOutboxWriter, DOMAIN_EVENTS_QUEUE } from "@capital-q/eventing";
 import {
   createDocumentProcessingService,
+  createPostgresDocumentPageTextReader,
   createPostgresEvidenceRepositories,
   createSupabaseDocumentStorageProvider,
   createPostgresDataRoom,
@@ -403,9 +404,11 @@ const mandateReview =
         responses: createPostgresOnboardingResponseRepository(),
         suggestions: createPostgresOnboardingSuggestionRepository(),
         utterances: createPostgresOnboardingUtteranceRepository(),
-        // Lane ob1: an investor's fund deck or thesis feeds mandate proposals.
+        // Lane ob1: an investor's fund deck or thesis feeds mandate proposals,
+        // read from the firm's own extracted pages (ob2): a firm's document
+        // has no company, so it is never cut into knowledge passages.
         documents: createPostgresEvidenceRepositories().documents,
-        chunks: createPostgresChunkRepository(),
+        pages: createPostgresDocumentPageTextReader(),
         synthesis: createMandateSynthesis({
           gateway: {
             execute: (request, options) =>
