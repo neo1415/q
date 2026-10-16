@@ -46,3 +46,8 @@ export {
 } from "./contexts.js";
 
 export { INVESTOR_UTTERANCE_ALIASES } from "./utterance-aliases.js";
+export {
+  INVESTOR_COVERAGE_PROFILE,
+  INVESTOR_DOCUMENT_FIELDS,
+  INVESTOR_UPLOAD_DOCUMENT_TYPES,
+} from "./coverage.js";

@@ -48,7 +48,21 @@ vi.mock("@capital-q/api-client", async (importOriginal) => {
   };
 });
 
-const { resolveOnboardingState } = await import("./context");
+const { onboardingGate, resolveOnboardingState } = await import("./context");
+
+describe("the app with setup unfinished (owner 2026-10-16)", () => {
+  it("keeps the whole shell for an unfinished setup; only a new person is held to the welcome", () => {
+    expect(onboardingGate({ kind: "UNFINISHED", journey: "founder" })).toBe(
+      null,
+    );
+    expect(onboardingGate({ kind: "UNFINISHED", journey: "investor" })).toBe(
+      null,
+    );
+    expect(onboardingGate({ kind: "DONE" })).toBe(null);
+    expect(onboardingGate({ kind: "UNKNOWN" })).toBe(null);
+    expect(onboardingGate({ kind: "NEW" })).toBe("/welcome");
+  });
+});
 
 describe("where a person stands with onboarding", () => {
   it("asks both journeys side by side: ~120 ms, not 240 ms, founder first", async () => {

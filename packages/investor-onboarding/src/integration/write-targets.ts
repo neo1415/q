@@ -48,6 +48,10 @@ import {
   type ActorContext,
   type OrganisationId,
 } from "@capital-q/security";
+import {
+  investorMayReuseWorkspace,
+  readInvestorWorkspaceFacts,
+} from "./workspace.js";
 import { TaxonomyNodeIdSchema } from "@capital-q/taxonomy";
 
 import {
@@ -748,11 +752,25 @@ async function bootstrapInvestor(
     return;
   }
 
+  // Owner directive 2026-10-16: the active organisation is reused only when
+  // it is a firm's workspace (`investorMayReuseWorkspace`); a founder who
+  // also invests gets their own investing workspace beside the company.
+  const reusable =
+    actor.context?.organisationId !== undefined &&
+    investorMayReuseWorkspace(
+      (await readInvestorWorkspaceFacts(context.tx.sql, actor.context)) ?? {
+        organisationType: "company",
+        holdsCompany: true,
+      },
+    )
+      ? actor.context
+      : null;
+
   let actorContext: ActorContext;
-  if (actor.context?.organisationId !== undefined) {
+  if (reusable !== null) {
     // An existing member acts in their explicit active context. Nobody joins
     // an organisation by typing its name.
-    actorContext = actor.context;
+    actorContext = reusable;
   } else {
     if (actor.principal === undefined) {
       throw new OnboardingContextRequiredError();

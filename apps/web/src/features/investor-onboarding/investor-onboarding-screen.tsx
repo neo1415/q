@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { FounderOnboardingAdapter } from "@capital-q/config/web";
 import { Button, buttonClassName } from "@capital-q/ui/button";
@@ -13,7 +13,18 @@ import { createInvestorOnboardingClient } from "./adapters/compose";
 import { INVESTOR_VOCABULARY } from "./conversation-adapter";
 import { reviewLines } from "../onboarding-conversation/conversation";
 import { QOnboardingWorkspace } from "../onboarding-conversation/q-onboarding-workspace";
+import { ContinueLater } from "../onboarding-kit/components/continue-later";
+import { FormCoverageArea } from "../onboarding-kit/components/coverage-overview";
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
+import { phasesFor } from "../onboarding-kit/coverage";
+import { useFormCoverage } from "../onboarding-kit/use-form-coverage";
+import { InvestorMaterials } from "./investor-materials";
+import {
+  openingMode,
+  readLastMode,
+  writeLastMode,
+} from "../onboarding-kit/last-mode";
+import { groupOf } from "./models/journey";
 import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
 import { VoiceHandover } from "../voice/voice-handover";
 import { useOnboardingJourney } from "../onboarding-kit/controller";
@@ -52,12 +63,29 @@ export function InvestorOnboardingScreen({
     InvestorOnboardingSessionView,
     StepResponse
   >(client);
+  // The canonical coverage (lane ob1), the same picture Q works from.
+  const coverage = useFormCoverage(state.session);
   // Q leads by default (CQ-PRE-REC-001 §16); the structured screens remain
   // for direct editing (§30) and as the fallback when a step needs them.
-  const [mode, setMode] = useState<"conversation" | "form">("conversation");
+  // Owner 2026-10-16: resuming (`?from=home`) opens the mode they last
+  // used, voice included, as the founder screen does.
+  const [opening] = useState(() =>
+    openingMode({
+      journey: "investor",
+      startTalking,
+      resuming: arrivedGreeted === true,
+    }),
+  );
+  const [mode, setMode] = useState<"conversation" | "form">(opening.mode);
+  useEffect(() => {
+    if (mode === "form") writeLastMode("investor", "form");
+    else if (readLastMode("investor") === "form") {
+      writeLastMode("investor", "conversation");
+    }
+  }, [mode]);
   // Set when the person asks for Q's voice from the form: the workspace
   // opens already talking, then this is cleared so it happens once.
-  const [talkOnOpen, setTalkOnOpen] = useState(startTalking);
+  const [talkOnOpen, setTalkOnOpen] = useState(opening.talk);
   // One welcome per visit: arriving already welcomed, or having been
   // welcomed here once before stepping out to the form and back.
   const [greeted, setGreeted] = useState(arrivedGreeted);
@@ -213,9 +241,7 @@ export function InvestorOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-6">
         <div className="flex items-center justify-between gap-2">
-          <Link href="/discover" className="cq-label text-(--cq-text-tertiary)">
-            Save &amp; leave
-          </Link>
+          <ContinueLater className="cq-label min-h-11 text-(--cq-text-tertiary) hover:text-(--cq-text-primary)" />
           <span className="cq-label text-(--cq-text-primary)">
             Investor setup
           </span>
@@ -327,7 +353,23 @@ export function InvestorOnboardingScreen({
   return (
     <OnboardingShell
       stepKey={step.id}
-      progress={<OnboardingProgress session={session} />}
+      progress={
+        <div className="flex flex-col gap-2">
+          <OnboardingProgress session={session} />
+          <FormCoverageArea
+            coverage={coverage}
+            phases={phasesFor("investor")}
+            busy={state.busy}
+            onOpen={(fieldKey) => {
+              const group = groupOf(fieldKey);
+              if (group !== undefined) void actions.openStep(group.id);
+            }}
+            onResolve={(suggestionId, resolution) =>
+              actions.resolveSuggestion({ suggestionId, resolution })
+            }
+          />
+        </div>
+      }
       onBack={isFirst ? undefined : () => void actions.back()}
       busy={state.busy}
       saveStatus={state.save}
@@ -354,6 +396,14 @@ export function InvestorOnboardingScreen({
       <div key={step.id} className="contents">
         {backToQ}
         {renderStep({ step, formId: STEP_FORM_ID, busy: state.busy, actions })}
+        {/* Optional fund materials, on every screen, never a gate. */}
+        <div className="mt-8 border-t border-(--cq-border-subtle) pt-4">
+          <InvestorMaterials
+            firmReady={
+              session.raw?.session.subject?.type === "INVESTOR_ORGANISATION"
+            }
+          />
+        </div>
       </div>
     </OnboardingShell>
   );

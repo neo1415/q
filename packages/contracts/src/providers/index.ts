@@ -7,3 +7,7 @@ export {
   ProviderValidationError,
   type ProviderErrorKind,
 } from "./errors.js";
+export {
+  RESERVED_TEST_EMAIL_REASON,
+  reservedTestEmailDomain,
+} from "./email-recipients.js";

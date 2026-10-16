@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { ChoiceList } from "@capital-q/ui/choice-list";
 import { Input } from "@capital-q/ui/input";
 
+import { useRegistrationDefaults } from "../../onboarding-kit/registration-defaults";
 import { StepHeading, type StepProps } from "./step-props";
 
 /**
@@ -22,9 +23,20 @@ export function InvestorRoleStep({
   const [investorType, setInvestorType] = useState<string | undefined>(
     saved?.investorType,
   );
+  // A saved answer wins; otherwise the firm typed at sign-up, confirmed by
+  // continuing (owner directive 2026-10-16: never re-asked).
+  const registered = useRegistrationDefaults().organisationName;
+  const savedName =
+    saved?.organisationName === undefined || saved.organisationName === ""
+      ? null
+      : saved.organisationName;
   const [organisationName, setOrganisationName] = useState(
-    saved?.organisationName ?? "",
+    savedName ?? registered ?? "",
   );
+  const fromRegistration =
+    savedName === null &&
+    registered !== null &&
+    organisationName === registered;
   const [businessTitle, setBusinessTitle] = useState(
     saved?.businessTitle ?? "",
   );
@@ -76,7 +88,11 @@ export function InvestorRoleStep({
       <Input
         id="investor-organisation"
         label="Your firm"
-        description={`Investing personally? Keep “${step.personalWorkspaceName}”. Typing another firm's name never joins it.`}
+        description={
+          fromRegistration
+            ? "From your sign-up. Typing another firm's name never joins it."
+            : `Investing personally? Keep “${step.personalWorkspaceName}”. Typing another firm's name never joins it.`
+        }
         autoComplete="organization"
         value={organisationName}
         disabled={busy}

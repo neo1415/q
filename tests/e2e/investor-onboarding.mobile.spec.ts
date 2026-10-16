@@ -53,7 +53,7 @@ test.describe("investor onboarding (mobile, real API)", () => {
     await screen(page, "How do you invest?");
     await expect(progressText(page)).toHaveText("Context, step 1 of 3");
     await expect(
-      page.getByRole("link", { name: "Save & leave" }),
+      page.getByRole("button", { name: "Continue later" }),
     ).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(
       0,
@@ -88,7 +88,7 @@ test.describe("investor onboarding (mobile, real API)", () => {
     await page.reload();
     await useTheForm(page);
     await screen(page, "Stage and cheque");
-    await page.getByRole("link", { name: "Save & leave" }).tap();
+    await page.getByRole("button", { name: "Continue later" }).tap();
     await expect(page).toHaveURL(/\/home$/);
     // Home no longer offers "Set up as an investor" once the organisation
     // exists; it offers the way back into the unfinished setup instead.

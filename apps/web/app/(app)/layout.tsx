@@ -7,6 +7,7 @@ import { AppShell, type ShellContext } from "@/components/app-shell/app-shell";
 import { redirect } from "next/navigation";
 
 import {
+  onboardingGate,
   onboardingPath,
   resolveOnboardingState,
   resolveOwnContext,
@@ -92,8 +93,15 @@ export default async function ApplicationLayout({
   if ((await standingRead)?.paused === true) {
     redirect("/paused");
   }
+  const onboardingState = onboardingRead === null ? null : await onboardingRead;
+  // Setup not finished (or not started): some extras wait for it.
   const unfinished =
-    onboardingRead === null ? null : onboardingPath(await onboardingRead);
+    onboardingState === null ? null : onboardingPath(onboardingState);
+  // Owner 2026-10-16: the app is fully usable with setup incomplete. Only
+  // somebody who has not chosen a journey at all is held to the way in;
+  // an unfinished setup keeps the whole shell, and is offered back on Home.
+  const gate =
+    onboardingState === null ? null : onboardingGate(onboardingState);
   // ADMIN-4 block: "Verify you and <organisation>" stays in the shell until
   // both the person and the organisation are verified. A read that fails
   // shows nothing rather than a wrong state.
@@ -114,7 +122,7 @@ export default async function ApplicationLayout({
       context={{ ...shell, admin, organisations, qPitch }}
       subject={subject}
       qConnected={qConnected}
-      onboarding={unfinished}
+      onboarding={gate}
       verifyNudge={verifyNudgeState}
     >
       <BrandStyle css={brandCss} />

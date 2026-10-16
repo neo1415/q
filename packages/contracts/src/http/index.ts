@@ -578,6 +578,9 @@ export {
   OnboardingResourceTypeSchema,
   OnboardingResponseInputSchema,
   OnboardingResponseTypeSchema,
+  ONBOARDING_RESPONSE_CHANNELS,
+  OnboardingResponseChannelSchema,
+  type OnboardingResponseChannel,
   OnboardingResponseValueSchema,
   OnboardingResponseViewSchema,
   OnboardingSessionStatusSchema,
@@ -1466,3 +1469,4 @@ export * from "./deal-close.js";
 export * from "./relationship-pipeline.js";
 export * from "./relationship-views.js";
 export * from "./relationship-notes.js";
+export * from "./onboarding-coverage.js";

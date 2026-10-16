@@ -222,6 +222,9 @@ const TYPE_LABELS: Readonly<Record<string, string>> = {
   FINANCIAL_MODEL: "Financial model",
   MANAGEMENT_ACCOUNTS: "Management accounts",
   COMPANY_PROFILE: "Company profile",
+  FUND_DECK: "Fund deck",
+  INVESTMENT_THESIS: "Investment thesis",
+  LP_LETTER: "LP letter",
   OTHER: "Other material",
   UNCLASSIFIED: "Document",
 };
@@ -251,6 +254,7 @@ export async function materialListAction(
         id: document.id,
         filename: document.currentVersion?.originalFilename ?? document.title,
         kindLabel: TYPE_LABELS[document.documentType] ?? "Document",
+        documentType: document.documentType,
         state,
         stateLabel: label,
       };

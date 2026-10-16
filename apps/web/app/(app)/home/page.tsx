@@ -38,10 +38,14 @@ export default async function HomePage({
    * The page already renders per request and already has the parameter.
    * Passing it down means the panel is mounted once, with the answer.
    */
-  // Founder direction 2026-09-30: Q's page is the interview until the
-  // person has been onboarded; general Q knows nothing to work from yet.
-  const unfinished = onboardingPath(await resolveOnboardingState());
-  if (unfinished !== null) redirect(unfinished);
+  // Owner 2026-10-16 (supersedes 2026-09-30): an unfinished setup no longer
+  // holds Home; the app is usable and the setup is offered back here, at
+  // most once a day. Only somebody who has not started goes to the welcome.
+  const state = await resolveOnboardingState();
+  if (state.kind === "NEW") {
+    const welcome = onboardingPath(state);
+    if (welcome !== null) redirect(welcome);
+  }
   const params = await searchParams;
   const raw = params["c"];
   const conversationId = typeof raw === "string" && raw.length > 0 ? raw : null;

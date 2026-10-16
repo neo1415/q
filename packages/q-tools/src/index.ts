@@ -743,3 +743,12 @@ export {
   type BriefPublicEntityInput,
   type BriefPublicEntityOutput,
 } from "./tools/brief-public-entity.js";
+export {
+  createRecallMySetupTool,
+  RECALL_MY_SETUP,
+  RecallMySetupInputSchema,
+  RecallMySetupOutputSchema,
+  type OnboardingTranscriptPort,
+  type RecallMySetupInput,
+  type RecallMySetupOutput,
+} from "./tools/onboarding-transcript.js";

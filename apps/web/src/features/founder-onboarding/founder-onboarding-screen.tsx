@@ -12,7 +12,17 @@ import { EmptyState, InlineNotice, Skeleton } from "@capital-q/ui/states";
 import { createFounderOnboardingClient } from "./adapters/compose";
 import { FOUNDER_VOCABULARY } from "./conversation-adapter";
 import { QOnboardingWorkspace } from "../onboarding-conversation/q-onboarding-workspace";
+import { ContinueLater } from "../onboarding-kit/components/continue-later";
+import { FormCoverageArea } from "../onboarding-kit/components/coverage-overview";
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
+import { phasesFor } from "../onboarding-kit/coverage";
+import { useFormCoverage } from "../onboarding-kit/use-form-coverage";
+import {
+  openingMode,
+  readLastMode,
+  writeLastMode,
+} from "../onboarding-kit/last-mode";
+import { groupOf } from "./models/journey";
 import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
 import { VoiceHandover } from "../voice/voice-handover";
 import { useFounderOnboarding } from "./controller/use-founder-onboarding";
@@ -25,7 +35,6 @@ const STEP_FORM_ID = "founder-onboarding-step";
  * one session through the adapter, and renders whichever screen the session
  * says is current. Nothing about the journey lives here.
  */
-const MODE_KEY = "cq.onboarding.founder.mode";
 /** F17: how long "Go to Home" waits for Q's first reading, in tries. */
 const FINISH_TRIES = 8;
 const FINISH_WAIT_MS = 2500;
@@ -52,35 +61,39 @@ export function FounderOnboardingScreen({
     [adapter, seed],
   );
   const [state, actions] = useFounderOnboarding(client);
+  // The canonical coverage (lane ob1), the same picture Q works from.
+  const coverage = useFormCoverage(state.session);
   // Q leads by default (CQ-PRE-REC-001 §16); the structured screens remain
   // for direct editing (§30) and as the fallback when a step needs them.
   // F15: a founder who chose the form resumes in the form; voice opens only
   // when asked for (`?talk=1` or "Talk with Q"). A per-browser convenience.
   // Read once at first render: the screen shows a skeleton until the
   // session loads, so the server's render never depends on it.
-  const [mode, setMode] = useState<"conversation" | "form">(() => {
-    if (startTalking || typeof window === "undefined") return "conversation";
-    try {
-      return window.localStorage.getItem(MODE_KEY) === "form"
-        ? "form"
-        : "conversation";
-    } catch {
-      // Storage unavailable: Q leads, as before.
-      return "conversation";
-    }
-  });
+  // Owner 2026-10-16: resuming (`?from=home`) opens the mode they last
+  // used, voice included; read once at first render (the screen shows a
+  // skeleton until the session loads, so the server's render never
+  // depends on it).
+  const [opening] = useState(() =>
+    openingMode({
+      journey: "founder",
+      startTalking,
+      resuming: arrivedGreeted === true,
+    }),
+  );
+  const [mode, setMode] = useState<"conversation" | "form">(opening.mode);
   useEffect(() => {
-    try {
-      window.localStorage.setItem(MODE_KEY, mode);
-    } catch {
-      // Nothing to remember it in; harmless.
+    // The form is remembered as soon as it is chosen; the conversation only
+    // replaces a remembered form, so a remembered voice survives a visit.
+    if (mode === "form") writeLastMode("founder", "form");
+    else if (readLastMode("founder") === "form") {
+      writeLastMode("founder", "conversation");
     }
   }, [mode]);
   // F17: "Go to Home" waits for Q's first reading instead of failing.
   const [finishing, setFinishing] = useState(false);
   // Set when the person asks for Q's voice from the form: the workspace
   // opens already talking, then this is cleared so it happens once.
-  const [talkOnOpen, setTalkOnOpen] = useState(startTalking);
+  const [talkOnOpen, setTalkOnOpen] = useState(opening.talk);
   // One welcome per visit: arriving already welcomed, or having been
   // welcomed here once before stepping out to the form and back.
   const [greeted, setGreeted] = useState(arrivedGreeted);
@@ -204,9 +217,7 @@ export function FounderOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-6">
         <div className="flex items-center justify-between gap-2">
-          <Link href="/discover" className="cq-label text-(--cq-text-tertiary)">
-            Save &amp; leave
-          </Link>
+          <ContinueLater className="cq-label min-h-11 text-(--cq-text-tertiary) hover:text-(--cq-text-primary)" />
           <span className="cq-label text-(--cq-text-primary)">
             Founder setup
           </span>
@@ -329,7 +340,23 @@ export function FounderOnboardingScreen({
   return (
     <OnboardingShell
       stepKey={step.id}
-      progress={<OnboardingProgress session={session} />}
+      progress={
+        <div className="flex flex-col gap-2">
+          <OnboardingProgress session={session} />
+          <FormCoverageArea
+            coverage={coverage}
+            phases={phasesFor("founder")}
+            busy={state.busy}
+            onOpen={(fieldKey) => {
+              const group = groupOf(fieldKey);
+              if (group !== undefined) void actions.openStep(group.id);
+            }}
+            onResolve={(suggestionId, resolution) =>
+              actions.resolveSuggestion({ suggestionId, resolution })
+            }
+          />
+        </div>
+      }
       onBack={isFirst ? undefined : () => void actions.back()}
       busy={state.busy}
       saveStatus={state.save}

@@ -299,3 +299,51 @@ export {
   type OnboardingNudgeStateRepository,
 } from "./application/nudges.js";
 export { createPostgresOnboardingNudgeStateRepository } from "./infrastructure/postgres-nudge-state-repository.js";
+export {
+  branchDependencies,
+  deriveOnboardingCoverage,
+  displayOnboardingValue,
+  knownFactsFromRegistration,
+  proposalSource,
+  selectNextFields,
+  type DeriveOnboardingCoverageInput,
+  type OnboardingCoverageCheck,
+  type OnboardingCoverageFieldProfile,
+  type OnboardingCoverageProfile,
+  type OnboardingKnownFact,
+  type OnboardingRegistrationFacts,
+} from "./application/coverage.js";
+export {
+  confirmationItemKey,
+  ENGLISH_ONBOARDING_COPY,
+  groupConfirmation,
+  ONBOARDING_COPY_CATALOGS,
+  onboardingCopyFor,
+  type OnboardingCopyCatalog,
+} from "./application/confirmation.js";
+export {
+  drainPendingWrites,
+  failureCode,
+  isTransientOnboardingFailure,
+  pendingReplayKey,
+  sameResponseValue,
+  type DrainPorts,
+  type DrainResult,
+  type PendingWrite,
+  type PendingWriteOrigin,
+  type PendingWriteRepository,
+  type ReplayFailure,
+} from "./application/pending-writes.js";
+export { createPostgresPendingWriteRepository } from "./infrastructure/postgres-pending-write-repository.js";
+export {
+  classifyOnboardingUpload,
+  ONBOARDING_READABLE_DOCUMENT_TYPES,
+  onboardingDocumentTreatment,
+  type OnboardingDocumentTreatment,
+} from "./application/documents.js";
+export {
+  createOwnOnboardingTranscriptReader,
+  type OwnOnboardingTranscriptReader,
+  type OwnTranscriptLine,
+  type OwnTranscriptSession,
+} from "./application/own-transcript.js";
