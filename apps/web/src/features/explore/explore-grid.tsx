@@ -119,6 +119,7 @@ export function ExploreTile({
     readonly playing: boolean;
     readonly authorize: AuthorizePreview;
     readonly onHover: () => void;
+    readonly onLeave: () => void;
   } | null;
 }) {
   const meta = tileMeta(tile, sectorLabels);
@@ -145,6 +146,7 @@ export function ExploreTile({
             onPointerEnter: (event: React.PointerEvent) => {
               if (event.pointerType === "mouse") preview.onHover();
             },
+            onPointerLeave: preview.onLeave,
           })}
     >
       <button
@@ -243,6 +245,7 @@ export function ExploreGrid({
                     playing: controller.active === tile.pitch.mediaAssetId,
                     authorize: preview.authorize,
                     onHover: () => controller.hover(tile.pitch.mediaAssetId),
+                    onLeave: () => controller.leave(tile.pitch.mediaAssetId),
                   }
             }
           />

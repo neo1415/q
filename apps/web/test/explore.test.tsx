@@ -22,7 +22,11 @@ import {
 } from "../src/features/explore/explore-fixtures";
 import { ExploreGrid } from "../src/features/explore/explore-grid";
 import {
+  GRANT_REUSE_MARGIN_MS,
+  HOVER_DWELL_MS,
+  SupersededGrantRequest,
   chooseActivePreview,
+  createPreviewGrants,
   linkIsConstrained,
   type PreviewInput,
 } from "../src/features/explore/grid-preview";
@@ -357,7 +361,12 @@ describe("grid previews: one muted player, chosen by one controller", () => {
 
     const third = container.querySelector('[data-rank="2"]');
     if (third === null) throw new Error("no third tile");
+    vi.useFakeTimers();
     fireEvent.pointerEnter(third, { pointerType: "mouse" });
+    act(() => {
+      vi.advanceTimersByTime(HOVER_DWELL_MS);
+    });
+    vi.useRealTimers();
     expect(videos()).toHaveLength(1);
     expect(
       videos()[0]?.closest("[data-explore-tile]")?.getAttribute("data-rank"),
@@ -368,6 +377,98 @@ describe("grid previews: one muted player, chosen by one controller", () => {
       videos()[0]?.closest("[data-explore-tile]")?.getAttribute("data-rank"),
     ).toBe("2");
     vi.unstubAllGlobals();
+  });
+
+  it("moves only after the pointer rests: a sweep across the grid asks for no grants", () => {
+    const { showAll } = mockBrowser(false);
+    const { container, authorize } = renderGrid();
+    showAll();
+    expect(authorize).toHaveBeenCalledTimes(1);
+    vi.useFakeTimers();
+    const rank = () =>
+      container
+        .querySelector("video")
+        ?.closest("[data-explore-tile]")
+        ?.getAttribute("data-rank");
+    for (const n of [1, 2, 3, 4]) {
+      const cell = container.querySelector(`[data-rank="${String(n)}"]`);
+      if (cell === null) throw new Error("no tile");
+      fireEvent.pointerEnter(cell, { pointerType: "mouse" });
+      act(() => {
+        vi.advanceTimersByTime(HOVER_DWELL_MS / 4);
+      });
+      fireEvent.pointerLeave(cell, { pointerType: "mouse" });
+    }
+    act(() => {
+      vi.advanceTimersByTime(HOVER_DWELL_MS * 2);
+    });
+    expect(rank()).toBe("0");
+    expect(authorize).toHaveBeenCalledTimes(1);
+    // Resting on one tile, short of the dwell, then past it.
+    const fifth = container.querySelector('[data-rank="5"]');
+    if (fifth === null) throw new Error("no tile");
+    fireEvent.pointerEnter(fifth, { pointerType: "mouse" });
+    act(() => {
+      vi.advanceTimersByTime(HOVER_DWELL_MS - 1);
+    });
+    expect(rank()).toBe("0");
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(rank()).toBe("5");
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("caches each pitch's grant until shortly before it expires", async () => {
+    let clock = 1_000_000;
+    const authorize = vi.fn((_c: string, id: string) =>
+      Promise.resolve({
+        playbackUrl: `https://cdn.example.invalid/${id}.m3u8`,
+        expiresAt: new Date(clock + 5 * 60_000).toISOString(),
+      }),
+    );
+    const grants = createPreviewGrants(authorize, () => clock);
+    const first = await grants("c1", "m1");
+    expect(await grants("c1", "m1")).toBe(first);
+    expect(authorize).toHaveBeenCalledTimes(1);
+    await grants("c2", "m2");
+    expect(authorize).toHaveBeenCalledTimes(2);
+    // Revisiting m1 reuses it; close to expiry it is asked for again.
+    await grants("c1", "m1");
+    expect(authorize).toHaveBeenCalledTimes(2);
+    clock += 5 * 60_000 - GRANT_REUSE_MARGIN_MS;
+    await grants("c1", "m1");
+    expect(authorize).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps one grant request in flight; a newer one replaces a waiting one", async () => {
+    const resolvers: (() => void)[] = [];
+    const authorize = vi.fn(
+      (_c: string, id: string) =>
+        new Promise<{ playbackUrl: string; expiresAt: string }>((resolve) => {
+          resolvers.push(() =>
+            resolve({
+              playbackUrl: `https://cdn.example.invalid/${id}.m3u8`,
+              expiresAt: "2099-01-01T00:00:00.000Z",
+            }),
+          );
+        }),
+    );
+    const grants = createPreviewGrants(authorize);
+    const a = grants("c", "a");
+    const b = grants("c", "b");
+    const c = grants("c", "c");
+    expect(authorize).toHaveBeenCalledTimes(1);
+    await expect(b).rejects.toBeInstanceOf(SupersededGrantRequest);
+    resolvers[0]?.();
+    await a;
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(authorize).toHaveBeenCalledTimes(2);
+    expect(authorize).toHaveBeenLastCalledWith("c", "c");
+    resolvers[1]?.();
+    expect((await c).playbackUrl).toContain("/c.m3u8");
   });
 
   it("shows posters only under reduced motion", () => {

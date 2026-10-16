@@ -22,7 +22,9 @@ import { isPlaybackUsable } from "../discover/player/pitch-playback";
 import { useReducedMotionPreference } from "../discover/player/use-pitch-playback";
 
 import {
+  HOVER_DWELL_MS,
   chooseActivePreview,
+  createPreviewGrants,
   linkIsConstrained,
   type LinkInfo,
 } from "./grid-preview";
@@ -34,6 +36,25 @@ import {
  * holds more than one grid player, and that one claims the page's active
  * player slot (R36), so it also yields to the opened pitch.
  */
+
+/**
+ * One grant cache per authorizer, for the life of the page: revisiting a
+ * tile reuses its grant, and at most one request is ever in flight.
+ */
+const grantCaches = new WeakMap<
+  AuthorizePreview,
+  ReturnType<typeof createPreviewGrants<PlaybackAuthorizationDto>>
+>();
+export function previewGrantsFor(
+  authorize: AuthorizePreview,
+): ReturnType<typeof createPreviewGrants<PlaybackAuthorizationDto>> {
+  let grants = grantCaches.get(authorize);
+  if (grants === undefined) {
+    grants = createPreviewGrants(authorize);
+    grantCaches.set(authorize, grants);
+  }
+  return grants;
+}
 
 export type AuthorizePreview = (
   companyId: string,
@@ -96,7 +117,10 @@ export function useGridPreview(
   suspended: boolean,
 ): {
   readonly active: string | null;
+  /** A mouse entered this tile: it takes over after HOVER_DWELL_MS. */
   readonly hover: (mediaAssetId: string) => void;
+  /** The mouse left this tile: a takeover still waiting is dropped. */
+  readonly leave: (mediaAssetId: string) => void;
 } {
   const reducedMotion = useReducedMotionPreference();
   const canHover = useSyncExternalStore(
@@ -157,10 +181,33 @@ export function useGridPreview(
     suspended: suspended || hidden,
   });
 
+  // A resting pointer, not a pass across the grid: the takeover waits.
+  const dwell = useRef<{
+    readonly id: string;
+    readonly timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
+  useEffect(
+    () => () => {
+      if (dwell.current !== null) clearTimeout(dwell.current.timer);
+    },
+    [],
+  );
   const hover = useCallback((mediaAssetId: string) => {
-    setHovered(mediaAssetId);
+    if (dwell.current !== null) clearTimeout(dwell.current.timer);
+    dwell.current = {
+      id: mediaAssetId,
+      timer: setTimeout(() => {
+        dwell.current = null;
+        setHovered(mediaAssetId);
+      }, HOVER_DWELL_MS),
+    };
   }, []);
-  return { active, hover };
+  const leave = useCallback((mediaAssetId: string) => {
+    if (dwell.current?.id !== mediaAssetId) return;
+    clearTimeout(dwell.current.timer);
+    dwell.current = null;
+  }, []);
+  return { active, hover, leave };
 }
 
 /**
@@ -202,7 +249,7 @@ export function GridPreviewVideo({
     video.addEventListener("play", onPlay);
     video.addEventListener("playing", onPlaying);
     video.addEventListener("ended", onEnded);
-    authorize(companyId, mediaAssetId).then(
+    previewGrantsFor(authorize)(companyId, mediaAssetId).then(
       (grant) => {
         if (cancelled || !isPlaybackUsable(grant, Date.now())) return;
         detach = attachHlsOrNativeSource(
