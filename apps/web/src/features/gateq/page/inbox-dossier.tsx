@@ -20,6 +20,7 @@ import {
   receivedWords,
   speakerWords,
 } from "./inbox-model";
+import { summaryWords } from "./submitted-brief";
 
 /**
  * GateQ slice 1: the dossier frozen with a submission, inside the existing
@@ -205,7 +206,9 @@ export function DossierSection({
                         </span>
                       )}
                     </span>
-                    <span className="cq-body-sm gq-t2">{fact.summary}</span>
+                    <span className="cq-body-sm gq-t2">
+                      {summaryWords(fact.summary)}
+                    </span>
                     {fact.derivation === undefined ? null : (
                       <span className="cq-caption gq-t3">
                         {fact.derivation}

@@ -9,6 +9,7 @@ import type {
 import { Button } from "@capital-q/ui/button";
 import { QSection, useQDialog } from "@/features/q/q-section";
 import { loadDetailAction } from "./gateq-actions";
+import { summaryWords } from "./submitted-brief";
 
 export const GATEQ_COMPARE_MAX = 6;
 const GROUPS: readonly (readonly [GateqInvestmentGroup, string])[] = [
@@ -51,7 +52,9 @@ function Fact({
         }[fact.provenance];
   return (
     <div className="flex flex-col gap-1">
-      <p className="whitespace-pre-wrap break-words">{fact.summary}</p>
+      <p className="whitespace-pre-wrap break-words">
+        {summaryWords(fact.summary)}
+      </p>
       <p className="cq-caption gq-t2">
         Origin: {origin} · Truth: {truth} · Evidence: {evidence}
       </p>
