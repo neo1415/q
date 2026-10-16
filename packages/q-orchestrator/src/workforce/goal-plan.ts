@@ -59,8 +59,18 @@ function refsIn(
   known: ReadonlySet<string>,
   dropped: { count: number },
 ): string[] {
-  const kept = [...new Set(refs)].filter((ref) => known.has(ref));
-  dropped.count += new Set(refs).size - kept.length;
+  // A model may write "F3", "f3", "[F3]" or "F3 [OPEN_REQUEST] ...": the F
+  // number is read out of it, and only a fact the lead was shown is kept.
+  const asked = [
+    ...new Set(
+      refs.map((ref) => {
+        const found = /\bF([1-9][0-9]?)\b/iu.exec(ref);
+        return found === null ? ref : `F${found[1] ?? ""}`;
+      }),
+    ),
+  ];
+  const kept = asked.filter((ref) => known.has(ref));
+  dropped.count += asked.length - kept.length;
   return kept.slice(0, 6);
 }
 

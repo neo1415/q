@@ -24,6 +24,7 @@ import { useGlobalQ, useQMomentSource } from "@/components/app-shell/global-q";
 import { QAperture } from "@/features/q-aperture";
 import { Q_FEED_EVENT } from "@/features/q/client-actions";
 import { useQSessionOptional } from "@/features/q/q-session";
+import { QPageState } from "@/features/q/q-section";
 import { QPageSubject } from "@/features/q/q-subject";
 
 import { FeedCard } from "./feed-card";
@@ -654,14 +655,22 @@ function InvestorFeed({
           nothing — the Q API resolves and authorises the subject again.
         */
         offTab ? null : (
-          <QPageSubject
-            subject={{
-              kind: "COMPANY",
-              companyId: card.companyId,
-              label: card.canonicalName,
-              scope: "network_visible",
-            }}
-          />
+          <>
+            <QPageSubject
+              subject={{
+                kind: "COMPANY",
+                companyId: card.companyId,
+                label: card.canonicalName,
+                scope: "network_visible",
+              }}
+            />
+            {/*
+              The card in focus, on the page manifest too: Q's Next and
+              Previous on this feed (carousel.feed) are DONE only once it
+              moves (premiere v5 run, 16 Oct: never set, so always FAILED).
+            */}
+            <QPageState focus={{ kind: "COMPANY", id: card.companyId }} />
+          </>
         )
       }
       top={

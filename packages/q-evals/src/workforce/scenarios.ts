@@ -1,5 +1,5 @@
 import type { RelationshipBrief } from "@capital-q/contracts";
-import type { JobPlanResultV5 } from "@capital-q/q-core";
+import type { JobPlanResultV6 } from "@capital-q/q-core";
 import type {
   RelationshipOverview,
   StepResult,
@@ -52,7 +52,7 @@ export type WorkforceScenario = {
   /** The goal names exactly one company on record (binds NAMED_COMPANY). */
   readonly namedCompanyId: string | null;
   readonly permitted: readonly string[];
-  readonly scripted: JobPlanResultV5;
+  readonly scripted: JobPlanResultV6;
   /** What each step reports, by key; absent: DONE with no outputs. */
   readonly behaviour: Readonly<Record<string, StepResult>>;
   readonly expect: WorkforceScenarioExpectation;

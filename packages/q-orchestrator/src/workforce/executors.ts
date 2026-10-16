@@ -119,6 +119,24 @@ export type ExecutorAvailability = {
   readonly diligence?: boolean | undefined;
 };
 
+/**
+ * The tool each executor cannot work without (production 2026-10-15: a
+ * CONVERSATION step planned with only list_messages was approved, then
+ * HELD as "Not allowed to do this step", because the reply executor acts
+ * only through chat.message.send). A step without its role's required tool
+ * is refused before it is offered for approval, never discovered after.
+ */
+export const REQUIRED_TOOLS: Readonly<Record<QAgentRole, readonly string[]>> = {
+  LEAD: [],
+  CONVERSATION: ["chat.message.send"],
+  OUTREACH: ["relationship.interest.express"],
+  SCHEDULING: ["schedule.meeting.book"],
+  DISCOVERY: [],
+  RESEARCH: ["public_web.search"],
+  DOCUMENTS: ["documents.own.prepare"],
+  DILIGENCE: ["diligence.questions.prepare"],
+};
+
 /** The executors this deployment registers, by role. */
 export function registeredExecutors(
   availability: ExecutorAvailability,
@@ -215,7 +233,8 @@ export function executorRosterText(
       const agent = AGENT_REGISTRY[STORED_ROLE[executor.role]];
       const tools = executor.tools.filter((tool) => permitted.has(tool));
       const does = executor.role === "DILIGENCE" ? DILIGENCE_DOES : agent.does;
-      return `- ${executor.role} (${roleTitle(executor.role)}): ${does} Tools: ${tools.join(", ") || "none permitted"}.`;
+      const required = REQUIRED_TOOLS[executor.role];
+      return `- ${executor.role} (${roleTitle(executor.role)}): ${does} Tools: ${tools.join(", ") || "none permitted"}.${required.length === 0 ? "" : ` A ${executor.role} step must include ${required.join(" and ")}.`}`;
     })
     .join("\n");
 }

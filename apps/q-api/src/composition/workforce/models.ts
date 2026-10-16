@@ -15,7 +15,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   DraftRedraftResultSchema,
   DraftReviewResultV2Schema,
-  JobPlanResultV5Schema,
+  JobPlanResultV6Schema,
   renderPrompt,
   SubstanceCritiqueResultSchema,
   type SubstanceCritiqueResult,
@@ -32,7 +32,7 @@ import {
   type DraftReviewResultV2,
   type DraftReviewV2Variables,
   type EtiquettePurpose,
-  type JobPlanResultV5,
+  type JobPlanResultV6,
   type JobPlanVariablesV5,
   type ReplyReaderResult,
   type ReplyReaderVariables,
@@ -118,7 +118,7 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     variables: PlanVariables,
-  ) => Promise<JobPlanResultV5 | null>;
+  ) => Promise<JobPlanResultV6 | null>;
   readonly critique: (
     who: Who,
     trace: Trace,
@@ -267,13 +267,13 @@ export function createWorkforceModels(dependencies: {
         etiquette: null,
       }),
     plan: (who, trace, variables) =>
-      call<PlanVariables, JobPlanResultV5>({
+      call<PlanVariables, JobPlanResultV6>({
         task: "JOB_PLAN",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: JobPlanResultV5Schema,
+        schema: JobPlanResultV6Schema,
         budget: PLAN,
         environmentNotes:
           "You are planning, not acting. Code checks every step against what they allowed before anything happens.",
