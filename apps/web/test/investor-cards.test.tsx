@@ -31,11 +31,13 @@ const investor = (coverUrl: string | null) =>
 
 describe("investor cards (demo audit 2026-10-03)", () => {
   it("draws a quiet horizon, never an empty grey band, when the investor set no cover", () => {
-    // Owner 2026-10-16: every investor card carries a banner.
+    // Owner 2026-10-16: every investor card carries a banner; drawn ridges
+    // in theme tokens, never an invented image (live check the same day).
     const { container } = render(<InvestorCards items={[investor(null)]} />);
-    const band = container.querySelector<HTMLElement>("[data-cover-band]");
+    const band = container.querySelector("[data-cover-band]");
     expect(band?.getAttribute("aria-hidden")).toBe("true");
-    expect(band?.style.backgroundImage).toContain("var(--cq-accent)");
+    expect(band?.querySelectorAll("path").length).toBe(3);
+    expect(band?.innerHTML).toContain("var(--cq-accent-soft)");
     expect(container.querySelector("img")).toBeNull();
   });
 

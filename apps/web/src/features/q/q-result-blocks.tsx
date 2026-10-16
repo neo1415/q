@@ -684,7 +684,7 @@ function ComparisonTable({
   const nameOf = useSubjectNames(block.subjects);
   return (
     <QResultCard label="Side by side">
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead>
             <tr>

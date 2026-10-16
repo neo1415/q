@@ -112,6 +112,74 @@ describe("what Q reads", () => {
   });
 });
 
+describe("the mandate check names the facts it read (live check 2026-10-16)", () => {
+  it("cites a location criterion to the country fact, not to stage or raise", () => {
+    const COUNTRY = "6b1f0e5e-0000-4000-8000-000000000003";
+    const STAGE = "6b1f0e5e-0000-4000-8000-000000000004";
+    const RAISE = "6b1f0e5e-0000-4000-8000-000000000005";
+    const fact = (dimension: string, sourceFactId: string) => ({
+      dimension,
+      label: dimension,
+      summary: "x",
+      provenance: "APPLICANT_PROVIDED" as const,
+      sourceFactId,
+      sourceTurnSeq: null,
+      truthClass: "USER_CLAIM" as const,
+      evidenceStatus: "SELF_REPORTED" as const,
+    });
+    const checked = {
+      ...dossier,
+      qualification: {
+        ...dossier.qualification,
+        criteria: [
+          {
+            label: "Where the company is based",
+            requiredness: "REQUIRED",
+            status: "NO_MATCH",
+          },
+          {
+            label: "Stage we invest at",
+            requiredness: "REQUIRED",
+            status: "MATCH",
+          },
+          {
+            label: "Our cheque size",
+            requiredness: "REQUIRED",
+            status: "MATCH",
+          },
+          {
+            label: "Something else",
+            requiredness: "PREFERRED",
+            status: "UNKNOWN",
+          },
+        ],
+      },
+      dimensions: [
+        {
+          group: "COMPANY",
+          label: "Company",
+          facts: [
+            fact("company.country", COUNTRY),
+            fact("company.stage", STAGE),
+            fact("raise.amount", RAISE),
+          ],
+        },
+      ],
+    } as unknown as GateqDossierV1;
+    const { findings } = synthesisContext({ dossier: checked, transcript });
+    expect(findings).toContain(
+      `Where the company is based NO_MATCH (checked against sourceFactId=${COUNTRY})`,
+    );
+    expect(findings).toContain(
+      `Stage we invest at MATCH (checked against sourceFactId=${STAGE})`,
+    );
+    expect(findings).toContain(
+      `Our cheque size MATCH (checked against sourceFactId=${RAISE})`,
+    );
+    expect(findings).toContain("Something else UNKNOWN.");
+  });
+});
+
 describe("what survives", () => {
   it("keeps only points that cite a real fact or turn, all as Q's inference", () => {
     const out = citedSynthesis(
@@ -223,5 +291,24 @@ describe("the job", () => {
     });
     expect(await job.sweep(1)).toEqual({ ready: 0, failed: 1 });
     expect(recorded).toEqual([]);
+  });
+});
+
+describe("money in the dossier (live check 2026-10-16)", () => {
+  it("reads as the currency and grouped digits, and still parses back, old format too", async () => {
+    const { amountWords, amountOfSummary } =
+      await import("../src/application/stated-amount.js");
+    expect(amountWords("360000", "USD")).toBe("USD 360,000");
+    expect(amountWords("1500000.50", "EUR")).toBe("EUR 1,500,000.50");
+    expect(amountWords("950.00", "NGN")).toBe("NGN 950");
+    expect(amountOfSummary("USD 360,000")).toEqual({
+      amount: "360000",
+      currency: "USD",
+    });
+    expect(amountOfSummary("360000 USD")).toEqual({
+      amount: "360000",
+      currency: "USD",
+    });
+    expect(amountOfSummary("USD 36,00")).toBeNull();
   });
 });

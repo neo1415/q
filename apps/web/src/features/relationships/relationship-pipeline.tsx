@@ -479,7 +479,9 @@ export function RelationshipPipeline({
           </Link>
         </div>
       ) : layout === "table" ? (
-        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        // `relative`: the rows' sr-only labels are absolutely positioned and
+        // would otherwise escape this scroller's clip and widen the page.
+        <div className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <table
             data-pipeline-records
             className="cq-body-sm w-full border-collapse text-left"
@@ -579,7 +581,7 @@ export function RelationshipPipeline({
         // of the next, so the row reads as scrollable.
         <div
           data-pipeline-records
-          className="-mx-4 flex snap-x snap-mandatory scroll-px-4 items-start gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:snap-none sm:scroll-px-0 sm:px-0"
+          className="relative -mx-4 flex snap-x snap-mandatory scroll-px-4 items-start gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:snap-none sm:scroll-px-0 sm:px-0"
         >
           {BOARD_STATES.filter((state) =>
             rows.some((row) => row.state === state),

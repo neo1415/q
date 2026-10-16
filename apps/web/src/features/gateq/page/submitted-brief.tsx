@@ -7,6 +7,7 @@ import type {
 import { QControl } from "@/features/q/control/q-control";
 
 import { FitGlyph } from "../fit-glyph";
+import { summaryWords } from "./summary-words";
 
 const STATUS = {
   MATCH: "Meets",
@@ -255,12 +256,15 @@ export function SubmittedBrief({
             {dossier.dimensions.map((group) => (
               <section key={group.group} aria-label={group.label}>
                 <h5 className="cq-label">{group.label}</h5>
+                {group.facts.length === 0 ? (
+                  <p className="cq-body-sm gq-t2 py-2">Not provided</p>
+                ) : null}
                 <ul className="gq-hair">
                   {group.facts.map((fact) => (
                     <li key={fact.dimension} className="py-3">
                       <h6 className="cq-body-sm font-medium">{fact.label}</h6>
                       <p className="cq-body-sm whitespace-pre-wrap break-words">
-                        {fact.summary}
+                        {summaryWords(fact.summary)}
                       </p>
                       <dl className="cq-caption gq-t2 mt-1 flex flex-wrap gap-x-4 gap-y-1">
                         <div>

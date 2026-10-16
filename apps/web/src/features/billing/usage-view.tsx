@@ -142,7 +142,7 @@ export function UsageView({ usage }: { readonly usage: QUsageDto }) {
           >
             Breakdown
           </h2>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="cq-body-sm w-full border-collapse">
               <thead>
                 <tr className="cq-caption text-left text-(--cq-text-secondary)">

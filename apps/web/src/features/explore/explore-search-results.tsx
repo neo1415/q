@@ -156,7 +156,7 @@ export function ExploreSearchResults({
       )}
       <nav
         aria-label="Result types"
-        className="flex gap-[22px] overflow-x-auto border-b border-(--cq-border-subtle) [scrollbar-width:none]"
+        className="relative flex gap-[22px] overflow-x-auto border-b border-(--cq-border-subtle) [scrollbar-width:none]"
       >
         {EXPLORE_SEARCH_TABS.map((option) => (
           <Link

@@ -2,7 +2,10 @@ import "server-only";
 
 import {
   type ApiSession,
+  getCapitalLedger,
+  getChatUnread,
   getCompanyNetworkPreview,
+  getMyCommitments,
   getDiscoveredInvestor,
   listCompanyRelationships,
   listInvestorRelationships,
@@ -12,12 +15,25 @@ import {
 import type {
   RelationshipBrief,
   RelationshipSummaryDto,
+  ReminderDto,
 } from "@capital-q/contracts";
 
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { investorTypeLabel } from "@/features/investors/investor-labels";
 
 import { apiSession, type OwnContext } from "@/features/q/context";
+
+import {
+  commitmentFacts,
+  lastActivityAt,
+  listOrder,
+  nextStepFor,
+  pageAfter,
+  rowFacts,
+  type CommitmentFact,
+  type NextStep,
+} from "./relationships-view";
+import { relationshipHref } from "./relationship-words";
 
 /**
  * The side's own relationships (CQ-WEB-030), or undefined when they
@@ -190,34 +206,139 @@ export async function relationshipDigests(
 
   const entries = page.map((item, at) => {
     const profile = profiles[at] ?? null;
-    const own = reminders.filter(
-      (reminder) => reminder.relationshipId === item.relationshipId,
-    );
-    const pending = own
-      .filter((reminder) => reminder.status === "PENDING")
-      .toSorted((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
     const digest: RelationshipDigest = {
       photoUrl: profile?.photoUrl ?? null,
       about: profile?.about ?? null,
       chips: profile?.chips ?? [],
       websiteUrl: profile?.websiteUrl ?? null,
-      ...digestFacts(
-        briefs.get(item.relationshipId),
-        item.state === "IN_DILIGENCE",
-      ),
-      nextReminder:
-        pending[0] === undefined
-          ? null
-          : { title: pending[0].title, dueAt: pending[0].dueAt },
-      followUpDue: own.some(
-        (reminder) =>
-          reminder.status === "DELIVERED" ||
-          (reminder.status === "PENDING" && Date.parse(reminder.dueAt) <= now),
-      ),
+      ...stepDigest(item, briefs.get(item.relationshipId), reminders, now),
     };
     return [item.relationshipId, digest] as const;
   });
   return Object.fromEntries(entries);
+}
+
+type StepDigest = Omit<
+  RelationshipDigest,
+  "photoUrl" | "about" | "chips" | "websiteUrl"
+>;
+
+/** What decides a row's next step: its brief and its reminders. */
+function stepDigest(
+  item: RelationshipSummaryDto,
+  brief: RelationshipBrief | undefined,
+  reminders: readonly ReminderDto[],
+  now: number,
+): StepDigest {
+  const own = reminders.filter(
+    (reminder) => reminder.relationshipId === item.relationshipId,
+  );
+  const pending = own
+    .filter((reminder) => reminder.status === "PENDING")
+    .toSorted((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
+  return {
+    ...digestFacts(brief, item.state === "IN_DILIGENCE"),
+    nextReminder:
+      pending[0] === undefined
+        ? null
+        : { title: pending[0].title, dueAt: pending[0].dueAt },
+    followUpDue: own.some(
+      (reminder) =>
+        reminder.status === "DELIVERED" ||
+        (reminder.status === "PENDING" && Date.parse(reminder.dueAt) <= now),
+    ),
+  };
+}
+
+/**
+ * The commitments waiting on this side, by relationship id, from the same
+ * Capital read its "Needs you" lists. Unreadable: none known (empty).
+ */
+export async function ownCommitmentFacts(
+  context: OwnContext,
+): Promise<Readonly<Record<string, CommitmentFact>>> {
+  if (context.kind !== "FOUNDER" && context.kind !== "INVESTOR") return {};
+  const session = await apiSession();
+  if (session === null) return {};
+  try {
+    const book =
+      context.kind === "FOUNDER"
+        ? await getCapitalLedger(session, context.companyId)
+        : await getMyCommitments(session);
+    return commitmentFacts(book.commitments);
+  } catch {
+    return {};
+  }
+}
+
+/** R34: unread chat per relationship; an unreadable count is none. */
+export async function unreadByRelationship(): Promise<
+  ReadonlyMap<string, number>
+> {
+  const session = await apiSession();
+  if (session === null) return new Map();
+  try {
+    const { items } = await getChatUnread(session);
+    return new Map(items.map((item) => [item.relationshipId, item.unread]));
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Every relationship's own next step, decided exactly as the Pipeline
+ * list decides it (same facts, same first page read in full, same
+ * nextStepFor), so the Overview's "Needs you" and Pipeline's filter can
+ * never disagree. One batched brief read; no per-row profile reads.
+ */
+export async function relationshipSteps(
+  context: OwnContext,
+  items: readonly RelationshipSummaryDto[],
+  reminders: readonly ReminderDto[],
+  now: number,
+): Promise<
+  readonly {
+    readonly item: RelationshipSummaryDto;
+    readonly step: NextStep;
+    readonly at: string;
+  }[]
+> {
+  if (context.kind !== "FOUNDER" && context.kind !== "INVESTOR") return [];
+  const side = context.kind === "FOUNDER" ? "COMPANY" : "INVESTOR";
+  const session = await apiSession();
+  if (session === null || items.length === 0) return [];
+  const page = pageAfter(items.toSorted(listOrder), null).items.slice(
+    0,
+    DIGEST_LIMIT,
+  );
+  const [briefs, unread, commitments] = await Promise.all([
+    listRelationshipBriefs(session, {
+      companyId: context.kind === "FOUNDER" ? context.companyId : undefined,
+      relationshipIds: page.map((item) => item.relationshipId),
+    })
+      .then(
+        (list) =>
+          new Map(list.items.map((brief) => [brief.relationshipId, brief])),
+      )
+      .catch(() => new Map<string, RelationshipBrief>()),
+    unreadByRelationship(),
+    ownCommitmentFacts(context),
+  ]);
+  const read = new Set(page.map((item) => item.relationshipId));
+  return items.map((item) => {
+    const facts = rowFacts(
+      read.has(item.relationshipId)
+        ? stepDigest(item, briefs.get(item.relationshipId), reminders, now)
+        : undefined,
+      unread.get(item.relationshipId) ?? 0,
+      commitments[item.relationshipId],
+    );
+    return {
+      item,
+      step: nextStepFor(item, facts, side, now, relationshipHref(item)),
+      at: lastActivityAt(item, facts),
+    };
+  });
 }
 
 /** The counterpart as the network shows it to this side; nothing private. */

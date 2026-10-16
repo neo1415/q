@@ -546,3 +546,32 @@ describe("the submitted investor brief", () => {
     ).toBeTruthy();
   });
 });
+
+describe("dossier figures in words (live check 2026-10-16)", () => {
+  it("reads an amount frozen as '360000 USD' as the currency and grouped digits", async () => {
+    const { summaryWords } =
+      await import("../src/features/gateq/page/summary-words");
+    expect(summaryWords("360000 USD")).toBe("USD 360,000");
+    expect(summaryWords("1500000.5 EUR")).toBe("EUR 1,500,000.50");
+    expect(summaryWords("USD 360,000")).toBe("USD 360,000");
+    expect(summaryWords("4 design partners")).toBe("4 design partners");
+  });
+
+  it("says Not provided under a dimension heading with nothing recorded", async () => {
+    const { SubmittedBrief } =
+      await import("../src/features/gateq/page/submitted-brief");
+    render(
+      <SubmittedBrief
+        dossier={{
+          ...dossier,
+          dimensions: [
+            { group: "TEAM", label: "Team", facts: [] },
+          ] as unknown as GateqDossierV1["dimensions"],
+        }}
+        synthesis={null}
+      />,
+    );
+    const team = screen.getByRole("region", { name: "Team" });
+    expect(within(team).getByText("Not provided")).toBeTruthy();
+  });
+});

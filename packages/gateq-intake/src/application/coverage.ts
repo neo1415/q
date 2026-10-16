@@ -16,6 +16,7 @@ import {
   STAGE_WORDS,
 } from "../inbox/domain.js";
 import { contradictionsIn, questionNeedsFor } from "./question-needs.js";
+import { amountWords } from "./stated-amount.js";
 
 /**
  * What an application covers, before the founder presses Submit (GateQ
@@ -142,7 +143,7 @@ export function factSummary(
     case "TEXT":
       return value.text;
     case "AMOUNT":
-      return `${value.amount} ${value.currency}`;
+      return amountWords(value.amount, value.currency);
     case "PHRASES":
       return value.phrases.join(", ");
     case "NONE":

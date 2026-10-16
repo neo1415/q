@@ -298,6 +298,25 @@
   .cq-shell:has([data-chat-thread]) .cq-shell-main {
     padding-bottom: var(--cq-safe-bottom);
   }
+  /* While a Q Pitch tour runs, its strip is fixed over the page's foot
+     (about 9rem with its offset): the page gets room to scroll its last
+     part clear of it (16 Oct run 4: the strip covered the CRM record's
+     history at the end of the page). Not under a full-height stage or a
+     thread, which never scroll. */
+  :root:has(section[data-q-pitch])
+    .cq-shell:not(:has(.cq-q-home, [data-feed-immersive], [data-chat-thread]))
+    .cq-shell-main {
+    padding-bottom: calc(
+      var(--cq-bottom-nav-height) + var(--cq-safe-bottom) + 10rem
+    );
+  }
+  @media (min-width: 1024px) {
+    :root:has(section[data-q-pitch])
+      .cq-shell:not(:has(.cq-q-home, [data-feed-immersive], [data-chat-thread]))
+      .cq-shell-main {
+      padding-bottom: 10rem;
+    }
+  }
   /* The "fictional" foot note never sits under a full-height stage or a
      thread, where it added a strip and a second scroll. The names on those
      pages still lose their mark; the note shows on the next page. */

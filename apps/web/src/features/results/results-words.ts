@@ -22,7 +22,9 @@ export function rangeOf(value: string | undefined): KnownRange {
 
 const STATE_WORDS: Readonly<Record<string, string>> = {
   DISCOVERED: "Discovered",
-  INTEREST_EXPRESSED: "Interest sent",
+  // The Pipeline filter's word: these wait on the founder's answer now,
+  // not "Interest sent" (the period's count above; live check 2026-10-16).
+  INTEREST_EXPRESSED: "Awaiting reply",
   CONNECTED: "Connected",
   IN_DILIGENCE: "In diligence",
   DECLINED: "Declined",
@@ -147,7 +149,7 @@ export function commitmentLines(
   readonly amounts: readonly string[];
 }[] {
   const labels = {
-    CONFIRMED: "Confirmed",
+    CONFIRMED: "Confirmed, not yet received",
     STATED: "Stated, not confirmed",
     WITHDRAWN: "Withdrawn",
   } as const;

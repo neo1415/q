@@ -246,7 +246,8 @@ export function PipelineSavedViews({
           <input
             aria-label="View name"
             placeholder="View name"
-            className={inputClass}
+            // Shrinks and wraps on a phone instead of widening the page.
+            className={`${inputClass} min-w-0 flex-1 basis-40`}
             value={name}
             maxLength={64}
             onChange={(event) => setName(event.target.value)}

@@ -31,6 +31,7 @@ import { setScreenFocusSource } from "@/features/q/screen";
 import { QSessionProvider, useQSessionOptional } from "@/features/q/q-session";
 import {
   QSubjectProvider,
+  useQAboutLabel,
   useQSubject,
   type QSubject,
 } from "@/features/q/q-subject";
@@ -389,12 +390,15 @@ export function GlobalQTrigger({
 function GlobalQSheet() {
   const { open, setOpen, connected, seed, moment } = useContext(GlobalQContext);
   const subject = useQSubject();
+  const label = useQAboutLabel();
   const about =
     moment !== null
       ? `${describeMoment(moment)}.`
-      : subject.kind === "NONE"
-        ? "About what you're looking at."
-        : `About ${subject.label ?? "this"}.`;
+      : label !== null
+        ? `About ${label}.`
+        : subject.kind === "NONE"
+          ? "About what you're looking at."
+          : "About this.";
   return (
     <SheetRoot open={open} onOpenChange={setOpen}>
       {open ? (
