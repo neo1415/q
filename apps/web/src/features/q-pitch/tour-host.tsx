@@ -32,6 +32,7 @@ import { useQSessionOptional } from "@/features/q/q-session";
 import type { TourSubject } from "./subject-model";
 import { setNarrationVoice, standardVoicePlaying } from "./narrator";
 import { RESUME_KEY } from "./resume";
+import { unlightAll } from "./section-light";
 import { openTourVoice } from "./tour-voice";
 import { viewerQuestions } from "./live-question";
 import { useTourPorts, type TranscriptSink } from "./use-tour-ports";
@@ -233,6 +234,7 @@ export function QPitchHost({
     return () => {
       transcript.current = null;
       next.dispose();
+      unlightAll();
       slot.set(null);
       heard.set(null);
     };

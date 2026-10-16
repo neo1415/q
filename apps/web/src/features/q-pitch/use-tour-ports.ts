@@ -45,6 +45,7 @@ import {
   type Narrator,
 } from "./narrator";
 import { rehearsalPorts } from "./rehearsal-ports";
+import { lightSection, unlightAll } from "./section-light";
 import { TOUR_BRIEF } from "./tour-voice";
 
 /**
@@ -331,6 +332,7 @@ export function useTourPorts(
       signal: AbortSignal,
     ): Promise<ActionOutcome> => {
       setOpen(false);
+      unlightAll();
       await closePanels();
       const handle = requestMove({ path });
       const settled = await Promise.race([
@@ -654,9 +656,17 @@ export function useTourPorts(
         }
       },
       execute,
-      speak: (lines, signal) => {
+      speak: async (lines, signal) => {
         narrator ??= sessionNarrator(() => qRef.current);
-        return narrator.speak(lines, signal);
+        // v6: a line about a section lights that section first, so the
+        // light moves with the narration (owner, 16 Oct).
+        for (const line of lines) {
+          if (signal.aborted) return;
+          if (line.anchor !== undefined) {
+            await lightSection(line.anchor, { open: line.open }, signal);
+          }
+          await narrator.speak([line], signal);
+        }
       },
       clearScoped: () => {
         receipt.current = [];
