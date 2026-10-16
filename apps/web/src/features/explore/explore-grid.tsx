@@ -7,7 +7,12 @@ import { Play } from "@capital-q/ui/icons";
 
 import { companyPhotoPath } from "@/features/entity/entity-avatar";
 
-import { REASON_WORDS, durationLabel, tileHook, tileMeta } from "./explore-words";
+import {
+  REASON_WORDS,
+  durationLabel,
+  tileHook,
+  tileMeta,
+} from "./explore-words";
 import { mosaicCellStyle, mosaicLayouts } from "./mosaic";
 
 /**

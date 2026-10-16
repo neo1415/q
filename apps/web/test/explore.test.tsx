@@ -31,16 +31,15 @@ import {
   type ExploreDataSource,
 } from "../src/features/explore/explore-screen";
 import {
-  TILE_RATIO_MAX,
-  TILE_RATIO_MIN,
+  MOSAIC_COLUMNS,
   columnsForWidth,
-  placeMasonry,
-  tileRatio,
-  tileRatioAt,
-} from "../src/features/explore/masonry";
+  mosaicCellStyle,
+  mosaicLayouts,
+  placeMosaic,
+} from "../src/features/explore/mosaic";
 
 /**
- * Explore (E1-E5, ADR 0055) on the web: the masonry math, the grid's
+ * Explore (E1-E5, ADR 0055) on the web: the mosaic math, the grid's
  * order and posters, the related feed, search routing to profiles, the
  * end of the slate, and that nothing is ever counted.
  */
@@ -65,57 +64,76 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("masonry layout math", () => {
-  it("clamps tile heights between 4:3 and 2:3 and reads both spellings", () => {
-    expect(tileRatio("9:16")).toBe(TILE_RATIO_MAX);
-    expect(tileRatio("9/16")).toBe(TILE_RATIO_MAX);
-    expect(tileRatio("4:5")).toBeCloseTo(5 / 4);
-    expect(tileRatio("1:1")).toBe(1);
-    expect(tileRatio("16:9")).toBe(TILE_RATIO_MIN);
-    expect(tileRatio("9:21")).toBe(TILE_RATIO_MAX);
-    // Unknown is the portrait default, never a zero-height box.
-    expect(tileRatio(null)).toBe(TILE_RATIO_MAX);
-    expect(tileRatio("nonsense")).toBe(TILE_RATIO_MAX);
+describe("mosaic layout math", () => {
+  it("uses 3 columns on a phone (as Instagram) and 4-5 on a desktop", () => {
+    expect(columnsForWidth(358)).toBe(3);
+    expect(columnsForWidth(390)).toBe(3);
+    expect(columnsForWidth(720)).toBe(4);
+    expect(columnsForWidth(1136)).toBe(5);
   });
 
-  it("varies equal portrait tiles by rank, never above 2:3 or below 4:3", () => {
-    const ratios = Array.from({ length: 7 }, (_, index) =>
-      tileRatioAt("9:16", index),
+  it("places 3 columns in bands of four squares and one tall tile, the side alternating", () => {
+    const placed = placeMosaic(10, 3);
+    expect(placed.map((p) => p.index)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    // Band 1: tall on the right, read top-left first.
+    expect(placed.slice(0, 5).map((p) => [p.column, p.row, p.rowSpan])).toEqual(
+      [
+        [1, 1, 1],
+        [2, 1, 1],
+        [3, 1, 2],
+        [1, 2, 1],
+        [2, 2, 1],
+      ],
     );
-    expect(new Set(ratios.map((r) => r.toFixed(3))).size).toBeGreaterThan(3);
-    for (const ratio of ratios) {
-      expect(ratio).toBeLessThanOrEqual(TILE_RATIO_MAX);
-      expect(ratio).toBeGreaterThanOrEqual(TILE_RATIO_MIN);
+    // Band 2: tall on the left.
+    expect(placed[5]).toMatchObject({ column: 1, row: 3, rowSpan: 2 });
+    expect(placed.filter((p) => p.rowSpan === 2)).toHaveLength(2);
+  });
+
+  it("fills every cell of a full band, gapless, at every column count", () => {
+    // Whole bands: 5 tiles per band at 3 columns, 7 at 4, 6 then 9 at 5.
+    const whole = { 3: 60, 4: 56, 5: 60 } as const;
+    for (const columns of MOSAIC_COLUMNS) {
+      const placed = placeMosaic(whole[columns], columns);
+      const taken = new Set<string>();
+      for (const p of placed) {
+        for (let c = 0; c < p.columnSpan; c++) {
+          for (let r = 0; r < p.rowSpan; r++) {
+            const key = `${String(p.column + c)}:${String(p.row + r)}`;
+            expect(taken.has(key)).toBe(false);
+            expect(p.column + c).toBeLessThanOrEqual(columns);
+            taken.add(key);
+          }
+        }
+      }
+      const rows = Math.max(...placed.map((p) => p.row + p.rowSpan - 1));
+      // Every cell of every band is covered: no holes in the mosaic.
+      expect(taken.size).toBe(rows * columns);
     }
-    expect(tileRatioAt("16:9", 1)).toBe(TILE_RATIO_MIN);
+    // Wide screens also get a large two-by-two tile.
+    expect(
+      placeMosaic(15, 5).some((p) => p.columnSpan === 2 && p.rowSpan === 2),
+    ).toBe(true);
   });
 
-  it("uses 2 columns on a phone and 4-5 on a desktop", () => {
-    expect(columnsForWidth(390)).toBe(2);
-    expect(columnsForWidth(800)).toBe(3);
-    expect(columnsForWidth(1280)).toBe(4);
-    expect(columnsForWidth(1440)).toBe(5);
-  });
-
-  it("places in rank order into the shortest column, leftmost on a tie", () => {
-    const layout = placeMasonry([16 / 9, 1.25, 1.25, 1.25], 2);
-    expect(layout.placements.map((p) => p.column)).toEqual([0, 1, 1, 0]);
-    expect(layout.placements.map((p) => p.index)).toEqual([0, 1, 2, 3]);
-    const third = layout.placements[2];
-    expect(third?.tilesAbove).toBe(1);
-    expect(third?.ratiosAbove).toBeCloseTo(1.25);
-    // The reserved height is the tallest column's.
-    expect(layout.height.tiles).toBe(2);
+  it("gives each cell its place for every column count, as CSS", () => {
+    const style = mosaicCellStyle(mosaicLayouts(5), 2);
+    expect(style).toMatchObject({
+      "--x3": "3 / span 1",
+      "--y3": "1 / span 2",
+    });
+    expect(Object.keys(style)).toEqual(
+      expect.arrayContaining(["--x4", "--y4", "--x5", "--y5"]),
+    );
   });
 });
 
 describe("the grid", () => {
-  it("keeps DOM order equal to rank order, posters only, a reason on every tile", () => {
+  it("keeps DOM order equal to rank order, posters only, no captions under tiles", () => {
     const { container } = render(
       <ExploreGrid
         tiles={FIXTURE_TILES}
         posters={FIXTURE_POSTERS}
-        columns={2}
         sectorLabels={labels}
         onOpen={() => undefined}
       />,
@@ -126,16 +144,57 @@ describe("the grid", () => {
     );
     // Reserved boxes: every cell is placed before any poster loads.
     for (const cell of cells) {
-      expect((cell as HTMLElement).style.height).not.toBe("");
+      expect((cell as HTMLElement).style.getPropertyValue("--y3")).not.toBe("");
     }
     expect(container.querySelector("video")).toBeNull();
+    // Why each tile is shown is still on every tile (hover/focus), and in
+    // its accessible name, with "video" said in words, not only an icon.
     expect(container.querySelectorAll("[data-reason]")).toHaveLength(
       FIXTURE_TILES.length,
     );
-    expect(
-      screen.getAllByText("Outside your usual focus").length,
-    ).toBeGreaterThan(0);
+    const first = FIXTURE_TILES[0];
+    if (first === undefined) throw new Error("no fixture tile");
+    const button = within(cells[0] as HTMLElement).getByRole("button");
+    const name = button.getAttribute("aria-label") ?? "";
+    expect(name).toContain(first.canonicalName);
+    expect(name).toContain("Pitch video");
+    expect(name).toContain("Matches your mandate");
+    // The tile shows the company's name on the image, and no stage label.
+    expect(cells[0]?.textContent).not.toMatch(/Seed|Series/);
     expect(container.textContent ?? "").not.toMatch(COUNT_WORDS);
+  });
+
+  it("opens the tile that was tapped, by rank", () => {
+    const onOpen = vi.fn();
+    render(
+      <ExploreGrid
+        tiles={FIXTURE_TILES.slice(0, 6)}
+        posters={{}}
+        sectorLabels={labels}
+        onOpen={onOpen}
+      />,
+    );
+    const buttons = screen.getAllByRole("button");
+    fireEvent.click(buttons[3] as HTMLElement);
+    expect(onOpen).toHaveBeenCalledWith(3);
+  });
+
+  it("never leaves a tile without a poster as an empty box", () => {
+    const { container } = render(
+      <ExploreGrid
+        tiles={FIXTURE_TILES.slice(0, 2)}
+        posters={{}}
+        sectorLabels={labels}
+        onOpen={() => undefined}
+      />,
+    );
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(
+      `/api/company-photo/${FIXTURE_TILES[0]?.companyId ?? ""}`,
+    );
+    expect(container.querySelector(".cq-explore-initial")?.textContent).toBe(
+      FIXTURE_TILES[0]?.canonicalName.slice(0, 1).toUpperCase(),
+    );
   });
 });
 
@@ -234,7 +293,6 @@ describe("search", () => {
     render(
       <ExploreSearchResults
         view={fixtureSearch("full", "top")}
-        columns={2}
         posters={FIXTURE_POSTERS}
         sectorLabels={labels}
         limited={null}

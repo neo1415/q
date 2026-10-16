@@ -579,7 +579,7 @@ export function ExploreScreen({
           <ExploreGrid
             tiles={shown}
             posters={posters}
-              sectorLabels={sectorLabels}
+            sectorLabels={sectorLabels}
             onOpen={(index) => open(shown, index)}
             onIntent={(index) => {
               const tile = shown[index];

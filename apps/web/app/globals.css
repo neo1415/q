@@ -3413,7 +3413,9 @@
     height: 18px;
     color: var(--cq-stage-text);
     fill: currentColor;
-    filter: drop-shadow(0 1px 2px color-mix(in oklch, var(--cq-stage-canvas) 70%, transparent));
+    filter: drop-shadow(
+      0 1px 2px color-mix(in oklch, var(--cq-stage-canvas) 70%, transparent)
+    );
   }
   /* The company name, small, on the image; the reason joins it on hover
      or keyboard focus (it is always in the tile's accessible name). */
