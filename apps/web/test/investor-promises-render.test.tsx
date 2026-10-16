@@ -265,7 +265,7 @@ describe("published gates for a founder (Q.05)", () => {
         ...["Lagos", "Fintech", "B2B", "Cheque"].map((label) => ({
           label,
           requiredness: "PREFERRED" as const,
-          dimension: "SECTOR" as const,
+          dimension: "TAXONOMY" as const,
           standing: "NOT_MET" as const,
         })),
       ],

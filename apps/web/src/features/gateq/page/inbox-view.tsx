@@ -493,7 +493,7 @@ export function InboxView({
               </div>
             ))}
           </div>
-          <div className="gq-detail">
+          <div className="gq-detail" data-content-pane>
             <div className="gq-dt">
               <Skeleton width="60%" height={28} />
               <Skeleton width="100%" height={40} />
@@ -833,7 +833,7 @@ export function InboxView({
       >
         <div className="gq-ibx">
           {list}
-          <div className="gq-detail" aria-live="polite">
+          <div className="gq-detail" aria-live="polite" data-content-pane>
             {detailPane}
           </div>
         </div>
