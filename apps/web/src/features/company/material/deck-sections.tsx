@@ -243,9 +243,11 @@ export function ReadSectionCard({
         </span>
       </header>
       {section.summary === null ? (
-        <p className="cq-body text-(--cq-text-secondary)">
-          {section.emptyText}
-        </p>
+        section.emptyText === "" ? null : (
+          <p className="cq-body text-(--cq-text-secondary)">
+            {section.emptyText}
+          </p>
+        )
       ) : (
         <div className="flex flex-col gap-1">
           <p className="cq-body text-(--cq-text-primary)">{section.summary}</p>
@@ -285,7 +287,7 @@ export function ReadSectionCard({
                       {fact.source}
                     </span>
                   </dt>
-                  <dd className="cq-title-sm cq-numeric min-w-0 text-end break-words text-(--cq-text-primary)">
+                  <dd className="cq-title-sm cq-numeric text-end text-(--cq-text-primary)">
                     {fact.value ?? (
                       <span className="cq-body-sm text-(--cq-text-secondary)">
                         {t("Not in the deck")}

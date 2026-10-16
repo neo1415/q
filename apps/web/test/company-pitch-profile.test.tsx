@@ -258,15 +258,31 @@ describe("deck, then pitch video, then the founder's confirmed answers", () => {
       source: "Founder's claim · Pitch video 0:34",
       group: "Traction",
     });
-    // The deck states the raise: the video's raise is not repeated, its
-    // use of funds (which the deck lacks) is.
+    // The deck states the raise and the video says it differently: both
+    // stand, each with its source (contradictions coexist). The use of
+    // funds, which the deck lacks, comes from the video.
     const ask = byKey(build(), "ask");
     expect(ask.facts.map((row) => row.label)).toEqual([
       "Raising",
+      "Raising, in the pitch",
       "Use of funds",
     ]);
     expect(ask.facts[0]?.source).toBe("Founder's claim · Slide 12");
-    expect(ask.facts[1]?.source).toBe("Founder's claim · Pitch video 1:11");
+    expect(ask.facts[1]?.source).toBe("Founder's claim · Pitch video 1:00");
+    expect(ask.facts[2]?.source).toBe("Founder's claim · Pitch video 1:11");
+    // The same figure in both is said once, from the deck.
+    const same = byKey(
+      build({
+        pitchClaims: [
+          {
+            ...claim("RAISE", "We are raising two million", 60),
+            money: { amount: "2000000.00", currency: "USD" },
+          },
+        ],
+      }),
+      "ask",
+    );
+    expect(same.facts.map((row) => row.label)).toEqual(["Raising"]);
   });
 
   it("falls back to the founder's confirmed answers last", () => {

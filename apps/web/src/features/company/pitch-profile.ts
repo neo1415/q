@@ -200,6 +200,16 @@ export type PitchProfileInput = {
 
 const ANSWER_SOURCE = "Founder's claim · Confirmed answer";
 
+/** "$1.5m" and "$1.5M" are one figure; "$750K" and "$1.5m" are not. */
+function sameFigure(a: string | null, b: string): boolean {
+  const plain = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[\s,“”"]/gu, "")
+      .replace(/\.0+(?=[a-z]|$)/u, "");
+  return a !== null && plain(a) === plain(b);
+}
+
 function slideLine(pages: readonly number[]): string | null {
   const unique = [...new Set(pages)].sort((a, b) => a - b);
   const first = unique[0];
@@ -301,17 +311,33 @@ export function pitchProfileSections(
         kind === "TRACTION"
           ? rows.some((row) => row.group === "Traction")
           : rows.some((row) => PITCH_COVERED_BY[kind].test(row.label));
-      if (covered) continue;
+      // The raise is the one figure both may state: a pitch that says a
+      // different amount from the deck is shown beside it, never dropped
+      // (contradictions coexist until reconciled).
+      if (covered && kind !== "RAISE") continue;
       for (const claim of input.pitchClaims.filter((c) => c.kind === kind)) {
+        const value =
+          kind === "RAISE" && claim.money !== null
+            ? compactMoneyText(claim.money)
+            : kind === "INSTRUMENT" && claim.instrument !== null
+              ? claim.instrument
+              : `“${claim.statement}”`;
+        if (
+          covered &&
+          rows.some(
+            (row) =>
+              PITCH_COVERED_BY.RAISE.test(row.label) &&
+              sameFigure(row.value, value),
+          )
+        ) {
+          continue;
+        }
         rows.push({
           key: `pitch-${claim.pitchId}-${String(claim.atSeconds)}-${kind}`,
-          label: PITCH_LABEL[kind],
-          value:
-            kind === "RAISE" && claim.money !== null
-              ? compactMoneyText(claim.money)
-              : kind === "INSTRUMENT" && claim.instrument !== null
-                ? claim.instrument
-                : `“${claim.statement}”`,
+          label: covered
+            ? `${PITCH_LABEL[kind]}, in the pitch`
+            : PITCH_LABEL[kind],
+          value,
           source: `Founder's claim · Pitch video ${pitchMoment(claim.atSeconds)}`,
           group:
             kind === "TRACTION" && spec.key === "opportunity"
