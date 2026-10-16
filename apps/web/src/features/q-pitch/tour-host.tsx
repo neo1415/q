@@ -680,7 +680,7 @@ function TourMenu({
     onControl(kind, chapterId);
   };
   const item =
-    "flex min-h-11 w-full items-center px-3 text-left cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)";
+    "flex min-h-11 w-full items-center px-3 text-start cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)";
   return (
     <div className="relative shrink-0">
       <button
@@ -696,7 +696,7 @@ function TourMenu({
         <div
           role="menu"
           aria-label="Tour"
-          className={`absolute right-0 z-(--cq-z-popover) flex max-h-96 w-72 flex-col gap-1 overflow-y-auto border border-(--cq-border) bg-(--cq-surface-raised) p-2 shadow-(--cq-shadow-overlay) ${placement === "up" ? "bottom-full mb-2" : "top-full mt-2"}`}
+          className={`absolute end-0 z-(--cq-z-popover) flex max-h-96 w-72 flex-col gap-1 overflow-y-auto border border-(--cq-border) bg-(--cq-surface-raised) p-2 shadow-(--cq-shadow-overlay) ${placement === "up" ? "bottom-full mb-2" : "top-full mt-2"}`}
         >
           <p className="px-3 py-1 cq-body-sm text-(--cq-text-secondary)">
             {label}
@@ -743,7 +743,7 @@ function TourMenu({
             Chapters
           </button>
           {chaptersOpen ? (
-            <ul className="flex flex-col gap-1 pl-3" aria-label="Chapters">
+            <ul className="flex flex-col gap-1 ps-3" aria-label="Chapters">
               {chapters.map((chapter) => (
                 <li key={chapter.chapterId}>
                   <button

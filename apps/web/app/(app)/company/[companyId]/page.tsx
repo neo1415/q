@@ -40,6 +40,7 @@ import {
 import { QSection } from "@/features/q/q-section";
 import { QPageSubject } from "@/features/q/q-subject";
 import { ArrowLeft, ICON_SIZE } from "@capital-q/ui/icons";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Company" };
 export const dynamic = "force-dynamic";
@@ -70,6 +71,7 @@ export default async function CompanyPage({
     readonly as?: string | string[];
   }>;
 }) {
+  const t = await serverT();
   const { companyId } = await params;
   const session = await apiSession();
 
@@ -124,8 +126,10 @@ export default async function CompanyPage({
       <PageContainer>
         <BackToDiscover />
         <EmptyState
-          title="This company isn't available to you."
-          description="It may not be discoverable, or it may no longer exist. Nothing is wrong with your account."
+          title={t("This company isn't available to you.")}
+          description={t(
+            "It may not be discoverable, or it may no longer exist. Nothing is wrong with your account.",
+          )}
         />
       </PageContainer>
     );
@@ -273,6 +277,7 @@ export default async function CompanyPage({
           <BackToDiscover />
         )}
         <CompanyProfileView
+          translate={t}
           profile={profile}
           tab={tab}
           interest={interest?.interest ?? null}
@@ -320,12 +325,13 @@ async function AssumptionsFold({
   readonly companyName: string;
   readonly route: QuestionsRoute;
 }) {
+  const t = await serverT();
   const board = await assumptions;
   if (board === null) return null;
   return (
     <Fold
       id="company-assumptions"
-      title="Questions to investigate"
+      title={t("Questions to investigate")}
       summary={[
         `${String(board.assumptions.length)} key ${board.assumptions.length === 1 ? "claim" : "claims"}`,
         board.counts.unknown > 0

@@ -309,3 +309,10 @@ export function renderPlainTextEmail(input: {
 }
 
 export { authEmailTemplates, type AuthTemplate } from "./auth-templates.js";
+export { EMAIL_ARABIC } from "./arabic.js";
+export {
+  localiseEmail,
+  translateEmailText,
+  type EmailLanguage,
+  type LocalisableMessage,
+} from "./localise.js";

@@ -47,7 +47,7 @@ export function QStateIndicator({
           {state === "WORKING" ? (
             <span
               aria-hidden="true"
-              className="ml-1 inline-flex gap-0.5 align-middle"
+              className="ms-1 inline-flex gap-0.5 align-middle"
             >
               <span className="cq-working-dot">·</span>
               <span className="cq-working-dot">·</span>

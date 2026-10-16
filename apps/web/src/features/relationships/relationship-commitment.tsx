@@ -21,6 +21,7 @@ import {
   stateCommitmentAction,
   withdrawCommitmentAction,
 } from "./commitment-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The relationship's commitment (spec 6.6.14): one side records money and
@@ -57,6 +58,8 @@ export function RelationshipCommitment({
   readonly relationshipId: string;
   readonly counterpart: string;
 }) {
+  const t = useT();
+
   const [state, setState] = useState<RelationshipCommitmentsDto | null>(null);
   const [editing, setEditing] = useState(false);
   const [money, setMoney] = useState<MoneyValue>({
@@ -99,12 +102,12 @@ export function RelationshipCommitment({
   // disputes it. It is never removed and never counts on its own.
   const detectedBlock =
     state.detected.length === 0 ? null : (
-      <ul className="flex flex-col gap-3" aria-label="Q heard in a call">
+      <ul className="flex flex-col gap-3" aria-label={t("Q heard in a call")}>
         {state.detected.map((item) => (
           <li key={item.id} className="flex flex-col gap-1" data-detected>
             <span className="cq-body-sm text-(--cq-text-primary)">
-              Q heard {item.currencyCode} {formatAmountForDisplay(item.amount)}{" "}
-              in your call
+              {t("Q heard")} {item.currencyCode}{" "}
+              {t(formatAmountForDisplay(item.amount))} {t("in your call")}
             </span>
             {item.quote === null ? null : (
               <span className="cq-caption text-(--cq-text-secondary)">
@@ -120,7 +123,7 @@ export function RelationshipCommitment({
                     act(() => adoptCommitmentAction(item.id, newKey()))
                   }
                 >
-                  That&apos;s right
+                  {t("That's right")}
                 </Button>
               ) : null}
               {item.canDispute ? (
@@ -130,7 +133,7 @@ export function RelationshipCommitment({
                   disabled={pending}
                   onClick={() => act(() => disputeCommitmentAction(item.id))}
                 >
-                  Not right
+                  {t("Not right")}
                 </Button>
               ) : null}
             </div>
@@ -149,7 +152,7 @@ export function RelationshipCommitment({
     if (!editing) {
       return withDetected(
         <Button variant="secondary" onClick={() => setEditing(true)}>
-          Record a commitment
+          {t("Record a commitment")}
         </Button>,
       );
     }
@@ -175,13 +178,17 @@ export function RelationshipCommitment({
       >
         <MoneyInput
           id={`commitment-${relationshipId}`}
-          label="Amount"
+          label={t("Amount")}
           value={money}
           currencies={CURRENCIES}
           onChange={setMoney}
           disabled={pending}
         />
-        <div role="radiogroup" aria-label="How firm" className="flex gap-2">
+        <div
+          role="radiogroup"
+          aria-label={t("How firm")}
+          className="flex gap-2"
+        >
           {LEVELS.map((option) => (
             <Button
               key={option.level}
@@ -192,25 +199,25 @@ export function RelationshipCommitment({
               aria-checked={level === option.level}
               onClick={() => setLevel(option.level)}
             >
-              {option.label}
+              {t(option.label)}
             </Button>
           ))}
         </div>
         <div className="flex gap-2">
           <Button type="submit" disabled={pending || money.amount === ""}>
-            {pending ? "Recording…" : `Send to ${counterpart} to confirm`}
+            {pending ? t("Recording…") : t(`Send to ${counterpart} to confirm`)}
           </Button>
           <Button
             type="button"
             variant="quiet"
             onClick={() => setEditing(false)}
           >
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
         {message === null ? null : (
           <span className="cq-caption text-(--cq-text-secondary)" role="status">
-            {message}
+            {t(message)}
           </span>
         )}
       </form>,
@@ -223,18 +230,18 @@ export function RelationshipCommitment({
   return withDetected(
     <div className="flex flex-col gap-2" data-commitment={current.status}>
       <p className="cq-title-sm text-(--cq-text-primary)">
-        {current.currencyCode} {formatAmountForDisplay(current.amount)}
+        {current.currencyCode} {t(formatAmountForDisplay(current.amount))}
         <span className="cq-body-sm text-(--cq-text-secondary)">
           {" "}
-          · {levelLabel}
+          · {t(levelLabel)}
         </span>
       </p>
       <span className="cq-caption text-(--cq-text-secondary)">
         {current.status === "CONFIRMED"
-          ? "Confirmed by both sides."
+          ? t("Confirmed by both sides.")
           : current.statedByYourSide
-            ? `Waiting for ${counterpart} to confirm.`
-            : `${counterpart} recorded this. Confirm if it's right.`}
+            ? t(`Waiting for ${counterpart} to confirm.`)
+            : t(`${counterpart} recorded this. Confirm if it's right.`)}
       </span>
       <div className="flex flex-wrap gap-2">
         {current.canConfirm ? (
@@ -243,7 +250,7 @@ export function RelationshipCommitment({
             disabled={pending}
             onClick={() => act(() => confirmCommitmentAction(current.id))}
           >
-            Confirm
+            {t("Confirm")}
           </Button>
         ) : null}
         <Button
@@ -259,7 +266,7 @@ export function RelationshipCommitment({
             setEditing(true);
           }}
         >
-          Change
+          {t("Change")}
         </Button>
         {current.canWithdraw ? (
           <Button
@@ -268,13 +275,13 @@ export function RelationshipCommitment({
             disabled={pending}
             onClick={() => act(() => withdrawCommitmentAction(current.id))}
           >
-            Withdraw
+            {t("Withdraw")}
           </Button>
         ) : null}
       </div>
       {message === null ? null : (
         <span className="cq-caption text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </span>
       )}
     </div>,

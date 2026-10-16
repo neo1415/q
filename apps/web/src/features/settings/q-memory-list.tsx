@@ -7,6 +7,7 @@ import type { QMemoryItemDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
 import { forgetMemoryAction } from "./memory-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * What Q remembers, grouped by kind, each with Forget (ADR 0012). Q uses
@@ -27,6 +28,7 @@ export function QMemoryList({
 }: {
   readonly items: readonly QMemoryItemDto[];
 }) {
+  const t = useT();
   const router = useRouter();
   const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
   const [failed, setFailed] = useState<string | null>(null);
@@ -36,8 +38,9 @@ export function QMemoryList({
   if (shown.length === 0) {
     return (
       <p className="cq-body text-(--cq-text-secondary)" data-state="empty">
-        Q hasn&apos;t remembered anything about you yet. Tell it how you like to
-        work, or correct it, and it keeps that for every conversation.
+        {t(
+          "Q hasn't remembered anything about you yet. Tell it how you like to work, or correct it, and it keeps that for every conversation.",
+        )}
       </p>
     );
   }
@@ -103,7 +106,7 @@ export function QMemoryList({
                     }}
                     aria-label={`Forget: ${item.content}`}
                   >
-                    Forget
+                    {t("Forget")}
                   </Button>
                 </li>
               ))}

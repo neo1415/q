@@ -10,6 +10,7 @@ import {
   GateqVideoBridgeBodySchema,
   GateqVideoProviderEventSchema,
   GateqVideoEndRequestSchema,
+  GateqVideoStartRequestSchema,
   GateqVideoStateDtoSchema,
   PROBLEM_CONTENT_TYPE,
 } from "@capital-q/contracts";
@@ -154,10 +155,15 @@ export function registerGateqVideoRoutes(
 
   app.post(GATEQ_APPLY_VIDEO_PATH, async (request, reply) => {
     const token = credential(request);
+    // Lane ml: the room's language; an absent body is English, as before.
+    const body = GateqVideoStartRequestSchema.safeParse(request.body ?? {});
+    if (!body.success)
+      return problem(request, reply, "INVALID_REQUEST", "Invalid request.");
     try {
       const session = await video.start({
         token,
         correlationId: randomUUID(),
+        ...(body.data.locale === undefined ? {} : { locale: body.data.locale }),
       });
       void reply.header("Cache-Control", "no-store");
       return GateqVideoStateDtoSchema.parse({

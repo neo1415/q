@@ -16,6 +16,7 @@ import {
 import { NEW_CHAT_HREF } from "./active-conversation";
 import { Q_CONVERSATIONS_CHANGED_EVENT } from "./use-q-conversation";
 import { formatStamp } from "@/components/date-format";
+import { useT } from "@/features/i18n/language";
 
 /**
  * A person's conversations with Q, as a collapsible list (ADR 0012).
@@ -66,6 +67,7 @@ export function ChatsList({
    */
   readonly active?: string | null;
 }) {
+  const t = useT();
   const router = useRouter();
   const [items, setItems] = useState<readonly QConversationSummary[] | null>(
     null,
@@ -147,12 +149,12 @@ export function ChatsList({
               folded ? "-rotate-90" : "",
             )}
           />
-          Chats
+          {t("Chats")}
         </button>
         <Link
           href={NEW_CHAT_HREF}
-          aria-label="New chat"
-          title="New chat"
+          aria-label={t("New chat")}
+          title={t("New chat")}
           className={buttonClassName("quiet", "compact", "min-h-10")}
         >
           <Plus
@@ -161,7 +163,7 @@ export function ChatsList({
             strokeWidth={ICON_STROKE}
           />
           <span className={variant === "sidebar" ? "sr-only" : ""}>
-            New chat
+            {t("New chat")}
           </span>
         </Link>
       </div>
@@ -169,7 +171,7 @@ export function ChatsList({
         <div id={listId} className="min-h-0 overflow-y-auto">
           {items === null ? (
             <p className="px-3 py-2 cq-caption text-(--cq-text-tertiary)">
-              Loading your chats…
+              {t("Loading your chats…")}
             </p>
           ) : items.length === 0 ? (
             <p className="px-3 py-2 cq-caption text-(--cq-text-tertiary)">
@@ -185,7 +187,7 @@ export function ChatsList({
                       href={`/home?${Q_CONVERSATION_PARAM}=${encodeURIComponent(item.conversationId)}`}
                       aria-current={current ? "page" : undefined}
                       className={cx(
-                        "flex min-h-10 flex-col justify-center gap-0.5 py-1.5 pr-16 pl-3 transition-colors duration-(--cq-motion-fast)",
+                        "flex min-h-10 flex-col justify-center gap-0.5 py-1.5 pe-16 ps-3 transition-colors duration-(--cq-motion-fast)",
                         current
                           ? "bg-(--cq-accent-soft) text-(--cq-text-primary)"
                           : "text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)",
@@ -200,14 +202,14 @@ export function ChatsList({
                       type="button"
                       onClick={() => void archive(item.conversationId)}
                       className={cx(
-                        "absolute top-1/2 right-1 -translate-y-1/2 px-2 py-1 cq-caption text-(--cq-text-tertiary) hover:text-(--cq-text-primary) focus-visible:opacity-100",
+                        "absolute top-1/2 end-1 -translate-y-1/2 px-2 py-1 cq-caption text-(--cq-text-tertiary) hover:text-(--cq-text-primary) focus-visible:opacity-100",
                         current
                           ? "opacity-100"
                           : "opacity-0 group-hover:opacity-100",
                       )}
                       aria-label={`Archive ${item.title}`}
                     >
-                      Archive
+                      {t("Archive")}
                     </button>
                   </li>
                 );

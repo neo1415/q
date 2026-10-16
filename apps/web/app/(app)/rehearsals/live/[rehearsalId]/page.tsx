@@ -10,6 +10,7 @@ import { qApiSession } from "@/features/q/context";
 import { readRehearsalRoom } from "@/features/rehearsal/read-rehearsal-room";
 import { RehearsalLive } from "@/features/rehearsal/rehearsal-live";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Rehearsal" };
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export default async function RehearsalLivePage({
   readonly params: Promise<{ readonly rehearsalId: string }>;
   readonly searchParams?: Promise<{ readonly video?: string }> | undefined;
 }) {
+  const t = await serverT();
   const { rehearsalId } = await params;
   // A display/recovery hint, never authority or permission to allocate.
   const expectsVideo = (await searchParams)?.video === "1";
@@ -37,14 +39,16 @@ export default async function RehearsalLivePage({
           id="rehearsal"
           kind="REHEARSAL"
           total={1}
-          label="a live rehearsal"
+          label={t("a live rehearsal")}
         >
           <EmptyState
-            title="This rehearsal isn't available."
-            description="Refresh to try recovering your room, or return to Rehearsals."
+            title={t("This rehearsal isn't available.")}
+            description={t(
+              "Refresh to try recovering your room, or return to Rehearsals.",
+            )}
             action={
               <Link href="/rehearsals" className={buttonClassName("secondary")}>
-                Rehearsals
+                {t("Rehearsals")}
               </Link>
             }
           />
@@ -59,7 +63,7 @@ export default async function RehearsalLivePage({
         id="rehearsal"
         kind="REHEARSAL"
         total={1}
-        label="a live rehearsal"
+        label={t("a live rehearsal")}
       >
         <div className="mx-auto w-full max-w-5xl">
           <RehearsalLive

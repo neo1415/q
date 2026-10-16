@@ -16,6 +16,7 @@ import {
   visibleFields,
 } from "../coverage";
 import type { FormCoverage } from "../use-form-coverage";
+import { useT } from "@/features/i18n/language";
 
 /**
  * What the form knows, all of it, in one place (owner directive 2026-10-16:
@@ -48,6 +49,7 @@ export function CoverageOverview({
     resolution: "ACCEPT" | "REJECT",
   ) => Promise<boolean>;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const fields = visibleFields(coverage);
   const known = new Set(phases.map((phase) => phase.phaseKey));
@@ -83,12 +85,14 @@ export function CoverageOverview({
           onClick={() => setOpen(true)}
           data-coverage-open
         >
-          What Q has
+          {t("What Q has")}
         </Button>
         <SheetContent
           side="side"
-          title="What Q has so far"
-          description="The same picture Q works from in conversation. Nothing waiting for your confirmation is saved."
+          title={t("What Q has so far")}
+          description={t(
+            "The same picture Q works from in conversation. Nothing waiting for your confirmation is saved.",
+          )}
         >
           <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-6">
             {byPhase.map(({ phase, fields: phaseFields }) => (
@@ -141,6 +145,7 @@ function CoverageRow({
     resolution: "ACCEPT" | "REJECT",
   ) => Promise<boolean>;
 }) {
+  const t = useT();
   const [refused, setRefused] = useState(false);
   const proposal = field.proposals[0];
   const decide = async (resolution: "ACCEPT" | "REJECT") => {
@@ -176,7 +181,7 @@ function CoverageRow({
         </span>
       ) : null}
       {field.state === "CONTRADICTORY" && field.readings.length > 0 ? (
-        <ul className="cq-body-sm list-disc pl-5 text-(--cq-text-secondary)">
+        <ul className="cq-body-sm list-disc ps-5 text-(--cq-text-secondary)">
           {field.readings.map((reading) => (
             <li key={reading}>{reading}</li>
           ))}
@@ -198,7 +203,7 @@ function CoverageRow({
               disabled={busy}
               onClick={() => void decide("ACCEPT")}
             >
-              Confirm
+              {t("Confirm")}
               <span className="sr-only"> {field.label}</span>
             </Button>
             <Button
@@ -207,7 +212,7 @@ function CoverageRow({
               disabled={busy}
               onClick={() => void decide("REJECT")}
             >
-              Not right
+              {t("Not right")}
               <span className="sr-only"> — {field.label}</span>
             </Button>
           </div>
@@ -215,7 +220,7 @@ function CoverageRow({
       ) : null}
       {refused ? (
         <span role="alert" className="cq-caption text-(--cq-danger)">
-          That wasn&apos;t recorded. Try again from the screen that asks it.
+          {t("That wasn't recorded. Try again from the screen that asks it.")}
         </span>
       ) : null}
       {onOpen === undefined || field.state === "INAPPLICABLE" ? null : (
@@ -262,6 +267,7 @@ export function FormCoverageArea({
     resolution: "ACCEPT" | "REJECT",
   ) => Promise<boolean>;
 }) {
+  const t = useT();
   switch (coverage.status) {
     case "NONE":
       return null;
@@ -271,7 +277,7 @@ export function FormCoverageArea({
           className="cq-caption text-(--cq-text-tertiary)"
           data-coverage-loading
         >
-          Checking what Q has…
+          {t("Checking what Q has…")}
         </span>
       );
     case "READY":
@@ -306,7 +312,7 @@ export function FormCoverageArea({
               className="px-1"
               onClick={coverage.retry}
             >
-              Try again
+              {t("Try again")}
             </Button>
           </span>
         </div>

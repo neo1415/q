@@ -8,6 +8,7 @@ import { ProfileSectionShell } from "@/features/profile/editable-section";
 import { apiSession } from "@/features/q/context";
 
 import { teamWords } from "./team-words";
+import { serverT } from "@/features/i18n/server";
 
 /**
  * The profile's Team section (G2): who works on this company or firm, in
@@ -15,6 +16,7 @@ import { teamWords } from "./team-words";
  * session; a read that fails shows nothing rather than a wrong team.
  */
 export async function ProfileTeamSection() {
+  const t = await serverT();
   const session = await apiSession();
   const team =
     session === null ? null : await getTeam(session).catch(() => null);
@@ -24,7 +26,7 @@ export async function ProfileTeamSection() {
   return (
     <ProfileSectionShell
       id="team"
-      title="Team"
+      title={t("Team")}
       description={
         solo
           ? `Just you, for now. You are ${team.organisation.name}.`
@@ -53,8 +55,8 @@ export async function ProfileTeamSection() {
             <span className="min-w-0 flex-1 truncate cq-body-sm text-(--cq-text-primary)">
               {member.name}
               {member.isYou ? (
-                <span className="ml-1.5 cq-caption text-(--cq-text-tertiary)">
-                  You
+                <span className="ms-1.5 cq-caption text-(--cq-text-tertiary)">
+                  {t("You")}
                 </span>
               ) : null}
             </span>

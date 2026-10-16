@@ -19,6 +19,7 @@ import {
   deletePipelineViewAction,
   savePipelineViewAction,
 } from "./pipeline-view-actions";
+import { useT } from "@/features/i18n/language";
 
 type ViewQuery = z.infer<typeof RelationshipViewQuerySchema>;
 /** What applying a view sets: the filters, the layout and the columns. */
@@ -56,6 +57,8 @@ export function PipelineSavedViews({
   readonly onApply: (view: AppliedView) => Promise<boolean>;
   readonly onNotice: (message: string) => void;
 }) {
+  const t = useT();
+
   const selectRef = useRef<HTMLSelectElement>(null);
   const [views, setViews] = useState<readonly SavedRelationshipView[]>(
     initial?.items ?? [],
@@ -195,7 +198,7 @@ export function PipelineSavedViews({
     >
       <select
         ref={selectRef}
-        aria-label="Saved view"
+        aria-label={t("Saved view")}
         className={inputClass}
         value={selectedId}
         onChange={(event) => {
@@ -205,10 +208,10 @@ export function PipelineSavedViews({
         }}
       >
         <option value="">
-          {initial === null ? "Saved views couldn't load" : "Saved views"}
+          {initial === null ? t("Saved views couldn't load") : t("Saved views")}
         </option>
         {mine.length === 0 ? null : (
-          <optgroup label="Mine">
+          <optgroup label={t("Mine")}>
             {mine.map((view) => (
               <option key={view.id} value={view.id}>
                 {view.name}
@@ -217,7 +220,7 @@ export function PipelineSavedViews({
           </optgroup>
         )}
         {team.length === 0 ? null : (
-          <optgroup label="Team">
+          <optgroup label={t("Team")}>
             {team.map((view) => (
               <option key={view.id} value={view.id}>
                 {view.name}
@@ -226,7 +229,7 @@ export function PipelineSavedViews({
           </optgroup>
         )}
         {device.length === 0 ? null : (
-          <optgroup label="On this device">
+          <optgroup label={t("On this device")}>
             {device.map((view) => (
               <option key={view.id} value={view.id}>
                 {view.name}
@@ -240,12 +243,12 @@ export function PipelineSavedViews({
       <details data-pipeline-view-manage>
         <summary className="cq-body-sm inline-flex min-h-11 cursor-pointer list-none items-center gap-1 px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
           <Bookmark size={ICON_SIZE.compact} aria-hidden="true" />
-          Manage views
+          {t("Manage views")}
         </summary>
         <div className="flex flex-wrap items-center gap-2 pt-2">
           <input
-            aria-label="View name"
-            placeholder="View name"
+            aria-label={t("View name")}
+            placeholder={t("View name")}
             // Shrinks and wraps on a phone instead of widening the page.
             className={`${inputClass} min-w-0 flex-1 basis-40`}
             value={name}
@@ -254,7 +257,7 @@ export function PipelineSavedViews({
           />
           {teamEditable ? (
             <select
-              aria-label="Who sees this view"
+              aria-label={t("Who sees this view")}
               className={inputClass}
               value={share}
               onChange={(event) =>
@@ -265,8 +268,8 @@ export function PipelineSavedViews({
                 )
               }
             >
-              <option value="PERSONAL">Only me</option>
-              <option value="ORGANISATION">My team</option>
+              <option value="PERSONAL">{t("Only me")}</option>
+              <option value="ORGANISATION">{t("My team")}</option>
             </select>
           ) : null}
           <button
@@ -275,7 +278,7 @@ export function PipelineSavedViews({
             onClick={save}
             disabled={pending || initial === null}
           >
-            Save view
+            {t("Save view")}
           </button>
           {changeable ? (
             <>
@@ -285,7 +288,7 @@ export function PipelineSavedViews({
                 onClick={rename}
                 disabled={pending}
               >
-                Rename view
+                {t("Rename view")}
               </button>
               <button
                 type="button"
@@ -293,7 +296,7 @@ export function PipelineSavedViews({
                 onClick={remove}
                 disabled={pending}
               >
-                Delete view
+                {t("Delete view")}
               </button>
             </>
           ) : null}

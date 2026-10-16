@@ -19,8 +19,13 @@ import {
   recordGateqSlot,
   recordWorkSlot,
 } from "@/features/relationships/record-workspace-sections";
+import { serverUiLanguage } from "@/features/i18n/server";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Relationship" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Relationship") };
+}
 export const dynamic = "force-dynamic";
 
 /**
@@ -39,6 +44,9 @@ export default async function CompanyRelationshipPage({
 }: {
   readonly params: Promise<{ readonly investorOrganisationId: string }>;
 }) {
+  // The language for the server components below (serverTNow).
+  await serverUiLanguage();
+
   const { investorOrganisationId } = await params;
   const [loaded, work] = await Promise.all([
     loadCompanySideRelationship(investorOrganisationId),

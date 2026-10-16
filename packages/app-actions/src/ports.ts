@@ -192,6 +192,7 @@ export type AppActionPorts = {
     | Pick<
         OnboardingService["runtime"],
         | "submitResponse"
+        | "submitResponses"
         | "reviseResponse"
         | "skipStep"
         | "withdrawResponse"

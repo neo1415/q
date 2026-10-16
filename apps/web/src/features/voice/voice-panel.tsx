@@ -8,6 +8,7 @@ import { InlineNotice } from "@capital-q/ui/states";
 
 import { QPresence } from "./q-presence";
 import type { VoiceSessionClient } from "./session";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The voice surface inside the interview (CQ-Q-VOICE-001 D §44-§50,
@@ -45,12 +46,13 @@ export function VoicePanel({
   notice,
   onDismissNotice,
 }: VoicePanelProps) {
+  const t = useT();
   const volumeId = useId();
   const busy = client.state === "CONNECTING";
 
   return (
     <section
-      aria-label="Talking with Q"
+      aria-label={t("Talking with Q")}
       className="flex flex-col items-center gap-4 border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-5"
       data-q-voice-panel={client.state}
     >
@@ -65,7 +67,7 @@ export function VoicePanel({
         <div className="w-full max-w-(--cq-layout-narrow)">
           <InlineNotice tone="warning" title={notice}>
             <Button size="compact" variant="quiet" onClick={onDismissNotice}>
-              Dismiss
+              {t("Dismiss")}
             </Button>
           </InlineNotice>
         </div>
@@ -87,7 +89,7 @@ export function VoicePanel({
           disabled={busy}
           onClick={onEnd}
         >
-          End voice
+          {t("End voice")}
         </Button>
       </div>
 
@@ -96,7 +98,7 @@ export function VoicePanel({
           <div
             className="flex items-center gap-1"
             role="group"
-            aria-label="Q's voice"
+            aria-label={t("Q's voice")}
           >
             {voices.map((choice) => (
               <Button
@@ -116,7 +118,7 @@ export function VoicePanel({
           htmlFor={volumeId}
           className="flex items-center gap-2 cq-caption text-(--cq-text-secondary)"
         >
-          Volume
+          {t("Volume")}
           <input
             id={volumeId}
             type="range"
@@ -132,7 +134,7 @@ export function VoicePanel({
         </label>
       </div>
       <p className="cq-caption text-center text-(--cq-text-tertiary)">
-        You can keep typing, or tap an option, while we talk.
+        {t("You can keep typing, or tap an option, while we talk.")}
       </p>
     </section>
   );

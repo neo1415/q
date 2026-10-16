@@ -10,6 +10,7 @@ import type {
 import { ProviderVideoRoom } from "@/features/video-room/provider-video-room";
 
 import { endRehearsalVideoAction } from "./rehearsal-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The video rehearsal (ADR 0066) in Capital Q's shared video room. The
@@ -26,6 +27,7 @@ export function RehearsalVideoStage({
   readonly session: RehearsalVideoSessionDto;
   readonly onContinueByVoice: (rehearsal: QRehearsalDto) => void;
 }) {
+  const t = useT();
   const router = useRouter();
   const name = rehearsal.counterpart.name;
   return (
@@ -50,10 +52,10 @@ export function RehearsalVideoStage({
       unavailableNote={
         <>
           <p className="cq-body text-(--cq-stage-text)">
-            This call can’t be rejoined from here.
+            {t("This call can’t be rejoined from here.")}
           </p>
           <p className="cq-body-sm text-(--cq-stage-text-muted)">
-            End it to see your review, or carry on by voice.
+            {t("End it to see your review, or carry on by voice.")}
           </p>
         </>
       }

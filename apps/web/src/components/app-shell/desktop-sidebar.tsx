@@ -29,6 +29,7 @@ import {
 import { useNavGroups } from "./nav-group-state";
 import { NavGroupToggle } from "./nav-group-toggle";
 import { sidebarCollapsed, type SidebarOverride } from "./sidebar-state";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Desktop progressive enhancement of the same information architecture.
@@ -64,6 +65,7 @@ export function DesktopSidebar({
   const needsYou = useNeedsYouCount();
   // Workspace, You and Admin fold away, closed until opened (2026-10-07).
   const disclosure = useNavGroups(groups, pathname);
+  const t = useT();
 
   return (
     <aside
@@ -74,7 +76,7 @@ export function DesktopSidebar({
       <div
         className={cx(
           "flex items-center gap-2 pt-4 pb-3",
-          collapsed ? "flex-col px-2" : "justify-between pr-2 pl-5",
+          collapsed ? "flex-col px-2" : "justify-between pe-2 ps-5",
         )}
       >
         {collapsed ? null : (
@@ -124,7 +126,7 @@ export function DesktopSidebar({
           and centres its 44 px icons, so a classic scrollbar (Windows,
           Linux) still leaves them room instead of forcing a sideways bar. */}
       <nav
-        aria-label="Primary"
+        aria-label={t("Primary")}
         className={cx(
           "flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto pb-3",
           collapsed ? "items-center px-0" : "px-3",
@@ -145,12 +147,12 @@ export function DesktopSidebar({
             <div
               key={label ?? "main"}
               role={label === null ? undefined : "group"}
-              aria-label={label ?? undefined}
+              aria-label={label === null ? undefined : t(label)}
               className={collapsed ? "flex flex-col items-center" : undefined}
             >
               {label === null || listId === undefined ? null : (
                 <NavGroupToggle
-                  label={label}
+                  label={t(label)}
                   open={open}
                   controls={listId}
                   waiting={waiting}
@@ -173,7 +175,7 @@ export function DesktopSidebar({
                   <li key={item.href}>
                     <SidebarLink
                       href={item.href === "/home" ? home : item.href}
-                      label={item.label}
+                      label={t(item.label)}
                       Icon={item.icon}
                       active={isActiveRoute(pathname, item.href)}
                       compact={collapsed}
@@ -201,7 +203,11 @@ export function DesktopSidebar({
         {collapsed ? null : (
           <div className="min-w-0 px-3 pb-1">
             {/* Where this person is acting: the scope, out of the input. */}
-            <ContextIndicator scope={context.scope} detail={context.label} />
+            <ContextIndicator
+              translate={t}
+              scope={context.scope}
+              detail={context.label}
+            />
           </div>
         )}
         <div
@@ -265,7 +271,7 @@ function SidebarLink({
       {active ? (
         <span
           aria-hidden="true"
-          className="absolute inset-y-2 left-0 w-0.5 bg-(--cq-accent)"
+          className="absolute inset-y-2 start-0 w-0.5 bg-(--cq-accent)"
         />
       ) : null}
       <Icon

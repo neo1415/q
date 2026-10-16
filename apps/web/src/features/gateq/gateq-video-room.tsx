@@ -5,6 +5,7 @@ import type { ApplicationCoverageDto } from "@capital-q/contracts";
 import { ProviderVideoRoom } from "@/features/video-room/provider-video-room";
 
 import { CoveragePanel } from "./coverage-panel";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The GateQ video interview in Capital Q's shared video room (directive
@@ -42,9 +43,11 @@ export function GateqVideoRoom({
   /** `typed` true: continue the same interview by typing. */
   readonly onEnd: (typed: boolean) => Promise<{ readonly message?: string }>;
 }) {
+  const t = useT();
+
   return (
     <ProviderVideoRoom
-      title={`Your interview for ${fund}`}
+      title={t(`Your interview for ${fund}`)}
       disclosure={session.disclosure}
       joinUrl={session.joinUrl}
       participantName={participantName}

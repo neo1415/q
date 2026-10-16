@@ -98,6 +98,7 @@ import { threadInOrder, type SpokenLine } from "./spoken";
 import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
 import { readTypedDraft } from "./control/fast-navigation";
 import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
+import { useT } from "@/features/i18n/language";
 
 /*
  * Q room W7: what opens on request -- a document Q made, the previous
@@ -315,7 +316,7 @@ function StageNotice({
       data-q-turn-role={turn === undefined ? undefined : "Q"}
       data-q-disposition={turn?.disposition}
       data-q-failure={turn?.failure ?? undefined}
-      className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 border border-(--cq-border) bg-(--cq-surface) px-4 py-3 text-left"
+      className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 border border-(--cq-border) bg-(--cq-surface) px-4 py-3 text-start"
     >
       <span className="cq-label text-(--cq-text-primary)">{title}</span>
       <span className="cq-body-sm text-(--cq-text-secondary)">{children}</span>
@@ -335,6 +336,7 @@ export function QConversationPanel({
   openBoard = false,
   stageLayer,
 }: QConversationPanelProps) {
+  const t = useT();
   const session = useQSession();
   const { q, turns, voice, spoken, spokenOnly, presence } = session;
   const client = voice.client;
@@ -886,7 +888,7 @@ export function QConversationPanel({
       ) : null}
       {q.state.failure !== null ? (
         <StageNotice
-          title="Q couldn't finish that"
+          title={t("Q couldn't finish that")}
           turn={{
             id: q.state.failure.runId ?? "run-failed",
             ...dispositionOfFailure(q.state.failure.code),
@@ -919,7 +921,9 @@ export function QConversationPanel({
         </p>
       )}
       {q.notice !== null && q.state.failure === null ? (
-        <StageNotice title="That didn't go through">{q.notice}</StageNotice>
+        <StageNotice title={t("That didn't go through")}>
+          {q.notice}
+        </StageNotice>
       ) : null}
       {voiceNotice !== null ? (
         <div
@@ -935,7 +939,7 @@ export function QConversationPanel({
             className="cq-stage-quiet"
             onClick={voice.clearNotice}
           >
-            Dismiss
+            {t("Dismiss")}
           </button>
         </div>
       ) : null}
@@ -945,7 +949,7 @@ export function QConversationPanel({
           className="cq-stage-control"
           onClick={speech.play}
         >
-          Play Q’s answer
+          {t("Play Q’s answer")}
         </button>
       ) : null}
     </>
@@ -997,12 +1001,13 @@ export function QConversationPanel({
                     />
                   </ViewTransition>
                   <span className="cq-caption text-(--cq-text-secondary) max-sm:sr-only">
-                    {stateLabel}
+                    {t(stateLabel)}
                   </span>
                 </span>
               )}
               <div className="min-w-0 max-lg:hidden" data-q-scope>
                 <ContextIndicator
+                  translate={t}
                   scope={context.scope}
                   detail={context.label}
                 />
@@ -1014,7 +1019,7 @@ export function QConversationPanel({
               {conversing ? (
                 <div
                   role="group"
-                  aria-label="View"
+                  aria-label={t("View")}
                   className="flex items-center border border-(--cq-border-subtle) p-0.5"
                   data-q-control="view"
                 >
@@ -1051,7 +1056,7 @@ export function QConversationPanel({
                     strokeWidth={ICON_STROKE}
                   />
                   {/* An icon on a phone, where the top line is full. */}
-                  <span className="max-sm:sr-only">Captions</span>
+                  <span className="max-sm:sr-only">{t("Captions")}</span>
                 </button>
               ) : null}
               <VoiceMenu
@@ -1073,7 +1078,7 @@ export function QConversationPanel({
                   size={ICON_SIZE.compact}
                   strokeWidth={ICON_STROKE}
                 />
-                <span aria-hidden="true">Board</span>
+                <span aria-hidden="true">{t("Board")}</span>
                 <span className="cq-board-count" aria-hidden="true">
                   {boardCount}
                 </span>
@@ -1089,14 +1094,14 @@ export function QConversationPanel({
                   size={ICON_SIZE.compact}
                   strokeWidth={ICON_STROKE}
                 />
-                <span className="max-sm:sr-only">Conversations</span>
+                <span className="max-sm:sr-only">{t("Conversations")}</span>
               </button>
               {download === undefined ? null : (
                 <button
                   type="button"
                   className="cq-stage-quiet"
                   onClick={download}
-                  aria-label="Save this conversation"
+                  aria-label={t("Save this conversation")}
                   data-q-control="download"
                 >
                   <Download
@@ -1138,7 +1143,7 @@ export function QConversationPanel({
                       // presence view shows no transcript (audit 06 §9);
                       // each turn with its id and disposition (G-R3).
                       // Text only: nothing focusable is hidden here.
-                      <ol className="sr-only" aria-label="Latest exchange">
+                      <ol className="sr-only" aria-label={t("Latest exchange")}>
                         {latestExchange(thread).map((line) =>
                           line.role === "person" ? (
                             <li
@@ -1217,7 +1222,7 @@ export function QConversationPanel({
                                 className="cq-stage-quiet"
                                 onClick={() => chooseView("chat")}
                               >
-                                Earlier in this conversation
+                                {t("Earlier in this conversation")}
                               </button>
                             ) : null}
                           </div>
@@ -1229,7 +1234,7 @@ export function QConversationPanel({
                       caption={
                         <ol
                           className="flex w-full flex-col gap-5"
-                          aria-label="Conversation"
+                          aria-label={t("Conversation")}
 
                           data-q-thread
                         >
@@ -1244,7 +1249,7 @@ export function QConversationPanel({
                                 data-q-disposition={rowDisposition(line)}
                               >
                                 <p className="cq-q-bubble cq-body">
-                                  <span className="sr-only">You: </span>
+                                  <span className="sr-only">{t("You:")} </span>
                                   {line.text}
                                 </p>
                                 <HideFromQ
@@ -1291,7 +1296,9 @@ export function QConversationPanel({
                                 className="cq-q-bubble is-live cq-body"
                                 data-q-live-line
                               >
-                                <span className="sr-only">You, speaking: </span>
+                                <span className="sr-only">
+                                  {t("You, speaking:")}{" "}
+                                </span>
                                 {live.text}
                               </p>
                             </li>
@@ -1314,7 +1321,7 @@ export function QConversationPanel({
                 ) : (
                   <ol
                     className="flex w-full flex-col gap-5"
-                    aria-label="Conversation"
+                    aria-label={t("Conversation")}
                     aria-live="polite"
                     data-q-thread
                   >
@@ -1329,7 +1336,7 @@ export function QConversationPanel({
                           data-q-disposition={rowDisposition(line)}
                         >
                           <p className="cq-q-bubble cq-body">
-                            <span className="sr-only">You: </span>
+                            <span className="sr-only">{t("You:")} </span>
                             {line.text}
                           </p>
                           <HideFromQ
@@ -1376,7 +1383,9 @@ export function QConversationPanel({
                           className="cq-q-bubble is-live cq-body"
                           data-q-live-line
                         >
-                          <span className="sr-only">You, speaking: </span>
+                          <span className="sr-only">
+                            {t("You, speaking:")}{" "}
+                          </span>
                           {live.text}
                         </p>
                       </li>
@@ -1395,7 +1404,7 @@ export function QConversationPanel({
                   >
                     {q.working ? <QSwarm state="WORKING" pixels={40} /> : null}
                     <span className="cq-caption text-(--cq-text-secondary)">
-                      {stateLabel}
+                      {t(stateLabel)}
                       {q.working &&
                       stage !== undefined &&
                       (!voice.active || documentStage)
@@ -1412,7 +1421,7 @@ export function QConversationPanel({
                   <div
                     className="flex flex-wrap gap-2"
                     role="group"
-                    aria-label="Options"
+                    aria-label={t("Options")}
                     data-q-stage-options
                   >
                     {voice.turn.asking.options.map((option) => (
@@ -1463,7 +1472,7 @@ export function QConversationPanel({
                     role="status"
                   >
                     <span className="cq-label text-(--cq-text-primary)">
-                      {stateLabel}
+                      {t(stateLabel)}
                     </span>
                     {!voice.active && q.working && stage !== undefined ? (
                       <span className="cq-caption text-(--cq-text-secondary)">
@@ -1486,7 +1495,9 @@ export function QConversationPanel({
                       strokeWidth={2}
                       aria-hidden="true"
                     />
-                    {connected ? "Talk with Q" : "Q isn't available right now"}
+                    {t(
+                      connected ? "Talk with Q" : "Q isn't available right now",
+                    )}
                   </button>
                 )}
 
@@ -1504,7 +1515,7 @@ export function QConversationPanel({
 
                 {showSuggestions ? (
                   <ul
-                    aria-label="Suggested questions"
+                    aria-label={t("Suggested questions")}
                     className="flex flex-wrap justify-center gap-2"
                     data-q-suggestions
                   >
@@ -1526,7 +1537,7 @@ export function QConversationPanel({
 
                 {q.loading ? (
                   <p className="cq-body-sm text-(--cq-text-secondary)">
-                    Opening your conversation…
+                    {t("Opening your conversation…")}
                   </p>
                 ) : null}
 
@@ -1564,7 +1575,7 @@ export function QConversationPanel({
                   size="compact"
                   onClick={() => void q.stop()}
                 >
-                  Stop
+                  {t("Stop")}
                 </Button>
               ) : null}
             </div>
@@ -1617,7 +1628,7 @@ export function QConversationPanel({
                               size={ICON_SIZE.compact}
                               aria-hidden="true"
                             />
-                            End
+                            {t("End")}
                           </button>
                         </div>
                       ),
@@ -1644,7 +1655,7 @@ export function QConversationPanel({
             // C7: on a desktop the Board takes the page (the stage stays
             // mounted underneath, so the conversation keeps its place).
             <aside
-              aria-label="Board"
+              aria-label={t("Board")}
               className="cq-q-aside flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto"
               data-q-aside
             >
@@ -1672,7 +1683,7 @@ export function QConversationPanel({
         ) : (
           <SheetRoot open={boardOpen} onOpenChange={setBoardOpen}>
             {boardOpen ? (
-              <SheetContent side="bottom" title="Board">
+              <SheetContent side="bottom" title={t("Board")}>
                 <QBoardTimeline
                   conversationId={q.conversationId}
                   turns={boardTurns}
@@ -1699,7 +1710,7 @@ export function QConversationPanel({
         >
           {openArtifact === null ? null : (
             <DialogViewerContent
-              title="Document"
+              title={t("Document")}
               onSwipeDismiss={closeArtifact}
             >
               <Suspense fallback={null}>

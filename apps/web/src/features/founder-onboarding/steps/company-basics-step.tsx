@@ -8,6 +8,7 @@ import { Select } from "@capital-q/ui/select";
 
 import { useRegistrationDefaults } from "../../onboarding-kit/registration-defaults";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /** "https://www.acme.com/" read as "acme.com". */
 function displayHost(url: string): string {
@@ -24,6 +25,7 @@ export function CompanyBasicsStep({
   busy,
   actions,
 }: StepProps<"company_basics">) {
+  const t = useT();
   // A saved answer wins; otherwise what they typed at sign-up, which they
   // confirm by continuing (owner directive 2026-10-16: never re-asked).
   const registered = useRegistrationDefaults().organisationName;
@@ -56,7 +58,7 @@ export function CompanyBasicsStep({
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
       <Input
         id="company-name"
-        label="Company name"
+        label={t("Company name")}
         description={
           fromRegistration && name === registered
             ? "From your sign-up. Change it if the company is called something else."
@@ -74,8 +76,8 @@ export function CompanyBasicsStep({
       />
       <Input
         id="company-website"
-        label="Website"
-        description="Optional. Q can read a website later to fill gaps."
+        label={t("Website")}
+        description={t("Optional. Q can read a website later to fill gaps.")}
         type="text"
         inputMode="url"
         autoComplete="url"
@@ -102,15 +104,15 @@ export function CompanyBasicsStep({
               setWebsite(step.suggestedWebsite ?? "");
             }}
           >
-            Use it
+            {t("Use it")}
           </Button>
         </div>
       ) : null}
       <Select
         id="company-country"
-        label="Where is the company based?"
-        description="Optional for now."
-        placeholder="Choose a country"
+        label={t("Where is the company based?")}
+        description={t("Optional for now.")}
+        placeholder={t("Choose a country")}
         options={step.countries}
         value={countryCode}
         disabled={busy}

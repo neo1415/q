@@ -49,7 +49,7 @@ export function VerifyNudgeLink({
         aria-hidden="true"
         size={ICON_SIZE.compact}
         strokeWidth={ICON_STROKE}
-        className="ml-auto shrink-0 text-(--cq-text-secondary)"
+        className="ms-auto shrink-0 text-(--cq-text-secondary)"
       />
     </Link>
   );

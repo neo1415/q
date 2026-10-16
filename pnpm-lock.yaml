@@ -1530,6 +1530,9 @@ importers:
       '@capital-q/database':
         specifier: workspace:*
         version: link:../database
+      '@capital-q/email':
+        specifier: workspace:*
+        version: link:../email
       '@capital-q/security':
         specifier: workspace:*
         version: link:../security

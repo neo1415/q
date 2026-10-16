@@ -35,6 +35,7 @@ import { reportPlaybackStall } from "../feed/use-feed-budget";
 import { recoverStream, restartPitch, setStreamWarmth } from "./hls-source";
 import { hasBeenActive, onAudioUnlock } from "./sound-policy";
 import { usePitchPlayback } from "./use-pitch-playback";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The pitch player (CQ-WEB-021; doc 20 §35-§36, §44-§50, §60; ADR-001).
@@ -176,6 +177,7 @@ export function PitchPlayer({
   onElement,
   offline = false,
 }: PitchPlayerProps) {
+  const t = useT();
   const videoRef = useRef<HTMLVideoElement>(null);
   // Sound on (ADR 0026), except under reduced motion, where audio stays
   // off until the person enables it (ADR-001 D5).
@@ -601,7 +603,7 @@ export function PitchPlayer({
             <track
               kind="captions"
               srcLang="en"
-              label="English (generated)"
+              label={t("English (generated)")}
               src={`/api/pitch-captions/${company.companyId}/${pitch.mediaAssetId}`}
               default={stageCaptionsOn}
             />
@@ -644,7 +646,7 @@ export function PitchPlayer({
                 data-sound-toggle
                 data-sound-blocked
               >
-                Tap for sound
+                {t("Tap for sound")}
               </button>
             ) : null}
           </div>
@@ -654,7 +656,7 @@ export function PitchPlayer({
           <span
             className="cq-feed-buffering"
             role="status"
-            aria-label="The pitch is loading"
+            aria-label={t("The pitch is loading")}
             data-buffering
           >
             <span className="cq-feed-ring" aria-hidden="true" />
@@ -682,11 +684,11 @@ export function PitchPlayer({
                 strokeWidth={ICON_STROKE}
                 fill="currentColor"
               />
-              Play pitch
+              {t("Play pitch")}
             </button>
             {silent ? (
               <span className="cq-feed-center-note">
-                Sound stays off until you turn it on
+                {t("Sound stays off until you turn it on")}
               </span>
             ) : null}
           </div>
@@ -728,7 +730,7 @@ export function PitchPlayer({
                   size={ICON_SIZE.regular}
                   strokeWidth={ICON_STROKE}
                 />
-                Try again
+                {t("Try again")}
               </button>
             )}
           </div>
@@ -787,7 +789,7 @@ export function PitchPlayer({
             <track
               kind="captions"
               srcLang="en"
-              label="English (generated)"
+              label={t("English (generated)")}
               src={`/api/pitch-captions/${company.companyId}/${pitch.mediaAssetId}`}
               default={captionsOn}
             />
@@ -840,7 +842,7 @@ export function PitchPlayer({
               size={ICON_SIZE.regular}
               strokeWidth={ICON_STROKE}
             />
-            Play
+            {t("Play")}
           </Button>
         ) : null}
         {explicitPlay && playing ? (
@@ -850,7 +852,7 @@ export function PitchPlayer({
               size={ICON_SIZE.regular}
               strokeWidth={ICON_STROKE}
             />
-            Pause
+            {t("Pause")}
           </Button>
         ) : null}
 
@@ -909,7 +911,7 @@ export function PitchPlayer({
 
       {failed ? (
         <p className="cq-caption text-(--cq-text-secondary)">
-          This pitch couldn&apos;t load right now. Try again in a moment.
+          {t("This pitch couldn't load right now. Try again in a moment.")}
         </p>
       ) : null}
     </div>

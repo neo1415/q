@@ -95,7 +95,7 @@ export function ScoreTrend({
       {shown === null || shown === undefined ? null : (
         <span
           role="status"
-          className="cq-caption pointer-events-none absolute -top-1 right-0 -translate-y-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-2 py-1 text-(--cq-text-primary) shadow-(--cq-shadow-sm)"
+          className="cq-caption pointer-events-none absolute -top-1 end-0 -translate-y-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-2 py-1 text-(--cq-text-primary) shadow-(--cq-shadow-sm)"
         >
           {shown.name} ·{" "}
           {new Date(shown.at).toLocaleDateString("en-GB", {

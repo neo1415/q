@@ -39,6 +39,7 @@ import {
 import { RehearsalVideoStage } from "./rehearsal-video-stage";
 import { CounterpartIdentity } from "./counterpart-identity";
 import { RehearsalRoom } from "./rehearsal-room";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The green room before a rehearsal (REHEARSE): who Q will play, what Q
@@ -97,6 +98,7 @@ export function RehearsalLobby({
   readonly meetingId?: string | undefined;
   readonly requestedVideo?: boolean;
 }) {
+  const t = useT();
   const router = useRouter();
   const [persona, setPersona] = useState<QRehearsalPersonaDto | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -253,7 +255,7 @@ export function RehearsalLobby({
     return (
       <section className="flex flex-col items-start gap-4 border border-(--cq-border-subtle) p-6">
         <h2 className="cq-title-md text-(--cq-text-primary)">
-          Q couldn’t get ready for this rehearsal
+          {t("Q couldn’t get ready for this rehearsal")}
         </h2>
         <p className="cq-body text-(--cq-text-secondary)">{failed}</p>
         <div className="flex gap-2">
@@ -263,10 +265,10 @@ export function RehearsalLobby({
               setAttempt((n) => n + 1);
             }}
           >
-            Try again
+            {t("Try again")}
           </Button>
           <Link href="/rehearsals" className={buttonClassName("secondary")}>
-            Rehearsals
+            {t("Rehearsals")}
           </Link>
         </div>
       </section>
@@ -281,10 +283,12 @@ export function RehearsalLobby({
       >
         <div className="size-24 animate-pulse rounded-full bg-(--cq-stage-surface-strong) motion-reduce:animate-none" />
         <p className="cq-body text-(--cq-stage-text)">
-          Q is reading up on who you’re meeting…
+          {t("Q is reading up on who you’re meeting…")}
         </p>
         <p className="cq-body-sm text-(--cq-stage-text-muted)">
-          The first time takes a few seconds; after that it’s ready at once.
+          {t(
+            "The first time takes a few seconds; after that it’s ready at once.",
+          )}
         </p>
       </section>
     );
@@ -326,7 +330,7 @@ export function RehearsalLobby({
           {persona.traits.length === 0 ? null : (
             <div className="flex flex-col gap-1">
               <h2 className="cq-label text-(--cq-text-primary)">
-                What Q knows about how they are
+                {t("What Q knows about how they are")}
               </h2>
               <ul className="cq-body-sm flex flex-col gap-1 text-(--cq-text-secondary)">
                 {persona.traits.map((item, index) => (
@@ -347,7 +351,7 @@ export function RehearsalLobby({
 
         <fieldset hidden={meetBy === "VIDEO"} className="flex flex-col gap-2">
           <legend className="cq-label mb-1 text-(--cq-text-primary)">
-            Their voice
+            {t("Their voice")}
           </legend>
           <div className="flex gap-2">
             {(["MALE", "FEMALE"] as const).map((choice) => (
@@ -375,7 +379,7 @@ export function RehearsalLobby({
 
         <fieldset className="flex flex-col gap-2">
           <legend className="cq-label mb-1 text-(--cq-text-primary)">
-            How hard should they be?
+            {t("How hard should they be?")}
           </legend>
           <div className="flex flex-wrap gap-2">
             {DIFFICULTIES.map((choice) => (
@@ -419,7 +423,7 @@ export function RehearsalLobby({
                     setInterviewerAttempt((value) => value + 1);
                   }}
                 >
-                  Retry meeting options
+                  {t("Retry meeting options")}
                 </Button>
               </>
             )}
@@ -435,14 +439,14 @@ export function RehearsalLobby({
                 : "Video interviews aren’t switched on for this account right now. No video room has been started."}
             </p>
             <Button variant="secondary" onClick={() => setMeetBy("VOICE")}>
-              Use voice instead
+              {t("Use voice instead")}
             </Button>
           </div>
         )}
         {interviewers === null || !interviewers.videoAvailable ? null : (
           <fieldset className="flex flex-col gap-2">
             <legend className="cq-label mb-1 text-(--cq-text-primary)">
-              How you’ll meet
+              {t("How you’ll meet")}
             </legend>
             <div className="flex flex-wrap gap-2">
               {(["VOICE", "VIDEO"] as const).map((choice) => (
@@ -480,9 +484,9 @@ export function RehearsalLobby({
                   It is never a likeness of the real person.
                 </p>
                 <p className="cq-body-sm text-(--cq-text-secondary)">
-                  Q chooses an available stock avatar and voice to suit this
-                  rehearsal. Two video interviews per account, up to three
-                  minutes each; reconnecting keeps the original deadline.
+                  {t(
+                    "Q chooses an available stock avatar and voice to suit this rehearsal. Two video interviews per account, up to three minutes each; reconnecting keeps the original deadline.",
+                  )}
                 </p>
               </div>
             )}

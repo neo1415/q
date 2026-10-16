@@ -11,6 +11,7 @@ import { qApiSession } from "@/features/q/context";
 import { readRehearsalRoom } from "@/features/rehearsal/read-rehearsal-room";
 import { RehearsalReview } from "@/features/rehearsal/rehearsal-review";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Rehearsal review" };
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export default async function RehearsalReviewPage({
 }: {
   readonly params: Promise<{ readonly rehearsalId: string }>;
 }) {
+  const t = await serverT();
   const { rehearsalId } = await params;
   const session = await qApiSession();
   const id = z.string().uuid().safeParse(rehearsalId);
@@ -43,14 +45,16 @@ export default async function RehearsalReviewPage({
           id="rehearsal"
           kind="REHEARSAL"
           total={1}
-          label="a rehearsal review"
+          label={t("a rehearsal review")}
         >
           <EmptyState
-            title="This rehearsal isn't available."
-            description="Your rehearsals are listed on the Rehearsals page."
+            title={t("This rehearsal isn't available.")}
+            description={t(
+              "Your rehearsals are listed on the Rehearsals page.",
+            )}
             action={
               <Link href="/rehearsals" className={buttonClassName("secondary")}>
-                Rehearsals
+                {t("Rehearsals")}
               </Link>
             }
           />
@@ -64,7 +68,7 @@ export default async function RehearsalReviewPage({
         id="rehearsal"
         kind="REHEARSAL"
         total={1}
-        label="a rehearsal review"
+        label={t("a rehearsal review")}
       >
         <div className="mx-auto w-full max-w-3xl">
           <RehearsalReview rehearsal={rehearsal} />

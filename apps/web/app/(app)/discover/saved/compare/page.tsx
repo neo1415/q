@@ -22,6 +22,7 @@ import {
 import { FitComparisonView } from "@/features/fit/fit-comparison";
 import { apiSession, qApiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Compare" };
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ export default async function SavedComparePage({
 }: {
   readonly searchParams: Promise<{ readonly ids?: string | string[] }>;
 }) {
+  const t = await serverT();
   const query = FitCompareQuerySchema.safeParse({
     ids: [(await searchParams).ids].flat()[0] ?? "",
   });
@@ -61,44 +63,50 @@ export default async function SavedComparePage({
           id: entry.companyId,
         }))}
         total={comparison?.entries.length ?? 0}
-        label="companies side by side"
+        label={t("companies side by side")}
       >
         <Link
           href="/discover/saved"
           className={buttonClassName("quiet", "compact", "self-start")}
         >
           <ArrowLeft size={ICON_SIZE.compact} aria-hidden="true" />
-          Back to Saved
+          {t("Back to Saved")}
         </Link>
         <PageHeader
-          title="Side by side"
-          description="Your picks on the same fit as your top three. Unknown never counts against a company, and the order is never paid for."
+          title={t("Side by side")}
+          description={t(
+            "Your picks on the same fit as your top three. Unknown never counts against a company, and the order is never paid for.",
+          )}
         />
         {!query.success ? (
           <EmptyState
-            title="Pick 2 to 4 companies to compare."
-            description="Tick them in Saved, then compare them side by side."
+            title={t("Pick 2 to 4 companies to compare.")}
+            description={t(
+              "Tick them in Saved, then compare them side by side.",
+            )}
             action={
               <Link
                 href="/discover/saved"
                 className={buttonClassName("secondary")}
               >
-                Go to Saved
+                {t("Go to Saved")}
               </Link>
             }
           />
         ) : comparison === null ? (
           <EmptyState
-            title="The comparison didn't load."
-            description="Nothing is lost. Try again in a moment."
+            title={t("The comparison didn't load.")}
+            description={t("Nothing is lost. Try again in a moment.")}
           />
         ) : comparison.entries.length === 0 ? (
           <EmptyState
-            title="None of these can be compared on fit right now."
-            description="You may have no active mandate, or these companies are no longer visible to you."
+            title={t("None of these can be compared on fit right now.")}
+            description={t(
+              "You may have no active mandate, or these companies are no longer visible to you.",
+            )}
             action={
               <Link href="/profile" className={buttonClassName("secondary")}>
-                Check your mandate
+                {t("Check your mandate")}
               </Link>
             }
           />
@@ -114,7 +122,7 @@ export default async function SavedComparePage({
                 id="compare-evidence"
                 className="cq-title-sm text-(--cq-text-primary)"
               >
-                What each has on record
+                {t("What each has on record")}
               </h2>
               <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
                 {comparison.entries.map((entry) => {
@@ -136,7 +144,7 @@ export default async function SavedComparePage({
                           href={`/company/${encodeURIComponent(entry.companyId)}#assumptions`}
                           className="underline underline-offset-4"
                         >
-                          Questions to investigate
+                          {t("Questions to investigate")}
                         </Link>
                       </dd>
                     </div>

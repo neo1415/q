@@ -54,6 +54,30 @@ export function isTavusConnectivityCheck(
   );
 }
 
+/**
+ * The room's disclosure in the applicant's language (lane ml). The same
+ * two facts in each: Q is an AI interviewer, and what is said is
+ * transcribed into the application.
+ */
+export function gateqVideoDisclosure(language: "ar" | null): {
+  readonly spoken: string;
+  readonly shown: string;
+} {
+  return language === "ar"
+    ? {
+        spoken:
+          "للعلم، أنا Q، محاور يعمل بالذكاء الاصطناعي. ما تقوله يُكتب في طلبك.",
+        shown:
+          "Q محاور يعمل بالذكاء الاصطناعي. تُكتب هذه المقابلة المرئية في طلبك.",
+      }
+    : {
+        spoken:
+          "Just so you know, I'm Q, an AI interviewer. What you say is transcribed into your application.",
+        shown:
+          "Q is an AI interviewer. This video interview is transcribed into your application.",
+      };
+}
+
 /** What the applicant sees on the interviewer's tile in the room. */
 /** Q's tile when the fund is not known: still Q, never the face's name. */
 export const GATEQ_VIDEO_PARTICIPANT_NAME = tavusParticipantLabel({
@@ -82,12 +106,7 @@ export function createTavusGateqVideoProvider(deps: {
           systemPrompt:
             "You are the face and voice of Q, Capital Q's AI interviewer for an investment application. Speak exactly the lines you are given, naturally, and nothing else.",
           faceId: deps.faceId,
-          disclosure: {
-            spoken:
-              "Just so you know, I'm Q, an AI interviewer. What you say is transcribed into your application.",
-            shown:
-              "Q is an AI interviewer. This video interview is transcribed into your application.",
-          },
+          disclosure: gateqVideoDisclosure(input.language ?? null),
           layers: {
             llm: {
               model: "capital-q-gateq-interview",
@@ -120,6 +139,8 @@ export function createTavusGateqVideoProvider(deps: {
             joinGraceSeconds: input.joinGraceSeconds,
             testMode: input.testMode,
             requireAuth: true,
+            // Lane ml: Arabic first, English understood (Tavus languages).
+            ...(input.language === "ar" ? { languages: ["ar", "en"] } : {}),
           });
         } catch (error) {
           // A PAL without a room is configuration, not spend; best effort.

@@ -117,6 +117,7 @@ export {
   startOnboardingSession,
   reviseOnboardingResponse,
   submitOnboardingResponse,
+  submitOnboardingResponses,
 } from "./onboarding.js";
 
 export {
@@ -392,7 +393,7 @@ export {
   startRehearsal,
 } from "./rehearsals.js";
 // end REHEARSE block
-export { getQStanding, setQPersonality } from "./standing.js";
+export { getQStanding, setQLanguage, setQPersonality } from "./standing.js";
 // AUTO block: Q's delegated work, Web Push, notification settings.
 export {
   answerQWork,

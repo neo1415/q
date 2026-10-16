@@ -130,7 +130,7 @@ export function MenuRadioItem({
       className="flex min-h-11 cursor-default select-none items-center gap-2 px-2.5 cq-body-sm text-(--cq-text-primary) outline-none data-[highlighted]:bg-(--cq-surface-subtle)"
     >
       {children}
-      <BaseMenu.RadioItemIndicator className="ml-auto inline-flex text-(--cq-text-primary)">
+      <BaseMenu.RadioItemIndicator className="ms-auto inline-flex text-(--cq-text-primary)">
         {indicator}
       </BaseMenu.RadioItemIndicator>
     </BaseMenu.RadioItem>

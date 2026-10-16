@@ -9,10 +9,16 @@ import { adminContext } from "@/features/admin/admin-context";
 import { FlagToggle } from "@/features/admin/flag-controls";
 import { flagName } from "@/features/admin/flag-names";
 import { when } from "@/features/admin/words";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Kill switches · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Kill switches · Admin") };
+}
 
 export default async function AdminFlagsPage() {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("flags.read")) notFound();
   const flags = await getAdminFlags(context.session)
@@ -21,13 +27,15 @@ export default async function AdminFlagsPage() {
   return (
     <PageSection
       id="flags"
-      title="Kill switches"
-      description="Stop what Q does on its own, platform-wide, at once. Every change names who and why."
+      title={t("Kill switches")}
+      description={t(
+        "Stop what Q does on its own, platform-wide, at once. Every change names who and why.",
+      )}
     >
       {flags === null ? (
         <ErrorState
-          title="Switches couldn't load"
-          description="Try again in a moment."
+          title={t("Switches couldn't load")}
+          description={t("Try again in a moment.")}
         />
       ) : (
         <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
@@ -38,10 +46,10 @@ export default async function AdminFlagsPage() {
             >
               <div className="flex min-w-0 flex-col gap-1">
                 <span className="cq-body font-medium text-(--cq-text-primary)">
-                  {flagName(flag.key)} · {flag.enabled ? "On" : "Off"}
+                  {t(flagName(flag.key))} · {flag.enabled ? t("On") : t("Off")}
                 </span>
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  {flag.description}
+                  {t(flag.description)}
                 </span>
                 {flag.history.length === 0 ? null : (
                   <ul className="mt-1 flex flex-col gap-0.5">
@@ -50,9 +58,9 @@ export default async function AdminFlagsPage() {
                         key={event.at}
                         className="cq-caption text-(--cq-text-secondary)"
                       >
-                        {event.enabled ? "Turned on" : "Turned off"}{" "}
-                        {when(event.at)} by {event.actorName ?? "an admin"}:{" "}
-                        {event.reason}
+                        {event.enabled ? t("Turned on") : t("Turned off")}{" "}
+                        {t(when(event.at))} {t("by")}{" "}
+                        {t(event.actorName ?? "an admin")}: {t(event.reason)}
                       </li>
                     ))}
                   </ul>

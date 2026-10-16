@@ -264,7 +264,8 @@ describe("founder interview and review", () => {
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("checkbox", { name: /AI interviewer/ }));
     await press("Continue by video");
-    expect(calls.videoStart).toHaveBeenCalledWith(token);
+    // Lane ml: with the device language, for the room's language.
+    expect(calls.videoStart).toHaveBeenCalledWith(token, navigator.language);
     expect(
       document.querySelector('iframe[title^="Video interview for"]'),
     ).not.toBeNull();

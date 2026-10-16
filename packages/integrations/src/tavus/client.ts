@@ -218,6 +218,12 @@ export type TavusClient = {
     readonly testMode: boolean;
     /** A private room: only the holder of the returned token joins. */
     readonly requireAuth?: boolean | undefined;
+    /**
+     * The languages the conversation runs in, first one opening (Tavus
+     * `properties.languages`, ISO 639-1; replaces the PAL's set). Absent:
+     * the provider's default, English. Multilingual Q, 2026-10-16.
+     */
+    readonly languages?: readonly string[] | undefined;
   }) => Promise<TavusCreatedConversation>;
   /**
    * Sends the PAL into an existing Google Meet as a participant (Tavus
@@ -378,6 +384,13 @@ export function createTavusClient(dependencies: {
             participant_left_timeout: 10,
             participant_absent_timeout: 90,
             enable_closed_captions: true,
+            ...(input.languages === undefined || input.languages.length === 0
+              ? {}
+              : {
+                  languages: input.languages
+                    .filter((code) => /^[a-z]{2,3}$/u.test(code))
+                    .slice(0, 4),
+                }),
           },
         },
       );

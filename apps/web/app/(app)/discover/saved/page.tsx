@@ -15,6 +15,7 @@ import {
 import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { SavedCompanies } from "@/features/discover/saved-companies";
 import { apiSession } from "@/features/q/context";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Saved" };
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export const dynamic = "force-dynamic";
  * shown, because once being saved must not leak it.
  */
 export default async function SavedPage() {
+  const t = await serverT();
   const session = await apiSession();
   const saved =
     session === null
@@ -49,29 +51,33 @@ export default async function SavedPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Saved"
-        description="Saving isn’t interest. The company isn’t told."
+        title={t("Saved")}
+        description={t("Saving isn’t interest. The company isn’t told.")}
       />
       {saved === null ? (
         <EmptyState
-          title="Saved couldn't load."
-          description="Nothing is lost. Capital Q didn't answer just now; try again in a moment."
+          title={t("Saved couldn't load.")}
+          description={t(
+            "Nothing is lost. Capital Q didn't answer just now; try again in a moment.",
+          )}
           action={
             <Link
               href="/discover/saved"
               className={buttonClassName("secondary")}
             >
-              Try again
+              {t("Try again")}
             </Link>
           }
         />
       ) : companies.length === 0 ? (
         <EmptyState
-          title="Nothing saved yet."
-          description="Save a company in Discover and it stays here, across visits and devices."
+          title={t("Nothing saved yet.")}
+          description={t(
+            "Save a company in Discover and it stays here, across visits and devices.",
+          )}
           action={
             <Link href="/discover" className={buttonClassName("secondary")}>
-              Go to Discover
+              {t("Go to Discover")}
             </Link>
           }
         />

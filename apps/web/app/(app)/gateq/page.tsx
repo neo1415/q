@@ -39,8 +39,12 @@ import { publicGateway } from "@/features/gateq/public-gateway";
 import { appOrigin } from "@/features/q-card/public-card-data";
 import { qrSvg } from "@/features/q-card/qr";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "GateQ" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("GateQ") };
+}
 export const dynamic = "force-dynamic";
 
 type Props = {
@@ -58,6 +62,8 @@ const one = (value: string | string[] | undefined) =>
  * gateway authority; the screen decides nothing.
  */
 export default async function GateqPage({ searchParams }: Props) {
+  const t = await serverT();
+
   const params = await searchParams;
   const context = await resolveOwnContext();
   const session = await apiSession();
@@ -65,7 +71,7 @@ export default async function GateqPage({ searchParams }: Props) {
   if (context.kind === "NONE" && context.unavailable === true) {
     return (
       <PageContainer>
-        <ErrorBlock what="GateQ" retryHref="/gateq" />
+        <ErrorBlock t={t} what="GateQ" retryHref="/gateq" />
       </PageContainer>
     );
   }
@@ -92,6 +98,7 @@ export default async function GateqPage({ searchParams }: Props) {
     return (
       <PageContainer>
         <GateqChrome
+          t={t}
           role="FOUNDER"
           active={tab}
           maxWidth={tab === "claim" ? 760 : 860}
@@ -132,8 +139,8 @@ export default async function GateqPage({ searchParams }: Props) {
   if (gateways === null) {
     return (
       <PageContainer>
-        <GateqChrome role="INVESTOR" active={tab}>
-          <ErrorBlock what="Your gate" retryHref={`/gateq?tab=${tab}`} />
+        <GateqChrome t={t} role="INVESTOR" active={tab}>
+          <ErrorBlock t={t} what="Your gate" retryHref={`/gateq?tab=${tab}`} />
         </GateqChrome>
       </PageContainer>
     );
@@ -142,7 +149,7 @@ export default async function GateqPage({ searchParams }: Props) {
   if (gateway === null && tab !== "find") {
     return (
       <PageContainer>
-        <GateqChrome role="INVESTOR" active={tab}>
+        <GateqChrome t={t} role="INVESTOR" active={tab}>
           <GateEmpty onOpen={<OpenGatewayButton />} />
         </GateqChrome>
       </PageContainer>
@@ -155,6 +162,7 @@ export default async function GateqPage({ searchParams }: Props) {
     return (
       <PageContainer>
         <GateqChrome
+          t={t}
           role="INVESTOR"
           active="find"
           action={action}
@@ -183,6 +191,7 @@ export default async function GateqPage({ searchParams }: Props) {
     return (
       <PageContainer>
         <GateqChrome
+          t={t}
           role="INVESTOR"
           active="gate"
           action={action}
@@ -254,6 +263,7 @@ export default async function GateqPage({ searchParams }: Props) {
   return (
     <PageContainer>
       <GateqChrome
+        t={t}
         role="INVESTOR"
         active="inbox"
         action={action}
@@ -268,7 +278,7 @@ export default async function GateqPage({ searchParams }: Props) {
             id: item.applicationId,
           }))}
           total={inbox?.items.length ?? 0}
-          label={`${String(inbox?.items.length ?? 0)} applications`}
+          label={t(`${String(inbox?.items.length ?? 0)} applications`)}
         />
         {detail === null ? null : (
           <QPageState
@@ -281,8 +291,9 @@ export default async function GateqPage({ searchParams }: Props) {
             className="cq-body-sm mb-4 border border-(--cq-border-subtle) px-4 py-3 text-(--cq-text-primary)"
             data-gateq-item-missing
           >
-            That application isn&apos;t in your GateQ inbox, or you don&apos;t
-            have access to it. Nothing else has been opened in its place.
+            {t(
+              "That application isn't in your GateQ inbox, or you don't have access to it. Nothing else has been opened in its place.",
+            )}
           </p>
         ) : null}
         <InboxView

@@ -12,6 +12,7 @@ import { loadWorkforceAction, type WorkforceView } from "./workforce-actions";
 import { freshness, useLive, type LiveStatus } from "./workforce-live";
 import { WorkforceTeam } from "./workforce-map";
 import { ApproveButton, DraftSheet } from "./workforce-panel";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q's team, live, on the Work page (P7): one reader shared by In progress,
@@ -64,6 +65,8 @@ export function LiveLine({
   readonly live: LiveWorkforce;
   readonly now: number;
 }) {
+  const t = useT();
+
   const at = new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
@@ -93,14 +96,14 @@ export function LiveLine({
           )}
         />
       )}
-      <span suppressHydrationWarning>{words}</span>
+      <span suppressHydrationWarning>{t(words)}</span>
       {live.status === "live" ? null : (
         <button
           type="button"
           onClick={live.refresh}
           className="min-h-11 px-2 font-medium text-(--cq-text-primary) underline-offset-2 hover:underline lg:min-h-8"
         >
-          Try now
+          {t("Try now")}
         </button>
       )}
     </p>

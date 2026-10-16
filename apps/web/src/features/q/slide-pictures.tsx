@@ -63,7 +63,7 @@ export function SlidePictures({
             className={`size-full ${picture.fit === "contain" ? "object-contain" : "object-cover"}`}
           />
           {picture.credit.length === 0 ? null : (
-            <figcaption className="cq-caption absolute bottom-1 left-1 bg-(--cq-surface-raised) px-1.5 py-0.5 text-(--cq-text-secondary)">
+            <figcaption className="cq-caption absolute bottom-1 start-1 bg-(--cq-surface-raised) px-1.5 py-0.5 text-(--cq-text-secondary)">
               {picture.credit}
             </figcaption>
           )}

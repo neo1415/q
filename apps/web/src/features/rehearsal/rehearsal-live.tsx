@@ -12,6 +12,7 @@ import { Button, buttonClassName } from "@capital-q/ui/button";
 import { readRehearsalRoomAction } from "./rehearsal-actions";
 import { RehearsalRoom } from "./rehearsal-room";
 import { RehearsalVideoStage } from "./rehearsal-video-stage";
+import { useT } from "@/features/i18n/language";
 
 /** The durable room URL recovers the same owned rehearsal after refresh. */
 export function RehearsalLive({
@@ -23,6 +24,7 @@ export function RehearsalLive({
   readonly initialVideo: RehearsalVideoSessionDto | null;
   readonly expectsVideo?: boolean | undefined;
 }) {
+  const t = useT();
   const router = useRouter();
   const [rehearsal, setRehearsal] = useState(initialRehearsal);
   const [video, setVideo] = useState(initialVideo);
@@ -134,10 +136,10 @@ export function RehearsalLive({
                 router.refresh();
               }}
             >
-              Refresh
+              {t("Refresh")}
             </Button>
             <Link href="/rehearsals" className={buttonClassName("secondary")}>
-              Rehearsals
+              {t("Rehearsals")}
             </Link>
           </div>
         ) : null}

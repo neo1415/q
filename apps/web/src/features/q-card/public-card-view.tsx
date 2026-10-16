@@ -412,7 +412,7 @@ export function PublicCardView({
                 <dt className="cq-body-sm shrink-0 text-(--cq-text-secondary)">
                   {cardFieldLabel(field.key)}
                 </dt>
-                <dd className="cq-body min-w-0 text-right break-words">
+                <dd className="cq-body min-w-0 text-end break-words">
                   {field.key === "foundedDate"
                     ? field.value.slice(0, 4)
                     : cardFieldValue(field)}

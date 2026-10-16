@@ -21,6 +21,7 @@ import {
   type DiscoverTab,
 } from "./discover-tab";
 import { YourCompaniesFeed } from "./your-companies";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Discover's two tabs at the top of the stage (founder decision
@@ -60,6 +61,7 @@ export function DiscoverTabs({
   /** A company to open on in Your companies ("show me Nixo's pitch"). */
   readonly focusCompanyId: string | null;
 }) {
+  const t = useT();
   // Set before paint, so neither feed starts under the wrong tab.
   useIsomorphicLayoutEffect(() => {
     setDiscoverTab(initialTab);
@@ -109,7 +111,11 @@ export function DiscoverTabs({
 
   return (
     <div className="cq-discover" data-discover-tab={tab}>
-      <nav aria-label="Discover" className="cq-discover-tabs" ref={tabsRef}>
+      <nav
+        aria-label={t("Discover")}
+        className="cq-discover-tabs"
+        ref={tabsRef}
+      >
         {TABS.map((entry) => {
           const selected = entry.tab === tab;
           return (
@@ -122,7 +128,7 @@ export function DiscoverTabs({
               onClick={() => choose(entry.tab)}
               data-discover-tab-button={entry.tab}
             >
-              {entry.label}
+              {t(entry.label)}
             </button>
           );
         })}

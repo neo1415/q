@@ -23,6 +23,7 @@ import { FormNotice } from "./form-notice";
 import { AuthDivider, GoogleSignIn } from "./google-sign-in";
 import { PasswordField } from "./password-field";
 import { SubmitButton } from "./submit-button";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Create account: what they are here to do, a name, an email, a password,
@@ -46,6 +47,7 @@ export function SignUpForm({
   /** Whether the Auth server actually offers Google. Resolved on the server. */
   readonly googleEnabled?: boolean | undefined;
 }) {
+  const t = useT();
   const [state, action] = useActionState(
     signUpWithPasswordAction,
     INITIAL_AUTH_FORM_STATE,
@@ -109,8 +111,9 @@ export function SignUpForm({
             }}
           />
           <p className="cq-caption mt-2 text-(--cq-text-secondary)">
-            Joining a team that is already on Capital Q? Open the link in your
-            invitation email instead.
+            {t(
+              "Joining a team that is already on Capital Q? Open the link in your invitation email instead.",
+            )}
           </p>
         </div>
       )}
@@ -142,11 +145,11 @@ export function SignUpForm({
         <Input
           id="fullName"
           name="fullName"
-          label="Your name"
+          label={t("Your name")}
           autoComplete="name"
           required
           maxLength={80}
-          description="What Q should call you."
+          description={t("What Q should call you.")}
         />
         {invited ? null : (
           <Input
@@ -161,23 +164,23 @@ export function SignUpForm({
         <EmailField />
         <PasswordField
           id="password"
-          label="Password"
+          label={t("Password")}
           autoComplete="new-password"
           minLength={8}
-          description="At least 8 characters."
+          description={t("At least 8 characters.")}
         />
         {state.status === "error" ? (
           <FormNotice tone="danger">{state.message}</FormNotice>
         ) : null}
         <SubmitButton pendingLabel="Creating account…">
-          Create account
+          {t("Create account")}
         </SubmitButton>
       </form>
 
       <p className="cq-body-sm text-(--cq-text-secondary)">
         Already have an account?{" "}
         <Link href={signInHref} className={linkClassName()}>
-          Sign in
+          {t("Sign in")}
         </Link>
       </p>
     </div>

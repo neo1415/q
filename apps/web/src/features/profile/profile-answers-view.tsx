@@ -85,7 +85,10 @@ export function ProfileAnswers({
   emptyText,
   provenance = true,
   bare = false,
+  translate = (english: string) => english,
 }: {
+  /** Multilingual Q: labels and questions in the reader's language. */
+  readonly translate?: ((english: string) => string) | undefined;
   readonly journey: ProfileJourney;
   readonly state: AnswersState;
   /** Only these answer groups (a profile section shows its own). */
@@ -152,6 +155,7 @@ export function ProfileAnswers({
             href={editHref(journey, group)}
             editable={editableOf(journey, group, fullState)}
             bare={bare}
+            translate={translate}
           />
         ))}
       {provenance ? (
@@ -210,7 +214,9 @@ function AnswerGroupView({
   href,
   editable,
   bare,
+  translate,
 }: {
+  readonly translate: (english: string) => string;
   readonly bare: boolean;
   readonly journey: ProfileJourney;
   readonly group: AnswerGroup;
@@ -237,7 +243,7 @@ function AnswerGroupView({
     ) : (
       <AnswerEditor
         journey={journey}
-        title={group.label}
+        title={translate(group.label)}
         stepKeys={editable.stepKeys}
         responses={editable.responses}
         labels={editable.labels}
@@ -261,7 +267,7 @@ function AnswerGroupView({
           <span className="inline-flex size-8 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
             <Icon size={ICON_SIZE.regular} aria-hidden="true" />
           </span>
-          {group.label}
+          {translate(group.label)}
         </h3>
         {edit}
       </div>
@@ -274,7 +280,7 @@ function AnswerGroupView({
             className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-baseline sm:gap-6"
           >
             <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-40">
-              {line.title}
+              {translate(line.title)}
             </dt>
             <dd className="min-w-0 flex-1">
               {line.value === null ? (

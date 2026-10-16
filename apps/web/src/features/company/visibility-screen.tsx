@@ -21,6 +21,7 @@ import {
   loadVisibilityOverviewAction,
   setCompanyVisibilityAction,
 } from "./visibility-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Visibility & Discovery (CQ-PRE-REC-001 §31-§36).
@@ -45,6 +46,7 @@ type Loaded = {
 };
 
 export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
+  const t = useT();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -109,7 +111,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
 
   if (error !== null && loaded === null) {
     return (
-      <InlineNotice tone="danger" title="Visibility couldn't load">
+      <InlineNotice tone="danger" title={t("Visibility couldn't load")}>
         {error}
       </InlineNotice>
     );
@@ -118,7 +120,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
     return (
       <div
         aria-busy="true"
-        aria-label="Loading visibility"
+        aria-label={t("Loading visibility")}
         className="flex flex-col gap-4"
       >
         <Skeleton lines={1} className="w-1/2" />
@@ -156,12 +158,12 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
   return (
     <div className="flex flex-col gap-10" data-visibility-screen>
       {saved !== null ? (
-        <InlineNotice tone="positive" title="Saved">
+        <InlineNotice tone="positive" title={t("Saved")}>
           {saved}
         </InlineNotice>
       ) : null}
       {error !== null ? (
-        <InlineNotice tone="danger" title="That didn't go through">
+        <InlineNotice tone="danger" title={t("That didn't go through")}>
           {error}
         </InlineNotice>
       ) : null}
@@ -186,6 +188,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
               : "Private to your organisation"}
           </h2>
           <ContextIndicator
+            translate={t}
             scope={visible ? "network_visible" : "organisation_private"}
           />
         </header>
@@ -220,7 +223,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
                 disabled={busy}
                 onClick={() => void choose("organisation_private")}
               >
-                Make private again
+                {t("Make private again")}
               </Button>
             ) : (
               <Button
@@ -228,11 +231,11 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
                 disabled={busy}
                 onClick={() => void choose("network_visible")}
               >
-                Make visible to investors
+                {t("Make visible to investors")}
               </Button>
             )}
             <span className="cq-status-line">
-              Finishing setup never changes this on its own. You decide.
+              {t("Finishing setup never changes this on its own. You decide.")}
             </span>
           </div>
         </div>
@@ -247,7 +250,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
             id="visibility-discovery"
             className="cq-title-md text-(--cq-text-primary)"
           >
-            Discovery status
+            {t("Discovery status")}
           </h2>
           <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
             {visible
@@ -257,7 +260,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
         </div>
         <div className="flex flex-col gap-2">
           <h3 className="cq-label text-(--cq-text-primary)">
-            Investor recommendations
+            {t("Investor recommendations")}
           </h3>
           <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
             {ready
@@ -267,7 +270,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
         </div>
         {readiness === null ? (
           <p className="cq-status-line">
-            Readiness couldn&apos;t load. Try again in a moment.
+            {t("Readiness couldn't load. Try again in a moment.")}
           </p>
         ) : (
           <ul
@@ -306,7 +309,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
             data-discoverability
           >
             <h3 className="cq-label text-(--cq-text-primary)">
-              How investors can find you
+              {t("How investors can find you")}
             </h3>
             <ul className="flex flex-col gap-2">
               {discoverabilityNotes(readiness.discoverability).map((note) => (
@@ -319,7 +322,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
                     href={note.href}
                     className="underline underline-offset-4"
                   >
-                    Add it
+                    {t("Add it")}
                   </Link>
                 </li>
               ))}
@@ -329,9 +332,9 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
         {readiness !== null && !readiness.verificationAvailable ? (
           <p className="cq-status-line max-w-(--cq-layout-reading) items-start">
             <span>
-              Identity and organisation verification are not yet available on
-              Capital Q, so no company is in investor recommendations today.
-              Nothing here calls your company verified when it isn&apos;t.
+              {t(
+                "Identity and organisation verification are not yet available on Capital Q, so no company is in investor recommendations today. Nothing here calls your company verified when it isn't.",
+              )}
             </span>
           </p>
         ) : null}
@@ -358,20 +361,20 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
         refreshKey={String(company.version)}
       />
 
-      <section aria-label="Related" className="flex flex-col gap-3">
+      <section aria-label={t("Related")} className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           {/* The pitch video is part of what investors see; it has its own
               flow (CQ-MEDIA), founder-only. */}
           <Link href="/pitch" className={buttonClassName("secondary")}>
-            Your pitch video
+            {t("Your pitch video")}
           </Link>
           {/* Capital Q verifies; the founder asks (CQ-VERIFY-001). */}
           <Link href="/verification" className={buttonClassName("secondary")}>
-            Verification
+            {t("Verification")}
           </Link>
           {/* Changes are asked of Q in one's own words and approved (ADR 0011). */}
           <Link href="/home" className={buttonClassName("quiet")}>
-            Ask Q to change it
+            {t("Ask Q to change it")}
           </Link>
         </div>
       </section>
@@ -384,25 +387,27 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
  * around an absence (design/visual-direction.md, "No dashboards").
  */
 export function VisibilityUnavailable() {
+  const t = useT();
   return (
     <section
-      aria-label="No company to show yet."
+      aria-label={t("No company to show yet.")}
       className="flex max-w-(--cq-layout-reading) flex-col gap-3"
       data-state="empty"
     >
       <p className="cq-body text-(--cq-text-primary)">
-        No company to show yet.
+        {t("No company to show yet.")}
       </p>
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        Set up as a founder first. Until then there is nothing investors could
-        see.
+        {t(
+          "Set up as a founder first. Until then there is nothing investors could see.",
+        )}
       </p>
       <div className="pt-1">
         <Link
           href="/onboarding/founder"
           className={buttonClassName("secondary")}
         >
-          Set up as a founder
+          {t("Set up as a founder")}
         </Link>
       </div>
     </section>

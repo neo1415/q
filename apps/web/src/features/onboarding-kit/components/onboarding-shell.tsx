@@ -4,6 +4,8 @@ import type { MouseEvent, ReactNode } from "react";
 import { Button, buttonClassName, IconButton } from "@capital-q/ui/button";
 import { ArrowLeft, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
+import { useT } from "@/features/i18n/language";
+
 import type { SaveStatus } from "../controller";
 import { ContinueLater } from "./continue-later";
 import { SaveStatusIndicator } from "./save-status";
@@ -56,6 +58,9 @@ export function OnboardingShell({
   // beside it says why. Any other busy state (going back, opening a step)
   // disables it as before.
   const saving = busy && saveStatus === "saving";
+  // Multilingual Q: the frame's own words follow the interface language;
+  // each step's words are the step's (and Q's) own.
+  const t = useT();
   const guard = (event: MouseEvent<HTMLButtonElement>) => {
     if (saving) {
       event.preventDefault();
@@ -69,7 +74,7 @@ export function OnboardingShell({
       <header className="sticky top-0 z-(--cq-z-sticky) border-b border-(--cq-border-subtle) bg-(--cq-canvas) pt-(--cq-safe-top)">
         <div className="mx-auto flex h-(--cq-header-height) w-full max-w-(--cq-layout-reading) items-center justify-between gap-2 px-2 sm:px-4">
           <IconButton
-            aria-label="Back"
+            aria-label={t("Back")}
             variant="quiet"
             onClick={onBack}
             disabled={onBack === undefined || busy}

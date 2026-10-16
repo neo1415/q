@@ -12,6 +12,7 @@ import {
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { readAgainAction, reviewSectionAction } from "./material-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F26: the founder checks Q's read of their deck one section at a time.
@@ -46,6 +47,7 @@ export function DeckReadingReview({
   readonly documentId: string;
   readonly extraction: DeckExtractionDto;
 }) {
+  const t = useT();
   const initial = new Map<DeckSectionCode, State>(
     (extraction.sectionStates ?? []).map((s) => [s.section, s.state]),
   );
@@ -124,7 +126,7 @@ export function DeckReadingReview({
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id="check-read" className="cq-title-sm text-(--cq-text-primary)">
-          Check Q&rsquo;s read, section by section
+          {t("Check Q’s read, section by section")}
         </h3>
         <span className="cq-caption text-(--cq-text-secondary)">
           Reading {extraction.readingNumber ?? 1} of version{" "}
@@ -132,8 +134,9 @@ export function DeckReadingReview({
         </span>
       </div>
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        Confirm what&rsquo;s right, mark what&rsquo;s wrong, or say it in your
-        own words. Investors see only the sections you confirm or write.
+        {t(
+          "Confirm what’s right, mark what’s wrong, or say it in your own words. Investors see only the sections you confirm or write.",
+        )}
       </p>
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
         {shown.map((section) => {
@@ -180,7 +183,7 @@ export function DeckReadingReview({
                   }}
                 >
                   <label className="cq-caption text-(--cq-text-secondary)">
-                    What your deck says, in your words
+                    {t("What your deck says, in your words")}
                     <textarea
                       className="cq-body-sm mt-1 min-h-20 w-full border border-(--cq-border) bg-(--cq-surface) p-2 text-(--cq-text-primary)"
                       maxLength={600}
@@ -198,7 +201,7 @@ export function DeckReadingReview({
                         "min-h-11",
                       )}
                     >
-                      Save my words
+                      {t("Save my words")}
                     </button>
                     <button
                       type="button"
@@ -209,7 +212,7 @@ export function DeckReadingReview({
                         "min-h-11",
                       )}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </button>
                   </div>
                 </form>
@@ -225,7 +228,7 @@ export function DeckReadingReview({
                       "min-h-11",
                     )}
                   >
-                    Looks right
+                    {t("Looks right")}
                   </button>
                   <button
                     type="button"
@@ -233,7 +236,7 @@ export function DeckReadingReview({
                     onClick={() => review(section.section, "DISMISS")}
                     className={buttonClassName("quiet", "compact", "min-h-11")}
                   >
-                    This is wrong
+                    {t("This is wrong")}
                   </button>
                   <button
                     type="button"
@@ -244,7 +247,7 @@ export function DeckReadingReview({
                     }}
                     className={buttonClassName("quiet", "compact", "min-h-11")}
                   >
-                    Correct it
+                    {t("Correct it")}
                   </button>
                 </div>
               )}
@@ -259,7 +262,7 @@ export function DeckReadingReview({
           onClick={readAgain}
           className={buttonClassName("secondary", "regular")}
         >
-          Ask Q to read again
+          {t("Ask Q to read again")}
         </button>
         <span className="cq-caption text-(--cq-text-secondary)">
           {waiting

@@ -6,6 +6,7 @@ import { Button } from "../components/button.js";
 import { Input } from "../components/input.js";
 import { cx } from "../primitives/class-names.js";
 import { EvidenceStatus, type EvidenceKind } from "./evidence-status.js";
+import { useUiText } from "../primitives/ui-text.js";
 
 /**
  * One reviewed fact: label, current value, where it came from, and the
@@ -53,6 +54,7 @@ export function EditableFact({
   onChange,
   disabled = false,
 }: EditableFactProps) {
+  const t = useUiText();
   const inputId = `${useId()}-${id}`;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -109,14 +111,14 @@ export function EditableFact({
           />
           <div className="flex gap-2">
             <Button variant="primary" size="compact" onClick={save}>
-              Save
+              {t("Save")}
             </Button>
             <Button
               variant="quiet"
               size="compact"
               onClick={() => setEditing(false)}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
           </div>
         </div>
@@ -145,7 +147,7 @@ export function EditableFact({
                 disabled={disabled}
                 onClick={() => onChange({ value, verdict: "confirmed" })}
               >
-                Confirm
+                {t("Confirm")}
               </Button>
             ) : null}
             <Button
@@ -163,7 +165,7 @@ export function EditableFact({
                 disabled={disabled}
                 onClick={() => onChange({ value: "", verdict: "missing" })}
               >
-                Mark missing
+                {t("Mark missing")}
               </Button>
             ) : null}
           </div>

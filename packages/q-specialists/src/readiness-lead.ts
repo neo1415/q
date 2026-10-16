@@ -1,4 +1,6 @@
+import type { QLanguageCode } from "@capital-q/contracts";
 import { readinessLeadLines } from "@capital-q/model-gateway/q";
+import { readinessLeadCopy } from "@capital-q/q-core";
 import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
 
 /**
@@ -19,7 +21,11 @@ type PlanItem = {
   readonly facts?: { readonly next?: unknown };
 };
 
-export function planLeadLines(read: unknown): string | null {
+export function planLeadLines(
+  read: unknown,
+  language: QLanguageCode | null = null,
+): string | null {
+  const copy = readinessLeadCopy(language);
   if (typeof read !== "object" || read === null) return null;
   const items = (read as { items?: unknown }).items;
   if (!Array.isArray(items)) return null;
@@ -34,21 +40,30 @@ export function planLeadLines(read: unknown): string | null {
     .map((item, index) => {
       const next =
         typeof item.facts?.next === "string"
-          ? ` ${item.facts.next.replace(/\s+/gu, " ").trim().slice(0, 160)}`
+          ? ` ${copy.step(item.facts.next.replace(/\s+/gu, " ").trim()).slice(0, 160)}`
           : "";
-      return `${String(index + 1)}. ${String(item.title)}.${next}`;
+      return `${String(index + 1)}. ${copy.step(String(item.title))}.${next}`;
     });
   if (open.length === 0) return null;
-  return [
-    "What to do next for your raise, most important first:",
-    ...open,
-  ].join("\n");
+  return [copy.planHeading, ...open].join("\n");
 }
 
 export function createToolReadinessLead(dependencies: {
   readonly tools: QToolPort;
+  /**
+   * Lane ml: the language this person chose for Q (Settings), so the list
+   * code writes is in it; null or absent is English. A failed read is
+   * English, never a lost lead.
+   */
+  readonly languageOf?:
+    | ((actor: QAnswerRequest["actor"]) => Promise<QLanguageCode | null>)
+    | undefined;
 }): (request: QAnswerRequest) => Promise<string | null> {
   return async (request) => {
+    const language =
+      dependencies.languageOf === undefined
+        ? null
+        : await dependencies.languageOf(request.actor).catch(() => null);
     const context = {
       actor: request.actor,
       runId: request.runId,
@@ -66,7 +81,7 @@ export function createToolReadinessLead(dependencies: {
       context,
     );
     const activation = outcome.result.ok
-      ? readinessLeadLines(outcome.result.data)
+      ? readinessLeadLines(outcome.result.data, language)
       : null;
     if (activation !== null) return activation;
     const plan = await dependencies.tools
@@ -80,7 +95,7 @@ export function createToolReadinessLead(dependencies: {
       )
       .catch(() => null);
     return plan !== null && plan.result.ok
-      ? planLeadLines(plan.result.data)
+      ? planLeadLines(plan.result.data, language)
       : null;
   };
 }

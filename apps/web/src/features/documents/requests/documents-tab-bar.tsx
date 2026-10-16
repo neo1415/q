@@ -6,6 +6,7 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import type { DocumentsTab } from "@capital-q/contracts";
 
 import { useQControlGroup } from "@/features/q/control/q-control";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Documents tab bar for founders (2026-10-08; design
@@ -42,6 +43,8 @@ export function DocumentsTabBar({
   /** Shown beside each tab's name; "3 open" on Requested. */
   readonly counts: Partial<Record<DocumentsTab, string>>;
 }) {
+  const t = useT();
+
   const listRef = useRef<HTMLDivElement>(null);
   // RECOVERY-2026-10 (C1): each tab, for Q, by its own data-tab marker.
   useQControlGroup({ kind: "TAB", ref: listRef, ids: Q_DOCUMENTS_TABS });
@@ -87,7 +90,7 @@ export function DocumentsTabBar({
     <div
       ref={listRef}
       role="tablist"
-      aria-label="Documents"
+      aria-label={t("Documents")}
       className="relative -mx-4 flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
       data-documents-tabs
     >
@@ -109,11 +112,11 @@ export function DocumentsTabBar({
             onClick={() => setPick({ tab: tab.key, from: active })}
             className={`cq-body-sm -mb-px inline-flex min-h-11 flex-none items-center gap-2 border-b-2 px-3 whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) ${selected ? "border-(--cq-accent) font-semibold text-(--cq-text-primary)" : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)"}`}
           >
-            {tab.label}
+            {t(tab.label)}
             {count === undefined ? null : (
               <span className="cq-caption bg-(--cq-surface-subtle) px-2 py-px font-medium text-(--cq-text-secondary) tabular-nums">
                 <span className="sr-only">, </span>
-                {count}
+                {t(count)}
               </span>
             )}
           </Link>

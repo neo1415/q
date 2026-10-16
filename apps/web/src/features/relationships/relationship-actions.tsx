@@ -9,6 +9,7 @@ import { useGlobalQ } from "@/components/app-shell/global-q";
 import { QAperture } from "@/features/q-aperture";
 import { ExpressInterest } from "@/features/network/express-interest";
 import { IncomingInterest } from "@/features/network/incoming-interest";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The relationship page's interactive parts (CQ-WEB-030).
@@ -68,6 +69,8 @@ export function AskQAboutRelationship({
 }: {
   readonly counterpart: string;
 }) {
+  const t = useT();
+
   const { askNow } = useGlobalQ();
   return (
     <Button
@@ -79,7 +82,7 @@ export function AskQAboutRelationship({
       }
     >
       <QAperture state="IDLE" size="chrome" />
-      Ask Q about this relationship
+      {t("Ask Q about this relationship")}
     </Button>
   );
 }

@@ -8,6 +8,7 @@ import { Button } from "@capital-q/ui/button";
 import { formatDayTime } from "@/components/date-format";
 
 import { requestDailyEditionAction } from "./daily-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Prepare my edition" (DAILY spec §3), and the quiet wait after it. The
@@ -20,6 +21,8 @@ const REFRESH_MS = 20_000;
 const GIVE_UP_MS = 15 * 60_000;
 
 export function PreparingNotice() {
+  const t = useT();
+
   const router = useRouter();
   const [gaveUp, setGaveUp] = useState(false);
   useEffect(() => {
@@ -43,8 +46,10 @@ export function PreparingNotice() {
       data-daily-preparing
     >
       {gaveUp
-        ? "Your edition is taking longer than usual. It will appear here and in your email when it's ready."
-        : "Q is gathering your edition. It appears here in a few minutes."}
+        ? t(
+            "Your edition is taking longer than usual. It will appear here and in your email when it's ready.",
+          )
+        : t("Q is gathering your edition. It appears here in a few minutes.")}
     </p>
   );
 }
@@ -54,6 +59,8 @@ export function PrepareEditionButton({
 }: {
   readonly label?: string;
 }) {
+  const t = useT();
+
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -91,11 +98,11 @@ export function PrepareEditionButton({
         disabled={pending}
         data-daily-prepare
       >
-        {pending ? "Starting…" : label}
+        {pending ? t("Starting…") : t(label)}
       </Button>
       {message === null ? null : (
         <p role="alert" className="cq-caption text-(--cq-text-secondary)">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>

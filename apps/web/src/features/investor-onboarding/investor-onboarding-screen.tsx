@@ -34,6 +34,7 @@ import type {
 } from "./models/presentation";
 import { renderStep } from "./steps/registry";
 import { PreferenceLearningAsk } from "../settings/preference-learning";
+import { useT } from "@/features/i18n/language";
 
 const STEP_FORM_ID = "investor-onboarding-step";
 
@@ -55,6 +56,7 @@ export function InvestorOnboardingScreen({
   readonly adapter: FounderOnboardingAdapter;
   readonly seed?: string | undefined;
 }) {
+  const t = useT();
   const router = useRouter();
   const client = useMemo(
     () => createInvestorOnboardingClient({ adapter, seed }),
@@ -98,14 +100,14 @@ export function InvestorOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-narrow) flex-col justify-center gap-6 px-4 py-10">
         <EmptyState
-          title="Investor setup isn't available right now."
+          title={t("Investor setup isn't available right now.")}
           description={
             state.errorMessage ??
             "When it is, you'll start here. Nothing you've done so far is lost."
           }
           action={
             <Link href="/home" className={buttonClassName("secondary")}>
-              Back to Home
+              {t("Back to Home")}
             </Link>
           }
         />
@@ -123,13 +125,16 @@ export function InvestorOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-10">
         {state.phase === "error" ? (
-          <InlineNotice tone="danger" title="Investor setup couldn't load.">
+          <InlineNotice
+            tone="danger"
+            title={t("Investor setup couldn't load.")}
+          >
             {state.errorMessage ?? "Try again in a moment."}
           </InlineNotice>
         ) : (
           <div
             aria-busy="true"
-            aria-label="Loading investor setup"
+            aria-label={t("Loading investor setup")}
             className="flex flex-col gap-4"
           >
             <Skeleton lines={1} className="w-1/2" />
@@ -154,18 +159,22 @@ export function InvestorOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-10">
         <header className="flex flex-col gap-2">
-          <h1 className="cq-title-xl text-(--cq-text-primary)">Your mandate</h1>
+          <h1 className="cq-title-xl text-(--cq-text-primary)">
+            {t("Your mandate")}
+          </h1>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Private to your organisation. Discover orders the companies you see
-            against it; change anything by telling Q.
+            {t(
+              "Private to your organisation. Discover orders the companies you see against it; change anything by telling Q.",
+            )}
           </p>
         </header>
         {/* Lane ob1: the end of onboarding is a natural moment to ask, once. */}
         <PreferenceLearningAsk />
         {review.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Your mandate couldn&apos;t be shown here just now. It is still on
-            record.
+            {t(
+              "Your mandate couldn't be shown here just now. It is still on record.",
+            )}
           </p>
         ) : (
           <div className="flex flex-col gap-6" data-mandate-review>
@@ -217,10 +226,10 @@ export function InvestorOnboardingScreen({
         )}
         <div className="flex flex-wrap gap-2">
           <Link href="/discover" className={buttonClassName("primary")}>
-            Go to Discover
+            {t("Go to Discover")}
           </Link>
           <Link href="/home#q" className={buttonClassName("secondary")}>
-            Change it with Q
+            {t("Change it with Q")}
           </Link>
         </div>
       </div>
@@ -246,14 +255,14 @@ export function InvestorOnboardingScreen({
         <div className="flex items-center justify-between gap-2">
           <ContinueLater className="cq-label min-h-11 text-(--cq-text-tertiary) hover:text-(--cq-text-primary)" />
           <span className="cq-label text-(--cq-text-primary)">
-            Investor setup
+            {t("Investor setup")}
           </span>
           <Button
             variant="quiet"
             size="compact"
             onClick={() => setMode("form")}
           >
-            Use the form
+            {t("Use the form")}
           </Button>
         </div>
         <QOnboardingWorkspace
@@ -295,7 +304,7 @@ export function InvestorOnboardingScreen({
           setMode("conversation");
         }}
       >
-        Back to Q
+        {t("Back to Q")}
       </Button>
       {/* The form's one primary is Continue; Q's voice is the alternative. */}
       <Button
@@ -307,7 +316,7 @@ export function InvestorOnboardingScreen({
         }}
       >
         <QMark size="sm" />
-        Talk with Q
+        {t("Talk with Q")}
       </Button>
     </div>
   );
@@ -316,7 +325,7 @@ export function InvestorOnboardingScreen({
     state.errorMessage !== undefined ? (
       <InlineNotice
         tone="danger"
-        title="Couldn't save"
+        title={t("Couldn't save")}
         action={
           state.canRetry ? (
             <Button
@@ -324,7 +333,7 @@ export function InvestorOnboardingScreen({
               size="compact"
               onClick={() => void actions.retry()}
             >
-              Try again
+              {t("Try again")}
             </Button>
           ) : undefined
         }
@@ -332,7 +341,7 @@ export function InvestorOnboardingScreen({
         {state.errorMessage} Your answers on this screen are kept.
       </InlineNotice>
     ) : state.conflictNotice !== undefined ? (
-      <InlineNotice tone="info" title="Updated elsewhere">
+      <InlineNotice tone="info" title={t("Updated elsewhere")}>
         {state.conflictNotice}
       </InlineNotice>
     ) : session.source.synthetic ? (

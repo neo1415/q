@@ -118,7 +118,7 @@ export function CompanyRequestCard({
         </p>
       )}
       <div className="relative flex flex-wrap items-center gap-2">
-        <span className="mr-auto text-[12.5px] text-(--cq-text-tertiary) max-sm:basis-full">
+        <span className="me-auto text-[12.5px] text-(--cq-text-tertiary) max-sm:basis-full">
           {askedAgo(requestedAt, now)}
           {waitingLongest === true ? " · waiting longest" : ""}
         </span>

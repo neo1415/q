@@ -116,6 +116,43 @@ export class DeepgramTokenError extends Error {
   }
 }
 
+/**
+ * Nova-3 Arabic's language codes (Deepgram changelog 2026-01-27): general
+ * Arabic and sixteen regional ones, the Gulf among them. Flux Multilingual
+ * does not hear Arabic at all (its ten languages exclude it), so an Arabic
+ * line listens with Nova-3 instead. docs/ai-handoff/MULTILINGUAL-2026-10-16.md.
+ */
+const NOVA3_ARABIC = new Set([
+  "ar",
+  "ar-AE",
+  "ar-SA",
+  "ar-QA",
+  "ar-KW",
+  "ar-SY",
+  "ar-LB",
+  "ar-PS",
+  "ar-JO",
+  "ar-EG",
+  "ar-SD",
+  "ar-TD",
+  "ar-MA",
+  "ar-DZ",
+  "ar-TN",
+  "ar-IQ",
+  "ar-IR",
+]);
+
+/** The Nova-3 code for an Arabic locale (its region when Nova-3 has it), else null. */
+export function arabicRecogniserLanguage(
+  locale: string | undefined,
+): string | null {
+  if (locale === undefined) return null;
+  const [primary, region] = locale.split("-");
+  if (primary?.toLowerCase() !== "ar") return null;
+  const regional = region === undefined ? null : `ar-${region.toUpperCase()}`;
+  return regional !== null && NOVA3_ARABIC.has(regional) ? regional : "ar";
+}
+
 /** Whether a device language is anything but English. */
 export function speaksBeyondEnglish(locale: string | undefined): boolean {
   if (locale === undefined) return false;
@@ -145,6 +182,7 @@ export function createDeepgramVoiceProvider(
     voice: QVoiceChoice,
     thinkToken: string,
     multilingual: boolean,
+    arabic: boolean,
   ): Record<string, unknown> =>
     speak === undefined
       ? { provider: { type: "deepgram", model: SPEAK_MODELS[voice] } }
@@ -152,7 +190,9 @@ export function createDeepgramVoiceProvider(
           provider: {
             type: "eleven_labs",
             model_id: ELEVENLABS_MODEL_ID,
-            language: multilingual ? "multi" : "en",
+            // Maps to ElevenLabs' language_code; Arabic is named so the
+            // voice does not guess from a mixed Arabic-English line.
+            language: arabic ? "ar" : multilingual ? "multi" : "en",
           },
           endpoint: {
             // No voice in the URL: the relay reads the session's voice
@@ -191,48 +231,65 @@ export function createDeepgramVoiceProvider(
     },
     settingsFor: ({ voice, greeting, thinkToken, terms, locale }) => {
       const multilingual = speaksBeyondEnglish(locale);
+      const arabic = arabicRecogniserLanguage(locale);
+      const keyterms = [
+        ...new Set([
+          ...(terms ?? [])
+            .map((term) => term.trim())
+            .filter((term) => term.length >= 2 && term.length <= 60),
+          ...ASR_KEYWORDS,
+        ]),
+      ].slice(0, 100);
       return {
         agent: {
           ...(multilingual ? {} : { language: "en" }),
           ...(greeting === undefined ? {} : { greeting }),
           listen: {
-            provider: {
-              type: "deepgram",
-              version: "v2",
-              model: multilingual ? "flux-general-multi" : "flux-general-en",
-              keyterms: [
-                ...new Set([
-                  ...(terms ?? [])
-                    .map((term) => term.trim())
-                    .filter((term) => term.length >= 2 && term.length <= 60),
-                  ...ASR_KEYWORDS,
-                ]),
-              ].slice(0, 100),
-              // When a person has finished. The threshold is how sure the
-              // turn model must be; the timeout is how long it waits for
-              // that certainty before ending the turn anyway.
-              //
-              // It was 0.8 with the provider's default timeout of five
-              // seconds. A short utterance — "what's up?" — rarely reaches
-              // 0.8 on its own, so the turn ended only when the timeout did,
-              // and five seconds of silence sat in front of every reply
-              // before Q had even begun. The provider's own default is 0.7;
-              // three seconds is the longest a person reads as "listening"
-              // rather than "not working".
-              //
-              // Then 0.7 split people thinking aloud into a turn per pause
-              // (live, 2026-09-25: twelve fragments of one thought). Measured
-              // on the same audio streamed to Flux in real time, 3 runs each
-              // (design/voice-comparison/flux-end-of-turn.md): 0.85 with a
-              // four-second ceiling kept a trailing-off thought whole that
-              // 0.7 and 0.8 split, and split a three-clause sentence in two
-              // rather than three, for about 0.4 s more on a finished
-              // sentence (end of speech to end of turn 0.9 s -> 1.3 s). 0.9
-              // split no less and cost another 0.4 s. What the recogniser
-              // still ends open is held by the turn (turn.ts, unfinished).
-              eot_threshold: 0.85,
-              eot_timeout_ms: 4_000,
-            },
+            provider:
+              arabic !== null
+                ? {
+                    // Multilingual Q: Nova-3 Arabic, which also carries the
+                    // English terms a Gulf founder mixes in. Keyterms stay:
+                    // names are what a recogniser cannot know. Flux's
+                    // end-of-turn fields do not apply to Nova.
+                    type: "deepgram",
+                    version: "v1",
+                    model: "nova-3",
+                    language: arabic,
+                    keyterms,
+                  }
+                : {
+                    type: "deepgram",
+                    version: "v2",
+                    model: multilingual
+                      ? "flux-general-multi"
+                      : "flux-general-en",
+                    keyterms,
+                    // When a person has finished. The threshold is how sure the
+                    // turn model must be; the timeout is how long it waits for
+                    // that certainty before ending the turn anyway.
+                    //
+                    // It was 0.8 with the provider's default timeout of five
+                    // seconds. A short utterance — "what's up?" — rarely reaches
+                    // 0.8 on its own, so the turn ended only when the timeout did,
+                    // and five seconds of silence sat in front of every reply
+                    // before Q had even begun. The provider's own default is 0.7;
+                    // three seconds is the longest a person reads as "listening"
+                    // rather than "not working".
+                    //
+                    // Then 0.7 split people thinking aloud into a turn per pause
+                    // (live, 2026-09-25: twelve fragments of one thought). Measured
+                    // on the same audio streamed to Flux in real time, 3 runs each
+                    // (design/voice-comparison/flux-end-of-turn.md): 0.85 with a
+                    // four-second ceiling kept a trailing-off thought whole that
+                    // 0.7 and 0.8 split, and split a three-clause sentence in two
+                    // rather than three, for about 0.4 s more on a finished
+                    // sentence (end of speech to end of turn 0.9 s -> 1.3 s). 0.9
+                    // split no less and cost another 0.4 s. What the recogniser
+                    // still ends open is held by the turn (turn.ts, unfinished).
+                    eot_threshold: 0.85,
+                    eot_timeout_ms: 4_000,
+                  },
           },
           think: {
             provider: { type: "open_ai", model: "capital-q" },
@@ -242,7 +299,7 @@ export function createDeepgramVoiceProvider(
             },
             prompt: THINK_PROMPT,
           },
-          speak: speakFor(voice, thinkToken, multilingual),
+          speak: speakFor(voice, thinkToken, multilingual, arabic !== null),
         },
         audio: {
           input: { encoding: "linear16", sample_rate: 16_000 },

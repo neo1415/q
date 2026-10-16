@@ -90,7 +90,7 @@ export function QRoomDocument({
       data-q-room-document
       data-q-section="q-room-document"
     >
-      <div className="flex min-h-11 flex-none items-center gap-1 border-b border-(--cq-border-subtle) py-1 pr-1 pl-4">
+      <div className="flex min-h-11 flex-none items-center gap-1 border-b border-(--cq-border-subtle) py-1 pe-1 ps-4">
         <div className="flex min-w-0 flex-1 flex-col">
           <h2 className="cq-body min-w-0 truncate font-medium text-(--cq-text-primary)">
             {title}
@@ -230,7 +230,7 @@ export function QRoomDocument({
         </div>
         {summary.length === 0 && !(reading && sentences.length > 0) ? null : (
           <aside
-            className="flex flex-col gap-3 border-(--cq-border-subtle) p-4 max-sm:border-b sm:w-72 sm:flex-none sm:border-l"
+            className="flex flex-col gap-3 border-(--cq-border-subtle) p-4 max-sm:border-b sm:w-72 sm:flex-none sm:border-s"
             data-q-room-document-summary
           >
             {summary.length === 0 ? null : (

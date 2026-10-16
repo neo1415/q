@@ -238,7 +238,7 @@
   min-height: 64px;
   width: 100%;
   border: 0;
-  text-align: left;
+  text-align: start;
   color: inherit;
   font: inherit;
 }
@@ -324,7 +324,7 @@
   gap: 2px;
   align-items: end;
   height: 12px;
-  margin-left: 6px;
+  margin-inline-start: 6px;
   vertical-align: middle;
 }
 .cq-ac-talking i {
@@ -502,7 +502,7 @@
   background: var(--cq-surface-raised);
   color: var(--cq-text-primary);
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   font-size: 15px;
   transition:
     transform 140ms var(--cq-ease),
@@ -706,7 +706,7 @@
 .cq-ac-table th,
 .cq-ac-table td {
   padding: 10px 12px;
-  text-align: left;
+  text-align: start;
   vertical-align: top;
   font-size: 14px;
   border-bottom: 1px solid var(--cq-border-subtle);
@@ -740,7 +740,7 @@
 .cq-ac-table .cscore small {
   font: 400 11.5px var(--cq-font-ui);
   color: var(--cq-text-tertiary);
-  margin-left: 4px;
+  margin-inline-start: 4px;
 }
 .cq-ac-table td .v {
   display: flex;
@@ -820,7 +820,7 @@
 /* Other pages: the compact answer chip (C6). */
 .cq-answer-chip {
   position: fixed;
-  right: 24px;
+  inset-inline-end: 24px;
   bottom: 24px;
   z-index: var(--cq-z-toast);
   display: grid;
@@ -879,7 +879,7 @@
 }
 @media (max-width: 760px) {
   .cq-answer-chip {
-    right: 16px;
+    inset-inline-end: 16px;
     bottom: 92px;
     grid-template-columns: 44px minmax(0, 1fr) 44px;
     row-gap: 4px;
@@ -958,7 +958,7 @@
 .cq-board-tl::before {
   content: "";
   position: absolute;
-  left: 47px;
+  inset-inline-start: 47px;
   top: 6px;
   bottom: 6px;
   width: 1px;
@@ -975,7 +975,7 @@
   color: var(--cq-text-tertiary);
   padding-top: 14px;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: end;
 }
 .cq-board-node {
   width: 9px;
@@ -1148,7 +1148,7 @@
   border-bottom: 1px solid var(--cq-border-subtle);
   background: transparent;
   color: inherit;
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 }
 .cq-board-file:last-child {
@@ -1255,7 +1255,7 @@
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
-    margin-right: 0;
+    margin-inline-end: 0;
   }
   .cq-board-mini {
     white-space: nowrap;

@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { cx } from "@capital-q/ui";
 import { ICON_SIZE, ICON_STROKE, Wifi, WifiOff } from "@capital-q/ui/icons";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Quiet network awareness. Offline is a state, not a broken page: the shell
@@ -35,6 +36,7 @@ function getSnapshot(): boolean {
 }
 
 export function NetworkStatus() {
+  const t = useT();
   const online = useSyncExternalStore(
     subscribe,
     getSnapshot,
@@ -91,7 +93,7 @@ export function NetworkStatus() {
             size={ICON_SIZE.compact}
             strokeWidth={ICON_STROKE}
           />
-          <span>Offline. Showing what was already loaded.</span>
+          <span>{t("Offline. Showing what was already loaded.")}</span>
         </>
       ) : null}
       {state === "reconnected" ? (
@@ -101,7 +103,7 @@ export function NetworkStatus() {
             size={ICON_SIZE.compact}
             strokeWidth={ICON_STROKE}
           />
-          <span>Back online.</span>
+          <span>{t("Back online.")}</span>
         </>
       ) : null}
     </div>

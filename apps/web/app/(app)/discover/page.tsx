@@ -30,6 +30,7 @@ import { NetworkVideos } from "@/features/discover/network/network-videos";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QControl } from "@/features/q/control/q-control";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Discover" };
 export const dynamic = "force-dynamic";
@@ -51,6 +52,7 @@ export default async function DiscoverPage({
     readonly company?: string | string[];
   }>;
 } = {}) {
+  const t = await serverT();
   const [context, session] = await Promise.all([
     resolveOwnContext(),
     apiSession(),
@@ -64,13 +66,15 @@ export default async function DiscoverPage({
     */
     return (
       <PageContainer>
-        <PageHeader title="Discover" />
+        <PageHeader title={t("Discover")} />
         <EmptyState
-          title="Discover couldn't load."
-          description="Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment."
+          title={t("Discover couldn't load.")}
+          description={t(
+            "Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment.",
+          )}
           action={
             <Link href="/discover" className={buttonClassName("secondary")}>
-              Try again
+              {t("Try again")}
             </Link>
           }
         />
@@ -81,13 +85,15 @@ export default async function DiscoverPage({
   if (context.kind === "NONE" || session === null) {
     return (
       <PageContainer>
-        <PageHeader title="Discover" />
+        <PageHeader title={t("Discover")} />
         <EmptyState
-          title="Tell Q what you're here to do first."
-          description="Discover shows companies to investors and investors to founders. Which one you see follows from your setup."
+          title={t("Tell Q what you're here to do first.")}
+          description={t(
+            "Discover shows companies to investors and investors to founders. Which one you see follows from your setup.",
+          )}
           action={
             <Link href="/home" className={buttonClassName("secondary")}>
-              Get set up
+              {t("Get set up")}
             </Link>
           }
         />
@@ -193,7 +199,7 @@ export default async function DiscoverPage({
           total={slate?.items.length ?? 0}
           label={`${String(slate?.items.length ?? 0)} companies`}
         />
-        <h1 className="sr-only">Discover</h1>
+        <h1 className="sr-only">{t("Discover")}</h1>
         <DiscoverTabs
           initialTab={initialTab}
           yoursInitial={yours}
@@ -222,14 +228,14 @@ export default async function DiscoverPage({
     }`;
   const tabs = (
     <div className="flex flex-wrap items-end justify-between gap-3 border-b border-(--cq-border-subtle)">
-      <nav aria-label="What to discover" className="flex gap-6">
+      <nav aria-label={t("What to discover")} className="flex gap-6">
         <QControl id="tab.investors" kind="TAB">
           <Link
             href="/discover"
             aria-current={founders ? undefined : "page"}
             className={tabClass(!founders)}
           >
-            Investors
+            {t("Investors")}
           </Link>
         </QControl>
         <QControl id="tab.founders" kind="TAB">
@@ -239,7 +245,7 @@ export default async function DiscoverPage({
             className={tabClass(founders)}
             data-discover-founders-tab
           >
-            Founders&apos; videos
+            {t("Founders' videos")}
           </Link>
         </QControl>
       </nav>
@@ -248,14 +254,14 @@ export default async function DiscoverPage({
         href="/company/interest"
         className="cq-body-sm mb-2 text-(--cq-text-secondary) underline-offset-4 hover:text-(--cq-text-primary) hover:underline"
       >
-        Investor interest in your company
+        {t("Investor interest in your company")}
       </Link>
     </div>
   );
   if (founders) {
     return (
       <PageContainer className="flex flex-col gap-6">
-        <PageHeader title="Discover" />
+        <PageHeader title={t("Discover")} />
         {tabs}
         <NetworkVideos />
       </PageContainer>
@@ -280,12 +286,14 @@ export default async function DiscoverPage({
         );
   return (
     <PageContainer className="flex flex-col gap-6">
-      <PageHeader title="Discover" />
+      <PageHeader title={t("Discover")} />
       {tabs}
       {slate === null ? (
         <EmptyState
-          title="Discover couldn't load."
-          description="Nothing is wrong with your profile. Try again in a moment."
+          title={t("Discover couldn't load.")}
+          description={t(
+            "Nothing is wrong with your profile. Try again in a moment.",
+          )}
         />
       ) : (
         <>
@@ -301,6 +309,7 @@ export default async function DiscoverPage({
           />
           <QControl id="list.investors" kind="LIST">
             <DiscoverInvestors
+              translate={t}
               items={slate.items}
               notes={slate.notes}
               gates={gates}

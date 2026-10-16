@@ -679,10 +679,10 @@ function Blocks({
             const cellAlign = (column: number) => {
               const align = block.align[column] ?? null;
               return align === "right"
-                ? "text-right"
+                ? "text-end"
                 : align === "center"
                   ? "text-center"
-                  : "text-left";
+                  : "text-start";
             };
             return (
               <div key={key} className="cq-md-table" data-md-table>

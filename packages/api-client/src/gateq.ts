@@ -298,12 +298,17 @@ export function getApplicationVideo(baseUrl: string, sessionToken: string) {
   );
 }
 /** Start, or return the same, video interview session. */
-export function startApplicationVideo(baseUrl: string, sessionToken: string) {
+export function startApplicationVideo(
+  baseUrl: string,
+  sessionToken: string,
+  locale?: string,
+) {
   return call(
     { baseUrl, accessToken: sessionToken },
     "POST",
     GATEQ_APPLY_VIDEO_PATH,
     GateqVideoStateDtoSchema,
+    locale === undefined ? {} : { body: { locale } },
   );
 }
 /** End it; `continueByTyping` keeps the same interview going by text. */

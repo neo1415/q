@@ -45,3 +45,11 @@ export function raiseWords(view: CompanyRaiseView, own: boolean): RaiseWords {
           : "Declared by the company",
   };
 }
+
+/** The same words with the label in the reader's language; figures as written. */
+export function translatedRaise(
+  words: RaiseWords,
+  translate: (english: string) => string,
+): RaiseWords {
+  return { ...words, label: translate(words.label) };
+}

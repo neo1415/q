@@ -29,6 +29,7 @@ import { plainFromMarkdown } from "./markdown";
 import { QEvidence } from "./q-evidence";
 import { QResultBlocks } from "./q-result-blocks";
 import { useSubjectNames } from "./blocks/use-subject-names";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Board (ADR 0017 F3; spec §7.1): what Q produced, as objects to open,
@@ -200,6 +201,7 @@ function ReferenceRows({
   readonly blocks: BoardObject["blocks"];
   readonly onAsk: (question: string) => void;
 }) {
+  const t = useT();
   const subjects: QSubjectRef[] = blocks.flatMap((block): QSubjectRef[] =>
     block.kind === "COMPANY_REFERENCE"
       ? [{ kind: "COMPANY" as const, companyId: block.companyId }]
@@ -245,7 +247,7 @@ function ReferenceRows({
                   href={`/company/${encodeURIComponent(block.companyId)}`}
                   className={buttonClassName("quiet", "compact")}
                 >
-                  Open
+                  {t("Open")}
                 </Link>
               ) : null}
               <button
@@ -259,7 +261,7 @@ function ReferenceRows({
                   );
                 }}
               >
-                Why?
+                {t("Why?")}
               </button>
             </span>
           </li>
@@ -359,6 +361,7 @@ export function QBoard({
   /** An answer already shown in full beside the Board: not noted twice. */
   readonly skipNoteOf?: string | undefined;
 }) {
+  const t = useT();
   const key = conversationId ?? "new";
   const marks = useSyncExternalStore(
     subscribeMarks,
@@ -392,14 +395,15 @@ export function QBoard({
   return (
     <ViewTransition name="q-board" share="cq-q-morph" default="none">
       <section
-        aria-label="Board"
+        aria-label={t("Board")}
         className="flex flex-col gap-3"
         data-q-board={compact ? "compact" : "full"}
       >
         {compact && objects.length === 0 ? null : objects.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            What Q finds and makes lands here: answers, companies, comparisons
-            and documents, to open, pin or ask about.
+            {t(
+              "What Q finds and makes lands here: answers, companies, comparisons and documents, to open, pin or ask about.",
+            )}
           </p>
         ) : null}
         <ul className="flex flex-col gap-3">
@@ -444,7 +448,7 @@ export function QBoard({
                     <button
                       type="button"
                       className="cq-q-board-icon"
-                      aria-label="Dismiss"
+                      aria-label={t("Dismiss")}
                       onClick={() => dismiss(object.key)}
                     >
                       <X
@@ -479,7 +483,7 @@ export function QBoard({
                         )
                       }
                     >
-                      Show exchange
+                      {t("Show exchange")}
                     </button>
                     {exchange === object.key ? (
                       <p className="cq-caption text-(--cq-text-secondary)">

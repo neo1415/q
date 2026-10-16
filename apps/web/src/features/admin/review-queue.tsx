@@ -5,6 +5,7 @@ import type { AdminReviewRowDto } from "@capital-q/contracts";
 import { decideReviewAction } from "./console-actions";
 import { ReasonAction } from "./console-ui";
 import { DecisionBar, QUEUE_ITEM } from "./queue-keys";
+import { useT } from "@/features/i18n/language";
 
 const SUBJECT_WORDS: Readonly<Record<string, string>> = {
   READINESS_ASSESSMENT: "Readiness reading",
@@ -41,6 +42,8 @@ export function ReviewQueue({
   readonly canDecide: boolean;
   readonly viewerId: string;
 }) {
+  const t = useT();
+
   return (
     <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
       {rows.map((row) => (
@@ -51,29 +54,31 @@ export function ReviewQueue({
         >
           <div className="flex flex-col gap-1">
             <span className="cq-body font-medium text-(--cq-text-primary)">
-              {SUBJECT_WORDS[row.subjectType] ?? row.subjectType} ·{" "}
+              {t(SUBJECT_WORDS[row.subjectType] ?? row.subjectType)} ·{" "}
               {row.status === "OPEN"
                 ? row.overdue
-                  ? "Overdue"
-                  : `Due ${new Date(row.dueAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+                  ? t("Overdue")
+                  : t(
+                      `Due ${new Date(row.dueAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`,
+                    )
                 : row.outcome === null
-                  ? "Decided"
-                  : OUTCOME_WORDS[row.outcome]}
+                  ? t("Decided")
+                  : t(OUTCOME_WORDS[row.outcome])}
             </span>
             <span className="cq-caption text-(--cq-text-secondary)">
-              {row.requesterName ?? "A member"}
+              {row.requesterName ?? t("A member")}
               {row.organisationName === null
                 ? ""
-                : ` · ${row.organisationName}`}
-              {row.source === "Q" ? " · offered by Q" : ""}
-              {row.subjectRef === null ? "" : ` · ref ${row.subjectRef}`}
+                : t(` · ${row.organisationName}`)}
+              {row.source === "Q" ? t(" · offered by Q") : ""}
+              {row.subjectRef === null ? "" : t(` · ref ${row.subjectRef}`)}
             </span>
             <span className="cq-body-sm text-(--cq-text-primary)">
-              &ldquo;{row.reason}&rdquo;
+              &ldquo;{t(row.reason)}&rdquo;
             </span>
             {row.decisionReason === null ? null : (
               <span className="cq-caption text-(--cq-text-secondary)">
-                {row.decidedByName ?? "An admin"}: {row.decisionReason}
+                {row.decidedByName ?? t("An admin")}: {t(row.decisionReason)}
               </span>
             )}
           </div>
@@ -85,14 +90,18 @@ export function ReviewQueue({
                 (outcome) => (
                   <ReasonAction
                     key={outcome}
-                    label={OUTCOME_WORDS[outcome]}
+                    label={t(OUTCOME_WORDS[outcome])}
                     shortcut={REVIEW_KEYS[outcome]}
                     wide
-                    title={`${OUTCOME_WORDS[outcome]}: tell them why`}
+                    title={t(`${OUTCOME_WORDS[outcome]}: tell them why`)}
                     description={
                       outcome === "CHANGED"
-                        ? "Make the change itself in its own section first (verification, accounts). They'll see this reason."
-                        : "They'll see this reason in a notice and on their Reviews page."
+                        ? t(
+                            "Make the change itself in its own section first (verification, accounts). They'll see this reason.",
+                          )
+                        : t(
+                            "They'll see this reason in a notice and on their Reviews page.",
+                          )
                     }
                     confirm="Send decision"
                     variant={outcome === "CHANGED" ? "primary" : "secondary"}

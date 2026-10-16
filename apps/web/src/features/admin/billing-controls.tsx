@@ -14,6 +14,7 @@ import {
   setFeeRateAction,
 } from "./billing-console-actions";
 import { ReasonAction, ResultLine, useConsoleAction } from "./console-ui";
+import { useT } from "@/features/i18n/language";
 
 /**
  * BILLING (ADR 0034): the operator's plan controls on an organisation, and
@@ -37,6 +38,8 @@ export function AssignPlan({
   readonly currentKey: string;
   readonly plans: readonly { readonly key: string; readonly name: string }[];
 }) {
+  const t = useT();
+
   const planId = useId();
   const trialId = useId();
   const [planKey, setPlanKey] = useState(currentKey);
@@ -46,29 +49,32 @@ export function AssignPlan({
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
       <Select
         id={planId}
-        label="Plan"
+        label={t("Plan")}
         value={planKey}
         options={plans.map((plan) => ({ value: plan.key, label: plan.name }))}
         onChange={(event) => setPlanKey(event.target.value)}
       />
       <Select
         id={trialId}
-        label="Ends"
+        label={t("Ends")}
         value={trial}
-        options={TRIALS}
+        options={TRIALS.map((option) => ({
+          ...option,
+          label: t(option.label),
+        }))}
         onChange={(event) => setTrial(event.target.value)}
       />
       <ReasonAction
-        label={trial === "" ? "Put on this plan" : "Start trial"}
+        label={trial === "" ? t("Put on this plan") : t("Start trial")}
         title={
           trial === ""
-            ? `Put this organisation on ${chosen}?`
-            : `Start a ${trial}-day ${chosen} trial?`
+            ? t(`Put this organisation on ${chosen}?`)
+            : t(`Start a ${trial}-day ${chosen} trial?`)
         }
         description={
           trial === ""
-            ? "Its limits change at once. Usage this month is kept."
-            : "At the end it returns to the default plan by itself."
+            ? t("Its limits change at once. Usage this month is kept.")
+            : t("At the end it returns to the default plan by itself.")
         }
         confirm="Apply"
         variant="primary"
@@ -92,6 +98,8 @@ export function OverrideLimit({
   readonly organisationId: string;
   readonly feature: BillingFeatureStandingDto;
 }) {
+  const t = useT();
+
   const fieldId = useId();
   const [value, setValue] = useState(
     feature.limit === null ? "" : String(feature.limit),
@@ -104,22 +112,24 @@ export function OverrideLimit({
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
       <Input
         id={fieldId}
-        label={`${feature.name} limit`}
+        label={t(`${feature.name} limit`)}
         labelHidden
         inputMode="numeric"
-        placeholder="Unlimited"
+        placeholder={t("Unlimited")}
         value={value}
         error={valid ? undefined : "A whole number, or empty for unlimited."}
         onChange={(event) => setValue(event.target.value)}
         className="sm:w-32"
       />
       <ReasonAction
-        label="Set limit"
-        title={`Set ${feature.name.toLowerCase()} for this organisation?`}
+        label={t("Set limit")}
+        title={t(`Set ${feature.name.toLowerCase()} for this organisation?`)}
         description={
           parsed === null
-            ? "Unlimited for this organisation until reset."
-            : `${String(parsed)} ${feature.kind === "MONTHLY" ? "a month " : ""}for this organisation until reset.`
+            ? t("Unlimited for this organisation until reset.")
+            : t(
+                `${String(parsed)} ${feature.kind === "MONTHLY" ? "a month " : ""}for this organisation until reset.`,
+              )
         }
         confirm="Set limit"
         disabled={!valid}
@@ -135,8 +145,8 @@ export function OverrideLimit({
       />
       {feature.overridden ? (
         <ReasonAction
-          label="Back to plan"
-          title={`Return ${feature.name.toLowerCase()} to the plan's limit?`}
+          label={t("Back to plan")}
+          title={t(`Return ${feature.name.toLowerCase()} to the plan's limit?`)}
           confirm="Reset"
           variant="quiet"
           run={(reason) =>
@@ -155,6 +165,8 @@ export function OverrideLimit({
 }
 
 export function AccrueFees() {
+  const t = useT();
+
   const { perform, pending, result } = useConsoleAction();
   return (
     <div className="flex flex-col items-start gap-1">
@@ -164,7 +176,7 @@ export function AccrueFees() {
         disabled={pending}
         onClick={() => perform(() => accrueFeesAction())}
       >
-        {pending ? "Updating…" : "Update from commitments"}
+        {pending ? t("Updating…") : t("Update from commitments")}
       </Button>
       <ResultLine result={result} />
     </div>
@@ -172,6 +184,8 @@ export function AccrueFees() {
 }
 
 export function SetFeeRate({ current }: { readonly current: number | null }) {
+  const t = useT();
+
   const fieldId = useId();
   const [value, setValue] = useState(current === null ? "" : String(current));
   const parsed = Number(value);
@@ -184,7 +198,7 @@ export function SetFeeRate({ current }: { readonly current: number | null }) {
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
       <Input
         id={fieldId}
-        label="Rate (basis points; 100 = 1%)"
+        label={t("Rate (basis points; 100 = 1%)")}
         inputMode="numeric"
         value={value}
         error={
@@ -194,9 +208,13 @@ export function SetFeeRate({ current }: { readonly current: number | null }) {
         className="sm:w-40"
       />
       <ReasonAction
-        label="Set rate"
-        title={`Set the facilitation fee to ${valid ? `${(parsed / 100).toFixed(2)}%` : "this rate"}?`}
-        description="A new schedule version. Entries without a rate are priced now; invoiced entries never change."
+        label={t("Set rate")}
+        title={t(
+          `Set the facilitation fee to ${valid ? `${(parsed / 100).toFixed(2)}%` : "this rate"}?`,
+        )}
+        description={t(
+          "A new schedule version. Entries without a rate are priced now; invoiced entries never change.",
+        )}
         confirm="Set rate"
         variant="primary"
         disabled={!valid}

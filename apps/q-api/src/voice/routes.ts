@@ -17,9 +17,11 @@ import {
   Q_VOICE_TURN_PATH,
   QVoiceScreenUpdateSchema,
   QVoiceTurnStateSchema,
+  type QLanguagePreference,
   type QVoiceChoice,
   type QVoiceDuplexCredential,
 } from "@capital-q/contracts";
+import { effectiveLocale } from "@capital-q/q-core";
 import { fetchMe } from "@capital-q/api-client";
 import { createCorrelationId, getMeter } from "@capital-q/observability";
 import { AuthenticationRequiredError } from "@capital-q/security";
@@ -118,6 +120,12 @@ export const Q_VOICE_SPEAK_RELAY_PATH = "/v1/q/voice/speak" as const;
 const FIRST_MESSAGE_MAX = 700;
 
 export type QVoiceRoutesDependencies = ActorContextDependencies & {
+  /**
+   * Multilingual Q: the language this person chose for Q (Settings), which
+   * overrides the device's locale on every voice line. Absent: the device's.
+   */
+  readonly languageOf?:
+    ((actor: ActorContext) => Promise<QLanguagePreference>) | undefined;
   /** The ElevenLabs transport, when composed. */
   readonly provider?: RealtimeVoiceProvider | undefined;
   /** The Deepgram transport, when composed; preferred when both exist. */
@@ -642,11 +650,22 @@ export function registerQVoiceRoutes(
     { onRequest: withContext },
     async (request, reply) => {
       const actor = getActorContext(request);
-      const input = parseContract(
+      const requested = parseContract(
         CreateQVoiceSessionRequestSchema,
         request.body ?? {},
         "The voice session request is not valid.",
       );
+      // Multilingual Q: the language they chose in Settings wins over the
+      // device's, for every line opened below (standard, duplex, GPT-Live,
+      // rehearsal). A failed read keeps the device's: never a refusal.
+      const chosen =
+        dependencies.languageOf === undefined
+          ? null
+          : await dependencies.languageOf(actor).catch(() => null);
+      const input = {
+        ...requested,
+        locale: effectiveLocale(chosen, requested.locale),
+      };
       const header = request.headers.authorization;
       const accessToken = extractBearerToken(
         typeof header === "string" ? header : undefined,
@@ -1055,6 +1074,13 @@ export function registerQVoiceRoutes(
       allowedUsers: dependencies.live.allowedUsers,
       withContext,
       binding: ownLine,
+      ...(dependencies.languageOf === undefined
+        ? {}
+        : {
+            languageOf: (request: FastifyRequest) =>
+              dependencies.languageOf?.(getActorContext(request)) ??
+              Promise.resolve("AUTO" as const),
+          }),
       // V (founder 2026-10-09, "Tensorgate" heard as "Tensorflow"): the
       // names this person is likely to say, as every speech transport gets
       // them, plus their counterparts. Each read is optional and bounded.

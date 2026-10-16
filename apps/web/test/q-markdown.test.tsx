@@ -116,7 +116,7 @@ describe("Q markdown structure", () => {
     ).toEqual(["Metric", "Acme", "Beta"]);
     // An empty cell is unknown, never a zero.
     expect(table?.querySelector("tbody")?.textContent).toContain("Not known");
-    expect(table?.querySelector("td")?.className).toContain("text-right");
+    expect(table?.querySelector("td")?.className).toContain("text-end");
   });
 
   it("lays a list of labelled values out as a key-value card", () => {

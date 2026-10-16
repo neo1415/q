@@ -17,6 +17,7 @@ import {
   setInvestorInboundPreferenceAction,
   setInvestorVisibilityAction,
 } from "./visibility-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Visibility & Discovery, investor side.
@@ -69,6 +70,7 @@ function deploymentLabel(state: string | null): string | null {
 export function InvestorVisibilityScreen({
   investorOrganisationId,
 }: InvestorVisibilityScreenProps) {
+  const t = useT();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -181,6 +183,7 @@ export function InvestorVisibilityScreen({
             {visible ? "Founders can find you" : "Private to your organisation"}
           </h2>
           <ContextIndicator
+            translate={t}
             scope={visible ? "network_visible" : "organisation_private"}
           />
         </header>

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { buttonClassName } from "@capital-q/ui/button";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Continue later" (owner 2026-10-16), in the form and in the Q interview.
@@ -28,6 +29,7 @@ export function ContinueLater({
   readonly className?: string | undefined;
   readonly destination?: string | undefined;
 }) {
+  const t = useT();
   const router = useRouter();
   const [leaving, setLeaving] = useState(false);
 
@@ -45,7 +47,7 @@ export function ContinueLater({
         }}
         data-continue-later
       >
-        Continue later
+        {t("Continue later")}
       </button>
       {leaving ? (
         // Polite and visible: read out without taking focus.

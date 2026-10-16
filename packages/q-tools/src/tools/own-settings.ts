@@ -2,8 +2,11 @@ import { z } from "zod";
 
 import {
   Q_TASK_CLASSES,
+  QLanguagePreferenceSchema,
   QPersonalitySchema,
+  QSetLanguageIntentSchema,
   type PermittedContextPlan,
+  type QLanguagePreference,
   type QPersonality,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
@@ -26,6 +29,15 @@ import { actorWideScope } from "../plan.js";
 
 export const SET_NOTIFICATION_SETTINGS = "settings.notifications.set" as const;
 export const SET_Q_PERSONALITY = "settings.q_personality.set" as const;
+export const SET_Q_LANGUAGE = "settings.q_language.set" as const;
+
+/** The person's own language for Q, the store Settings' Language writes. */
+export type QLanguagePort = {
+  readonly set: (
+    actor: ActorContext,
+    language: QLanguagePreference,
+  ) => Promise<void>;
+};
 
 export type NotificationSettingsPort = {
   readonly read: (
@@ -177,9 +189,73 @@ export function createSetQPersonalityTool(
   });
 }
 
+export const SetQLanguageInputSchema = z
+  .object({
+    language: QLanguagePreferenceSchema.describe(
+      "ar (Arabic), en (English) or AUTO (follow their device): the language they asked Q and Capital Q to use, however and in whatever language they asked.",
+    ),
+  })
+  .strict();
+
+export const SetQLanguageOutputSchema = z
+  .object({
+    language: QLanguagePreferenceSchema,
+    done: z.boolean(),
+    /** The screen switches language and direction at once (no reload). */
+    clientAction: QSetLanguageIntentSchema,
+    /** What Q says back, in the new language: the confirmation is in it. */
+    confirm: z.string().max(240),
+  })
+  .strict();
+
+/** Q's confirmation, in the language just chosen (trusted product copy). */
+export const LANGUAGE_CONFIRMATIONS: Readonly<
+  Record<QLanguagePreference, string>
+> = {
+  ar: "تم. سأتحدث معك بالعربية من الآن، وتتحول الشاشات إلى العربية.",
+  en: "Done. I'll speak English with you from now on, and your screens are in English.",
+  AUTO: "Done. I'll follow your device's language from now on.",
+};
+
+export function createSetQLanguageTool(
+  port: QLanguagePort,
+): AnyQToolDefinition {
+  return defineQTool<
+    z.infer<typeof SetQLanguageInputSchema>,
+    z.infer<typeof SetQLanguageOutputSchema>,
+    ActorContext
+  >({
+    ...OWN,
+    id: SET_Q_LANGUAGE,
+    providerName: "set_q_language",
+    description:
+      'Sets the language Q and Capital Q use with them (Arabic, English, or automatic from their device), at once and reversibly, exactly as Language in Settings does: their screens, Q\'s replies and voice switch. Call it when they ask to change language or to be spoken to in a language, in any words and any language ("switch to Arabic", "speak English please", "غيّر اللغة إلى العربية"). Their own setting only; it takes no person. After it, say its confirm line as your whole reply.',
+    input: SetQLanguageInputSchema,
+    output: SetQLanguageOutputSchema,
+    // Their own conversation and their own row: the input names nobody,
+    // and an agent or a delegated run may not change a person's language.
+    authorize: (_input, { actor, plan }) =>
+      Promise.resolve(
+        ownConversation(actor, plan)
+          ? allow<ActorContext>("INTERNAL", actor)
+          : deny<ActorContext>("NOT_AVAILABLE"),
+      ),
+    execute: async (input, _context, actor) => {
+      await port.set(actor, input.language);
+      return {
+        language: input.language,
+        done: true,
+        clientAction: { kind: "SET_LANGUAGE", language: input.language },
+        confirm: LANGUAGE_CONFIRMATIONS[input.language],
+      };
+    },
+  });
+}
+
 export function createOwnSettingsTools(ports: {
   readonly notificationSettings?: NotificationSettingsPort | undefined;
   readonly personality?: QPersonalityPort | undefined;
+  readonly language?: QLanguagePort | undefined;
 }): readonly AnyQToolDefinition[] {
   return [
     ...(ports.notificationSettings === undefined
@@ -188,5 +264,8 @@ export function createOwnSettingsTools(ports: {
     ...(ports.personality === undefined
       ? []
       : [createSetQPersonalityTool(ports.personality)]),
+    ...(ports.language === undefined
+      ? []
+      : [createSetQLanguageTool(ports.language)]),
   ];
 }

@@ -1,6 +1,8 @@
 import { cx } from "@capital-q/ui";
 import { Check, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
+import { useT } from "@/features/i18n/language";
+
 import type { SaveStatus } from "../controller";
 
 /**
@@ -22,6 +24,7 @@ export function SaveStatusIndicator({
 }: {
   readonly status: SaveStatus;
 }) {
+  const t = useT();
   return (
     <span
       role="status"
@@ -39,7 +42,7 @@ export function SaveStatusIndicator({
           strokeWidth={ICON_STROKE}
         />
       ) : null}
-      {label[status]}
+      {status === "idle" ? "" : t(label[status])}
       {status === "saving" ? (
         <span aria-hidden="true" className="inline-flex gap-0.5">
           <span className="cq-working-dot">·</span>

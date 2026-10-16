@@ -25,6 +25,7 @@ import {
   type DiscoverFilters,
   type SectorOption,
 } from "./discover-filters";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Discover's filter controls (ux/discover-filters).
@@ -98,6 +99,7 @@ function FilterSheetBody({
   readonly sectors: readonly SectorOption[];
   readonly onApply: (next: DiscoverFilters) => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<DiscoverFilters>(filters);
   const [min, setMin] = useState(filters.raise?.min ?? "");
   const [max, setMax] = useState(filters.raise?.max ?? "");
@@ -136,8 +138,10 @@ function FilterSheetBody({
   return (
     <SheetContent
       side="side"
-      title="Filter Discover"
-      description="Narrows your recommendations. The order stays as Q ranked them."
+      title={t("Filter Discover")}
+      description={t(
+        "Narrows your recommendations. The order stays as Q ranked them.",
+      )}
     >
       <form
         className="flex flex-col gap-6"
@@ -148,7 +152,7 @@ function FilterSheetBody({
       >
         <fieldset className="flex flex-col gap-2">
           <legend className="cq-label mb-2 text-(--cq-text-primary)">
-            Sector
+            {t("Sector")}
           </legend>
           <div className="flex flex-wrap gap-2">
             {shownSectors.map((sector) => (
@@ -173,7 +177,7 @@ function FilterSheetBody({
 
         <fieldset className="flex flex-col gap-2">
           <legend className="cq-label mb-2 text-(--cq-text-primary)">
-            Stage
+            {t("Stage")}
           </legend>
           <div className="flex flex-wrap gap-2">
             {STAGE_FILTER_OPTIONS.map((stage) => (
@@ -195,7 +199,7 @@ function FilterSheetBody({
 
         <fieldset className="flex flex-col gap-2">
           <legend className="cq-label mb-2 text-(--cq-text-primary)">
-            Country
+            {t("Country")}
           </legend>
           <div className="flex flex-wrap gap-2">
             {COUNTRY_FILTER_OPTIONS.map((country) => (
@@ -220,12 +224,12 @@ function FilterSheetBody({
 
         <fieldset className="flex flex-col gap-3">
           <legend className="cq-label mb-2 text-(--cq-text-primary)">
-            Raise size
+            {t("Raise size")}
           </legend>
           <div className="grid grid-cols-2 gap-3">
             <Input
               id="discover-raise-min"
-              label="From"
+              label={t("From")}
               inputMode="numeric"
               value={min}
               error={minError}
@@ -235,7 +239,7 @@ function FilterSheetBody({
             />
             <Input
               id="discover-raise-max"
-              label="To"
+              label={t("To")}
               inputMode="numeric"
               value={max}
               error={maxError}
@@ -246,7 +250,7 @@ function FilterSheetBody({
           </div>
           <Select
             id="discover-raise-currency"
-            label="Currency"
+            label={t("Currency")}
             value={currency}
             options={RAISE_CURRENCIES.map((code) => ({
               value: code,
@@ -264,18 +268,19 @@ function FilterSheetBody({
               }
             />
             <span className="cq-body-sm text-(--cq-text-primary)">
-              Only companies that shared their raise with me
+              {t("Only companies that shared their raise with me")}
             </span>
           </label>
           <p className="cq-caption text-(--cq-text-secondary)">
-            Otherwise companies that haven&apos;t shared a raise stay in, marked
-            &ldquo;Raise not shared&rdquo;.
+            {t(
+              "Otherwise companies that haven't shared a raise stay in, marked “Raise not shared”.",
+            )}
           </p>
         </fieldset>
 
         <fieldset className="flex flex-col gap-2">
           <legend className="cq-label mb-2 text-(--cq-text-primary)">
-            Show only
+            {t("Show only")}
           </legend>
           <div className="flex flex-wrap gap-2">
             <ChoiceChip
@@ -284,13 +289,13 @@ function FilterSheetBody({
                 setDraft({ ...draft, verifiedOnly: !draft.verifiedOnly })
               }
             >
-              Verified
+              {t("Verified")}
             </ChoiceChip>
             <ChoiceChip
               selected={draft.hasPitch}
               onClick={() => setDraft({ ...draft, hasPitch: !draft.hasPitch })}
             >
-              Has pitch video
+              {t("Has pitch video")}
             </ChoiceChip>
           </div>
         </fieldset>
@@ -304,14 +309,14 @@ function FilterSheetBody({
               setMax("");
             }}
           >
-            Clear all
+            {t("Clear all")}
           </Button>
           <div className="flex items-center gap-2">
             <SheetClose>
-              <Button variant="secondary">Cancel</Button>
+              <Button variant="secondary">{t("Cancel")}</Button>
             </SheetClose>
             <Button variant="primary" type="submit">
-              Show companies
+              {t("Show companies")}
             </Button>
           </div>
         </div>
@@ -358,6 +363,7 @@ export function DiscoverFilterRow({
   readonly onOpen: () => void;
   readonly className?: string | undefined;
 }) {
+  const t = useT();
   const count = activeDiscoverFilterCount(filters);
   const chips = activeFilterChips(filters, sectors).filter(
     (chip) => chip.key !== "verified" && chip.key !== "pitch",
@@ -366,7 +372,7 @@ export function DiscoverFilterRow({
     <div
       className={`flex flex-wrap items-center gap-2 ${className ?? ""}`}
       role="toolbar"
-      aria-label="Discover filters"
+      aria-label={t("Discover filters")}
     >
       <Button
         variant="secondary"
@@ -379,7 +385,7 @@ export function DiscoverFilterRow({
           size={ICON_SIZE.compact}
           strokeWidth={ICON_STROKE}
         />
-        Filters
+        {t("Filters")}
         <FilterCountBadge count={count} />
       </Button>
       <ChoiceChip
@@ -388,13 +394,13 @@ export function DiscoverFilterRow({
           onChange({ ...filters, verifiedOnly: !filters.verifiedOnly })
         }
       >
-        Verified
+        {t("Verified")}
       </ChoiceChip>
       <ChoiceChip
         selected={filters.hasPitch}
         onClick={() => onChange({ ...filters, hasPitch: !filters.hasPitch })}
       >
-        Has pitch video
+        {t("Has pitch video")}
       </ChoiceChip>
       {chips.map((chip) => (
         <button
@@ -418,7 +424,7 @@ export function DiscoverFilterRow({
           size="compact"
           onClick={() => onChange(NO_DISCOVER_FILTERS)}
         >
-          Clear all
+          {t("Clear all")}
         </Button>
       )}
     </div>
