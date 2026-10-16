@@ -18,6 +18,7 @@ import {
 import {
   createRehearsalVideoService,
   enabledInterviewersFrom,
+  videoAdmissionFrom,
   joinUrlOf,
   selectRehearsalInterviewer,
   type RehearsalVideoStore,
@@ -544,7 +545,11 @@ describe("starting a video rehearsal", () => {
     expect(harness.tavus.calls.conversations[0]?.input.maxCallSeconds).toBe(
       180,
     );
-    expect(harness.tavus.calls.pals[0]?.input.name).toMatch(/^Steve, \S/u);
+    // Who Q plays, never the stock face's own name (lead 2026-10-16).
+    expect(harness.tavus.calls.pals[0]?.input.name).toMatch(
+      /^\S.* \(Q rehearsal\)$/u,
+    );
+    expect(harness.tavus.calls.pals[0]?.input.name).not.toMatch(/Steve/u);
     expect(harness.tavus.calls.pals[0]?.input.name).not.toMatch(
       /cq-|[0-9a-f]{8}-/u,
     );
@@ -1573,6 +1578,35 @@ describe("bounded wider video access", () => {
       selectRehearsalInterviewer(rehearsal, new Set(["analyst-julia"]))?.id,
     ).toBe("analyst-julia");
     expect(selectRehearsalInterviewer(rehearsal, new Set())).toBeUndefined();
+  });
+  it("admits every account by default; the paid list no longer decides eligibility (owner 2026-10-16)", () => {
+    const daniel = "801f52ed-8af3-4e72-ab21-2434f7ccb50e";
+    expect(videoAdmissionFrom({})).toEqual({
+      allAccounts: true,
+      paidUserIds: new Set(),
+    });
+    expect(
+      videoAdmissionFrom({ CQ_TAVUS_PAID_USER_IDS: `${daniel}, not-a-uuid` }),
+    ).toEqual({ allAccounts: true, paidUserIds: new Set([daniel]) });
+    // The explicit incident brake back to list-only admission.
+    expect(
+      videoAdmissionFrom({
+        CQ_TAVUS_ALL_ACCOUNTS: "false",
+        CQ_TAVUS_PAID_USER_IDS: daniel,
+      }),
+    ).toEqual({ allAccounts: false, paidUserIds: new Set([daniel]) });
+  });
+  it("a fresh account with no list entry is offered video, and still refused when its membership is gone", async () => {
+    const harness = setup({
+      ...videoAdmissionFrom({}),
+    });
+    expect((await harness.service.interviewers(STRANGER)).videoAvailable).toBe(
+      true,
+    );
+    harness.stillAllowed.mockResolvedValue(false);
+    expect((await harness.service.interviewers(STRANGER)).videoAvailable).toBe(
+      false,
+    );
   });
   it("admits other legitimate accounts only with explicit wider funding configuration", async () => {
     const harness = setup({ allAccounts: true, paidUserIds: new Set() });

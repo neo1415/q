@@ -2,6 +2,10 @@ import "server-only";
 
 import { z } from "zod";
 
+import {
+  RegistrationJourneySchema,
+  type RegistrationJourney,
+} from "./registration";
 import { createServerSupabaseClient } from "./supabase-server";
 
 /**
@@ -29,14 +33,21 @@ const Details = z.object({
     .max(120)
     .optional()
     .catch(undefined),
+  intended_journey: RegistrationJourneySchema.optional().catch(undefined),
 });
 
 export type AccountDetails = {
   readonly displayName: string | null;
   readonly organisationName: string | null;
+  /** Raising or investing, as chosen at registration; null when not chosen. */
+  readonly intendedJourney: RegistrationJourney | null;
 };
 
-const NOTHING: AccountDetails = { displayName: null, organisationName: null };
+const NOTHING: AccountDetails = {
+  displayName: null,
+  organisationName: null,
+  intendedJourney: null,
+};
 
 export async function accountDetails(): Promise<AccountDetails> {
   try {
@@ -52,6 +63,7 @@ export async function accountDetails(): Promise<AccountDetails> {
     return {
       displayName: parsed.data.display_name ?? null,
       organisationName: parsed.data.organisation_name ?? null,
+      intendedJourney: parsed.data.intended_journey ?? null,
     };
   } catch {
     // Somebody whose details we cannot read is somebody we greet without

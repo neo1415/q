@@ -49,8 +49,10 @@ test("investor declares a mandate", async ({ page }) => {
   test.setTimeout(900_000);
   const email = `e5-ans-investor-${Date.now().toString(36)}@capitalq.local`;
   await page.goto("/auth/sign-up");
+  // Registration chooses the journey (owner directive 2026-10-16).
+  await page.getByRole("radio", { name: /^Invest/ }).check();
   await page.getByLabel("Your name").fill("Ama Mensah");
-  await page.getByLabel("Company or fund").fill("Savannah Logistics Capital");
+  await page.getByLabel("Fund or firm name").fill("Savannah Logistics Capital");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();

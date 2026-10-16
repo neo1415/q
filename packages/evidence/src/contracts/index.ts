@@ -121,6 +121,10 @@ export const DOCUMENT_TYPES = [
   "CUSTOMER",
   "OPERATIONAL",
   "OTHER",
+  // An investor firm's own materials (2026-10-16); mirrors the HTTP contract.
+  "FUND_DECK",
+  "INVESTMENT_THESIS",
+  "LP_LETTER",
 ] as const;
 export const DocumentTypeSchema = z.enum(DOCUMENT_TYPES);
 export type DocumentType = z.infer<typeof DocumentTypeSchema>;

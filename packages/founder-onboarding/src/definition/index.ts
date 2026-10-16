@@ -83,3 +83,4 @@ export {
 } from "./contexts.js";
 
 export { FOUNDER_UTTERANCE_ALIASES } from "./utterance-aliases.js";
+export { FOUNDER_COVERAGE_PROFILE } from "./coverage.js";

@@ -690,6 +690,7 @@ import {
   createPostgresRehearsalVideoStore,
   createRehearsalVideoService,
   enabledInterviewersFrom,
+  videoAdmissionFrom,
 } from "./composition/rehearsal-video.js";
 import {
   createTavusKeyPool,
@@ -6128,16 +6129,11 @@ const rehearsalVideo = createRehearsalVideoService({
     process.env.CQ_REHEARSAL_VIDEO_INTERVIEWERS,
   ),
   testMode: process.env.CQ_TAVUS_TEST_MODE === "true",
-  allAccounts: process.env.CQ_TAVUS_ALL_ACCOUNTS === "true",
-  paidUserIds: new Set(
-    (process.env.CQ_TAVUS_PAID_USER_IDS ?? "")
-      .split(/[\s,]+/u)
-      .filter((id) =>
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(
-          id,
-        ),
-      ),
-  ),
+  // Every eligible account by default; the database bounds the spend.
+  ...videoAdmissionFrom({
+    CQ_TAVUS_ALL_ACCOUNTS: process.env.CQ_TAVUS_ALL_ACCOUNTS,
+    CQ_TAVUS_PAID_USER_IDS: process.env.CQ_TAVUS_PAID_USER_IDS,
+  }),
   logger,
 });
 logger.info(
