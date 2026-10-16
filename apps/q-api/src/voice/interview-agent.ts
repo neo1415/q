@@ -1647,6 +1647,7 @@ export function createInterviewAgent(
         }
         if (response.output.kind !== "TOOL_CALLS") break;
         const proposals = response.output.calls.slice(0, MAX_CALLS - calls);
+        const roundStart = actions.length;
         for (const call of proposals) {
           calls += 1;
           const outcome = await tools.execute(
@@ -1663,11 +1664,38 @@ export function createInterviewAgent(
         state = await port.state();
         // Everything they said is saved and their words ask nothing else:
         // the reply is decided, so code writes it (no second model round).
-        const written = rounds === 1 ? await codeWrittenReply() : null;
+        // After any recording round, not only the first: facts that open
+        // with an answer ("raising" opens the amount) take one more tool
+        // round, then the reply is code's (owner 2026-10-16: latency).
+        const written = await codeWrittenReply();
         if (written !== null) {
           stream?.push(written.reply);
           result = written;
           logger.info({}, "interview reply written by code after a clean save");
+          break;
+        }
+        // A recording round that saved nothing new is not repeated: the
+        // next call is the reply (live 2026-10-16: four rounds re-sending a
+        // refused answer in other words made a 12 s turn).
+        const thisRound = actions.slice(roundStart);
+        const recordingOnly = thisRound.every(
+          (action) =>
+            action.tool === "record_answers" ||
+            action.tool === "correct_answer",
+        );
+        // Only rounds whose saves ran and were answered (a tool that was not
+        // offered or whose call was malformed is the model's to put right).
+        const outcomes = thisRound.map((action) =>
+          RecordedResultsSchema.safeParse(action.result),
+        );
+        const ran = outcomes.every((parsed) => parsed.success);
+        const committedNow = outcomes.some(
+          (parsed) =>
+            parsed.success &&
+            parsed.data.results.some((r) => r.outcome === "COMMITTED"),
+        );
+        if (recordingOnly && thisRound.length > 0 && ran && !committedNow) {
+          logger.info({}, "a recording round saved nothing; replying now");
           break;
         }
       }

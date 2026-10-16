@@ -76,6 +76,14 @@ const TURNS: readonly {
   readonly answers: Answer[];
   /** Answers that must NOT go on the record (refused); default none. */
   readonly refused?: number;
+  /**
+   * What the model sends round by round (default: all answers in round
+   * one). Live 2026-10-16: a fact that opens with another answer is
+   * recorded a round later, and a refused one is re-sent in new words.
+   */
+  readonly rounds?: Answer[][];
+  /** Answers kept with their notes, off the path (saved there). */
+  readonly offPath?: number;
 }[] = [
   {
     said: "We're seed stage, based in Kenya.",
@@ -107,6 +115,8 @@ const TURNS: readonly {
       { stepKey: "F6.currency", value: "usd", quote: "US dollars" },
       { stepKey: "F6.target_amount", value: 2_000_000, quote: "2000000" },
     ],
+    // Revenue is off a pre-seed path here: kept with their notes.
+    offPath: 1,
   },
   {
     said: "A SAFE, closing in 3 to 6 months.",
@@ -139,6 +149,64 @@ const TURNS: readonly {
     ],
     refused: 1,
   },
+  {
+    // Off their path (revenue for a pre-seed company): kept with notes. The
+    // live model re-sent it when it came back under another key.
+    said: "We have first revenue only.",
+    answers: [
+      {
+        stepKey: "F5.revenue_status",
+        value: "early",
+        quote: "first revenue only",
+      },
+    ],
+    offPath: 1,
+    rounds: [
+      [
+        {
+          stepKey: "F5.revenue_status",
+          value: "early",
+          quote: "first revenue only",
+        },
+      ],
+      [
+        {
+          stepKey: "F5.revenue_status",
+          value: "First revenue only",
+          quote: "first revenue only",
+        },
+      ],
+    ],
+  },
+  {
+    // A fact that opens with another answer is recorded a round later.
+    said: "Our team is mostly product people, and we'd take cheques from 50k.",
+    answers: [
+      { stepKey: "F4.functions", value: ["product"], quote: "product people" },
+      { stepKey: "F6.min_cheque", value: 50_000, quote: "50k" },
+    ],
+    rounds: [
+      [
+        {
+          stepKey: "F4.functions",
+          value: ["product"],
+          quote: "product people",
+        },
+      ],
+      [{ stepKey: "F6.min_cheque", value: 50_000, quote: "50k" }],
+    ],
+  },
+  {
+    // A refused answer re-sent in other words, round after round (live).
+    said: "Our gross margin is decent.",
+    answers: [{ stepKey: "F5.gross_margin", value: 60, quote: "60 percent" }],
+    refused: 1,
+    rounds: [
+      [{ stepKey: "F5.gross_margin", value: 60, quote: "60 percent" }],
+      [{ stepKey: "F5.gross_margin", value: 0.6, quote: "sixty" }],
+      [{ stepKey: "F5.gross_margin", value: "60%", quote: "60%" }],
+    ],
+  },
 ];
 
 type Turn = {
@@ -153,6 +221,7 @@ async function runBench(): Promise<Turn[]> {
   const world = investorSession({
     journey: "founder",
     currentStepKey: "F1.website",
+    ineligible: ["F5.revenue_status"],
     recorded: {
       "F0.intent": "raising_now",
       "F1.company_name": "Quillmark Health",
@@ -190,21 +259,24 @@ async function runBench(): Promise<Turn[]> {
 
   let modelCalls = 0;
   let script: Answer[] = [];
+  let rounds: Answer[][] = [];
   let round = 0;
   const gateway = {
-    execute: async () => {
+    execute: async (request: { readonly tools?: readonly unknown[] }) => {
       modelCalls += 1;
       round += 1;
-      if (round === 1) {
+      const answers = rounds[round - 1];
+      // The final reply call offers no tools: it is always the reply.
+      if (answers !== undefined && request.tools !== undefined) {
         await wait(MODELLED.toolRoundMs);
         return {
           output: {
             kind: "TOOL_CALLS",
             calls: [
               {
-                callId: "call_1",
+                callId: `call_${String(round)}`,
                 name: "record_answers",
-                arguments: { answers: script },
+                arguments: { answers },
               },
             ],
           },
@@ -240,6 +312,7 @@ async function runBench(): Promise<Turn[]> {
   const out: Turn[] = [];
   for (const t of TURNS) {
     script = t.answers;
+    rounds = t.rounds ?? [t.answers];
     round = 0;
     modelCalls = 0;
     apiCalls = 0;
@@ -260,9 +333,10 @@ async function runBench(): Promise<Turn[]> {
       modelCalls,
       apiCalls,
       writes,
-      committed: t.answers.filter(
-        (a) => world.recordedValue(a.stepKey) !== undefined,
-      ).length,
+      committed:
+        (t.offPath ?? 0) +
+        t.answers.filter((a) => world.recordedValue(a.stepKey) !== undefined)
+          .length,
     });
   }
   return out;
@@ -286,11 +360,18 @@ describe("typed interview turn latency, with fakes", () => {
     // What the code owns, asserted always: a clean save is one model round
     // plus the parallel reading, and one write for the whole breath.
     for (const [index, t] of turns.entries()) {
-      const clean = (TURNS[index]?.refused ?? 0) === 0;
+      const spec = TURNS[index];
+      const single = (spec?.rounds?.length ?? 1) === 1;
+      const clean = (spec?.refused ?? 0) === 0 && single;
+      // A clean save is one model round plus the reading; anything else at
+      // most one more round and the reply.
       expect(t.modelCalls, `turn ${String(index + 1)}`).toBeLessThanOrEqual(
         clean ? 2 : 3,
       );
-      expect(t.apiCalls, `turn ${String(index + 1)}`).toBeLessThanOrEqual(5);
+      expect(t.apiCalls, `turn ${String(index + 1)}`).toBeLessThanOrEqual(
+        // A fact kept with their notes is one more write.
+        single ? 5 + (spec?.offPath ?? 0) : 8,
+      );
     }
     // Wall-clock targets only when benchmarking on purpose: timers on a
     // loaded CI runner are not the code's latency (no flaky gates).
