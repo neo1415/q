@@ -33,13 +33,8 @@ import {
   InvestorBook,
   investorCommitments,
 } from "./capital-book";
-import {
-  NextSteps,
-  needsYouCount,
-  nowCount,
-  RaiseSummary,
-  StopYourRaise,
-} from "./capital-overview";
+import { needsYouCount, nowCount } from "./capital-counts";
+import { NextSteps, RaiseSummary, StopYourRaise } from "./capital-overview";
 import { CapitalTabBar, TabBadge } from "./capital-tab-bar";
 import { capitalTabHref, type CapitalTab } from "./capital-tabs";
 import { MandateSummary } from "./mandate-summary";

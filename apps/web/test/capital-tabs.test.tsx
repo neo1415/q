@@ -45,10 +45,12 @@ vi.mock("../src/features/capital/readiness-blueprint", () => ({
 }));
 
 import {
-  nextSteps,
   needsYouCount,
-  NextSteps,
   nowCount,
+} from "../src/features/capital/capital-counts";
+import {
+  nextSteps,
+  NextSteps,
   RaiseSummary,
 } from "../src/features/capital/capital-overview";
 import { FounderTab } from "../src/features/capital/capital-screen";

@@ -9,7 +9,8 @@ import {
   PageSection,
 } from "@/components/app-shell/page-container";
 import { apiSession } from "@/features/q/context";
-import { ReviewForm, SUBJECT_OPTIONS } from "@/features/reviews/review-form";
+import { ReviewForm } from "@/features/reviews/review-form";
+import { SUBJECT_OPTIONS } from "@/features/reviews/review-subjects";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
 

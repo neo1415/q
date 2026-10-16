@@ -11,6 +11,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import { QControl } from "@/features/q/control/q-control";
 
+import { needsYouCount } from "./capital-counts";
 import { capitalTabHref } from "./capital-tabs";
 import { money, percent, shareOf } from "./money";
 import { instrumentLabel } from "./round-labels";
@@ -22,18 +23,6 @@ import { useT } from "@/features/i18n/language";
  * short landing. The raise in one card, what could stop it, and the next
  * three steps, each with the way to the tab that holds the rest.
  */
-
-/** Commitments waiting on the founder's own next step. */
-export function needsYouCount(ledger: CapitalLedgerDto): number {
-  return ledger.commitments.filter((item) => item.next !== null).length;
-}
-
-/** Open steps in the action plan's Now column. */
-export function nowCount(readiness: ReadinessDto): number {
-  return readiness.actions.filter(
-    (action) => action.state === "OPEN" && action.priority === "NOW",
-  ).length;
-}
 
 const ORDER: Readonly<Record<ReadinessAction["priority"], number>> = {
   NOW: 0,
