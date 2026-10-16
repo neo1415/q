@@ -12,6 +12,7 @@ import {
   answerQuestionAction,
   setAsideQuestionAction,
 } from "./readiness-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Q still wants to know" (Q.01): the follow-up questions Q generated from
@@ -45,6 +46,7 @@ export function FollowUpStack({
    */
   readonly unlessOnStage?: boolean | undefined;
 }) {
+  const t = useT();
   const arrival = useArrivalStatus();
   const onStage =
     unlessOnStage &&
@@ -66,7 +68,7 @@ export function FollowUpStack({
         className="cq-body-sm text-(--cq-text-secondary)"
         data-follow-ups="none"
       >
-        Q has nothing left to ask right now.
+        {t("Q has nothing left to ask right now.")}
       </p>
     );
   }
@@ -116,7 +118,9 @@ export function FollowUpStack({
     >
       {heading ? (
         <p className="cq-caption font-semibold text-(--cq-accent)">
-          Q still wants to know · {position} of {followUps.length}
+          {t(
+            `Q still wants to know · ${String(position)} of ${String(followUps.length)}`,
+          )}
         </p>
       ) : null}
       <div className="relative pb-4">
@@ -129,10 +133,10 @@ export function FollowUpStack({
         ) : null}
         <div className="relative flex flex-col gap-3 border border-(--cq-border) bg-(--cq-surface) p-5">
           <p className="cq-caption flex justify-between gap-2 text-(--cq-text-tertiary)">
-            <span>{REASON_WORDS[current.reason]}</span>
+            <span>{t(REASON_WORDS[current.reason])}</span>
             {heading ? null : (
               <span>
-                {position} of {followUps.length}
+                {t(`${String(position)} of ${String(followUps.length)}`)}
               </span>
             )}
           </p>
@@ -140,19 +144,19 @@ export function FollowUpStack({
             id={`${inputId}-q`}
             className="cq-title-sm text-balance text-(--cq-text-primary)"
           >
-            {current.question}
+            {t(current.question)}
           </h3>
           {current.why === null ? null : (
             <p className="cq-body-sm bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-secondary)">
               <span className="font-semibold text-(--cq-text-primary)">
-                Why Q asks:
+                {t("Why Q asks:")}
               </span>{" "}
-              {current.why}
+              {t(current.why)}
             </p>
           )}
           {current.readings.length === 0 ? null : (
             <ul
-              aria-label="What your records say"
+              aria-label={t("What your records say")}
               className="grid gap-2 sm:grid-cols-2"
             >
               {current.readings.map((reading) => (
@@ -173,14 +177,17 @@ export function FollowUpStack({
                   href={current.editHref}
                   className="font-semibold text-(--cq-accent) underline-offset-2 hover:underline"
                 >
-                  Go there
+                  {t("Go there")}
                 </Link>
               )}
             </p>
           ) : (
             <>
               {current.quickAnswers.length === 0 ? null : (
-                <ul className="flex flex-wrap gap-2" aria-label="Quick answers">
+                <ul
+                  className="flex flex-wrap gap-2"
+                  aria-label={t("Quick answers")}
+                >
                   {current.quickAnswers.map((label, index) => (
                     <li key={label}>
                       <button
@@ -189,7 +196,7 @@ export function FollowUpStack({
                         onClick={() => answer({ kind: "QUICK", index })}
                         className="cq-body-sm inline-flex min-h-11 items-center border border-(--cq-border) bg-(--cq-surface-raised) px-4 text-(--cq-text-primary) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
                       >
-                        {label}
+                        {t(label)}
                       </button>
                     </li>
                   ))}
@@ -226,7 +233,7 @@ export function FollowUpStack({
                     disabled={pending || typed.trim().length === 0}
                     className="cq-label inline-flex min-h-11 items-center bg-(--cq-accent) px-4 text-(--cq-text-inverse) disabled:opacity-60"
                   >
-                    Answer
+                    {t("Answer")}
                   </button>
                 </form>
               )}
@@ -239,15 +246,15 @@ export function FollowUpStack({
               onClick={setAside}
               className="cq-label inline-flex min-h-11 items-center px-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary) disabled:opacity-60"
             >
-              Skip for now
+              {t("Skip for now")}
             </button>
             <span className="cq-caption text-(--cq-text-tertiary)">
-              Saved as your claim until evidence backs it.
+              {t("Saved as your claim until evidence backs it.")}
             </span>
           </div>
           {message === null ? null : (
             <p role="status" className="cq-caption text-(--cq-text-secondary)">
-              {message}
+              {t(message)}
             </p>
           )}
         </div>

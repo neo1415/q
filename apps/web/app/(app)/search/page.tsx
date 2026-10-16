@@ -19,6 +19,7 @@ import {
 import { loadPublicCard } from "@/features/q-card/public-card-data";
 import { nameMatches } from "@/features/search/name-matches";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Search" };
 export const dynamic = "force-dynamic";
@@ -44,6 +45,7 @@ export default async function SearchPage({
     readonly tab?: string | string[];
   }>;
 } = {}) {
+  const t = await serverT();
   const params = (await searchParams) ?? {};
   const raw =
     typeof params.q === "string"
@@ -70,8 +72,8 @@ export default async function SearchPage({
 
   return (
     <PageContainer className="flex flex-col gap-6">
-      <QSection id="search" kind="SEARCH_RESULTS" label="search results">
-        <PageHeader title="Search" />
+      <QSection id="search" kind="SEARCH_RESULTS" label={t("search results")}>
+        <PageHeader title={t("Search")} />
         <form
           action="/search"
           method="get"
@@ -80,7 +82,7 @@ export default async function SearchPage({
         >
           <input type="hidden" name="tab" value={tab} />
           <label className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="sr-only">Search</span>
+            <span className="sr-only">{t("Search")}</span>
             <span className="flex min-h-11 items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 focus-within:outline-2 focus-within:outline-(--cq-focus-ring)">
               <Search
                 size={ICON_SIZE.compact}
@@ -104,12 +106,12 @@ export default async function SearchPage({
             </span>
           </label>
           <button type="submit" className={buttonClassName("primary")}>
-            Search
+            {t("Search")}
           </button>
         </form>
 
         <nav
-          aria-label="Search results"
+          aria-label={t("Search results")}
           className="flex gap-6 border-b border-(--cq-border-subtle)"
         >
           {(["people", "videos"] as const).map((option) => (
@@ -132,14 +134,15 @@ export default async function SearchPage({
           <NetworkVideos key={text} text={text} />
         ) : text.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Search a name among your relationships and Discover, or open
-            anyone&apos;s Q Card by their @handle.
+            {t(
+              "Search a name among your relationships and Discover, or open anyone's Q Card by their @handle.",
+            )}
           </p>
         ) : card === null ? (
           <div className="flex flex-col gap-4">
             {names.length === 0 ? null : (
               <ul
-                aria-label="Names you can already see"
+                aria-label={t("Names you can already see")}
                 className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)"
                 data-search-names
               >

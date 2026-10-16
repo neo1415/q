@@ -54,9 +54,9 @@ export function FitStripCell() {
         {t("Fit with you")}
       </dt>
       <dd className="cq-title-sm text-(--cq-text-primary)">
-        {FIT_BAND_LABELS[band]}
+        {t(FIT_BAND_LABELS[band])}
         <span className="cq-caption block font-normal text-(--cq-text-secondary)">
-          {FIT_CONFIDENCE_LABELS[confidence]}
+          {t(FIT_CONFIDENCE_LABELS[confidence])}
         </span>
       </dd>
     </div>

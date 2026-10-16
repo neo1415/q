@@ -2555,12 +2555,13 @@ export function createModelGatewayQAnswer(
         available: prefetchTools,
       }).catch(() => null);
     // D1: investors of a region or kind, found by meaning; cards by code.
-    const investorsFor = (ask: InvestorAsk) =>
+    const investorsFor = (ask: InvestorAsk, language: "en" | "ar") =>
       runInvestorDiscovery({
         ask,
         tools,
         context: toolContext,
         available: prefetchTools,
+        language,
       }).catch(() => null);
     // RECOVERY-2026-10 B1 (live T3): "what needs me" is read from every
     // source through the attention tool, under this run's plan, beside the
@@ -4518,7 +4519,13 @@ export function createModelGatewayQAnswer(
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const investorsStarted = Date.now();
-        const found = await investorsFor(request.discoverInvestors);
+        // Multilingual Q: a chosen language note means Arabic (the only
+        // language with one); the answer is composed in it from the same
+        // facts.
+        const found = await investorsFor(
+          request.discoverInvestors,
+          (await languageRead) === null ? "en" : "ar",
+        );
         if (found !== null) {
           const message = await persistAnswer(
             found.text,

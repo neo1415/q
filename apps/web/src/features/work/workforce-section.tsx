@@ -124,6 +124,7 @@ export function WorkforceTeamView({
   /** After a decision: read again now rather than at the next tick. */
   readonly onChanged: () => void;
 }) {
+  const t = useT();
   const nodes = useMemo(
     () =>
       agentNodes({
@@ -159,7 +160,7 @@ export function WorkforceTeamView({
               approvalId={asking.approval.approvalId}
               onDone={onChanged}
             >
-              Approve
+              {t("Approve")}
             </ApproveButton>
           )
         }

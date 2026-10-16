@@ -12,7 +12,7 @@ export const SETUP_AR: Readonly<Record<string, string>> = {
     "تفضيل مرن: قد تظهر هذه مع ذلك، في ترتيب أدنى. لا شيء مخفيّ هنا.",
   "Add a short description first and suggestions will appear here.":
     "أضف وصفاً قصيراً أولاً وستظهر الاقتراحات هنا.",
-  Allow: "سماح",
+  Allow: "اسمح",
   "Almost there": "اقتربنا",
   "An admin of your organisation can change its plan.":
     "يمكن لمسؤول في مؤسستك تغيير خطتها.",

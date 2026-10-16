@@ -11,6 +11,7 @@ import { FitScore } from "./fit-breakdown";
 import { FitGlyph, glyphKindOf } from "./fit-glyph";
 import { askedAgo, cardReasons } from "./fit-words";
 import { LazyQViewNote, type QViewPort } from "./q-view-note";
+import { useT } from "@/features/i18n/language";
 
 /**
  * One Company request (brief B4; match.html "requests"): the company, its
@@ -47,6 +48,7 @@ export function CompanyRequestCard({
   /** The answer controls or the answer's outcome. */
   readonly outcome: ReactNode;
 }) {
+  const t = useT();
   const titleId = `company-request-${companyId}`;
   const reasons = fit === null ? [] : cardReasons(fit.profile);
   return (
@@ -82,8 +84,9 @@ export function CompanyRequestCard({
       </div>
       {fit === null ? (
         <p className="cq-body-sm text-(--cq-text-secondary)" data-fit-missing>
-          Fit shows once your mandate is set and the company has shared enough
-          to compare.
+          {t(
+            "Fit shows once your mandate is set and the company has shared enough to compare.",
+          )}
         </p>
       ) : (
         <div className="flex flex-wrap items-start gap-3">
@@ -94,7 +97,7 @@ export function CompanyRequestCard({
             defaultOpen={openFit}
           />
           <ul
-            aria-label="Why"
+            aria-label={t("Why")}
             className="flex min-w-[220px] flex-1 flex-col gap-1.5"
           >
             {reasons.map((r) => (

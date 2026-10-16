@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 import {
@@ -10,6 +12,7 @@ import { AskQChips } from "@/features/capital/ask-q-chips";
 import { QControl } from "@/features/q/control/q-control";
 
 import { ReadinessStatusBadge } from "./readiness-status";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Readiness (Q.03): what could stop the raise, then each pillar as a row
@@ -47,6 +50,7 @@ function evidenceTag(line: ReadinessEvidenceLine): string {
 }
 
 export function PrivateNote() {
+  const t = useT();
   return (
     <span className="cq-caption inline-flex items-center gap-1.5 text-(--cq-text-tertiary)">
       <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true">
@@ -67,7 +71,7 @@ export function PrivateNote() {
           strokeWidth="1.3"
         />
       </svg>
-      Only your team sees this
+      {t("Only your team sees this")}
     </span>
   );
 }
@@ -77,8 +81,9 @@ export function ReadinessTally({
 }: {
   readonly readiness: ReadinessDto;
 }) {
+  const t = useT();
   return (
-    <ul className="flex flex-wrap gap-2" aria-label="Pillars by status">
+    <ul className="flex flex-wrap gap-2" aria-label={t("Pillars by status")}>
       {READINESS_STATUSES.map((status) => {
         const count = readiness.pillars.filter(
           (pillar) => pillar.status === status,
@@ -98,6 +103,7 @@ export function ReadinessSection({
 }: {
   readonly readiness: ReadinessDto;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-6" data-readiness>
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
@@ -110,12 +116,13 @@ export function ReadinessSection({
               id="stop-raise-heading"
               className="cq-title-sm text-(--cq-text-primary)"
             >
-              What could stop your raise
+              {t("What could stop your raise")}
             </h3>
             {readiness.blockers.length === 0 ? (
               <p className="cq-body-sm pt-2 text-(--cq-text-secondary)">
-                Nothing that investors at your stage usually ask for first is
-                missing from what you&apos;ve shared.
+                {t(
+                  "Nothing that investors at your stage usually ask for first is missing from what you've shared.",
+                )}
               </p>
             ) : (
               <QControl id="list.risks" kind="LIST">
@@ -150,7 +157,7 @@ export function ReadinessSection({
                 href="/relationships?view=capital&tab=action-plan"
                 className="cq-label inline-flex min-h-11 items-center bg-(--cq-accent) px-4 text-(--cq-text-inverse) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
               >
-                Open the action plan
+                {t("Open the action plan")}
               </Link>
               <AskQChips
                 asks={[
@@ -172,19 +179,19 @@ export function ReadinessSection({
             id="glance-heading"
             className="cq-title-sm text-(--cq-text-primary)"
           >
-            At a glance
+            {t("At a glance")}
           </h3>
           <div className="pt-3">
             <ReadinessTally readiness={readiness} />
           </div>
           <p className="cq-body-sm pt-3 text-(--cq-text-secondary)">
-            No score: each pillar says what Q can see and what is missing. Not
-            shared yet means Q has nothing to go on, and it is never counted
-            against you.
+            {t(
+              "No score: each pillar says what Q can see and what is missing. Not shared yet means Q has nothing to go on, and it is never counted against you.",
+            )}
           </p>
           <ul className="cq-caption flex flex-col gap-1 pt-2 text-(--cq-text-tertiary)">
             {readiness.uncertainty.slice(0, 3).map((line) => (
-              <li key={line}>{line}</li>
+              <li key={line}>{t(line)}</li>
             ))}
           </ul>
         </section>
@@ -192,7 +199,7 @@ export function ReadinessSection({
 
       <QControl id="list.pillars" kind="LIST">
         <ul
-          aria-label="Readiness by pillar"
+          aria-label={t("Readiness by pillar")}
           className="overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)"
         >
           {readiness.pillars.map((pillar) => (
@@ -203,39 +210,41 @@ export function ReadinessSection({
               <details className="group">
                 <summary className="grid min-h-11 cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-5 py-3.5 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:grid-cols-[11rem_9rem_1fr_auto]">
                   <span className="cq-body font-semibold text-(--cq-text-primary)">
-                    {pillar.label}
+                    {t(pillar.label)}
                   </span>
                   <ReadinessStatusBadge status={pillar.status} />
                   <span className="cq-body-sm col-span-2 text-(--cq-text-secondary) lg:col-span-1">
-                    {pillar.summary}
+                    {t(pillar.summary)}
                   </span>
                   <span className="cq-caption hidden text-(--cq-text-tertiary) lg:inline">
-                    {pillar.evidence.length === 1
-                      ? "1 piece of evidence"
-                      : `${String(pillar.evidence.length)} pieces of evidence`}
+                    {t(
+                      pillar.evidence.length === 1
+                        ? "1 piece of evidence"
+                        : `${String(pillar.evidence.length)} pieces of evidence`,
+                    )}
                   </span>
                 </summary>
                 <div className="grid gap-5 border-t border-dashed border-(--cq-border) bg-(--cq-surface-raised) px-5 py-4 lg:grid-cols-2">
                   <div>
                     <h4 className="cq-caption pb-2 font-semibold text-(--cq-text-tertiary)">
-                      Evidence
+                      {t("Evidence")}
                     </h4>
                     {pillar.evidence.length === 0 ? (
                       <p className="cq-body-sm text-(--cq-text-secondary)">
-                        Nothing on record yet.
+                        {t("Nothing on record yet.")}
                       </p>
                     ) : (
                       <ul className="flex flex-col">
                         {pillar.evidence.map((line, index) => (
                           <li
-                            key={`${line.label}-${String(index)}`}
+                            key={`${t(line.label)}-${String(index)}`}
                             className="cq-body-sm flex justify-between gap-3 border-t border-(--cq-border-subtle) py-2 first:border-t-0"
                           >
                             <span className="text-(--cq-text-primary)">
-                              {line.label}
+                              {t(line.label)}
                             </span>
                             <span className="cq-caption shrink-0 border border-(--cq-border) px-1.5 py-0.5 text-(--cq-text-secondary)">
-                              {evidenceTag(line)}
+                              {t(evidenceTag(line))}
                             </span>
                           </li>
                         ))}
@@ -244,16 +253,16 @@ export function ReadinessSection({
                   </div>
                   <div>
                     <h4 className="cq-caption pb-2 font-semibold text-(--cq-text-tertiary)">
-                      What would move it
+                      {t("What would move it")}
                     </h4>
                     {pillar.improve.length === 0 ? (
                       <p className="cq-body-sm text-(--cq-text-secondary)">
-                        Nothing expected is missing here.
+                        {t("Nothing expected is missing here.")}
                       </p>
                     ) : (
                       <ul className="cq-body-sm flex list-disc flex-col gap-1 ps-5 text-(--cq-text-secondary)">
                         {pillar.improve.map((line) => (
-                          <li key={line}>{line}</li>
+                          <li key={line}>{t(line)}</li>
                         ))}
                       </ul>
                     )}

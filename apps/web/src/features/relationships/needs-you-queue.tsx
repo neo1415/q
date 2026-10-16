@@ -157,6 +157,8 @@ export function NeedsYouQueue({
       count={left.length > 0 ? left.length : undefined}
       lead
       flush
+      collapsible
+      defaultOpen={false}
       data-needs-you
       action={
         left.length > NEEDS_YOU_SHOWN ? (

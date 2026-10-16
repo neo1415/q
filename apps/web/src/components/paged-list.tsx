@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { cx } from "@capital-q/ui";
+import { useT } from "@/features/i18n/language";
 
 /**
  * A list that shows one page and opens the next on request (owner
@@ -40,6 +41,7 @@ export function PagedList({
   readonly itemClassName?: string | undefined;
   readonly footerClassName?: string | undefined;
 } & { readonly [data: `data-${string}`]: string | boolean | undefined }) {
+  const t = useT();
   const [through, setThrough] = useState<string | null>(null);
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -109,7 +111,7 @@ export function PagedList({
               }}
               className="cq-body-sm inline-flex min-h-11 items-center px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
             >
-              Show fewer
+              {t("Show fewer")}
             </button>
           )}
         </div>

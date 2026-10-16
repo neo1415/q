@@ -6,6 +6,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import type { InboundEmailAddressDto } from "@capital-q/contracts";
 
 import { readQEmailAddress, rotateQEmailAddress } from "./integration-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Your Q email address" on Settings (inbound email): the address people
@@ -15,6 +16,7 @@ import { readQEmailAddress, rotateQEmailAddress } from "./integration-actions";
  * as data and never acts on it without the person's approval.
  */
 export function QEmailAddress() {
+  const t = useT();
   const [address, setAddress] = useState<InboundEmailAddressDto | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -53,17 +55,20 @@ export function QEmailAddress() {
     >
       {address === null ? (
         message === null ? (
-          <p className="cq-body-sm text-(--cq-text-tertiary)">Checking…</p>
+          <p className="cq-body-sm text-(--cq-text-tertiary)">
+            {t("Checking…")}
+          </p>
         ) : null
       ) : address.status === "UNAVAILABLE" ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Receiving email isn&apos;t available yet.
+          {t("Receiving email isn't available yet.")}
         </p>
       ) : (
         <>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Email sent here reaches Q for you. Q tells you, and replies only
-            when you approve.
+            {t(
+              "Email sent here reaches Q for you. Q tells you, and replies only when you approve.",
+            )}
           </p>
           <p className="cq-body-sm break-all font-mono text-(--cq-text-primary)">
             {address.address}
@@ -71,7 +76,7 @@ export function QEmailAddress() {
           {confirming ? (
             <div className="flex flex-col items-start gap-2">
               <p className="cq-body-sm text-(--cq-text-primary)">
-                Anyone with the old address won&apos;t reach you any more.
+                {t("Anyone with the old address won't reach you any more.")}
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -80,7 +85,7 @@ export function QEmailAddress() {
                   disabled={pending}
                   onClick={() => rotate(address.address)}
                 >
-                  Get a new address
+                  {t("Get a new address")}
                 </button>
                 <button
                   type="button"
@@ -88,7 +93,7 @@ export function QEmailAddress() {
                   disabled={pending}
                   onClick={() => setConfirming(false)}
                 >
-                  Keep this one
+                  {t("Keep this one")}
                 </button>
               </div>
             </div>
@@ -99,7 +104,7 @@ export function QEmailAddress() {
                 className={buttonClassName("secondary", "compact")}
                 onClick={() => copy(address.address)}
               >
-                Copy
+                {t("Copy")}
               </button>
               <button
                 type="button"
@@ -109,7 +114,7 @@ export function QEmailAddress() {
                   setConfirming(true);
                 }}
               >
-                New address
+                {t("New address")}
               </button>
             </div>
           )}

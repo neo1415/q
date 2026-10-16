@@ -172,7 +172,7 @@ function Confirm({
                 disabled={busy}
                 onClick={() => setOpen(false)}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 variant="primary"
@@ -626,7 +626,7 @@ export function RelationshipDeal({
             .filter((step) => STEP_WORDS[step] !== undefined)
             .map((step) => (
               <p key={step} className="cq-body-sm text-(--cq-text-secondary)">
-                {STEP_WORDS[step]}
+                {t(STEP_WORDS[step] ?? "")}
               </p>
             ))}
           {steps.includes("RECORD_TERMS") ? (

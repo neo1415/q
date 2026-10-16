@@ -171,7 +171,7 @@ export function ExploreSearchResults({
                 : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
             }`}
           >
-            {SEARCH_TAB_LABELS[option]}
+            {t(SEARCH_TAB_LABELS[option])}
           </Link>
         ))}
       </nav>

@@ -102,6 +102,11 @@ async function overview() {
   );
 }
 
+/** Needs you starts folded (owner 2026-10-16); open it to read its rows. */
+function openNeedsYou() {
+  fireEvent.click(screen.getByRole("button", { name: /^Needs you/u }));
+}
+
 describe("Hub foundation", () => {
   it("opens the Overview by default and keeps old record-list links on the Pipeline", () => {
     // Owner 2026-10-16: a bare /relationships (the sidebar's CRM) opens the
@@ -345,6 +350,7 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
     mocks.relationships.mockResolvedValue([relationship]);
     mocks.notices.mockResolvedValue({ items: [notice(1), notice(2)] });
     await overview();
+    openNeedsYou();
     const queue = screen.getByRole("region", { name: /Needs you/u });
     const rows = within(queue).getAllByRole("listitem");
     expect(rows).toHaveLength(1);
@@ -406,6 +412,7 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
       },
     ]);
     await overview();
+    openNeedsYou();
     const queue = screen.getByRole("region", { name: /Needs you/u });
     expect(within(queue).getAllByRole("listitem")).toHaveLength(2);
     expect(within(queue).getByText("Ajopot")).toBeDefined();
@@ -424,12 +431,14 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
 
   it("says nothing needs them, not a blank area", async () => {
     await overview();
+    openNeedsYou();
     expect(screen.getByText(/Nothing needs you right now\./u)).toBeDefined();
   });
 
   it("is partial, never 'nothing', when the notices cannot be read", async () => {
     mocks.notices.mockRejectedValue(new Error("down"));
     await overview();
+    openNeedsYou();
     expect(
       screen.getByText(/What needs you couldn't be read just now/u),
     ).toBeDefined();
@@ -441,6 +450,7 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
     mocks.notices.mockResolvedValue({ items: [notice(1)] });
     mocks.results.mockRejectedValue(new Error("down"));
     await overview();
+    openNeedsYou();
     expect(screen.getByRole("region", { name: /Needs you/u })).toBeDefined();
     expect(screen.getByText("The period report couldn't load")).toBeDefined();
   });
@@ -455,6 +465,7 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
     }));
     mocks.notices.mockResolvedValue({ items: many });
     await overview();
+    openNeedsYou();
     const queue = screen.getByRole("region", { name: /Needs you/u });
     expect(within(queue).getAllByRole("listitem")).toHaveLength(5);
     fireEvent.click(within(queue).getByRole("button", { name: "See all 7" }));

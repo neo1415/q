@@ -95,3 +95,13 @@ export function useT(): (english: string) => string {
   const language = useContext(LanguageContext);
   return (english) => translate(language, english);
 }
+
+/**
+ * `<Words>Not met</Words>`: English words in the reader's language, for a
+ * component that cannot take a hook (a server component that is not
+ * async). It follows a language change at once, like `useT`.
+ */
+export function Words({ children }: { readonly children: string }) {
+  const t = useT();
+  return <>{t(children)}</>;
+}

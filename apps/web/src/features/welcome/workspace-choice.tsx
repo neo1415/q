@@ -9,6 +9,7 @@ import {
   chooseWorkspaceAction,
   keepWorkspaceAction,
 } from "./workspace-actions";
+import { useT } from "@/features/i18n/language";
 
 const ROLE = { OWNER: "Owner", ADMIN: "Admin", MEMBER: "Member" } as const;
 
@@ -30,6 +31,7 @@ export function WorkspaceChoice({
   readonly name: string | null;
   readonly workspaces: readonly MyOrganisationDto[];
 }) {
+  const t = useT();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export function WorkspaceChoice({
                   </span>
                   <span className="cq-body-sm text-(--cq-text-secondary)">
                     {workspace.kind === "FIRM" ? "Investing" : "Company"} ·{" "}
-                    {ROLE[workspace.role]}
+                    {t(ROLE[workspace.role])}
                     {workspace.active ? " · Last used" : ""}
                   </span>
                 </span>

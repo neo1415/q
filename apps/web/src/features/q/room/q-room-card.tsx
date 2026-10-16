@@ -22,6 +22,7 @@ import type { RoomCardView } from "./room-card-view";
 import { RoomLoadFailed } from "./room-load-failed";
 import { roomRead, useRetryWhenOnline } from "./room-read";
 import type { RoomCard, RoomNote } from "./room-stage";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q room R4: the card Q brought into the room, and the quiet note when it
@@ -372,10 +373,11 @@ function SourceCards({
 }: {
   readonly sources: readonly QTurnPublicSource[];
 }) {
+  const t = useT();
   if (sources.length === 0) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        This answer read no public sources.
+        {t("This answer read no public sources.")}
       </p>
     );
   }

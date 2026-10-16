@@ -31,6 +31,11 @@ const SAME_IN_EVERY_LANGUAGE = new Set([
   "Q Pitch",
   "Capital Q",
   "Q",
+  "PDF",
+  "PowerPoint",
+  // A colour code's format and a type sample, not words.
+  "#rrggbb",
+  "Aa",
 ]);
 
 const LITERAL = /\bt\(\s*("(?:[^"\\]|\\.)*")\s*\)/gu;

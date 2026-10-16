@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@capital-q/ui/button";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q room W5 (R8): the onboarding offer. After a founder's first upload has
@@ -69,6 +70,7 @@ export function DeckOffer({
   readonly founder: boolean;
   readonly readingLanded: boolean;
 }) {
+  const t = useT();
   const [answer, setAnswer] = useState<DeckOfferAnswer | null>(() =>
     readDeckOffer(),
   );
@@ -95,14 +97,14 @@ export function DeckOffer({
       <p className="cq-body text-(--cq-text-primary)">{DECK_OFFER_LINE}</p>
       <div className="flex flex-wrap gap-2">
         <Button size="compact" onClick={() => choose("ACCEPTED")}>
-          Yes, draft it
+          {t("Yes, draft it")}
         </Button>
         <Button
           size="compact"
           variant="quiet"
           onClick={() => choose("DECLINED")}
         >
-          Not now
+          {t("Not now")}
         </Button>
       </div>
     </li>

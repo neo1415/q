@@ -5,6 +5,7 @@ import { Select } from "@capital-q/ui/select";
 
 import { PRO_RATA_WORDS } from "./round-words";
 import type { TermsDraft } from "./round-terms";
+import { useT } from "@/features/i18n/language";
 
 export type LeadOption = {
   readonly relationshipId: string;
@@ -37,6 +38,7 @@ export function RoundTermsFields({
   /** A past round: what it raised outside Capital Q comes first. */
   readonly past?: boolean;
 }) {
+  const t = useT();
   const set = <K extends keyof TermsDraft>(key: K, value: TermsDraft[K]) =>
     onChange({ ...draft, [key]: value });
   const amountField = (
@@ -50,7 +52,7 @@ export function RoundTermsFields({
       description={description}
       inputMode="decimal"
       autoComplete="off"
-      placeholder="Not said"
+      placeholder={t("Not said")}
       value={draft[key]}
       onChange={(event) => set(key, event.target.value)}
     />
@@ -66,17 +68,17 @@ export function RoundTermsFields({
       {amountField("valuationCap", "Valuation cap", "For a SAFE, ASA or note.")}
       <Input
         id={`${id}-discount`}
-        label="Discount (%)"
+        label={t("Discount (%)")}
         inputMode="decimal"
         autoComplete="off"
-        placeholder="Not said"
+        placeholder={t("Not said")}
         value={draft.discountPercent}
         onChange={(event) => set("discountPercent", event.target.value)}
       />
       {amountField("valuationAmount", "Valuation", "For a priced round.")}
       <Select
         id={`${id}-basis`}
-        label="Valuation is"
+        label={t("Valuation is")}
         value={draft.valuationBasis}
         options={[
           { value: "POST_MONEY", label: "Post-money" },
@@ -97,13 +99,13 @@ export function RoundTermsFields({
       <Input
         id={`${id}-close`}
         type="date"
-        label="Target close date"
+        label={t("Target close date")}
         value={draft.targetCloseOn}
         onChange={(event) => set("targetCloseOn", event.target.value)}
       />
       <Select
         id={`${id}-prorata`}
-        label="Pro-rata rights"
+        label={t("Pro-rata rights")}
         value={draft.proRataRights}
         options={[
           { value: "", label: "Not said" },
@@ -123,7 +125,7 @@ export function RoundTermsFields({
       />
       <Select
         id={`${id}-lead`}
-        label="Lead investor"
+        label={t("Lead investor")}
         value={draft.leadChoice}
         options={[
           { value: "", label: "No lead / not said" },
@@ -138,7 +140,7 @@ export function RoundTermsFields({
       {draft.leadChoice === "named" ? (
         <Input
           id={`${id}-lead-name`}
-          label="Lead's name"
+          label={t("Lead's name")}
           maxLength={120}
           value={draft.leadName}
           onChange={(event) => set("leadName", event.target.value)}
@@ -147,8 +149,8 @@ export function RoundTermsFields({
       {rounds.length === 0 ? null : (
         <Select
           id={`${id}-extends`}
-          label="Extends an earlier round"
-          description="For a bridge or an extension."
+          label={t("Extends an earlier round")}
+          description={t("For a bridge or an extension.")}
           value={draft.extendsRoundId}
           options={[
             { value: "", label: "No" },

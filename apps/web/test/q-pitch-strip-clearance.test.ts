@@ -32,7 +32,7 @@ describe("the Q Pitch strip leaves the page's foot readable", () => {
   it("is keyed to the strip the tour host renders", () => {
     const host = read("../src/features/q-pitch/tour-host.tsx");
     expect(host).toMatch(
-      /<section\s+aria-label="Q Pitch tour"\s+data-q-pitch/u,
+      /<section\s+aria-label=\{t\("Q Pitch tour"\)\}\s+data-q-pitch/u,
     );
   });
 

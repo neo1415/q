@@ -44,6 +44,7 @@ import {
   useRetryWhenOnline,
   type UploadDrop,
 } from "./room-read";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q room W5 (R8): a document Q made, as a DECK surface in the room.
@@ -160,6 +161,7 @@ export function QRoomDeck({
   readonly openedAt: number;
   readonly loaders?: DeckLoaders | undefined;
 }) {
+  const t = useT();
   const [state, setState] = useState<DeckState | null>(null);
   const [drawing, setDrawing] = useState<{
     readonly version: number;
@@ -383,7 +385,7 @@ export function QRoomDeck({
   if (state.status === "FAILED") {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)" data-q-deck-failed>
-        This document could not be finished. Ask Q to try again.
+        {t("This document could not be finished. Ask Q to try again.")}
       </p>
     );
   }
@@ -426,7 +428,7 @@ export function QRoomDeck({
               <button
                 type="button"
                 className="cq-stage-quiet min-h-11 min-w-11 justify-center"
-                aria-label="Previous slide"
+                aria-label={t("Previous slide")}
                 disabled={page <= 1}
                 onClick={() => go(page - 1)}
                 data-q-deck-previous
@@ -446,7 +448,7 @@ export function QRoomDeck({
               <button
                 type="button"
                 className="cq-stage-quiet min-h-11 min-w-11 justify-center"
-                aria-label="Next slide"
+                aria-label={t("Next slide")}
                 disabled={page >= count}
                 onClick={() => go(page + 1)}
                 data-q-deck-next
@@ -469,14 +471,14 @@ export function QRoomDeck({
               size={ICON_SIZE.compact}
               strokeWidth={ICON_STROKE}
             />
-            PDF
+            {t("PDF")}
           </a>
           {isDeck ? (
             <a
               className="cq-stage-quiet min-h-11"
               href={`/api/q-artifact/${encodeURIComponent(artifactId)}/pptx`}
             >
-              PowerPoint
+              {t("PowerPoint")}
             </a>
           ) : null}
         </div>
@@ -535,7 +537,7 @@ export function QRoomDeck({
           </div>
           <ol
             className="grid grid-cols-5 content-start gap-2 md:max-h-[27.5rem] md:grid-cols-2 md:overflow-y-auto"
-            aria-label="Slides"
+            aria-label={t("Slides")}
             data-q-deck-thumbs
           >
             {pictures.map((picture, at) => {
@@ -568,7 +570,7 @@ export function QRoomDeck({
                     />
                     {toFill ? (
                       <span className="cq-caption absolute top-1 end-1 bg-(--cq-surface-raised) px-1 text-(--cq-text-primary)">
-                        To fill
+                        {t("To fill")}
                       </span>
                     ) : null}
                   </button>
@@ -595,7 +597,7 @@ export function QRoomDeck({
             disabled={busy}
             data-q-deck-upload-retry
           >
-            Try again
+            {t("Try again")}
           </button>
         )}
         <button

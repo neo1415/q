@@ -130,6 +130,14 @@ export function readinessLeadCopy(
   return language === "ar" ? ARABIC : ENGLISH;
 }
 
+/**
+ * The rule titles and next actions in Arabic, keyed by their English: the
+ * web catalogue uses the same words, so the action plan on the page and
+ * Q's spoken lead never say a step two ways.
+ */
+export const READINESS_STEPS_ARABIC: Readonly<Record<string, string>> =
+  AR_STEPS;
+
 /** Rule texts with an Arabic rendering, for tests. */
 export const READINESS_LEAD_ARABIC_STEPS: readonly string[] =
   Object.keys(AR_STEPS);

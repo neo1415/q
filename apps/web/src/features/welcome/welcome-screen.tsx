@@ -123,7 +123,8 @@ export function WelcomeScreen({
   /** Q has handed them to their setup by voice; the next screen carries it. */
   const [leaving, setLeaving] = useState<string | null>(null);
 
-  const lines = introduction(knownName, journey);
+  // Said and shown in the reader's language (live 2026-10-16: English).
+  const lines = introduction(knownName, journey).map(t);
   const spoken = lines.join(" ");
 
   /**
@@ -326,7 +327,7 @@ export function WelcomeScreen({
               aria-pressed={speech.muted}
               data-q-speech-mute
             >
-              {speech.muted ? "Unmute Q" : "Mute Q"}
+              {t(speech.muted ? "Unmute Q" : "Mute Q")}
             </button>
           )}
         </div>
@@ -401,9 +402,11 @@ export function WelcomeScreen({
                 }}
                 data-q-welcome-other-journey
               >
-                {journey === "founder"
-                  ? "Here to invest instead?"
-                  : "Here to raise instead?"}
+                {t(
+                  journey === "founder"
+                    ? "Here to invest instead?"
+                    : "Here to raise instead?",
+                )}
               </button>
             )}
             {/* F8: someone joining a team that is already here asks its

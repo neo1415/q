@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q room W6 (R9): what a room surface shows when its read failed twice.
@@ -11,6 +12,7 @@ export function RoomLoadFailed({
   readonly onRetry: () => void;
   readonly className?: string | undefined;
 }) {
+  const t = useT();
   return (
     <div
       role="alert"
@@ -18,7 +20,7 @@ export function RoomLoadFailed({
       data-q-room-failed
     >
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        Couldn&apos;t load — try again.
+        {t("Couldn't load — try again.")}
       </p>
       <button
         type="button"
@@ -26,7 +28,7 @@ export function RoomLoadFailed({
         onClick={onRetry}
         data-q-room-retry
       >
-        Try again
+        {t("Try again")}
       </button>
     </div>
   );

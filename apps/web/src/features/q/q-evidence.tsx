@@ -164,14 +164,14 @@ export function QEvidenceBody({
               className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4"
             >
               <dt className="cq-label shrink-0 text-(--cq-text-tertiary) sm:w-28">
-                {FINDING_LABELS[finding.type]}
+                {t(FINDING_LABELS[finding.type])}
               </dt>
               <dd className="flex flex-col gap-1">
                 <span className="cq-body text-(--cq-text-primary)">
                   {finding.statement}
                 </span>
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  {Q_CONFIDENCE_LABELS[finding.confidence]}
+                  {t(Q_CONFIDENCE_LABELS[finding.confidence])}
                   {finding.sourceCount > 0
                     ? ` · ${sources(finding.sourceCount)}`
                     : ""}

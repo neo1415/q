@@ -56,7 +56,7 @@ export function ContinueLater({
           className="cq-body-sm max-w-xs text-(--cq-text-secondary)"
           data-continue-later-line
         >
-          {CONTINUE_LATER_LINE}
+          {t(CONTINUE_LATER_LINE)}
         </span>
       ) : null}
     </span>

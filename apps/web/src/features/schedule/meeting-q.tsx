@@ -13,6 +13,7 @@ import {
   dismissMeetingQAction,
   readMeetingQAction,
 } from "./meeting-q-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q in a meeting, on the meeting itself (ADR 0027; founder direction
@@ -54,6 +55,7 @@ export function MeetingQ({
   /** The call is over: its record can only be read. */
   readonly ended: boolean;
 }) {
+  const t = useT();
   const [state, setState] = useState<QMeetingAssistantDto | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -116,7 +118,7 @@ export function MeetingQ({
             disabled={pending}
             onClick={() => act(() => bringMeetingQAction(meetingId, newKey()))}
           >
-            Let Q record
+            {t("Let Q record")}
           </Button>
         ) : null}
       </div>
@@ -141,7 +143,7 @@ export function MeetingQ({
             disabled={pending}
             onClick={() => act(() => bringMeetingQAction(meetingId, newKey()))}
           >
-            Send Q in again
+            {t("Send Q in again")}
           </Button>
         )}
       </div>
@@ -162,7 +164,7 @@ export function MeetingQ({
       )}
       <div className="flex flex-wrap items-center gap-2">
         <span className="cq-caption text-(--cq-text-secondary)">
-          Q joins and keeps the record for both sides.
+          {t("Q joins and keeps the record for both sides.")}
         </span>
         {confirming ? (
           <>
@@ -175,14 +177,14 @@ export function MeetingQ({
                 act(() => dismissMeetingQAction(meetingId));
               }}
             >
-              Yes, decline
+              {t("Yes, decline")}
             </Button>
             <Button
               variant="quiet"
               size="compact"
               onClick={() => setConfirming(false)}
             >
-              Keep Q
+              {t("Keep Q")}
             </Button>
           </>
         ) : (
@@ -192,14 +194,15 @@ export function MeetingQ({
             disabled={pending}
             onClick={() => setConfirming(true)}
           >
-            Decline recording
+            {t("Decline recording")}
           </Button>
         )}
       </div>
       {confirming ? (
         <span className="cq-caption text-(--cq-text-tertiary)">
-          Q won&apos;t record this call. Everyone on it, and Capital Q, will see
-          that you declined.
+          {t(
+            "Q won't record this call. Everyone on it, and Capital Q, will see that you declined.",
+          )}
         </span>
       ) : null}
       {message === null ? null : (
@@ -232,10 +235,11 @@ function RecordSection({
  * capital until someone confirms it (spec 6.6.14).
  */
 function MeetingRecord({ record }: { readonly record: QMeetingAssistantDto }) {
+  const t = useT();
   return (
     <details className="flex flex-col gap-2" data-meeting-q="DONE">
       <summary className="cq-label flex min-h-11 cursor-pointer items-center text-(--cq-text-primary)">
-        Meeting record
+        {t("Meeting record")}
       </summary>
       <div className="flex flex-col gap-4 pt-2">
         {record.summary === null ? null : (
@@ -244,7 +248,7 @@ function MeetingRecord({ record }: { readonly record: QMeetingAssistantDto }) {
           </p>
         )}
         {record.followUps.length === 0 ? null : (
-          <RecordSection label="Next">
+          <RecordSection label={t("Next")}>
             <ul className="flex flex-col gap-1">
               {record.followUps.map((item) => (
                 <li
@@ -264,7 +268,7 @@ function MeetingRecord({ record }: { readonly record: QMeetingAssistantDto }) {
           </RecordSection>
         )}
         {record.agreements.length === 0 ? null : (
-          <RecordSection label="Agreed">
+          <RecordSection label={t("Agreed")}>
             <ul className="flex flex-col gap-1">
               {record.agreements.map((item) => (
                 <li key={item} className="cq-body-sm text-(--cq-text-primary)">
@@ -275,7 +279,7 @@ function MeetingRecord({ record }: { readonly record: QMeetingAssistantDto }) {
           </RecordSection>
         )}
         {record.commitments.length === 0 ? null : (
-          <RecordSection label="Money mentioned">
+          <RecordSection label={t("Money mentioned")}>
             <ul className="flex flex-col gap-2">
               {record.commitments.map((item) => (
                 <li
@@ -293,12 +297,12 @@ function MeetingRecord({ record }: { readonly record: QMeetingAssistantDto }) {
               ))}
             </ul>
             <p className="cq-caption text-(--cq-text-tertiary)">
-              As said in the call; not a commitment until confirmed.
+              {t("As said in the call; not a commitment until confirmed.")}
             </p>
           </RecordSection>
         )}
         {record.flags.length === 0 ? null : (
-          <RecordSection label="Worth knowing">
+          <RecordSection label={t("Worth knowing")}>
             <ul className="flex flex-col gap-1.5">
               {record.flags.map((flag) => (
                 <li
@@ -321,7 +325,7 @@ function MeetingRecord({ record }: { readonly record: QMeetingAssistantDto }) {
           </RecordSection>
         )}
         {record.attendees.length === 0 ? null : (
-          <RecordSection label="Who was there">
+          <RecordSection label={t("Who was there")}>
             <ul className="flex flex-wrap gap-x-4 gap-y-2">
               {record.attendees.map((person, index) => (
                 <li

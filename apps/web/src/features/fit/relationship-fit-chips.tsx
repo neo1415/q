@@ -1,3 +1,5 @@
+"use client";
+
 import {
   FIT_BAND_LABELS,
   FIT_CONFIDENCE_LABELS,
@@ -7,6 +9,7 @@ import {
 
 import { FitGlyph } from "./fit-glyph";
 import { chipParameters } from "./fit-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Fit on a relationship card (brief B3; match.html "relationships"): the
@@ -19,6 +22,7 @@ export function RelationshipFitChips({
 }: {
   readonly profile: FitProfileDto | null;
 }) {
+  const t = useT();
   const chip =
     "inline-flex items-center gap-[5px] whitespace-nowrap border border-(--cq-border-subtle) px-2 py-[3px] text-[12.5px] text-(--cq-text-secondary)";
   if (profile === null) {
@@ -47,7 +51,7 @@ export function RelationshipFitChips({
       {strong.map((p) => (
         <span key={p.parameter} className={chip}>
           <FitGlyph kind="STRONG" size={13} />
-          {FIT_PARAMETER_LABELS[p.parameter]}
+          {t(FIT_PARAMETER_LABELS[p.parameter])}
         </span>
       ))}
       {unknown === null ? null : (
@@ -70,6 +74,7 @@ export function RelationshipFitLine({
 }: {
   readonly profile: FitProfileDto | null;
 }) {
+  const t = useT();
   if (profile === null) {
     return (
       <p className="cq-caption text-(--cq-text-tertiary)" data-fit-line="none">
@@ -94,7 +99,7 @@ export function RelationshipFitLine({
       data-fit-line={profile.band}
     >
       <span className="font-medium text-(--cq-text-primary)">
-        {FIT_BAND_LABELS[profile.band]}
+        {t(FIT_BAND_LABELS[profile.band])}
       </span>
       {` · ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}`}
       {[matches, gap]

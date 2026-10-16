@@ -283,7 +283,7 @@ function PassDialog({
                 disabled={busy}
                 onClick={() => setOpen(false)}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 variant="primary"

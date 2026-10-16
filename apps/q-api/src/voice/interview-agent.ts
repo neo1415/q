@@ -99,6 +99,7 @@ import {
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import { ONBOARDING_ARABIC_NOTE, withArabicQuestions } from "./step-copy-ar.js";
 import { settleKnownAnswers } from "./known-answers.js";
 import { textStatedIn } from "./value-support.js";
 
@@ -790,6 +791,9 @@ export function createInterviewAgent(
               return null;
             });
     const personality = standing?.personality ?? "AUTO";
+    // Multilingual Q: the language they chose for Q (Settings or by telling
+    // Q), so the interview opens and asks in it.
+    const arabic = standing?.language === "ar";
     const conductBefore = standing?.conduct ?? INITIAL_CONDUCT;
     // A paused account talks to nobody until a person at Capital Q has
     // looked at it: refused here, before any model is called.
@@ -1368,7 +1372,13 @@ export function createInterviewAgent(
           approved: current().approved,
           declined: current().declined,
           turnNotes: current().turnNotes(state),
-          personality: PERSONALITY_NOTES[personality],
+          personality: [
+            PERSONALITY_NOTES[personality],
+            arabic ? ONBOARDING_ARABIC_NOTE : "",
+          ]
+            .filter((note) => note.length > 0)
+            .join(" ")
+            .slice(0, 1_200),
           conduct: conductText.slice(0, 600),
           openings: openingsOf(thread).slice(0, 600),
         },
@@ -1880,6 +1890,12 @@ export function createInterviewAgent(
         );
         reply = backed;
       }
+    }
+
+    // Multilingual Q (live 2026-10-16): the questions code adds are the
+    // journey's English; an Arabic speaker hears each step in Arabic.
+    if (arabic) {
+      reply = withArabicQuestions(reply, journeySteps, SPOKEN_QUESTIONS);
     }
 
     // Kept: one exchange per turn, under one reference.

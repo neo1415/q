@@ -32,6 +32,7 @@ import { resolveReturningFacts } from "./returning-facts";
 import { ReturningWelcome } from "./returning-welcome";
 import { resolveSetupReminder } from "./setup-reminder";
 import { serverT, serverUiLanguage } from "@/features/i18n/server";
+import { Words } from "@/features/i18n/language";
 
 /**
  * Home is Q (QX-001 §4; doc 17 §60-§63; acceptance A and K).
@@ -140,10 +141,10 @@ function FirstRunWelcome({ name }: { readonly name: string | null }) {
           id="first-run-headline"
           className="cq-title-lg text-balance text-(--cq-text-primary)"
         >
-          {name === null ? "Hi, I'm Q." : `Hi ${name}, I'm Q.`}
+          <Words>{name === null ? "Hi, I'm Q." : `Hi ${name}, I'm Q.`}</Words>
         </h1>
         <p className="cq-body-lg text-balance text-(--cq-text-secondary)">
-          {FIRST_RUN_QUESTION}
+          <Words>{FIRST_RUN_QUESTION}</Words>
         </p>
       </div>
       <div className="w-full">
