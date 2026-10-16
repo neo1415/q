@@ -24,8 +24,8 @@ select throws_ok(
      values (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('user_a'), 'REVOKED', 'SETTINGS', 'v1') $$,
   '23505', null, 'one decision per person per tenant');
 select lives_ok(
-  $$ insert into q_knowledge.preference_learning_consents (tenant_id, user_id, status, decided_via, policy_version)
-     values (pg_temp.rls_id('tenant_b'), pg_temp.rls_id('user_a'), 'DECLINED', 'PROMPT', 'v1') $$,
+  $$ insert into q_knowledge.preference_learning_consents (tenant_id, user_id, status, ask_again_after, decided_via, policy_version)
+     values (pg_temp.rls_id('tenant_b'), pg_temp.rls_id('user_a'), 'DECLINED', now() + interval '30 days', 'PROMPT', 'v1') $$,
   'another tenant keeps its own decision, never inherited');
 select throws_ok(
   $$ insert into q_knowledge.preference_learning_consents (tenant_id, user_id, status, decided_via, policy_version)

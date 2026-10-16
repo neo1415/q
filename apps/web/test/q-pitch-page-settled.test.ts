@@ -31,4 +31,22 @@ describe("pageSettled (a tour question waits for the page it is about)", () => {
     window.history.pushState({}, "", "/discover");
     expect(await pageSettled(new AbortController().signal, 2_000)).toBe(true);
   });
+
+  it("waits until Q's subject is that company too, not the feed's last card (run 6)", async () => {
+    window.history.pushState({}, "", `/company/${HARBOURLINE}`);
+    setQFocus({ kind: "COMPANY", id: HARBOURLINE });
+    let subject = FEED_CARD;
+    setTimeout(() => {
+      subject = HARBOURLINE;
+    }, 200);
+    const started = Date.now();
+    expect(
+      await pageSettled(new AbortController().signal, 2_000, () => subject),
+    ).toBe(true);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(150);
+    // Never settles on the stale subject alone.
+    expect(
+      await pageSettled(new AbortController().signal, 300, () => FEED_CARD),
+    ).toBe(false);
+  });
 });

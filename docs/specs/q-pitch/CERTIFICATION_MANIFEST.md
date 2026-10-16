@@ -277,3 +277,35 @@ Every other atlas feature currently has no certification entry and must not be p
   - **Fix (tour):** `claude/p-premiere-fix3-oct16`: before every tour question, wait (up to 8 s) until the page has stopped loading and, on a company page, declares that company in focus (`pageSettled`, with tests).
   - **Open (q-api, not changed here):** when the screen names a company but the manifest has no focus yet, "this company" should resolve to `screen.companyId`, not to an older subject in the conversation. This also affects a person who asks quickly after opening a profile.
 - **Provider usage (estimate, not reconciled with billing):** 4 Q text runs (top three, profile, comparison, the live question) plus 1 short rehearsal (counterpart turns and review), and about 7 minutes of standard-voice speech. Roughly $0.3–0.6.
+
+## Premiere v5 acceptance run 6 — production `db16ca36` (releases V+W), 16 Oct 2026 11:39–11:46 UTC (Lane P, lead-approved)
+
+- **Attempt 1 (11:22):** the browser crashed in "Opening Q's voice…" (`page.screenshot: Target crashed`, the VM shared with other agents' builds). The tour never started; no Q run, no speech. **Retried once.**
+- **Run (retry):** RUNNING 27 s after Start; **17 of 17 scenes complete, 0 fallbacks, 0 page or console errors, 0 speech refusals, in 6:19** (tour complete at 379 s); hand-over: the strip left by itself, Q on `/home`. The live question passed: paused, answered, visible in the panel, resumed by itself.
+- **Scene 6: NOT certified (content).** Run `1f490098` (11:40:30) answered about **Brancheon Works**, the feed's last card. Its subjects in order: `5be654c3` (Brancheon Works), `ceb6ec2d` (Harbourline), Savanna's organisation. The screen was right: `companyId` and manifest focus were both Harbourline (the page-settled fix held). The cause is one level up: the session's page subject was still the feed's card, and it went as the subject **named** with the question, which `screenCompanyFirst` deliberately leaves in place.
+  - **Fix (tour):** `claude/p-premiere-fix4-oct16`: on a company page, a tour question also waits until Q's subject is that company (`pageSettled`, with a test).
+  - **Open (web, real users):** a person who asks right after opening a profile can send the previous page's subject. Either the page subject should follow the route at once, or the server should let the screen's company lead over a named one that contradicts it on a company route. That is a rule change, for the lead to decide.
+- The other three Q runs had Harbourline first: the comparison, the live question and the run-5 profile order are unchanged.
+
+## Premiere v5 acceptance run 7 — production `f688c48e` (release X), 16 Oct 2026 12:32–12:39 UTC (Lane P, lead-approved)
+
+- **Method:** as runs 3–6 (Playwright, savanna-seed, nothing blocked, microphone denied: standard voice). Receipts: scratchpad `v5-acc/run7/`, not committed.
+- **Result:** RUNNING 28 s after Start; **17 of 17 scenes complete, 0 fallbacks, 0 page or console errors, 0 speech refusals, in 6:52** (tour complete at 412 s); 60 narration lines; hand-over: the strip left by itself, Q on `/home`. The live question passed: paused, answered (run `cae4abff`), visible in the panel, resumed by itself.
+- **Scene 6: CERTIFIED (PRODUCTION_LIVE_VERIFIED, content and timing).** Run `bec093d3` (12:33:10). Subjects in order: Harbourline (`ceb6ec2d`), then Savanna's organisation; no stale feed card. Its answer opens "Harbourline Cargo provides port-to-warehouse container trucking for Lagos importers…" and states the fit with unknowns kept unknown (`scene-06.png`). The comparison (`f26b1723`) and the live question also carried Harbourline first.
+- **Certified scenes now: 15 of 17** in the main cut (every feature PRODUCTION_LIVE_VERIFIED). Not yet:
+  - **15, Q-to-Q rehearsal:** `REH-Q2Q-SHORT` waits on the microphone "skip" test, which only a human can run.
+  - **16, Capital Q's own profile:** `QP-SUBJECT` is CODE_VERIFIED. The scene completed in runs 3–7; promoting it needs a lead decision on its claims.
+- **Defect (cosmetic, not tour-specific):** the scene 6 answer showed a literal `\n\n` between paragraphs ("Apapa.\n\nThe fit…"). An escaped newline in the model's text reached the panel unrendered.
+- **Provider usage (estimate):** 4 Q text runs (top three, profile, comparison, live question), 1 short rehearsal, about 7 minutes of standard voice. Roughly $0.3–0.5.
+
+## Scene 16 (Capital Q's own profile): promoted, conditional on migration 20261228141700 (16 Oct, lead decision)
+
+- **Rule (lead):** Capital Q's profile may claim only what is on its record: pre-seed, bootstrapped, the USD 2M raise as a founder claim, and the product description. No verified traction, customers, revenue or investors; every claim labelled with its evidence status.
+- **Run 7 check (`scene-16.png` and the scene's narration):**
+  - Pre-seed; "$2M · Said in their pitch"; the product description; "Traction: Nothing stated in their pitch yet"; "Q's view · not verified".
+  - The narration calls the fundraising details the founders' own statements.
+  - No traction, customers, revenue or investors are claimed. Compliant, except one statement:
+- **The one breach:** the badge **"Demo verified (synthetic)"** under the name. Its source is data: Capital Q's organisation (`f95c3469…`) has a current `evidence.verification_claims` revision 2, VERIFIED by `SYNTHETIC_DEMO_ATTESTATION` (15 Oct 10:48 UTC, on a request from a synthetic-marked account).
+  - **Fix:** `supabase/migrations/20261228141700_capital_q_revoke_synthetic_attestation.sql` appends a REVOKED revision naming that row. It runs only while that attestation is current, updates and deletes nothing, and changes no grant or policy.
+  - **pgTAP:** `rls/972_capital_q_synthetic_revocation.test.sql`.
+- **Status:** `QP-SUBJECT` is **PRODUCTION_LIVE_VERIFIED once the migration is applied in production** and the profile shows no verification badge (a read-only check: the current revision is REVOKED). The ledger entry in `premiere.ts` stays CODE_VERIFIED until then, so no audience run shows the badge. With it, **16 of 17** scenes are certified; scene 15 waits on the human microphone test.

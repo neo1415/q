@@ -23,6 +23,7 @@ import {
 import { useIntentWarmup } from "../discover/player/use-intent-warmup";
 import { ExploreFeed, type ExploreFeedItem } from "./explore-feed";
 import { ExploreGrid, ExploreGridSkeleton } from "./explore-grid";
+import { previewGrantsFor } from "./grid-preview-player";
 import {
   ExploreSearchBar,
   ExploreSearchResults,
@@ -338,7 +339,10 @@ export function ExploreScreen({
   }, [toast]);
 
   // A tile the person is about to open is warmed before the click.
-  const warm = useIntentWarmup(source.authorize);
+  // The warm-up shares the grid preview's grants (cached per pitch, one
+  // request in flight): resting on a tile asks for its grant once, not
+  // once for the warm-up and again for the preview (live 2026-10-16).
+  const warm = useIntentWarmup(previewGrantsFor(source.authorize));
   const open = useCallback((list: readonly ExploreTileDto[], index: number) => {
     const anchor = list[index];
     if (anchor === undefined) return;

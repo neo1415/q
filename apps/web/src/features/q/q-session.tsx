@@ -273,6 +273,9 @@ export function QSessionProvider({
     relationshipId,
     conversationId,
     onConversation,
+    // The page's subject, not one picked for the question: sent as the
+    // screen context, never as a named subject.
+    ambient: true,
   });
   const turns = turnsFrom(q.state, q.pending);
 

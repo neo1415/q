@@ -42,9 +42,15 @@ async function qSession() {
 
 /** Whether Q may learn how they like to work (lane ob1). Null: unknown. */
 export async function preferenceLearningAction(): Promise<QPreferenceLearningDto | null> {
-  const session = await qSession();
-  if (session === null) return null;
-  return getQPreferenceLearning(session).catch(() => null);
+  // Unknown stays unknown: a missing session, config or API answer hides
+  // the prompt rather than failing the page.
+  try {
+    const session = await qSession();
+    if (session === null) return null;
+    return await getQPreferenceLearning(session);
+  } catch {
+    return null;
+  }
 }
 
 const Choice = z.object({
