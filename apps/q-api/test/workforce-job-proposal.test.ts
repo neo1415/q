@@ -381,8 +381,12 @@ describe("a job the lead Q proposes (J1, J4)", () => {
     );
     expect(prepared.status).toBe("PREPARED");
     expect(plans()).toBe(2);
-    const proposal = await board.proposer.propose({ runId: "run-r", actor });
-    const payload = WorkforceJobStartPayloadSchema.parse(proposal?.payload);
+    const proposal = await board.proposer.propose({
+      runId: "run-r",
+      actor,
+    } as unknown as Parameters<typeof board.proposer.propose>[0]);
+    if (proposal === null || "refused" in proposal) throw new Error("none");
+    const payload = WorkforceJobStartPayloadSchema.parse(proposal.payload);
     expect(payload.steps.map((step) => [step.role, step.tools])).toEqual([
       ["MANDATE_WATCHER", ["search_companies"]],
       ["OUTREACH", ["relationship.interest.express"]],
