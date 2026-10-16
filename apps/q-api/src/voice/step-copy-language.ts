@@ -112,14 +112,35 @@ type Step = {
   readonly configuration: { readonly prompt: string };
 };
 
-/** English lines code may add, longest first, each with its hand Arabic. */
+/** A hand-written step copy: questions by step key, and the two added lines. */
+type HandStepCopy = {
+  readonly questions: Readonly<Record<string, string>>;
+  readonly optionalTail: string;
+  readonly finishOrContinue: string;
+};
+
+/**
+ * Hand-written step copy by primary language subtag (like the web's hand
+ * catalogues and the email's hand locales): it wins over machine
+ * translation for that language. Another hand copy drops in here.
+ */
+export const HAND_STEP_COPY: Readonly<Record<string, HandStepCopy>> = {
+  ar: {
+    questions: SPOKEN_QUESTIONS_AR,
+    optionalTail: ARABIC_OPTIONAL_TAIL.trim(),
+    finishOrContinue: ARABIC_FINISH_OR_CONTINUE,
+  },
+};
+
+/** English lines code may add, longest first, each with its hand copy. */
 function addedLines(
   steps: readonly Step[],
   spoken: Readonly<Record<string, string>>,
-): readonly { readonly english: string; readonly arabic: string | null }[] {
-  const lines: { english: string; arabic: string | null }[] = [
-    { english: OPTIONAL_TAIL_EN.trim(), arabic: ARABIC_OPTIONAL_TAIL.trim() },
-    { english: FINISH_OR_CONTINUE_EN, arabic: ARABIC_FINISH_OR_CONTINUE },
+  hand: HandStepCopy | undefined,
+): readonly { readonly english: string; readonly hand: string | null }[] {
+  const lines: { english: string; hand: string | null }[] = [
+    { english: OPTIONAL_TAIL_EN.trim(), hand: hand?.optionalTail ?? null },
+    { english: FINISH_OR_CONTINUE_EN, hand: hand?.finishOrContinue ?? null },
   ];
   for (const step of steps) {
     const prompt = step.configuration.prompt;
@@ -128,10 +149,7 @@ function addedLines(
       prompt.endsWith("?") ? prompt : `${prompt}?`,
     ]) {
       if (english === undefined || english.length <= 3) continue;
-      lines.push({
-        english,
-        arabic: SPOKEN_QUESTIONS_AR[step.stepKey] ?? null,
-      });
+      lines.push({ english, hand: hand?.questions[step.stepKey] ?? null });
     }
   }
   return lines.sort((a, b) => b.english.length - a.english.length);
@@ -139,8 +157,8 @@ function addedLines(
 
 /**
  * The reply with each English question code added put in `language`: the
- * hand Arabic for Arabic, otherwise `localise` (Q's shared translation
- * layer). What the model wrote itself is left as it is; a line with no
+ * language's hand step copy where there is one, otherwise `localise` (Q's
+ * shared translation layer). What the model wrote itself is left as it is; a line with no
  * translation stays as it was.
  */
 export async function withQuestionsInLanguage(
@@ -152,20 +170,18 @@ export async function withQuestionsInLanguage(
 ): Promise<string> {
   const info = languageInfo(language ?? undefined);
   if (info === null || info.primary === "en") return reply;
-  const present = addedLines(steps, spoken).filter((line) =>
-    reply.includes(line.english),
-  );
+  const present = addedLines(
+    steps,
+    spoken,
+    HAND_STEP_COPY[info.primary],
+  ).filter((line) => reply.includes(line.english));
   if (present.length === 0) return reply;
-  const machine =
-    info.primary === "ar" && present.every((line) => line.arabic !== null)
-      ? []
-      : await localise(present.map((line) => line.english)).catch(() => []);
+  const machine = present.every((line) => line.hand !== null)
+    ? []
+    : await localise(present.map((line) => line.english)).catch(() => []);
   let out = reply;
   present.forEach((line, i) => {
-    const words =
-      info.primary === "ar" && line.arabic !== null
-        ? line.arabic
-        : (machine[i] ?? null);
+    const words = line.hand ?? machine[i] ?? null;
     if (words !== null) out = out.split(line.english).join(words);
   });
   return out;
