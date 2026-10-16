@@ -393,6 +393,14 @@ function QReading({
                   {item.label}
                 </p>
                 <p className="cq-body text-(--cq-text-primary)">{item.value}</p>
+                {item.note === undefined ? null : (
+                  <p
+                    className="cq-caption text-(--cq-text-secondary)"
+                    data-q-proposal-note
+                  >
+                    {item.note}
+                  </p>
+                )}
               </div>
               <div className="flex shrink-0 gap-2">
                 <Button
