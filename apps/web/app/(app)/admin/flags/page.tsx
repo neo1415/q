@@ -11,7 +11,10 @@ import { flagName } from "@/features/admin/flag-names";
 import { when } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Kill switches · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Kill switches · Admin") };
+}
 
 export default async function AdminFlagsPage() {
   const t = await serverT();

@@ -22,7 +22,10 @@ import { resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Documents" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Documents") };
+}
 export const dynamic = "force-dynamic";
 
 /**

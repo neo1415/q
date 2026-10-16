@@ -14,7 +14,10 @@ import { loadCompanySideRelationship } from "@/features/relationships/relationsh
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Calls" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Calls") };
+}
 export const dynamic = "force-dynamic";
 
 /** A relationship's calls: book one, the ones booked, and what happened. */

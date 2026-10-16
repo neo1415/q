@@ -13,7 +13,10 @@ import { auditFiltersFrom } from "@/features/admin/audit-filters";
 import { ROLE_WORDS, when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Audit · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Audit · Admin") };
+}
 
 const ACTOR_WORDS: Readonly<Record<string, string>> = {
   human: "Person",

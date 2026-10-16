@@ -11,7 +11,10 @@ import { SearchForm } from "@/features/admin/search-form";
 import { words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Organisations · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Organisations · Admin") };
+}
 
 export default async function AdminOrganisationsPage({
   searchParams,

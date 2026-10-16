@@ -75,7 +75,10 @@ import {
 } from "@/features/relationships/relationships-view";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Relationships" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Relationships") };
+}
 
 // Read under the person's own session on every request.
 export const dynamic = "force-dynamic";

@@ -11,7 +11,10 @@ import { AccountSuspension } from "@/features/admin/suspension-controls";
 import { ROLE_WORDS, when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Account · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Account · Admin") };
+}
 
 export default async function AdminAccountPage({
   params,

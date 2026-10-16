@@ -21,7 +21,10 @@ import { WorkPage } from "@/features/work/work-page";
 import { loadWorkforceAction } from "@/features/work/workforce-actions";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Work" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Work") };
+}
 
 /** Waiting cards read in full with the page; the rest load when opened. */
 const VIEWS_READ_AHEAD = 10;

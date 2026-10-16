@@ -10,7 +10,10 @@ import { adminContext } from "@/features/admin/admin-context";
 import { BreakGlassList, SafetyReports } from "@/features/admin/safety-queue";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Safety · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Safety · Admin") };
+}
 
 export default async function AdminSafetyPage({
   searchParams,

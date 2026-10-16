@@ -10,7 +10,10 @@ import { RunBreakGlass } from "@/features/admin/run-break-glass";
 import { usd, when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Q run · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Q run · Admin") };
+}
 
 /**
  * One Q run, step by step: stages, every model call, every firewall

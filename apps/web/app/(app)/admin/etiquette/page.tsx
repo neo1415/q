@@ -9,7 +9,10 @@ import { adminContext } from "@/features/admin/admin-context";
 import { HouseGuideEditor } from "@/features/etiquette/house-guide-editor";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "How Q conducts business · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("How Q conducts business · Admin") };
+}
 
 /**
  * ADR 0050: the house guide Q follows for everyone when it writes or speaks

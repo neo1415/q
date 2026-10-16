@@ -14,7 +14,10 @@ import { ReviewQueue } from "@/features/admin/review-queue";
 import { VerificationQueue } from "@/features/admin/verification-queue";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Queue · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Queue · Admin") };
+}
 
 type Tab = "verification" | "reviews";
 

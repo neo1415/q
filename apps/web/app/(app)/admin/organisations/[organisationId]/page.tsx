@@ -16,7 +16,10 @@ import { allowanceLine, sourceLine } from "@/features/billing/plan-words";
 import { when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Organisation · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Organisation · Admin") };
+}
 
 const KIND_WORDS = {
   COMPANY: "Company",

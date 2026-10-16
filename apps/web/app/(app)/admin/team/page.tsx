@@ -10,7 +10,10 @@ import { GrantRole, RevokeRole } from "@/features/admin/team-controls";
 import { ROLE_WORDS, when } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Team · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Team · Admin") };
+}
 
 const ROLE_DOES: Readonly<Record<string, string>> = {
   platform_owner: "Everything, including the team and roles.",

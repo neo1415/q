@@ -11,7 +11,10 @@ import { messageCountOf } from "@/features/relationships/brief-lines";
 import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Messages" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Messages") };
+}
 export const dynamic = "force-dynamic";
 
 /** An investor organisation's conversation with one company (R34). */

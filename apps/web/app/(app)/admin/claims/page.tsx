@@ -10,7 +10,10 @@ import { ClaimDecision, PublishCompany } from "@/features/admin/claim-controls";
 import { when } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Company claims · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Company claims · Admin") };
+}
 
 const METHOD_WORDS = {
   WORK_EMAIL: "Work email",

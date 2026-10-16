@@ -10,7 +10,10 @@ import { adminContext } from "@/features/admin/admin-context";
 import { when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Email · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Email · Admin") };
+}
 
 const STATUS_WORDS = {
   PASS: "Set up",

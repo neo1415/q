@@ -21,7 +21,10 @@ import { formatDay } from "@/components/date-format";
 import { adminContext } from "@/features/admin/admin-context";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Admin") };
+}
 export const dynamic = "force-dynamic";
 
 const ORIGIN_WORDS: Readonly<Record<string, string>> = {

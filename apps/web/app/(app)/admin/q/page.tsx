@@ -11,7 +11,10 @@ import { ErrorStream } from "@/features/admin/error-stream";
 import { usd, when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Q monitor · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Q monitor · Admin") };
+}
 
 const WINDOWS = [
   { value: "24h", label: "24 hours" },

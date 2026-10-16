@@ -14,7 +14,10 @@ import { when, words } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 import { serverTNow } from "@/features/i18n/server-now";
 
-export const metadata: Metadata = { title: "Billing · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Billing · Admin") };
+}
 
 /**
  * The facilitation-fee ledger (BILLING, ADR 0034): one entry per

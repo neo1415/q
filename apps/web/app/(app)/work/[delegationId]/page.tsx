@@ -15,7 +15,10 @@ import { DoneForYouUndo } from "@/features/work/done-for-you-undo";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "What Q did" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("What Q did") };
+}
 
 /**
  * One delegation in full (AUTO, ADR 0030): who Q picked and on what words,

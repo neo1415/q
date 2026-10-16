@@ -13,8 +13,12 @@ import {
 import { messageCountOf } from "@/features/relationships/brief-lines";
 import { loadCompanySideRelationship } from "@/features/relationships/relationship-page-data";
 import { serverUiLanguage } from "@/features/i18n/server";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Diligence" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Diligence") };
+}
 export const dynamic = "force-dynamic";
 
 /**

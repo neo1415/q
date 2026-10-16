@@ -15,7 +15,10 @@ import { qApiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "First-stage report" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("First-stage report") };
+}
 
 const VERDICT = {
   PROCEED: "Q suggests you proceed",

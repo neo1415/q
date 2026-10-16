@@ -41,7 +41,10 @@ import { qrSvg } from "@/features/q-card/qr";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "GateQ" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("GateQ") };
+}
 export const dynamic = "force-dynamic";
 
 type Props = {

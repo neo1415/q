@@ -9,7 +9,10 @@ import { adminContext } from "@/features/admin/admin-context";
 import { when } from "@/features/admin/words";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Conversation · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Conversation · Admin") };
+}
 
 /**
  * A private conversation under an approved break-glass request. Only the

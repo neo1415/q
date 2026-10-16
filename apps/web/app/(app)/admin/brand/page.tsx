@@ -9,7 +9,10 @@ import { adminContext } from "@/features/admin/admin-context";
 import { BrandEditor } from "@/features/brand-theme/brand-editor";
 import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Brand · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Brand · Admin") };
+}
 
 /**
  * P5 brand theming with K3 presets: the platform owner or an operator
