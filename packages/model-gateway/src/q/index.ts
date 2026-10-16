@@ -16,6 +16,7 @@ import {
 } from "./early-lead.js";
 import {
   companiesMapAskOf,
+  mayDrawCompaniesMap,
   runCompaniesMap,
   type CompaniesMapAnswer,
   type CompaniesMapAsk,
@@ -4376,12 +4377,9 @@ export function createModelGatewayQAnswer(
       // Lead 2026-10-16 (live: a map of known companies took 22 s through a
       // public web search, or came back as cards with no map): drawn by
       // code from what the companies declare, before any model is asked.
-      const companiesMapAsk =
-        request.writingDocument !== true &&
-        request.askedAction === undefined &&
-        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
-          ? companiesMapAskOf(latest.content, shownBefore)
-          : null;
+      const companiesMapAsk = mayDrawCompaniesMap(request)
+        ? companiesMapAskOf(latest.content, shownBefore)
+        : null;
       if (companiesMapAsk !== null) {
         const mapStarted = Date.now();
         const drawn = await mapFor(companiesMapAsk);

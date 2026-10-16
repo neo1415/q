@@ -70,7 +70,7 @@ export const AGENT_REGISTRY: Readonly<Record<AgentRole, AgentDefinition>> = {
   CONVERSATION: {
     role: "CONVERSATION",
     title: "Conversation",
-    does: "Reads replies and answers them, warmly and only from what the person approved; each draft is written and checked against the guides before it goes.",
+    does: "Reads replies and answers them, warmly and only from what the person approved; each draft is written and checked against the guides before it goes. It only answers people who already wrote: it never starts a new conversation or writes an introduction.",
     tools: ["list_messages", "chat.message.send"],
     budgetUsd: 0.1,
   },

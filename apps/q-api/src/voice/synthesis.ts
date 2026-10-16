@@ -100,6 +100,30 @@ export function speechWithFallback(
  */
 export const SPEECH_QUOTA = { limit: 30, windowMs: 10 * 60_000 } as const;
 
+/** Bounds for `CQ_SPEECH_LINES_PER_10MIN`: never off, never unbounded. */
+export const SPEECH_LINES_MIN = 1;
+export const SPEECH_LINES_MAX = 1_000;
+
+/**
+ * The per-person allowance from the environment (owner 16 Oct: voice is
+ * unlimited for every account for now, and a narrated tour speaks about 60
+ * lines). `CQ_SPEECH_LINES_PER_10MIN` is a whole number of lines per ten
+ * minutes within the bounds above; unset, empty or out of bounds keeps the
+ * default, so a typo can never remove the bound.
+ */
+export function speechQuotaFrom(
+  env: Readonly<Record<string, string | undefined>>,
+): { readonly limit: number; readonly windowMs: number } {
+  const raw = env.CQ_SPEECH_LINES_PER_10MIN?.trim();
+  if (raw === undefined || raw === "" || !/^\d+$/u.test(raw)) {
+    return SPEECH_QUOTA;
+  }
+  const limit = Number(raw);
+  return limit >= SPEECH_LINES_MIN && limit <= SPEECH_LINES_MAX
+    ? { limit, windowMs: SPEECH_QUOTA.windowMs }
+    : SPEECH_QUOTA;
+}
+
 /** Beyond this many live buckets the oldest window is dropped. */
 const MAX_TRACKED = 10_000;
 

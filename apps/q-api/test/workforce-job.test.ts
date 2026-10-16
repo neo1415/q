@@ -474,7 +474,9 @@ describe("J9: a job carried out by Q's workforce, end to end", () => {
     });
     expect(result.outcome).toBe("NOT_PLANNED");
     expect(record.sent).toEqual([]);
-    expect(calls.map((call) => call.task)).toEqual(["JOB_PLAN"]);
+    // Refused, the lead replans once, told in code's words why; then stops.
+    expect(calls.map((call) => call.task)).toEqual(["JOB_PLAN", "JOB_PLAN"]);
+    expect(calls[1]?.prompt).toContain("YOUR LAST PLAN WAS REFUSED BY CODE");
     // The plan prompt never offered WRITER or REVIEWER as roles.
     const roster = calls[0]?.prompt ?? "";
     expect(roster).not.toMatch(/- WRITER|- REVIEWER|- AD_HOC/u);

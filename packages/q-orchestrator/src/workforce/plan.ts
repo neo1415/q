@@ -8,6 +8,7 @@ import {
 } from "@capital-q/contracts";
 
 import {
+  REQUIRED_TOOLS,
   STORED_ROLE,
   isQAgentRole,
   registeredExecutors,
@@ -87,6 +88,8 @@ export const STEP_REFUSALS = [
   /** A real role with no executor here (incl. WRITER and REVIEWER, which run inside the sender). */
   "NO_EXECUTOR",
   "NO_PERMITTED_TOOL",
+  /** The step lacks the one tool its executor acts through (e.g. CONVERSATION without chat.message.send). */
+  "MISSING_REQUIRED_TOOL",
   "INVALID_DOCUMENT_REQUEST",
   /** A memo about "the company the job names" when it names none, or several. */
   "NO_NAMED_COMPANY",
@@ -210,6 +213,10 @@ export function boundPlan(
     );
     if (tools.length === 0) {
       refuse("NO_PERMITTED_TOOL");
+      continue;
+    }
+    if (REQUIRED_TOOLS[role].some((tool) => !tools.includes(tool))) {
+      refuse("MISSING_REQUIRED_TOOL");
       continue;
     }
     if (role !== "DOCUMENTS" && step.document !== undefined) {

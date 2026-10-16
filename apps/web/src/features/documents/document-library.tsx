@@ -40,7 +40,8 @@ import {
 } from "@/features/onboarding-kit/material-actions";
 import { artifactFileUrl } from "@/features/q/artifact-download";
 import { newIntentKey } from "@/features/q/control/intent-key";
-import { useQControlGroup } from "@/features/q/control/q-control";
+import { effectShown } from "@/features/q/control/perform";
+import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 
 import { DECK_AUDIENCE_OPTIONS, deckAudienceDescription } from "./deck-sharing";
 import { setDeckAudienceAction } from "./deck-sharing-actions";
@@ -372,11 +373,6 @@ const Q_LIBRARY_LIST: Readonly<Record<string, string>> = {
 const Q_LIBRARY_SEARCH: Readonly<Record<string, string>> = {
   "input.document-search": "[data-documents-search]",
 };
-// Q Pitch (premiere v5): show what Q made before opening one, so the
-// opened item is a Q memo shown in place, never a file in a new tab.
-const Q_LIBRARY_FILTERS: Readonly<Record<string, string>> = {
-  "button.documents-by-q": '[data-documents-filter="BY_Q"]',
-};
 
 export function DocumentLibrary({
   initial,
@@ -399,11 +395,6 @@ export function DocumentLibrary({
   const libraryRef = useRef<HTMLElement>(null);
   useQControlGroup({ kind: "LIST", ref: libraryRef, ids: Q_LIBRARY_LIST });
   useQControlGroup({ kind: "INPUT", ref: libraryRef, ids: Q_LIBRARY_SEARCH });
-  useQControlGroup({
-    kind: "BUTTON",
-    ref: libraryRef,
-    ids: Q_LIBRARY_FILTERS,
-  });
   const [items, setItems] = useState<readonly LibraryItem[]>(
     initial?.items ?? [],
   );
@@ -413,6 +404,27 @@ export function DocumentLibrary({
   const [failed, setFailed] = useState(initial === null);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<LibraryFilter>("ALL");
+  // Q Pitch (premiere v5): show what Q made before opening one, so the
+  // opened item is a Q memo shown in place, never a file in a new tab.
+  // DONE once the filter reads By Q (a pill's pressed state is not one
+  // the default button act can see: 16 Oct run, FAILED).
+  const byQRef = useRef<HTMLButtonElement>(null);
+  const filterNow = useRef(filter);
+  useEffect(() => {
+    filterNow.current = filter;
+  });
+  useQControl({
+    id: "button.documents-by-q",
+    kind: "BUTTON",
+    ref: byQRef,
+    onAct: async (intent) => {
+      if (intent.act !== "ACTIVATE") return "NOT_APPLICABLE";
+      setFilter("BY_Q");
+      return (await effectShown(() => filterNow.current === "BY_Q", 3_000))
+        ? "DONE"
+        : "FAILED";
+    },
+  });
   const [sort, setSort] = useState<LibrarySort>("RECENT");
   const [query, setQuery] = useState("");
   const [uploads, setUploads] = useState<readonly Upload[]>([]);
@@ -743,6 +755,7 @@ export function DocumentLibrary({
                   : "min-h-11 shrink-0 border border-(--cq-border-subtle) px-3.5 cq-body-sm text-(--cq-text-secondary) hover:border-(--cq-border-strong) lg:min-h-8"
               }
               data-documents-filter={option.value}
+              ref={option.value === "BY_Q" ? byQRef : undefined}
             >
               {option.label}
             </button>

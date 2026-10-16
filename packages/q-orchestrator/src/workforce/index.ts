@@ -10,6 +10,7 @@ export {
 } from "./registry.js";
 export {
   ALL_EXECUTORS,
+  REQUIRED_TOOLS,
   STORED_ROLE,
   UNREGISTERED_ROLE_REASONS,
   executorRoleOf,

@@ -618,7 +618,11 @@ import {
   createDeepgramSpeakStream,
   createDeepgramSpeechSynthesis,
 } from "./voice/providers/deepgram-speak.js";
-import { speechWithFallback } from "./voice/synthesis.js";
+import {
+  createSpeechThrottle,
+  speechQuotaFrom,
+  speechWithFallback,
+} from "./voice/synthesis.js";
 import {
   createElevenLabsSpeechRelay,
   personaVoiceId,
@@ -6578,6 +6582,9 @@ const { app, logger: appLogger } = createApp(
             provider: voiceProvider,
             deepgram: deepgramProvider,
             speech: speechSynthesis,
+            speechThrottle: createSpeechThrottle({
+              quota: speechQuotaFrom(process.env),
+            }),
             bindings: voiceBindings,
             interviewAgent,
             interviewPresence: presenceTrigger,
@@ -6767,7 +6774,11 @@ if (deepgramProvider !== undefined) {
 }
 if (speechSynthesis !== undefined) {
   appLogger.info(
-    { path: Q_VOICE_SPEECH_PATH, voices: speechSynthesis.voices },
+    {
+      path: Q_VOICE_SPEECH_PATH,
+      voices: speechSynthesis.voices,
+      linesPer10Min: speechQuotaFrom(process.env).limit,
+    },
     `one-way speech: ${speechSynthesis.name}`,
   );
 }

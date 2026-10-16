@@ -224,3 +224,18 @@ describe("runCompaniesMap", () => {
     expect(await run("look it up online and put it on a map")).toBeNull();
   });
 });
+
+describe("mayDrawCompaniesMap", () => {
+  it("draws for a question or a research request, never for a document or an action", async () => {
+    const { mayDrawCompaniesMap } = await import("../src/q/companies-map.js");
+    expect(mayDrawCompaniesMap({})).toBe(true);
+    expect(mayDrawCompaniesMap({ turnKind: "QUESTION_TO_Q" })).toBe(true);
+    // Live 2026-10-16: the Tensorgate map was read as RESEARCH_REQUEST.
+    expect(mayDrawCompaniesMap({ turnKind: "RESEARCH_REQUEST" })).toBe(true);
+    expect(mayDrawCompaniesMap({ turnKind: "SMALL_TALK" })).toBe(false);
+    expect(mayDrawCompaniesMap({ writingDocument: true })).toBe(false);
+    expect(mayDrawCompaniesMap({ askedAction: "express_interest" })).toBe(
+      false,
+    );
+  });
+});
