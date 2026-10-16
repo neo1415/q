@@ -668,12 +668,17 @@ export type PendingProposalPort = {
   /**
    * Approves exactly this proposal's stored payload and reports its status
    * afterwards. CHANGED: the stored payload no longer matches what was
-   * proposed, so nothing was approved.
+   * proposed, so nothing was approved. CARD_ONLY: a kind that keeps the
+   * card's own Approve (money, terms, sharing a private document), so
+   * nothing was approved by words. PENDING: nothing the person said since
+   * the card was shown stands as their approval, so nothing was approved.
    */
   readonly approve: (
     context: PendingProposalContext,
     proposalId: string,
-  ) => Promise<{ readonly status: ProposalPlainStatus | "CHANGED" }>;
+  ) => Promise<{
+    readonly status: ProposalPlainStatus | "CHANGED" | "CARD_ONLY";
+  }>;
   /**
    * R33: declines exactly this proposal through the Approval Engine's own
    * reject, the call the card's Decline button makes, and reports its

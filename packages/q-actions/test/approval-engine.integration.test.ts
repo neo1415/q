@@ -524,6 +524,13 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
         (a) => a.action_type === "q.action.approved",
       );
       expect(approvedAudit?.actor_type).toBe("human");
+      // A tap on the card: recorded as such, with the idempotency key.
+      expect(approvedAudit?.metadata).toMatchObject({
+        decidedVia: "CARD",
+        evidenceRef: null,
+        idempotencyKey: action.idempotencyKey,
+        approvalPayloadHash: action.payloadHash,
+      });
       assertNoMarkers(JSON.stringify(audit));
 
       // Domain events went through the outbox, without content.
@@ -539,6 +546,48 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
       assertNoMarkers(JSON.stringify(outbox));
       expect(JSON.stringify(outbox)).not.toContain("sha256:");
       assertNoMarkers(world.logLines.join("\n"));
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("approval by words (owner 2026-10-16): recorded as the person's, with its channel and the message as evidence; the same checks as the card", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder } = world;
+      const { action, approval } = await propose(world, founder, {
+        note: `Send the follow-up. ${MARKERS.payload}`,
+      });
+      const messageId = randomUUID();
+      const decided = await world.service.approve({
+        actor: founder.actor,
+        approvalId: approval.id,
+        correlationId: CORRELATION(),
+        via: { channel: "TEXT", evidenceRef: messageId },
+      });
+      expect(decided.decided).toBe(true);
+      expect(decided.approval.approvedByUserId).toBe(founder.actor.userId);
+      expect(decided.approval.approvalPayloadHash).toBe(action.payloadHash);
+      const rows = await db.sql<
+        {
+          actor_type: string;
+          authority_user_id: string | null;
+          metadata: Record<string, unknown>;
+        }[]
+      >`
+        select actor_type, authority_user_id, metadata from audit.material_actions
+         where resource_id = ${action.id} and action_type = 'q.action.approved'`;
+      expect(rows).toHaveLength(1);
+      // The human's approval, never the model's.
+      expect(rows[0]?.actor_type).toBe("human");
+      expect(rows[0]?.authority_user_id).toBe(founder.actor.userId);
+      expect(rows[0]?.metadata).toMatchObject({
+        decidedVia: "TEXT",
+        evidenceRef: messageId,
+        idempotencyKey: action.idempotencyKey,
+        approvalPayloadHash: action.payloadHash,
+      });
+      assertNoMarkers(JSON.stringify(rows));
     } finally {
       await cleanup(world);
     }
