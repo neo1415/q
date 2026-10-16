@@ -9,6 +9,7 @@ import { VERIFICATION_EVENTS } from "@capital-q/verification";
 
 import {
   companiesOfEvent,
+  runInvestabilitySweepTicker,
   withInvestabilityRecompute,
 } from "../src/investability/handler.js";
 import type { QueueMessage } from "../src/queue/pgmq.js";
@@ -131,5 +132,38 @@ describe("investability recompute on events", () => {
       kind: "DONE",
     });
     expect(passed).toBe(1);
+  });
+});
+
+describe("investability sweep ticker", () => {
+  it("refreshes slates after the first sweep and after any sweep that recorded", async () => {
+    const controller = new AbortController();
+    const results = [
+      { recorded: 0, unchanged: 5, failed: 0 },
+      { recorded: 0, unchanged: 5, failed: 0 },
+      { recorded: 2, unchanged: 3, failed: 0 },
+    ];
+    let sweeps = 0;
+    let refreshes = 0;
+    await runInvestabilitySweepTicker({
+      service: {
+        sweep: () => {
+          const r = results[sweeps] ?? results[0];
+          sweeps += 1;
+          if (sweeps >= results.length) controller.abort();
+          return Promise.resolve(r ?? { recorded: 0, unchanged: 0, failed: 0 });
+        },
+      },
+      onScoresChanged: () => {
+        refreshes += 1;
+        return Promise.resolve();
+      },
+      signal: controller.signal,
+      logger: createRecordingLogger(),
+      sleep: () => Promise.resolve(),
+    });
+    expect(sweeps).toBe(3);
+    // First sweep (a deploy) and the third (recorded 2); not the second.
+    expect(refreshes).toBe(2);
   });
 });

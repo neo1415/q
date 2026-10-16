@@ -1049,7 +1049,24 @@ const documentEvents = createQueueRunner({
       ),
       { registry, projector: relationshipProjector, logger },
     ),
-    { registry, sql: database.sql, service: investability.service, logger },
+    {
+      registry,
+      sql: database.sql,
+      service: investability.service,
+      // fit-order.v2: a new Investability revision reorders the slates
+      // that serve the company.
+      onRecorded: async (companyId) => {
+        await slateInvalidation.apply({
+          kind: "COMPANY",
+          companyId,
+          scope: "CONTAINING",
+          invalidate: null,
+          reason: "COMPANY_UPDATED",
+          priority: "NORMAL",
+        });
+      },
+      logger,
+    },
   ),
   batchSize: config.documents.batchSize,
   pollIntervalMs: config.documents.pollIntervalMs,
@@ -1455,6 +1472,18 @@ await Promise.all([
   }),
   runInvestabilitySweepTicker({
     service: investability.service,
+    // Every current slate once, after a sweep that changed scores (and
+    // after the first sweep of a deploy): Discover's order follows them.
+    onScoresChanged: async () => {
+      await slateInvalidation.apply({
+        kind: "COMPANY",
+        companyId: "00000000-0000-0000-0000-000000000000",
+        scope: "ALL",
+        invalidate: null,
+        reason: "COMPANY_UPDATED",
+        priority: "NORMAL",
+      });
+    },
     signal: shutdownController.signal,
     logger,
   }),
