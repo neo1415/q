@@ -218,7 +218,7 @@ function EditableRow({
       className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:gap-6"
     >
       <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-40 sm:pt-2.5">
-        {spec.label}
+        {t(spec.label)}
       </dt>
       <dd className="min-w-0 flex-1">
         {editing ? (

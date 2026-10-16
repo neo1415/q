@@ -120,9 +120,9 @@ export function QSheetConversation({
           <QCanSee />
         </div>
         {connected ? (
-          <Tooltip content={voice.active ? "End voice" : "Talk with Q"}>
+          <Tooltip content={t(voice.active ? "End voice" : "Talk with Q")}>
             <IconButton
-              aria-label={voice.active ? "End voice" : "Talk with Q"}
+              aria-label={t(voice.active ? "End voice" : "Talk with Q")}
               variant={voice.active ? "secondary" : "primary"}
               onClick={
                 voice.active

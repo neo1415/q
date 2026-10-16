@@ -800,8 +800,10 @@ async function AnswersRead({
   readonly bare: boolean;
 }) {
   const state = await pageAnswers();
+  const t = await serverT();
   return (
     <ProfileAnswers
+      translate={t}
       journey={journey}
       state={state}
       include={include}

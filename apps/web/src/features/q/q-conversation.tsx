@@ -1495,7 +1495,9 @@ export function QConversationPanel({
                       strokeWidth={2}
                       aria-hidden="true"
                     />
-                    {connected ? "Talk with Q" : "Q isn't available right now"}
+                    {t(
+                      connected ? "Talk with Q" : "Q isn't available right now",
+                    )}
                   </button>
                 )}
 

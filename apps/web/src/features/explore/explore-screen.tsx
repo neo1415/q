@@ -544,19 +544,20 @@ export function ExploreScreen({
         aria-label={t("Topics")}
         className="relative flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none]"
       >
-        {topics.map((t) => (
+        {topics.map((topic) => (
           <button
-            key={t.kind === "SECTOR" ? t.nodeId : t.kind}
+            key={topic.kind === "SECTOR" ? topic.nodeId : topic.kind}
             type="button"
-            aria-pressed={topicOn(t)}
-            onClick={() => choose(t)}
+            aria-pressed={topicOn(topic)}
+            onClick={() => choose(topic)}
             className={`inline-flex min-h-9 shrink-0 items-center border px-3.5 text-sm whitespace-nowrap ${
-              topicOn(t)
+              topicOn(topic)
                 ? "border-(--cq-text-primary) bg-(--cq-text-primary) text-(--cq-canvas)"
                 : "border-(--cq-border) bg-(--cq-surface-raised) text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
             }`}
           >
-            {t.label}
+            {/* Sector names are taxonomy data, shown as recorded. */}
+            {topic.kind === "SECTOR" ? topic.label : t(topic.label)}
           </button>
         ))}
       </div>

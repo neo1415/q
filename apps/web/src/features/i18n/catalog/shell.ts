@@ -13,6 +13,7 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   "Q isn't connected on this surface yet.": "Q غير متصل بهذه الواجهة بعد.",
   "Send to Q": "أرسل إلى Q",
   "Message Q": "راسل Q",
+  "Q isn't available right now": "Q غير متاح الآن",
   Muted: "مكتوم",
   Listening: "يستمع",
   "Ready when you are": "جاهز حين تكون جاهزاً",

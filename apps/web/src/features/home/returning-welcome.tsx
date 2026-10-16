@@ -48,15 +48,16 @@ const CARD_CLASS = [
 ].join(" ");
 
 function CardBody({ card }: { readonly card: ReturningCard }) {
+  const t = useT();
   return (
     <>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="cq-body-sm font-medium text-(--cq-text-primary)">
-          {card.title}
+          {t(card.title)}
         </span>
         {/* The title says where it goes; the line under it is for
             assistive technology only (minimal Home, 2026-09-29). */}
-        <span className="sr-only">{card.description}</span>
+        <span className="sr-only">{t(card.description)}</span>
       </span>
       <ChevronRight
         aria-hidden="true"

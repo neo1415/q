@@ -154,7 +154,13 @@ export function QCanSee({ className }: { readonly className?: string }) {
         className="flex-none"
       />
       <span className="flex-none">{t("Q can see:")}</span>
-      <span className="min-w-0 truncate">{line}</span>
+      {/* Each part in their language; a page's own names stay as shown. */}
+      <span className="min-w-0 truncate">
+        {line
+          .split(" · ")
+          .map((part) => t(part))
+          .join(" · ")}
+      </span>
     </p>
   );
 }
