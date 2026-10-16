@@ -187,7 +187,7 @@ export function branchDependencies(
 }
 
 function optionLabel(
-  step: OnboardingStepManifest,
+  step: Pick<OnboardingStepManifest, "stepKey" | "configuration">,
   key: string,
 ): string | undefined {
   const config = step.configuration;
@@ -199,7 +199,7 @@ function optionLabel(
 
 /** A value as a person would read it. Deterministic; no model. */
 export function displayOnboardingValue(
-  step: OnboardingStepManifest,
+  step: Pick<OnboardingStepManifest, "stepKey" | "configuration">,
   value: OnboardingResponseValue,
   labelFor?: DeriveOnboardingCoverageInput["labelFor"],
 ): string {
