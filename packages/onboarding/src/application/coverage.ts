@@ -44,6 +44,8 @@ export type OnboardingCoverageFieldProfile = {
   readonly evidenceWanted?: readonly string[] | undefined;
   /** Option keys whose answer needs no evidence (e.g. "pre_revenue"). */
   readonly evidenceNotFor?: readonly string[] | undefined;
+  /** What to ask first within a priority (lower first). Absent: definition order. */
+  readonly rank?: number | undefined;
   /** Rough seconds to answer it in conversation; for the time estimate. */
   readonly seconds?: number | undefined;
 };
@@ -430,6 +432,7 @@ export function deriveOnboardingCoverage(
         evidenceWanted,
         savePending: pendingSaves.has(step.stepKey),
         dependsOn: branchDependencies(step.branching).slice(0, 8),
+        ...(fieldProfile.rank === undefined ? {} : { rank: fieldProfile.rank }),
       };
     },
   );
@@ -530,7 +533,12 @@ export function selectNextFields(
   coverage: Pick<OnboardingCoverage, "fields">,
   max = 3,
 ): OnboardingNextField[] {
-  const open = coverage.fields.filter((f) => f.applicable && !f.savePending);
+  // Most valuable first within a tier: the journey's rank, then its order.
+  const open = coverage.fields
+    .map((f, index) => ({ f, index }))
+    .filter(({ f }) => f.applicable && !f.savePending)
+    .sort((a, b) => (a.f.rank ?? 500) - (b.f.rank ?? 500) || a.index - b.index)
+    .map(({ f }) => f);
   const out: OnboardingNextField[] = [];
   const push = (
     f: OnboardingCoverageField,

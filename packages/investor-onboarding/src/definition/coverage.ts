@@ -64,12 +64,14 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
   },
   fields: {
     [INVESTOR_STEPS.investorType]: {
+      rank: 1,
       concept: "investor.type",
       priority: "ESSENTIAL",
       label: "How you invest",
       seconds: 10,
     },
     [INVESTOR_STEPS.organisationName]: {
+      rank: 0,
       concept: "organisation.name",
       priority: "ESSENTIAL",
       label: "Firm",
@@ -82,24 +84,28 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 10,
     },
     [INVESTOR_STEPS.deploymentStatus]: {
+      rank: 6,
       concept: "investor.deployment_status",
       priority: "ESSENTIAL",
       label: "Deploying now",
       seconds: 10,
     },
     [INVESTOR_STEPS.mandateContext]: {
+      rank: 7,
       concept: "mandate.context",
       priority: "ESSENTIAL",
       label: "Mandate",
       seconds: 10,
     },
     [INVESTOR_STEPS.stages]: {
+      rank: 2,
       concept: "mandate.stages",
       priority: "ESSENTIAL",
       label: "Stages",
       seconds: 15,
     },
     [INVESTOR_STEPS.currency]: {
+      rank: 5,
       concept: "mandate.currency",
       priority: "ESSENTIAL",
       label: "Cheque currency",
@@ -130,6 +136,7 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 10,
     },
     [INVESTOR_STEPS.geography]: {
+      rank: 4,
       concept: "mandate.geography",
       priority: "ESSENTIAL",
       label: "Geography",
@@ -142,6 +149,7 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 5,
     },
     [INVESTOR_STEPS.sectors]: {
+      rank: 3,
       concept: "mandate.sectors",
       priority: "ESSENTIAL",
       label: "Sectors",
@@ -244,12 +252,14 @@ export const INVESTOR_COVERAGE_PROFILE: OnboardingCoverageProfile = {
       seconds: 30,
     },
     [INVESTOR_STEPS.discoveryMode]: {
+      rank: 8,
       concept: "discovery.mode",
       priority: "ESSENTIAL",
       label: "Discovery",
       seconds: 10,
     },
     [INVESTOR_STEPS.inboundPreference]: {
+      rank: 9,
       concept: "discovery.inbound_preference",
       priority: "ESSENTIAL",
       label: "Inbound",
