@@ -101,6 +101,15 @@ describe("sign-up asks raising or investing, once", () => {
     expect(signUp).not.toHaveBeenCalled();
   });
 
+  it("carries the chosen journey through Google, which takes no sign-up fields", async () => {
+    render(<SignUpForm next="/welcome" googleEnabled />);
+    await userEvent.click(screen.getByRole("radio", { name: /Invest/ }));
+    const nexts = [
+      ...document.querySelectorAll<HTMLInputElement>('input[name="next"]'),
+    ].map((input) => input.value);
+    expect(nexts).toContain("/welcome?journey=investor");
+  });
+
   it("asks an invitee nothing about journeys or organisations", () => {
     render(<SignUpForm next="/join/abcdefghijklmnopqrstuvwxyz0123456789" />);
     expect(screen.queryByRole("radio")).toBeNull();

@@ -14,7 +14,11 @@ import { PendingInvitations } from "@/features/team/pending-invitations";
 import { fetchMe, updateMe } from "@capital-q/api-client";
 import { accountDetails } from "@/auth/account-details";
 import { getSessionAccessToken } from "@/auth/session";
-import { decideArrival, WORKSPACE_CHOSEN_COOKIE } from "@/auth/registration";
+import {
+  decideArrival,
+  RegistrationJourneySchema,
+  WORKSPACE_CHOSEN_COOKIE,
+} from "@/auth/registration";
 
 export const metadata: Metadata = {
   title: "Welcome",
@@ -57,7 +61,12 @@ export default async function WelcomePage({
     again: params["again"] === "1",
     workspaces,
     workspaceChosen: jar.get(WORKSPACE_CHOSEN_COOKIE)?.value === "1",
-    intendedJourney: signedUpWith.intendedJourney,
+    // The account's own choice first; a Google sign-up, which carries no
+    // sign-up fields, brings it back on the return path instead.
+    intendedJourney:
+      signedUpWith.intendedJourney ??
+      RegistrationJourneySchema.safeParse(params["journey"]).data ??
+      null,
   });
   // F15: back to the screen they were on, not live voice.
   if (arrival.kind === "RESUME") redirect(arrival.path);

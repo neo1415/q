@@ -9,6 +9,7 @@ import { linkClassName } from "@capital-q/ui/link";
 
 import { signUpWithPasswordAction } from "@/auth/actions";
 import { INITIAL_AUTH_FORM_STATE } from "@/auth/form-state";
+import { DEFAULT_RETURN_PATH } from "@/auth/redirect-safety";
 import {
   isInvitationReturn,
   organisationFieldFor,
@@ -79,9 +80,52 @@ export function SignUpForm({
         }
       />
 
+      {invited ? null : (
+        <div data-sign-up-journey>
+          <ChoiceList
+            id="journey"
+            name="journeyChoice"
+            legend="What are you here to do?"
+            options={[
+              {
+                value: "founder",
+                label: "Raise capital",
+                description: "Set up your company as a founder.",
+              },
+              {
+                value: "investor",
+                label: "Invest",
+                description: "Set up your mandate as an investor.",
+              },
+            ]}
+            value={journey ?? undefined}
+            error={journeyError}
+            onChange={(value) => {
+              const parsed = RegistrationJourneySchema.safeParse(value);
+              if (parsed.success) {
+                setJourney(parsed.data);
+                setJourneyError(undefined);
+              }
+            }}
+          />
+          <p className="cq-caption mt-2 text-(--cq-text-secondary)">
+            Joining a team that is already on Capital Q? Open the link in your
+            invitation email instead.
+          </p>
+        </div>
+      )}
+
       {googleEnabled ? (
         <div className="flex flex-col gap-5">
-          <GoogleSignIn next={next} />
+          {/* Google carries the journey on its return path: the provider
+              takes no sign-up fields, and /welcome reads it from there. */}
+          <GoogleSignIn
+            next={
+              journey !== null && next === DEFAULT_RETURN_PATH
+                ? `${DEFAULT_RETURN_PATH}?journey=${journey}`
+                : next
+            }
+          />
           <AuthDivider />
         </div>
       ) : null}
@@ -93,40 +137,8 @@ export function SignUpForm({
         data-sign-up-form
       >
         <input type="hidden" name="next" value={next} />
-        {invited ? null : (
-          <div data-sign-up-journey>
-            <ChoiceList
-              id="journey"
-              name="journey"
-              legend="What are you here to do?"
-              options={[
-                {
-                  value: "founder",
-                  label: "Raise capital",
-                  description: "Set up your company as a founder.",
-                },
-                {
-                  value: "investor",
-                  label: "Invest",
-                  description: "Set up your mandate as an investor.",
-                },
-              ]}
-              value={journey ?? undefined}
-              error={journeyError}
-              onChange={(value) => {
-                const parsed = RegistrationJourneySchema.safeParse(value);
-                if (parsed.success) {
-                  setJourney(parsed.data);
-                  setJourneyError(undefined);
-                }
-              }}
-            />
-            <p className="cq-caption mt-2 text-(--cq-text-secondary)">
-              Joining a team that is already on Capital Q? Open the link in your
-              invitation email instead.
-            </p>
-          </div>
-        )}
+        {/* The choice is shown above, outside this form; it rides here. */}
+        <input type="hidden" name="journey" value={journey ?? ""} />
         <Input
           id="fullName"
           name="fullName"
