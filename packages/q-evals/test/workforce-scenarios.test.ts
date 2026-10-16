@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  JobPlanResultV5Schema,
+  JobPlanResultV6Schema,
   createDefaultPromptRegistry,
   renderPrompt,
   DEFAULT_COMMUNICATION_PROFILE,
-  type JobPlanResultV5,
+  type JobPlanResultV6,
 } from "@capital-q/q-core";
 
 import {
@@ -30,7 +30,7 @@ describe("workforce scenarios (scripted planner, real engine)", () => {
   for (const scenario of WORKFORCE_SCENARIOS) {
     it(`${scenario.id}: ${scenario.title}`, async () => {
       // The scripted plan is a valid JOB_PLAN v5 answer.
-      expect(JobPlanResultV5Schema.safeParse(scenario.scripted).success).toBe(
+      expect(JobPlanResultV6Schema.safeParse(scenario.scripted).success).toBe(
         true,
       );
       const run = await runWorkforceScenario(scenario, () =>
@@ -48,7 +48,7 @@ describe("workforce scenarios (scripted planner, real engine)", () => {
   it("scores a weak plan low: no outcome, invented evidence, false dependencies, missing specialist", async () => {
     const [scenario] = WORKFORCE_SCENARIOS;
     if (scenario === undefined) throw new Error("no scenario");
-    const weak: JobPlanResultV5 = {
+    const weak: JobPlanResultV6 = {
       ...scenario.scripted,
       outcome: "Do it.",
       prerequisites: [

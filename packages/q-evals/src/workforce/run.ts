@@ -3,7 +3,7 @@ import type {
   WorkforceJobStartPayload,
   WorkforcePlanProgress,
 } from "@capital-q/contracts";
-import type { JobPlanResultV5 } from "@capital-q/q-core";
+import type { JobPlanResultV6 } from "@capital-q/q-core";
 import {
   boundPlan,
   executorRoleOf,
@@ -113,7 +113,7 @@ function recorder(): JobRecorder {
 
 export async function runWorkforceScenario(
   scenario: WorkforceScenario,
-  planner: (variables: PlannerVariables) => Promise<JobPlanResultV5 | null>,
+  planner: (variables: PlannerVariables) => Promise<JobPlanResultV6 | null>,
 ): Promise<WorkforceScenarioRun | null> {
   const situation = situationFrom({
     briefs: scenario.briefs,

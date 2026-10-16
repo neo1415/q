@@ -28,6 +28,9 @@ import {
   JOB_PLAN_V5_SCHEMA_VERSION,
   JOB_PLAN_V5_UNTRUSTED,
   JobPlanResultV5Schema,
+  JobPlanResultV6Schema,
+  JOB_PLAN_V6_SCHEMA_VERSION,
+  type JobPlanResultV6,
   JobPlanVariablesV5Schema,
   type JobPlanResultV5,
   type JobPlanVariablesV5,
@@ -563,7 +566,7 @@ export const JOB_PLAN_V5: PromptDefinition<
 > = {
   id: "JOB_PLAN",
   version: 5,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -581,6 +584,29 @@ export const JOB_PLAN_V5: PromptDefinition<
     schema: JobPlanResultV5Schema,
   },
   template: JOB_PLAN_TEMPLATE_V5,
+};
+
+/** v6: same reasoning; a reference is written as F and its number alone. */
+export const JOB_PLAN_V6: PromptDefinition<
+  JobPlanVariablesV5,
+  JobPlanResultV6
+> = {
+  ...JOB_PLAN_V5,
+  version: 6,
+  status: "ACTIVE",
+  changeDescription:
+    "Live 2026-10-15: v5's strict reference pattern refused whole plans over the shape of evidence references. References are loose strings; code extracts and grounds the F numbers. The template asks for F and the number alone.",
+  effectiveFrom: "2026-10-16",
+  output: {
+    kind: "STRUCTURED",
+    schemaName: JOB_PLAN_SCHEMA_NAME,
+    schemaVersion: JOB_PLAN_V6_SCHEMA_VERSION,
+    schema: JobPlanResultV6Schema,
+  },
+  template: JOB_PLAN_TEMPLATE_V5.replace(
+    "A reference must be one of the F numbers above.",
+    'A reference must be one of the F numbers above, written as F and the number alone (for example "F3"), never the fact\'s text.',
+  ),
 };
 
 const SUBSTANCE_CRITIQUE_TEMPLATE = `TASK: SUBSTANCE_CRITIQUE
