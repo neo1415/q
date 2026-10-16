@@ -2,14 +2,15 @@
 
 import { ApiProblemError, setQLanguage } from "@capital-q/api-client";
 import {
-  QLanguagePreferenceSchema,
+  canonicalLanguageTag,
   type QLanguagePreference,
 } from "@capital-q/contracts";
+import { isOfferedLanguage } from "@capital-q/q-core/language";
 
 import { qApiSession } from "@/features/q/context";
 
 /**
- * The language Q uses with this person (multilingual Q, 2026-10-16), set
+ * The language Q uses with this person (any language, 2026-10-16), set
  * from Settings. A server action so the session token never reaches the
  * browser; the Q API writes the person's own row only, and the value is
  * validated here and again there.
@@ -20,10 +21,12 @@ export async function setLanguageAction(
   | { readonly ok: true; readonly language: QLanguagePreference }
   | { readonly ok: false; readonly message: string }
 > {
-  const language = QLanguagePreferenceSchema.safeParse(choice);
-  if (!language.success) {
+  // Any language the registry offers, in its canonical form ("pt-BR").
+  const tag = choice === "AUTO" ? "AUTO" : canonicalLanguageTag(choice);
+  if (tag === null || (tag !== "AUTO" && !isOfferedLanguage(tag))) {
     return { ok: false, message: "Choose one of the languages Q speaks." };
   }
+  const language = { data: tag };
   const session = await qApiSession();
   if (session === null) {
     return { ok: false, message: "Please sign in again to continue." };

@@ -49,7 +49,9 @@ describe("the notes Q is told", () => {
     expect(note).toMatch(/mix it with English/u);
     expect(writtenLanguageNote("sw")).toContain("Swahili (Kiswahili)");
     expect(writtenLanguageNote("ja")).toContain("Japanese (日本語)");
-    expect(spokenLanguageNote("fr")).toContain("Speak natural, clear French (français)");
+    expect(spokenLanguageNote("fr")).toContain(
+      "Speak natural, clear French (français)",
+    );
     // English in any region needs no note; an unknown tag gets none.
     expect(writtenLanguageNote("en-GB")).toBeNull();
     expect(writtenLanguageNote("tlh")).toBeNull();

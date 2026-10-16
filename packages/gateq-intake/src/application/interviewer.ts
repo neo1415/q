@@ -256,18 +256,56 @@ function renderPublicGateway(gateway: PublicGateway): string {
  * Latin is left out because it cannot tell English from French.
  */
 const SCRIPTS = [
-  "Arabic", "Hebrew", "Cyrillic", "Greek", "Devanagari", "Bengali",
-  "Tamil", "Telugu", "Gujarati", "Gurmukhi", "Kannada", "Malayalam",
-  "Thai", "Hangul", "Hiragana", "Katakana", "Han", "Ethiopic", "Georgian",
-  "Armenian", "Khmer", "Lao", "Myanmar", "Sinhala",
+  "Arabic",
+  "Hebrew",
+  "Cyrillic",
+  "Greek",
+  "Devanagari",
+  "Bengali",
+  "Tamil",
+  "Telugu",
+  "Gujarati",
+  "Gurmukhi",
+  "Kannada",
+  "Malayalam",
+  "Thai",
+  "Hangul",
+  "Hiragana",
+  "Katakana",
+  "Han",
+  "Ethiopic",
+  "Georgian",
+  "Armenian",
+  "Khmer",
+  "Lao",
+  "Myanmar",
+  "Sinhala",
 ] as const;
 const SCRIPT_CODES: Readonly<Record<(typeof SCRIPTS)[number], string>> = {
-  Arabic: "Arab", Hebrew: "Hebr", Cyrillic: "Cyrl", Greek: "Grek",
-  Devanagari: "Deva", Bengali: "Beng", Tamil: "Taml", Telugu: "Telu",
-  Gujarati: "Gujr", Gurmukhi: "Guru", Kannada: "Knda", Malayalam: "Mlym",
-  Thai: "Thai", Hangul: "Kore", Hiragana: "Jpan", Katakana: "Jpan",
-  Han: "Hani", Ethiopic: "Ethi", Georgian: "Geor", Armenian: "Armn",
-  Khmer: "Khmr", Lao: "Laoo", Myanmar: "Mymr", Sinhala: "Sinh",
+  Arabic: "Arab",
+  Hebrew: "Hebr",
+  Cyrillic: "Cyrl",
+  Greek: "Grek",
+  Devanagari: "Deva",
+  Bengali: "Beng",
+  Tamil: "Taml",
+  Telugu: "Telu",
+  Gujarati: "Gujr",
+  Gurmukhi: "Guru",
+  Kannada: "Knda",
+  Malayalam: "Mlym",
+  Thai: "Thai",
+  Hangul: "Kore",
+  Hiragana: "Jpan",
+  Katakana: "Jpan",
+  Han: "Hani",
+  Ethiopic: "Ethi",
+  Georgian: "Geor",
+  Armenian: "Armn",
+  Khmer: "Khmr",
+  Lao: "Laoo",
+  Myanmar: "Mymr",
+  Sinhala: "Sinh",
 };
 
 /** The language most of an utterance's letters are written in, from its script, or null. */
@@ -275,10 +313,12 @@ function languageOfScript(text: string): string | null {
   const letters = text.match(/\p{L}/gu)?.length ?? 0;
   if (letters === 0) return null;
   for (const script of SCRIPTS) {
-    const count = text.match(new RegExp(`\\p{Script=${script}}`, "gu"))?.length ?? 0;
+    const count =
+      text.match(new RegExp(`\\p{Script=${script}}`, "gu"))?.length ?? 0;
     if (count / letters > 0.5) {
       try {
-        return new Intl.Locale(`und-${SCRIPT_CODES[script]}`).maximize().language;
+        return new Intl.Locale(`und-${SCRIPT_CODES[script]}`).maximize()
+          .language;
       } catch {
         return null;
       }

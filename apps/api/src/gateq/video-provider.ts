@@ -158,7 +158,9 @@ export function createTavusGateqVideoProvider(deps: {
             // Their language first, English understood, when Tavus lists
             // it (q-core capability table); otherwise the room is English
             // and the entry page says so before anyone starts.
-            ...(videoPlan === null ? {} : { languages: [...videoPlan.languages] }),
+            ...(videoPlan === null
+              ? {}
+              : { languages: [...videoPlan.languages] }),
           });
         } catch (error) {
           // A PAL without a room is configuration, not spend; best effort.

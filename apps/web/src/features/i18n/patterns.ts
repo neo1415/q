@@ -77,6 +77,7 @@ export function matchPattern(
   index: PatternIndex,
   catalogue: Readonly<Record<string, string>>,
   english: string,
+  language: string,
 ): string | undefined {
   const candidates = [
     ...(index.byFirst.get(english.charAt(0)) ?? []),
@@ -100,9 +101,9 @@ export function matchPattern(
         name,
         catalogue[value] ??
           (value.length < english.length
-            ? matchPattern(index, catalogue, value)
+            ? matchPattern(index, catalogue, value, language)
             : undefined) ??
-          localiseDate(value) ??
+          localiseDate(value, language, catalogue) ??
           value,
       );
     });
@@ -114,52 +115,36 @@ export function matchPattern(
   return undefined;
 }
 
-const MONTHS_AR: Readonly<Record<string, string>> = {
-  Jan: "يناير",
-  January: "يناير",
-  Feb: "فبراير",
-  February: "فبراير",
-  Mar: "مارس",
-  March: "مارس",
-  Apr: "أبريل",
-  April: "أبريل",
-  May: "مايو",
-  Jun: "يونيو",
-  June: "يونيو",
-  Jul: "يوليو",
-  July: "يوليو",
-  Aug: "أغسطس",
-  August: "أغسطس",
-  Sep: "سبتمبر",
-  Sept: "سبتمبر",
-  September: "سبتمبر",
-  Oct: "أكتوبر",
-  October: "أكتوبر",
-  Nov: "نوفمبر",
-  November: "نوفمبر",
-  Dec: "ديسمبر",
-  December: "ديسمبر",
-};
+/** English month and weekday words as the app writes them (en-GB), by index. */
+const MONTHS_EN: readonly (readonly string[])[] = [
+  ["Jan", "January"],
+  ["Feb", "February"],
+  ["Mar", "March"],
+  ["Apr", "April"],
+  ["May"],
+  ["Jun", "June"],
+  ["Jul", "July"],
+  ["Aug", "August"],
+  ["Sep", "Sept", "September"],
+  ["Oct", "October"],
+  ["Nov", "November"],
+  ["Dec", "December"],
+];
+const DAYS_EN: readonly (readonly string[])[] = [
+  ["Sun", "Sunday"],
+  ["Mon", "Monday"],
+  ["Tue", "Tuesday"],
+  ["Wed", "Wednesday"],
+  ["Thu", "Thursday"],
+  ["Fri", "Friday"],
+  ["Sat", "Saturday"],
+];
+const LONG_FORMS = new Set(
+  [...MONTHS_EN, ...DAYS_EN].map((forms) => forms.at(-1) ?? ""),
+);
 
-const DAYS_AR: Readonly<Record<string, string>> = {
-  Mon: "الاثنين",
-  Monday: "الاثنين",
-  Tue: "الثلاثاء",
-  Tuesday: "الثلاثاء",
-  Wed: "الأربعاء",
-  Wednesday: "الأربعاء",
-  Thu: "الخميس",
-  Thursday: "الخميس",
-  Fri: "الجمعة",
-  Friday: "الجمعة",
-  Sat: "السبت",
-  Saturday: "السبت",
-  Sun: "الأحد",
-  Sunday: "الأحد",
-};
-
-const MONTH = Object.keys(MONTHS_AR).join("|");
-const DAY = Object.keys(DAYS_AR).join("|");
+const MONTH = MONTHS_EN.flat().join("|");
+const DAY = DAYS_EN.flat().join("|");
 /**
  * A date as the app writes it in English (en-GB: "18 Sept", "27 Sept 2026",
  * "Tue 18 Sept, 14:00", "Thu 09:03"), and nothing else.
@@ -171,19 +156,93 @@ const DATE_ONLY = new RegExp(
 );
 const WORD = new RegExp(`\\b(${MONTH}|${DAY}|at|am|pm)\\b`, "g");
 
-/**
- * The same date with Arabic month and day names; digits stay Western, as
- * everywhere in the Arabic interface. Undefined when it is not a date.
- */
-export function localiseDate(text: string): string | undefined {
-  if (!DATE_ONLY.test(text)) return undefined;
-  return text.replace(WORD, (word) =>
-    word === "at"
-      ? "الساعة"
-      : word === "am"
-        ? "ص"
-        : word === "pm"
-          ? "م"
-          : (MONTHS_AR[word] ?? DAYS_AR[word] ?? word),
+type DateWords = {
+  readonly month: (index: number, long: boolean) => string;
+  readonly day: (index: number, long: boolean) => string;
+  readonly am: string;
+  readonly pm: string;
+};
+
+const WORDS = new Map<string, DateWords | null>();
+/** A marker no date contains, for a word that has no translation. */
+const DROP = "\u2063";
+
+/** Month, weekday and day-period words in a language, from Intl (Gregorian calendar). */
+function dateWords(language: string): DateWords | null {
+  const cached = WORDS.get(language);
+  if (cached !== undefined) return cached;
+  let words: DateWords | null;
+  try {
+    // Gregorian, whatever the locale's default calendar: the dates are.
+    const locale = `${language}-u-ca-gregory`;
+    const format = (options: Intl.DateTimeFormatOptions, at: Date) =>
+      new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" }).format(
+        at,
+      );
+    const period = (hour: number) =>
+      new Intl.DateTimeFormat(locale, {
+        hour: "numeric",
+        hour12: true,
+        timeZone: "UTC",
+      })
+        .formatToParts(new Date(Date.UTC(2026, 0, 5, hour)))
+        .find((part) => part.type === "dayPeriod")?.value ??
+      (hour < 12 ? "am" : "pm");
+    words = {
+      month: (index, long) =>
+        format(
+          { month: long ? "long" : "short" },
+          new Date(Date.UTC(2026, index, 15)),
+        ),
+      // 2026-01-04 was a Sunday.
+      day: (index, long) =>
+        format(
+          { weekday: long ? "long" : "short" },
+          new Date(Date.UTC(2026, 0, 4 + index)),
+        ),
+      am: period(9),
+      pm: period(15),
+    };
+  } catch {
+    words = null;
+  }
+  WORDS.set(language, words);
+  return words;
+}
+
+const indexIn = (table: readonly (readonly string[])[], word: string): number =>
+  table.findIndex((forms) =>
+    forms.some((form) => form.toLowerCase() === word.toLowerCase()),
   );
+
+/**
+ * The same date with the language's month and day names (Intl); digits
+ * stay Western, as everywhere in the interface. "at" is the catalogue's
+ * word for it when there is one, else left out. Undefined when it is not
+ * a date, or for English.
+ */
+export function localiseDate(
+  text: string,
+  language: string,
+  catalogue: Readonly<Record<string, string>> = {},
+): string | undefined {
+  if (!DATE_ONLY.test(text)) return undefined;
+  if ((language.split("-")[0] ?? "").toLowerCase() === "en") return undefined;
+  const words = dateWords(language);
+  if (words === null) return undefined;
+  return text
+    .replace(WORD, (word) => {
+      const lower = word.toLowerCase();
+      // No word for "at" in this language: the word and its space go.
+      if (lower === "at") return catalogue["at"] ?? DROP;
+      if (lower === "am") return words.am;
+      if (lower === "pm") return words.pm;
+      const long = LONG_FORMS.has(word);
+      const month = indexIn(MONTHS_EN, word);
+      if (month >= 0) return words.month(month, long);
+      const day = indexIn(DAYS_EN, word);
+      return day >= 0 ? words.day(day, long) : word;
+    })
+    .replaceAll(` ${DROP}`, "")
+    .replaceAll(DROP, "");
 }

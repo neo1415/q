@@ -29,7 +29,7 @@ const LONE_Q = /(?<![\p{L}\p{N}])Q(?![\p{L}\p{N}])/gu;
 let CURRENCIES: ReadonlySet<string> | null = null;
 function currencyCodes(): ReadonlySet<string> {
   if (CURRENCIES === null) {
-    let codes: readonly string[] = [];
+    let codes: readonly string[];
     try {
       codes = Intl.supportedValuesOf("currency");
     } catch {
@@ -52,7 +52,10 @@ function sameCounts(a: Map<string, number>, b: Map<string, number>): boolean {
   return true;
 }
 
-function containsAll(source: Map<string, number>, target: Map<string, number>): boolean {
+function containsAll(
+  source: Map<string, number>,
+  target: Map<string, number>,
+): boolean {
   for (const [key, n] of source) if ((target.get(key) ?? 0) < n) return false;
   return true;
 }
@@ -93,7 +96,8 @@ export function checkUiTranslation(
   ) {
     return { ok: false, reason: "PLACEHOLDERS" };
   }
-  const withoutPlaceholders = (value: string) => value.replace(PLACEHOLDER, " ");
+  const withoutPlaceholders = (value: string) =>
+    value.replace(PLACEHOLDER, " ");
   if (
     !containsAll(
       counted(withoutPlaceholders(source).match(DIGITS) ?? []),
@@ -106,7 +110,12 @@ export function checkUiTranslation(
   const sourceCodes = (source.match(/\b[A-Z]{3}\b/gu) ?? []).filter((code) =>
     codes.has(code),
   );
-  if (!containsAll(counted(sourceCodes), counted(text.match(/\b[A-Z]{3}\b/gu) ?? []))) {
+  if (
+    !containsAll(
+      counted(sourceCodes),
+      counted(text.match(/\b[A-Z]{3}\b/gu) ?? []),
+    )
+  ) {
     return { ok: false, reason: "CURRENCY_CODES" };
   }
   for (const name of PRODUCT_NAMES) {
@@ -127,7 +136,11 @@ export const UiTranslationBatchResultSchema = z
       .array(
         z
           .object({
-            i: z.number().int().min(0).max(UI_TEXT_BATCH_SIZE - 1),
+            i: z
+              .number()
+              .int()
+              .min(0)
+              .max(UI_TEXT_BATCH_SIZE - 1),
             t: z.string().max(2_000),
           })
           .strict(),
@@ -175,13 +188,21 @@ Return JSON {"items":[{"i":<index>,"t":"<translation>"}]} with one item for ever
 
 /** The two messages for one batch: trusted instructions, then the strings as data. */
 export function uiTranslationMessages(
-  language: { readonly tag: string; readonly englishName: string; readonly nativeName: string },
+  language: {
+    readonly tag: string;
+    readonly englishName: string;
+    readonly nativeName: string;
+  },
   batch: readonly string[],
 ): readonly { readonly role: "SYSTEM" | "USER"; readonly content: string }[] {
   return [
     {
       role: "SYSTEM",
-      content: INSTRUCTIONS(language.englishName, language.nativeName, language.tag),
+      content: INSTRUCTIONS(
+        language.englishName,
+        language.nativeName,
+        language.tag,
+      ),
     },
     {
       role: "USER",
@@ -193,7 +214,9 @@ export function uiTranslationMessages(
 }
 
 /** Batches of at most UI_TEXT_BATCH_SIZE, in source order. */
-export function uiTextBatches(strings: readonly string[]): readonly (readonly string[])[] {
+export function uiTextBatches(
+  strings: readonly string[],
+): readonly (readonly string[])[] {
   const batches: string[][] = [];
   for (let start = 0; start < strings.length; start += UI_TEXT_BATCH_SIZE) {
     batches.push(strings.slice(start, start + UI_TEXT_BATCH_SIZE));
@@ -216,7 +239,8 @@ export function acceptUiTranslations(
   const rejected = new Map<string, UiTranslationVerdict>();
   for (const item of result.items) {
     const source = batch[item.i];
-    if (source === undefined || accepted.has(source) || rejected.has(source)) continue;
+    if (source === undefined || accepted.has(source) || rejected.has(source))
+      continue;
     const verdict = checkUiTranslation(source, item.t);
     // The source's own edge spaces (" (email confirmed)") are kept: a
     // screen joins such pieces to its neighbours.

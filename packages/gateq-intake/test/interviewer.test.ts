@@ -746,10 +746,17 @@ describe("the interview in Arabic (lane ml)", () => {
       interviewLanguageOf({ locale: "fr-FR", utterance: "", recentTurns: [] }),
     ).toBe("fr-FR");
     expect(
-      interviewLanguageOf({ locale: "en-GB", utterance: "Привет", recentTurns: [] }),
+      interviewLanguageOf({
+        locale: "en-GB",
+        utterance: "Привет",
+        recentTurns: [],
+      }),
     ).toBeNull();
     expect(
-      interviewLanguageOf({ utterance: "Мы находимся в Лагосе", recentTurns: [] }),
+      interviewLanguageOf({
+        utterance: "Мы находимся в Лагосе",
+        recentTurns: [],
+      }),
     ).toBe("ru");
     expect(
       interviewLanguageOf({ utterance: "हम लागोस में हैं", recentTurns: [] }),

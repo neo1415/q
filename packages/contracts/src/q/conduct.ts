@@ -70,8 +70,18 @@ export function canonicalLanguageTag(value: string): string | null {
  * a runtime has no Intl.Locale text info.
  */
 const RTL_SCRIPTS: ReadonlySet<string> = new Set([
-  "Adlm", "Arab", "Aran", "Hebr", "Mand", "Mend", "Nkoo", "Rohg", "Samr",
-  "Syrc", "Thaa", "Yezi",
+  "Adlm",
+  "Arab",
+  "Aran",
+  "Hebr",
+  "Mand",
+  "Mend",
+  "Nkoo",
+  "Rohg",
+  "Samr",
+  "Syrc",
+  "Thaa",
+  "Yezi",
 ]);
 
 type TextInfoLocale = Intl.Locale & {
@@ -86,15 +96,20 @@ type TextInfoLocale = Intl.Locale & {
  * named here: Arabic, Urdu, Hebrew, Dhivehi and every other right-to-left
  * language come out of the same lookup.
  */
-export function languageDirectionOf(value: string | null | undefined): "ltr" | "rtl" {
+export function languageDirectionOf(
+  value: string | null | undefined,
+): "ltr" | "rtl" {
   if (value === null || value === undefined) return "ltr";
   const tag = canonicalLanguageTag(value);
   if (tag === null) return "ltr";
   try {
     const locale = new Intl.Locale(tag) as TextInfoLocale;
     const info =
-      typeof locale.getTextInfo === "function" ? locale.getTextInfo() : locale.textInfo;
-    if (info?.direction === "rtl" || info?.direction === "ltr") return info.direction;
+      typeof locale.getTextInfo === "function"
+        ? locale.getTextInfo()
+        : locale.textInfo;
+    if (info?.direction === "rtl" || info?.direction === "ltr")
+      return info.direction;
     const script = locale.script ?? locale.maximize().script;
     return script !== undefined && RTL_SCRIPTS.has(script) ? "rtl" : "ltr";
   } catch {

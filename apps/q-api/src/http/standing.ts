@@ -110,7 +110,8 @@ export function registerStandingRoutes(
       // well-formed tag it cannot name or script is refused, not stored.
       if (
         !body.success ||
-        (body.data.language !== "AUTO" && !isOfferedLanguage(body.data.language))
+        (body.data.language !== "AUTO" &&
+          !isOfferedLanguage(body.data.language))
       ) {
         const problem = createProblemDetails({
           code: "INVALID_REQUEST",

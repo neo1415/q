@@ -47,13 +47,30 @@ describe("the language registry", () => {
   });
 
   it("resolves a language asked for by tag or by name in any language", () => {
-    for (const asked of ["fr", "French", "français", "Kifaransa", "francés", "الفرنسية", "فرنسي"]) {
+    for (const asked of [
+      "fr",
+      "French",
+      "français",
+      "Kifaransa",
+      "francés",
+      "الفرنسية",
+      "فرنسي",
+    ]) {
       const resolved = resolveLanguage(asked);
       expect(resolved.ok && resolved.info.tag, asked).toBe("fr");
     }
-    expect(resolveLanguage("Kiswahili")).toMatchObject({ ok: true, info: { tag: "sw" } });
-    expect(resolveLanguage("日本語")).toMatchObject({ ok: true, info: { tag: "ja" } });
-    expect(resolveLanguage("tlh")).toEqual({ ok: false, reason: "NOT_OFFERED" });
+    expect(resolveLanguage("Kiswahili")).toMatchObject({
+      ok: true,
+      info: { tag: "sw" },
+    });
+    expect(resolveLanguage("日本語")).toMatchObject({
+      ok: true,
+      info: { tag: "ja" },
+    });
+    expect(resolveLanguage("tlh")).toEqual({
+      ok: false,
+      reason: "NOT_OFFERED",
+    });
     expect(resolveLanguage("Klingon")).toMatchObject({ ok: false });
     expect(resolveLanguage("")).toMatchObject({ ok: false });
   });
@@ -69,10 +86,21 @@ describe("the language registry", () => {
 describe("voice and video capability", () => {
   it("listens with the Deepgram model each language is documented for", () => {
     expect(languageChannels("en").listen).toEqual({ model: "flux-general-en" });
-    expect(languageChannels("fr").listen).toEqual({ model: "flux-general-multi" });
-    expect(languageChannels("ar-AE").listen).toEqual({ model: "nova-3", language: "ar-AE" });
-    expect(languageChannels("ar-YE").listen).toEqual({ model: "nova-3", language: "ar" });
-    expect(languageChannels("ko").listen).toEqual({ model: "nova-3", language: "ko" });
+    expect(languageChannels("fr").listen).toEqual({
+      model: "flux-general-multi",
+    });
+    expect(languageChannels("ar-AE").listen).toEqual({
+      model: "nova-3",
+      language: "ar-AE",
+    });
+    expect(languageChannels("ar-YE").listen).toEqual({
+      model: "nova-3",
+      language: "ar",
+    });
+    expect(languageChannels("ko").listen).toEqual({
+      model: "nova-3",
+      language: "ko",
+    });
   });
 
   it("falls back honestly where a provider lists no support", () => {

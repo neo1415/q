@@ -18,12 +18,14 @@ import { actorA, actorB, contextFor, planFor } from "./support.js";
  * The registry's resolution (Intl data) is q-core's and tested there; this
  * stand-in knows a few names, as the real one knows every offered language.
  */
-const KNOWN: Readonly<Record<string, { tag: string; nativeName: string; englishName: string }>> = {
+const KNOWN: Readonly<
+  Record<string, { tag: string; nativeName: string; englishName: string }>
+> = {
   ar: { tag: "ar", nativeName: "العربية", englishName: "Arabic" },
   en: { tag: "en", nativeName: "English", englishName: "English" },
   fr: { tag: "fr", nativeName: "français", englishName: "French" },
-  "français": { tag: "fr", nativeName: "français", englishName: "French" },
-  "الفرنسية": { tag: "fr", nativeName: "français", englishName: "French" },
+  français: { tag: "fr", nativeName: "français", englishName: "French" },
+  الفرنسية: { tag: "fr", nativeName: "français", englishName: "French" },
   es: { tag: "es", nativeName: "español", englishName: "Spanish" },
 };
 

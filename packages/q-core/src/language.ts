@@ -63,7 +63,8 @@ const KEEP_EXACT =
 export function writtenLanguageNote(
   language: QLanguageCode | null | undefined,
 ): string | null {
-  const name = language === null || language === undefined ? null : promptName(language);
+  const name =
+    language === null || language === undefined ? null : promptName(language);
   if (name === null) return null;
   return `THEIR LANGUAGE: this person chose ${name}. Write everything they read in clear, professional ${name}, in the standard written form professionals use at work. If they write to you in another language, or ask you to switch, follow them. If they mix it with English, answer in their language and keep the English terms they used. ${KEEP_EXACT} JSON keys, codes, enum values and identifiers stay exactly as the output format specifies; only the words meant for the person are in their language.`;
 }
@@ -75,7 +76,8 @@ export function writtenLanguageNote(
 export function spokenLanguageNote(
   language: QLanguageCode | null | undefined,
 ): string | null {
-  const name = language === null || language === undefined ? null : promptName(language);
+  const name =
+    language === null || language === undefined ? null : promptName(language);
   if (name === null) return null;
   return `Language: this person chose ${name}. Speak natural, clear ${name}, the standard register a professional uses at work, and understand regional accents and dialects and their mixing with English. If they speak to you in another language, or ask you to switch, follow them. Keep names, company names and investment terms as they say them (ARR, SAFE, term sheet). Say amounts in spoken words with the currency named; never convert a currency.`;
 }

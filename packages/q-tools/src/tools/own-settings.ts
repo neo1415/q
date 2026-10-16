@@ -235,7 +235,8 @@ export const LANGUAGE_CONFIRMATIONS: Readonly<Record<string, string>> = {
 };
 
 /** Examples named in a refusal: an illustration, not the list (any offered language works). */
-const REFUSAL_EXAMPLES = "French, Spanish, Portuguese, Arabic, Swahili, Hindi or Japanese";
+const REFUSAL_EXAMPLES =
+  "French, Spanish, Portuguese, Arabic, Swahili, Hindi or Japanese";
 
 export function createSetQLanguageTool(
   port: QLanguagePort,

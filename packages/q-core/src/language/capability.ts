@@ -10,8 +10,7 @@ import { languageInfo } from "./registry.js";
  */
 
 export const LANGUAGE_CAPABILITY_SOURCES = {
-  deepgram:
-    "https://developers.deepgram.com/docs/models-languages-overview",
+  deepgram: "https://developers.deepgram.com/docs/models-languages-overview",
   deepgramVoiceAgent:
     "https://developers.deepgram.com/docs/configure-voice-agent",
   elevenlabs: "https://elevenlabs.io/docs/overview/models",
@@ -67,7 +66,10 @@ const PROVIDER_ALIASES: Readonly<Record<string, string>> = {
   fil: "tl",
 };
 
-function providerCode(primary: string, supported: ReadonlySet<string>): string | null {
+function providerCode(
+  primary: string,
+  supported: ReadonlySet<string>,
+): string | null {
   if (supported.has(primary)) return primary;
   const alias = PROVIDER_ALIASES[primary];
   return alias !== undefined && supported.has(alias) ? alias : null;
@@ -101,7 +103,9 @@ export type LanguageChannels = {
 };
 
 /** The configuration every channel uses for a language (any offered tag). */
-export function languageChannels(value: string | null | undefined): LanguageChannels {
+export function languageChannels(
+  value: string | null | undefined,
+): LanguageChannels {
   const info = languageInfo(value);
   const primary = info?.primary ?? "en";
   const tag = info?.tag ?? "en";

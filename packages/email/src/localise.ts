@@ -35,7 +35,8 @@ export const EMAIL_HAND_CATALOGUES: Readonly<
 > = { ar: EMAIL_ARABIC };
 
 /** Every English string the email catalogue translates (the machine source). */
-export const EMAIL_SOURCE_STRINGS: readonly string[] = Object.keys(EMAIL_ARABIC);
+export const EMAIL_SOURCE_STRINGS: readonly string[] =
+  Object.keys(EMAIL_ARABIC);
 
 const ARABIC_LOCALE: EmailLocale = {
   tag: "ar",
@@ -78,7 +79,9 @@ function compile(key: string, template: string): Pattern {
 
 const PATTERNS = new WeakMap<object, readonly Pattern[]>();
 
-function patternsOf(catalogue: Readonly<Record<string, string>>): readonly Pattern[] {
+function patternsOf(
+  catalogue: Readonly<Record<string, string>>,
+): readonly Pattern[] {
   const cached = PATTERNS.get(catalogue);
   if (cached !== undefined) return cached;
   const compiled = Object.entries(catalogue)

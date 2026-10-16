@@ -34,7 +34,10 @@ function database(
       return Promise.resolve(
         Object.entries(machine[String(values[0])] ?? {})
           .filter(([english]) => wanted.has(english))
-          .map(([source_text, translated_text]) => ({ source_text, translated_text })),
+          .map(([source_text, translated_text]) => ({
+            source_text,
+            translated_text,
+          })),
       );
     }
     return Promise.resolve([]);
@@ -94,7 +97,11 @@ describe("emails in the recipient's language", () => {
       { available: true, send },
       {
         sql: database(
-          { "zoe@fennelpay.co": "fr", "ali@fennelpay.co": "ur", "kim@fennelpay.co": "sw" },
+          {
+            "zoe@fennelpay.co": "fr",
+            "ali@fennelpay.co": "ur",
+            "kim@fennelpay.co": "sw",
+          },
           {
             fr: {
               "Your code to claim {company} on Capital Q":
@@ -114,7 +121,9 @@ describe("emails in the recipient's language", () => {
     await sender.send(codeEmail("ali@fennelpay.co"));
     await sender.send(codeEmail("kim@fennelpay.co"));
     const [french, urdu, swahili] = send.mock.calls.map((call) => call[0]);
-    expect(french?.subject).toBe("Votre code pour revendiquer Fennel Pay sur Capital Q");
+    expect(french?.subject).toBe(
+      "Votre code pour revendiquer Fennel Pay sur Capital Q",
+    );
     expect(french?.html).toContain('<html lang="fr" dir="ltr">');
     expect(urdu?.html).toContain('<html lang="ur" dir="rtl">');
     expect(urdu?.subject).toContain("Fennel Pay");

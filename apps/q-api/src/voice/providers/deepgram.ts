@@ -215,7 +215,9 @@ export function createDeepgramVoiceProvider(
       const multilingual = speaksBeyondEnglish(locale);
       const recogniser = recogniserFor(locale);
       const speakCode =
-        locale === undefined ? null : (languageChannels(locale).speak?.languageCode ?? null);
+        locale === undefined
+          ? null
+          : (languageChannels(locale).speak?.languageCode ?? null);
       const keyterms = [
         ...new Set([
           ...(terms ?? [])

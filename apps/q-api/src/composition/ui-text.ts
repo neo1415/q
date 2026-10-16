@@ -84,7 +84,11 @@ export function createPostgresUiTextStore(sql: DatabaseExecutor): UiTextStore {
   return {
     read: async (language, version) => {
       const rows = await sql<
-        { source_text: string; status: string; translated_text: string | null }[]
+        {
+          source_text: string;
+          status: string;
+          translated_text: string | null;
+        }[]
       >`
         select source_text, status, translated_text
           from q_runtime.ui_translations
@@ -103,8 +107,12 @@ export function createPostgresUiTextStore(sql: DatabaseExecutor): UiTextStore {
       if (rows.length === 0) return;
       const sources = rows.map((row) => row.source);
       const statuses = rows.map((row) => row.status);
-      const texts = rows.map((row) => (row.status === "ACCEPTED" ? row.text : null));
-      const reasons = rows.map((row) => (row.status === "REJECTED" ? row.reason : null));
+      const texts = rows.map((row) =>
+        row.status === "ACCEPTED" ? row.text : null,
+      );
+      const reasons = rows.map((row) =>
+        row.status === "REJECTED" ? row.reason : null,
+      );
       const models = rows.map((row) => row.modelCode);
       // The hash is computed by the database from the English itself, so a
       // row can only ever be found by the string it translates.
@@ -180,11 +188,12 @@ export function createGatewayUiTextTranslator(
     } catch (error: unknown) {
       const failureClass =
         typeof error === "object" && error !== null && "failureClass" in error
-          ? String((error as { failureClass: unknown }).failureClass)
+          ? String(error.failureClass)
           : "";
       return {
         ok: false,
-        reason: failureClass === "BUDGET_EXCEEDED" ? "DAILY_BUDGET" : "UNAVAILABLE",
+        reason:
+          failureClass === "BUDGET_EXCEEDED" ? "DAILY_BUDGET" : "UNAVAILABLE",
       };
     }
   };
@@ -284,13 +293,21 @@ export function createUiTextService(
     const batches = [...uiTextBatches(missing)];
     let stopped = false;
     const worker = async (): Promise<void> => {
-      for (let batch = batches.shift(); batch !== undefined && !stopped; batch = batches.shift()) {
+      for (
+        let batch = batches.shift();
+        batch !== undefined && !stopped;
+        batch = batches.shift()
+      ) {
         const verdict = await dependencies.cap.check();
         if (!verdict.allowed) {
           stopped = true;
           paused.set(info.tag, { at: now(), reason: "DAILY_BUDGET" });
           dependencies.logger?.warn(
-            { language: info.tag, capUsd: verdict.capUsd, spentUsd: verdict.spentUsd },
+            {
+              language: info.tag,
+              capUsd: verdict.capUsd,
+              spentUsd: verdict.spentUsd,
+            },
             "ui translation paused: the day's translation budget is spent",
           );
           return;
@@ -306,31 +323,31 @@ export function createUiTextService(
           return;
         }
         dependencies.cap.note(outcome.costUsd);
-        const { accepted, rejected } = acceptUiTranslations(batch, outcome.result);
+        const { accepted, rejected } = acceptUiTranslations(
+          batch,
+          outcome.result,
+        );
         const rows: UiTextRow[] = [
-          ...[...accepted].map(
-            ([text, translated]): UiTextRow => ({
-              source: text,
-              status: "ACCEPTED",
-              text: translated,
-              modelCode: outcome.modelCode,
-            }),
-          ),
-          ...[...rejected].map(
-            ([text, why]): UiTextRow => ({
-              source: text,
-              status: "REJECTED",
-              reason: why.ok ? "UNKNOWN" : why.reason,
-              modelCode: outcome.modelCode,
-            }),
-          ),
+          ...[...accepted].map(([text, translated]): UiTextRow => ({
+            source: text,
+            status: "ACCEPTED",
+            text: translated,
+            modelCode: outcome.modelCode,
+          })),
+          ...[...rejected].map(([text, why]): UiTextRow => ({
+            source: text,
+            status: "REJECTED",
+            reason: why.ok ? "UNKNOWN" : why.reason,
+            modelCode: outcome.modelCode,
+          })),
         ];
         await dependencies.store.write(info.tag, version, rows);
         const cached = cache.get(info.tag);
         if (cached !== undefined) {
           for (const row of rows) {
             cached.settled.add(row.source);
-            if (row.status === "ACCEPTED") cached.accepted.set(row.source, row.text);
+            if (row.status === "ACCEPTED")
+              cached.accepted.set(row.source, row.text);
           }
         }
       }
@@ -415,24 +432,35 @@ export function registerUiTextRoutes(
     identity === undefined
       ? requireActorContextHook(dependencies)
       : requireActorContextOrPersonalHook({ ...dependencies, identity });
-  app.get(Q_UI_TEXT_PATH, { onRequest: withContext }, async (request, reply) => {
-    const params = request.params as { readonly language?: unknown };
-    const language = typeof params.language === "string" ? params.language : "";
-    const actor = getActorContext(request);
-    const catalog = await dependencies.uiText.catalog(language, {
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-    });
-    if (catalog === null) {
-      const problem = createProblemDetails({
-        code: "INVALID_REQUEST",
-        requestId: request.id,
-        detail: "That is not a language Capital Q can offer.",
+  app.get(
+    Q_UI_TEXT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const params = request.params as { readonly language?: unknown };
+      const language =
+        typeof params.language === "string" ? params.language : "";
+      const actor = getActorContext(request);
+      const catalog = await dependencies.uiText.catalog(language, {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
       });
-      return reply.status(problem.status).type(PROBLEM_CONTENT_TYPE).send(problem);
-    }
-    // Shared product copy: the same for everyone, never personal.
-    void reply.header("Cache-Control", catalog.complete ? "private, max-age=300" : "no-store");
-    return catalog;
-  });
+      if (catalog === null) {
+        const problem = createProblemDetails({
+          code: "INVALID_REQUEST",
+          requestId: request.id,
+          detail: "That is not a language Capital Q can offer.",
+        });
+        return reply
+          .status(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(problem);
+      }
+      // Shared product copy: the same for everyone, never personal.
+      void reply.header(
+        "Cache-Control",
+        catalog.complete ? "private, max-age=300" : "no-store",
+      );
+      return catalog;
+    },
+  );
 }

@@ -1,4 +1,7 @@
-import { canonicalLanguageTag, languageDirectionOf } from "@capital-q/contracts";
+import {
+  canonicalLanguageTag,
+  languageDirectionOf,
+} from "@capital-q/contracts";
 
 /**
  * The language registry (owner directive 2026-10-16: "any language, and
@@ -213,9 +216,10 @@ export function resolveLanguage(asked: string): LanguageResolution {
   // A name the runtime knows for something it cannot script (Klingon).
   return {
     ok: false,
-    reason: asTag !== null && nameOf(asTag, "en") !== undefined
-      ? "NOT_OFFERED"
-      : "UNKNOWN",
+    reason:
+      asTag !== null && nameOf(asTag, "en") !== undefined
+        ? "NOT_OFFERED"
+        : "UNKNOWN",
   };
 }
 

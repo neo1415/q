@@ -1224,7 +1224,9 @@ export function createRehearsalVideoService(dependencies: {
                 testMode: dependencies.testMode === true,
                 requireAuth: true,
                 // Their language first, English understood: people mix both.
-                ...(videoPlan === null ? {} : { languages: [...videoPlan.languages] }),
+                ...(videoPlan === null
+                  ? {}
+                  : { languages: [...videoPlan.languages] }),
               });
               return { palId, conversation };
             } catch (error: unknown) {

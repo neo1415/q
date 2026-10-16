@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { EMAIL_SOURCE_STRINGS } from "@capital-q/email";
 import { createDailySpendCap } from "@capital-q/model-gateway";
 import { languageInfo } from "@capital-q/q-core/language";
 import {
@@ -52,7 +53,11 @@ function memoryStore() {
 function fakeTranslator(options: { costUsd?: number; breakOne?: string } = {}) {
   const calls: { language: string; size: number; tenantId: string }[] = [];
   const translate: UiTextTranslator = (language, batch, attribution) => {
-    calls.push({ language: language.tag, size: batch.length, tenantId: attribution.tenantId });
+    calls.push({
+      language: language.tag,
+      size: batch.length,
+      tenantId: attribution.tenantId,
+    });
     return Promise.resolve({
       ok: true,
       modelCode: "fake-model",
@@ -79,27 +84,53 @@ const actor = {
   userId: "00000000-0000-4000-8000-0000000000b1",
 };
 
-const SOURCE = ["Settings", "Discover", "Waiting on {name}.", "USD {n} raised", "Ask Q"];
+const SOURCE = [
+  "Settings",
+  "Discover",
+  "Waiting on {name}.",
+  "USD {n} raised",
+  "Ask Q",
+];
 
 describe("checking a machine translation", () => {
   it("keeps every placeholder and refuses one that breaks or invents one", () => {
-    expect(checkUiTranslation("Waiting on {name}.", "En attente de {name}.")).toEqual({ ok: true });
-    expect(checkUiTranslation("Waiting on {name}.", "En attente de {nom}.")).toEqual({
+    expect(
+      checkUiTranslation("Waiting on {name}.", "En attente de {name}."),
+    ).toEqual({ ok: true });
+    expect(
+      checkUiTranslation("Waiting on {name}.", "En attente de {nom}."),
+    ).toEqual({
       ok: false,
       reason: "PLACEHOLDERS",
     });
-    expect(checkUiTranslation("Waiting on {name}.", "En attente.")).toMatchObject({ reason: "PLACEHOLDERS" });
-    expect(checkUiTranslation("{n} of {n2}", "{n} sur {n2} {n}")).toMatchObject({ reason: "PLACEHOLDERS" });
+    expect(
+      checkUiTranslation("Waiting on {name}.", "En attente."),
+    ).toMatchObject({ reason: "PLACEHOLDERS" });
+    expect(checkUiTranslation("{n} of {n2}", "{n} sur {n2} {n}")).toMatchObject(
+      { reason: "PLACEHOLDERS" },
+    );
   });
 
   it("never loses figures, currency codes or product names", () => {
-    expect(checkUiTranslation("Raise USD 2.5m", "Lever 3 M USD")).toMatchObject({ reason: "FIGURES" });
-    expect(checkUiTranslation("Raise USD 2.5m", "Lever 2.5m dollars")).toMatchObject({ reason: "CURRENCY_CODES" });
-    expect(checkUiTranslation("Raise USD 2.5m", "Lever 2.5m USD")).toEqual({ ok: true });
-    expect(checkUiTranslation("Ask Q", "Demander à Kyu")).toMatchObject({ reason: "PRODUCT_NAMES" });
-    expect(checkUiTranslation("Open GateQ", "Ouvrir la porte")).toMatchObject({ reason: "PRODUCT_NAMES" });
+    expect(checkUiTranslation("Raise USD 2.5m", "Lever 3 M USD")).toMatchObject(
+      { reason: "FIGURES" },
+    );
+    expect(
+      checkUiTranslation("Raise USD 2.5m", "Lever 2.5m dollars"),
+    ).toMatchObject({ reason: "CURRENCY_CODES" });
+    expect(checkUiTranslation("Raise USD 2.5m", "Lever 2.5m USD")).toEqual({
+      ok: true,
+    });
+    expect(checkUiTranslation("Ask Q", "Demander à Kyu")).toMatchObject({
+      reason: "PRODUCT_NAMES",
+    });
+    expect(checkUiTranslation("Open GateQ", "Ouvrir la porte")).toMatchObject({
+      reason: "PRODUCT_NAMES",
+    });
     expect(checkUiTranslation("Ask Q", "اسأل Q")).toEqual({ ok: true });
-    expect(checkUiTranslation("Settings", "  ")).toMatchObject({ reason: "EMPTY" });
+    expect(checkUiTranslation("Settings", "  ")).toMatchObject({
+      reason: "EMPTY",
+    });
   });
 });
 
@@ -115,12 +146,24 @@ describe("the ui-text service", () => {
       handGaps: {},
     });
     const first = await service.catalog("fr", actor);
-    expect(first).toMatchObject({ language: "fr", complete: false, settled: 0, total: 5, entries: {} });
+    expect(first).toMatchObject({
+      language: "fr",
+      complete: false,
+      settled: 0,
+      total: 5,
+      entries: {},
+    });
     await service.idle();
     const second = await service.catalog("fr", actor);
-    expect(second).toMatchObject({ complete: true, settled: 5, version: UI_TEXT_CATALOG_VERSION });
+    expect(second).toMatchObject({
+      complete: true,
+      settled: 5,
+      version: UI_TEXT_CATALOG_VERSION,
+    });
     expect(second?.entries["Settings"]).toBe("[fr] Settings");
-    expect(second?.entries["Waiting on {name}."]).toBe("[fr] Waiting on {name}.");
+    expect(second?.entries["Waiting on {name}."]).toBe(
+      "[fr] Waiting on {name}.",
+    );
     // Once complete, nothing more is asked of the model.
     await service.catalog("fr", actor);
     await service.idle();
@@ -138,7 +181,11 @@ describe("the ui-text service", () => {
       source: SOURCE,
       handGaps: {},
     });
-    await Promise.all([service.catalog("sw", actor), service.catalog("sw", actor), service.catalog("sw", actor)]);
+    await Promise.all([
+      service.catalog("sw", actor),
+      service.catalog("sw", actor),
+      service.catalog("sw", actor),
+    ]);
     await service.idle();
     expect(fake.calls.filter((call) => call.language === "sw")).toHaveLength(1);
   });
@@ -158,7 +205,9 @@ describe("the ui-text service", () => {
     const after = await service.catalog("ja", actor);
     expect(after?.complete).toBe(true);
     expect(after?.entries["Waiting on {name}."]).toBeUndefined();
-    expect(memory.rows.get(`ja|${UI_TEXT_CATALOG_VERSION}|Waiting on {name}.`)).toMatchObject({
+    expect(
+      memory.rows.get(`ja|${UI_TEXT_CATALOG_VERSION}|Waiting on {name}.`),
+    ).toMatchObject({
       status: "REJECTED",
       reason: "PLACEHOLDERS",
     });
@@ -202,8 +251,13 @@ describe("the ui-text service", () => {
     await service.catalog("ar-AE", actor);
     await service.catalog("en-GB", actor);
     await service.idle();
-    expect(fake.calls).toEqual([{ language: "ar-AE", size: 1, tenantId: actor.tenantId }]);
-    expect(await service.catalog("en", actor)).toMatchObject({ complete: true, total: 0 });
+    expect(fake.calls).toEqual([
+      { language: "ar-AE", size: 1, tenantId: actor.tenantId },
+    ]);
+    expect(await service.catalog("en", actor)).toMatchObject({
+      complete: true,
+      total: 0,
+    });
   });
 
   it("refuses a language it cannot offer, and translates nothing for it", async () => {
@@ -239,7 +293,10 @@ describe("the ui-text service", () => {
     });
     await service.catalog("es", actor);
     await service.idle();
-    expect(await service.catalog("es", actor)).toMatchObject({ paused: "UNAVAILABLE", complete: false });
+    expect(await service.catalog("es", actor)).toMatchObject({
+      paused: "UNAVAILABLE",
+      complete: false,
+    });
     await service.idle();
     expect(calls).toBe(1);
     t = 5_000;
@@ -254,13 +311,24 @@ describe("the shipped catalogue and cap", () => {
     expect(UI_TEXT_SOURCE.length).toBeGreaterThan(3_000);
     expect(new Set(UI_TEXT_SOURCE).size).toBe(UI_TEXT_SOURCE.length);
     expect(UI_TEXT_HAND_GAPS["ar"]).toEqual([]);
+    // Emails go out in any language from the same cache.
+    const source = new Set(UI_TEXT_SOURCE);
+    expect(
+      EMAIL_SOURCE_STRINGS.filter((english) => !source.has(english)),
+    ).toEqual([]);
     expect(languageInfo("ar")?.direction).toBe("rtl");
   });
 
   it("defaults the daily cap to USD 2 and refuses a malformed one", () => {
     expect(parseUiTranslationDailyCapUsd({})).toBe(2);
-    expect(parseUiTranslationDailyCapUsd({ CQ_UI_TRANSLATION_DAILY_CAP_USD: "0.5" })).toBe(0.5);
-    expect(() => parseUiTranslationDailyCapUsd({ CQ_UI_TRANSLATION_DAILY_CAP_USD: "two" })).toThrow();
-    expect(() => parseUiTranslationDailyCapUsd({ CQ_UI_TRANSLATION_DAILY_CAP_USD: "500" })).toThrow();
+    expect(
+      parseUiTranslationDailyCapUsd({ CQ_UI_TRANSLATION_DAILY_CAP_USD: "0.5" }),
+    ).toBe(0.5);
+    expect(() =>
+      parseUiTranslationDailyCapUsd({ CQ_UI_TRANSLATION_DAILY_CAP_USD: "two" }),
+    ).toThrow();
+    expect(() =>
+      parseUiTranslationDailyCapUsd({ CQ_UI_TRANSLATION_DAILY_CAP_USD: "500" }),
+    ).toThrow();
   });
 });

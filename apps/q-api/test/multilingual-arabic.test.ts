@@ -213,8 +213,14 @@ describe("the standard voice line in Arabic", () => {
 
   it("maps Arabic locales to Nova-3's codes, the Gulf ones kept", () => {
     expect(recogniserFor("ar")).toEqual({ model: "nova-3", language: "ar" });
-    expect(recogniserFor("ar-SA")).toEqual({ model: "nova-3", language: "ar-SA" });
-    expect(recogniserFor("ar-qa")).toEqual({ model: "nova-3", language: "ar-QA" });
+    expect(recogniserFor("ar-SA")).toEqual({
+      model: "nova-3",
+      language: "ar-SA",
+    });
+    expect(recogniserFor("ar-qa")).toEqual({
+      model: "nova-3",
+      language: "ar-QA",
+    });
     // A region Nova-3 does not list falls back to general Arabic.
     expect(recogniserFor("ar-OM")).toEqual({ model: "nova-3", language: "ar" });
     expect(recogniserFor("en-AE")).toEqual({ model: "flux-general-en" });
@@ -224,15 +230,26 @@ describe("the standard voice line in Arabic", () => {
   it("picks each language's documented model from the table, with no per-language code", () => {
     const listenOf = (locale: string) =>
       (
-        provider.settingsFor({ voice: "FEMALE", greeting: undefined, thinkToken: "t", locale })
-          .agent as { listen: { provider: Record<string, unknown> } }
+        provider.settingsFor({
+          voice: "FEMALE",
+          greeting: undefined,
+          thinkToken: "t",
+          locale,
+        }).agent as { listen: { provider: Record<string, unknown> } }
       ).listen.provider;
     const speakOf = (locale: string) =>
       (
-        provider.settingsFor({ voice: "FEMALE", greeting: undefined, thinkToken: "t", locale })
-          .agent as { speak: { provider: Record<string, unknown> } }
+        provider.settingsFor({
+          voice: "FEMALE",
+          greeting: undefined,
+          thinkToken: "t",
+          locale,
+        }).agent as { speak: { provider: Record<string, unknown> } }
       ).speak.provider;
-    expect(listenOf("fr-FR")).toMatchObject({ model: "flux-general-multi", version: "v2" });
+    expect(listenOf("fr-FR")).toMatchObject({
+      model: "flux-general-multi",
+      version: "v2",
+    });
     expect(speakOf("fr-FR")).toMatchObject({ language: "fr" });
     expect(listenOf("ko")).toMatchObject({ model: "nova-3", language: "ko" });
     expect(listenOf("pt-BR")).toMatchObject({ model: "flux-general-multi" });

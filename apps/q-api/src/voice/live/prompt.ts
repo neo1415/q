@@ -121,11 +121,16 @@ function spokenName(locale: string | undefined): string | null {
       return null;
     }
     const of = (inLocale: string) =>
-      new Intl.DisplayNames([inLocale], { type: "language", fallback: "none" }).of(tag);
+      new Intl.DisplayNames([inLocale], {
+        type: "language",
+        fallback: "none",
+      }).of(tag);
     const english = of("en");
     if (english === undefined || english === tag) return null;
     const native = of(tag);
-    return native === undefined || native === english ? english : `${english} (${native})`;
+    return native === undefined || native === english
+      ? english
+      : `${english} (${native})`;
   } catch {
     return null;
   }

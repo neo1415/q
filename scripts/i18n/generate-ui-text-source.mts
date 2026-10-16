@@ -47,7 +47,9 @@ for (const file of readdirSync(catalogDir).sort()) {
   if (file.endsWith(".ts")) await collect(join(catalogDir, file));
 }
 // The email catalogue exports EMAIL_ARABIC.
-const email = (await import(join(root, "packages/email/src/arabic.ts"))) as Record<string, unknown>;
+const email = (await import(
+  join(root, "packages/email/src/arabic.ts")
+)) as Record<string, unknown>;
 for (const value of Object.values(email)) {
   if (!isCatalogue(value)) continue;
   const catalogue = hand.get("ar") ?? new Map<string, string>();
@@ -81,5 +83,11 @@ export const UI_TEXT_HAND_GAPS: Readonly<Record<string, readonly string[]>> = ${
 const target = join(root, "packages/q-core/src/ui-text/source.generated.ts");
 writeFileSync(target, out);
 // Formatted like every other source file, so format:check stays green.
-execFileSync(join(root, "node_modules/.bin/prettier"), ["--write", target], { stdio: "ignore" });
-console.log(`${strings.length} strings; hand catalogues: ${Object.entries(gaps).map(([l, g]) => `${l} (${g.length} gaps)`).join(", ")}`);
+execFileSync(join(root, "node_modules/.bin/prettier"), ["--write", target], {
+  stdio: "ignore",
+});
+console.log(
+  `${strings.length} strings; hand catalogues: ${Object.entries(gaps)
+    .map(([l, g]) => `${l} (${g.length} gaps)`)
+    .join(", ")}`,
+);
