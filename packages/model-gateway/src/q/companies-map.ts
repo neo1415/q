@@ -68,6 +68,29 @@ export function companiesMapAskOf(
   return null;
 }
 
+/**
+ * Whether this turn may be answered with a map drawn by code. A research
+ * request counts (live 2026-10-16, batch R: "show me a map of where
+ * Tensorgate is in the world" was read as RESEARCH_REQUEST and ran an 18 s
+ * web search for a company whose country Capital Q holds); the map then
+ * hands back to research only when no location is known and they asked
+ * for public information (runCompaniesMap). Never for a document being
+ * written or an action they asked for.
+ */
+export function mayDrawCompaniesMap(request: {
+  readonly writingDocument?: boolean | undefined;
+  readonly askedAction?: string | undefined;
+  readonly turnKind?: string | undefined;
+}): boolean {
+  return (
+    request.writingDocument !== true &&
+    request.askedAction === undefined &&
+    (request.turnKind === undefined ||
+      request.turnKind === "QUESTION_TO_Q" ||
+      request.turnKind === "RESEARCH_REQUEST")
+  );
+}
+
 export type CompaniesMapAnswer = {
   readonly text: string;
   readonly blocks: readonly QResultBlock[];
