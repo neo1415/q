@@ -285,6 +285,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_knowledge', 'contradiction_sets',     'INTERNAL_SERVER_ONLY', '{}'),
   ('q_knowledge', 'contradiction_members',  'INTERNAL_SERVER_ONLY', '{}'),
   ('q_knowledge', 'memory_items',           'INTERNAL_SERVER_ONLY', '{}'),
+  ('q_knowledge', 'preference_learning_consents', 'INTERNAL_SERVER_ONLY', '{}'),
   ('q_knowledge', 'presence_builds',        'INTERNAL_SERVER_ONLY', '{}'),
   ('recommendation', 'company_representations', 'INTERNAL_SERVER_ONLY', '{}'),
   ('recommendation', 'mandate_representations', 'INTERNAL_SERVER_ONLY', '{}'),

@@ -944,11 +944,16 @@ export {
 export {
   Q_MEMORY_FORGET_PATH,
   Q_MEMORY_KINDS,
+  Q_MEMORY_LEARNING_PATH,
   Q_MEMORY_PATH,
   QMemoryItemDtoSchema,
   QMemoryListDtoSchema,
+  QPreferenceLearningChoiceRequestSchema,
+  QPreferenceLearningDtoSchema,
   type QMemoryItemDto,
   type QMemoryListDto,
+  type QPreferenceLearningChoiceRequest,
+  type QPreferenceLearningDto,
 } from "./memory.js";
 
 export {

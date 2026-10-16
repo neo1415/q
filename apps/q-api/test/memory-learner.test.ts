@@ -43,7 +43,7 @@ const logger = {
   child: () => logger,
 } as never;
 
-function world(extractorOutput: unknown) {
+function world(extractorOutput: unknown, consent?: boolean | "FAILS") {
   const remembered: RememberCommand[] = [];
   const digests: unknown[] = [];
   const conversation = {
@@ -138,9 +138,61 @@ function world(extractorOutput: unknown) {
     transactions: { run: (work) => work({} as never) },
     people: { displayNameFor: () => Promise.resolve("Daniel") },
     logger,
+    ...(consent === undefined
+      ? {}
+      : {
+          learningConsent: {
+            granted: () =>
+              consent === "FAILS"
+                ? Promise.reject(new Error("db down"))
+                : Promise.resolve(consent),
+          },
+        }),
   });
   return { learner, remembered, digests };
 }
+
+const MIXED = {
+  title: "Pace",
+  summary: "They asked for brevity and named their co-founder.",
+  items: [
+    {
+      type: "PREFERENCE",
+      key: "preference.response_depth",
+      content: "Keep answers short.",
+      quote: "call me Dan",
+    },
+    {
+      type: "FACT_ABOUT_PERSON",
+      key: "fact.cofounder",
+      content: "Their co-founder is Ama.",
+      quote: "call me Dan",
+    },
+  ],
+};
+
+describe("lane ob1 · inferring communication preferences needs consent", () => {
+  it("infers no preference without consent, and still keeps other memories", async () => {
+    const { learner, remembered } = world(MIXED, false);
+    await learner.learn({ actor, runId: RUN });
+    expect(remembered.map((r) => r.candidate.memoryType)).toEqual(["fact"]);
+  });
+
+  it("infers preferences once they allow it", async () => {
+    const { learner, remembered } = world(MIXED, true);
+    await learner.learn({ actor, runId: RUN });
+    expect(remembered.map((r) => r.candidate.memoryType)).toEqual([
+      "preference",
+      "fact",
+    ]);
+  });
+
+  it("a consent read that fails is not consent", async () => {
+    const { learner, remembered } = world(MIXED, "FAILS");
+    await learner.learn({ actor, runId: RUN });
+    expect(remembered.map((r) => r.candidate.memoryType)).toEqual(["fact"]);
+  });
+});
 
 describe("the memory learner", () => {
   it("hands each proposal to the gate with the person's turns, and writes the digest back", async () => {

@@ -109,6 +109,17 @@ export type DocumentProcessingHandlerOptions = {
           readonly responseId: string;
         }) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
         readonly onUtterance: UtteranceReader;
+        /** Lane ob1: an investor's own fund deck or thesis, read into proposals. */
+        readonly onDocumentReady?:
+          | ((event: {
+              readonly tenantId: TenantId;
+              readonly documentId: string;
+              readonly documentVersionId: string;
+            }) => Promise<{
+              readonly kind: string;
+              readonly blocked?: unknown;
+            }>)
+          | undefined;
       }
     | undefined;
   /**
@@ -397,18 +408,35 @@ export function createDomainEventHandler(
     }
 
     if (event.type === READY_EVENT) {
-      if (founderReview === undefined) {
+      const investorRead = mandateReview?.onDocumentReady;
+      if (founderReview === undefined && investorRead === undefined) {
         return { kind: "ARCHIVE" };
       }
       const ready = event.data as DocumentReadyData;
       try {
-        const outcome = await founderReview.onDocumentReady({
+        const ref = {
           // A queue message is untrusted input: the tenant is validated
           // here, at the boundary, before it names anything.
           tenantId: TenantIdSchema.parse(event.tenantId),
           documentId: ready.documentId,
           documentVersionId: ready.documentVersionId,
-        });
+        };
+        // Each reading skips a document that is not its own (a company's
+        // deck vs an investor's fund deck), so both may be offered it.
+        const outcome =
+          founderReview === undefined
+            ? { kind: "SKIPPED" }
+            : await founderReview.onDocumentReady(ref);
+        const investorOutcome =
+          investorRead === undefined
+            ? { kind: "SKIPPED" }
+            : await investorRead(ref);
+        if (transientlyBlocked(investorOutcome)) {
+          return {
+            kind: "RETRY",
+            errorCode: "MANDATE_REVIEW_MODEL_UNAVAILABLE",
+          };
+        }
         if (transientlyBlocked(outcome)) {
           return {
             kind: "RETRY",

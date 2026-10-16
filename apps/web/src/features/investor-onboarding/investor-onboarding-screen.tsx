@@ -27,6 +27,7 @@ import type {
   StepResponse,
 } from "./models/presentation";
 import { renderStep } from "./steps/registry";
+import { PreferenceLearningAsk } from "../settings/preference-learning";
 
 const STEP_FORM_ID = "investor-onboarding-step";
 
@@ -138,6 +139,8 @@ export function InvestorOnboardingScreen({
             against it; change anything by telling Q.
           </p>
         </header>
+        {/* Lane ob1: the end of onboarding is a natural moment to ask, once. */}
+        <PreferenceLearningAsk />
         {review.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
             Your mandate couldn&apos;t be shown here just now. It is still on
