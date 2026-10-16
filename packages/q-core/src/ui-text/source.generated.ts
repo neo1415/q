@@ -3459,6 +3459,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Technical founding capability",
   "Telecommunications",
   "Telehealth",
+  "Tell Q",
   "Tell Q about your company. {name} reviews every application.",
   "Tell Q what to do with these",
   "Tell Q what you're here to do first.",
