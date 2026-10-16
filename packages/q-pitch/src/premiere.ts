@@ -86,7 +86,11 @@ function v5Entries(): CertificationEntry[] {
     claims: readonly string[],
     forbidden: readonly string[],
     /** The acceptance run's browser receipt, when the scene passed on production. */
-    live?: string,
+    live?: {
+      readonly receipt: string;
+      readonly commit: string;
+      readonly at: string;
+    },
   ): CertificationEntry => {
     const base = codeEntry({
       featureId,
@@ -105,14 +109,22 @@ function v5Entries(): CertificationEntry[] {
       : {
           ...base,
           status: "PRODUCTION_LIVE_VERIFIED",
-          appCommit: "web production f28ab37d (batch Q)",
-          verifiedAt: "2026-10-15 22:13 UTC",
+          appCommit: live.commit,
+          verifiedAt: live.at,
           verifierType: "BROWSER",
-          receipt: live,
+          receipt: live.receipt,
         };
   };
-  const run3 = (scene: string) =>
-    `Premiere v5 acceptance run 3 (Playwright, savanna-seed, every request live): ${scene}; scratchpad v5-acc/run3 run-log.json + video`;
+  const run3 = (scene: string) => ({
+    receipt: `v5 acceptance run 3 (Playwright, savanna-seed, live): ${scene}; scratchpad v5-acc/run3`,
+    commit: "web production f28ab37d (batch Q)",
+    at: "2026-10-15 22:13 UTC",
+  });
+  const run4 = (scene: string) => ({
+    receipt: `v5 acceptance run 4 (Playwright, savanna-seed, live): ${scene}; scratchpad v5-acc/run4`,
+    commit: "web production 2c2010cb (batch S)",
+    at: "2026-10-16 07:00 UTC",
+  });
   return [
     entry(
       "FEED-VIEW",
@@ -124,6 +136,9 @@ function v5Entries(): CertificationEntry[] {
         "That a presenter is the real founder",
         "Any ranking as a quality judgement",
       ],
+      run4(
+        'scene 3 complete: carousel.feed NEXT DONE twice; the pitch in focus is labelled "AI presenter · AI-generated" (scene-03.png)',
+      ),
     ),
     entry(
       "FEED-SAVE",
@@ -143,6 +158,9 @@ function v5Entries(): CertificationEntry[] {
         "An application through the investor's gate opens with the brief frozen from the founder's submission, its qualification against the firm's rules, the interview transcript and the dossier",
       ],
       ["A live interview", "That the founder's statements are verified"],
+      run4(
+        "scene 8 complete: Maji Loop (3 of 4 rules), Download pack and missing answers on screen; disclosure.gateq-transcript SCROLL_TO + EXPAND DONE, turns on screen (scene-08.png)",
+      ),
     ),
     entry(
       "CRM-RECORD-VIEW",
@@ -168,6 +186,9 @@ function v5Entries(): CertificationEntry[] {
       "Savanna's documents: the first, a memo Q made",
       ["A memo Q made opens in place, marked with who can see it"],
       ["That a Q-made memo is verified analysis"],
+      run4(
+        'scene 13 complete: By Q filter DONE (items marked "Only your team"), first memo opened in the document viewer in place (scene-13.png)',
+      ),
     ),
     entry(
       "NOTIFICATIONS-VIEW",
