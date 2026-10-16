@@ -23,6 +23,36 @@ Scores read Q's **unconfirmed** reading of decks open to all investors, and the 
 
 A number is shown whenever any investor-visible material exists. Below InvestIQ's full gates it is a **provisional** score: criterion scores weighted by stage weight per criterion, unknown left out, Low confidence, at most Developing, labelled "early read". Coverage is shown as "based on N of M factors". With no deck, no pitch and no shared claim the investor sees "No pitch or deck shared yet". Inputs version: `investability-inputs.v2`. Production offline count after the amendment: 461 of 461 listed companies scored, 190 of them provisional, all 50–54, Developing, Low confidence.
 
+## Content grading and an unshrunk point estimate (lead, 2026-10-16; ADR 0075 amendment 2)
+
+**Diagnosis.** Under `investiq/v1` with `investability-inputs.v2`, all 461 listed companies scored 50–54. There were two causes.
+
+1. Criteria were graded on _presence_: a deck section on record was anchor 2, the stage norm, whatever it said.
+2. Evidence weight shrank every point estimate back to 2: `2 + (anchor − 2) × w`, with w = 0.5 for a founder claim and 0.25 for an unconfirmed read. A strength of 3 became 2.25–2.5.
+
+**Change** (`investiq/v2+investability-inputs.v3`; the `investability-grading.v1` rules live in `packages/readiness/src/investability/grade.ts`):
+
+- **Grade on content.** Each criterion is graded from what the material states, against stage benchmarks. The grading is deterministic, with no model involved. Anchors run 4 well above typical / 3 above / 2 typical / 1 below / 0 well below; a 0 needs an affirmative statement.
+  - Monthly revenue in USD (ARR ÷ 12; a fixed FX table, `fx-2026-10.v1`). Typical range: pre-seed $1k–10k, seed $10k–80k, Series A $80k–300k, growth $0.3m–2m. At or above the top of the range is 3, at least 3× the top is 4, below a quarter of the bottom is 0. Pre-seed is never graded below 2.
+  - A stated "no revenue yet": 2 at pre-seed, 1 at seed, 0 at Series A and later.
+  - Customer and user counts against stage ranges. They are never graded below 1, because units differ by business model.
+  - Headcount and named leadership roles. Founder experience: prior founding or an exit is 4; stated relevant experience, or technical plus commercial founders, is 3.
+  - Market size (≥ $1bn is 3, ≥ $20bn is 4, < $100m is 1; a sized reachable segment adds one step).
+  - Runway: under 6 months 0, 6–12 months 1, 12–18 months 2, 18+ months 3. Runway after the raise: under 12 months 1, 12–18 months 2, 18+ months 3.
+  - Stated pricing 3. Gross margin: ≥ 70% 4, ≥ 50% 3, ≥ 20% 2, below 1.
+  - Transcript-derived grades are limited to 1–3.
+- **Presence does not move the number.** Criteria merely on record count toward coverage and confidence, not toward the point estimate.
+- **Score and confidence are separate.** A criterion scores its graded anchor (no shrinkage). Evidence weight drives confidence and an **evidence range**: each criterion's grade ± 2 × (1 − w), averaged with the same weights. Verified evidence narrows the range; self-reported or unconfirmed evidence widens it. The band follows the score (no confidence cap); confidence is shown beside it.
+- **Credibility by the number of graded factors.** One fact cannot make a company Strong or Early on its own: the graded mean's distance from the norm counts in full from 3 graded factors (z = min(1, n / 3)).
+- **One weighting.** Every graded criterion counts by its dimension's stage weight shared over the dimension's applicable criteria. Unknown criteria stay out.
+
+**Production distribution after the change** (offline, read-only, 461 listed companies):
+
+- Range 31–81. p10 44, p25 48, median 50, p75 59, p90 66.
+- Count by 5-point bucket: 30–34: 4, 35–39: 7, 40–44: 45, 45–49: 72, 50–54: 155, 55–59: 68, 60–64: 56, 65–69: 27, 70–74: 13, 75–79: 13, 80+: 1.
+- Every score is Low confidence (the evidence is self-reported).
+- Most companies have only 2–4 gradable facts. The spread reflects that; it is not invented.
+
 ## Investability: the InvestIQ v1 method
 
 ### Dimensions and stage weights

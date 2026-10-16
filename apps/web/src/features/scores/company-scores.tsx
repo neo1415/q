@@ -247,7 +247,7 @@ export function CompanyScores({
         coverage={
           inv.status === "NOT_ASSESSED"
             ? "Assessed once the company is listed"
-            : `Based on ${inv.coverage.criteriaScored} of ${inv.coverage.criteriaApplicable} factors · ${inv.coverage.areasScored} of ${inv.coverage.areasTotal} areas`
+            : `Based on ${inv.coverage.criteriaScored} of ${inv.coverage.criteriaApplicable} factors · ${inv.coverage.areasScored} of ${inv.coverage.areasTotal} areas${inv.range === undefined ? "" : ` · evidence range ${String(inv.range.low)}–${String(inv.range.high)}`}`
         }
       >
         <Why

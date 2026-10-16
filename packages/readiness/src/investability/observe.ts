@@ -10,6 +10,16 @@ import {
 } from "@capital-q/contracts";
 
 import { observationWeight } from "../investiq/assess-v1.js";
+import {
+  gradeFounders,
+  gradeMarket,
+  gradePricing,
+  gradeRunway,
+  gradeTeam,
+  gradeTraction,
+  gradeUnitEconomics,
+  type Grade,
+} from "./grade.js";
 import type { InvestIQObservation } from "../investiq/contracts.js";
 import { stageBandOf, type StageBand } from "../investiq/method-v1.js";
 import {
@@ -45,7 +55,7 @@ import {
  */
 
 /** v2 (ADR 0075): unconfirmed reads of open decks and investor-visible pitches. */
-export const INVESTABILITY_INPUTS_VERSION = "investability-inputs.v2";
+export const INVESTABILITY_INPUTS_VERSION = "investability-inputs.v3";
 
 type Reading = InvestIQObservation["reading"];
 type SourceKind = InvestIQObservation["provenance"]["sourceKind"];
@@ -62,6 +72,8 @@ type Signal = {
   readonly observedAt: string | null;
   /** The rule that produced it (INVESTABILITY_INPUT_RULES). */
   readonly rule: string;
+  /** investability-grading.v1: the graded 0-4 anchor; absent: from the reading. */
+  readonly anchor?: number | undefined;
 };
 
 /** Every producer rule, for the trace, the "why" and the methodology doc. */
@@ -92,6 +104,10 @@ export const INVESTABILITY_INPUT_RULES = {
     "ADR 0075: Q's reading of an unreviewed section of a deck open to all investors (Q inference, self-reported; never quoted).",
   "pitch.presented":
     "ADR 0075: the founder presents the product in a pitch investors may play.",
+  "deck.graded":
+    "investability-grading.v1: a criterion graded from what the section states, against stage benchmarks.",
+  "pitch.graded":
+    "investability-grading.v1: the transcript's stated figures graded against stage benchmarks (never quoted).",
   "pitch.transcript":
     "ADR 0075: the pitch's generated transcript speaks to the topic (fixed patterns; never quoted).",
 } as const;
@@ -125,24 +141,6 @@ const CLAIM_CRITERION: Readonly<Record<string, string>> = {
   capital: "cs.raise_amount",
 };
 
-const PRE_REVENUE = /\bpre[- ]?revenue\b|\bno revenue\b/iu;
-const CUSTOMER =
-  /\b(customers?|clients?|users?|merchants?|subscribers?|accounts?|schools?|farmers?|patients?|pilots?)\b/iu;
-const PROJECTION =
-  /\b(forecast|projection|projected|plan(?:ned)?|target|budget)\b/iu;
-const CASH = /\b(burn|runway|cash)\b/iu;
-const PRICING = /\b(pric\w*|fee|subscription|commission|take rate|margin)\b/iu;
-const USE_OF_FUNDS = /\b(use of funds|allocation|spend|hire|hiring)\b/iu;
-const PRIOR_DELIVERY = /\b(founded|co-?founded|exit(?:ed)?|acquired|sold)\b/iu;
-
-const early = (stage: StageBand | null) =>
-  stage === "PRE_SEED" || stage === "SEED";
-const late = (stage: StageBand | null) =>
-  stage === "SERIES_A" || stage === "GROWTH";
-
-const datedFigure = (fact: DeckFact) =>
-  fact.kind === "FIGURE" && fact.value !== null && fact.asOf !== null;
-
 const known = (fact: DeckFact) =>
   fact.value !== null && fact.unknownReason === null;
 
@@ -156,10 +154,6 @@ function strongest(statuses: readonly EvidenceStatus[]): EvidenceStatus {
   return best;
 }
 
-function factText(fact: DeckFact): string {
-  return `${fact.label} ${fact.value ?? ""}`;
-}
-
 function iso(value: string | null): string | null {
   if (value === null) return null;
   const t = Date.parse(value);
@@ -170,6 +164,13 @@ function clip(text: string, max = 300): string {
   const one = text.replace(/\s+/gu, " ").trim();
   return one.length <= max ? one : `${one.slice(0, max - 1)}…`;
 }
+
+const readingOf = (anchor: number): Reading =>
+  anchor <= 1
+    ? "INDICATES_WEAKNESS"
+    : anchor >= 3
+      ? "SUPPORTS_STRENGTH"
+      : "RECORDED";
 
 function deckSignals(
   section: DeckSection,
@@ -191,206 +192,120 @@ function deckSignals(
     observedAt: iso(deck.readAt),
   };
   const out: Signal[] = [];
-  const add = (
-    criterion: string,
-    reading: Reading,
-    rule: InvestabilityInputRule,
-    statement: string,
-    overrides: Partial<Signal> = {},
-  ) =>
+  const record = (criterion: string, statement: string) =>
     out.push({
       ...base,
       lifecycleStatus: "CURRENT",
       criterion,
-      reading,
-      rule,
+      reading: "RECORDED",
+      rule: "deck.section",
       statement: clip(statement),
-      ...overrides,
     });
+  const graded = (grades: readonly Grade[]) => {
+    for (const g of grades) {
+      out.push({
+        ...base,
+        lifecycleStatus: "CURRENT",
+        criterion: g.criterion,
+        reading: readingOf(g.anchor),
+        anchor: g.anchor,
+        rule: "deck.graded",
+        statement: clip(g.statement),
+      });
+    }
+    return grades.length;
+  };
+  const plain = facts.map((f) => ({ label: f.label, value: f.value ?? "" }));
 
   const contradictory =
     section.status === "CONTRADICTORY" ||
     section.facts.some((f) => f.unknownReason === "CONTRADICTORY");
   const primary = DECK_SECTION_CRITERION[section.section];
   const summary = section.summary ?? section.section.toLowerCase();
-
   if (contradictory && primary !== undefined) {
-    add(
-      primary,
-      "RECORDED",
-      "deck.contradiction",
-      `Contradictory: ${summary}`,
-      {
-        lifecycleStatus: "CONTRADICTORY",
-      },
-    );
+    out.push({
+      ...base,
+      lifecycleStatus: "CONTRADICTORY",
+      criterion: primary,
+      reading: "RECORDED",
+      anchor: 2,
+      rule: "deck.contradiction",
+      statement: clip(`Contradictory: ${summary}`),
+    });
   }
 
   switch (section.section) {
     case "TRACTION": {
-      const said = [section.summary ?? "", ...facts.map(factText)].join(" ");
-      const preRevenue = PRE_REVENUE.test(said);
-      const dated = facts.filter(datedFigure);
-      if (preRevenue && late(stage)) {
-        add(
-          "cp.traction",
-          "INDICATES_WEAKNESS",
-          "deck.traction.late_pre_revenue",
-          `Pre-revenue at a stage that expects revenue: ${summary}`,
-        );
-      } else if (!preRevenue && dated.length > 0 && early(stage)) {
-        add(
-          "cp.traction",
-          "SUPPORTS_STRENGTH",
-          "deck.traction.early_dated_figure",
-          `Dated traction: ${dated.map(factText).join("; ")}`,
-          { evidenceStatus: strongest(dated.map((f) => f.evidenceStatus)) },
-        );
-      } else {
-        add("cp.traction", "RECORDED", "deck.section", summary);
-      }
-      const customers = facts.filter((f) => CUSTOMER.test(factText(f)));
-      if (customers.length > 0) {
-        const figure = customers.some((f) => f.kind === "FIGURE");
-        add(
-          "cp.customer_base",
-          figure && early(stage) ? "SUPPORTS_STRENGTH" : "RECORDED",
-          figure && early(stage)
-            ? "deck.customers.early_figure"
-            : "deck.section",
-          `Customers: ${customers.map(factText).join("; ")}`,
-          {
-            evidenceStatus: strongest(customers.map((f) => f.evidenceStatus)),
-          },
-        );
+      if (graded(gradeTraction(plain, stage)) === 0) {
+        record("cp.traction", summary);
       }
       return out;
     }
     case "FINANCIALS": {
-      const projections = facts.filter((f) => PROJECTION.test(factText(f)));
-      const cash = facts.filter((f) => CASH.test(factText(f)));
-      const historical = facts.filter(
-        (f) =>
-          datedFigure(f) &&
-          !PROJECTION.test(factText(f)) &&
-          !CASH.test(factText(f)),
+      // Revenue here is the same signal as traction: it goes to cp.traction
+      // (the higher-evidence or higher grade wins), never counted twice.
+      graded(
+        gradeTraction(plain, stage).filter(
+          (g) => g.criterion === "cp.traction",
+        ),
       );
-      if (historical.length > 0) {
-        add(
-          "fh.historical_financials",
-          early(stage) ? "SUPPORTS_STRENGTH" : "RECORDED",
-          early(stage) ? "deck.financials.early_historical" : "deck.section",
-          `Historical figures: ${historical.map(factText).join("; ")}`,
-          {
-            evidenceStatus: strongest(historical.map((f) => f.evidenceStatus)),
-          },
-        );
-      }
-      if (projections.length > 0) {
-        add(
-          "fh.forecasts",
-          "RECORDED",
-          "deck.section",
-          `Forecast: ${projections.map(factText).join("; ")}`,
-        );
-      }
-      if (cash.length > 0) {
-        add(
-          "fh.cash_flow",
-          "RECORDED",
-          "deck.section",
-          `Cash: ${cash.map(factText).join("; ")}`,
-        );
-      }
-      if (contradictory) {
-        add(
-          "fh.historical_financials",
-          "RECORDED",
-          "deck.contradiction",
-          `Contradictory: ${summary}`,
-          { lifecycleStatus: "CONTRADICTORY" },
-        );
+      graded(gradeRunway(plain));
+      graded(gradeUnitEconomics(plain));
+      if (plain.some((f) => /\d/u.test(f.value))) {
+        record("fh.historical_financials", "Financial figures on record");
       }
       if (
-        historical.length + projections.length + cash.length === 0 &&
-        section.summary !== null
+        plain.some((f) =>
+          /forecast|projection|projected|plan/iu.test(`${f.label} ${f.value}`),
+        )
       ) {
-        add("fh.forecasts", "RECORDED", "deck.section", summary);
+        record("fh.forecasts", "Forecast on record");
       }
       return out;
     }
     case "THE_ASK": {
       const ask = deckAskTerms([section]);
-      if (ask.amount !== undefined) {
-        add(
-          "cs.raise_amount",
-          "RECORDED",
-          "deck.section",
-          `Raise: ${ask.amount}`,
-        );
-      }
+      if (ask.amount !== undefined)
+        record("cs.raise_amount", `Raise: ${ask.amount}`);
       if (ask.instrument !== undefined) {
-        add(
-          "cs.investment_structure",
-          "RECORDED",
-          "deck.section",
-          `Instrument: ${ask.instrument}`,
-        );
+        record("cs.investment_structure", `Instrument: ${ask.instrument}`);
       }
-      const funds = facts.filter((f) => USE_OF_FUNDS.test(factText(f)));
-      if (funds.length > 0) {
-        add(
-          "cs.use_of_funds",
-          "RECORDED",
-          "deck.section",
-          `Use of funds: ${funds.map(factText).join("; ")}`,
-        );
-      }
-      if (contradictory) {
-        add(
-          "cs.raise_amount",
-          "RECORDED",
-          "deck.contradiction",
-          `Contradictory: ${summary}`,
-          { lifecycleStatus: "CONTRADICTORY" },
-        );
+      if (
+        graded(gradeRunway(plain)) === 0 &&
+        plain.some((f) =>
+          /use of funds|allocation|spend|hire/iu.test(`${f.label} ${f.value}`),
+        )
+      ) {
+        record("cs.use_of_funds", "Use of funds on record");
       }
       return out;
     }
     case "TEAM": {
-      add(
-        "fl.leadership_depth",
-        facts.length >= 3 && early(stage) ? "SUPPORTS_STRENGTH" : "RECORDED",
-        facts.length >= 3 && early(stage)
-          ? "deck.team.early_depth"
-          : "deck.section",
-        summary,
-      );
+      if (graded(gradeTeam(plain, stage)) === 0)
+        record("fl.leadership_depth", summary);
+      return out;
+    }
+    case "FOUNDERS": {
+      if (graded(gradeFounders(plain)) === 0)
+        record("fl.founder_quality", summary);
       return out;
     }
     case "BUSINESS_MODEL": {
-      add("cp.business_model", "RECORDED", "deck.section", summary);
-      const pricing = facts.filter((f) => PRICING.test(factText(f)));
-      if (pricing.length > 0) {
-        add(
-          "cp.revenue_model",
-          "RECORDED",
-          "deck.section",
-          `Revenue model: ${pricing.map(factText).join("; ")}`,
-        );
-      }
+      record("cp.business_model", summary);
+      graded(gradePricing(plain));
+      graded(gradeUnitEconomics(plain));
       return out;
     }
-    case "MARKET":
+    case "MARKET": {
+      if (graded(gradeMarket(plain)) === 0) record("mo.market_size", summary);
+      return out;
+    }
     case "PROBLEM":
     case "SOLUTION":
     case "VALUE_PROPOSITION":
     case "GO_TO_MARKET":
-    case "COMPETITION":
-    case "FOUNDERS": {
-      if (primary !== undefined) {
-        add(primary, "RECORDED", "deck.section", summary);
-      }
+    case "COMPETITION": {
+      if (primary !== undefined) record(primary, summary);
       return out;
     }
   }
@@ -463,6 +378,7 @@ const PITCH_RULES: readonly {
  */
 function pitchSignals(
   pitch: NonNullable<InvestabilityInputs["pitch"]>,
+  stage: StageBand | null,
 ): Signal[] {
   const base = {
     reading: "RECORDED" as const,
@@ -484,6 +400,23 @@ function pitchSignals(
   const text = (pitch.transcript ?? "").slice(0, 20_000);
   if (text.trim() === "") return out;
   const sentences = text.split(/(?<=[.!?])\s+/u);
+  // The same content grading as a deck, over what was said (never quoted).
+  const said = sentences.map((sentence) => ({
+    label: sentence,
+    value: sentence,
+  }));
+  for (const g of [...gradeTraction(said, stage), ...gradeMarket(said)]) {
+    // Spoken and machine-transcribed: graded within 1-3, never an extreme.
+    const anchor = Math.min(3, Math.max(1, g.anchor));
+    out.push({
+      ...base,
+      criterion: g.criterion,
+      reading: readingOf(anchor),
+      anchor,
+      statement: "Stated in their pitch video.",
+      rule: "pitch.graded",
+    });
+  }
   for (const rule of PITCH_RULES) {
     const said = sentences.some(
       (sentence) =>
@@ -561,25 +494,26 @@ export function observeInvestability(
     (line) => line.visibilityScope === "network_visible",
   );
   if (lines.length > 0) {
-    const prior = lines.filter((line) =>
-      PRIOR_DELIVERY.test(`${line.title} ${line.detail ?? ""}`),
-    );
-    const chosen = prior.length > 0 ? prior : lines;
+    const grade = gradeFounders(
+      lines.map((l) => ({
+        label: l.title,
+        value: `${l.title} ${l.detail ?? ""}`,
+      })),
+    )[0];
     signals.push({
       criterion: "fl.founder_quality",
-      reading: prior.length > 0 ? "SUPPORTS_STRENGTH" : "RECORDED",
-      statement: clip(
-        `Founder background: ${chosen.map((l) => l.title).join("; ")}`,
-      ),
+      reading: grade === undefined ? "RECORDED" : readingOf(grade.anchor),
+      ...(grade === undefined ? {} : { anchor: grade.anchor }),
+      statement: clip(grade?.statement ?? "Founder background on record"),
       truthClass: "USER_CLAIM",
-      evidenceStatus: chosen.some((l) => l.documentSupported)
+      evidenceStatus: lines.some((l) => l.documentSupported)
         ? "DOCUMENT_SUPPORTED"
         : "SELF_REPORTED",
       lifecycleStatus: "CURRENT",
       sourceKind: "PROFILE",
-      sourceRef: `founder:${[...chosen.map((l) => l.id)].sort()[0] ?? ""}`,
+      sourceRef: `founder:${[...lines.map((l) => l.id)].sort()[0] ?? ""}`,
       observedAt: profileAt,
-      rule: prior.length > 0 ? "founder.prior_delivery" : "founder.background",
+      rule: "founder.background",
     });
   }
 
@@ -640,7 +574,7 @@ export function observeInvestability(
   }
 
   if (inputs.pitch !== null && inputs.pitch !== undefined) {
-    signals.push(...pitchSignals(inputs.pitch));
+    signals.push(...pitchSignals(inputs.pitch, stage));
   }
 
   return mergeSignals(signals);
@@ -676,8 +610,21 @@ function mergeSignals(signals: readonly Signal[]): InvestIQObservation[] {
         ? -1
         : 1,
     );
-    const strength = sorted.filter((s) => s.reading === "SUPPORTS_STRENGTH");
-    const weakness = sorted.filter((s) => s.reading === "INDICATES_WEAKNESS");
+    // The most informative member: the lowest graded weakness, else the
+    // highest graded strength, else a record. Ties keep the sorted order.
+    const anchorOf = (x: Signal) =>
+      x.anchor ??
+      (x.reading === "SUPPORTS_STRENGTH"
+        ? 3
+        : x.reading === "INDICATES_WEAKNESS"
+          ? 1
+          : 2);
+    const weakness = sorted
+      .filter((x) => x.reading === "INDICATES_WEAKNESS")
+      .sort((x, y) => anchorOf(x) - anchorOf(y));
+    const strength = sorted
+      .filter((x) => x.reading === "SUPPORTS_STRENGTH")
+      .sort((x, y) => anchorOf(y) - anchorOf(x));
     const chosen = weakness[0] ?? strength[0] ?? sorted[0];
     if (chosen === undefined) continue;
     const latest = sorted
@@ -700,6 +647,7 @@ function toObservation(s: Signal, id: string): InvestIQObservation {
     id,
     criterion: s.criterion,
     reading: s.reading,
+    ...(s.anchor === undefined ? {} : { anchor: s.anchor }),
     statement: s.statement.length === 0 ? s.rule : s.statement,
     truthClass: s.truthClass,
     evidenceStatus: s.evidenceStatus,

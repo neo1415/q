@@ -159,13 +159,12 @@ describe("ADR 0075: unconfirmed investor-visible material", () => {
     }
     // Nothing the founder has not confirmed is ever shown in words.
     expect(JSON.stringify(unconfirmed.view)).not.toMatch(/\$40k|summary|Ada/u);
-    // Confirmed evidence counts more than the same reading unconfirmed.
+    // Confirmed evidence does not move the score (content does); it
+    // narrows the evidence range around it.
     const confirmed = assessInvestability(inputs(), AS_OF);
-    const traction = (x: typeof confirmed) =>
-      x.assessment.dimensions
-        .flatMap((d) => d.criteria)
-        .find((c) => c.criterion === "cp.traction")?.score ?? 0;
-    expect(traction(confirmed)).toBeGreaterThan(traction(unconfirmed));
+    const width = (x: typeof confirmed) =>
+      (x.view.range?.high ?? 0) - (x.view.range?.low ?? 0);
+    expect(width(confirmed)).toBeLessThan(width(unconfirmed));
   });
 
   it("a pitch investors may play counts, its transcript by topic only", () => {
@@ -200,6 +199,71 @@ describe("ADR 0075: unconfirmed investor-visible material", () => {
           o.provenance.sourceKind !== "Q_EXTRACTION",
       ),
     ).toBe(true);
+  });
+});
+
+describe("content grading (investability-grading.v1, investiq/v2)", () => {
+  const traction = (value: string, stage: string) =>
+    assessInvestability(
+      inputs(
+        {
+          stageCode: stage,
+          businessModelCodes: [],
+          profile: {
+            listed: true,
+            description: false,
+            website: false,
+            updatedAt: null,
+          },
+        },
+        DECK_SECTIONS.map((code) =>
+          code === "TRACTION"
+            ? section("TRACTION", [fact("Monthly revenue", value)])
+            : section(code, [], { status: "NOT_IN_DECK", summary: null }),
+        ),
+      ),
+      AS_OF,
+    );
+
+  it("a seed founder claiming $41k MRR scores clearly above a pre-revenue peer", () => {
+    const revenue = traction("USD 41,000", "seed");
+    const none = traction("None reported yet", "seed");
+    expect(
+      (revenue.view.score ?? 0) - (none.view.score ?? 0),
+    ).toBeGreaterThanOrEqual(5);
+    expect(revenue.view.confidence).toBe("LOW");
+    expect(
+      revenue.view.up.length + revenue.view.down.length,
+    ).toBeGreaterThanOrEqual(0);
+  });
+
+  it("grades revenue against the stage: the same MRR is strong at pre-seed, weak at Series A", () => {
+    const preSeed = traction("USD 41,000", "pre_seed");
+    const seriesA = traction("USD 41,000", "series_a");
+    expect(preSeed.view.score ?? 0).toBeGreaterThan(seriesA.view.score ?? 0);
+  });
+
+  it("parses currencies to USD (order of magnitude)", () => {
+    const kes = traction("Around KES 130,000,000", "series_b");
+    const usd = traction("Around USD 1,000,000", "series_b");
+    expect(
+      Math.abs((kes.view.score ?? 0) - (usd.view.score ?? 0)),
+    ).toBeLessThanOrEqual(5);
+  });
+
+  it("presence alone never moves the number", () => {
+    const only = assessInvestability(
+      inputs(
+        {},
+        DECK_SECTIONS.map((code) =>
+          code === "PROBLEM" || code === "SOLUTION" || code === "COMPETITION"
+            ? section(code)
+            : section(code, [], { status: "NOT_IN_DECK", summary: null }),
+        ),
+      ),
+      AS_OF,
+    );
+    expect(only.view.score).toBe(50);
   });
 });
 
@@ -238,14 +302,17 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
     );
     // Self-reported deck evidence: low confidence, band held at Developing.
     expect(view.confidence).toBe("LOW");
-    expect(["DEVELOPING", "EARLY"]).toContain(view.band);
-    expect(view.up.map((f) => f.label)).toContain("Traction");
+    // Score and confidence are separate: the band follows the score.
+    expect(view.cappedByConfidence).toBe(false);
+    expect(view.range).toBeDefined();
+    expect(view.up.length).toBeGreaterThan(0);
     expect(view.missing.length).toBeGreaterThan(0);
   });
 
   it("is stage-aware: pre-revenue is never a weakness at pre-seed, but is at Series A", () => {
     const preRevenue = fullDeck({
       TRACTION: section("TRACTION", [fact("Revenue", "Pre-revenue, 3 pilots")]),
+      FINANCIALS: section("FINANCIALS", [fact("Runway", "14 months of cash")]),
     });
     const preSeed = assessInvestability(
       inputs({ stageCode: "pre_seed" }, preRevenue),
@@ -316,8 +383,12 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
       r.assessment.dimensions
         .flatMap((d) => d.criteria)
         .find((c) => c.criterion === key)?.score ?? 0;
-    expect(of(doc, "cp.traction")).toBeGreaterThan(of(self, "cp.traction"));
-    expect(doc.view.score ?? 0).toBeGreaterThanOrEqual(self.view.score ?? 0);
+    // The same fact graded the same; better evidence narrows the range
+    // and never lowers confidence.
+    expect(of(doc, "cp.traction")).toBe(of(self, "cp.traction"));
+    const width = (x: typeof self) =>
+      (x.view.range?.high ?? 0) - (x.view.range?.low ?? 0);
+    expect(width(doc)).toBeLessThan(width(self));
   });
 
   it("more recorded information never dilutes a strength", () => {

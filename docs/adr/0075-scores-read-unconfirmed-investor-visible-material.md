@@ -43,3 +43,13 @@ The owner, 2026-10-16: investors must see Investability and Suitability on every
 - An offline, read-only count over production gave **461 of 461 listed companies scored** (190 provisional), all 50–54, Developing, Low confidence.
 - Today's material is thin and unconfirmed, so it differentiates little. Founder confirmation, document support and verification move both the score and the confidence.
 - The workforce must treat Low-confidence, provisional scores as a screening signal, never a decision basis. Any threshold action should require at least Moderate confidence, or human review.
+
+## Amendment 2 (lead, 2026-10-16): content grading, no shrinkage
+
+The first reading under this ADR put every company at 50–54. Criteria were graded on presence, and evidence weight pulled every point estimate back to the stage norm.
+
+`investiq/v2+investability-inputs.v3` changes three things. It grades each criterion from what the material states against stage benchmarks (`investability-grading.v1`). It scores the graded anchor without shrinkage. And it moves evidence weight into confidence and an evidence range around the score, with the band following the score.
+
+Presence counts toward coverage only. One graded fact cannot set the score alone: the full distance from the norm needs 3 graded factors.
+
+v1 stays published and reproducible. Offline production result: 31–81, median 50, all Low confidence. Details are in INVESTIQ-METHODOLOGY.md.

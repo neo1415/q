@@ -10,13 +10,13 @@ import {
 import {
   assessInvestIQV1,
   bandOf,
+  INVESTIQ_V2_ARITHMETIC,
   observationWeight,
   type InvestIQV1Assessment,
 } from "../investiq/assess-v1.js";
 import type { InvestIQObservation } from "../investiq/contracts.js";
 import {
   GRADED_DIMENSIONS,
-  INVESTIQ_V1,
   STAGE_WEIGHTS,
   type GradedDimension,
   type ReadinessBand,
@@ -51,7 +51,8 @@ import {
  * company is never re-recorded.
  */
 
-export const INVESTABILITY_METHOD_VERSION = `${INVESTIQ_V1.version}+${INVESTABILITY_INPUTS_VERSION}`;
+/** investiq/v2 arithmetic (no shrinkage; evidence drives confidence and range). */
+export const INVESTABILITY_METHOD_VERSION = `${INVESTIQ_V2_ARITHMETIC.version}+${INVESTABILITY_INPUTS_VERSION}`;
 
 export const INVESTABILITY_SCALE = 25;
 
@@ -133,12 +134,15 @@ export function assessInvestability(
     businessModel: [...inputs.businessModelCodes].sort()[0] ?? null,
     instrument: null,
   };
-  const assessment = assessInvestIQV1({
-    companyRef: inputs.companyId,
-    asOf,
-    context,
-    observations,
-  });
+  const assessment = assessInvestIQV1(
+    {
+      companyRef: inputs.companyId,
+      asOf,
+      context,
+      observations,
+    },
+    INVESTIQ_V2_ARITHMETIC,
+  );
   const basisHash = createHash("sha256")
     .update(INVESTABILITY_METHOD_VERSION)
     .update("\n")
@@ -180,6 +184,93 @@ function hasMaterial(inputs: InvestabilityInputs): boolean {
  * criteria with evidence. Unknown criteria stay out (never zero). Stage
  * unknown: equal dimension weights, and no stage-specific readings.
  */
+/**
+ * Lead 2026-10-16 (ADR 0075 amendment): the point estimate reads only
+ * content-graded criteria (a fact graded against the stage benchmark);
+ * criteria merely on record count toward coverage and confidence, never
+ * toward the number, so presence cannot pull every company to the stage
+ * norm. With nothing content-graded the record-only score (the norm) is
+ * used.
+ *
+ *   banded       stage-weighted mean over dimensions with a graded
+ *                criterion, each dimension the mean of its graded criteria
+ *   provisional  each graded criterion weighted by its dimension's stage
+ *                weight shared over the dimension's applicable criteria
+ */
+/**
+ * Credibility by how many factors are graded (not by evidence weight): one
+ * graded factor cannot make a company Strong or Early on its own. The
+ * graded mean's distance from the stage norm (2) counts in full from four
+ * graded factors: z = min(1, n / 4).
+ */
+export const FULL_CREDIBILITY_FACTORS = 3;
+
+function pointEstimate(
+  a: InvestIQV1Assessment,
+  graded: ReadonlySet<string>,
+  banded: boolean,
+): number | null {
+  // One weighting for every company, whatever the coverage gates say: a
+  // graded fact counts by its dimension's stage weight shared over the
+  // dimension's applicable criteria. The gates decide confidence and the
+  // "early read" label, never which facts count.
+  void banded;
+  const raw = gradedMean(a, graded, false);
+  if (raw === null) return null;
+  const n = [...graded].filter((key) =>
+    a.dimensions.some((d) =>
+      d.criteria.some(
+        (c) => c.criterion === key && c.graded && c.state === "SCORED",
+      ),
+    ),
+  ).length;
+  if (n === 0) return raw;
+  const z = Math.min(1, n / FULL_CREDIBILITY_FACTORS);
+  return 2 + (raw - 2) * z;
+}
+
+function gradedMean(
+  a: InvestIQV1Assessment,
+  graded: ReadonlySet<string>,
+  banded: boolean,
+): number | null {
+  const weights = a.stageBand === null ? null : STAGE_WEIGHTS[a.stageBand];
+  const scoredGraded = (d: InvestIQV1Assessment["dimensions"][number]) =>
+    d.criteria.filter(
+      (c) =>
+        c.graded &&
+        c.state === "SCORED" &&
+        c.score !== null &&
+        graded.has(c.criterion),
+    );
+  if (banded) {
+    let total = 0;
+    let sum = 0;
+    for (const d of a.dimensions) {
+      const cs = scoredGraded(d);
+      if (cs.length === 0 || d.status !== "SCORED") continue;
+      const w = weights === null ? 1 : weights[d.dimension];
+      total += w;
+      sum += (w * cs.reduce((s, c) => s + (c.score ?? 0), 0)) / cs.length;
+    }
+    if (total > 0) return sum / total;
+    return a.overall.score;
+  }
+  let total = 0;
+  let sum = 0;
+  for (const d of a.dimensions) {
+    if (d.applicableGradedCriteria === 0) continue;
+    const each =
+      (weights === null ? 1 : weights[d.dimension]) /
+      d.applicableGradedCriteria;
+    for (const c of scoredGraded(d)) {
+      total += each;
+      sum += each * (c.score ?? 0);
+    }
+  }
+  return total > 0 ? sum / total : provisionalScore(a);
+}
+
 function provisionalScore(a: InvestIQV1Assessment): number | null {
   const weights = a.stageBand === null ? null : STAGE_WEIGHTS[a.stageBand];
   let total = 0;
@@ -195,6 +286,37 @@ function provisionalScore(a: InvestIQV1Assessment): number | null {
     }
   }
   return total === 0 ? null : sum / total;
+}
+
+/**
+ * The evidence range: each scored criterion's anchor ± 2 × (1 − w), where
+ * w is its deciding observation's evidence weight (verified 1 → no width,
+ * a founder claim 0.5 → ±1, Q's unconfirmed read 0.25 → ±1.5), clipped to
+ * 0-4, then averaged with the provisional weights. Unknown criteria stay
+ * out of it, as they stay out of the score.
+ */
+function evidenceRange(
+  a: InvestIQV1Assessment,
+  weightOfCriterion: ReadonlyMap<string, number>,
+): { readonly low: number; readonly high: number } | null {
+  const weights = a.stageBand === null ? null : STAGE_WEIGHTS[a.stageBand];
+  let total = 0;
+  let low = 0;
+  let high = 0;
+  for (const d of a.dimensions) {
+    if (d.applicableGradedCriteria === 0) continue;
+    const each =
+      (weights === null ? 1 : weights[d.dimension]) /
+      d.applicableGradedCriteria;
+    for (const c of d.criteria) {
+      if (!c.graded || c.state !== "SCORED" || c.score === null) continue;
+      const half = 2 * (1 - (weightOfCriterion.get(c.criterion) ?? 0.25));
+      total += each;
+      low += each * Math.max(0, c.score - half);
+      high += each * Math.min(4, c.score + half);
+    }
+  }
+  return total === 0 ? null : { low: low / total, high: high / total };
 }
 
 /** What a factor line may say: confirmed facts are quoted, the rest named only. */
@@ -231,6 +353,8 @@ function viewOf(
   const rows: Row[] = [];
   const withheld: ScoreFactor[] = [];
   let unconfirmedOnly = 0;
+  const deciding = new Map<string, number>();
+  const contentGraded = new Set<string>();
   for (const d of a.dimensions) {
     for (const c of d.criteria) {
       if (!c.graded) continue;
@@ -245,6 +369,9 @@ function viewOf(
           detail: "Contradictory evidence: withheld until reconciled",
         });
       } else if (c.state === "SCORED" && c.score !== null) {
+        if (top !== undefined)
+          deciding.set(c.criterion, observationWeight(top));
+        if (top?.anchor !== undefined) contentGraded.add(c.criterion);
         const ref = top?.provenance.sourceRef ?? "";
         if (ref.startsWith(UNCONFIRMED_DECK_REF) || ref.startsWith(PITCH_REF)) {
           unconfirmedOnly += 1;
@@ -322,6 +449,16 @@ function viewOf(
     methodVersion: INVESTABILITY_METHOD_VERSION,
   };
   const viewSchema = InvestabilityDtoSchema.omit({ assessedAt: true });
+  const range = evidenceRange(a, deciding);
+  const rangeAround = (score: number) =>
+    range === null
+      ? {}
+      : {
+          range: {
+            low: Math.min(score, Math.round(range.low * INVESTABILITY_SCALE)),
+            high: Math.max(score, Math.round(range.high * INVESTABILITY_SCALE)),
+          },
+        };
   const parse = (value: unknown) => viewSchema.parse(value);
 
   if (!material) {
@@ -340,19 +477,24 @@ function viewOf(
     overall.score !== null &&
     overall.band !== null
   ) {
+    // Score and confidence are separate (lead 2026-10-16): the band says
+    // where the score is; confidence says how far to trust it.
+    const point = pointEstimate(a, contentGraded, true) ?? overall.score;
+    const score = Math.round(point * INVESTABILITY_SCALE);
     return parse({
       ...common,
       status: "SCORED",
-      score: Math.round(overall.score * INVESTABILITY_SCALE),
-      band: BAND_WORDS[overall.band],
+      score,
+      ...rangeAround(score),
+      band: BAND_WORDS[bandOf(point)],
       confidence: overall.confidence,
-      cappedByConfidence: overall.cappedByConfidence,
+      cappedByConfidence: false,
       provisional: false,
     });
   }
   // ADR 0075: always a number when there is material; a thin basis is
   // Low confidence and the band is held at Developing at most.
-  const provisional = provisionalScore(a);
+  const provisional = pointEstimate(a, contentGraded, false);
   if (provisional === null) {
     return parse({
       ...common,
@@ -364,15 +506,15 @@ function viewOf(
       provisional: false,
     });
   }
-  const raw = bandOf(provisional);
-  const capped = raw === "READY" || raw === "STRONG";
+  const score = Math.round(provisional * INVESTABILITY_SCALE);
   return parse({
     ...common,
     status: "SCORED",
-    score: Math.round(provisional * INVESTABILITY_SCALE),
-    band: BAND_WORDS[capped ? "DEVELOPING" : raw],
+    score,
+    ...rangeAround(score),
+    band: BAND_WORDS[bandOf(provisional)],
     confidence: "LOW",
-    cappedByConfidence: capped,
+    cappedByConfidence: false,
     provisional: true,
   });
 }

@@ -124,6 +124,18 @@ export const InvestabilityDtoSchema = z
      * (a screening signal); confidence is then Low. Absent: false.
      */
     provisional: z.boolean().optional(),
+    /**
+     * Lead 2026-10-16: the evidence range around the score, 0-100. Weak
+     * (self-reported, unconfirmed) evidence widens it; verified evidence
+     * narrows it. It never moves the score itself. Absent: not computed.
+     */
+    range: z
+      .object({
+        low: z.number().int().min(0).max(100),
+        high: z.number().int().min(0).max(100),
+      })
+      .strict()
+      .optional(),
     coverage: z
       .object({
         /** InvestIQ dimensions with enough evidence to score. */
