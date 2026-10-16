@@ -57,6 +57,9 @@ export function defaultDocumentSensitivity(
     case "CUSTOMER":
     case "OPERATIONAL":
     case "OTHER":
+    case "FUND_DECK":
+    case "INVESTMENT_THESIS":
+    case "LP_LETTER":
       return "CONFIDENTIAL";
   }
 }

@@ -17,6 +17,7 @@ import { CoverageOverview } from "../onboarding-kit/components/coverage-overview
 import { OnboardingProgress } from "../onboarding-kit/components/onboarding-progress";
 import { phasesFor } from "../onboarding-kit/coverage";
 import { useFormCoverage } from "../onboarding-kit/use-form-coverage";
+import { InvestorMaterials } from "./investor-materials";
 import { groupOf } from "./models/journey";
 import { OnboardingShell } from "../onboarding-kit/components/onboarding-shell";
 import { VoiceHandover } from "../voice/voice-handover";
@@ -378,6 +379,14 @@ export function InvestorOnboardingScreen({
       <div key={step.id} className="contents">
         {backToQ}
         {renderStep({ step, formId: STEP_FORM_ID, busy: state.busy, actions })}
+        {/* Optional fund materials, on every screen, never a gate. */}
+        <div className="mt-8 border-t border-(--cq-border-subtle) pt-4">
+          <InvestorMaterials
+            firmReady={
+              session.raw?.session.subject?.type === "INVESTOR_ORGANISATION"
+            }
+          />
+        </div>
       </div>
     </OnboardingShell>
   );
