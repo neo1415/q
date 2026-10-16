@@ -32,7 +32,7 @@ is filled from it, not from a second list.
 | G1 | Done: the registration organisation is the starting value of F1.company_name / I0.organisation_name ("From your sign-up"), only for the journey it was typed for; recorded only on Continue; a saved answer wins. Live-checked locally against production. |
 | G2 | Done: sign-up chooses Raise capital / Invest (Google carries it on the return path); `/welcome` opens that journey without the role question; invitees choose nothing. |
 | G3, G4, G5, G8 | Done on ob1's contract: the form renders `deriveOnboardingCoverage` (same definition, session view, registration facts as REGISTRATION) — summary line plus "What Q has" (state in words, value, provenance, Required/Optional, Confirm / Not right, jump to the screen). |
-| G6 | Open: investor upload needs an ob1 coverage decision (no investor document step exists). |
+| G6 | Done (form): optional fund deck / thesis / LP letter in investor setup as firm documents (FUND_DECK, INVESTMENT_THESIS, LP_LETTER). Mapping to mandate coverage: ob1. |
 | G7 | Partial (unchanged). |
 | G9, G10 | Waiting on ob1 (deferral and notes in coverage; the API route adds held saves and document types). |
 
