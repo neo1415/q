@@ -155,7 +155,9 @@ describe("CRM in Arabic", () => {
         />
       </LanguageProvider>,
     );
-    expect(screen.getByRole("link", { name: "افتح اكتشف" })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: translate("ar", "Open Discover") }),
+    ).toBeTruthy();
     expect(screen.getByText(/لا توجد علاقات بعد/u)).toBeTruthy();
   });
 });
