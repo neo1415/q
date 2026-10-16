@@ -513,7 +513,7 @@ export function RelationshipDeal({
         >
           <p className="cq-body text-(--cq-text-primary)">
             <strong>{t("Investment closed")}</strong> {t("on")}{" "}
-            {dealDay(view.end.at)}
+            {t(dealDay(view.end.at))}
             {view.terms === null ? "" : t(`: ${termsLine(view.terms)}`)}
             {t(". This is the final state; the history and reports stay.")}
           </p>
@@ -575,7 +575,7 @@ export function RelationshipDeal({
           data-deal-final="PASSED"
         >
           {side === "INVESTOR" ? t("You decided") : t(`${counterpart} decided`)}{" "}
-          {t("not to proceed on")} {dealDay(view.end.at)}
+          {t("not to proceed on")} {t(dealDay(view.end.at))}
           {t(
             ". The relationship is archived, never deleted: its history and reports stay here.",
           )}
@@ -592,7 +592,7 @@ export function RelationshipDeal({
                   ? "your side"
                   : counterpart),
             )}{" "}
-            {t("on")} {dealDay(view.terms.recordedAt)}
+            {t("on")} {t(dealDay(view.terms.recordedAt))}
           </span>
           <span className="cq-body text-(--cq-text-primary)">
             {t(termsLine(view.terms))}
@@ -756,7 +756,7 @@ export function RelationshipDeal({
                     {t(REPORT_WORDS[report.kind])}
                   </span>
                   <span className="cq-caption text-(--cq-text-tertiary)">
-                    v{report.version} · {dealDay(report.createdAt)} ·{" "}
+                    v{report.version} · {t(dealDay(report.createdAt))} ·{" "}
                     {report.visibility === "relationship_shared"
                       ? t(`Shared with ${counterpart}`)
                       : t("Only your organisation")}

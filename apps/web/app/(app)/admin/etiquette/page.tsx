@@ -7,6 +7,7 @@ import { ErrorState } from "@capital-q/ui/states";
 import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
 import { HouseGuideEditor } from "@/features/etiquette/house-guide-editor";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "How Q conducts business · Admin" };
 
@@ -17,19 +18,23 @@ export const metadata: Metadata = { title: "How Q conducts business · Admin" };
  * the page shows.
  */
 export default async function AdminEtiquettePage() {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("flags.write")) notFound();
   const guide = await getAdminEtiquetteGuide(context.session).catch(() => null);
   return (
     <PageSection
       id="etiquette"
-      title="How Q conducts business"
-      description="The house guide Q follows when it writes or speaks to investors and founders for anyone on Capital Q."
+      title={t("How Q conducts business")}
+      description={t(
+        "The house guide Q follows when it writes or speaks to investors and founders for anyone on Capital Q.",
+      )}
     >
       {guide === null ? (
         <ErrorState
-          title="The guide couldn't load"
-          description="Nothing changed. Try again in a moment."
+          title={t("The guide couldn't load")}
+          description={t("Nothing changed. Try again in a moment.")}
         />
       ) : (
         <HouseGuideEditor guide={guide} />

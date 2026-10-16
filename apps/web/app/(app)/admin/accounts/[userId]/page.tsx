@@ -9,6 +9,7 @@ import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
 import { AccountSuspension } from "@/features/admin/suspension-controls";
 import { ROLE_WORDS, when, words } from "@/features/admin/words";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Account · Admin" };
 
@@ -17,6 +18,8 @@ export default async function AdminAccountPage({
 }: {
   readonly params: Promise<{ readonly userId: string }>;
 }) {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("accounts.read")) notFound();
   const { userId } = await params;
@@ -57,10 +60,10 @@ export default async function AdminAccountPage({
             {facts.map((fact) => (
               <div key={fact.term} className="flex flex-col gap-1">
                 <dt className="cq-caption text-(--cq-text-secondary)">
-                  {fact.term}
+                  {t(fact.term)}
                 </dt>
                 <dd className="cq-body text-(--cq-text-primary)">
-                  {fact.value}
+                  {t(fact.value)}
                 </dd>
               </div>
             ))}
@@ -75,9 +78,9 @@ export default async function AdminAccountPage({
         </div>
       </PageSection>
 
-      <PageSection id="memberships" title="Organisations">
+      <PageSection id="memberships" title={t("Organisations")}>
         {account.memberships.length === 0 ? (
-          <EmptyState compact title="No organisation yet" />
+          <EmptyState compact title={t("No organisation yet")} />
         ) : (
           <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
             {account.memberships.map((membership) => (
@@ -90,11 +93,11 @@ export default async function AdminAccountPage({
                     {membership.organisationName}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {words(membership.organisationType)} ·{" "}
-                    {words(membership.status)}
+                    {t(words(membership.organisationType))} ·{" "}
+                    {t(words(membership.status))}
                     {membership.roles.length === 0
                       ? ""
-                      : ` · ${membership.roles.map(words).join(", ")}`}
+                      : t(` · ${membership.roles.map(words).join(", ")}`)}
                   </span>
                 </Link>
               </li>
@@ -103,9 +106,9 @@ export default async function AdminAccountPage({
         )}
       </PageSection>
 
-      <PageSection id="suspensions" title="Suspension history">
+      <PageSection id="suspensions" title={t("Suspension history")}>
         {account.suspensions.length === 0 ? (
-          <EmptyState compact title="Never suspended" />
+          <EmptyState compact title={t("Never suspended")} />
         ) : (
           <ul className="flex flex-col gap-2">
             {account.suspensions.map((entry) => (
@@ -113,9 +116,9 @@ export default async function AdminAccountPage({
                 key={`${entry.occurredAt}-${entry.action}`}
                 className="cq-body-sm text-(--cq-text-primary)"
               >
-                {entry.action === "SUSPENDED" ? "Suspended" : "Lifted"}{" "}
-                {when(entry.occurredAt)} by {entry.actorName ?? "an admin"}:{" "}
-                {entry.reason}
+                {entry.action === "SUSPENDED" ? t("Suspended") : t("Lifted")}{" "}
+                {t(when(entry.occurredAt))} {t("by")}{" "}
+                {t(entry.actorName ?? "an admin")}: {t(entry.reason)}
               </li>
             ))}
           </ul>

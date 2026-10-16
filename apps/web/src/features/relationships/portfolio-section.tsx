@@ -120,7 +120,7 @@ export function PortfolioSection({
                     : "Open for the commitment"}
                   {" · since "}
                   <time dateTime={item.stateSince}>
-                    {dealDay(item.stateSince)}
+                    {t(dealDay(item.stateSince))}
                   </time>
                 </span>
               </Link>

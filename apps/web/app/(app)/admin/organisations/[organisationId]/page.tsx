@@ -14,6 +14,7 @@ import { OrganisationSuspension } from "@/features/admin/suspension-controls";
 import { AssignPlan, OverrideLimit } from "@/features/admin/billing-controls";
 import { allowanceLine, sourceLine } from "@/features/billing/plan-words";
 import { when, words } from "@/features/admin/words";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Organisation · Admin" };
 
@@ -28,6 +29,8 @@ export default async function AdminOrganisationPage({
 }: {
   readonly params: Promise<{ readonly organisationId: string }>;
 }) {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("accounts.read")) notFound();
   const { organisationId } = await params;
@@ -59,10 +62,10 @@ export default async function AdminOrganisationPage({
             {facts.map((fact) => (
               <div key={fact.term} className="flex flex-col gap-1">
                 <dt className="cq-caption text-(--cq-text-secondary)">
-                  {fact.term}
+                  {t(fact.term)}
                 </dt>
                 <dd className="cq-body break-words text-(--cq-text-primary)">
-                  {fact.value}
+                  {t(fact.value)}
                 </dd>
               </div>
             ))}
@@ -80,12 +83,14 @@ export default async function AdminOrganisationPage({
       {billing === null ? null : (
         <PageSection
           id="plan"
-          title="Plan and usage"
-          description={sourceLine({
-            source: billing.current.source,
-            planName: billing.current.plan.name,
-            endsAt: billing.current.endsAt,
-          })}
+          title={t("Plan and usage")}
+          description={t(
+            sourceLine({
+              source: billing.current.source,
+              planName: billing.current.plan.name,
+              endsAt: billing.current.endsAt,
+            }),
+          )}
         >
           <div className="flex flex-col gap-6">
             {canChangePlan ? (
@@ -106,8 +111,10 @@ export default async function AdminOrganisationPage({
                       {feature.name}
                     </span>
                     <span className="cq-caption text-(--cq-text-secondary)">
-                      {allowanceLine(feature)}
-                      {feature.overridden ? " · set for this organisation" : ""}
+                      {t(allowanceLine(feature))}
+                      {feature.overridden
+                        ? t(" · set for this organisation")
+                        : ""}
                     </span>
                   </div>
                   {canChangePlan ? (
@@ -126,12 +133,12 @@ export default async function AdminOrganisationPage({
                     key={`${row.startsAt}-${row.planKey}`}
                     className="cq-caption text-(--cq-text-secondary)"
                   >
-                    {row.planName} ({words(row.source)}) from{" "}
-                    {when(row.startsAt)}
+                    {row.planName} ({t(words(row.source))}
+                    {t(") from")} {t(when(row.startsAt))}
                     {row.supersededAt === null
                       ? ""
-                      : ` until ${when(row.supersededAt)}`}
-                    {row.reason === null ? "" : `: ${row.reason}`}
+                      : t(` until ${when(row.supersededAt)}`)}
+                    {row.reason === null ? "" : t(`: ${row.reason}`)}
                   </li>
                 ))}
               </ul>
@@ -141,12 +148,14 @@ export default async function AdminOrganisationPage({
       )}
       {/* end BILLING block */}
 
-      <PageSection id="verification" title="Verification">
+      <PageSection id="verification" title={t("Verification")}>
         {org.verification.length === 0 ? (
           <EmptyState
             compact
-            title="Not requested"
-            description="Nobody has asked Capital Q to verify this organisation."
+            title={t("Not requested")}
+            description={t(
+              "Nobody has asked Capital Q to verify this organisation.",
+            )}
           />
         ) : (
           <ul className="flex flex-col gap-2">
@@ -155,19 +164,19 @@ export default async function AdminOrganisationPage({
                 key={`${entry.claimType}-${entry.at}`}
                 className="cq-body-sm text-(--cq-text-primary)"
               >
-                {words(entry.claimType)}: {words(entry.status)}
+                {t(words(entry.claimType))}: {t(words(entry.status))}
                 {entry.method === null
                   ? ""
-                  : ` (${words(entry.method)})`} · {when(entry.at)}
+                  : t(` (${words(entry.method)})`)} · {t(when(entry.at))}
               </li>
             ))}
           </ul>
         )}
       </PageSection>
 
-      <PageSection id="members" title="Members">
+      <PageSection id="members" title={t("Members")}>
         {org.memberList.length === 0 ? (
-          <EmptyState compact title="No members" />
+          <EmptyState compact title={t("No members")} />
         ) : (
           <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
             {org.memberList.map((member) => (
@@ -177,10 +186,10 @@ export default async function AdminOrganisationPage({
                   className="flex min-h-11 items-center justify-between gap-3 py-3 hover:bg-(--cq-surface-subtle)"
                 >
                   <span className="cq-body text-(--cq-text-primary)">
-                    {member.name ?? "Unnamed member"}
+                    {member.name ?? t("Unnamed member")}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {words(member.status)}
+                    {t(words(member.status))}
                     {member.suspended ? " · Suspended" : ""}
                   </span>
                 </Link>

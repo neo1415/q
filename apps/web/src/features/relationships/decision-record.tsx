@@ -18,7 +18,7 @@ export function DecisionRecord({ decision }: { readonly decision: Decision }) {
           dateTime={decision.at}
           className="cq-body-sm cq-numeric text-(--cq-text-secondary)"
         >
-          {dealDay(decision.at)}
+          {t(dealDay(decision.at))}
         </time>
       </p>
       {decision.details.length === 0 ? null : (
@@ -33,11 +33,9 @@ export function DecisionRecord({ decision }: { readonly decision: Decision }) {
       {decision.earlier.length === 0 ? null : (
         <p className="cq-caption text-(--cq-text-tertiary)">
           {t("Earlier:")}{" "}
-          {t(
-            decision.earlier
-              .map((entry) => `${entry.title} ${dealDay(entry.at)}`)
-              .join(" · "),
-          )}
+          {decision.earlier
+            .map((entry) => `${t(entry.title)} ${t(dealDay(entry.at))}`)
+            .join(" · ")}
         </p>
       )}
     </div>

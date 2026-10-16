@@ -8,6 +8,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { Download, ExternalLink } from "@capital-q/ui/icons";
 
 import { formatLongDay } from "@/components/date-format";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /**
  * The Q Daily, read in the app (DAILY spec §3): a newspaper rather than a
@@ -37,13 +38,15 @@ function Picture({
   readonly image: QDailyImage;
   readonly priority?: boolean;
 }) {
+  const t = serverTNow();
+
   const img = (
     // A remote picture shown as the publisher or Pexels serves it: the
     // optimiser would re-host bytes Capital Q has no right to copy.
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={image.url}
-      alt={image.alt}
+      alt={t(image.alt)}
       loading={priority ? "eager" : "lazy"}
       decoding="async"
       referrerPolicy="no-referrer"
@@ -61,7 +64,7 @@ function Picture({
       )}
       <figcaption className="cq-caption text-(--cq-text-tertiary)">
         {image.creditUrl === null ? (
-          image.credit
+          t(image.credit)
         ) : (
           <a
             href={image.creditUrl}
@@ -69,7 +72,7 @@ function Picture({
             rel="noopener noreferrer"
             className="underline-offset-2 hover:underline"
           >
-            {image.credit}
+            {t(image.credit)}
           </a>
         )}
       </figcaption>
@@ -78,9 +81,11 @@ function Picture({
 }
 
 function Sources({ story }: { readonly story: QDailyStory }) {
+  const t = serverTNow();
+
   return (
     <p className="cq-caption flex flex-wrap items-center gap-x-2 text-(--cq-text-secondary)">
-      <span>Source:</span>
+      <span>{t("Source:")}</span>
       {story.sources.map((source) => (
         <a
           key={source.url}
@@ -89,10 +94,11 @@ function Sources({ story }: { readonly story: QDailyStory }) {
           rel="noopener noreferrer"
           className="inline-flex min-h-11 items-center gap-1 underline underline-offset-2 sm:min-h-0"
         >
-          {source.publisher}
+          {t(source.publisher)}
           <span className="sr-only">
             {" "}
-            ({hostOf(source.url)}, opens in a new tab)
+            ({t(hostOf(source.url))}
+            {t(", opens in a new tab)")}
           </span>
           <ExternalLink aria-hidden="true" size={12} strokeWidth={1.75} />
         </a>
@@ -102,11 +108,13 @@ function Sources({ story }: { readonly story: QDailyStory }) {
 }
 
 function Paragraphs({ story }: { readonly story: QDailyStory }) {
+  const t = serverTNow();
+
   return (
     <>
       {story.paragraphs.map((paragraph, index) => (
         <p key={index} className="cq-body-sm text-(--cq-text-primary)">
-          {paragraph}
+          {t(paragraph)}
         </p>
       ))}
       {story.quotes.map((quote, index) => (
@@ -117,7 +125,7 @@ function Paragraphs({ story }: { readonly story: QDailyStory }) {
           <p>&ldquo;{quote.text}&rdquo;</p>
           {quote.speaker === null ? null : (
             <footer className="cq-caption mt-1 font-(family-name:--cq-font-ui) text-(--cq-text-secondary)">
-              {quote.speaker}
+              {t(quote.speaker)}
             </footer>
           )}
         </blockquote>
@@ -138,6 +146,8 @@ function Body({
    */
   readonly fold?: boolean;
 }) {
+  const t = serverTNow();
+
   const hasBody = story.paragraphs.length > 0 || story.quotes.length > 0;
   return (
     <>
@@ -147,8 +157,8 @@ function Body({
           data-story-fold
         >
           <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center text-(--cq-text-primary) underline underline-offset-4 lg:hidden [&::-webkit-details-marker]:hidden">
-            Read
-            <span className="sr-only"> {story.headline}</span>
+            {t("Read")}
+            <span className="sr-only"> {t(story.headline)}</span>
           </summary>
           <div className="flex flex-col gap-3">
             <Paragraphs story={story} />
@@ -163,6 +173,8 @@ function Body({
 }
 
 function Lead({ story }: { readonly story: QDailyStory }) {
+  const t = serverTNow();
+
   return (
     <article
       aria-labelledby={`story-${story.id}`}
@@ -178,13 +190,13 @@ function Lead({ story }: { readonly story: QDailyStory }) {
           id={`story-${story.id}`}
           className={`${EDITORIAL} text-[30px] leading-[1.12] font-semibold text-(--cq-text-primary) md:text-[38px]`}
         >
-          {story.headline}
+          {t(story.headline)}
         </h2>
         {story.standfirst.length === 0 ? null : (
           <p
             className={`${EDITORIAL} text-[19px] leading-snug text-(--cq-text-secondary)`}
           >
-            {story.standfirst}
+            {t(story.standfirst)}
           </p>
         )}
         <div className="flex flex-col gap-3 md:columns-1">
@@ -201,6 +213,8 @@ function Lead({ story }: { readonly story: QDailyStory }) {
 }
 
 function Story({ story }: { readonly story: QDailyStory }) {
+  const t = serverTNow();
+
   return (
     <article
       aria-labelledby={`story-${story.id}`}
@@ -211,11 +225,11 @@ function Story({ story }: { readonly story: QDailyStory }) {
         id={`story-${story.id}`}
         className={`${EDITORIAL} text-[21px] leading-tight font-semibold text-(--cq-text-primary)`}
       >
-        {story.headline}
+        {t(story.headline)}
       </h3>
       {story.standfirst.length === 0 ? null : (
         <p className="cq-body-sm font-medium text-(--cq-text-secondary)">
-          {story.standfirst}
+          {t(story.standfirst)}
         </p>
       )}
       <Body story={story} fold />
@@ -230,17 +244,21 @@ function Kicker({
   readonly id: string;
   readonly title: string;
 }) {
+  const t = serverTNow();
+
   return (
     <h2
       id={id}
       className="cq-label border-b-2 border-(--cq-text-primary) pb-1 text-(--cq-text-primary)"
     >
-      {title}
+      {t(title)}
     </h2>
   );
 }
 
 function DealsChart({ chart }: { readonly chart: QDailyChart }) {
+  const t = serverTNow();
+
   const top = Math.max(...chart.bars.map((bar) => bar.value), 1);
   return (
     <figure
@@ -248,7 +266,7 @@ function DealsChart({ chart }: { readonly chart: QDailyChart }) {
       data-daily-chart
     >
       <figcaption className="cq-title-sm text-(--cq-text-primary)">
-        {chart.title}
+        {t(chart.title)}
       </figcaption>
       <ol className="flex flex-col gap-2">
         {chart.bars.map((bar) => (
@@ -260,7 +278,7 @@ function DealsChart({ chart }: { readonly chart: QDailyChart }) {
               href={`#story-${bar.storyId}`}
               className="cq-body-sm truncate text-(--cq-text-primary) underline-offset-2 hover:underline"
             >
-              {bar.label}
+              {t(bar.label)}
             </a>
             <span
               aria-hidden="true"
@@ -270,12 +288,12 @@ function DealsChart({ chart }: { readonly chart: QDailyChart }) {
               }}
             />
             <span className="cq-body-sm cq-numeric font-semibold text-(--cq-text-primary)">
-              {bar.formatted}
+              {t(bar.formatted)}
             </span>
           </li>
         ))}
       </ol>
-      <p className="cq-caption text-(--cq-text-tertiary)">{chart.source}</p>
+      <p className="cq-caption text-(--cq-text-tertiary)">{t(chart.source)}</p>
     </figure>
   );
 }
@@ -297,6 +315,8 @@ export function dateline(edition: QDailyEdition): string {
 }
 
 export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
+  const t = serverTNow();
+
   const hasDeals = edition.sections.some((section) => section.code === "DEALS");
   return (
     <article className="flex flex-col gap-8" data-daily-edition={edition.id}>
@@ -308,12 +328,12 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
         </p>
         <div className="w-full border-y-[3px] border-double border-(--cq-text-primary) py-2">
           <p className="cq-caption text-(--cq-text-secondary)">
-            {dateline(edition)}
+            {t(dateline(edition))}
           </p>
         </div>
         {edition.topics.length === 0 ? null : (
           <p className="cq-caption text-(--cq-text-tertiary)">
-            Following {edition.topics.join(", ")}
+            {t("Following")} {t(edition.topics.join(", "))}
           </p>
         )}
         <div className="mt-1 flex flex-wrap justify-center gap-2">
@@ -324,13 +344,13 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
             data-daily-pdf
           >
             <Download aria-hidden="true" size={16} strokeWidth={1.75} />
-            Download PDF
+            {t("Download PDF")}
           </a>
           <a
             href="/settings#q-daily"
             className={buttonClassName("quiet", "compact")}
           >
-            Change how often
+            {t("Change how often")}
           </a>
         </div>
       </header>
@@ -339,8 +359,8 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
         <p
           className={`${EDITORIAL} text-center text-[19px] text-(--cq-text-secondary)`}
         >
-          A quiet {edition.frequency === "DAILY" ? "day" : "week"} in your
-          markets: nothing new Q could cite.
+          {t("A quiet")} {edition.frequency === "DAILY" ? "day" : "week"}{" "}
+          {t("in your markets: nothing new Q could cite.")}
         </p>
       ) : (
         <Lead story={edition.lead} />
@@ -352,7 +372,7 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
           aria-labelledby={`section-${section.code}`}
           className="flex flex-col gap-4"
         >
-          <Kicker id={`section-${section.code}`} title={section.title} />
+          <Kicker id={`section-${section.code}`} title={t(section.title)} />
           <div className="grid gap-x-8 gap-y-2 md:grid-cols-2">
             {section.stories.map((story) => (
               <Story key={story.id} story={story} />
@@ -369,7 +389,7 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
           aria-labelledby="section-deals-chart"
           className="flex flex-col gap-4"
         >
-          <Kicker id="section-deals-chart" title="Deals and rounds" />
+          <Kicker id="section-deals-chart" title={t("Deals and rounds")} />
           <DealsChart chart={edition.chart} />
         </section>
       ) : null}
@@ -379,7 +399,7 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
           aria-labelledby="section-briefs"
           className="flex flex-col gap-3"
         >
-          <Kicker id="section-briefs" title="In brief" />
+          <Kicker id="section-briefs" title={t("In brief")} />
           <ul className="grid gap-x-8 md:grid-cols-2">
             {edition.briefs.map((story) => (
               <li
@@ -390,7 +410,7 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
                 <p
                   className={`${EDITORIAL} text-[17px] leading-snug font-semibold text-(--cq-text-primary)`}
                 >
-                  {story.headline}
+                  {t(story.headline)}
                 </p>
                 <Sources story={story} />
               </li>
@@ -406,27 +426,26 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
           data-daily-q-take
         >
           <h2 id="section-q-take" className="cq-label text-(--cq-text-primary)">
-            Q&apos;s take
+            {t("Q's take")}
           </h2>
           <p className="cq-caption text-(--cq-text-secondary)">
-            Q&apos;s inference from the stories in this edition, not reported
-            fact.
+            {t(
+              "Q's inference from the stories in this edition, not reported fact.",
+            )}
           </p>
           {edition.qTake.paragraphs.map((paragraph, index) => (
             <p
               key={index}
               className={`${EDITORIAL} text-[17px] leading-relaxed text-(--cq-text-primary)`}
             >
-              {paragraph}
+              {t(paragraph)}
             </p>
           ))}
         </aside>
       )}
 
       <footer className="cq-caption flex flex-col gap-1 border-t border-(--cq-border) pt-4 text-(--cq-text-tertiary)">
-        <p>
-          Every story names its source. Q&apos;s take is Q&apos;s inference.
-        </p>
+        <p>{t("Every story names its source. Q's take is Q's inference.")}</p>
         {usesStock(edition) ? (
           <p>
             <a
@@ -435,7 +454,7 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
               rel="noopener noreferrer"
               className="underline underline-offset-2"
             >
-              Photos provided by Pexels
+              {t("Photos provided by Pexels")}
             </a>
           </p>
         ) : null}

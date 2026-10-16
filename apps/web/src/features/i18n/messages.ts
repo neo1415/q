@@ -3,8 +3,10 @@ import {
   type QLanguagePreference,
 } from "@capital-q/contracts";
 
+import { ADMIN_AR } from "./catalog/admin";
 import { COMPANY_AR } from "./catalog/company";
 import { CORE_AR } from "./catalog/core";
+import { DAILY_AR } from "./catalog/daily";
 import { DISCOVER_AR } from "./catalog/discover";
 import { DOCUMENTS_AR } from "./catalog/documents";
 import { GATEQ_AR } from "./catalog/gateq";
@@ -37,6 +39,8 @@ const ARABIC: Readonly<Record<string, string>> = {
   ...DOCUMENTS_AR,
   ...GATEQ_AR,
   ...WORK_AR,
+  ...DAILY_AR,
+  ...ADMIN_AR,
   ...Q_AR,
   ...DISCOVER_AR,
   ...COMPANY_AR,

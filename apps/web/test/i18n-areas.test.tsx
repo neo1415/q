@@ -15,6 +15,8 @@ vi.mock("../src/features/gateq/gateway-actions", () => ({
 import { WorkforceOverviewDtoSchema } from "@capital-q/contracts";
 
 import { dealFixture } from "../app/dev/deal-close/fixtures";
+import { ADMIN_AR } from "../src/features/i18n/catalog/admin";
+import { DAILY_AR } from "../src/features/i18n/catalog/daily";
 import { DOCUMENTS_AR } from "../src/features/i18n/catalog/documents";
 import { GATEQ_AR } from "../src/features/i18n/catalog/gateq";
 import { RELATIONSHIPS_AR } from "../src/features/i18n/catalog/relationships";
@@ -55,6 +57,8 @@ const AREAS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   documents: DOCUMENTS_AR,
   gateq: GATEQ_AR,
   work: WORK_AR,
+  daily: DAILY_AR,
+  admin: ADMIN_AR,
 };
 
 describe("the area catalogues", () => {

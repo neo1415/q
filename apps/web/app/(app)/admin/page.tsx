@@ -19,6 +19,7 @@ import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 import { PageSection } from "@/components/app-shell/page-container";
 import { formatDay } from "@/components/date-format";
 import { adminContext } from "@/features/admin/admin-context";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Admin" };
 export const dynamic = "force-dynamic";
@@ -52,6 +53,8 @@ function money(
  * a platform admin; anyone else gets this route's 404.
  */
 export default async function AdminPage() {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null) notFound();
   const { session, can } = context;
@@ -151,7 +154,7 @@ export default async function AdminPage() {
   return (
     <div className="flex flex-col gap-10">
       {queues.length === 0 ? null : (
-        <PageSection id="queues" title="Waiting on you">
+        <PageSection id="queues" title={t("Waiting on you")}>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {queues.map((queue) => (
               <li key={queue.term}>
@@ -160,7 +163,7 @@ export default async function AdminPage() {
                   className="flex min-h-11 flex-col gap-1 border border-(--cq-border-subtle) px-3 py-2 hover:bg-(--cq-surface-subtle)"
                 >
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {queue.term}
+                    {t(queue.term)}
                   </span>
                   <span className="cq-title-sm tabular-nums text-(--cq-text-primary)">
                     {String(queue.value)}
@@ -171,15 +174,15 @@ export default async function AdminPage() {
           </ul>
         </PageSection>
       )}
-      <PageSection id="overview" title="Overview">
+      <PageSection id="overview" title={t("Overview")}>
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {figures.map((figure) => (
             <div key={figure.term} className="flex flex-col gap-1">
               <dt className="cq-caption text-(--cq-text-secondary)">
-                {figure.term}
+                {t(figure.term)}
               </dt>
               <dd className="cq-title-sm text-(--cq-text-primary) tabular-nums">
-                {figure.value}
+                {t(figure.value)}
               </dd>
             </div>
           ))}
@@ -187,13 +190,13 @@ export default async function AdminPage() {
       </PageSection>
 
       {can("accounts.read") ? (
-        <PageSection id="paused" title="Paused by Q">
+        <PageSection id="paused" title={t("Paused by Q")}>
           <PausedAccounts rows={paused} />
         </PageSection>
       ) : null}
 
       {can("ledger.read") ? (
-        <PageSection id="attribution" title="Attribution">
+        <PageSection id="attribution" title={t("Attribution")}>
           <div className="flex flex-col gap-3">
             <div>
               <a
@@ -201,20 +204,20 @@ export default async function AdminPage() {
                 className={buttonClassName("quiet", "compact")}
                 download
               >
-                Download CSV
+                {t("Download CSV")}
               </a>
             </div>
             <div className="relative overflow-x-auto">
               <table className="cq-body-sm w-full min-w-[48rem] text-start">
                 <thead className="cq-caption text-(--cq-text-secondary)">
                   <tr>
-                    <th className="py-2 pe-4 font-normal">Company</th>
-                    <th className="py-2 pe-4 font-normal">Investor</th>
-                    <th className="py-2 pe-4 font-normal">Began</th>
-                    <th className="py-2 pe-4 font-normal">Connected</th>
-                    <th className="py-2 pe-4 font-normal">Calls</th>
-                    <th className="py-2 pe-4 font-normal">Q heard</th>
-                    <th className="py-2 font-normal">Confirmed</th>
+                    <th className="py-2 pe-4 font-normal">{t("Company")}</th>
+                    <th className="py-2 pe-4 font-normal">{t("Investor")}</th>
+                    <th className="py-2 pe-4 font-normal">{t("Began")}</th>
+                    <th className="py-2 pe-4 font-normal">{t("Connected")}</th>
+                    <th className="py-2 pe-4 font-normal">{t("Calls")}</th>
+                    <th className="py-2 pe-4 font-normal">{t("Q heard")}</th>
+                    <th className="py-2 font-normal">{t("Confirmed")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-(--cq-border-subtle)">
@@ -226,25 +229,25 @@ export default async function AdminPage() {
                       <td className="py-2 pe-4">{row.companyName}</td>
                       <td className="py-2 pe-4">{row.investorName}</td>
                       <td className="py-2 pe-4">
-                        {ORIGIN_WORDS[row.origin] ?? row.origin} ·{" "}
-                        {formatDay(row.startedAt.slice(0, 10))}
+                        {t(ORIGIN_WORDS[row.origin] ?? row.origin)} ·{" "}
+                        {t(formatDay(row.startedAt.slice(0, 10)))}
                       </td>
                       <td className="py-2 pe-4">
                         {row.connectedAt === null
                           ? "—"
-                          : formatDay(row.connectedAt.slice(0, 10))}
+                          : t(formatDay(row.connectedAt.slice(0, 10)))}
                       </td>
                       <td className="py-2 pe-4 tabular-nums">
                         {row.meetingsHeld}
                         {row.recordingsDeclined === 0
                           ? ""
-                          : ` (${String(row.recordingsDeclined)} declined)`}
+                          : t(` (${String(row.recordingsDeclined)} declined)`)}
                       </td>
                       <td className="py-2 pe-4 tabular-nums">
                         {row.detected}
                         {row.disputed === 0
                           ? ""
-                          : ` (${String(row.disputed)} disputed)`}
+                          : t(` (${String(row.disputed)} disputed)`)}
                       </td>
                       <td className="py-2 tabular-nums">
                         {money(row.confirmed)}
@@ -259,21 +262,22 @@ export default async function AdminPage() {
       ) : null}
 
       {can("ledger.read") ? (
-        <PageSection id="disputes" title="Disputes">
+        <PageSection id="disputes" title={t("Disputes")}>
           {disputes.length === 0 ? (
-            <p className="cq-body text-(--cq-text-secondary)">None.</p>
+            <p className="cq-body text-(--cq-text-secondary)">{t("None.")}</p>
           ) : (
             <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
               {disputes.map((row) => (
                 <li key={row.commitmentId} className="flex flex-col gap-1 py-3">
                   <span className="cq-body-sm text-(--cq-text-primary)">
                     {row.companyName} · {row.investorName} · {row.currencyCode}{" "}
-                    {formatAmountForDisplay(row.amount)}
+                    {t(formatAmountForDisplay(row.amount))}
                   </span>
                   {row.quote === null ? null : (
                     <span className="cq-caption text-(--cq-text-secondary)">
-                      &ldquo;{row.quote}&rdquo; · disputed{" "}
-                      {formatDay(row.disputedAt.slice(0, 10))}
+                      &ldquo;{row.quote}
+                      {t("” · disputed")}{" "}
+                      {t(formatDay(row.disputedAt.slice(0, 10)))}
                     </span>
                   )}
                 </li>

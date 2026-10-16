@@ -9,6 +9,7 @@ import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
 import { ErrorStream } from "@/features/admin/error-stream";
 import { usd, when, words } from "@/features/admin/words";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Q monitor · Admin" };
 
@@ -23,6 +24,8 @@ export default async function AdminQPage({
 }: {
   readonly searchParams: Promise<{ readonly window?: string | undefined }>;
 }) {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("q.monitor.read")) notFound();
   const asked = (await searchParams).window;
@@ -37,8 +40,8 @@ export default async function AdminQPage({
   if (monitor === null) {
     return (
       <ErrorState
-        title="Q's figures couldn't load"
-        description="Try again in a moment."
+        title={t("Q's figures couldn't load")}
+        description={t("Try again in a moment.")}
       />
     );
   }
@@ -63,7 +66,7 @@ export default async function AdminQPage({
   );
   return (
     <div className="flex flex-col gap-10">
-      <nav aria-label="Time window" className="flex gap-2">
+      <nav aria-label={t("Time window")} className="flex gap-2">
         {WINDOWS.map((option) => (
           <Link
             key={option.value}
@@ -75,61 +78,65 @@ export default async function AdminQPage({
                 : "border-(--cq-border-subtle) text-(--cq-text-secondary)"
             }`}
           >
-            {option.label}
+            {t(option.label)}
           </Link>
         ))}
       </nav>
 
-      <PageSection id="figures" title="At a glance">
+      <PageSection id="figures" title={t("At a glance")}>
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {figures.map((figure) => (
             <div key={figure.term} className="flex flex-col gap-1">
               <dt className="cq-caption text-(--cq-text-secondary)">
-                {figure.term}
+                {t(figure.term)}
               </dt>
               <dd className="cq-title-sm tabular-nums text-(--cq-text-primary)">
-                {figure.value}
+                {t(figure.value)}
               </dd>
             </div>
           ))}
         </dl>
       </PageSection>
 
-      <PageSection id="errors" title="Live errors">
+      <PageSection id="errors" title={t("Live errors")}>
         <ErrorStream initial={errors} canTrace={canTrace} />
       </PageSection>
 
-      <PageSection id="latency" title="Latency by task and model">
+      <PageSection id="latency" title={t("Latency by task and model")}>
         {monitor.latency.length === 0 ? (
-          <EmptyState compact title="No model calls in this window" />
+          <EmptyState compact title={t("No model calls in this window")} />
         ) : (
           <div className="relative overflow-x-auto">
             <table className="cq-body-sm w-full min-w-[40rem] text-start">
               <thead className="cq-caption text-(--cq-text-secondary)">
                 <tr>
-                  <th className="py-2 pe-4 font-normal">Task</th>
-                  <th className="py-2 pe-4 font-normal">Model</th>
-                  <th className="py-2 pe-4 text-end font-normal">Calls</th>
-                  <th className="py-2 pe-4 text-end font-normal">Failed</th>
+                  <th className="py-2 pe-4 font-normal">{t("Task")}</th>
+                  <th className="py-2 pe-4 font-normal">{t("Model")}</th>
+                  <th className="py-2 pe-4 text-end font-normal">
+                    {t("Calls")}
+                  </th>
+                  <th className="py-2 pe-4 text-end font-normal">
+                    {t("Failed")}
+                  </th>
                   <th className="py-2 pe-4 text-end font-normal">p50</th>
                   <th className="py-2 pe-4 text-end font-normal">p95</th>
-                  <th className="py-2 text-end font-normal">Spend</th>
+                  <th className="py-2 text-end font-normal">{t("Spend")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-(--cq-border-subtle) tabular-nums text-(--cq-text-primary)">
                 {monitor.latency.map((row) => (
                   <tr key={`${row.taskClass}-${row.model}`}>
-                    <td className="py-2 pe-4">{words(row.taskClass)}</td>
-                    <td className="py-2 pe-4">{row.model}</td>
+                    <td className="py-2 pe-4">{t(words(row.taskClass))}</td>
+                    <td className="py-2 pe-4">{t(row.model)}</td>
                     <td className="py-2 pe-4 text-end">{row.calls}</td>
                     <td className="py-2 pe-4 text-end">{row.failed}</td>
                     <td className="py-2 pe-4 text-end">
-                      {(row.p50Ms / 1000).toFixed(1)} s
+                      {t((row.p50Ms / 1000).toFixed(1))} s
                     </td>
                     <td className="py-2 pe-4 text-end">
-                      {(row.p95Ms / 1000).toFixed(1)} s
+                      {t((row.p95Ms / 1000).toFixed(1))} s
                     </td>
-                    <td className="py-2 text-end">{usd(row.costUsd)}</td>
+                    <td className="py-2 text-end">{t(usd(row.costUsd))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -138,9 +145,9 @@ export default async function AdminQPage({
         )}
       </PageSection>
 
-      <PageSection id="cost" title="Spend per day">
+      <PageSection id="cost" title={t("Spend per day")}>
         {monitor.costPerDay.length === 0 ? (
-          <EmptyState compact title="No spend in this window" />
+          <EmptyState compact title={t("No spend in this window")} />
         ) : (
           <ul className="flex flex-col gap-1.5">
             {monitor.costPerDay.map((day) => (
@@ -149,7 +156,7 @@ export default async function AdminQPage({
                 className="grid grid-cols-[6rem_1fr_6rem] items-center gap-3"
               >
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  {day.day}
+                  {t(day.day)}
                 </span>
                 <span
                   aria-hidden="true"
@@ -163,7 +170,7 @@ export default async function AdminQPage({
                   />
                 </span>
                 <span className="cq-body-sm text-end tabular-nums text-(--cq-text-primary)">
-                  {usd(day.costUsd)} · {day.calls}
+                  {t(usd(day.costUsd))} · {day.calls}
                 </span>
               </li>
             ))}
@@ -171,7 +178,7 @@ export default async function AdminQPage({
         )}
       </PageSection>
 
-      <PageSection id="refusals" title="Refusals and failures">
+      <PageSection id="refusals" title={t("Refusals and failures")}>
         <div className="grid gap-6 sm:grid-cols-3">
           {[
             {
@@ -198,10 +205,12 @@ export default async function AdminQPage({
           ].map((block) => (
             <div key={block.title} className="flex flex-col gap-2">
               <h3 className="cq-body font-medium text-(--cq-text-primary)">
-                {block.title}
+                {t(block.title)}
               </h3>
               {block.rows.length === 0 ? (
-                <p className="cq-body-sm text-(--cq-text-secondary)">None.</p>
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  {t("None.")}
+                </p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {block.rows.map((row) => (
@@ -209,7 +218,7 @@ export default async function AdminQPage({
                       key={row.key}
                       className="cq-body-sm flex justify-between gap-3 text-(--cq-text-primary)"
                     >
-                      <span>{words(row.key)}</span>
+                      <span>{t(words(row.key))}</span>
                       <span className="tabular-nums">{row.count}</span>
                     </li>
                   ))}
@@ -220,25 +229,25 @@ export default async function AdminQPage({
         </div>
       </PageSection>
 
-      <PageSection id="runs" title="Recent runs">
+      <PageSection id="runs" title={t("Recent runs")}>
         {monitor.recentRuns.length === 0 ? (
-          <EmptyState compact title="No runs in this window" />
+          <EmptyState compact title={t("No runs in this window")} />
         ) : (
           <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
             {monitor.recentRuns.map((run) => {
               const line = (
                 <>
                   <span className="cq-body-sm text-(--cq-text-primary)">
-                    {words(run.capability)} · {words(run.status)}
+                    {t(words(run.capability))} · {t(words(run.status))}
                     {run.failureCode === null
                       ? ""
-                      : ` · ${words(run.failureCode)}`}
+                      : t(` · ${words(run.failureCode)}`)}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {run.userName ?? "A member"} · {when(run.createdAt)}
+                    {run.userName ?? t("A member")} · {t(when(run.createdAt))}
                     {run.durationMs === null
                       ? ""
-                      : ` · ${(run.durationMs / 1000).toFixed(1)} s`}
+                      : t(` · ${(run.durationMs / 1000).toFixed(1)} s`)}
                   </span>
                 </>
               );

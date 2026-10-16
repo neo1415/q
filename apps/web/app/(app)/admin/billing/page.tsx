@@ -11,6 +11,8 @@ import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
 import { AccrueFees, SetFeeRate } from "@/features/admin/billing-controls";
 import { when, words } from "@/features/admin/words";
+import { serverT } from "@/features/i18n/server";
+import { serverTNow } from "@/features/i18n/server-now";
 
 export const metadata: Metadata = { title: "Billing · Admin" };
 
@@ -23,6 +25,8 @@ export const metadata: Metadata = { title: "Billing · Admin" };
  * organisation's page.
  */
 export default async function AdminBillingPage() {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("billing.fees.read")) notFound();
   const [ledger, usage] = await Promise.all([
@@ -32,8 +36,8 @@ export default async function AdminBillingPage() {
   if (ledger === null) {
     return (
       <ErrorState
-        title="The fee ledger couldn't load"
-        description="Try again in a moment."
+        title={t("The fee ledger couldn't load")}
+        description={t("Try again in a moment.")}
       />
     );
   }
@@ -43,26 +47,27 @@ export default async function AdminBillingPage() {
       {usage === null ? (
         <ErrorState
           compact
-          title="Model cost couldn't load"
-          description="Spend is still recorded; only this view failed."
+          title={t("Model cost couldn't load")}
+          description={t("Spend is still recorded; only this view failed.")}
         />
       ) : (
         <ModelCost usage={usage} />
       )}
       <PageSection
         id="schedule"
-        title="Facilitation fee"
-        description={`Schedule v${String(ledger.schedule.version)} · ${
-          rate === null ? "no rate set" : `${(rate / 100).toFixed(2)}%`
-        } of ${ledger.schedule.accrueLevels.map((level) => words(level).toLowerCase()).join(", ")} commitments confirmed by both sides · paid by the ${words(ledger.schedule.payerSide).toLowerCase()}`}
+        title={t("Facilitation fee")}
+        description={t(
+          `Schedule v${String(ledger.schedule.version)} · ${
+            rate === null ? "no rate set" : `${(rate / 100).toFixed(2)}%`
+          } of ${ledger.schedule.accrueLevels.map((level) => words(level).toLowerCase()).join(", ")} commitments confirmed by both sides · paid by the ${words(ledger.schedule.payerSide).toLowerCase()}`,
+        )}
       >
         <div className="flex flex-col gap-4">
           {rate === null ? (
-            <InlineNotice tone="warning" title="No rate set">
-              Confirmed commitments are recorded below without a fee. A success
-              fee on capital raised can need a licence (for example
-              broker-dealer rules in the US, or FCA permission in the UK): get
-              legal advice before setting a rate or invoicing.
+            <InlineNotice tone="warning" title={t("No rate set")}>
+              {t(
+                "Confirmed commitments are recorded below without a fee. A success fee on capital raised can need a licence (for example broker-dealer rules in the US, or FCA permission in the UK): get legal advice before setting a rate or invoicing.",
+              )}
             </InlineNotice>
           ) : null}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -75,19 +80,21 @@ export default async function AdminBillingPage() {
                 href="/admin/billing/fees.csv"
                 className={buttonClassName("secondary", "compact")}
               >
-                Download CSV
+                {t("Download CSV")}
               </a>
             </div>
           </div>
         </div>
       </PageSection>
 
-      <PageSection id="entries" title="Entries">
+      <PageSection id="entries" title={t("Entries")}>
         {ledger.entries.length === 0 ? (
           <EmptyState
             compact
-            title="No confirmed commitments yet"
-            description="An entry appears here when one side states money and the other side confirms it."
+            title={t("No confirmed commitments yet")}
+            description={t(
+              "An entry appears here when one side states money and the other side confirms it.",
+            )}
           />
         ) : (
           <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
@@ -101,15 +108,15 @@ export default async function AdminBillingPage() {
                     {entry.companyName} · {entry.investorName}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {words(entry.level)} · confirmed {when(entry.confirmedAt)} ·{" "}
-                    {words(entry.status)}
+                    {t(words(entry.level))} {t("· confirmed")}{" "}
+                    {t(when(entry.confirmedAt))} · {t(words(entry.status))}
                   </span>
                 </div>
                 <span className="cq-body-sm cq-numeric shrink-0 text-(--cq-text-primary)">
                   {entry.currencyCode} {entry.amount}
                   {entry.feeAmount === null
-                    ? " · no fee yet"
-                    : ` · fee ${entry.currencyCode} ${entry.feeAmount}`}
+                    ? t(" · no fee yet")
+                    : t(` · fee ${entry.currencyCode} ${entry.feeAmount}`)}
                 </span>
               </li>
             ))}
@@ -128,21 +135,23 @@ const usd = (value: string) => `$${Number(value).toFixed(2)}`;
  * not revenue; nobody is charged from it.
  */
 function ModelCost({ usage }: { readonly usage: AdminUsageDto }) {
+  const t = serverTNow();
+
   return (
     <PageSection
       id="model-cost"
-      title="Model cost this month"
-      description={`${usage.month} · operational cost, not a charge`}
+      title={t("Model cost this month")}
+      description={t(`${usage.month} · operational cost, not a charge`)}
     >
       <p className="flex items-baseline gap-2 pb-4" data-model-cost-total>
         <span className="cq-numeric text-4xl font-semibold tracking-tight text-(--cq-text-primary)">
-          {usd(usage.totalUsd)}
+          {t(usd(usage.totalUsd))}
         </span>
-        <span className="cq-body text-(--cq-text-secondary)">USD</span>
+        <span className="cq-body text-(--cq-text-secondary)">{t("USD")}</span>
       </p>
       <div className="grid gap-6 md:grid-cols-3">
         <CostList
-          title="By tenant"
+          title={t("By tenant")}
           rows={usage.tenants.map((row) => ({
             key: row.tenantId,
             label: row.name ?? row.tenantId.slice(0, 8),
@@ -151,7 +160,7 @@ function ModelCost({ usage }: { readonly usage: AdminUsageDto }) {
           }))}
         />
         <CostList
-          title="By person"
+          title={t("By person")}
           rows={usage.users.map((row) => ({
             key: `${row.tenantId}:${row.userId ?? "guest"}`,
             label: row.name ?? row.userId?.slice(0, 8) ?? "Guest",
@@ -160,7 +169,7 @@ function ModelCost({ usage }: { readonly usage: AdminUsageDto }) {
           }))}
         />
         <CostList
-          title="Top drivers"
+          title={t("Top drivers")}
           rows={usage.drivers.map((row) => ({
             key: `${row.purpose}:${row.taskClass}:${row.model}`,
             label: `${words(row.purpose)} · ${words(row.taskClass)} · ${row.model}`,
@@ -173,7 +182,7 @@ function ModelCost({ usage }: { readonly usage: AdminUsageDto }) {
         href="/admin/q?window=30d"
         className="cq-body-sm inline-flex min-h-11 items-center underline underline-offset-4"
       >
-        Failed and refused calls (not charged to anyone)
+        {t("Failed and refused calls (not charged to anyone)")}
       </Link>
     </PageSection>
   );
@@ -191,13 +200,17 @@ function CostList({
     readonly calls: number;
   }[];
 }) {
+  const t = serverTNow();
+
   return (
     <div className="flex flex-col gap-2">
       <h3 className="cq-body-sm font-medium text-(--cq-text-primary)">
-        {title}
+        {t(title)}
       </h3>
       {rows.length === 0 ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)">Nothing yet.</p>
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          {t("Nothing yet.")}
+        </p>
       ) : (
         <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
           {rows.slice(0, 10).map((row) => (
@@ -206,10 +219,10 @@ function CostList({
               className="flex items-baseline justify-between gap-4 py-2"
             >
               <span className="cq-body-sm truncate text-(--cq-text-primary)">
-                {row.label}
+                {t(row.label)}
               </span>
               <span className="cq-caption cq-numeric shrink-0 text-(--cq-text-secondary)">
-                {usd(row.usd)} · {String(row.calls)}{" "}
+                {t(usd(row.usd))} · {String(row.calls)}{" "}
                 {row.calls === 1 ? "call" : "calls"}
               </span>
             </li>

@@ -12,6 +12,7 @@ import { adminContext } from "@/features/admin/admin-context";
 import { QueueKeys } from "@/features/admin/queue-keys";
 import { ReviewQueue } from "@/features/admin/review-queue";
 import { VerificationQueue } from "@/features/admin/verification-queue";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Queue · Admin" };
 
@@ -31,6 +32,8 @@ export default async function AdminQueuePage({
     readonly all?: string | undefined;
   }>;
 }) {
+  const t = await serverT();
+
   const context = await adminContext();
   const canVerify = context?.can("verification.read") ?? false;
   const canReview = context?.can("reviews.read") ?? false;
@@ -74,10 +77,10 @@ export default async function AdminQueuePage({
   return (
     <section aria-labelledby="queue-heading" className="flex flex-col gap-4">
       <h2 id="queue-heading" className="cq-title-md text-(--cq-text-primary)">
-        Queue
+        {t("Queue")}
       </h2>
       <nav
-        aria-label="Queues"
+        aria-label={t("Queues")}
         className="inline-flex gap-1 self-start bg-(--cq-surface-subtle) p-1"
       >
         {tabs.map((entry) => (
@@ -91,7 +94,7 @@ export default async function AdminQueuePage({
                 : "text-(--cq-text-secondary)"
             }`}
           >
-            {entry.label}{" "}
+            {t(entry.label)}{" "}
             {entry.rows === null || entry.rows === undefined ? null : (
               <span className="cq-numeric">{entry.rows.length}</span>
             )}
@@ -101,13 +104,13 @@ export default async function AdminQueuePage({
       {tab === "verification" ? (
         verification === null || verification === undefined ? (
           <ErrorState
-            title="The queue couldn't load"
-            description="No decision was made or lost."
+            title={t("The queue couldn't load")}
+            description={t("No decision was made or lost.")}
           />
         ) : verification.length === 0 ? (
-          <EmptyState compact title="No requests waiting" />
+          <EmptyState compact title={t("No requests waiting")} />
         ) : (
-          <QueueKeys hint="J / K move · V verify · D decline">
+          <QueueKeys hint={t("J / K move · V verify · D decline")}>
             <VerificationQueue
               rows={verification}
               canDecide={context.can("verification.decide")}
@@ -124,17 +127,19 @@ export default async function AdminQueuePage({
             }
             className="cq-body-sm inline-flex min-h-11 items-center self-start underline underline-offset-4"
           >
-            {all ? "Open only" : "Include decided"}
+            {all ? t("Open only") : t("Include decided")}
           </Link>
           {reviews === null || reviews === undefined ? (
             <ErrorState
-              title="Reviews couldn't load"
-              description="No decision was made or lost."
+              title={t("Reviews couldn't load")}
+              description={t("No decision was made or lost.")}
             />
           ) : reviews.length === 0 ? (
-            <EmptyState compact title="No reviews waiting" />
+            <EmptyState compact title={t("No reviews waiting")} />
           ) : (
-            <QueueKeys hint="J / K move · V changed · M needs evidence · D upheld">
+            <QueueKeys
+              hint={t("J / K move · V changed · M needs evidence · D upheld")}
+            >
               <ReviewQueue
                 rows={reviews}
                 canDecide={context.can("reviews.decide")}

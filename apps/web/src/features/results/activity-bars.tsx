@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { dayLabel } from "./results-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * One measure over the period, a bar per day or week (a small multiple:
@@ -25,6 +26,8 @@ export function ActivityBars({
     readonly value: number;
   }[];
 }) {
+  const t = useT();
+
   const [active, setActive] = useState<number | null>(null);
   const max = Math.max(1, ...points.map((point) => point.value));
   const shown = active === null ? null : points[active];
@@ -35,7 +38,9 @@ export function ActivityBars({
   return (
     <figure className="flex min-w-0 flex-col gap-2">
       <figcaption className="flex items-baseline justify-between gap-2">
-        <span className="cq-body-sm text-(--cq-text-secondary)">{title}</span>
+        <span className="cq-body-sm text-(--cq-text-secondary)">
+          {t(title)}
+        </span>
         <span className="cq-title-sm tabular-nums text-(--cq-text-primary)">
           {total}
         </span>
@@ -43,7 +48,7 @@ export function ActivityBars({
       {total === 0 ? (
         // Nothing to draw: said, not shown as an empty axis.
         <p className="cq-body-sm flex h-20 items-center border-b border-(--cq-border-subtle) text-(--cq-text-tertiary)">
-          None in this period
+          {t("None in this period")}
         </p>
       ) : (
         <div className="relative" onPointerLeave={() => setActive(null)}>
@@ -78,7 +83,7 @@ export function ActivityBars({
               role="status"
               className="cq-caption pointer-events-none absolute -top-2 end-0 -translate-y-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-2 py-1 text-(--cq-text-primary) shadow-(--cq-shadow-sm)"
             >
-              {label(shown.start)} · {shown.value}
+              {t(label(shown.start))} · {shown.value}
             </span>
           )}
         </div>
@@ -88,18 +93,18 @@ export function ActivityBars({
           aria-hidden="true"
           className="cq-caption flex justify-between text-(--cq-text-tertiary)"
         >
-          <span>{dayLabel(first.start)}</span>
-          <span>{dayLabel(last.start)}</span>
+          <span>{t(dayLabel(first.start))}</span>
+          <span>{t(dayLabel(last.start))}</span>
         </div>
       )}
       <table className="sr-only">
         <caption>
-          {title} by {bucket === "WEEK" ? "week" : "day"}
+          {t(title)} {t("by")} {bucket === "WEEK" ? "week" : "day"}
         </caption>
         <tbody>
           {points.map((point) => (
             <tr key={point.start}>
-              <th scope="row">{label(point.start)}</th>
+              <th scope="row">{t(label(point.start))}</th>
               <td>{point.value}</td>
             </tr>
           ))}
