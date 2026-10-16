@@ -81,6 +81,7 @@ import {
 } from "./form-model";
 import { InterviewStep } from "./interview-step";
 import { ReviewStep } from "./review-step";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The GateQ form (F1, 2026-10-06; design a/gateq.html "Founder: GateQ form").
@@ -173,6 +174,8 @@ export function GateQForm({
   materials = [],
   preview,
 }: GateQFormProps) {
+  const t = useT();
+
   const fund = gateway.organisationDisplayName;
   const anonymous = prefill === null;
   const initial = answersFromProfile(prefill);
@@ -495,13 +498,14 @@ export function GateQForm({
           <span className="gq-state-ic">
             <Building2 {...icon} size={ICON_SIZE.prominent} />
           </span>
-          <h2 className="cq-title-sm">First, find your company</h2>
+          <h2 className="cq-title-sm">{t("First, find your company")}</h2>
           <p className="cq-body-sm gq-t2">
-            {fund} needs to know which company is applying. Find it on Capital Q
-            or add it in a minute: upload your deck and Q fills in the rest.
+            {t(
+              `${fund} needs to know which company is applying. Find it on Capital Q or add it in a minute: upload your deck and Q fills in the rest.`,
+            )}
           </p>
           <a href="/gateq?tab=claim" className={buttonClassName("primary")}>
-            Find my startup
+            {t("Find my startup")}
           </a>
         </div>
       </div>
@@ -517,10 +521,10 @@ export function GateQForm({
             <CircleAlert {...icon} size={ICON_SIZE.prominent} />
           </span>
           <h2 className="cq-title-sm">
-            {fund} isn&apos;t taking applications right now
+            {t(`${fund} isn't taking applications right now`)}
           </h2>
           <p className="cq-body-sm gq-t2">
-            Their gate is closed. You can still read what they look for.
+            {t("Their gate is closed. You can still read what they look for.")}
           </p>
         </div>
       </div>
@@ -538,16 +542,17 @@ export function GateQForm({
         {card}
         <div className="gq-card gq-result">
           <h2 ref={heading} tabIndex={-1} className="cq-title-md">
-            {verdictTitle("NOT_A_FIT", fund, lines)}
+            {t(verdictTitle("NOT_A_FIT", fund, lines))}
           </h2>
           <p className="cq-body gq-t2">
-            {answers.companyName || "Your company"} meets {met} of their{" "}
-            {lines.length} rules, but this gate only accepts companies that meet
-            all of the required ones. That&apos;s about fit, not quality.
+            {answers.companyName || t("Your company")} {t("meets")} {met}{" "}
+            {t(
+              `of their ${lines.length} rules, but this gate only accepts companies that meet all of the required ones. That's about fit, not quality.`,
+            )}
           </p>
           <ResultLines lines={lines} />
           <p className="cq-body-sm gq-t2">
-            Something wrong?{" "}
+            {t("Something wrong?")}{" "}
             <button
               type="button"
               className="underline underline-offset-4"
@@ -559,7 +564,7 @@ export function GateQForm({
                 )
               }
             >
-              Change your answer
+              {t("Change your answer")}
             </button>
             .
           </p>
@@ -569,11 +574,11 @@ export function GateQForm({
                 href="/discover?tab=investors"
                 className={buttonClassName("primary")}
               >
-                Find investors who fit
+                {t("Find investors who fit")}
               </a>
             )}
             <Button variant="quiet" onClick={onBack}>
-              Back
+              {t("Back")}
             </Button>
           </div>
         </div>
@@ -594,7 +599,7 @@ export function GateQForm({
   const head = (
     <div className="flex flex-col gap-2.5">
       <p className="cq-caption gq-t2">
-        Apply to {fund} · {stage}
+        {t("Apply to")} {fund} · {t(stage)}
       </p>
       <div className="gq-steps" aria-hidden="true">
         {FLOW_PROGRESS.map((segment, i) => (
@@ -617,8 +622,8 @@ export function GateQForm({
           <div className="gq-banner gq-banner-err" role="alert">
             <CircleAlert {...icon} />
             <span>
-              <b>{step === "review" ? "Not sent." : "Not saved."}</b> {problem}{" "}
-              Your answers are still here.{" "}
+              <b>{step === "review" ? t("Not sent.") : t("Not saved.")}</b>{" "}
+              {t(problem)} {t("Your answers are still here.")}{" "}
               <Button
                 size="compact"
                 className="ms-1.5"
@@ -626,7 +631,7 @@ export function GateQForm({
                 disabled={pending}
               >
                 <RotateCw {...icon} />
-                Try again
+                {t("Try again")}
               </Button>
             </span>
           </div>
@@ -747,22 +752,29 @@ export function GateQForm({
               <FitGlyph kind="fit" size={40} />
             </span>
             <h1 ref={heading} tabIndex={-1} className="cq-title-lg">
-              Thank you. {fund} has your application
+              {t(`Thank you. ${fund} has your application`)}
             </h1>
             <p className="cq-body gq-t2" style={{ maxWidth: "52ch" }}>
-              Their team will review it, and may contact you
-              {contact === null ? "" : ` ${reachWords(contact)}`}.{" "}
+              {t(
+                contact === null
+                  ? "Their team will review it, and may contact you."
+                  : `Their team will review it, and may contact you ${reachWords(contact)}.`,
+              )}{" "}
               {gateway.replyWithinDays
-                ? `${fund} has committed to reply within ${gateway.replyWithinDays} working days. `
+                ? t(
+                    `${fund} has committed to reply within ${gateway.replyWithinDays} working days. `,
+                  )
                 : ""}
               {inApp
-                ? "You'll see every step on your GateQ page, and Q will tell you if they reply."
+                ? t(
+                    "You'll see every step on your GateQ page, and Q will tell you if they reply.",
+                  )
                 : ""}
             </p>
             {inApp ? (
               <div className="flex flex-wrap gap-2">
                 <a href="/gateq" className={buttonClassName("primary")}>
-                  See your applications
+                  {t("See your applications")}
                 </a>
               </div>
             ) : null}
@@ -771,7 +783,7 @@ export function GateQForm({
           <div className="gq-formbar">
             <Button variant="quiet" onClick={onBack} disabled={pending}>
               <ChevronLeft {...icon} />
-              Back
+              {t("Back")}
             </Button>
             {step === "check" ? (
               <Button
@@ -780,7 +792,7 @@ export function GateQForm({
                 onClick={onToInterview}
                 disabled={pending || !maySend(verdict)}
               >
-                Continue to interview
+                {t("Continue to interview")}
               </Button>
             ) : (
               <Button
@@ -790,10 +802,10 @@ export function GateQForm({
                 disabled={pending}
               >
                 {pending
-                  ? "Checking…"
+                  ? t("Checking…")
                   : step === "note"
-                    ? "Check my fit"
-                    : "Continue"}
+                    ? t("Check my fit")
+                    : t("Continue")}
               </Button>
             )}
           </div>
@@ -816,11 +828,13 @@ function GateCard({
   readonly showResults: boolean;
   readonly openByDefault: boolean;
 }) {
+  const t = useT();
+
   const fund = gateway.organisationDisplayName;
   return (
     <aside
       className="gq-card gq-gatecard"
-      aria-label={`What ${fund} looks for`}
+      aria-label={t(`What ${fund} looks for`)}
     >
       <div className="flex items-center gap-3">
         <span
@@ -832,34 +846,36 @@ function GateCard({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={gateway.organisationPhotoUrl} alt="" />
           ) : (
-            fund.slice(0, 1).toUpperCase()
+            t(fund.slice(0, 1).toUpperCase())
           )}
         </span>
         <div className="min-w-0">
           <p className="cq-title-sm">{fund}</p>
           <p className="cq-caption gq-t2">
             {gateway.replyWithinDays
-              ? `Replies within ${gateway.replyWithinDays} working days`
-              : gateway.title}
+              ? t(`Replies within ${gateway.replyWithinDays} working days`)
+              : t(gateway.title)}
           </p>
         </div>
       </div>
       <details open={openByDefault || showResults}>
         <summary>
-          <span className="cq-label">What they look for</span>
+          <span className="cq-label">{t("What they look for")}</span>
           <span className="gq-t3 flex items-center gap-1 text-[13px]">
-            {lines.length} rule{lines.length === 1 ? "" : "s"}
+            {lines.length} {t("rule")}
+            {lines.length === 1 ? "" : "s"}
             <ChevronDown {...icon} />
           </span>
         </summary>
         <div className="flex flex-col gap-3">
           {gateway.description ? (
-            <p className="cq-body-sm">{gateway.description}</p>
+            <p className="cq-body-sm">{t(gateway.description)}</p>
           ) : null}
           {lines.length === 0 ? (
             <p className="cq-body-sm gq-t2">
-              No published criteria yet: nothing is checked, and every founder
-              can share with them.
+              {t(
+                "No published criteria yet: nothing is checked, and every founder can share with them.",
+              )}
             </p>
           ) : (
             <ul className="gq-crit">
@@ -874,12 +890,12 @@ function GateCard({
                   )}
                   <span>
                     <b className="font-medium">
-                      {dimensionWord(line.dimension)}
+                      {t(dimensionWord(line.dimension))}
                     </b>
                     {line.required ? (
                       ""
                     ) : (
-                      <span className="gq-t3"> · preferred</span>
+                      <span className="gq-t3"> {t("· preferred")}</span>
                     )}
                     {ownLabel(line) === null ? null : (
                       <>
@@ -889,7 +905,7 @@ function GateCard({
                     )}
                     {showResults && line.standing !== null ? (
                       <span className="sr-only">
-                        : {STANDING_WORDS[line.standing]}
+                        : {t(STANDING_WORDS[line.standing])}
                       </span>
                     ) : null}
                   </span>
@@ -898,7 +914,7 @@ function GateCard({
             </ul>
           )}
           <p className="cq-caption gq-t3">
-            Nothing is sent until you press Submit.
+            {t("Nothing is sent until you press Submit.")}
           </p>
         </div>
       </details>
@@ -907,6 +923,8 @@ function GateCard({
 }
 
 function ResultLines({ lines }: { readonly lines: readonly RuleLine[] }) {
+  const t = useT();
+
   return (
     <div>
       {lines.map((line) =>
@@ -914,7 +932,7 @@ function ResultLines({ lines }: { readonly lines: readonly RuleLine[] }) {
           <div key={line.label} className="gq-check">
             <FitGlyph kind={GLYPH[line.standing]} />
             <span>
-              <b className="font-medium">{dimensionWord(line.dimension)}</b>
+              <b className="font-medium">{t(dimensionWord(line.dimension))}</b>
               {ownLabel(line) === null ? null : (
                 <>
                   <br />
@@ -922,7 +940,9 @@ function ResultLines({ lines }: { readonly lines: readonly RuleLine[] }) {
                 </>
               )}
             </span>
-            <span className="gq-status">{STANDING_WORDS[line.standing]}</span>
+            <span className="gq-status">
+              {t(STANDING_WORDS[line.standing])}
+            </span>
           </div>
         ),
       )}
@@ -936,10 +956,12 @@ type SetAnswer = <K extends keyof FormAnswers>(
 ) => void;
 
 function FromProfile() {
+  const t = useT();
+
   return (
     <span className="gq-prefill">
       <Check {...icon} size={13} />
-      From your profile
+      {t("From your profile")}
     </span>
   );
 }
@@ -963,11 +985,13 @@ function Options({
   readonly error?: string | undefined;
   readonly badge?: boolean;
 }) {
+  const t = useT();
+
   const id = useId();
   return (
     <div className="gq-q">
       <p className="gq-label" id={id}>
-        {label}
+        {t(label)}
         {badge === true ? <FromProfile /> : null}
       </p>
       <div className="gq-opts" role="radiogroup" aria-labelledby={id}>
@@ -981,12 +1005,12 @@ function Options({
               className={`gq-opt${option.value === DECLINED ? " gq-skip" : ""}`}
               onClick={() => onChange(option.value)}
             >
-              {option.label}
+              {t(option.label)}
             </button>
           ),
         )}
       </div>
-      {error === undefined ? null : <p className="gq-err">{error}</p>}
+      {error === undefined ? null : <p className="gq-err">{t(error)}</p>}
     </div>
   );
 }
@@ -1005,6 +1029,8 @@ function CompanyStep({
   fromProfile,
   set,
 }: StepProps & { readonly fromProfile: ReadonlySet<keyof FormAnswers> }) {
+  const t = useT();
+
   const [editing, setEditing] = useState(!fromProfile.has("companyName"));
   const sectors = answers.sectors === DECLINED ? [] : answers.sectors;
   const [other, setOther] = useState(answers.otherSector !== "");
@@ -1017,18 +1043,22 @@ function CompanyStep({
   return (
     <>
       <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-        Your company
+        {t("Your company")}
       </h1>
       <p className="cq-body gq-t2">
         {fromProfile.size > 0
-          ? "Filled in from your profile. Change anything that's out of date."
-          : "Tap what fits. Rough is fine, and you can say you'd rather not."}
+          ? t(
+              "Filled in from your profile. Change anything that's out of date.",
+            )
+          : t(
+              "Tap what fits. Rough is fine, and you can say you'd rather not.",
+            )}
       </p>
       {editing ? (
         <div className="flex flex-col gap-3">
           <div className="gq-field">
             <label className="gq-label" htmlFor="gq-name">
-              Company name
+              {t("Company name")}
             </label>
             <input
               id="gq-name"
@@ -1045,8 +1075,8 @@ function CompanyStep({
           </div>
           <div className="gq-field">
             <label className="gq-label" htmlFor="gq-line">
-              What it does, in one line{" "}
-              <span className="gq-t3">(optional)</span>
+              {t("What it does, in one line")}{" "}
+              <span className="gq-t3">{t("(optional)")}</span>
             </label>
             <input
               id="gq-line"
@@ -1060,12 +1090,14 @@ function CompanyStep({
       ) : (
         <div className="gq-card gq-cocard">
           <span className="gq-logo" style={{ width: 48, height: 48 }}>
-            {answers.companyName.slice(0, 1).toUpperCase()}
+            {t(answers.companyName.slice(0, 1).toUpperCase())}
           </span>
           <span className="min-w-0 flex-1">
             <b className="cq-title-sm block">{answers.companyName}</b>
             {answers.oneLiner ? (
-              <span className="cq-body-sm gq-t2 block">{answers.oneLiner}</span>
+              <span className="cq-body-sm gq-t2 block">
+                {t(answers.oneLiner)}
+              </span>
             ) : null}
           </span>
           <Button
@@ -1073,12 +1105,12 @@ function CompanyStep({
             size="compact"
             onClick={() => setEditing(true)}
           >
-            Edit
+            {t("Edit")}
           </Button>
         </div>
       )}
       <Options
-        label="Stage"
+        label={t("Stage")}
         badge={fromProfile.has("stage") && answers.stage !== ""}
         options={STAGE_CHOICES}
         value={answers.stage}
@@ -1087,7 +1119,8 @@ function CompanyStep({
       />
       <div className="gq-q">
         <p className="gq-label" id={sectorId}>
-          Sector <span className="gq-t3 font-normal">(pick any)</span>
+          {t("Sector")}{" "}
+          <span className="gq-t3 font-normal">{t("(pick any)")}</span>
         </p>
         <div className="gq-opts" role="group" aria-labelledby={sectorId}>
           {SECTOR_CHOICES.map((choice) => {
@@ -1107,7 +1140,7 @@ function CompanyStep({
                   )
                 }
               >
-                {choice.label}
+                {t(choice.label)}
               </button>
             );
           })}
@@ -1121,7 +1154,7 @@ function CompanyStep({
               if (other) set("otherSector", "");
             }}
           >
-            Something else
+            {t("Something else")}
           </button>
           <button
             type="button"
@@ -1133,24 +1166,24 @@ function CompanyStep({
               set("sectors", answers.sectors === DECLINED ? [] : DECLINED);
             }}
           >
-            I&apos;d rather not say
+            {t("I'd rather not say")}
           </button>
         </div>
         {other ? (
           <input
             className="gq-input"
-            aria-label="Your sector, in a few words"
-            placeholder="In a few words, like insurance software"
+            aria-label={t("Your sector, in a few words")}
+            placeholder={t("In a few words, like insurance software")}
             maxLength={120}
             value={answers.otherSector}
             onChange={(e) => set("otherSector", e.target.value)}
           />
         ) : null}
-        {errors.sectors ? <p className="gq-err">{errors.sectors}</p> : null}
+        {errors.sectors ? <p className="gq-err">{t(errors.sectors)}</p> : null}
       </div>
       <div className="gq-q">
         <p className="gq-label" id={countryId}>
-          Where is the company based?
+          {t("Where is the company based?")}
           {fromProfile.has("country") && answers.country !== "" ? (
             <FromProfile />
           ) : null}
@@ -1168,7 +1201,7 @@ function CompanyStep({
                 set("country", choice.value);
               }}
             >
-              {choice.label}
+              {t(choice.label)}
             </button>
           ))}
           <button
@@ -1181,7 +1214,7 @@ function CompanyStep({
               if (inList || answers.country === DECLINED) set("country", "");
             }}
           >
-            Elsewhere
+            {t("Elsewhere")}
           </button>
           <button
             type="button"
@@ -1193,44 +1226,46 @@ function CompanyStep({
               set("country", DECLINED);
             }}
           >
-            I&apos;d rather not say
+            {t("I'd rather not say")}
           </button>
         </div>
         {elsewhere ? (
           <select
             className="gq-input"
-            aria-label="Country"
+            aria-label={t("Country")}
             value={
               inList || answers.country === DECLINED ? "" : answers.country
             }
             onChange={(e) => set("country", e.target.value)}
           >
-            <option value="">Choose a country</option>
+            <option value="">{t("Choose a country")}</option>
             {MORE_COUNTRIES.map((choice) => (
               <option key={choice.value} value={choice.value}>
-                {choice.label}
+                {t(choice.label)}
               </option>
             ))}
           </select>
         ) : null}
-        {errors.country ? <p className="gq-err">{errors.country}</p> : null}
+        {errors.country ? <p className="gq-err">{t(errors.country)}</p> : null}
       </div>
     </>
   );
 }
 
 function RoundStep({ headingRef, answers, errors, set }: StepProps) {
+  const t = useT();
+
   return (
     <>
       <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-        Your round
+        {t("Your round")}
       </h1>
       <p className="cq-body gq-t2">
-        Rough numbers are fine. You can say you&apos;d rather not.
+        {t("Rough numbers are fine. You can say you'd rather not.")}
       </p>
       <div className="gq-q">
         <Options
-          label="How much are you raising?"
+          label={t("How much are you raising?")}
           options={RAISE_BANDS}
           value={answers.band}
           onChange={(value) => {
@@ -1244,19 +1279,19 @@ function RoundStep({ headingRef, answers, errors, set }: StepProps) {
             <select
               className="gq-input"
               style={{ width: 96 }}
-              aria-label="Currency"
+              aria-label={t("Currency")}
               value={answers.currency}
               onChange={(e) => set("currency", e.target.value)}
             >
               {CURRENCIES.map((c) => (
-                <option key={c}>{c}</option>
+                <option key={c}>{t(c)}</option>
               ))}
             </select>
             <input
               className="gq-input"
               inputMode="decimal"
-              aria-label="Exact amount"
-              placeholder="Exact amount, like 1,200,000"
+              aria-label={t("Exact amount")}
+              placeholder={t("Exact amount, like 1,200,000")}
               value={answers.amount}
               aria-invalid={errors.amount !== undefined}
               onChange={(e) => {
@@ -1275,13 +1310,14 @@ function RoundStep({ headingRef, answers, errors, set }: StepProps) {
         answers.band !== DECLINED &&
         answers.amount.trim() === "" ? (
           <p className="cq-caption gq-t3">
-            Add the exact amount so the round-size rule can be checked. Without
-            it, that rule stays unanswered.
+            {t(
+              "Add the exact amount so the round-size rule can be checked. Without it, that rule stays unanswered.",
+            )}
           </p>
         ) : null}
       </div>
       <Options
-        label="How are you raising?"
+        label={t("How are you raising?")}
         options={INSTRUMENT_CHOICES}
         value={answers.instrument}
         onChange={(value) =>
@@ -1289,7 +1325,7 @@ function RoundStep({ headingRef, answers, errors, set }: StepProps) {
         }
       />
       <Options
-        label="Do you have a lead investor?"
+        label={t("Do you have a lead investor?")}
         options={LEAD_CHOICES}
         value={answers.lead}
         onChange={(value) => set("lead", value as FormAnswers["lead"])}
@@ -1314,15 +1350,17 @@ function ShareStep({
   /** Slice 1: the contact confirmed on the first step replaces the fields. */
   readonly confirmed: ApplicationContactDto | null;
 }) {
+  const t = useT();
+
   return (
     <>
       <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-        What to share
+        {t("What to share")}
       </h1>
       <p className="cq-body gq-t2">
         {materials.length > 0
-          ? `Pick what ${fund} should see. They only get what you tick.`
-          : `${fund} gets your answers and your note. Nothing else.`}
+          ? t(`Pick what ${fund} should see. They only get what you tick.`)
+          : t(`${fund} gets your answers and your note. Nothing else.`)}
       </p>
       {materials.length > 0 ? (
         <ul className="gq-hair">
@@ -1343,7 +1381,7 @@ function ShareStep({
                 />
                 <span className="flex-1">
                   <b className="block font-medium">{material.name}</b>
-                  <span className="cq-caption gq-t2">{material.detail}</span>
+                  <span className="cq-caption gq-t2">{t(material.detail)}</span>
                 </span>
                 <FileText {...icon} size={ICON_SIZE.regular} />
               </label>
@@ -1353,14 +1391,14 @@ function ShareStep({
       ) : null}
       {confirmed !== null ? (
         <p className="cq-body-sm gq-t2">
-          {fund} may contact you at <b>{confirmed.email}</b>, the email you
-          confirmed.
+          {t(`${fund} may contact you at`)} <b>{confirmed.email}</b>
+          {t(", the email you confirmed.")}
         </p>
       ) : anonymous ? (
         <div className="flex flex-col gap-3">
           <div className="gq-field">
             <label className="gq-label" htmlFor="gq-cname">
-              Your name <span className="gq-t3">(optional)</span>
+              {t("Your name")} <span className="gq-t3">{t("(optional)")}</span>
             </label>
             <input
               id="gq-cname"
@@ -1373,7 +1411,7 @@ function ShareStep({
           </div>
           <div className="gq-field">
             <label className="gq-label" htmlFor="gq-cmail">
-              Email for their reply
+              {t("Email for their reply")}
             </label>
             <input
               id="gq-cmail"
@@ -1386,12 +1424,13 @@ function ShareStep({
               onChange={(e) => set("contactEmail", e.target.value)}
             />
             {errors.contactEmail ? (
-              <p className="gq-err">{errors.contactEmail}</p>
+              <p className="gq-err">{t(errors.contactEmail)}</p>
             ) : null}
           </div>
           <p className="cq-caption gq-t3">
-            Have a Capital Q account? Sign in on the gate&apos;s page to share
-            your deck too.
+            {t(
+              "Have a Capital Q account? Sign in on the gate's page to share your deck too.",
+            )}
           </p>
         </div>
       ) : null}
@@ -1407,20 +1446,22 @@ function NoteStep({
   fromProfile,
   set,
 }: StepProps & { readonly fund: string; readonly fromProfile: boolean }) {
+  const t = useT();
+
   return (
     <>
       <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-        A short note
+        {t("A short note")}
       </h1>
       <p className="cq-body gq-t2">
-        Optional.{" "}
+        {t("Optional.")}{" "}
         {fromProfile
-          ? "A first draft from your profile; it's yours to change."
-          : "A line or two about why them."}
+          ? t("A first draft from your profile; it's yours to change.")
+          : t("A line or two about why them.")}
       </p>
       <div className="gq-field">
         <label className="gq-label" htmlFor="gq-msg">
-          Note to {fund}
+          {t(`Note to ${fund}`)}
         </label>
         <textarea
           id="gq-msg"
@@ -1433,7 +1474,7 @@ function NoteStep({
           onChange={(e) => set("note", e.target.value)}
         />
         <span id="gq-msg-count" className="cq-caption gq-t3 text-end">
-          {answers.note.length} of {GATEQ_NOTE_MAX_CHARS}
+          {answers.note.length} {t("of")} {GATEQ_NOTE_MAX_CHARS}
         </span>
         {errors.note ? <p className="gq-err">{errors.note}</p> : null}
       </div>
@@ -1460,6 +1501,8 @@ function CheckStep({
   readonly replyWithinDays: number | null;
   readonly onAnswer: (dimension: string) => void;
 }) {
+  const t = useT();
+
   const unanswered = lines.filter(
     (line) => line.standing === "NOT_ANSWERED" && line.required,
   );
@@ -1475,7 +1518,9 @@ function CheckStep({
           size={28}
         />
         <h1 ref={headingRef} tabIndex={-1} className="cq-title-md">
-          {verdict === null ? "Checking…" : verdictTitle(verdict, fund, lines)}
+          {verdict === null
+            ? t("Checking…")
+            : t(verdictTitle(verdict, fund, lines))}
         </h1>
       </div>
       <ResultLines lines={lines} />
@@ -1483,32 +1528,38 @@ function CheckStep({
         <div className="gq-banner">
           <CircleAlert {...icon} />
           <span>
-            Unanswered isn&apos;t a no, but this gate needs{" "}
-            {unanswered
-              .map((line) => dimensionWord(line.dimension).toLowerCase())
-              .join(" and ")}{" "}
-            to decide.{" "}
+            {t("Unanswered isn't a no, but this gate needs")}{" "}
+            {t(
+              unanswered
+                .map((line) => dimensionWord(line.dimension).toLowerCase())
+                .join(" and "),
+            )}{" "}
+            {t("to decide.")}{" "}
             <button
               type="button"
               className="underline underline-offset-4"
               onClick={() => onAnswer(unanswered[0]?.dimension ?? "STAGE")}
             >
-              Answer it
+              {t("Answer it")}
             </button>
           </span>
         </div>
       ) : null}
       <p className="cq-body-sm gq-t2">
-        Next, a few questions from Q, then you review everything before it goes.
-        When you submit, {fund} gets: {answers.companyName || "your company"},
-        your answers
+        {t(
+          "Next, a few questions from Q, then you review everything before it goes. When you submit,",
+        )}{" "}
+        {t(`${fund} gets:`)} {t(answers.companyName || "your company")}
+        {t(", your answers")}
         {amount !== null
-          ? ` (raising ${formatMoney(amount, answers.currency)})`
+          ? t(` (raising ${formatMoney(amount, answers.currency)})`)
           : ""}
-        {shared.length > 0 ? `, ${shared.join(", ")}` : ""}
-        {answers.note.trim() !== "" ? " and your note" : ""}.
+        {shared.length > 0 ? t(`, ${shared.join(", ")}`) : ""}
+        {answers.note.trim() !== "" ? t(" and your note") : ""}.
         {replyWithinDays
-          ? ` ${fund} promises a reply within ${replyWithinDays} working days.`
+          ? t(
+              ` ${fund} promises a reply within ${replyWithinDays} working days.`,
+            )
           : ""}
       </p>
     </div>

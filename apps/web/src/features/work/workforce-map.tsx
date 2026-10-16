@@ -45,6 +45,7 @@ import {
   type View,
 } from "./workforce-agents";
 import { dollars } from "./workforce-view";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q's team as a map (P7; mockup docs/design/2026-10-06/workforce): Lead Q
@@ -150,6 +151,8 @@ export function AgentRing({
   readonly node: Pick<AgentNode, "state" | "mono" | "lead">;
   readonly size?: number;
 }) {
+  const t = useT();
+
   const tone = RING_TONE[node.state];
   return (
     <span
@@ -189,7 +192,7 @@ export function AgentRing({
           style={{ borderColor: tone }}
         />
       ) : null}
-      {node.mono}
+      {t(node.mono)}
       <span
         className="absolute -right-1.5 -bottom-1.5 grid place-items-center rounded-full border-[1.5px] bg-(--cq-surface-raised)"
         style={{
@@ -215,6 +218,8 @@ export function StateLabel({
   readonly node: Pick<AgentNode, "state" | "pause" | "waitingOn">;
   readonly className?: string | undefined;
 }) {
+  const t = useT();
+
   return (
     <span
       className={cx(
@@ -224,7 +229,7 @@ export function StateLabel({
       )}
     >
       <StateGlyph state={node.state} size={13} />
-      {stateLabel(node)}
+      {t(stateLabel(node))}
     </span>
   );
 }
@@ -244,6 +249,8 @@ export function WorkforceTeam({
   /** The inline approve for an asking node (the Approval Engine's own). */
   readonly approve: (node: AgentNode) => ReactNode;
 }) {
+  const t = useT();
+
   const [filter, setFilter] = useState<AgentState | null>(null);
   const [mode, setMode] = useState<"map" | "list">("map");
   const counts = stateCounts(nodes);
@@ -255,7 +262,7 @@ export function WorkforceTeam({
       data-workforce-team
     >
       <h2 id="workforce-team-heading" className="sr-only">
-        Q’s team
+        {t("Q’s team")}
       </h2>
       <div className="relative -mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0">
         {counts.map(({ state, count }) => (
@@ -277,12 +284,12 @@ export function WorkforceTeam({
             data-chip={state}
           >
             <b className="cq-numeric font-semibold">{count}</b>
-            {STATE_WORDS[state]}
+            {t(STATE_WORDS[state])}
           </button>
         ))}
         <div
           role="group"
-          aria-label="Show as"
+          aria-label={t("Show as")}
           className="ms-auto inline-flex flex-none border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
         >
           {(["map", "list"] as const).map((one) => (
@@ -298,7 +305,7 @@ export function WorkforceTeam({
                   : "text-(--cq-text-secondary)",
               )}
             >
-              {one === "map" ? "Map" : "List"}
+              {one === "map" ? t("Map") : t("List")}
             </button>
           ))}
         </div>
@@ -314,7 +321,7 @@ export function WorkforceTeam({
       ) : null}
       {/* The list twin: always in the accessibility tree, visible on demand. */}
       <ul
-        aria-label="Q’s team, by state"
+        aria-label={t("Q’s team, by state")}
         className={cx(
           "m-0 list-none overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-0",
           mode === "map" && "sr-only",
@@ -341,15 +348,15 @@ export function WorkforceTeam({
                   </span>
                   <StateLabel node={node} />
                   <span className="block truncate text-[13px] text-(--cq-text-secondary)">
-                    {node.now}
+                    {t(node.now)}
                   </span>
                 </span>
                 <span className="cq-numeric text-end text-[12.5px] text-(--cq-text-tertiary)">
                   <span suppressHydrationWarning>
-                    {ago(node.since, now) ?? ""}
+                    {t(ago(node.since, now) ?? "")}
                   </span>
                   <br />
-                  {dollars(node.monthUsd)}
+                  {t(dollars(node.monthUsd))}
                 </span>
               </button>
             </li>
@@ -361,6 +368,8 @@ export function WorkforceTeam({
 }
 
 function Legend() {
+  const t = useT();
+
   const order: readonly AgentState[] = [
     "working",
     "thinking",
@@ -386,7 +395,7 @@ function Legend() {
             )}
             style={{ borderColor: RING_TONE[state] }}
           />
-          {STATE_WORDS[state]}
+          {t(STATE_WORDS[state])}
         </span>
       ))}
     </div>
@@ -408,6 +417,8 @@ function TeamMap({
   readonly onOpen: (role: Role) => void;
   readonly approve: (node: AgentNode) => ReactNode;
 }) {
+  const t = useT();
+
   const reduced = useReducedMotion() === true;
   const viewport = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<Size | null>(null);
@@ -597,7 +608,9 @@ function TeamMap({
         tabIndex={0}
         role="application"
         aria-roledescription="map"
-        aria-label="Q’s team map. Plus and minus zoom, 0 fits, arrow keys move. The list below has the same content."
+        aria-label={t(
+          "Q’s team map. Plus and minus zoom, 0 fits, arrow keys move. The list below has the same content.",
+        )}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -725,7 +738,9 @@ function TeamMap({
                     setHover(null);
                     onOpen(node.role);
                   }}
-                  aria-label={`${node.name}: ${stateLabel(node)}. ${node.now}`}
+                  aria-label={t(
+                    `${node.name}: ${stateLabel(node)}. ${node.now}`,
+                  )}
                   className={cx(
                     "grid w-full cursor-pointer items-center text-start",
                     level === "far"
@@ -763,31 +778,31 @@ function TeamMap({
                           : "[-webkit-line-clamp:2]",
                       )}
                     >
-                      {node.now}
+                      {t(node.now)}
                     </span>
                   )}
                   {level === "near" ? (
                     <span className="col-span-2 mt-2 flex flex-col gap-1 border-t border-(--cq-border-subtle) pt-2 text-[12.5px] text-(--cq-text-tertiary)">
                       <span className="flex justify-between gap-2">
-                        <span>Job</span>
+                        <span>{t("Job")}</span>
                         <span className="truncate text-(--cq-text-primary)">
-                          {node.job ?? "—"}
+                          {t(node.job ?? "—")}
                         </span>
                       </span>
                       <span className="flex justify-between gap-2">
-                        <span>Since</span>
+                        <span>{t("Since")}</span>
                         <span
                           className="cq-numeric text-(--cq-text-primary)"
                           suppressHydrationWarning
                         >
-                          {since ?? "—"}
+                          {t(since ?? "—")}
                         </span>
                       </span>
                       <span className="flex justify-between gap-2">
-                        <span>This month</span>
+                        <span>{t("This month")}</span>
                         <span className="cq-numeric text-(--cq-text-primary)">
-                          {node.runs} {node.runs === 1 ? "run" : "runs"} today ·{" "}
-                          {dollars(node.monthUsd)}
+                          {node.runs} {node.runs === 1 ? "run" : "runs"}{" "}
+                          {t("today ·")} {t(dollars(node.monthUsd))}
                         </span>
                       </span>
                     </span>
@@ -806,11 +821,11 @@ function TeamMap({
         </div>
         <div
           role="group"
-          aria-label="Zoom"
+          aria-label={t("Zoom")}
           data-map-controls
           className="absolute end-3 bottom-3 flex items-center gap-0.5 border border-(--cq-border) bg-(--cq-surface-raised) p-[3px] shadow-[0_4px_18px_-8px_rgb(0_0_0/0.25)]"
         >
-          <MapButton label="Zoom out" onClick={() => zoomBy(1 / 1.25)}>
+          <MapButton label={t("Zoom out")} onClick={() => zoomBy(1 / 1.25)}>
             <Minus size={18} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </MapButton>
           <span
@@ -819,15 +834,15 @@ function TeamMap({
           >
             {Math.round(view.scale * 100)}%
           </span>
-          <MapButton label="Zoom in" onClick={() => zoomBy(1.25)}>
+          <MapButton label={t("Zoom in")} onClick={() => zoomBy(1.25)}>
             <Plus size={18} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </MapButton>
-          <MapButton label="Fit everyone" onClick={fit}>
+          <MapButton label={t("Fit everyone")} onClick={fit}>
             <Maximize2 size={18} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </MapButton>
         </div>
         <p className="pointer-events-none absolute bottom-3.5 start-3.5 m-0 hidden bg-(--cq-surface) px-1.5 text-[12.5px] text-(--cq-text-tertiary) lg:block">
-          Drag to move · pinch or Ctrl/⌘ + scroll to zoom
+          {t("Drag to move · pinch or Ctrl/⌘ + scroll to zoom")}
         </p>
       </div>
       {hovered === undefined || hover === null ? null : (
@@ -840,20 +855,20 @@ function TeamMap({
           <b className="block text-[14px]">{hovered.name}</b>
           <StateLabel node={hovered} />
           <p className="mt-1.5 mb-0 text-(--cq-text-secondary)">
-            {hovered.now}
+            {t(hovered.now)}
           </p>
           <dl className="mt-2 mb-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-(--cq-text-tertiary)">
-            <dt>Job</dt>
+            <dt>{t("Job")}</dt>
             <dd className="m-0 truncate text-end text-(--cq-text-primary)">
-              {hovered.job ?? "—"}
+              {t(hovered.job ?? "—")}
             </dd>
-            <dt>Since</dt>
+            <dt>{t("Since")}</dt>
             <dd className="cq-numeric m-0 text-end text-(--cq-text-primary)">
-              {ago(hovered.since, now) ?? "—"}
+              {t(ago(hovered.since, now) ?? "—")}
             </dd>
-            <dt>This month</dt>
+            <dt>{t("This month")}</dt>
             <dd className="cq-numeric m-0 text-end text-(--cq-text-primary)">
-              {dollars(hovered.monthUsd)}
+              {t(dollars(hovered.monthUsd))}
             </dd>
           </dl>
         </div>
@@ -871,10 +886,12 @@ function MapButton({
   readonly onClick: () => void;
   readonly children: ReactNode;
 }) {
+  const t = useT();
+
   return (
     <button
       type="button"
-      aria-label={label}
+      aria-label={t(label)}
       onClick={onClick}
       className="grid h-11 w-11 place-items-center hover:bg-(--cq-surface-subtle) lg:h-10 lg:w-10"
     >

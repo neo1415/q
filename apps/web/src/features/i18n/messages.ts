@@ -4,12 +4,19 @@ import {
 } from "@capital-q/contracts";
 
 import { ANSWERS_AR } from "./catalog/answers";
+import { ADMIN_AR } from "./catalog/admin";
 import { COMPANY_AR } from "./catalog/company";
 import { CORE_AR } from "./catalog/core";
+import { DAILY_AR } from "./catalog/daily";
 import { DISCOVER_AR } from "./catalog/discover";
+import { DOCUMENTS_AR } from "./catalog/documents";
+import { GATEQ_AR } from "./catalog/gateq";
 import { Q_AR } from "./catalog/q";
+import { RELATIONSHIPS_AR } from "./catalog/relationships";
 import { SETUP_AR } from "./catalog/setup";
 import { SHELL_AR } from "./catalog/shell";
+import { WORK_AR } from "./catalog/work";
+import { indexPatterns, localiseDate, matchPattern } from "./patterns";
 
 /**
  * The interface's language (multilingual Q, Arabic first, 2026-10-16).
@@ -30,6 +37,12 @@ export type UiLanguage = "en" | "ar";
  */
 const ARABIC: Readonly<Record<string, string>> = {
   ...CORE_AR,
+  ...RELATIONSHIPS_AR,
+  ...DOCUMENTS_AR,
+  ...GATEQ_AR,
+  ...WORK_AR,
+  ...DAILY_AR,
+  ...ADMIN_AR,
   ...Q_AR,
   ...DISCOVER_AR,
   ...COMPANY_AR,
@@ -52,9 +65,20 @@ const CATALOGUE: Readonly<
   Record<UiLanguage, Readonly<Record<string, string>>>
 > = { en: {}, ar: ARABIC };
 
-/** The text in this language; the English source when there is none. */
+const PATTERNS = { en: indexPatterns({}), ar: indexPatterns(ARABIC) };
+
+/**
+ * The text in this language; the English source when there is none. A
+ * sentence with a name or figure in it matches a `{placeholder}` key.
+ */
 export function translate(language: UiLanguage, english: string): string {
-  return CATALOGUE[language][english] ?? english;
+  const catalogue = CATALOGUE[language];
+  return (
+    catalogue[english] ??
+    matchPattern(PATTERNS[language], catalogue, english) ??
+    (language === "ar" ? localiseDate(english) : undefined) ??
+    english
+  );
 }
 
 /** Strings this catalogue translates, for tests. */

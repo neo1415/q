@@ -29,6 +29,7 @@ import {
 
 import { GateqVideoRoom } from "./gateq-video-room";
 import { deviceLocale } from "@/features/voice/device-locale";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The way into the GateQ video interview (C3). It appears only when the
@@ -72,6 +73,8 @@ export function GateqVideoEntry({
   /** The room opened (true) or closed (false). */
   readonly onRoomChange?: ((open: boolean) => void) | undefined;
 }) {
+  const t = useT();
+
   const primary = variant === "primary";
   const [checked, setChecked] = useState(false);
   const [available, setAvailable] = useState(false);
@@ -193,7 +196,7 @@ export function GateqVideoEntry({
         : null);
     return said === null ? null : (
       <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-        {said}
+        {t(said)}
       </p>
     );
   }
@@ -208,13 +211,15 @@ export function GateqVideoEntry({
       data-gateq-video-entry={variant}
     >
       <p className="cq-label text-(--cq-text-primary)">
-        {primary ? "Talk it through with Q" : "Prefer to talk it through?"}
+        {primary
+          ? t("Talk it through with Q")
+          : t("Prefer to talk it through?")}
       </p>
       {primary ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          A short video conversation, the way you would pitch {fund} in person.
-          Q asks, you answer out loud; every answer is written into this
-          application for you to review.
+          {t(
+            `A short video conversation, the way you would pitch ${fund} in person. Q asks, you answer out loud; every answer is written into this application for you to review.`,
+          )}
         </p>
       ) : null}
       {videoAllowanceLine(allowance) === null ? null : (
@@ -236,9 +241,9 @@ export function GateqVideoEntry({
           className="mt-1 size-4 accent-(--cq-accent)"
         />
         <span>
-          I understand Q is an AI interviewer, my camera and microphone are used
-          only while the video room is open, and what I say is transcribed into
-          this application. Nothing reaches {fund} until I review and submit.
+          {t(
+            `I understand Q is an AI interviewer, my camera and microphone are used only while the video room is open, and what I say is transcribed into this application. Nothing reaches ${fund} until I review and submit.`,
+          )}
         </span>
       </label>
       {arabic ? (
@@ -291,18 +296,18 @@ export function GateqVideoEntry({
           }}
         >
           {pending
-            ? "Opening the video room…"
+            ? t("Opening the video room…")
             : primary
-              ? "Start the video interview"
-              : "Continue by video"}
+              ? t("Start the video interview")
+              : t("Continue by video")}
         </Button>
         {primary && onTypeInstead !== undefined ? (
           <Button variant="quiet" disabled={pending} onClick={onTypeInstead}>
-            Type my answers instead
+            {t("Type my answers instead")}
           </Button>
         ) : (
           <span className="cq-caption text-(--cq-text-tertiary)">
-            Short sessions; typing stays available.
+            {t("Short sessions; typing stays available.")}
           </span>
         )}
       </div>
@@ -312,12 +317,12 @@ export function GateqVideoEntry({
           role="status"
           className="cq-body-sm text-(--cq-text-primary)"
         >
-          Tick the box above to start the video interview.
+          {t("Tick the box above to start the video interview.")}
         </p>
       ) : null}
       {message === null ? null : (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>

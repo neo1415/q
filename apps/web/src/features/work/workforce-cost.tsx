@@ -5,6 +5,7 @@ import type {
 import { cx } from "@capital-q/ui";
 
 import { costRows, dollars, jobTitle } from "./workforce-view";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Work's Cost tab (P7): what Q's work cost this month against the
@@ -18,6 +19,8 @@ export function WorkforceCost({
   readonly overview: WorkforceOverviewDto;
   readonly jobs: readonly WorkforceJobDetailDto[];
 }) {
+  const t = useT();
+
   const rows = costRows(overview);
   const spent = Number(overview.spentUsd) || 0;
   const limit = overview.limitUsd === null ? null : Number(overview.limitUsd);
@@ -40,15 +43,15 @@ export function WorkforceCost({
             id="cost-month"
             className="m-0 text-[13px] font-normal text-(--cq-text-secondary)"
           >
-            This month
+            {t("This month")}
           </h2>
           <p className="cq-numeric my-2 font-(family-name:--cq-font-editorial) text-[34px] leading-none font-medium">
-            {dollars(overview.spentUsd)}
+            {t(dollars(overview.spentUsd))}
           </p>
           {share === null ? null : (
             <div
               role="meter"
-              aria-label="Spent of your monthly limit"
+              aria-label={t("Spent of your monthly limit")}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Math.round(share)}
@@ -65,10 +68,14 @@ export function WorkforceCost({
           )}
           <p className="mt-2 mb-0 text-[13px] text-(--cq-text-secondary)">
             {limitWords === null
-              ? "No monthly limit is set for Q’s work."
+              ? t("No monthly limit is set for Q’s work.")
               : overview.paused
-                ? `Your ${limitWords} limit is reached: Q starts no new work this month until you raise it.`
-                : `of your ${limitWords} limit. Q pauses new work and asks you at ${limitWords}.`}
+                ? t(
+                    `Your ${limitWords} limit is reached: Q starts no new work this month until you raise it.`,
+                  )
+                : t(
+                    `of your ${limitWords} limit. Q pauses new work and asks you at ${limitWords}.`,
+                  )}
           </p>
         </section>
         <section
@@ -76,11 +83,11 @@ export function WorkforceCost({
           className="border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4.5 py-4"
         >
           <h2 id="cost-role" className="mt-0 mb-2.5 text-[15px] font-semibold">
-            By specialist
+            {t("By specialist")}
           </h2>
           {rows.length === 0 ? (
             <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
-              Nothing spent yet this month.
+              {t("Nothing spent yet this month.")}
             </p>
           ) : (
             <table className="w-full border-collapse text-[14px]">
@@ -102,7 +109,7 @@ export function WorkforceCost({
                       </div>
                     </td>
                     <td className="cq-numeric w-16 py-1.5 text-end">
-                      {dollars(row.usd)}
+                      {t(dollars(row.usd))}
                     </td>
                   </tr>
                 ))}
@@ -117,7 +124,7 @@ export function WorkforceCost({
           className="border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4.5 py-4"
         >
           <h2 id="cost-job" className="mt-0 mb-1 text-[15px] font-semibold">
-            By job
+            {t("By job")}
           </h2>
           <ul className="m-0 list-none p-0">
             {spending.map((job) => (
@@ -127,13 +134,15 @@ export function WorkforceCost({
               >
                 <span className="min-w-0">
                   <span className="block truncate">
-                    {jobTitle(job.job.goal)}
+                    {t(jobTitle(job.job.goal))}
                   </span>
                   <span className="text-[13px] text-(--cq-text-secondary)">
-                    {dollars(job.job.budgetUsd)} budget
+                    {t(dollars(job.job.budgetUsd))} {t("budget")}
                   </span>
                 </span>
-                <span className="cq-numeric">{dollars(job.job.costUsd)}</span>
+                <span className="cq-numeric">
+                  {t(dollars(job.job.costUsd))}
+                </span>
               </li>
             ))}
           </ul>

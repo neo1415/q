@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { cx } from "@capital-q/ui";
 
 import { hubTabs, hubViewOf } from "./hub-view";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The CRM's tab strip while a tab loads (owner 2026-10-16: tab switching
@@ -14,6 +15,8 @@ import { hubTabs, hubViewOf } from "./hub-view";
  * only, never a second set of links.
  */
 export function HubLoadingTabs() {
+  const t = useT();
+
   const view = hubViewOf(useSearchParams().get("view") ?? undefined);
   return (
     <span
@@ -30,7 +33,7 @@ export function HubLoadingTabs() {
               : "border-transparent font-medium text-(--cq-text-secondary)",
           )}
         >
-          {entry.label}
+          {t(entry.label)}
         </span>
       ))}
     </span>

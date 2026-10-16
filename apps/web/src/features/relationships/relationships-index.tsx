@@ -1,13 +1,13 @@
-import Link from "next/link";
-
 import type {
   FitProfileDto,
   RelationshipSummaryDto,
 } from "@capital-q/contracts";
-import { buttonClassName } from "@capital-q/ui/button";
-
 import type { RelationshipDigest } from "./relationship-data";
 import { RelationshipsBoard } from "./relationships-board";
+import {
+  RelationshipsEmpty as Empty,
+  RelationshipsUnavailable,
+} from "./relationships-empty";
 import {
   cursorOf,
   listOrder,
@@ -52,14 +52,7 @@ export function RelationshipsIndex({
     );
   }
   if (items === undefined) {
-    return (
-      <p
-        className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)"
-        data-state="unavailable"
-      >
-        Your relationships couldn&apos;t be read just now. Reload in a moment.
-      </p>
-    );
+    return <RelationshipsUnavailable />;
   }
   if (items.length === 0) {
     return side === "INVESTOR" ? (
@@ -96,25 +89,4 @@ export function RelationshipsIndex({
 
 function readClock(): number {
   return Date.now();
-}
-
-function Empty({
-  sentence,
-  href,
-  action,
-}: {
-  readonly sentence: string;
-  readonly href: string;
-  readonly action: string;
-}) {
-  return (
-    <div className="flex flex-col items-start gap-4" data-state="empty">
-      <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
-        {sentence}
-      </p>
-      <Link href={href} className={buttonClassName("secondary")}>
-        {action}
-      </Link>
-    </div>
-  );
 }

@@ -10,6 +10,7 @@ import { useQSessionOptional } from "@/features/q/q-session";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import { readErrandsAction, stopErrandAction } from "./errand-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q looking after one relationship (founder direction 2026-09-29): while an
@@ -25,6 +26,8 @@ export function RelationshipErrands({
   readonly counterpart: string;
   readonly connected: boolean;
 }) {
+  const t = useT();
+
   const { askNow, setOpen } = useGlobalQ();
   const session = useQSessionOptional();
   const [errands, setErrands] = useState<readonly QErrandDto[] | null>(null);
@@ -65,7 +68,7 @@ export function RelationshipErrands({
           void session.q.ask(ask);
         }}
       >
-        Let Q handle this
+        {t("Let Q handle this")}
       </Button>
     );
   }
@@ -75,12 +78,12 @@ export function RelationshipErrands({
       <div className="flex items-center gap-2">
         <QSwarm state="WORKING" pixels={28} />
         <span className="cq-body-sm text-(--cq-text-primary)">
-          Q is looking after this
+          {t("Q is looking after this")}
         </span>
       </div>
       {active.lastStep === null ? null : (
         <span className="cq-caption text-(--cq-text-secondary)">
-          {active.lastStep}
+          {t(active.lastStep)}
         </span>
       )}
       <Button
@@ -105,11 +108,11 @@ export function RelationshipErrands({
           })
         }
       >
-        Stop
+        {t("Stop")}
       </Button>
       {message === null ? null : (
         <span className="cq-caption text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </span>
       )}
     </div>

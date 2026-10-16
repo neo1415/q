@@ -21,6 +21,7 @@ import {
   type ContactAnswers,
   type ContactErrors,
 } from "./form-model";
+import { useT } from "@/features/i18n/language";
 
 /**
  * GateQ slice 1: who is applying, before anything else.
@@ -58,6 +59,8 @@ export function ContactStep({
   /** Why the founder is back here, if they were sent back. */
   readonly notice?: string | null;
 }) {
+  const t = useT();
+
   const [contact, setContact] = useState<ContactAnswers>(initial);
   const [errors, setErrors] = useState<ContactErrors>({});
   // A guest sent back here unconfirmed goes straight to the code (with
@@ -146,12 +149,11 @@ export function ContactStep({
 
   const explain = (
     <div className="gq-card flex flex-col gap-1.5 p-4">
-      <p className="cq-label">Who receives this</p>
+      <p className="cq-label">{t("Who receives this")}</p>
       <p className="cq-body-sm gq-t2">
-        Your application goes to {fund}&apos;s team only, and only when you
-        press Submit at the end. They&apos;ll see these contact details, your
-        answers, your interview with Q and any documents you choose. They may
-        contact you at the email you confirm here.
+        {t(
+          `Your application goes to ${fund}'s team only, and only when you press Submit at the end. They'll see these contact details, your answers, your interview with Q and any documents you choose. They may contact you at the email you confirm here.`,
+        )}
       </p>
     </div>
   );
@@ -160,24 +162,24 @@ export function ContactStep({
     return (
       <>
         <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-          Your details
+          {t("Your details")}
         </h1>
         {explain}
         <div className="gq-card gq-cocard">
           <span className="min-w-0 flex-1">
             <b className="cq-title-sm block">{saved.name}</b>
             <span className="cq-body-sm gq-t2 block">
-              {[saved.role, saved.companyName].join(", ")}
+              {t([saved.role, saved.companyName].join(", "))}
             </span>
             <span className="cq-body-sm gq-t2 block">
               {saved.email}
               <span className="gq-prefill">
                 <Check {...icon} size={13} />
-                Confirmed
+                {t("Confirmed")}
               </span>
             </span>
             {saved.phone === null ? null : (
-              <span className="cq-body-sm gq-t2 block">{saved.phone}</span>
+              <span className="cq-body-sm gq-t2 block">{t(saved.phone)}</span>
             )}
           </span>
           <Button
@@ -185,7 +187,7 @@ export function ContactStep({
             size="compact"
             onClick={() => setEditing(true)}
           >
-            Change
+            {t("Change")}
           </Button>
         </div>
         <div className="gq-formbar">
@@ -195,7 +197,7 @@ export function ContactStep({
             style={{ minWidth: 160 }}
             onClick={() => onConfirmed(saved)}
           >
-            Continue
+            {t("Continue")}
           </Button>
         </div>
       </>
@@ -206,21 +208,22 @@ export function ContactStep({
     return (
       <>
         <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-          Check your email
+          {t("Check your email")}
         </h1>
         {info === null ? (
           <p className="cq-body gq-t2">
-            Enter the 6-digit code we sent to {contact.email || saved?.email}.
+            {t("Enter the 6-digit code we sent to")}{" "}
+            {contact.email || saved?.email}.
           </p>
         ) : (
           <p className="cq-body gq-t2" role="status">
-            {info}
+            {t(info)}
           </p>
         )}
         {notice ? (
           <div className="gq-banner" role="status">
             <CircleAlert {...icon} />
-            <span>{notice}</span>
+            <span>{t(notice)}</span>
           </div>
         ) : null}
         <form
@@ -232,7 +235,7 @@ export function ContactStep({
         >
           <div className="gq-field">
             <label className="gq-label" htmlFor="gq-code">
-              6-digit code
+              {t("6-digit code")}
             </label>
             <input
               id="gq-code"
@@ -249,13 +252,13 @@ export function ContactStep({
             />
             {problem === null ? null : (
               <p id="gq-code-err" className="gq-err" role="alert">
-                {problem}
+                {t(problem)}
               </p>
             )}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="primary" disabled={pending}>
-              {pending ? "Checking…" : "Confirm"}
+              {pending ? t("Checking…") : t("Confirm")}
             </Button>
             <Button
               type="button"
@@ -263,7 +266,7 @@ export function ContactStep({
               onClick={send}
               disabled={pending}
             >
-              Send a new code
+              {t("Send a new code")}
             </Button>
             <Button
               type="button"
@@ -275,7 +278,7 @@ export function ContactStep({
               }}
               disabled={pending}
             >
-              Change details
+              {t("Change details")}
             </Button>
           </div>
         </form>
@@ -286,24 +289,28 @@ export function ContactStep({
   return (
     <>
       <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-        Your details
+        {t("Your details")}
       </h1>
       <p className="cq-body gq-t2">
         {signedIn
-          ? "From your account. Check they're right; there's no code to type when it's your account's email."
-          : "So they know who's applying and how to reach you. We'll email you a code to confirm the address."}
+          ? t(
+              "From your account. Check they're right; there's no code to type when it's your account's email.",
+            )
+          : t(
+              "So they know who's applying and how to reach you. We'll email you a code to confirm the address.",
+            )}
       </p>
       {explain}
       {notice ? (
         <div className="gq-banner" role="status">
           <CircleAlert {...icon} />
-          <span>{notice}</span>
+          <span>{t(notice)}</span>
         </div>
       ) : null}
       {problem === null ? null : (
         <div className="gq-banner gq-banner-err" role="alert">
           <CircleAlert {...icon} />
-          <span>{problem}</span>
+          <span>{t(problem)}</span>
         </div>
       )}
       <form
@@ -316,7 +323,7 @@ export function ContactStep({
       >
         <Field
           id="gq-c-name"
-          label="Full name"
+          label={t("Full name")}
           value={contact.name}
           autoComplete="name"
           maxLength={200}
@@ -325,7 +332,7 @@ export function ContactStep({
         />
         <Field
           id="gq-c-email"
-          label="Email"
+          label={t("Email")}
           type="email"
           value={contact.email}
           autoComplete="email"
@@ -340,17 +347,17 @@ export function ContactStep({
         />
         <Field
           id="gq-c-role"
-          label="Your role"
+          label={t("Your role")}
           value={contact.role}
           autoComplete="organization-title"
           maxLength={120}
-          placeholder="Like Founder & CEO"
+          placeholder={t("Like Founder & CEO")}
           error={errors.role}
           onChange={(value) => set("role", value)}
         />
         <Field
           id="gq-c-company"
-          label="Company"
+          label={t("Company")}
           value={contact.companyName}
           autoComplete="organization"
           maxLength={200}
@@ -359,7 +366,7 @@ export function ContactStep({
         />
         <Field
           id="gq-c-phone"
-          label="Phone"
+          label={t("Phone")}
           optional
           type="tel"
           value={contact.phone}
@@ -370,7 +377,8 @@ export function ContactStep({
         />
         <div className="gq-q">
           <p className="gq-label" id={channelId}>
-            Best way to reach you <span className="gq-t3">(optional)</span>
+            {t("Best way to reach you")}{" "}
+            <span className="gq-t3">{t("(optional)")}</span>
           </p>
           <div
             className="gq-opts"
@@ -396,7 +404,7 @@ export function ContactStep({
                   )
                 }
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </div>
@@ -410,10 +418,10 @@ export function ContactStep({
             disabled={pending}
           >
             {pending
-              ? "Saving…"
+              ? t("Saving…")
               : signedIn
-                ? "Confirm and continue"
-                : "Email me a code"}
+                ? t("Confirm and continue")
+                : t("Email me a code")}
           </Button>
         </div>
       </form>
@@ -446,15 +454,17 @@ function Field({
   readonly maxLength: number;
   readonly placeholder?: string;
 }) {
+  const t = useT();
+
   return (
     <div className="gq-field">
       <label className="gq-label" htmlFor={id}>
-        {label}
-        {optional ? <span className="gq-t3"> (optional)</span> : null}
+        {t(label)}
+        {optional ? <span className="gq-t3"> {t("(optional)")}</span> : null}
         {badge ? (
           <span className="gq-prefill">
             <Check {...icon} size={13} />
-            Confirmed
+            {t("Confirmed")}
           </span>
         ) : null}
       </label>
@@ -472,7 +482,7 @@ function Field({
       />
       {error === undefined ? null : (
         <p id={`${id}-err`} className="gq-err">
-          {error}
+          {t(error)}
         </p>
       )}
     </div>

@@ -40,6 +40,7 @@ import {
   type NextStep,
 } from "./relationships-view";
 import { StatusPill, type StatusTone } from "./status-pill";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Relationships list (founder critique 2026-10-04): search first, then
@@ -127,6 +128,8 @@ export function RelationshipsBoard({
   /** When the page was read, so server and browser say the same "2h". */
   readonly now: number;
 }) {
+  const t = useT();
+
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("ALL");
   // RECOVERY-2026-10 (C1): the board's search, list and filter, for Q. The
@@ -248,13 +251,13 @@ export function RelationshipsBoard({
           aria-hidden="true"
           className="shrink-0 text-(--cq-text-tertiary)"
         />
-        <span className="sr-only">Search relationships</span>
+        <span className="sr-only">{t("Search relationships")}</span>
         <input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={
-            side === "INVESTOR" ? "Search companies" : "Search investors"
+            side === "INVESTOR" ? t("Search companies") : t("Search investors")
           }
           className="cq-body min-w-0 flex-1 bg-transparent text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary)"
           data-relationships-search
@@ -264,7 +267,7 @@ export function RelationshipsBoard({
       <div
         ref={filterRef}
         role="group"
-        aria-label="Show"
+        aria-label={t("Show")}
         className="relative -mx-(--cq-page-gutter) flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-(--cq-page-gutter) [scrollbar-width:none]"
       >
         {tabs.map((key) => {
@@ -283,7 +286,7 @@ export function RelationshipsBoard({
               )}
               data-filter={key}
             >
-              {FILTER_WORDS[key]}{" "}
+              {t(FILTER_WORDS[key])}{" "}
               <span
                 className={cx(
                   "cq-caption cq-numeric px-1.5",
@@ -306,10 +309,10 @@ export function RelationshipsBoard({
           data-state="filtered-empty"
         >
           {needle.length > 0
-            ? `Nothing matches “${query.trim()}”.`
+            ? t(`Nothing matches “${query.trim()}”.`)
             : filter === "NEEDS_YOU"
-              ? "Nothing needs you right now."
-              : `None ${FILTER_WORDS[filter].toLowerCase()} right now.`}
+              ? t("Nothing needs you right now.")
+              : t(`None ${FILTER_WORDS[filter].toLowerCase()} right now.`)}
         </p>
       ) : (
         <div className="flex flex-col gap-2">
@@ -318,15 +321,15 @@ export function RelationshipsBoard({
             className="cq-caption hidden grid-cols-[40px_minmax(0,1fr)_150px_96px_190px] gap-3 px-4 text-(--cq-text-tertiary) lg:grid"
           >
             <span />
-            <span>Name</span>
-            <span>Stage</span>
-            <span className="text-end">Last activity</span>
-            <span className="text-end">Next step</span>
+            <span>{t("Name")}</span>
+            <span>{t("Stage")}</span>
+            <span className="text-end">{t("Last activity")}</span>
+            <span className="text-end">{t("Next step")}</span>
           </div>
           {/* One surface with hairline rows, not a card per relationship
               (redesign 2026-10-15). */}
           <ul
-            aria-label="Relationships"
+            aria-label={t("Relationships")}
             className="flex flex-col divide-y divide-(--cq-border-subtle) overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
             data-relationships-list
           >
@@ -371,11 +374,11 @@ export function RelationshipsBoard({
             className={buttonClassName("quiet")}
             data-show-more
           >
-            {loading ? "Loading…" : "Show more"}
+            {loading ? t("Loading…") : t("Show more")}
           </button>
           {moreFailed ? (
             <p role="alert" className="cq-body-sm text-(--cq-text-secondary)">
-              More didn&apos;t load. Try again.
+              {t("More didn't load. Try again.")}
             </p>
           ) : null}
         </div>
@@ -403,12 +406,14 @@ function RelationshipRow({
   readonly unread: boolean;
   readonly now: number;
 }) {
+  const t = useT();
+
   const href = relationshipHref(item);
   const name = item.counterpart.name;
   const Icon = step.icon === null ? null : ICONS[step.icon];
   const pill = (
     <StatusPill tone={TONE[stageTone(item.state)]}>
-      {STATE_WORDS[item.state]}
+      {t(STATE_WORDS[item.state])}
     </StatusPill>
   );
   const when = (
@@ -416,7 +421,7 @@ function RelationshipRow({
       dateTime={activity}
       className="cq-caption cq-numeric text-(--cq-text-tertiary)"
     >
-      {since(activity, now)}
+      {t(since(activity, now))}
     </time>
   );
   const quiet = step.label === null && step.why === "";
@@ -467,7 +472,7 @@ function RelationshipRow({
         </h2>
         {about === null ? null : (
           <p className="cq-body-sm hidden truncate text-(--cq-text-secondary) lg:block">
-            {about}
+            {t(about)}
           </p>
         )}
         {fit === undefined ? null : <RelationshipFitLine profile={fit} />}
@@ -487,11 +492,11 @@ function RelationshipRow({
         )}
       >
         <span className="cq-body-sm min-w-0 truncate text-(--cq-text-secondary) lg:hidden">
-          {step.why}
+          {t(step.why)}
         </span>
         {step.label === null || step.href === null ? (
           <span className="cq-body-sm hidden text-(--cq-text-tertiary) lg:inline">
-            {step.why}
+            {t(step.why)}
           </span>
         ) : (
           <Link
@@ -505,7 +510,7 @@ function RelationshipRow({
             {Icon === null ? null : (
               <Icon size={ICON_SIZE.compact} aria-hidden="true" />
             )}
-            {step.label}
+            {t(step.label)}
           </Link>
         )}
       </div>

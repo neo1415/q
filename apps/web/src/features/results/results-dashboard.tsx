@@ -31,6 +31,7 @@ import {
   waitWords,
   type KnownRange,
 } from "./results-words";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /**
  * The Results dashboard (founder critique 2026-10-05: "imagine when there's
@@ -88,10 +89,12 @@ function Panel({
   readonly className?: string;
   readonly flush?: boolean;
 }) {
+  const tr = serverTNow();
+
   return (
     <SurfacePanel
       id={id}
-      title={title}
+      title={tr(title)}
       description={description}
       headingLevel={3}
       action={action}
@@ -121,17 +124,19 @@ function Tile({
    */
   readonly figure?: boolean | undefined;
 }) {
+  const tr = serverTNow();
+
   const body = (
     <>
-      <span className="cq-body-sm text-(--cq-text-secondary)">{label}</span>
+      <span className="cq-body-sm text-(--cq-text-secondary)">{tr(label)}</span>
       {figure ? (
         <span className="text-[1.625rem] leading-tight font-semibold tracking-[-0.01em] tabular-nums text-(--cq-text-primary) sm:text-[1.875rem]">
-          {value}
+          {tr(value)}
         </span>
       ) : (
         // An unknown is said in words, never drawn as large as a number.
         <span className="cq-body flex min-h-[2.25rem] items-end font-medium text-(--cq-text-primary)">
-          {value}
+          {tr(value)}
         </span>
       )}
       {note === undefined ? null : (
@@ -166,6 +171,8 @@ function Header({
   readonly props: ResultsDashboardProps;
   readonly name: string;
 }) {
+  const tr = serverTNow();
+
   const Heading = props.headingLevel === 2 ? "h2" : "h1";
   return (
     <header className="flex flex-wrap items-end justify-between gap-3">
@@ -177,16 +184,16 @@ function Header({
               "text-(--cq-text-primary)",
             )}
           >
-            {props.heading ?? "Results"}
+            {props.heading ?? tr("Results")}
           </Heading>
         )}
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          {name} · {props.results.window.label.toLowerCase()}
+          {name} · {tr(props.results.window.label.toLowerCase())}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <nav
-          aria-label="Period"
+          aria-label={tr("Period")}
           className="inline-flex border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
         >
           {RESULTS_PERIODS.map((period) => {
@@ -203,7 +210,7 @@ function Header({
                     : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
                 )}
               >
-                {period.label}
+                {tr(period.label)}
               </Link>
             );
           })}
@@ -215,14 +222,14 @@ function Header({
               className={buttonClassName("secondary")}
               download
             >
-              Download PDF
+              {tr("Download PDF")}
             </a>
             <a
               href={`/results/report?format=csv&${props.download}`}
               className={buttonClassName("quiet")}
               download
             >
-              CSV
+              {tr("CSV")}
             </a>
           </>
         )}
@@ -238,18 +245,20 @@ function Activity({
   readonly activity: ResultsActivity | undefined;
   readonly first: string;
 }) {
+  const tr = serverTNow();
+
   if (activity === undefined) return null;
   const totals = activityTotals(activity);
   return (
-    <Panel id="activity" title="Activity">
+    <Panel id="activity" title={tr("Activity")}>
       {activity.points.length === 0 || totals === null ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Nothing recorded yet.
+          {tr("Nothing recorded yet.")}
         </p>
       ) : (
         <div className="grid gap-6 sm:grid-cols-3">
           <ActivityBars
-            title={first}
+            title={tr(first)}
             total={totals.interests}
             bucket={activity.bucket}
             points={activity.points.map((p) => ({
@@ -258,7 +267,7 @@ function Activity({
             }))}
           />
           <ActivityBars
-            title="Connections"
+            title={tr("Connections")}
             total={totals.connections}
             bucket={activity.bucket}
             points={activity.points.map((p) => ({
@@ -267,7 +276,7 @@ function Activity({
             }))}
           />
           <ActivityBars
-            title="Meetings held"
+            title={tr("Meetings held")}
             total={totals.meetings}
             bucket={activity.bucket}
             points={activity.points.map((p) => ({
@@ -310,6 +319,8 @@ function Pipeline({
   /** Stages the list does not carry (said, never shown as empty). */
   readonly unlisted: readonly string[];
 }) {
+  const tr = serverTNow();
+
   const stages = orderedStages(byState);
   const max = Math.max(1, ...stages.map((s) => s.count));
   const picked = stages.some((s) => s.state === props.stage)
@@ -320,10 +331,10 @@ function Pipeline({
   return (
     <Panel
       id="pipeline"
-      title="Pipeline"
+      title={tr("Pipeline")}
       // Now, not the period: "Interest sent" above counts the period's
       // interest; this counts where each relationship stands today.
-      description="Where each relationship stands now."
+      description={tr("Where each relationship stands now.")}
       action={
         picked === null ? null : (
           <Link
@@ -339,14 +350,20 @@ function Pipeline({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {side === "INVESTOR"
-              ? "No relationships yet. They start when you express interest."
-              : "No relationships yet. They start when an investor expresses interest."}
+              ? tr(
+                  "No relationships yet. They start when you express interest.",
+                )
+              : tr(
+                  "No relationships yet. They start when an investor expresses interest.",
+                )}
           </p>
           <Link
             href={side === "INVESTOR" ? "/discover" : "/profile"}
             className={buttonClassName("primary", "compact")}
           >
-            {side === "INVESTOR" ? "Find founders" : "Polish your profile"}
+            {side === "INVESTOR"
+              ? tr("Find founders")
+              : tr("Polish your profile")}
           </Link>
         </div>
       ) : (
@@ -371,7 +388,7 @@ function Pipeline({
                     )}
                   >
                     <span className="cq-body-sm truncate text-(--cq-text-primary)">
-                      {stateWord(stage.state, side)}
+                      {tr(stateWord(stage.state, side))}
                     </span>
                     <span
                       aria-hidden="true"
@@ -394,8 +411,10 @@ function Pipeline({
           </ul>
           {picked !== null && unlisted.includes(picked) ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              {stateWord(picked, side)} relationships aren’t listed here. Find
-              them on Relationships.
+              {tr(stateWord(picked, side))}{" "}
+              {tr(
+                "relationships aren’t listed here. Find them on Relationships.",
+              )}
             </p>
           ) : shown.length === 0 ? null : (
             // A pipeline longer than a screen pages by cursor (owner
@@ -459,6 +478,8 @@ function Lines({
     readonly value: string;
   }[];
 }) {
+  const tr = serverTNow();
+
   return (
     <dl className="divide-y divide-(--cq-border-subtle)">
       {items.map((item) => (
@@ -467,10 +488,10 @@ function Lines({
           className="flex min-h-10 items-center justify-between gap-3 py-1.5"
         >
           <dt className="cq-body-sm text-(--cq-text-secondary)">
-            {item.label}
+            {tr(item.label)}
           </dt>
           <dd className="cq-body-sm text-end tabular-nums text-(--cq-text-primary)">
-            {item.value}
+            {tr(item.value)}
           </dd>
         </div>
       ))}
@@ -526,6 +547,8 @@ function InvestorDashboard(
     readonly results: InvestorResults;
   },
 ) {
+  const tr = serverTNow();
+
   const { results, usage } = props;
   const interest = results.interest;
   const commitments = commitmentLines(results.commitments ?? []);
@@ -588,32 +611,34 @@ function InvestorDashboard(
         data-stat-strip
       >
         <Tile
-          label="Interest sent"
+          label={tr("Interest sent")}
           value={String(interest?.sent ?? f.interest)}
           note={
             interest === undefined
               ? undefined
-              : `${String(interest.accepted)} accepted · ${String(interest.declined)} declined`
+              : tr(
+                  `${String(interest.accepted)} accepted · ${String(interest.declined)} declined`,
+                )
           }
           href={stageHref(props.basePath, props.range, "INTEREST_EXPRESSED")}
         />
         <Tile {...response} />
         <Tile
-          label="Meetings held"
+          label={tr("Meetings held")}
           value={String(results.meetings.held)}
           note={
             results.meetings.upcoming.length === 0
-              ? "None coming up"
-              : `${String(results.meetings.upcoming.length)} coming up`
+              ? tr("None coming up")
+              : tr(`${String(results.meetings.upcoming.length)} coming up`)
           }
         />
         <Tile
-          label="Commitments"
+          label={tr("Commitments")}
           value={results.commitments === undefined ? "Unknown" : String(live)}
           note={
             results.commitments === undefined || confirmed === undefined
               ? undefined
-              : `${String(confirmed.count)} confirmed, not yet received`
+              : tr(`${String(confirmed.count)} confirmed, not yet received`)
           }
           href="#commitments"
         />
@@ -632,21 +657,21 @@ function InvestorDashboard(
           />
           <Panel
             id="deal-flow"
-            title="Funnel"
-            description="Companies this period, each counted once."
+            title={tr("Funnel")}
+            description={tr("Companies this period, each counted once.")}
           >
             <ol className="grid grid-cols-3 gap-3 sm:grid-cols-6">
               {funnelSteps(f).map(({ label, value }) => (
                 <li key={label} className="flex flex-col gap-0.5">
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {label}
+                    {tr(label)}
                   </span>
                   {value === null ? (
                     // Fewer seen than acted on: views are not all recorded
                     // (interest also comes from search, profiles and Q), so
                     // the count is unknown, never a 0 beside 10.
                     <span className="cq-body-sm min-h-7 text-(--cq-text-secondary)">
-                      Not recorded
+                      {tr("Not recorded")}
                     </span>
                   ) : (
                     <span className="cq-title-sm tabular-nums text-(--cq-text-primary)">
@@ -661,7 +686,7 @@ function InvestorDashboard(
         <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
           <Panel
             id="commitments"
-            title="Commitments"
+            title={tr("Commitments")}
             action={
               <Link
                 href="/relationships?view=capital"
@@ -673,7 +698,7 @@ function InvestorDashboard(
           >
             {results.commitments === undefined ? (
               <p className="cq-body-sm text-(--cq-text-secondary)">
-                Commitments couldn’t be read just now.
+                {tr("Commitments couldn’t be read just now.")}
               </p>
             ) : (
               <Lines
@@ -689,7 +714,7 @@ function InvestorDashboard(
           </Panel>
           <Panel
             id="q-work"
-            title="Q’s work"
+            title={tr("Q’s work")}
             action={
               <Link href="/settings/usage" className={panelLinkClassName}>
                 Usage
@@ -719,7 +744,7 @@ function InvestorDashboard(
             />
           </Panel>
           {results.meetings.upcoming.length === 0 ? null : (
-            <Panel id="upcoming" title="Coming up">
+            <Panel id="upcoming" title={tr("Coming up")}>
               <Lines
                 items={results.meetings.upcoming.slice(0, 5).map((m) => ({
                   label: m.companyName,
@@ -740,19 +765,21 @@ function InvestorDashboard(
 }
 
 function RaisePanel({ results }: { readonly results: FounderResults }) {
+  const tr = serverTNow();
+
   const raise = results.raise;
   if (raise === null) {
     return (
-      <Panel id="raise" title="Your round">
+      <Panel id="raise" title={tr("Your round")}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Set your round on Capital to see what’s raised against it.
+            {tr("Set your round on Capital to see what’s raised against it.")}
           </p>
           <Link
             className={buttonClassName("primary", "compact")}
             href="/relationships?view=capital"
           >
-            Set your round
+            {tr("Set your round")}
           </Link>
         </div>
       </Panel>
@@ -773,7 +800,7 @@ function RaisePanel({ results }: { readonly results: FounderResults }) {
   return (
     <Panel
       id="raise"
-      title="Your round"
+      title={tr("Your round")}
       action={
         <Link href="/relationships?view=capital" className={panelLinkClassName}>
           Open Capital
@@ -785,20 +812,22 @@ function RaisePanel({ results }: { readonly results: FounderResults }) {
           <span className="text-[1.625rem] leading-tight font-semibold tabular-nums text-(--cq-text-primary) sm:text-[1.875rem]">
             {own === undefined
               ? target === null
-                ? "Target not set"
+                ? tr("Target not set")
                 : money(target.currencyCode, "0")
               : money(own.currencyCode, own.confirmed)}
           </span>
           <span className="cq-body-sm text-(--cq-text-secondary)">
             {target === null
               ? "confirmed"
-              : `confirmed of ${money(target.currencyCode, target.amount)}`}
+              : tr(`confirmed of ${money(target.currencyCode, target.amount)}`)}
           </span>
         </p>
         {target === null ? null : (
           <div
             role="img"
-            aria-label={`${String(Math.round(confirmedPct))}% confirmed, ${String(Math.round(softPct))}% with soft commitments`}
+            aria-label={tr(
+              `${String(Math.round(confirmedPct))}% confirmed, ${String(Math.round(softPct))}% with soft commitments`,
+            )}
             className="relative h-2.5 overflow-hidden bg-(--cq-surface-subtle)"
           >
             <span
@@ -812,17 +841,19 @@ function RaisePanel({ results }: { readonly results: FounderResults }) {
           </div>
         )}
         <p className="cq-caption text-(--cq-text-secondary)">
-          {[
-            own === undefined || Number(own.soft) === 0
-              ? null
-              : `${money(own.currencyCode, own.soft)} soft`,
-            raise.remaining === null || target === null
-              ? null
-              : `${money(target.currencyCode, raise.remaining)} to go`,
-            `${plural(raise.inConversation, "investor", "investors")} in conversation`,
-          ]
-            .filter((part): part is string => part !== null)
-            .join(" · ")}
+          {tr(
+            [
+              own === undefined || Number(own.soft) === 0
+                ? null
+                : `${money(own.currencyCode, own.soft)} soft`,
+              raise.remaining === null || target === null
+                ? null
+                : `${money(target.currencyCode, raise.remaining)} to go`,
+              `${plural(raise.inConversation, "investor", "investors")} in conversation`,
+            ]
+              .filter((part): part is string => part !== null)
+              .join(" · "),
+          )}
         </p>
       </div>
       {raise.committedInvestors.length === 0 ? null : (
@@ -842,6 +873,8 @@ function FounderDashboard(
     readonly results: FounderResults;
   },
 ) {
+  const tr = serverTNow();
+
   const { results } = props;
   const e = results.engagement;
   const rows: DrillRow[] = results.pipeline.rows.map((row) => ({
@@ -880,22 +913,26 @@ function FounderDashboard(
         data-stat-strip
       >
         <Tile
-          label="Investors engaged"
+          label={tr("Investors engaged")}
           value={
             results.investorsEngaged === undefined
               ? String(e.connections)
               : String(results.investorsEngaged)
           }
-          note={`${plural(e.interestsReceived, "interest", "interests")} received`}
+          note={tr(
+            `${plural(e.interestsReceived, "interest", "interests")} received`,
+          )}
           href={stageHref(props.basePath, props.range, null)}
         />
         <Tile
-          label="Meetings held"
+          label={tr("Meetings held")}
           value={String(e.meetingsHeld)}
-          note={`${plural(e.connections, "new connection", "new connections")}`}
+          note={tr(
+            `${plural(e.connections, "new connection", "new connections")}`,
+          )}
         />
         <Tile
-          label="Diligence requests"
+          label={tr("Diligence requests")}
           value={
             results.diligence === undefined
               ? "Unknown"
@@ -904,7 +941,7 @@ function FounderDashboard(
           note={
             results.diligence === undefined
               ? undefined
-              : `${String(results.diligence.fulfilled)} answered`
+              : tr(`${String(results.diligence.fulfilled)} answered`)
           }
         />
         <Tile {...responseTile("You answer in", results.responseTime)} />
@@ -925,7 +962,7 @@ function FounderDashboard(
         <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
           <Panel
             id="rehearsals"
-            title="Rehearsals"
+            title={tr("Rehearsals")}
             action={
               <Link href="/rehearsals" className={panelLinkClassName}>
                 Rehearse
@@ -934,7 +971,7 @@ function FounderDashboard(
           >
             {latest === undefined ? (
               <p className="cq-body-sm text-(--cq-text-secondary)">
-                None in this period.
+                {tr("None in this period.")}
               </p>
             ) : (
               <Lines
@@ -955,7 +992,7 @@ function FounderDashboard(
               />
             )}
           </Panel>
-          <Panel id="seen" title="Seen by investors">
+          <Panel id="seen" title={tr("Seen by investors")}>
             <Lines
               items={[
                 {
@@ -970,7 +1007,7 @@ function FounderDashboard(
             />
           </Panel>
           {results.documents.length === 0 ? null : (
-            <Panel id="documents" title="Documents Q made">
+            <Panel id="documents" title={tr("Documents Q made")}>
               <Lines
                 items={results.documents.map((d) => ({
                   label: sentenceCase(d.type),

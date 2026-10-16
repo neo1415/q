@@ -7,6 +7,7 @@ import { Button } from "@capital-q/ui/button";
 
 import { disablePush, enablePush, pushState, type PushState } from "./push";
 import { noticeSettingsAction, saveNoticeSettingsAction } from "./work-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * How Q reaches the person beyond the app (AUTO; spec auto.md §3.5): a
@@ -20,6 +21,8 @@ export function PushSetting({
 }: {
   readonly compact?: boolean;
 }) {
+  const t = useT();
+
   const [state, setState] = useState<PushState | null>(null);
   const [settings, setSettings] = useState<NotificationSettingsDto | null>(
     null,
@@ -81,7 +84,7 @@ export function PushSetting({
     <div className="flex flex-col gap-3" data-push-setting>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="cq-body-sm text-(--cq-text-secondary)" aria-live="polite">
-          {pushLine}
+          {t(pushLine)}
         </p>
         {state === "OFF" && settings?.pushAvailable !== false ? (
           <Button
@@ -90,7 +93,7 @@ export function PushSetting({
             disabled={pending}
             onClick={turnOn}
           >
-            Turn on notifications
+            {t("Turn on notifications")}
           </Button>
         ) : null}
         {state === "ON" ? (
@@ -100,14 +103,14 @@ export function PushSetting({
             disabled={pending}
             onClick={turnOff}
           >
-            Turn off
+            {t("Turn off")}
           </Button>
         ) : null}
       </div>
       {compact || settings === null ? null : (
         <label className="flex min-h-11 items-center justify-between gap-3">
           <span className="cq-body-sm text-(--cq-text-primary)">
-            Email me what needs me if I haven&rsquo;t seen it in 10 minutes
+            {t("Email me what needs me if I haven’t seen it in 10 minutes")}
           </span>
           <input
             type="checkbox"
@@ -120,7 +123,7 @@ export function PushSetting({
       )}
       {message === null ? null : (
         <p className="cq-caption text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>

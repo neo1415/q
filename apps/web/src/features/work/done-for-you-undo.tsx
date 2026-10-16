@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@capital-q/ui/button";
 
 import { unsendDoneForYouAction } from "./work-page-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Scoped delegation: a message Q sent on its own can be unsent from Work
@@ -21,13 +22,15 @@ export function DoneForYouUndo({
   readonly messageId: string;
   readonly until: string;
 }) {
+  const t = useT();
+
   const [pending, startTransition] = useTransition();
   const [state, setState] = useState<"OPEN" | "UNSENT">("OPEN");
   const [message, setMessage] = useState<string | null>(null);
   if (state === "UNSENT") {
     return (
       <span className="cq-caption text-(--cq-text-secondary)" role="status">
-        Unsent.
+        {t("Unsent.")}
       </span>
     );
   }
@@ -49,22 +52,24 @@ export function DoneForYouUndo({
           })
         }
       >
-        Unsend
+        {t("Unsend")}
       </Button>
       <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
-        until{" "}
+        {t("until")}{" "}
         <time dateTime={until}>
-          {new Intl.DateTimeFormat("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "UTC",
-            timeZoneName: "short",
-          }).format(new Date(until))}
+          {t(
+            new Intl.DateTimeFormat("en-GB", {
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "UTC",
+              timeZoneName: "short",
+            }).format(new Date(until)),
+          )}
         </time>
       </span>
       {message === null ? null : (
         <span className="cq-caption text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </span>
       )}
     </span>

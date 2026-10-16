@@ -16,6 +16,7 @@ import {
   type HubSide,
   type HubView,
 } from "./hub-view";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The CRM workspace's own tabs. Links own the state, so refresh, back and
@@ -25,6 +26,8 @@ import {
  * phone the strip scrolls sideways and keeps the open tab in view.
  */
 export function HubNavigation({ view }: { readonly view: HubView }) {
+  const t = useT();
+
   const ref = useRef<HTMLElement>(null);
   useQControlGroup({
     kind: "TAB",
@@ -46,15 +49,20 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
     const open = strip?.querySelector<HTMLElement>('[aria-current="page"]');
     if (strip === null || strip === undefined || open === null) return;
     if (open === undefined) return;
-    const right = open.offsetLeft - strip.offsetLeft + open.offsetWidth;
-    if (right > strip.clientWidth)
-      strip.scrollLeft = right - strip.clientWidth + 16;
+    // Measured on screen, so it holds right to left (Arabic) as well:
+    // a relative scrollLeft step moves the same way in both directions.
+    const box = open.getBoundingClientRect();
+    const frame = strip.getBoundingClientRect();
+    if (box.right > frame.right)
+      strip.scrollLeft += box.right - frame.right + 16;
+    else if (box.left < frame.left)
+      strip.scrollLeft -= frame.left - box.left + 16;
   }, [view]);
 
   return (
     <nav
       ref={ref}
-      aria-label="CRM"
+      aria-label={t("CRM")}
       className="relative -mx-4 flex items-stretch gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
     >
       <QPageState
@@ -78,7 +86,7 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
                 : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
             )}
           >
-            {entry.label}
+            {t(entry.label)}
             <LinkPending />
           </Link>
         );
@@ -93,6 +101,8 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
  * `button.hub-gateq`; the sidebar's own entries are not repeated here.
  */
 export function HubRelated({ side }: { readonly side: HubSide }) {
+  const t = useT();
+
   const ref = useRef<HTMLElement>(null);
   useQControlGroup({
     kind: "BUTTON",
@@ -106,7 +116,7 @@ export function HubRelated({ side }: { readonly side: HubSide }) {
   return (
     <nav
       ref={ref}
-      aria-label="Related"
+      aria-label={t("Related")}
       className="flex flex-wrap items-center gap-x-1"
     >
       {destinations.map((entry) => (
@@ -116,7 +126,7 @@ export function HubRelated({ side }: { readonly side: HubSide }) {
           data-hub-link={entry.id}
           className="cq-body-sm inline-flex min-h-11 items-center gap-1 px-2 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
-          {entry.label}
+          {t(entry.label)}
           <ArrowUpRight
             size={ICON_SIZE.compact}
             aria-hidden="true"

@@ -9,6 +9,7 @@ import { AgentRing, StateLabel } from "./workforce-map";
 import type { AgentNode } from "./workforce-agents";
 import { ApproveButton } from "./workforce-panel";
 import { dollars, jobLines, type StepState } from "./workforce-view";
+import { useT } from "@/features/i18n/language";
 
 /**
  * One specialist, opened from the map or the list (P7): what it is doing
@@ -58,6 +59,8 @@ export function AgentSheet({
   readonly onGoTo: (view: "cost" | "progress") => void;
   readonly onDecided: () => void;
 }) {
+  const t = useT();
+
   const draft =
     node?.draftId == null || job === null
       ? undefined
@@ -93,7 +96,7 @@ export function AgentSheet({
               <div className="border border-(--cq-border) bg-(--cq-surface) px-3.5 py-3 text-[14px] whitespace-pre-line">
                 {draft.counterpartName === null ? null : (
                   <span className="mb-1 block text-[12.5px] text-(--cq-text-tertiary)">
-                    To {draft.counterpartName} · draft {draft.attempt}
+                    {t(`To ${draft.counterpartName} · draft`)} {draft.attempt}
                   </span>
                 )}
                 {draft.body}
@@ -110,17 +113,17 @@ export function AgentSheet({
             />
 
             <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13.5px]">
-              <dt className="text-(--cq-text-tertiary)">Job</dt>
-              <dd className="m-0 text-end">{node.job ?? "—"}</dd>
-              <dt className="text-(--cq-text-tertiary)">Since</dt>
+              <dt className="text-(--cq-text-tertiary)">{t("Job")}</dt>
+              <dd className="m-0 text-end">{t(node.job ?? "—")}</dd>
+              <dt className="text-(--cq-text-tertiary)">{t("Since")}</dt>
               <dd className="cq-numeric m-0 text-end" suppressHydrationWarning>
-                {since ?? "—"}
+                {t(since ?? "—")}
               </dd>
-              <dt className="text-(--cq-text-tertiary)">Runs today</dt>
+              <dt className="text-(--cq-text-tertiary)">{t("Runs today")}</dt>
               <dd className="cq-numeric m-0 text-end">{node.runs}</dd>
-              <dt className="text-(--cq-text-tertiary)">This month</dt>
+              <dt className="text-(--cq-text-tertiary)">{t("This month")}</dt>
               <dd className="cq-numeric m-0 text-end">
-                {dollars(node.monthUsd)}
+                {t(dollars(node.monthUsd))}
               </dd>
             </dl>
 
@@ -130,7 +133,7 @@ export function AgentSheet({
                   id="agent-sheet-log"
                   className="mb-1.5 text-[14px] font-semibold"
                 >
-                  What happened
+                  {t("What happened")}
                 </h3>
                 <ol className="m-0 list-none p-0">
                   {lines.map((line, index) =>
@@ -152,14 +155,14 @@ export function AgentSheet({
                           )}
                         >
                           <span className="sr-only">
-                            {DOT_WORDS[line.state]}
+                            {t(DOT_WORDS[line.state])}
                           </span>
                         </span>
                         <span className="min-w-0">
                           <span className="text-(--cq-text-tertiary)">
                             {line.who}:{" "}
                           </span>
-                          {line.title}
+                          {t(line.title)}
                         </span>
                         <time
                           className="cq-numeric text-[12.5px] text-(--cq-text-tertiary)"
@@ -170,7 +173,7 @@ export function AgentSheet({
                             ? line.state === "you"
                               ? "now"
                               : ""
-                            : clock(line.at)}
+                            : t(clock(line.at))}
                         </time>
                       </li>
                     ) : null,
@@ -186,6 +189,8 @@ export function AgentSheet({
 }
 
 function Callout({ node }: { readonly node: AgentNode }) {
+  const t = useT();
+
   const tone =
     node.state === "asking"
       ? "bg-(--cq-accent-soft)"
@@ -225,8 +230,8 @@ function Callout({ node }: { readonly node: AgentNode }) {
   }
   return (
     <p className={cx("m-0 px-3.5 py-3 text-[14px]", tone)}>
-      {lead === null ? null : <b className="font-semibold">{lead} </b>}
-      {node.now}
+      {lead === null ? null : <b className="font-semibold">{t(lead)} </b>}
+      {t(node.now)}
     </p>
   );
 }
@@ -246,6 +251,8 @@ function Actions({
   readonly onGoTo: (view: "cost" | "progress") => void;
   readonly onDecided: () => void;
 }) {
+  const t = useT();
+
   const read =
     job !== null && node.draftId !== null ? (
       <Button
@@ -254,7 +261,7 @@ function Actions({
           if (node.draftId !== null) onReadDraft(job, node.draftId);
         }}
       >
-        {node.state === "held" ? "Read the drafts" : "Compare drafts"}
+        {node.state === "held" ? t("Read the drafts") : t("Compare drafts")}
       </Button>
     ) : null;
   if (node.state === "asking" && node.approval !== null) {
@@ -266,7 +273,7 @@ function Actions({
         />
         {read}
         <Button variant="quiet" onClick={onClose}>
-          Not now
+          {t("Not now")}
         </Button>
       </div>
     );
@@ -279,7 +286,7 @@ function Actions({
     return (
       <div className="flex flex-wrap gap-2">
         <Button variant="primary" onClick={() => onGoTo("cost")}>
-          See the limit
+          {t("See the limit")}
         </Button>
       </div>
     );
@@ -288,7 +295,7 @@ function Actions({
     return (
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={() => onGoTo("progress")}>
-          Resume it in In progress
+          {t("Resume it in In progress")}
         </Button>
       </div>
     );

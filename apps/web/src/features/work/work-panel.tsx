@@ -30,6 +30,7 @@ import {
   WORK_KIND_LABELS,
 } from "./work-words";
 import { instructionWords } from "./instruction-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Q is working on" (AUTO; spec auto.md §3.4): every outreach and stand-in
@@ -64,6 +65,8 @@ function LaneRow({
   readonly lane: Lane;
   readonly onChanged: () => void;
 }) {
+  const t = useT();
+
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const active = work.status === "ACTIVE" && OPEN_STAGES.includes(lane.stage);
@@ -97,22 +100,24 @@ function LaneRow({
           {lane.counterpartName}
         </span>
         <span className="cq-caption text-(--cq-text-secondary)">
-          {STAGE_WORDS[lane.stage]}
+          {t(STAGE_WORDS[lane.stage])}
         </span>
       </div>
       {lane.lastStep === null ? null : (
-        <p className="cq-body-sm text-(--cq-text-secondary)">{lane.lastStep}</p>
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          {t(lane.lastStep)}
+        </p>
       )}
       {lane.report === null ? null : (
         <p className="cq-body-sm text-(--cq-text-primary)">
-          {VERDICT[lane.report.recommendation]}: {lane.report.headline}
+          {t(VERDICT[lane.report.recommendation])}: {t(lane.report.headline)}
         </p>
       )}
       {active && lane.offered.length > 0 ? (
         <div
           className="flex flex-wrap gap-2"
           role="group"
-          aria-label="Times Q offers"
+          aria-label={t("Times Q offers")}
         >
           {lane.offered.map((slot) => (
             <Button
@@ -129,7 +134,7 @@ function LaneRow({
                 )
               }
             >
-              Book {slot.label}
+              {t("Book")} {t(slot.label)}
             </Button>
           ))}
         </div>
@@ -140,7 +145,7 @@ function LaneRow({
             href={`/work/${work.id}/report/${lane.id}`}
             className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-4"
           >
-            Read the report
+            {t("Read the report")}
           </Link>
         )}
         {lane.chatPath === null ? null : (
@@ -148,7 +153,7 @@ function LaneRow({
             href={lane.chatPath}
             className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-4"
           >
-            Open chat
+            {t("Open chat")}
           </Link>
         )}
         {active &&
@@ -162,7 +167,7 @@ function LaneRow({
               act(() => answerWorkAction(work.id, lane.id, { kind: "PASS" }))
             }
           >
-            Pass
+            {t("Pass")}
           </Button>
         ) : null}
         {active && work.kind === "INVESTOR_OUTREACH" ? (
@@ -172,13 +177,13 @@ function LaneRow({
             disabled={pending}
             onClick={() => act(() => stopWorkAction(work.id, lane.id))}
           >
-            Stop this one
+            {t("Stop this one")}
           </Button>
         ) : null}
       </div>
       {message === null ? null : (
         <p className="cq-caption text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </p>
       )}
     </li>
@@ -194,6 +199,8 @@ function WorkItem({
   readonly onChanged: () => void;
   readonly detailLink: boolean;
 }) {
+  const t = useT();
+
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -228,23 +235,25 @@ function WorkItem({
       <header className="flex flex-col gap-0.5">
         <h3 className="cq-title-sm line-clamp-2 text-(--cq-text-primary)">
           {words === null || words.goal === ""
-            ? WORK_KIND_LABELS[work.kind]
-            : words.goal}
+            ? t(WORK_KIND_LABELS[work.kind])
+            : t(words.goal)}
         </h3>
         <p className="cq-caption cq-numeric text-(--cq-text-secondary)">
-          {[
-            words !== null && words.paused !== null
-              ? `Paused: ${words.paused}`
-              : STATUS_WORDS[work.status],
-            words?.spend ?? null,
-          ]
-            .filter((part) => part !== null)
-            .join(" · ")}
+          {t(
+            [
+              words !== null && words.paused !== null
+                ? `Paused: ${words.paused}`
+                : STATUS_WORDS[work.status],
+              words?.spend ?? null,
+            ]
+              .filter((part) => part !== null)
+              .join(" · "),
+          )}
         </p>
       </header>
       {words === null && work.summary !== null ? (
         <p className="cq-body-sm line-clamp-2 text-(--cq-text-secondary)">
-          {work.summary}
+          {t(work.summary)}
         </p>
       ) : null}
       {work.lanes.length === 0 ? null : (
@@ -265,7 +274,7 @@ function WorkItem({
             href={`/work/${work.id}`}
             className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-4"
           >
-            What Q did
+            {t("What Q did")}
           </Link>
         ) : null}
         {work.status === "ACTIVE" && work.kind === "FOUNDER_STAND_IN" ? (
@@ -276,7 +285,7 @@ function WorkItem({
               disabled={pending}
               onClick={() => away(true)}
             >
-              I&rsquo;m away now
+              {t("I’m away now")}
             </Button>
             <Button
               variant="quiet"
@@ -284,14 +293,14 @@ function WorkItem({
               disabled={pending}
               onClick={() => away(false)}
             >
-              I&rsquo;m back
+              {t("I’m back")}
             </Button>
           </>
         ) : null}
         {work.status !== "ACTIVE" ? null : confirming ? (
           <span className="flex flex-wrap items-center gap-2">
             <span className="cq-body-sm text-(--cq-text-primary)">
-              Stop all of it?
+              {t("Stop all of it?")}
             </span>
             <Button
               variant="danger"
@@ -299,7 +308,7 @@ function WorkItem({
               disabled={pending}
               onClick={stop}
             >
-              Stop
+              {t("Stop")}
             </Button>
             <Button
               variant="quiet"
@@ -307,7 +316,7 @@ function WorkItem({
               disabled={pending}
               onClick={() => setConfirming(false)}
             >
-              Keep going
+              {t("Keep going")}
             </Button>
           </span>
         ) : (
@@ -316,13 +325,13 @@ function WorkItem({
             size="compact"
             onClick={() => setConfirming(true)}
           >
-            Stop
+            {t("Stop")}
           </Button>
         )}
       </div>
       {message === null ? null : (
         <p className="cq-caption text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </p>
       )}
     </article>
@@ -353,6 +362,8 @@ export function WorkPanel({
   readonly initial?: readonly QWorkDto[] | null;
   readonly initialFailed?: boolean;
 }) {
+  const t = useT();
+
   const [items, setItems] = useState<readonly QWorkDto[] | null>(initial);
   const [failed, setFailed] = useState(initialFailed);
   const { askAbout } = useGlobalQ();
@@ -425,8 +436,10 @@ export function WorkPanel({
       <Skeleton lines={3} />
     ) : items === null ? (
       <ErrorState
-        title="Q's work couldn't load"
-        description="Running work continues. Nothing is sent without your yes."
+        title={t("Q's work couldn't load")}
+        description={t(
+          "Running work continues. Nothing is sent without your yes.",
+        )}
         action={
           <Button
             variant="secondary"
@@ -443,8 +456,10 @@ export function WorkPanel({
       />
     ) : running.length === 0 && finished.length === 0 ? (
       <EmptyState
-        title="Nothing running"
-        description="Hand Q something that repeats, in your own words. You approve the plan first."
+        title={t("Nothing running")}
+        description={t(
+          "Hand Q something that repeats, in your own words. You approve the plan first.",
+        )}
         action={
           <Button
             variant="primary"
@@ -459,7 +474,7 @@ export function WorkPanel({
       <>
         {running.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Nothing is running now.
+            {t("Nothing is running now.")}
           </p>
         ) : (
           list(running)
@@ -470,7 +485,7 @@ export function WorkPanel({
             data-work-finished
           >
             <summary className="cq-body-sm flex min-h-11 cursor-pointer items-center font-medium text-(--cq-text-primary)">
-              Finished · {finished.length}
+              {t("Finished ·")} {finished.length}
             </summary>
             {list(finished)}
           </details>
@@ -504,10 +519,10 @@ export function WorkPanel({
               id="q-work-home"
               className="cq-title-sm text-(--cq-text-primary)"
             >
-              Q is working on{" "}
+              {t("Q is working on")}{" "}
               {running.length === 1
                 ? "1 thing"
-                : `${String(running.length)} things`}
+                : t(`${String(running.length)} things`)}
             </h2>
             <Expand
               aria-hidden="true"
@@ -516,7 +531,7 @@ export function WorkPanel({
             />
           </button>
           <IconButton
-            aria-label="Hide Q's work here"
+            aria-label={t("Hide Q's work here")}
             variant="quiet"
             onClick={hide}
             data-work-panel-hide
@@ -543,7 +558,7 @@ export function WorkPanel({
         id={`q-work-${variant}`}
         className="cq-title-sm text-(--cq-text-primary)"
       >
-        Running
+        {t("Running")}
       </h2>
       {body}
     </section>

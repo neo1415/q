@@ -35,6 +35,7 @@ import {
   QUICK_REPLIES,
   type InterviewLine,
 } from "./form-model";
+import { useT } from "@/features/i18n/language";
 
 /**
  * GateQ slice 1: the interview with Q, after the form and before the review.
@@ -96,6 +97,8 @@ export function InterviewStep({
   readonly onApplication?: (application: ApplicationSummaryDto) => void;
   readonly preview?: InterviewPreview | undefined;
 }) {
+  const t = useT();
+
   const [lines, setLines] = useState<readonly InterviewLine[]>(
     preview?.lines ?? [],
   );
@@ -243,23 +246,23 @@ export function InterviewStep({
     return (
       <div className="gq-card gq-result">
         <h1 ref={headingRef} tabIndex={-1} className="cq-title-md">
-          Interview paused
+          {t("Interview paused")}
         </h1>
         <p className="cq-body gq-t2">
-          Everything you&apos;ve said is saved with your application. Pick up
-          where you left off whenever you&apos;re ready; keep this page open, it
-          holds your place. Nothing goes to {fund} until you submit.
+          {t(
+            `Everything you've said is saved with your application. Pick up where you left off whenever you're ready; keep this page open, it holds your place. Nothing goes to ${fund} until you submit.`,
+          )}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={resume}>
-            Resume the interview
+            {t("Resume the interview")}
           </Button>
           <Button
             variant="quiet"
             onClick={onFinish}
             disabled={unsent !== null || !loaded}
           >
-            Review instead
+            {t("Review instead")}
           </Button>
         </div>
       </div>
@@ -269,15 +272,18 @@ export function InterviewStep({
   return (
     <div className="flex flex-col gap-4">
       <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-        A few questions from Q
+        {t("A few questions from Q")}
       </h1>
       <p className="cq-body gq-t2">
-        Q is {fund}&apos;s analyst. It has your answers and asks what an
-        investor would want to know about {companyName || "your company"}.{" "}
+        {t(
+          `Q is ${fund}'s analyst. It has your answers and asks what an investor would want to know about ${companyName || "your company"}.`,
+        )}{" "}
         {mode === "video"
-          ? "Talk it through on video, or type if you prefer; both go into the same interview. "
-          : "Fifteen minutes at most; stop whenever you like. "}
-        &ldquo;I don&apos;t know&rdquo; is a fine answer.
+          ? t(
+              "Talk it through on video, or type if you prefer; both go into the same interview. ",
+            )
+          : t("Fifteen minutes at most; stop whenever you like. ")}
+        {t("“I don't know” is a fine answer.")}
       </p>
 
       {!loaded && problem === null ? (
@@ -323,7 +329,7 @@ export function InterviewStep({
 
       {mode === "text" && videoNote !== null ? (
         <p role="status" className="cq-body-sm gq-t2">
-          {videoNote}
+          {t(videoNote)}
         </p>
       ) : null}
 
@@ -337,15 +343,16 @@ export function InterviewStep({
               setMode("video");
             }}
           >
-            Talk with Q on video instead
+            {t("Talk with Q on video instead")}
           </Button>
         </p>
       ) : null}
 
       {mode === "text" && loaded && lines.length === 0 ? (
         <p className="cq-body-sm gq-t2">
-          Say hello, or start with what you most want {fund} to know. Q takes it
-          from there.
+          {t(
+            `Say hello, or start with what you most want ${fund} to know. Q takes it from there.`,
+          )}
         </p>
       ) : null}
 
@@ -353,15 +360,17 @@ export function InterviewStep({
         lines={lines}
         thinking={pending}
         endRef={end}
-        label="Interview with Q"
+        label={t("Interview with Q")}
       />
 
       {problem === null ? null : (
         <div className="gq-banner gq-banner-err" role="alert">
           <CircleAlert {...icon} />
           <span>
-            <b>{waiting ? "Not sent." : "Couldn't load the interview."}</b>{" "}
-            {problem} {waiting ? "Your message is still here. " : ""}
+            <b>
+              {waiting ? t("Not sent.") : t("Couldn't load the interview.")}
+            </b>{" "}
+            {t(problem)} {waiting ? t("Your message is still here. ") : ""}
             <Button
               size="compact"
               className="ms-1.5"
@@ -369,7 +378,7 @@ export function InterviewStep({
               disabled={pending}
             >
               <RotateCw {...icon} />
-              Try again
+              {t("Try again")}
             </Button>
           </span>
         </div>
@@ -379,7 +388,7 @@ export function InterviewStep({
         <div className="flex flex-col gap-2">
           {question === null ? null : (
             <p className="cq-caption gq-t2" id="gq-latest-question">
-              <span className="font-medium">Q asked:</span> {question}
+              <span className="font-medium">{t("Q asked:")}</span> {t(question)}
             </p>
           )}
           <ChatComposer
@@ -388,17 +397,17 @@ export function InterviewStep({
             onChange={setDraft}
             onSend={() => say(draft)}
             pending={pending || waiting || !loaded}
-            label={question === null ? "Your message" : "Your answer"}
-            placeholder={question === null ? "Say hello" : "Your answer"}
+            label={question === null ? t("Your message") : t("Your answer")}
+            placeholder={question === null ? t("Say hello") : t("Your answer")}
           />
-          <div className="gq-opts" role="group" aria-label="Quick answers">
+          <div className="gq-opts" role="group" aria-label={t("Quick answers")}>
             <button
               type="button"
               className="gq-opt gq-skip"
               disabled={pending || waiting || !loaded || question === null}
               onClick={() => say(QUICK_REPLIES.UNKNOWN)}
             >
-              I don&apos;t know
+              {t("I don't know")}
             </button>
             <button
               type="button"
@@ -406,7 +415,7 @@ export function InterviewStep({
               disabled={pending || waiting || !loaded || question === null}
               onClick={() => say(QUICK_REPLIES.DECLINED)}
             >
-              I&apos;d rather not say
+              {t("I'd rather not say")}
             </button>
           </div>
         </div>
@@ -419,7 +428,7 @@ export function InterviewStep({
             onClick={() => setPaused(true)}
             disabled={pending}
           >
-            Pause, come back later
+            {t("Pause, come back later")}
           </Button>
           <Button
             // While the video interview is on offer and nothing is answered,
@@ -430,7 +439,7 @@ export function InterviewStep({
             onClick={onFinish}
             disabled={pending || unsent !== null || !loaded}
           >
-            {answered ? "Finish and review" : "Skip to review"}
+            {answered ? t("Finish and review") : t("Skip to review")}
           </Button>
         </div>
       )}

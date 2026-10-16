@@ -8,8 +8,12 @@ import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
 import { ClaimDecision, PublishCompany } from "@/features/admin/claim-controls";
 import { when } from "@/features/admin/words";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Company claims · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Company claims · Admin") };
+}
 
 const METHOD_WORDS = {
   WORK_EMAIL: "Work email",
@@ -22,6 +26,8 @@ const METHOD_WORDS = {
  * decides its own on Team), and making such a company's profile public.
  */
 export default async function AdminClaimsPage() {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("claims.read")) notFound();
   const claims = await listAdminCompanyClaims(context.session)
@@ -31,17 +37,19 @@ export default async function AdminClaimsPage() {
     <>
       <PageSection
         id="claims"
-        title="Company claims"
-        description="People asking to claim a company nobody holds on Capital Q. Approving makes them its first owner. Every decision names who and why."
+        title={t("Company claims")}
+        description={t(
+          "People asking to claim a company nobody holds on Capital Q. Approving makes them its first owner. Every decision names who and why.",
+        )}
       >
         {claims === null ? (
           <ErrorState
-            title="Claims couldn't load"
-            description="Try again in a moment."
+            title={t("Claims couldn't load")}
+            description={t("Try again in a moment.")}
           />
         ) : claims.length === 0 ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            No claims waiting.
+            {t("No claims waiting.")}
           </p>
         ) : (
           <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
@@ -56,18 +64,20 @@ export default async function AdminClaimsPage() {
                     {claim.companyName}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {claim.requesterName ?? "A person"} ·{" "}
-                    {METHOD_WORDS[claim.method]}
+                    {claim.requesterName ?? t("A person")} ·{" "}
+                    {t(METHOD_WORDS[claim.method])}
                     {claim.workEmailDomain === null
                       ? ""
-                      : ` at ${claim.workEmailDomain} · ${claim.emailConfirmed ? "code confirmed" : "code not confirmed"}`}{" "}
-                    · {when(claim.requestedAt)}
+                      : t(
+                          ` at ${claim.workEmailDomain} · ${claim.emailConfirmed ? "code confirmed" : "code not confirmed"}`,
+                        )}{" "}
+                    · {t(when(claim.requestedAt))}
                   </span>
                   {claim.method !==
                   "REGISTRY_DOCUMENT" ? null : claim.evidence === null ||
                     claim.evidence === undefined ? (
                     <span className="cq-caption text-(--cq-text-secondary)">
-                      No document attached yet
+                      {t("No document attached yet")}
                     </span>
                   ) : (
                     <a
@@ -76,9 +86,9 @@ export default async function AdminClaimsPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Open {claim.evidence.fileName} (
+                      {t("Open")} {claim.evidence.fileName} (
                       {Math.max(1, Math.round(claim.evidence.sizeBytes / 1024))}{" "}
-                      KB)
+                      {t("KB)")}
                     </a>
                   )}
                 </div>
@@ -96,8 +106,10 @@ export default async function AdminClaimsPage() {
       {context.can("companies.publish") ? (
         <PageSection
           id="publish"
-          title="Public company profiles"
-          description="A real company nobody has claimed can be public at its own link, or seen only by people on Capital Q. Public and network are different audiences."
+          title={t("Public company profiles")}
+          description={t(
+            "A real company nobody has claimed can be public at its own link, or seen only by people on Capital Q. Public and network are different audiences.",
+          )}
         >
           <PublishCompany />
         </PageSection>

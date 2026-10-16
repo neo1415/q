@@ -50,6 +50,7 @@ import {
 import { workStateOf } from "./job-state";
 import { WorkforceDocuments } from "./workforce-documents";
 import { WorkforcePlan } from "./workforce-plan";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q's team (founder brief J5; approved mockup 2026-10-06 b/workforce): on
@@ -98,6 +99,8 @@ export function WorkforcePanel({
   /** Older jobs, read a page at a time by cursor; null: none. */
   readonly nextCursor?: string | null | undefined;
 }) {
+  const t = useT();
+
   const [older, setOlder] = useState<readonly WorkforceJobDetailDto[]>([]);
   const [cursor, setCursor] = useState<string | null>(nextCursor);
   const [loading, startLoading] = useTransition();
@@ -134,10 +137,10 @@ export function WorkforcePanel({
     return (
       <section aria-labelledby="workforce-heading" data-workforce>
         <h2 id="workforce-heading" className="cq-title-sm">
-          Q’s team
+          {t("Q’s team")}
         </h2>
         <p className="cq-body-sm mt-1 text-(--cq-text-secondary)">
-          Q’s team couldn’t load. Try again in a moment.
+          {t("Q’s team couldn’t load. Try again in a moment.")}
         </p>
       </section>
     );
@@ -161,22 +164,24 @@ export function WorkforcePanel({
             id="workforce-heading"
             className="m-0 text-[24px] leading-[1.2] font-medium tracking-[-0.01em]"
           >
-            Q’s team
+            {t("Q’s team")}
           </h2>
           <p className="cq-body-sm mt-0.5 text-(--cq-text-secondary)">
             {open} {open === 1 ? "job" : "jobs"}. {needs}{" "}
-            {needs === 1 ? "needs" : "need"} you.
+            {needs === 1 ? "needs" : "need"} {t("you.")}
           </p>
         </div>
         <div className="flex w-full items-baseline gap-2 lg:ms-auto lg:block lg:w-auto lg:text-end">
           <b className="cq-numeric font-(family-name:--cq-font-editorial) text-[22px] leading-none font-medium">
-            {dollars(overview.spentUsd)}
+            {t(dollars(overview.spentUsd))}
           </b>
           <span className="cq-label text-(--cq-text-secondary) lg:mt-1 lg:block lg:font-normal">
-            this month
+            {t("this month")}
             {overview.limitUsd === null
               ? ""
-              : `, of your ${dollars(overview.limitUsd).replace(".00", "")} limit`}
+              : t(
+                  `, of your ${dollars(overview.limitUsd).replace(".00", "")} limit`,
+                )}
           </span>
         </div>
       </header>
@@ -185,7 +190,9 @@ export function WorkforcePanel({
         <div className="min-w-0">
           {jobs.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              No jobs yet. Give Q a task above and its team takes it from there.
+              {t(
+                "No jobs yet. Give Q a task above and its team takes it from there.",
+              )}
             </p>
           ) : (
             [
@@ -211,7 +218,9 @@ export function WorkforcePanel({
               className="inline-flex min-h-11 items-center gap-1 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary) disabled:opacity-60"
               data-more-jobs
             >
-              {moreFailed ? "Couldn’t load more. Try again" : "Show older jobs"}
+              {moreFailed
+                ? t("Couldn’t load more. Try again")
+                : t("Show older jobs")}
             </button>
           )}
         </div>
@@ -219,7 +228,7 @@ export function WorkforcePanel({
         <>
           <div
             role="tablist"
-            aria-label="Q’s team"
+            aria-label={t("Q’s team")}
             className="-mx-4 mb-3.5 flex gap-1 border-b border-(--cq-border-subtle) px-3 lg:hidden"
           >
             {(
@@ -244,7 +253,7 @@ export function WorkforcePanel({
                     : "border-transparent text-(--cq-text-secondary)",
                 )}
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </div>
@@ -252,12 +261,13 @@ export function WorkforcePanel({
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div className={cx("min-w-0", tab !== "now" && "hidden lg:block")}>
               <h3 className="mb-2.5 hidden text-[15px] font-semibold lg:block">
-                Now
+                {t("Now")}
               </h3>
               {jobs.length === 0 ? (
                 <p className="cq-body-sm text-(--cq-text-secondary)">
-                  No jobs yet. Give Q a task above and its team takes it from
-                  there.
+                  {t(
+                    "No jobs yet. Give Q a task above and its team takes it from there.",
+                  )}
                 </p>
               ) : (
                 jobs.map((job) => (
@@ -325,6 +335,8 @@ function JobCard({
   readonly job: WorkforceJobDetailDto;
   readonly onRead: (draftId: string) => void;
 }) {
+  const t = useT();
+
   const needs = needsYou(job);
   const status = jobStatus(job.job, needs);
   const [all, setAll] = useState(false);
@@ -347,10 +359,10 @@ function JobCard({
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 py-3 pe-2 ps-4">
         <div className="min-w-0">
           <h4 className="m-0 text-[15.5px] font-semibold">
-            {jobTitle(job.job.goal)}
+            {t(jobTitle(job.job.goal))}
           </h4>
           <p className="mt-0.5 text-[13px] text-(--cq-text-secondary)">
-            <span suppressHydrationWarning>{jobSubtitle(job, clock)}</span>
+            <span suppressHydrationWarning>{t(jobSubtitle(job, clock))}</span>
           </p>
         </div>
         <span
@@ -362,7 +374,7 @@ function JobCard({
           )}
         >
           <StatusIcon icon={status.icon} />
-          {status.label}
+          {t(status.label)}
         </span>
       </div>
       <WorkforcePlan plan={job.plan} />
@@ -372,7 +384,7 @@ function JobCard({
           onClick={() => setAll(true)}
           className="min-h-11 w-full border-t border-(--cq-border-subtle) px-4 text-start cq-label font-normal text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
         >
-          Show {lines.length - shown.length} earlier steps
+          {t(`Show ${String(lines.length - shown.length)} earlier steps`)}
         </button>
       ) : null}
       {shown.length > 0 ? (
@@ -442,10 +454,12 @@ function PreparedApprovals({
   readonly approvals: readonly QApprovalView[];
   readonly unavailable: boolean;
 }) {
+  const t = useT();
+
   if (approvals.length === 0 && !unavailable) return null;
   return (
     <section
-      aria-label="Prepared actions"
+      aria-label={t("Prepared actions")}
       className="border-t border-(--cq-border-subtle) px-4 py-3"
     >
       {approvals.map((view) => (
@@ -454,27 +468,27 @@ function PreparedApprovals({
           data-workforce-approval={view.approvalId}
         >
           <summary className="cq-label cursor-pointer py-2">
-            {view.action.summary}
+            {t(view.action.summary)}
           </summary>
           <p className="cq-body-sm mb-3 whitespace-pre-line text-(--cq-text-secondary)">
-            {view.action.preview ?? view.action.summary}
+            {t(view.action.preview ?? view.action.summary)}
           </p>
           {view.status === "PENDING" &&
           view.canDecide &&
           view.action.actionStatus === "AWAITING_APPROVAL" ? (
             <ApproveButton approvalId={view.approvalId}>
-              Approve this action
+              {t("Approve this action")}
             </ApproveButton>
           ) : (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              {approvalState(view)}
+              {t(approvalState(view))}
             </p>
           )}
         </details>
       ))}
       {unavailable ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          An approval from this job isn’t available right now.
+          {t("An approval from this job isn’t available right now.")}
         </p>
       ) : null}
     </section>
@@ -482,6 +496,8 @@ function PreparedApprovals({
 }
 
 function StateDot({ state }: { readonly state: StepState }) {
+  const t = useT();
+
   const base =
     "relative z-[1] mt-1.5 grid h-[22px] w-[22px] place-items-center rounded-full";
   switch (state) {
@@ -491,7 +507,7 @@ function StateDot({ state }: { readonly state: StepState }) {
           className={cx(base, "bg-(--cq-positive) text-(--cq-surface-raised)")}
         >
           <Check {...ICON} aria-hidden="true" />
-          <span className="sr-only">Done</span>
+          <span className="sr-only">{t("Done")}</span>
         </span>
       );
     case "run":
@@ -503,7 +519,7 @@ function StateDot({ state }: { readonly state: StepState }) {
           )}
         >
           <span className="h-2 w-2 rounded-full bg-(--cq-accent) motion-safe:animate-pulse" />
-          <span className="sr-only">Working</span>
+          <span className="sr-only">{t("Working")}</span>
         </span>
       );
     case "back":
@@ -515,7 +531,7 @@ function StateDot({ state }: { readonly state: StepState }) {
           )}
         >
           <RotateCw {...ICON} aria-hidden="true" />
-          <span className="sr-only">Sent back</span>
+          <span className="sr-only">{t("Sent back")}</span>
         </span>
       );
     case "you":
@@ -527,7 +543,7 @@ function StateDot({ state }: { readonly state: StepState }) {
           )}
         >
           <Hand {...ICON} aria-hidden="true" />
-          <span className="sr-only">Needs you</span>
+          <span className="sr-only">{t("Needs you")}</span>
         </span>
       );
     case "wait":
@@ -538,7 +554,7 @@ function StateDot({ state }: { readonly state: StepState }) {
             "bg-(--cq-surface-raised) border-2 border-dashed border-(--cq-border-strong)",
           )}
         >
-          <span className="sr-only">Waiting</span>
+          <span className="sr-only">{t("Waiting")}</span>
         </span>
       );
   }
@@ -577,6 +593,8 @@ function Step({
   readonly last: boolean;
   readonly onRead: (draftId: string) => void;
 }) {
+  const t = useT();
+
   const [hidden, setHidden] = useState(false);
   return (
     <li
@@ -597,26 +615,28 @@ function Step({
         <span className="block text-[12.5px] text-(--cq-text-tertiary)">
           {line.who}
         </span>
-        <b className="text-[14.5px] font-medium">{line.title}</b>
+        <b className="text-[14.5px] font-medium">{t(line.title)}</b>
         {line.what === null ? null : (
           <div className="mt-0.5 text-[14px] text-(--cq-text-secondary)">
-            {line.what}
+            {t(line.what)}
           </div>
         )}
         {line.grade === undefined ? null : (
           <div className="cq-numeric mt-0.5 flex items-baseline gap-1">
             <b className="font-(family-name:--cq-font-editorial) text-[18px] leading-none font-medium">
-              {line.grade.score}
+              {t(line.grade.score)}
             </b>
             <small className="text-[12px] text-(--cq-text-tertiary)">
-              out of 10
-              {line.grade.bar === null ? "" : `, the bar is ${line.grade.bar}`}
+              {t("out of 10")}
+              {line.grade.bar === null
+                ? ""
+                : t(`, the bar is ${line.grade.bar}`)}
             </small>
           </div>
         )}
         {line.feedback === undefined || line.feedback.length === 0 ? null : (
           <p className="mt-1.5 mb-0 bg-(--cq-surface-subtle) px-2.5 py-2 text-[13.5px] text-(--cq-text-secondary)">
-            {line.feedback}
+            {t(line.feedback)}
           </p>
         )}
         {line.readDraftId !== undefined && !hidden ? (
@@ -630,7 +650,7 @@ function Step({
                 if (line.readDraftId !== undefined) onRead(line.readDraftId);
               }}
             >
-              Read the draft
+              {t("Read the draft")}
             </Button>
             {line.approval === undefined ? null : (
               <Button
@@ -639,7 +659,7 @@ function Step({
                   setHidden(true);
                 }}
               >
-                Not now
+                {t("Not now")}
               </Button>
             )}
           </div>
@@ -654,7 +674,7 @@ function Step({
           ? line.state === "you"
             ? "now"
             : ""
-          : clock(line.at)}
+          : t(clock(line.at))}
       </time>
     </li>
   );
@@ -670,6 +690,8 @@ export function ApproveButton({
   /** After the approval went through (the live view reads again). */
   readonly onDone?: (() => void) | undefined;
 }) {
+  const t = useT();
+
   const router = useRouter();
   const [busy, start] = useTransition();
   const interactive = useSyncExternalStore(
@@ -705,7 +727,7 @@ export function ApproveButton({
           role="alert"
           className="cq-body-sm w-full text-(--cq-text-secondary)"
         >
-          {error}
+          {t(error)}
         </p>
       )}
     </>
@@ -717,11 +739,13 @@ export function ApproveButton({
 // ---------------------------------------------------------------------------
 
 function Team({ overview }: { readonly overview: WorkforceOverviewDto }) {
+  const t = useT();
+
   const members = teamMembers(overview);
   return (
     <section aria-labelledby="workforce-team">
       <h3 id="workforce-team" className="mb-2.5 text-[15px] font-semibold">
-        Who’s on it
+        {t("Who’s on it")}
       </h3>
       <ul className="m-0 list-none border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-0 py-1">
         {members.map((member) => (
@@ -738,7 +762,7 @@ function Team({ overview }: { readonly overview: WorkforceOverviewDto }) {
                 {member.name}
               </strong>
               <span className="block truncate text-[13px] text-(--cq-text-secondary)">
-                {member.line}
+                {t(member.line)}
               </span>
             </div>
             <span className="inline-flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-(--cq-text-secondary)">
@@ -753,7 +777,7 @@ function Team({ overview }: { readonly overview: WorkforceOverviewDto }) {
                       : "bg-(--cq-border-strong)",
                 )}
               />
-              {member.label}
+              {t(member.label)}
             </span>
           </li>
         ))}
@@ -769,6 +793,8 @@ function Cost({
   readonly overview: WorkforceOverviewDto;
   readonly first: boolean;
 }) {
+  const t = useT();
+
   const rows = costRows(overview);
   const limit =
     overview.limitUsd === null
@@ -783,11 +809,11 @@ function Cost({
       )}
     >
       <h3 id="workforce-cost" className="mb-2.5 text-[15px] font-semibold">
-        Cost of Q’s work this month
+        {t("Cost of Q’s work this month")}
       </h3>
       {rows.length === 0 ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Nothing spent yet this month.
+          {t("Nothing spent yet this month.")}
         </p>
       ) : (
         <table className="w-full border-collapse text-[13.5px]">
@@ -802,7 +828,7 @@ function Cost({
                   />
                 </td>
                 <td className="cq-numeric w-16 py-[5px] text-end align-middle">
-                  {dollars(row.usd)}
+                  {t(dollars(row.usd))}
                 </td>
               </tr>
             ))}
@@ -810,18 +836,20 @@ function Cost({
         </table>
       )}
       <div className="mt-2 flex justify-between border-t border-(--cq-border-subtle) pt-2.5 text-[14px]">
-        <span>Total</span>
+        <span>{t("Total")}</span>
         <b className="cq-numeric">
-          {dollars(overview.spentUsd)}
-          {limit === null ? "" : ` of ${limit}`}
+          {t(dollars(overview.spentUsd))}
+          {limit === null ? "" : t(` of ${limit}`)}
         </b>
       </div>
       <p className="mt-2 text-[13px] text-(--cq-text-secondary)">
         {limit === null
-          ? "No monthly limit is set for Q’s work."
+          ? t("No monthly limit is set for Q’s work.")
           : overview.paused
-            ? `The limit is reached: Q starts no new work this month until you raise it.`
-            : `Q pauses new work and asks you at ${limit}.`}
+            ? t(
+                "The limit is reached: Q starts no new work this month until you raise it.",
+              )
+            : t(`Q pauses new work and asks you at ${limit}.`)}
       </p>
     </section>
   );
@@ -840,6 +868,8 @@ function DraftCard({
   readonly before: WorkforceDraftDto | undefined;
   readonly after: WorkforceDraftDto | undefined;
 }) {
+  const t = useT();
+
   // A draft sent back shows what its redraft cut; the redraft, what it added.
   const marked =
     after !== undefined
@@ -854,15 +884,15 @@ function DraftCard({
     >
       <header className="mb-2 flex items-center justify-between gap-2">
         <strong className="text-[14px] font-semibold">
-          Draft {draft.attempt}
+          {t("Draft")} {draft.attempt}
         </strong>
         {draft.grade === null ? null : (
           <span className="cq-numeric flex items-baseline gap-1">
             <b className="font-(family-name:--cq-font-editorial) text-[18px] leading-none font-medium">
-              {outOfTen(draft.grade.score)}
+              {t(outOfTen(draft.grade.score))}
             </b>
             <small className="text-[12px] text-(--cq-text-tertiary)">
-              of 10
+              {t("of 10")}
             </small>
           </span>
         )}
@@ -882,7 +912,7 @@ function DraftCard({
               )}
             >
               <span className="sr-only">
-                {part.mark === "cut" ? "Cut: " : "Added: "}
+                {part.mark === "cut" ? t("Cut: ") : t("Added: ")}
               </span>
               {part.text}
             </mark>
@@ -906,10 +936,14 @@ function DraftCard({
                   <Check
                     size={16}
                     strokeWidth={ICON_STROKE}
-                    aria-label="Meets"
+                    aria-label={t("Meets")}
                   />
                 ) : (
-                  <X size={16} strokeWidth={ICON_STROKE} aria-label="Misses" />
+                  <X
+                    size={16}
+                    strokeWidth={ICON_STROKE}
+                    aria-label={t("Misses")}
+                  />
                 )}
               </span>
               {rule.text}
@@ -931,6 +965,8 @@ export function DraftSheet({
   } | null;
   readonly onClose: () => void;
 }) {
+  const t = useT();
+
   const draft = reading?.job.drafts.find((one) => one.id === reading.draftId);
   const chain =
     reading === null || draft === undefined
@@ -951,11 +987,11 @@ export function DraftSheet({
     >
       {reading === null || draft === undefined ? null : (
         <SheetContent
-          title={jobTitle(reading.job.job.goal)}
+          title={t(jobTitle(reading.job.job.goal))}
           description={
             draft.counterpartName === null
-              ? "From you."
-              : `To ${draft.counterpartName}. From you.`
+              ? t("From you.")
+              : t(`To ${draft.counterpartName}. From you.`)
           }
           className="lg:inset-x-auto lg:top-1/2 lg:bottom-auto lg:left-1/2 lg:w-[520px] lg:-translate-x-1/2 lg:-translate-y-1/2"
         >
@@ -972,19 +1008,20 @@ export function DraftSheet({
           {pending === null ? (
             <p className="mt-2.5 text-[13px] text-(--cq-text-secondary)">
               {draft.outcome?.outcome === "HELD"
-                ? "Q didn’t send this. Send your own, or ask Q to try again."
-                : "This draft is no longer waiting for you."}
+                ? t("Q didn’t send this. Send your own, or ask Q to try again.")
+                : t("This draft is no longer waiting for you.")}
             </p>
           ) : (
             <>
               <p className="mt-2.5 text-[13px] text-(--cq-text-secondary)">
-                You approve this exact text. If it changes, it needs your
-                approval again.
+                {t(
+                  "You approve this exact text. If it changes, it needs your approval again.",
+                )}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <ApproveButton approvalId={pending} />
                 <Button variant="secondary" onClick={onClose}>
-                  Not now
+                  {t("Not now")}
                 </Button>
               </div>
             </>

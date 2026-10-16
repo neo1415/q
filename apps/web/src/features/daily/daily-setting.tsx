@@ -13,6 +13,7 @@ import {
 import { formatDayTime } from "@/components/date-format";
 
 import { setDailyPreferencesAction } from "./daily-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Settings → The Q Daily (DAILY spec §3): how often (weekly by default,
@@ -58,6 +59,8 @@ export function DailySetting({
 }: {
   readonly initial: QDailyPreferences;
 }) {
+  const t = useT();
+
   const [preferences, setPreferences] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -87,7 +90,7 @@ export function DailySetting({
       <div className="flex flex-col gap-2">
         <div
           role="group"
-          aria-label="How often"
+          aria-label={t("How often")}
           className="flex flex-wrap gap-1"
         >
           {Q_DAILY_FREQUENCIES.map((frequency) => (
@@ -105,12 +108,12 @@ export function DailySetting({
                   : "cq-appearance-option"
               }
             >
-              {FREQUENCY[frequency]}
+              {t(FREQUENCY[frequency])}
             </button>
           ))}
         </div>
         <p className="cq-caption text-(--cq-text-secondary)" data-daily-meaning>
-          {meaning(preferences)}
+          {t(meaning(preferences))}
         </p>
       </div>
 
@@ -128,13 +131,13 @@ export function DailySetting({
               className="size-5 accent-(--cq-accent)"
             />
             <span className="cq-body-sm text-(--cq-text-primary)">
-              Email me each edition
+              {t("Email me each edition")}
             </span>
           </label>
 
           <fieldset className="flex flex-col gap-1">
             <legend className="cq-caption pb-1 text-(--cq-text-secondary)">
-              Sections (the lead story is always included)
+              {t("Sections (the lead story is always included)")}
             </legend>
             <div className="flex flex-wrap gap-1">
               {Q_DAILY_OPTIONAL_SECTIONS.map((section) => {
@@ -163,7 +166,7 @@ export function DailySetting({
                         : "cq-appearance-option"
                     }
                   >
-                    {SECTION[section]}
+                    {t(SECTION[section])}
                   </button>
                 );
               })}
@@ -174,7 +177,7 @@ export function DailySetting({
 
       {message === null ? null : (
         <p role="alert" className="cq-caption text-(--cq-text-secondary)">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>

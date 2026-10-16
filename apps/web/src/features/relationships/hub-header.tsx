@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { HubNavigation, HubRelated } from "./hub-navigation";
 import { hubTitle, type HubSide, type HubView } from "./hub-view";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /**
  * The CRM's one header (redesign 2026-10-15): the Hub's name, the modules
@@ -17,11 +18,13 @@ export function HubHeader({
   readonly view: HubView;
   readonly actions?: ReactNode;
 }) {
+  const t = serverTNow();
+
   return (
     <header className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h1 className="cq-title-lg text-(--cq-text-primary)">
-          {hubTitle(side)}
+          {t(hubTitle(side))}
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           <HubRelated side={side} />

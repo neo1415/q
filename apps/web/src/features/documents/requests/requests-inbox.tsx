@@ -36,6 +36,7 @@ import {
   waitingWords,
   type InboxFilter,
 } from "./requests-model";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Requested tab (founder documents, 2026-10-08; design
@@ -135,6 +136,8 @@ function Who({
   readonly detail: string;
   readonly title: string;
 }) {
+  const t = useT();
+
   return (
     <div className="flex min-w-0 items-start gap-3">
       <span
@@ -145,12 +148,14 @@ function Who({
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
         <h3 className="cq-body font-semibold text-(--cq-text-primary)">
-          {title}
+          {t(title)}
         </h3>
         <p className="cq-caption text-(--cq-text-secondary)">
-          {[name, organisation ?? "An investor", detail]
-            .filter((part): part is string => part !== null && part !== "")
-            .join(" · ")}
+          {t(
+            [name, organisation ?? "An investor", detail]
+              .filter((part): part is string => part !== null && part !== "")
+              .join(" · "),
+          )}
         </p>
       </div>
     </div>
@@ -180,6 +185,8 @@ function DocumentRequestCard({
   readonly focused: boolean;
   readonly onChanged: (message: string) => void;
 }) {
+  const t = useT();
+
   const now = useMemo(() => new Date(), []);
   const [folder, setFolder] = useState(item.dataRoom?.folderCode ?? "other");
   const [level, setLevel] = useState<DocumentAccessLevel>("view");
@@ -242,7 +249,7 @@ function DocumentRequestCard({
     <article
       id={`request-${item.itemId}`}
       tabIndex={-1}
-      aria-label={`Request from ${who}: ${item.title}`}
+      aria-label={t(`Request from ${who}: ${item.title}`)}
       className={`flex flex-col gap-3 border bg-(--cq-surface-raised) p-4 outline-none ${focused ? "border-(--cq-accent) ring-2 ring-(--cq-accent-soft)" : "border-(--cq-border-subtle)"}`}
       data-request-item={item.itemId}
       data-request-status={item.status}
@@ -251,13 +258,17 @@ function DocumentRequestCard({
         <Who
           name={item.requesterName}
           organisation={item.investorOrganisationName}
-          title={item.title}
-          detail={`asked ${shortDate(item.requestedAt)}${open ? ` · ${waitingWords(item.requestedAt, now)}` : ""}${item.source === "DATA_ROOM" ? " · from your data room" : ""}`}
+          title={t(item.title)}
+          detail={t(
+            `asked ${shortDate(item.requestedAt)}${open ? ` · ${waitingWords(item.requestedAt, now)}` : ""}${item.source === "DATA_ROOM" ? " · from your data room" : ""}`,
+          )}
         />
         {item.dataRoom === null ? (
-          <Chip>Document</Chip>
+          <Chip>{t("Document")}</Chip>
         ) : (
-          <Chip>In data room · {folderWords(item.dataRoom.folderCode)}</Chip>
+          <Chip>
+            {t("In data room ·")} {t(folderWords(item.dataRoom.folderCode))}
+          </Chip>
         )}
       </div>
       {item.note === null ? null : (
@@ -268,17 +279,19 @@ function DocumentRequestCard({
 
       {item.status === "SHARED" ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Shared
-          {item.sharedDocument === null ? "" : `: ${item.sharedDocument.title}`}
+          {t("Shared")}
+          {item.sharedDocument === null
+            ? ""
+            : t(`: ${item.sharedDocument.title}`)}
           {item.accessEndsAt === null
             ? "."
-            : `, until ${shortDate(item.accessEndsAt)}.`}
+            : t(`, until ${shortDate(item.accessEndsAt)}.`)}
         </p>
       ) : null}
       {item.status === "DECLINED" ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Declined
-          {item.declineNote === null ? "." : `: “${item.declineNote}”`}
+          {t("Declined")}
+          {item.declineNote === null ? "." : t(`: “${item.declineNote}”`)}
         </p>
       ) : null}
 
@@ -286,7 +299,7 @@ function DocumentRequestCard({
         <>
           <div className="grid gap-3 border-t border-(--cq-border-subtle) pt-3 sm:grid-cols-3">
             <label className="cq-caption flex flex-col gap-1 text-(--cq-text-secondary)">
-              File in
+              {t("File in")}
               <select
                 value={folder}
                 onChange={(event) => setFolder(event.target.value)}
@@ -294,13 +307,13 @@ function DocumentRequestCard({
               >
                 {folders.map((candidate) => (
                   <option key={candidate.code} value={candidate.code}>
-                    {candidate.label}
+                    {t(candidate.label)}
                   </option>
                 ))}
               </select>
             </label>
             <label className="cq-caption flex flex-col gap-1 text-(--cq-text-secondary)">
-              They can
+              {t("They can")}
               <select
                 value={level}
                 onChange={(event) =>
@@ -308,14 +321,16 @@ function DocumentRequestCard({
                 }
                 className={selectClass}
               >
-                <option value="view">{DOCUMENT_ACCESS_LEVEL_WORDS.view}</option>
+                <option value="view">
+                  {t(DOCUMENT_ACCESS_LEVEL_WORDS.view)}
+                </option>
                 <option value="view_download">
-                  {DOCUMENT_ACCESS_LEVEL_WORDS.view_download}
+                  {t(DOCUMENT_ACCESS_LEVEL_WORDS.view_download)}
                 </option>
               </select>
             </label>
             <label className="cq-caption flex flex-col gap-1 text-(--cq-text-secondary)">
-              For
+              {t("For")}
               <select
                 value={days}
                 onChange={(event) => setDays(Number(event.target.value))}
@@ -323,14 +338,14 @@ function DocumentRequestCard({
               >
                 {DATA_ROOM_GRANT_DAYS.map((n) => (
                   <option key={n} value={n}>
-                    {n} days
+                    {n} {t("days")}
                   </option>
                 ))}
               </select>
             </label>
           </div>
           <p className="cq-caption text-(--cq-text-tertiary)">
-            Only {who} will see it. You can take it back at any time.
+            {t(`Only ${who} will see it. You can take it back at any time.`)}
           </p>
           <input
             ref={file}
@@ -351,8 +366,8 @@ function DocumentRequestCard({
               className={buttonClassName("primary", "regular", "min-h-11")}
               data-request-upload
             >
-              <Upload size={ICON_SIZE.compact} aria-hidden="true" /> Upload and
-              share
+              <Upload size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+              {t("Upload and share")}
             </button>
             <button
               type="button"
@@ -361,7 +376,7 @@ function DocumentRequestCard({
               aria-expanded={mode === "PICK"}
               className={buttonClassName("secondary", "regular", "min-h-11")}
             >
-              Share a document you have
+              {t("Share a document you have")}
             </button>
             <button
               type="button"
@@ -370,26 +385,26 @@ function DocumentRequestCard({
               aria-expanded={mode === "DECLINE"}
               className={buttonClassName("quiet", "regular", "min-h-11")}
             >
-              Decline
+              {t("Decline")}
             </button>
           </div>
           {mode === "PICK" ? (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <label className="cq-caption flex flex-1 flex-col gap-1 text-(--cq-text-secondary)">
-                Document
+                {t("Document")}
                 <select
                   value={picked}
                   onChange={(event) => setPicked(event.target.value)}
                   className={selectClass}
                   data-request-pick
                 >
-                  <option value="">Choose a document</option>
+                  <option value="">{t("Choose a document")}</option>
                   {documents.map((document) => (
                     <option
                       key={document.documentId}
                       value={document.documentId}
                     >
-                      {document.title}
+                      {t(document.title)}
                     </option>
                   ))}
                 </select>
@@ -400,20 +415,20 @@ function DocumentRequestCard({
                 onClick={() => void share(picked)}
                 className={buttonClassName("primary", "regular", "min-h-11")}
               >
-                Share
+                {t("Share")}
               </button>
             </div>
           ) : null}
           {mode === "DECLINE" ? (
             <div className="flex flex-col gap-2">
               <label className="cq-caption flex flex-col gap-1 text-(--cq-text-secondary)">
-                A note for {who} (optional)
+                {t(`A note for ${who} (optional)`)}
                 <textarea
                   value={note}
                   maxLength={1000}
                   onChange={(event) => setNote(event.target.value)}
                   className="cq-body-sm min-h-20 border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
-                  placeholder="For example: after a term sheet."
+                  placeholder={t("For example: after a term sheet.")}
                 />
               </label>
               <div>
@@ -428,7 +443,7 @@ function DocumentRequestCard({
                   )}
                   data-request-decline
                 >
-                  Decline request
+                  {t("Decline request")}
                 </button>
               </div>
             </div>
@@ -437,12 +452,12 @@ function DocumentRequestCard({
       ) : null}
       {busy === null ? null : (
         <p role="status" className="cq-caption text-(--cq-text-secondary)">
-          {busy}
+          {t(busy)}
         </p>
       )}
       {error === null ? null : (
         <p role="alert" className="cq-body-sm text-(--cq-danger)">
-          {error}
+          {t(error)}
         </p>
       )}
     </article>
@@ -464,6 +479,8 @@ function QuestionRow({
   readonly startOpen: boolean;
   readonly onChanged: (message: string) => void;
 }) {
+  const t = useT();
+
   const [open, setOpen] = useState(startOpen);
   const [text, setText] = useState("");
   const [attached, setAttached] = useState<readonly OwnDocument[]>([]);
@@ -511,19 +528,19 @@ function QuestionRow({
     >
       <p className="cq-body text-(--cq-text-primary)">
         <span className="font-semibold">{question.position}.</span>{" "}
-        {question.question}
+        {t(question.question)}
       </p>
       {question.assumptionLabel === null ? null : (
         <p className="cq-caption text-(--cq-text-tertiary)">
-          About: {question.assumptionLabel}
+          {t("About:")} {t(question.assumptionLabel)}
         </p>
       )}
       {question.answer !== null ? (
         <div className="flex flex-col gap-1 border border-(--cq-border-subtle) bg-(--cq-surface) p-3">
           <p className="cq-caption text-(--cq-text-tertiary)">
-            Your answer, {shortDate(question.answer.answeredAt)} ·{" "}
+            {t("Your answer,")} {t(shortDate(question.answer.answeredAt))} ·{" "}
             {question.answer.evidenceStatus === "DOCUMENT_SUPPORTED"
-              ? "your claim, with a document"
+              ? t("your claim, with a document")
               : "your claim"}
           </p>
           <p className="cq-body-sm text-(--cq-text-primary)">
@@ -535,7 +552,7 @@ function QuestionRow({
               className="cq-caption inline-flex items-center gap-1 text-(--cq-text-secondary)"
             >
               <FileText size={ICON_SIZE.compact} aria-hidden="true" />
-              {document.title}
+              {t(document.title)}
             </p>
           ))}
         </div>
@@ -547,20 +564,20 @@ function QuestionRow({
             className={buttonClassName("secondary", "compact", "min-h-11")}
             data-question-answer-open
           >
-            Answer
+            {t("Answer")}
           </button>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           <label className="sr-only" htmlFor={`answer-${question.questionId}`}>
-            Your answer
+            {t("Your answer")}
           </label>
           <textarea
             id={`answer-${question.questionId}`}
             value={text}
             maxLength={2000}
             onChange={(event) => setText(event.target.value)}
-            placeholder="Your answer, in your words."
+            placeholder={t("Your answer, in your words.")}
             className="cq-body-sm min-h-24 border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
             data-question-text
           />
@@ -581,12 +598,14 @@ function QuestionRow({
               onClick={() => file.current?.click()}
               className={buttonClassName("secondary", "compact", "min-h-11")}
             >
-              <Plus size={ICON_SIZE.compact} aria-hidden="true" /> Attach
-              evidence
+              <Plus size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+              {t("Attach evidence")}
             </button>
             {documents.length === 0 ? null : (
               <label className="cq-caption flex items-center gap-1 text-(--cq-text-secondary)">
-                <span className="sr-only">Attach a document you have</span>
+                <span className="sr-only">
+                  {t("Attach a document you have")}
+                </span>
                 <select
                   value={picking}
                   onChange={(event) => {
@@ -602,13 +621,13 @@ function QuestionRow({
                   }}
                   className="cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface) px-2 text-(--cq-text-primary)"
                 >
-                  <option value="">Or one you have…</option>
+                  <option value="">{t("Or one you have…")}</option>
                   {documents.map((document) => (
                     <option
                       key={document.documentId}
                       value={document.documentId}
                     >
-                      {document.title}
+                      {t(document.title)}
                     </option>
                   ))}
                 </select>
@@ -619,10 +638,10 @@ function QuestionRow({
                 key={document.documentId}
                 className="cq-caption inline-flex items-center gap-1 bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)"
               >
-                {document.title}
+                {t(document.title)}
                 <button
                   type="button"
-                  aria-label={`Remove ${document.title}`}
+                  aria-label={t(`Remove ${document.title}`)}
                   onClick={() =>
                     setAttached((now) =>
                       now.filter((a) => a.documentId !== document.documentId),
@@ -643,24 +662,26 @@ function QuestionRow({
               className={buttonClassName("primary", "regular", "min-h-11")}
               data-question-send
             >
-              Send answer
+              {t("Send answer")}
             </button>
             <p className="cq-caption text-(--cq-text-tertiary)">
               {attached.length > 0
-                ? `Recorded as your claim, supported by ${attached.length === 1 ? "the document" : "the documents"}. ${investor} is told and can open ${attached.length === 1 ? "it" : "them"}, view only.`
-                : `Recorded as your claim. ${investor} is told.`}
+                ? t(
+                    `Recorded as your claim, supported by ${attached.length === 1 ? "the document" : "the documents"}. ${investor} is told and can open ${attached.length === 1 ? "it" : "them"}, view only.`,
+                  )
+                : t(`Recorded as your claim. ${investor} is told.`)}
             </p>
           </div>
         </div>
       )}
       {busy === null ? null : (
         <p role="status" className="cq-caption text-(--cq-text-secondary)">
-          {busy}
+          {t(busy)}
         </p>
       )}
       {error === null ? null : (
         <p role="alert" className="cq-body-sm text-(--cq-danger)">
-          {error}
+          {t(error)}
         </p>
       )}
     </li>
@@ -680,6 +701,8 @@ function QuestionSetCard({
   readonly focused: boolean;
   readonly onChanged: (message: string) => void;
 }) {
+  const t = useT();
+
   const count = item.questions.length;
   const investor = item.investorOrganisationName ?? "The investor";
   const fromBoard = item.questions.some((q) => q.assumptionId !== null);
@@ -687,7 +710,7 @@ function QuestionSetCard({
     <article
       id={`request-${item.itemId}`}
       tabIndex={-1}
-      aria-label={`Questions from ${investor}`}
+      aria-label={t(`Questions from ${investor}`)}
       className={`flex flex-col gap-3 border bg-(--cq-surface-raised) p-4 outline-none ${focused ? "border-(--cq-accent) ring-2 ring-(--cq-accent-soft)" : "border-(--cq-border-subtle)"}`}
       data-request-item={item.itemId}
       data-request-kind="QUESTIONS"
@@ -698,12 +721,14 @@ function QuestionSetCard({
           organisation={item.investorOrganisationName}
           title={
             count === 1
-              ? `A question from ${investor}`
-              : `${String(count)} questions from ${investor}`
+              ? t(`A question from ${investor}`)
+              : t(`${String(count)} questions from ${investor}`)
           }
-          detail={`${fromBoard ? "from their key questions · " : ""}asked ${shortDate(item.askedAt)}`}
+          detail={t(
+            `${fromBoard ? "from their key questions · " : ""}asked ${shortDate(item.askedAt)}`,
+          )}
         />
-        <Chip>Questions</Chip>
+        <Chip>{t("Questions")}</Chip>
       </div>
       <ol className="flex flex-col gap-3">
         {item.questions.map((question, index) => (
@@ -739,6 +764,8 @@ export function RequestsInbox({
   /** A notification's `?item=`: opened, scrolled to and focused. */
   readonly focusItem?: string | null;
 }) {
+  const t = useT();
+
   const [inbox, setInbox] = useState(initial);
   const focused = inbox?.items.find((item) => item.itemId === focusItem);
   const [filter, setFilter] = useState<InboxFilter>(
@@ -766,7 +793,7 @@ export function RequestsInbox({
   if (inbox === null) {
     return (
       <p className="cq-body text-(--cq-text-secondary)" role="status">
-        Requests couldn&apos;t load. Try again in a moment.
+        {t("Requests couldn't load. Try again in a moment.")}
       </p>
     );
   }
@@ -780,10 +807,14 @@ export function RequestsInbox({
   return (
     <section
       className="flex flex-col gap-4"
-      aria-label="Requested"
+      aria-label={t("Requested")}
       data-requests-inbox
     >
-      <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5">
+      <div
+        role="group"
+        aria-label={t("Show")}
+        className="flex flex-wrap gap-1.5"
+      >
         {FILTERS.map(([value, label]) => (
           <button
             key={value}
@@ -797,22 +828,24 @@ export function RequestsInbox({
             }
             data-requests-filter={value}
           >
-            {label} · {counts[value]}
+            {t(label)} · {counts[value]}
           </button>
         ))}
       </div>
       {message === null ? null : (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-          {message}
+          {t(message)}
         </p>
       )}
       {shown.length === 0 ? (
         <p className="cq-body text-(--cq-text-secondary)">
           {filter === "OPEN"
-            ? "Nothing waiting for you. When an investor asks for a document or sends a question, it shows here."
+            ? t(
+                "Nothing waiting for you. When an investor asks for a document or sends a question, it shows here.",
+              )
             : filter === "ANSWERED"
-              ? "Nothing answered yet."
-              : "Nothing declined."}
+              ? t("Nothing answered yet.")
+              : t("Nothing declined.")}
         </p>
       ) : (
         <div className="flex flex-col gap-3">

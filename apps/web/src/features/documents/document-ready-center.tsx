@@ -21,6 +21,18 @@ import { useGlobalQ } from "@/components/app-shell/global-q";
 import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 import { ArtifactDownloads } from "@/features/q/artifact-download";
 import { artifactTypeLabel } from "@/features/q/artifact-type";
+import { useT } from "@/features/i18n/language";
+
+function OpeningDocument() {
+  const t = useT();
+  return (
+    <div
+      className="min-h-[60vh] w-full bg-(--cq-surface-subtle)"
+      aria-busy="true"
+      aria-label={t("Opening the document")}
+    />
+  );
+}
 
 /**
  * P9: the viewer (pages, slides, pictures) is code a page view rarely runs;
@@ -30,13 +42,7 @@ const ArtifactViewer = dynamic(
   () => import("@/features/q/artifact-viewer").then((m) => m.ArtifactViewer),
   {
     ssr: false,
-    loading: () => (
-      <div
-        className="min-h-[60vh] w-full bg-(--cq-surface-subtle)"
-        aria-busy="true"
-        aria-label="Opening the document"
-      />
-    ),
+    loading: () => <OpeningDocument />,
   },
 );
 
@@ -172,6 +178,8 @@ function ReadyCard({
   readonly document: ReadyDocument;
   readonly onOpen: (artifactId: string) => void;
 }) {
+  const t = useT();
+
   const [held, setHeld] = useState(false);
   useEffect(() => {
     if (held) return;
@@ -198,7 +206,7 @@ function ReadyCard({
     <section
       role="status"
       aria-live="polite"
-      aria-label={`${what}: ${ready.title}. ${state}.`}
+      aria-label={t(`${what}: ${ready.title}. ${state}.`)}
       data-document-ready={ready.artifactId}
       data-document-ready-status={ready.status}
       onPointerEnter={() => setHeld(true)}
@@ -221,14 +229,14 @@ function ReadyCard({
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="cq-caption text-(--cq-text-tertiary)">
-            {what} · {state}
+            {t(what)} · {t(state)}
           </p>
           <p className="cq-body-sm line-clamp-2 font-medium text-(--cq-text-primary)">
-            {ready.title}
+            {t(ready.title)}
           </p>
         </div>
         <IconButton
-          aria-label="Dismiss"
+          aria-label={t("Dismiss")}
           variant="quiet"
           onClick={() => dismissDocument(ready.artifactId)}
           data-document-ready-dismiss
@@ -244,7 +252,7 @@ function ReadyCard({
             onClick={() => onOpen(ready.artifactId)}
             data-document-ready-open
           >
-            Open
+            {t("Open")}
           </button>
           <ArtifactDownloads
             artifactId={ready.artifactId}
@@ -262,6 +270,8 @@ export function DocumentReadyCenter({
 }: {
   readonly connected: boolean;
 }) {
+  const t = useT();
+
   useDocumentWatch(connected);
   const ready = useReadyDocuments();
   const open = useViewingDocument();
@@ -300,7 +310,7 @@ export function DocumentReadyCenter({
       >
         {open === null ? null : (
           <DialogViewerContent
-            title="Document"
+            title={t("Document")}
             onSwipeDismiss={() => setOpen(null)}
           >
             <ArtifactViewer
