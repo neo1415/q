@@ -179,7 +179,7 @@ export async function MandateSummary({
 
   return (
     <div className="flex flex-col gap-4" data-mandate-summary>
-      <dl className="flex max-w-(--cq-layout-narrow) flex-col divide-y divide-(--cq-border-subtle)">
+      <dl className="flex max-w-(--cq-layout-reading) flex-col divide-y divide-(--cq-border-subtle)">
         {rows.map(([term, value]) => (
           <div
             key={term}

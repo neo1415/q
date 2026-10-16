@@ -579,7 +579,7 @@ function InvestorDashboard(
           note={
             results.commitments === undefined || confirmed === undefined
               ? undefined
-              : `${String(confirmed.count)} confirmed`
+              : `${String(confirmed.count)} confirmed, not yet received`
           }
           href="#commitments"
         />

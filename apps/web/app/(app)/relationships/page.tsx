@@ -60,7 +60,7 @@ import { CapitalSkeleton } from "@/features/capital/capital-book";
 import { CapitalScreen } from "@/features/capital/capital-screen";
 import { capitalTabFrom } from "@/features/capital/capital-tabs";
 import { ResultsDashboard } from "@/features/results/results-dashboard";
-import { rangeOf } from "@/features/results/results-words";
+import { commitmentLines, rangeOf } from "@/features/results/results-words";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
 import { NeedsYouQueue } from "@/features/relationships/needs-you-queue";
 import {
@@ -318,7 +318,19 @@ export default async function RelationshipsPage({
           />
         )}
         {side === "INVESTOR" ? (
-          <PortfolioSection items={portfolio} commitments={commitments} />
+          <PortfolioSection
+            items={portfolio}
+            commitments={commitments}
+            agreed={
+              results !== null &&
+              results.side === "INVESTOR" &&
+              results.commitments !== undefined
+                ? commitmentLines(results.commitments).find(
+                    (line) => line.status === "CONFIRMED",
+                  )
+                : undefined
+            }
+          />
         ) : null}
         {unset ? null : !available || results === null ? (
           // Partial: the queue above still stands when the period cannot.

@@ -76,7 +76,7 @@ describe("results words", () => {
     ]);
     expect(lines[0]).toEqual({
       status: "CONFIRMED",
-      label: "Confirmed",
+      label: "Confirmed, not yet received",
       count: 3,
       amounts: ["USD 250,000", "NGN 1,000,000.50"],
     });

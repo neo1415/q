@@ -147,7 +147,7 @@ export function commitmentLines(
   readonly amounts: readonly string[];
 }[] {
   const labels = {
-    CONFIRMED: "Confirmed",
+    CONFIRMED: "Confirmed, not yet received",
     STATED: "Stated, not confirmed",
     WITHDRAWN: "Withdrawn",
   } as const;

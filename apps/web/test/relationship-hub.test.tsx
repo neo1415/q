@@ -598,6 +598,33 @@ describe("S4: the investor's portfolio on the Overview", () => {
     ).toBeDefined();
   });
 
+  it("says confirmed money is not yet an investment, beside the empty portfolio (live check 2026-10-16)", async () => {
+    mocks.results.mockResolvedValue({
+      side: "INVESTOR",
+      organisationName: "Fund",
+      pipelineFit: [],
+      commitments: [
+        {
+          status: "CONFIRMED",
+          currencyCode: "USD",
+          count: 1,
+          amount: "250000",
+        },
+      ],
+    });
+    await overview();
+    const section = screen.getByRole("region", { name: /Portfolio/u });
+    expect(section.textContent).toContain("No investments recorded yet");
+    expect(section.textContent).toContain(
+      "1 commitment is confirmed and not yet received (USD 250,000).",
+    );
+    expect(
+      within(section)
+        .getByRole("link", { name: "Open Capital" })
+        .getAttribute("href"),
+    ).toBe("/relationships?view=capital#commitments");
+  });
+
   it("is the investor's alone: a founder's Overview has no portfolio", async () => {
     mocks.context.mockResolvedValue({
       kind: "FOUNDER",

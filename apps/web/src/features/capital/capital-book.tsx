@@ -80,7 +80,11 @@ function Group({
       <h3 className="cq-label text-(--cq-text-secondary)">
         {title} <span className="cq-numeric">({String(count)})</span>
       </h3>
-      <div className="grid gap-3 md:grid-cols-2">{children}</div>
+      {/* One card takes the column's width, not half of it (live check
+          2026-10-16: the card and the mandate list sat at different widths). */}
+      <div className={count > 1 ? "grid gap-3 md:grid-cols-2" : "grid gap-3"}>
+        {children}
+      </div>
     </section>
   );
 }
@@ -239,28 +243,45 @@ export function FounderBook({
 
 export function InvestorBook({ mine }: { readonly mine: MyCommitmentsDto }) {
   const [first, ...others] = mine.totals;
-  const companies = new Set(
-    mine.commitments
-      .filter((item) => item.status === "RECEIVED")
-      .map((item) => item.counterpartId),
-  ).size;
+  const companiesWith = (statuses: readonly LedgerCommitmentDto["status"][]) =>
+    new Set(
+      mine.commitments
+        .filter((item) => statuses.includes(item.status))
+        .map((item) => item.counterpartId),
+    ).size;
+  const received = companiesWith(["RECEIVED"]);
+  const agreed = companiesWith(["CONFIRMED", "TRANSFER_SENT"]);
+  // Nothing received is a known fact, said in words: a large "USD 0"
+  // beside a confirmed commitment read as a contradiction (live check
+  // 2026-10-16). Invested means received; confirmed money is said apart.
+  const none = first === undefined || /^0*(\.0*)?$/.test(first.raised);
   return (
-    <div className="flex flex-col gap-6">
-      <article className="cq-glow-card flex max-w-(--cq-layout-reading) flex-col gap-2 p-5 sm:p-6">
+    <div className="flex max-w-(--cq-layout-reading) flex-col gap-6">
+      <article className="cq-glow-card flex flex-col gap-2 p-5 sm:p-6">
         <h3 className="cq-body-sm text-(--cq-text-secondary)">Invested</h3>
-        <p className="cq-display cq-numeric text-(--cq-text-primary)">
+        <p
+          className={
+            none
+              ? "cq-title-md text-(--cq-text-primary)"
+              : "cq-display cq-numeric text-(--cq-text-primary)"
+          }
+        >
           {first === undefined
             ? "Nothing yet"
-            : money(first.raised, first.currencyCode)}
+            : none
+              ? "Nothing received yet"
+              : money(first.raised, first.currencyCode)}
         </p>
         {first === undefined ? null : (
           <p className="cq-body-sm cq-numeric text-(--cq-text-secondary)">
-            {companies === 1
-              ? "In 1 company"
-              : `In ${String(companies)} companies`}
-            {first.confirmed === "0"
+            {none
               ? ""
-              : `, ${money(first.confirmed, first.currencyCode)} agreed and not yet received`}
+              : received === 1
+                ? "In 1 company"
+                : `In ${String(received)} companies`}
+            {first.confirmed === "0" || /^0*(\.0*)?$/.test(first.confirmed)
+              ? ""
+              : `${none ? "" : ". "}${money(first.confirmed, first.currencyCode)} confirmed with ${agreed === 1 ? "1 company" : `${String(agreed)} companies`}, not yet received`}
           </p>
         )}
         {others.map((total) => (
