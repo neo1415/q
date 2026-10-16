@@ -6,6 +6,11 @@ import {
   reservedTestEmailDomain,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
+import {
+  localiseEmail,
+  type EmailLanguage,
+  type LocalisableMessage,
+} from "@capital-q/email";
 
 import type { AdminGrant } from "./access.js";
 
@@ -292,7 +297,18 @@ function errorClassOf(error: unknown): string {
  * directive 2026-10-16): nothing reaches the provider, the row says
  * SUPPRESSED with the reason, never SENT, and the call resolves, so no
  * caller retries a message that must never go.
+ *
+ * And the one place a message takes the recipient's language (multilingual
+ * Q): a known person who chose Arabic gets it in Arabic, right to left;
+ * anyone else, or any failure to look it up, gets the English as rendered.
  */
+function localisable<M extends { readonly to: string }>(
+  message: M,
+): message is M & LocalisableMessage {
+  const fields = message as { subject?: unknown; text?: unknown };
+  return typeof fields.subject === "string" && typeof fields.text === "string";
+}
+
 export function recordingEmailSender<M extends { readonly to: string }>(
   sender: SenderLike<M>,
   options: {
@@ -300,8 +316,12 @@ export function recordingEmailSender<M extends { readonly to: string }>(
     readonly source: string;
     readonly provider: "BREVO_API" | "SMTP";
     readonly onRecordError?: ((error: unknown) => void) | undefined;
+    /** The recipient's language; defaults to their saved choice. */
+    readonly language?: ((to: string) => Promise<EmailLanguage>) | undefined;
   },
 ): SenderLike<M> {
+  const languageOf =
+    options.language ?? ((to: string) => recipientLanguage(options.sql, to));
   const record = async (
     to: string,
     outcome: "SENT" | "FAILED" | "SUPPRESSED",
@@ -327,8 +347,14 @@ export function recordingEmailSender<M extends { readonly to: string }>(
         await record(message.to, "SUPPRESSED", RESERVED_TEST_EMAIL_REASON);
         return;
       }
+      const outgoing = localisable(message)
+        ? localiseEmail(
+            message,
+            await languageOf(message.to).catch((): EmailLanguage => "en"),
+          )
+        : message;
       try {
-        await sender.send(message);
+        await sender.send(outgoing);
       } catch (error: unknown) {
         await record(message.to, "FAILED", errorClassOf(error));
         throw error;
@@ -336,4 +362,25 @@ export function recordingEmailSender<M extends { readonly to: string }>(
       await record(message.to, "SENT", null);
     },
   };
+}
+
+/**
+ * The language a recipient chose for Capital Q, by their sign-in address:
+ * "ar" only for a known person whose saved choice is Arabic. Unknown
+ * addresses, people who never chose (AUTO) and English all read "en".
+ */
+export async function recipientLanguage(
+  sql: DatabaseExecutor,
+  to: string,
+): Promise<EmailLanguage> {
+  const address = to.trim().toLowerCase();
+  if (address === "") return "en";
+  const rows = await sql<{ language: string | null }[]>`
+    select s.language
+      from auth.users u
+      join identity.user_profiles p on p.auth_user_id = u.id
+      join q_runtime.person_standing s on s.user_id = p.id
+     where lower(u.email) = ${address}
+     limit 1`;
+  return rows[0]?.language === "ar" ? "ar" : "en";
 }
