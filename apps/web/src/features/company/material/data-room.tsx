@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition, type ComponentType } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ComponentType,
+} from "react";
 
 import {
   DATA_ROOM_GRANT_DAYS,
@@ -322,7 +328,11 @@ function ConnectedDataRoom({
     file: OpenedFile;
   } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  // One open at a time, by document, never a shared "busy" flag: a slow or
+  // failed open disabled every other document's Open (sc, 2026-10-16). A
+  // newer click supersedes an older one; the older result is dropped.
+  const [opening, setOpening] = useState<string | null>(null);
+  const latest = useRef(0);
 
   const documents = view.documents.map((document) =>
     requested.has(document.documentId) ||
@@ -361,12 +371,22 @@ function ConnectedDataRoom({
     );
   }
 
-  const open = (document: DataRoomInvestorDocument) =>
-    start(async () => {
+  const open = async (document: DataRoomInvestorDocument) => {
+    const ticket = ++latest.current;
+    setOpening(document.documentId);
+    setMessage(null);
+    try {
       const result = await openDocumentAction(companyId, document.documentId);
+      if (ticket !== latest.current) return;
       if (result.ok) setOpened({ title: document.title, file: result.value });
       else setMessage(result.message);
-    });
+    } catch {
+      if (ticket === latest.current)
+        setMessage(t("That couldn't be opened. Try again."));
+    } finally {
+      if (ticket === latest.current) setOpening(null);
+    }
+  };
 
   return (
     <section
@@ -500,15 +520,18 @@ function ConnectedDataRoom({
                       {document.access === "OPEN" ? (
                         <button
                           type="button"
-                          disabled={pending}
+                          disabled={opening === document.documentId}
+                          aria-busy={opening === document.documentId}
                           className={buttonClassName(
                             "secondary",
                             "compact",
                             "min-h-11",
                           )}
-                          onClick={() => open(document)}
+                          onClick={() => void open(document)}
                         >
-                          {t("Open")}
+                          {opening === document.documentId
+                            ? t("Opening")
+                            : t("Open")}
                         </button>
                       ) : document.access === "REQUESTED" ? (
                         <span className="cq-caption inline-flex min-h-11 items-center gap-1 text-(--cq-text-secondary)">
