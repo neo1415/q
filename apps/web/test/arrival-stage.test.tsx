@@ -219,9 +219,8 @@ describe("the cards wait for their answer to Q's opener (owner 2026-10-16)", () 
     expect(document.querySelector("[data-arrival-card]")).toBeNull();
     // Nothing on screen to decide, so a spoken "send it" has no card.
     expect(cardInFocus()).toBe(false);
-    act(() => {
-      setOpenerOffered(true);
-    });
+    // The stage itself opens the question (a call may have replaced the
+    // welcome): a spoken "yes" still brings the cards up.
     act(() => {
       expect(answerOpener("yes please")).toBe("SHOW");
     });

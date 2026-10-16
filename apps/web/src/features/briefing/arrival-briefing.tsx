@@ -1230,6 +1230,8 @@ export function ArrivalBriefing({
   const choose = (choice: OpenerChoice) => {
     chooseOpener(choice);
     tellLineOpenerAnswer(choice);
+    // The dock has no place to type: "something else" hands over to Q.
+    if (compact && choice === "OTHER") onClose?.();
   };
   // What Q says after the greeting: the opener until they answer, then
   // what follows from the answer.

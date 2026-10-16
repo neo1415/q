@@ -37,6 +37,7 @@ import {
   leftIn,
   markArrivalSaid,
   refreshArrival,
+  setOpenerOffered,
   useArrival,
   useOpener,
   type ArrivalLoader,
@@ -478,6 +479,15 @@ export function ArrivalStage({
         : arrivalWords(rawData, now?.() ?? new Date(), browserZone()),
     [rawData, now],
   );
+
+  // The opener's question is open whether or not the welcome is still on
+  // screen (a call replaces it with the spoken thread): their spoken "yes"
+  // must still bring the cards up.
+  const offers = words?.opener.offersChoice ?? null;
+  const nudged = ready?.nudge === true;
+  useEffect(() => {
+    if (offers !== null && !nudged) setOpenerOffered(offers);
+  }, [offers, nudged]);
 
   const activity =
     data === null ? null : activityLines(data.activity, data.jobsDone);
