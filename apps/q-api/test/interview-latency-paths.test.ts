@@ -517,22 +517,103 @@ describe("the reply is in their language (ob1 live on AF)", () => {
     expect(outcome.reply).toBe("The model's own reply. What else?");
   });
 
-  it("a chosen language and an English turn: still no English acknowledgement by code", async () => {
+  it("a chosen language with its copy translated: code writes the reply in it, one model round", async () => {
     const world = founderWorld();
     const model = recordingModel(answers());
-    const told = toldOf(model.gateway);
-    await createInterviewAgent({
+    const asked: { texts: readonly string[]; cachedOnly: boolean }[] = [];
+    const outcome = await createInterviewAgent({
       gateway: model.gateway,
       firewall,
       logger,
       delegation: readerOf(reading({ stated: ["F1.stage", "F1.country"] })),
       replyByCodeAfterCleanSave: true,
       standing: standingIn("fr"),
-      localiseWords: (_actor, _language, texts) =>
-        Promise.resolve(texts.map((text) => `[fr] ${text}`)),
+      localiseWords: (_actor, _language, texts, options) => {
+        asked.push({ texts, cachedOnly: options?.cachedOnly === true });
+        return Promise.resolve(texts.map((text) => `[fr] ${text}`));
+      },
+    }).turn({ ...turn(world, "Seed stage, based in Kenya."), actor });
+    expect(model.calls()).toBe(1);
+    // Only product copy was sent for translation, and without waiting.
+    expect(asked[0]?.cachedOnly).toBe(true);
+    expect(asked[0]?.texts).toContain("stage");
+    expect(asked[0]?.texts).toContain("Seed");
+    expect(asked[0]?.texts.join("\n")).not.toMatch(/Seed stage|based in/u);
+    expect(outcome.reply).toMatch(
+      /^\[fr\] [^:]+: \[fr\] stage: \[fr\] Seed; /u,
+    );
+    // No English line is left over in the reply.
+    expect(outcome.reply.replace(/\[fr\][^;:.?]*/gu, "")).not.toMatch(
+      /[a-z]{4,}/u,
+    );
+  });
+
+  it("a chosen language whose copy is not translated yet: the model replies, nothing English is written by code", async () => {
+    const world = founderWorld();
+    const model = recordingModel(answers());
+    const told = toldOf(model.gateway);
+    const outcome = await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({ stated: ["F1.stage", "F1.country"] })),
+      replyByCodeAfterCleanSave: true,
+      standing: standingIn("fr"),
+      localiseWords: (_actor, _language, texts, options) =>
+        Promise.resolve(
+          texts.map((text) =>
+            options?.cachedOnly === true ? null : `[fr] ${text}`,
+          ),
+        ),
     }).turn({ ...turn(world, "Seed stage, based in Kenya."), actor });
     expect(model.calls()).toBe(2);
     expect(told.join("\n")).toMatch(/this person chose French/u);
+    expect(outcome.reply).not.toMatch(
+      /Got it, saved|on your record|Noted and saved|Great, saved/u,
+    );
+  });
+
+  it("Arabic chosen: the hand-written question is used and their own words are read back exactly", async () => {
+    const world = founderWorld();
+    const model = recordingModel([
+      { stepKey: "F1.stage", value: "seed", quote: "مرحلة البذرة" },
+    ]);
+    const outcome = await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({ stated: ["F1.stage"] })),
+      replyByCodeAfterCleanSave: true,
+      standing: standingIn("ar"),
+      localiseWords: (_actor, _language, texts) =>
+        Promise.resolve(texts.map((text) => `«${text.length}»`)),
+    }).turn({ ...turn(world, "نحن في مرحلة البذرة"), actor });
+    expect(model.calls()).toBe(1);
+    expect(outcome.reply).not.toMatch(/[A-Za-z]{3,}/u);
+    expect(outcome.reply).toMatch(/[\u0600-\u06FF]/u);
+  });
+
+  it("Automatic and a turn not in English: still the model's reply (no language tag to translate to)", async () => {
+    const world = founderWorld();
+    const model = recordingModel(answers());
+    let asked = 0;
+    await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({ stated: ["F1.stage", "F1.country"] })),
+      replyByCodeAfterCleanSave: true,
+      standing: standingIn("AUTO"),
+      localiseWords: (_actor, _language, texts) => {
+        asked += 1;
+        return Promise.resolve(texts.map((text) => `[x] ${text}`));
+      },
+    }).turn({
+      ...turn(world, "Nous sommes en phase d'amorçage, basés au Kenya."),
+      actor,
+    });
+    expect(model.calls()).toBe(2);
+    expect(asked).toBe(0);
   });
 
   it("Automatic and an English turn keep the quick English reply", async () => {

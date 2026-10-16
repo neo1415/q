@@ -68,7 +68,7 @@ const firewall: ContextFirewallPort = {
 
 type Answer = {
   readonly stepKey: string;
-  readonly value: string | number;
+  readonly value: string | number | readonly string[];
   readonly quote: string;
 };
 const TURNS: readonly {

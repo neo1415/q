@@ -86,7 +86,14 @@ import {
 import type { HeldWritesStore } from "./held-writes.js";
 import { codeReading } from "./code-reading.js";
 import { createReplySentenceStream } from "./reply-stream.js";
-import { quickAcknowledgement } from "./quick-acknowledgement.js";
+import { languageInfo, listSeparator } from "@capital-q/q-core/language";
+import {
+  acknowledgementCopy,
+  acknowledgementIn,
+  acknowledgementParts,
+  quickAcknowledgement,
+  type ChoicesOf,
+} from "./quick-acknowledgement.js";
 import {
   firstNameOf,
   onboardingFlowFor,
@@ -102,6 +109,7 @@ import {
   replyLanguageOf,
 } from "./reply-language.js";
 import {
+  HAND_STEP_COPY,
   onboardingLanguageNote,
   withQuestionsInLanguage,
 } from "./step-copy-language.js";
@@ -354,6 +362,8 @@ export type InterviewAgentDependencies = {
         actor: ActorContext,
         language: string,
         texts: readonly string[],
+        /** cachedOnly: translations already made, without waiting on a model. */
+        options?: { readonly cachedOnly?: boolean | undefined },
       ) => Promise<readonly (string | null)[]>)
     | undefined;
 };
@@ -1512,13 +1522,88 @@ export function createInterviewAgent(
      * the model as before: a refusal or held save, a finding or check to
      * put to them, a reading that asks more (a pause, a look-up, a
      * delegation, an approval, a decline, finishing), the essentials done,
-     * or words not in English (the reply's language is the model's).
+     * or a reply whose language code cannot write in without a model: a
+     * chosen language is written from translations already cached (lane
+     * lang's translateLines, product copy only); Automatic with a turn not
+     * in English is the model's (its language has no tag to translate to).
      */
+    /**
+     * The acknowledgement in their chosen language from translations
+     * already cached: only product copy (lead, labels, choices, question)
+     * is asked for, never what they said; their own words are read back as
+     * recorded. Anything not yet translated: null, and the reply is the
+     * model's this turn (the missing lines are translated meanwhile, so a
+     * later turn has them).
+     */
+    const choicesOf: ChoicesOf = (stepKey, value) => {
+      const configuration = journeySteps.find(
+        (step) => step.stepKey === stepKey,
+      )?.configuration;
+      if (configuration === undefined || !("options" in configuration)) {
+        return null;
+      }
+      const labels = new Set(configuration.options.map((o) => o.label));
+      if (labels.has(value)) return [value];
+      const pieces = value.split(/,\s*/u);
+      return pieces.length > 1 && pieces.every((piece) => labels.has(piece))
+        ? pieces
+        : null;
+    };
+    const acknowledgementInLanguage = async (
+      acknowledgement: Parameters<typeof acknowledgementParts>[0],
+      nextStepKey: string,
+      tag: string,
+    ): Promise<string | null> => {
+      const localise = dependencies.localiseWords;
+      const info = languageInfo(tag);
+      if (localise === undefined || info === null) return null;
+      const parts = acknowledgementParts(acknowledgement);
+      if (parts === null) return null;
+      const handCopy = HAND_STEP_COPY[info.primary];
+      const hand = {
+        question: handCopy?.questions[nextStepKey] ?? null,
+        tail: handCopy?.optionalTail ?? null,
+      };
+      const copy = acknowledgementCopy(parts, choicesOf, hand);
+      if (copy === null) return null;
+      const translated = await localise(actor, info.tag, copy.lines, {
+        cachedOnly: true,
+      }).catch(() => copy.lines.map(() => null));
+      const words = new Map<string, string>();
+      copy.lines.forEach((line, i) => {
+        const text = translated[i];
+        if (text !== null && text !== undefined) words.set(line, text);
+      });
+      const reply = acknowledgementIn(
+        parts,
+        (english) => words.get(english) ?? null,
+        choicesOf,
+        hand,
+        {
+          items: info.script === "Arab" || info.script === "Aran" ? "؛ " : "; ",
+          list: listSeparator(info.tag),
+        },
+      );
+      if (reply === null) {
+        logger.info(
+          { language: info.tag, missing: copy.lines.length - words.size },
+          "code reply waits for translations; the model replies this turn",
+        );
+      }
+      return reply;
+    };
     const codeWrittenReply =
       async (): Promise<InterviewAgentV16Result | null> => {
         if (dependencies.replyByCodeAfterCleanSave !== true) return null;
-        // Code's acknowledgement is English: only for an English reply.
-        if (opening || !codeSpeaksEnglish) return null;
+        // Code's acknowledgement is English, or a chosen language through
+        // the translations already made; never English in another language.
+        if (opening) return null;
+        if (
+          !codeSpeaksEnglish &&
+          (language === null || dependencies.localiseWords === undefined)
+        ) {
+          return null;
+        }
         if (
           actions.length === 0 ||
           actions.some((action) => action.tool !== "record_answers")
@@ -1584,13 +1669,21 @@ export function createInterviewAgent(
         const flow = flowFor(state);
         if (flow.next === null || flow.next.confirming) return null;
         const profile = coverageProfileFor(input.journeyType);
-        const reply = quickAcknowledgement({
+        const acknowledgement = {
           results,
-          labelOf: (stepKey) => profile.fields[stepKey]?.label,
+          labelOf: (stepKey: string) => profile.fields[stepKey]?.label,
           next: flow.next,
           // One person turn and one of Q's per exchange.
           turnIndex: Math.floor(thread.length / 2),
-        });
+        };
+        const reply =
+          language === null
+            ? quickAcknowledgement(acknowledgement)
+            : await acknowledgementInLanguage(
+                acknowledgement,
+                flow.next.stepKey,
+                language,
+              );
         if (reply === null) return null;
         const parsed = InterviewAgentV16ResultSchema.safeParse({
           reply,
