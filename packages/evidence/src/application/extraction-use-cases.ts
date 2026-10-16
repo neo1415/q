@@ -25,7 +25,10 @@ import {
   DocumentVersionNotFoundError,
   EvidenceRuleError,
 } from "../domain/errors.js";
-import { pagesFromBlocks } from "../domain/document-pages.js";
+import {
+  documentTextFromBlocks,
+  pagesFromBlocks,
+} from "../domain/document-pages.js";
 import { scanInstructionRisk } from "../domain/instruction-risk.js";
 import type { EvidenceProcessingDependencies } from "./dependencies.js";
 
@@ -224,6 +227,92 @@ export function createFindDocumentExtraction(
     );
 }
 
+/**
+ * An extraction's private artifact, read back: bounded while it streams,
+ * checked against the hash its row records, and validated. The bytes are
+ * the parser's output for exactly that version; nothing is trusted unread.
+ */
+async function readExtractionArtifact(
+  storage: NonNullable<EvidenceProcessingDependencies["storage"]>,
+  extraction: DocumentExtraction,
+): Promise<ExtractedDocument> {
+  const stream = await storage.openObjectStream({
+    bucket: extraction.artifactBucket,
+    key: extraction.artifactKey,
+  });
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of stream.body) {
+    size += chunk.byteLength;
+    if (size > EXTRACTION_LIMITS.maxArtifactBytes) {
+      throw new EvidenceRuleError("the artifact exceeds its bound");
+    }
+    chunks.push(chunk);
+  }
+  const body = Buffer.concat(chunks);
+  if (
+    createHash("sha256").update(body).digest("hex") !==
+    extraction.artifactSha256
+  ) {
+    throw new EvidenceRuleError("the artifact does not match its hash");
+  }
+  return ExtractedDocumentSchema.parse(JSON.parse(body.toString("utf8")));
+}
+
+export type ReadOwnDocumentTextQuery = {
+  readonly tenantId: string;
+  readonly documentId: string;
+  readonly documentVersionId: string;
+  /** The organisation that owns the document; any other owner reads nothing. */
+  readonly ownerOrganisationId: string;
+  readonly maxChars: number;
+};
+
+/**
+ * An organisation's own document as plain text, from its stored extraction
+ * (ob2 2026-10-16): for a document with no pages (a Word or plain-text
+ * thesis), whose text exists only in the private artifact. A trusted
+ * server read for the onboarding worker, scoped like the page read: the
+ * newest extraction of that tenant's version whose document and owning
+ * organisation both match, and an artifact that names the same document
+ * and version. Anything else is the empty string, never another document's
+ * text. It widens no retrieval scope: nothing is chunked or indexed.
+ */
+export function createReadOwnDocumentText(
+  dependencies: EvidenceProcessingDependencies,
+) {
+  return async (query: ReadOwnDocumentTextQuery): Promise<string> => {
+    const storage = dependencies.storage;
+    if (storage === undefined) {
+      throw new DocumentStorageUnavailableError();
+    }
+    const extractions =
+      await dependencies.repositories.documentExtractions.listByVersion(
+        dependencies.sql,
+        query.tenantId as TenantId,
+        DocumentVersionIdSchema.parse(query.documentVersionId),
+      );
+    // Oldest first: the last match is the newest extraction.
+    const own = extractions.filter(
+      (extraction) =>
+        extraction.tenantId === query.tenantId &&
+        extraction.documentId === query.documentId &&
+        extraction.documentVersionId === query.documentVersionId &&
+        extraction.ownerOrganisationId === query.ownerOrganisationId,
+    );
+    const newest = own.at(-1);
+    if (newest === undefined) return "";
+    const artifact = await readExtractionArtifact(storage, newest);
+    if (
+      artifact.documentId !== query.documentId ||
+      artifact.documentVersionId !== query.documentVersionId
+    ) {
+      return "";
+    }
+    return documentTextFromBlocks(artifact.blocks, query.maxChars);
+  };
+}
+
 export type BackfillDocumentPagesResult = {
   readonly examined: number;
   readonly pagesWritten: number;
@@ -254,29 +343,7 @@ export function createBackfillDocumentPages(
     let failed = 0;
     for (const extraction of missing) {
       try {
-        const stream = await storage.openObjectStream({
-          bucket: extraction.artifactBucket,
-          key: extraction.artifactKey,
-        });
-        const chunks: Uint8Array[] = [];
-        let size = 0;
-        for await (const chunk of stream.body) {
-          size += chunk.byteLength;
-          if (size > EXTRACTION_LIMITS.maxArtifactBytes) {
-            throw new EvidenceRuleError("the artifact exceeds its bound");
-          }
-          chunks.push(chunk);
-        }
-        const body = Buffer.concat(chunks);
-        if (
-          createHash("sha256").update(body).digest("hex") !==
-          extraction.artifactSha256
-        ) {
-          throw new EvidenceRuleError("the artifact does not match its hash");
-        }
-        const artifact = ExtractedDocumentSchema.parse(
-          JSON.parse(body.toString("utf8")),
-        );
+        const artifact = await readExtractionArtifact(storage, extraction);
         const pages = pagesFromBlocks(artifact.blocks);
         pagesWritten += await transactions.run((tx) =>
           repositories.documentExtractions.insertPages(tx, extraction, pages),

@@ -661,6 +661,8 @@ import { createHandleClaimAction } from "./composition/handle-claim-action.js";
 import { assertComposedActionTypes } from "./composition/q-action-types.js";
 import {
   createConversationApprovalPort,
+  createDecisionRelay,
+  keepsItsCard,
   createPendingDecisionPort,
   createRecentPendingElsewhere,
   plainProposalStatus,
@@ -2347,10 +2349,13 @@ const entitlements = createEntitlementService({ sql: database.sql });
 // Approval by conversation: the one change waiting for this person in
 // this conversation, approved as the card approves it (live test
 // 2026-09-27 #1). The engine and orchestrator are composed below.
+// One outcome line per action decided in words (owner 2026-10-16).
+const decisionRelay = createDecisionRelay();
 const conversationApprovals = createConversationApprovalPort({
   runtime: qRuntime,
   late: () => ({ actions: qActions, orchestrator, continueApproved }),
   logger,
+  relay: decisionRelay,
 });
 const errandStore = createPostgresErrandStore(database.sql);
 // ADR 0040 (Proposed): the services the app's declared actions call, and
@@ -3525,7 +3530,7 @@ const qActionRegistry = createQActionRegistry([
   // R34: chat message from the relationship chat.
   createChatMessageSendAction({ chat, logger }),
   // BIZ-008: reminders and calls (Google Calendar + Meet).
-  createReminderCreateAction({ schedule, logger }),
+  createReminderCreateAction({ schedule, logger, people }),
   createMeetingScheduleAction({
     schedule,
     logger,
@@ -3646,6 +3651,8 @@ const qActionPort = createQActionPort({
     actions: qActionRepositories.actions,
     registry: qActionRegistry,
     logger,
+    cardOnly: keepsItsCard,
+    relay: decisionRelay,
   }),
   logger,
 });
@@ -5746,6 +5753,21 @@ const voiceBindings = createVoiceSessionBindings({
 });
 // The interview as a tool-calling Q run (ADR 0016): the same firewall,
 // tool pipeline and gateway as every Q answer.
+// Fictional accounts (the seed markers, or a fictional.capitalq.local
+// address: lane ob1 live acceptance 2026-10-16) are never researched on
+// the open web, which can only return real namesakes.
+const isFictionalAccount = async (userId: string): Promise<boolean> => {
+  const rows = await database.sql<{ fictional: boolean }[]>`
+    select coalesce(
+             (u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb
+              and u.raw_app_meta_data -> 'fictional_demo' = 'true'::jsonb)
+             or u.email like '%@fictional.capitalq.local',
+             false) as fictional
+      from identity.user_profiles p
+      join auth.users u on u.id = p.auth_user_id
+     where p.id = ${userId}::uuid`;
+  return rows[0]?.fictional === true;
+};
 const onboardingRecommendations = createOnboardingQRecommendations({
   transactions: database.transactions,
 });
@@ -5775,6 +5797,7 @@ const investorResearch =
   researchComposition.research === undefined && investorRegistries.length === 0
     ? undefined
     : createInvestorResearch({
+        isFictionalAccount,
         read:
           researchComposition.research === undefined
             ? () => Promise.resolve([])
@@ -5813,6 +5836,7 @@ const founderResearch =
   researchComposition.research === undefined
     ? undefined
     : createInvestorResearch({
+        isFictionalAccount,
         journey: "founder",
         read: founderResearchReadFrom(
           createPresenceReadPort({
@@ -5995,16 +6019,7 @@ const presenceTrigger =
         // row. Their own only: the query is keyed on the acting user.
         people: { displayNameFor },
         // Same markers as the workers' typed-onboarding guard.
-        isFictionalAccount: async (userId) => {
-          const rows = await database.sql<{ fictional: boolean }[]>`
-            select coalesce(u.raw_app_meta_data -> 'synthetic' = 'true'::jsonb
-                        and u.raw_app_meta_data -> 'fictional_demo' = 'true'::jsonb,
-                        false) as fictional
-              from identity.user_profiles p
-              join auth.users u on u.id = p.auth_user_id
-             where p.id = ${userId}::uuid`;
-          return rows[0]?.fictional === true;
-        },
+        isFictionalAccount,
         logger,
       });
 

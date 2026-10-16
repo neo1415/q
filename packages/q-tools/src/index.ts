@@ -157,6 +157,7 @@ export {
   explicitlyApproves,
   mayStandAsApproval,
   readApprovalWords,
+  readEditRequest,
   type ApprovalScope,
   type ApprovalWords,
 } from "./approval-words.js";

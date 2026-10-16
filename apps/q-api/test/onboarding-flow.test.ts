@@ -6,6 +6,7 @@ import {
   firstNameOf,
   onboardingFlowFor,
   withNextQuestion,
+  withoutAnsweredQuestions,
 } from "../src/voice/onboarding-flow.js";
 
 const step = (
@@ -87,5 +88,24 @@ describe("onboarding flow (owner 2026-10-16)", () => {
     expect(firstNameOf("Ines Duarte")).toBe("Ines");
     expect(firstNameOf("  ")).toBeNull();
     expect(firstNameOf(null)).toBeNull();
+  });
+
+  it("takes out a question the record already answers (live 2026-10-16)", () => {
+    const reply =
+      "Your description and team are noted. In a sentence or two, what does the company do?";
+    const out = withoutAnsweredQuestions(
+      reply,
+      state(
+        [
+          step("F1.description", {
+            status: "ANSWERED",
+            question: "What does it do?",
+          }),
+        ],
+        [],
+      ),
+      { "F1.description": "In a sentence or two, what does the company do?" },
+    );
+    expect(out).toBe("Your description and team are noted.");
   });
 });

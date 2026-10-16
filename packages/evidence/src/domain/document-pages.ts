@@ -88,3 +88,21 @@ export function pagesFromBlocks(
   }
   return pages;
 }
+
+/**
+ * A whole document's text, in block order, whether or not its blocks carry
+ * a page (ob2 2026-10-16: a Word or plain-text thesis has no pages, and is
+ * read from its extraction instead). The same plain text a page holds, no
+ * interpretation, bounded to `maxChars` code points.
+ */
+export function documentTextFromBlocks(
+  blocks: readonly ExtractedBlock[],
+  maxChars: number,
+): string {
+  const parts = blocks
+    .map((block) => textOf(block).trim())
+    .filter((text) => text.length > 0);
+  return codePoints(parts.join("\n\n"))
+    .slice(0, Math.max(0, maxChars))
+    .join("");
+}

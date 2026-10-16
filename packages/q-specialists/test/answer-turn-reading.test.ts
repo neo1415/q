@@ -3176,6 +3176,71 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
     ]);
   });
 
+  it("a reply read as 'do it again' still continues the waiting action with the zone, never repeats it without (live 2026-10-16: 'Lagos. Set both reminders.')", async () => {
+    const asked =
+      "Which city are you in, so Friday at 10:00 is right? Then I'll set the reminder.";
+    const first = {
+      title: "Review the cash forecast",
+      when: { day: "friday", time: "10:00" },
+    };
+    const reading = (kind: string, appAction: unknown, retryLast: boolean) =>
+      ({
+        kind,
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        handOver: null,
+        appAction,
+        askedAction: null,
+        reference: {
+          open: null,
+          name: null,
+          shown: null,
+          retryLast,
+          sameFor: null,
+        },
+      }) as unknown as TurnReaderResult;
+    let turn = 0;
+    const ran: TurnAppAction[] = [];
+    const run = seam({
+      said: "Set a reminder for Friday at 10am to review the cash forecast.",
+      reading: () =>
+        turn === 0
+          ? reading(
+              "TOOL_REQUEST",
+              { tool: "propose_reminder", arguments: first },
+              false,
+            )
+          : reading("ANSWER", null, true),
+      outcomes: [],
+      appActions: {
+        tools: new Set(["propose_reminder"]),
+        run: (_request, action) => {
+          ran.push(action);
+          return Promise.resolve(
+            ran.length === 1
+              ? { asks: asked, needs: "TIME_ZONE" }
+              : { prepared: "Reminder: Review the cash forecast" },
+          );
+        },
+      },
+      appActionArguments: () => Promise.resolve({}),
+    });
+    await run.answer.answer(request());
+    turn = 1;
+    (run.message as { content: string }).content = "Lagos. Set both reminders.";
+    await run.answer.answer(request());
+    expect(ran).toEqual([
+      { tool: "propose_reminder", arguments: first },
+      {
+        tool: "propose_reminder",
+        arguments: { ...first, timeZone: "Africa/Lagos" },
+      },
+    ]);
+  });
+
   it("a legacy proposal tool's PREPARED output is a prepared card (QA run 4e3b1903)", async () => {
     const port = createToolAppActionPort({
       names: ["propose_express_interest"],

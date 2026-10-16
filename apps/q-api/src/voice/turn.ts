@@ -103,11 +103,12 @@ import {
   approvesByWords,
   declinesByWords,
   isReplyToCard,
+  askForChangeLine,
   restatesCard,
   statusLine,
   type PendingTurnReading,
 } from "@capital-q/q-specialists";
-import { readApprovalWords } from "@capital-q/q-tools";
+import { readApprovalWords, readEditRequest } from "@capital-q/q-tools";
 
 /**
  * One spoken turn (CQ-Q-VOICE-001 C §35-§40).
@@ -2179,6 +2180,21 @@ export function createVoiceTurnHandler(
           },
           "a spoken reply to a waiting card was read",
         );
+      }
+      // "Yes, but change the date": the new value is asked for, and the
+      // card keeps waiting, unchanged (owner 2026-10-16).
+      if (asksChange) {
+        const edit = readEditRequest(text, { summaries: [summary] });
+        if (edit !== null && !edit.valueGiven) {
+          return (await speakLine(
+            speaker,
+            askForChangeLine(edit.field, summary),
+            signal,
+            binding,
+          ))
+            ? { kind: "SPOKEN", path: "MOVE" }
+            : { kind: "INTERRUPTED", path: "MOVE" };
+        }
       }
       if (decision === "APPROVE" || decision === "REJECT") {
         pendingApproval.delete(binding);

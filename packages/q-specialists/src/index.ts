@@ -290,6 +290,7 @@ export {
   restatesCard,
   statusLine,
   whichToDecideLine,
+  askForChangeLine,
   WHICH_TO_APPROVE,
   WHICH_TO_DECLINE,
   type DecisionReading,

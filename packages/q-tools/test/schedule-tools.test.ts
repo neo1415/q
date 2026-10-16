@@ -658,6 +658,34 @@ describe("schedule tools", () => {
       ]);
     });
 
+    it("the zone they gave is offered on the card to be kept as theirs, when none is saved (live 2026-10-16)", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-03T17:38:13Z"));
+      const { executor, prepared } = world();
+      await executor.execute(
+        { ...asked, arguments: { ...asked.arguments, timeZone: "Lagos" } },
+        contextFor(actorA, ownPlan(actorA)),
+      );
+      expect(prepared).toMatchObject([
+        { payload: { timeZone: "Africa/Lagos", saveTimeZone: "Africa/Lagos" } },
+      ]);
+    });
+
+    it("a zone already saved is used, and nothing is offered to be kept", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-03T17:38:13Z"));
+      const { executor, prepared } = world({ profileZone: "Africa/Lagos" });
+      const outcome = await executor.execute(
+        asked,
+        contextFor(actorA, ownPlan(actorA)),
+      );
+      expect(JSON.stringify(outcome.result)).not.toMatch(/Which city/);
+      expect(prepared[0]?.payload).toMatchObject({ timeZone: "Africa/Lagos" });
+      expect(
+        (prepared[0]?.payload as { saveTimeZone?: string }).saveTimeZone,
+      ).toBeUndefined();
+    });
+
     it("with their city, prepares it as their own reminder, the name in its title", async () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date("2026-10-03T17:38:13Z"));

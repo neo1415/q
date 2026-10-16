@@ -11,7 +11,9 @@ import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import {
   createConversationApprovalPort,
+  createDecisionRelay,
   createRecentPendingElsewhere,
+  type DecisionRelay,
   keepsItsCard,
   plainProposalStatus,
   type ConversationApprovalDependencies,
@@ -94,6 +96,7 @@ function harness(
     readonly applyWithinMs?: number;
     /** Null: nothing said since the cards. Default: "yes, go ahead". */
     readonly said?: Said | null;
+    readonly relay?: DecisionRelay;
   } = {},
 ) {
   const said =
@@ -195,7 +198,7 @@ function harness(
           }
           return Promise.resolve({
             decided,
-            action: { runId: RUN_EARLIER },
+            action: { runId: RUN_EARLIER, id: row.proposalId },
           } as never);
         },
         reject: (command) => {
@@ -234,6 +237,7 @@ function harness(
   return {
     port: createConversationApprovalPort({
       ...dependencies,
+      ...(options.relay === undefined ? {} : { relay: options.relay }),
       ...(options.applyWithinMs === undefined
         ? {}
         : { applyWithinMs: options.applyWithinMs }),
@@ -624,5 +628,32 @@ describe("keepsItsCard", () => {
         actionClass: "CONFIRM_REQUIRED",
       }),
     ).toBe(false);
+  });
+});
+
+describe("one outcome line per action decided in words (live 2026-10-16)", () => {
+  it("the action's own line is handed to the turn that approved, never written twice", async () => {
+    const relay = createDecisionRelay();
+    const row = pending();
+    let narratedOnRun = 0;
+    const { port } = harness([row], {
+      relay,
+      said: { text: "I approve" },
+      // The execution's narrator: hands its line over while claimed.
+      continueApproved: () => {
+        const id = row.proposalId;
+        if (relay.heldFor(id)) relay.hold(id, "Done. I'll remind you: X.");
+        else narratedOnRun += 1;
+        row.action = "EXECUTED";
+        return Promise.resolve();
+      },
+    });
+    expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+      status: "SAVED",
+      line: "Done. I'll remind you: X.",
+    });
+    expect(narratedOnRun).toBe(0);
+    // Released: a later settlement is narrated on its run as before.
+    expect(relay.heldFor(row.proposalId)).toBe(false);
   });
 });

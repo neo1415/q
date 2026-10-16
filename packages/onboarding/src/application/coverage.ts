@@ -44,6 +44,11 @@ export type OnboardingCoverageFieldProfile = {
   readonly evidenceWanted?: readonly string[] | undefined;
   /** Option keys whose answer needs no evidence (e.g. "pre_revenue"). */
   readonly evidenceNotFor?: readonly string[] | undefined;
+  /**
+   * For an upload step: held documents of these types settle it, so a
+   * deck uploaded in the conversation is not listed as still to do.
+   */
+  readonly satisfiedByDocuments?: readonly string[] | undefined;
   /** What to ask first within a priority (lower first). Absent: definition order. */
   readonly rank?: number | undefined;
   /** Rough seconds to answer it in conversation; for the time estimate. */
@@ -402,6 +407,14 @@ export function deriveOnboardingCoverage(
         } else {
           state = "CONFIRMED_SAVED";
         }
+      } else if (
+        (fieldProfile.satisfiedByDocuments ?? []).some((t) =>
+          heldDocTypes.has(t),
+        )
+      ) {
+        state = "CONFIRMED_SAVED";
+        display = "Uploaded";
+        source = "DOCUMENT";
       } else if (declined) {
         state = "DEFERRABLE";
       } else if (seed !== undefined) {
