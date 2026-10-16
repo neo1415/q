@@ -1105,16 +1105,27 @@ export function createOnboardingPort(input: {
     const existing =
       before?.value.type === "TEXT" ? before.value.text.trim() : "";
     if (existing.includes(line)) {
-      return { stepKey: OFF_PATH_NOTES, outcome: "SAME_AS_ANSWER" } as never;
+      written.push(step.stepKey);
+      return {
+        stepKey: step.stepKey,
+        outcome: "COMMITTED",
+        recorded: `${line} (kept with their notes: already there)`.slice(
+          0,
+          600,
+        ),
+      };
     }
     const text = (existing.length > 0 ? `${existing}\n${line}` : line).slice(
       -2000,
     );
     try {
       await submit(OFF_PATH_NOTES, { type: "TEXT", text });
-      written.push(OFF_PATH_NOTES);
+      // Reported against the question they answered, so it is seen as
+      // done and never re-sent (live 2026-10-16: a fact kept under the
+      // notes' key was retried for four rounds).
+      written.push(OFF_PATH_NOTES, step.stepKey);
       return {
-        stepKey: OFF_PATH_NOTES,
+        stepKey: step.stepKey,
         outcome: "COMMITTED",
         question: (
           SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt

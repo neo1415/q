@@ -6051,11 +6051,13 @@ const reportPausedAccount = async (
 const interviewLoop = createInterviewAgent({
   // Any language: the questions code adds, through Q's shared translation
   // layer (Arabic's hand-written questions win).
-  localiseWords: (actor, language, texts) =>
-    answerWords.localise(language, texts, {
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-    }),
+  localiseWords: (actor, language, texts, options) =>
+    answerWords.localise(
+      language,
+      texts,
+      { tenantId: actor.tenantId, userId: actor.userId },
+      options,
+    ),
   // Lane ob1 (2026-10-16): after a round that only saved answers, all
   // committed, with nothing else to judge, code writes the reply (what was
   // saved, then the next coverage question) instead of a second model round.
@@ -6150,6 +6152,18 @@ const presenceTrigger =
 // leads, research findings put back as questions, one turn at a time.
 const interviewAgent = createOnboardingConductor({
   agent: interviewLoop,
+  // Multilingual Q: the conductor's own lines in their chosen language.
+  languageOf: (actor) =>
+    standingStore
+      .read(actor.userId, actor.tenantId, new Date())
+      .then((standing) =>
+        standing.language === "AUTO" ? null : standing.language,
+      ),
+  localiseWords: (actor, language, texts) =>
+    answerWords.localise(language, texts, {
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+    }),
   portFor: ({ actor, session, onboardingSessionId, journeyType }) =>
     createOnboardingPort({
       session,

@@ -86,9 +86,13 @@ import {
 import type { HeldWritesStore } from "./held-writes.js";
 import { codeReading } from "./code-reading.js";
 import { createReplySentenceStream } from "./reply-stream.js";
+import { languageInfo, listSeparator } from "@capital-q/q-core/language";
 import {
+  acknowledgementCopy,
+  acknowledgementIn,
+  acknowledgementParts,
   quickAcknowledgement,
-  writtenInLatinScript,
+  type ChoicesOf,
 } from "./quick-acknowledgement.js";
 import {
   firstNameOf,
@@ -101,6 +105,11 @@ import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
 import {
+  FOLLOW_THEIR_LANGUAGE_NOTE,
+  replyLanguageOf,
+} from "./reply-language.js";
+import {
+  HAND_STEP_COPY,
   onboardingLanguageNote,
   withQuestionsInLanguage,
 } from "./step-copy-language.js";
@@ -353,6 +362,8 @@ export type InterviewAgentDependencies = {
         actor: ActorContext,
         language: string,
         texts: readonly string[],
+        /** cachedOnly: translations already made, without waiting on a model. */
+        options?: { readonly cachedOnly?: boolean | undefined },
       ) => Promise<readonly (string | null)[]>)
     | undefined;
 };
@@ -808,11 +819,21 @@ export function createInterviewAgent(
     const personality = standing?.personality ?? "AUTO";
     // Multilingual Q: the language they chose for Q (Settings or by telling
     // Q), so the interview opens and asks in it.
-    const language =
+    // The reply's language (ob1 live, AF): their chosen language, or with
+    // Automatic the language of this turn. Code writes its own words only
+    // in English; otherwise they are translated or left to the model.
+    const replyLanguage = replyLanguageOf(
       standing === null || standing.language === "AUTO"
         ? null
-        : standing.language;
-    const languageNote = onboardingLanguageNote(language);
+        : standing.language,
+      utterance,
+    );
+    const language = replyLanguage.kind === "CHOSEN" ? replyLanguage.tag : null;
+    const codeSpeaksEnglish = replyLanguage.kind === "ENGLISH";
+    const languageNote =
+      replyLanguage.kind === "THEIRS"
+        ? FOLLOW_THEIR_LANGUAGE_NOTE
+        : onboardingLanguageNote(language);
     const conductBefore = standing?.conduct ?? INITIAL_CONDUCT;
     // A paused account talks to nobody until a person at Capital Q has
     // looked at it: refused here, before any model is called.
@@ -1501,12 +1522,88 @@ export function createInterviewAgent(
      * the model as before: a refusal or held save, a finding or check to
      * put to them, a reading that asks more (a pause, a look-up, a
      * delegation, an approval, a decline, finishing), the essentials done,
-     * or words not in English (the reply's language is the model's).
+     * or a reply whose language code cannot write in without a model: a
+     * chosen language is written from translations already cached (lane
+     * lang's translateLines, product copy only); Automatic with a turn not
+     * in English is the model's (its language has no tag to translate to).
      */
+    /**
+     * The acknowledgement in their chosen language from translations
+     * already cached: only product copy (lead, labels, choices, question)
+     * is asked for, never what they said; their own words are read back as
+     * recorded. Anything not yet translated: null, and the reply is the
+     * model's this turn (the missing lines are translated meanwhile, so a
+     * later turn has them).
+     */
+    const choicesOf: ChoicesOf = (stepKey, value) => {
+      const configuration = journeySteps.find(
+        (step) => step.stepKey === stepKey,
+      )?.configuration;
+      if (configuration === undefined || !("options" in configuration)) {
+        return null;
+      }
+      const labels = new Set(configuration.options.map((o) => o.label));
+      if (labels.has(value)) return [value];
+      const pieces = value.split(/,\s*/u);
+      return pieces.length > 1 && pieces.every((piece) => labels.has(piece))
+        ? pieces
+        : null;
+    };
+    const acknowledgementInLanguage = async (
+      acknowledgement: Parameters<typeof acknowledgementParts>[0],
+      nextStepKey: string,
+      tag: string,
+    ): Promise<string | null> => {
+      const localise = dependencies.localiseWords;
+      const info = languageInfo(tag);
+      if (localise === undefined || info === null) return null;
+      const parts = acknowledgementParts(acknowledgement);
+      if (parts === null) return null;
+      const handCopy = HAND_STEP_COPY[info.primary];
+      const hand = {
+        question: handCopy?.questions[nextStepKey] ?? null,
+        tail: handCopy?.optionalTail ?? null,
+      };
+      const copy = acknowledgementCopy(parts, choicesOf, hand);
+      if (copy === null) return null;
+      const translated = await localise(actor, info.tag, copy.lines, {
+        cachedOnly: true,
+      }).catch(() => copy.lines.map(() => null));
+      const words = new Map<string, string>();
+      copy.lines.forEach((line, i) => {
+        const text = translated[i];
+        if (text !== null && text !== undefined) words.set(line, text);
+      });
+      const reply = acknowledgementIn(
+        parts,
+        (english) => words.get(english) ?? null,
+        choicesOf,
+        hand,
+        {
+          items: info.script === "Arab" || info.script === "Aran" ? "؛ " : "; ",
+          list: listSeparator(info.tag),
+        },
+      );
+      if (reply === null) {
+        logger.info(
+          { language: info.tag, missing: copy.lines.length - words.size },
+          "code reply waits for translations; the model replies this turn",
+        );
+      }
+      return reply;
+    };
     const codeWrittenReply =
       async (): Promise<InterviewAgentV16Result | null> => {
         if (dependencies.replyByCodeAfterCleanSave !== true) return null;
-        if (opening || !writtenInLatinScript(utterance)) return null;
+        // Code's acknowledgement is English, or a chosen language through
+        // the translations already made; never English in another language.
+        if (opening) return null;
+        if (
+          !codeSpeaksEnglish &&
+          (language === null || dependencies.localiseWords === undefined)
+        ) {
+          return null;
+        }
         if (
           actions.length === 0 ||
           actions.some((action) => action.tool !== "record_answers")
@@ -1572,13 +1669,21 @@ export function createInterviewAgent(
         const flow = flowFor(state);
         if (flow.next === null || flow.next.confirming) return null;
         const profile = coverageProfileFor(input.journeyType);
-        const reply = quickAcknowledgement({
+        const acknowledgement = {
           results,
-          labelOf: (stepKey) => profile.fields[stepKey]?.label,
+          labelOf: (stepKey: string) => profile.fields[stepKey]?.label,
           next: flow.next,
           // One person turn and one of Q's per exchange.
           turnIndex: Math.floor(thread.length / 2),
-        });
+        };
+        const reply =
+          language === null
+            ? quickAcknowledgement(acknowledgement)
+            : await acknowledgementInLanguage(
+                acknowledgement,
+                flow.next.stepKey,
+                language,
+              );
         if (reply === null) return null;
         const parsed = InterviewAgentV16ResultSchema.safeParse({
           reply,
@@ -1647,6 +1752,7 @@ export function createInterviewAgent(
         }
         if (response.output.kind !== "TOOL_CALLS") break;
         const proposals = response.output.calls.slice(0, MAX_CALLS - calls);
+        const roundStart = actions.length;
         for (const call of proposals) {
           calls += 1;
           const outcome = await tools.execute(
@@ -1663,11 +1769,38 @@ export function createInterviewAgent(
         state = await port.state();
         // Everything they said is saved and their words ask nothing else:
         // the reply is decided, so code writes it (no second model round).
-        const written = rounds === 1 ? await codeWrittenReply() : null;
+        // After any recording round, not only the first: facts that open
+        // with an answer ("raising" opens the amount) take one more tool
+        // round, then the reply is code's (owner 2026-10-16: latency).
+        const written = await codeWrittenReply();
         if (written !== null) {
           stream?.push(written.reply);
           result = written;
           logger.info({}, "interview reply written by code after a clean save");
+          break;
+        }
+        // A recording round that saved nothing new is not repeated: the
+        // next call is the reply (live 2026-10-16: four rounds re-sending a
+        // refused answer in other words made a 12 s turn).
+        const thisRound = actions.slice(roundStart);
+        const recordingOnly = thisRound.every(
+          (action) =>
+            action.tool === "record_answers" ||
+            action.tool === "correct_answer",
+        );
+        // Only rounds whose saves ran and were answered (a tool that was not
+        // offered or whose call was malformed is the model's to put right).
+        const outcomes = thisRound.map((action) =>
+          RecordedResultsSchema.safeParse(action.result),
+        );
+        const ran = outcomes.every((parsed) => parsed.success);
+        const committedNow = outcomes.some(
+          (parsed) =>
+            parsed.success &&
+            parsed.data.results.some((r) => r.outcome === "COMMITTED"),
+        );
+        if (recordingOnly && thisRound.length > 0 && ran && !committedNow) {
+          logger.info({}, "a recording round saved nothing; replying now");
           break;
         }
       }
@@ -1762,14 +1895,24 @@ export function createInterviewAgent(
       );
     }
     const recorded = port.recorded();
-    const replyWritten =
-      result?.reply ??
-      (recorded.length > 0
+    const fallbackLine =
+      recorded.length > 0
         ? // Live acceptance 2026-10-16: eleven answers saved, then "say
           // that last part again?". What was saved stays saved; the
           // backstop below adds the next question.
           "That's all on your record."
-        : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.");
+        : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.";
+    // The model's reply, or code's line when it gave none: in their chosen
+    // language through the shared translation layer when it is ready.
+    const replyWritten =
+      result?.reply ??
+      (language === null || dependencies.localiseWords === undefined
+        ? fallbackLine
+        : ((
+            await dependencies
+              .localiseWords(actor, language, [fallbackLine])
+              .catch(() => [null])
+          )[0] ?? fallbackLine));
     // Never the previous question word for word (QA 2026-10-03): what they
     // said is acknowledged first, and the question comes in other words.
     // Never "saved" when nothing was (owner 2026-10-16): the claim is
@@ -1779,7 +1922,7 @@ export function createInterviewAgent(
       opening || recorded.length > 0 || (heldNote?.applied.length ?? 0) > 0,
       // Code's own words only in English; in any other language the claim
       // is taken out and the model's reply speaks for itself.
-      writtenInLatinScript(utterance) ? undefined : "",
+      codeSpeaksEnglish ? undefined : "",
     );
     if (backedReply !== replyWritten) {
       logger.info({}, "interview reply claimed a save nothing backed; removed");
@@ -1787,6 +1930,9 @@ export function createInterviewAgent(
     let reply = notVerbatim(backedReply, lastQTurn ?? null, {
       asking: result?.asking ?? null,
       alternate: (stepKey) => {
+        // An English rewording only where the reply is English or will be
+        // translated below; in their own language the model's words stand.
+        if (replyLanguage.kind === "THEIRS") return null;
         const step = journeySteps.find((s) => s.stepKey === stepKey);
         if (step === undefined) return null;
         const spoken = SPOKEN_QUESTIONS[stepKey] ?? null;
@@ -1922,7 +2068,10 @@ export function createInterviewAgent(
       !handingOver &&
       !pausing &&
       stateAfter !== null &&
-      !stateAfter.completed
+      !stateAfter.completed &&
+      // In a language known only from the turn, the model was told to end
+      // with the next question; an English one is never appended.
+      replyLanguage.kind !== "THEIRS"
     ) {
       const backed = withNextQuestion(
         withoutAnsweredQuestions(reply, stateAfter, SPOKEN_QUESTIONS),
