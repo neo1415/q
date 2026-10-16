@@ -299,3 +299,25 @@ export {
   type OnboardingNudgeStateRepository,
 } from "./application/nudges.js";
 export { createPostgresOnboardingNudgeStateRepository } from "./infrastructure/postgres-nudge-state-repository.js";
+export {
+  branchDependencies,
+  deriveOnboardingCoverage,
+  displayOnboardingValue,
+  knownFactsFromRegistration,
+  proposalSource,
+  selectNextFields,
+  type DeriveOnboardingCoverageInput,
+  type OnboardingCoverageCheck,
+  type OnboardingCoverageFieldProfile,
+  type OnboardingCoverageProfile,
+  type OnboardingKnownFact,
+  type OnboardingRegistrationFacts,
+} from "./application/coverage.js";
+export {
+  confirmationItemKey,
+  ENGLISH_ONBOARDING_COPY,
+  groupConfirmation,
+  ONBOARDING_COPY_CATALOGS,
+  onboardingCopyFor,
+  type OnboardingCopyCatalog,
+} from "./application/confirmation.js";
