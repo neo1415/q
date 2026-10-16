@@ -1,4 +1,5 @@
 import {
+  arabicCardLine,
   arrivalGreeting,
   cardFactsForVoice,
   cardLine,
@@ -119,12 +120,13 @@ export function focusSay(
   cards: readonly ArrivalCard[],
   state: SequenceState,
   lead?: string | null,
+  language: "en" | "ar" = "en",
 ): string | null {
   const focused = focusedCard(state);
   if (focused === null) return null;
   const card = cards.find((one) => one.key === focused.key);
   if (card === undefined) return null;
-  const line = cardLine(
+  const line = (language === "ar" ? arabicCardLine : cardLine)(
     decisionFactsOf(card),
     state.focus + 1,
     state.cards.length,
@@ -297,7 +299,7 @@ export type ArrivalWords = {
 };
 
 /** "Zino Aviation is waiting for a reply" -> "Zino Aviation". */
-const WAITING_NAME =
+export const WAITING_NAME =
   /^(.+?) (?:is waiting for (?:a|your) reply|sent you a message|wrote back|replied)\b/u;
 
 /**
@@ -348,7 +350,7 @@ export function arrivalWords(
   const english = englishArrivalWords(data, now, browserZone);
   if (language !== "ar") return english;
   const zone = zoneFor(data, browserZone);
-  return arabicArrivalWords(english, {
+  return arabicArrivalWords(english, data, {
     firstName: data.firstName,
     now,
     timeZone: zone,

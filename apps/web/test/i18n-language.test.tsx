@@ -126,7 +126,8 @@ describe("Settings says what is Arabic today", () => {
     expect(ARABIC_NOW).toMatch(/rehearsals/u);
     expect(ARABIC_NOW).toMatch(/onboarding/u);
     expect(ARABIC_NOW).toMatch(/every page/u);
-    expect(STILL_ENGLISH).toMatch(/summary of what happened/u);
+    expect(STILL_ENGLISH).toMatch(/decision card/u);
+    expect(STILL_ENGLISH).not.toMatch(/since your last visit/u);
     for (const line of [ARABIC_NOW, STILL_ENGLISH, VIDEO_FALLBACK]) {
       expect(translate("ar", line)).not.toBe(line);
     }
