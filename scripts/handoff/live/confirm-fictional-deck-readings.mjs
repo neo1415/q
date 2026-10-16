@@ -182,17 +182,30 @@ async function healthGate(done) {
   await sleep(BACKOFF_MS);
 }
 
+/** A dropped connection (the sandbox proxy) is retried like a 5xx. */
+const fetchOrNetworkError = (url, init) =>
+  fetch(url, init).catch(() => ({ ok: false, status: 599 }));
+
 const write = (line) => appendFileSync(receipt, `${JSON.stringify(line)}\n`);
 let confirmed = 0;
 let refused = 0;
 let inBatch = 0;
 for (const t of targets) {
-  const session = await timed(() => signIn(t.founder_email, API));
+  let session;
+  for (let tries = 0; ; tries += 1) {
+    try {
+      session = await timed(() => signIn(t.founder_email, API));
+      break;
+    } catch (error) {
+      if (tries >= 3) throw error;
+      await sleep(30_000);
+    }
+  }
   for (const section of t.sections) {
     let attempt = 0;
     for (;;) {
       const response = await timed(() =>
-        fetch(
+        fetchOrNetworkError(
           `${API}/v1/documents/${encodeURIComponent(t.document_id)}/deck-extractions/${encodeURIComponent(t.extraction_id)}/sections/${encodeURIComponent(section)}/review`,
           {
             method: "POST",
@@ -212,7 +225,7 @@ for (const t of targets) {
       if (response.status >= 500 && attempt < 3) {
         attempt += 1;
         console.log(JSON.stringify({ backoff: response.status, attempt }));
-        await sleep(BACKOFF_MS);
+        await sleep(response.status === 599 ? 30_000 : BACKOFF_MS);
         continue;
       }
       if (response.status >= 500) {
