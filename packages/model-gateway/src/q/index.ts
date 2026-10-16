@@ -204,7 +204,12 @@ import {
   ownStandingFact,
   type QOwnIndex,
 } from "./own-standing.js";
-import { afterLeadLines, ownReadinessFact } from "./own-readiness.js";
+import {
+  afterLeadLines,
+  ASKS_ABOUT_OWN_TEAM,
+  ownReadinessFact,
+  ownTeamFact,
+} from "./own-readiness.js";
 import { speculationGate } from "./speculation.js";
 
 export type { QOwnIndex } from "./own-standing.js";
@@ -1153,7 +1158,7 @@ export const NAME_NOTE =
  * reminders and rehearsals.
  */
 export const OWN_DAY_NOTE =
-  "Their tasks, day, agenda or what's next mean their own day among the facts (calls, reminders, approvals, Q's work), told in their time; how they are doing or their rehearsals means their last rehearsals there (get_my_results for more). Never say a record is unavailable when it is among the facts. If their time zone is not known, say times as UTC once, ask which city they are in, and offer to save it (update_my_profile, timeZone).";
+  "Their tasks, day, agenda or what's next mean their own day among the facts (calls, reminders, approvals, Q's work), told in their time; how they are doing or their rehearsals means their last rehearsals there (get_my_results for more). Never say a record is unavailable when it is among the facts. If their time zone is not known, say times as UTC once, ask which city they are in, and offer to save it (update_my_profile, timeZone). A reminder or call they ask for is prepared with its own tool even then: the tool asks for the city and keeps it, so never ask for it yourself first.";
 
 /**
  * Saving is not verifying (ADR-001; founder live 2026-10-02: "regardless
@@ -3594,6 +3599,28 @@ export function createModelGatewayQAnswer(
         }
         took("own-readiness");
       }
+      // Their own team counts, when they ask about their team: read from
+      // the canonical team facts, never left to be inferred (live
+      // 2026-10-16: "1 founder and 1 person" for a company of 2 and 14).
+      let ownTeam: AuthorisedFact | null = null;
+      if (
+        prefetchable.has("read_my_record") &&
+        ASKS_ABOUT_OWN_TEAM.test(latest.content) &&
+        !(ownInvestorOrganisationIn(plan) !== null && ownCompanyId === null)
+      ) {
+        const outcome = await callTool(
+          {
+            callId: "q-own-team",
+            name: "read_my_record",
+            arguments: { record: "COMPANY_TEAM" },
+          },
+          toolContext,
+        ).catch(() => null);
+        if (outcome?.result.ok === true) {
+          ownTeam = ownTeamFact(outcome.result.data);
+        }
+        took("own-team");
+      }
       // Read beside the readiness read above, not before it (L1).
       await nudgeRead;
       took("nudge");
@@ -3615,6 +3642,7 @@ export function createModelGatewayQAnswer(
         const facts: readonly AuthorisedFact[] = [
           // Their readiness first when it leads this answer.
           ...(ownReadiness === null ? [] : [ownReadiness]),
+          ...(ownTeam === null ? [] : [ownTeam]),
           ...w.onboardingFacts,
           ...(ownProfile === null ? [] : [ownProfile]),
           ...(ownCompany === null ? [] : [ownCompany]),

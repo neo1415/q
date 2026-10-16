@@ -494,14 +494,11 @@ export function createOnboardingPort(input: {
     for (const eligible of view.progress.eligibleSteps) {
       const step = steps.get(eligible.stepKey);
       if (step === undefined) continue;
-      // A reference to a platform record (the mandate being defined),
-      // once resolved, is not something to discuss with the person.
-      const config = step.configuration;
-      if (
-        eligible.status === "COMPLETED" &&
-        config.stepType === "reference_select" &&
-        config.resourceType !== "TAXONOMY_NODE"
-      ) {
+      // A reference to a platform record (the mandate being defined) is
+      // the journey's to settle, never something to discuss with the
+      // person, resolved or not (live 2026-10-16: "your main investment
+      // strategy, or a different one?" asked, and unrecordable).
+      if (isPlatformReference(step)) {
         continue;
       }
       const open = toOpenStep(step, view);
@@ -595,10 +592,38 @@ export function createOnboardingPort(input: {
           stepKeys: [...check.stepKeys].slice(0, 4),
           raised: input.raisedChecks?.has(check.id) === true,
         })),
-      next: coverage.next.map((n) => ({
-        stepKey: n.fieldKey,
-        reason: n.reason,
-      })),
+      next: (() => {
+        // A proposal waiting on a question not yet answered (a deck's "4
+        // pilots" while "what early signal do you have?" is open, live
+        // 2026-10-16): that question comes first, so their answer lets the
+        // proposal be put to them and confirmed.
+        const eligibleKeys = new Set(
+          view.progress.eligibleSteps.map((e) => e.stepKey),
+        );
+        const answeredKeys = new Set(view.responses.map((r) => r.stepKey));
+        const unlocking = proposalPrerequisites({
+          pending: pendingList.map((r) => r.stepKey),
+          eligible: eligibleKeys,
+          answered: answeredKeys,
+          stepOf: (key) => steps.get(key),
+        }).filter((key) => {
+          const step = steps.get(key);
+          return step !== undefined && !isPlatformReference(step);
+        });
+        return [
+          // Asked as the question it is, not as a value on offer.
+          ...unlocking.map((stepKey) => ({
+            stepKey,
+            reason:
+              steps.get(stepKey)?.required === true
+                ? ("ESSENTIAL_MISSING" as const)
+                : ("IMPORTANT_MISSING" as const),
+          })),
+          ...coverage.next
+            .filter((n) => !unlocking.includes(n.fieldKey))
+            .map((n) => ({ stepKey: n.fieldKey, reason: n.reason })),
+        ].slice(0, 12);
+      })(),
       minutesLeft: coverage.summary.minutesLeft,
     };
   };
@@ -629,6 +654,11 @@ export function createOnboardingPort(input: {
     );
     trusted = true;
   };
+
+  /** A step that points at a platform record (a mandate), not a vocabulary. */
+  const isPlatformReference = (step: OnboardingStepManifest): boolean =>
+    step.configuration.stepType === "reference_select" &&
+    step.configuration.resourceType !== "TAXONOMY_NODE";
 
   /** Where a refusal names a prerequisite by its field, the step that holds it. */
   const stepNamed = (suffix: string | null): string | undefined =>
@@ -1024,8 +1054,11 @@ export function createOnboardingPort(input: {
       : {
           stepKey,
           outcome: "REJECTED",
-          reason: (
-            refusal.because ?? "The onboarding service did not accept it."
+          reason: (refusal.because?.includes("(STEP_NOT_ELIGIBLE)") === true
+            ? // Live 2026-10-16: refused as not on their path, then narrated
+              // as "I've matched your description to first revenue only".
+              "That question is not on their path (it applies at another stage or after another answer), so nothing was recorded. Do not mention it or say you matched anything to it."
+            : (refusal.because ?? "The onboarding service did not accept it.")
           ).slice(0, 400),
         };
   };
@@ -1384,7 +1417,17 @@ export function createOnboardingPort(input: {
           "A choice is delegated only by what they say now, handing it to you; that quote is not from their latest words, so nothing was recorded.",
       });
     }
-    if (answer.basis !== "DELEGATED") {
+    // Their latest words name one choice by its own label, verbatim ("first
+    // revenue only"): that is their answer, decided by code, not a reading
+    // (live 2026-10-16: the reader missed it, the choice was held, and Q
+    // said it had "matched your description to first revenue only").
+    const verbatim =
+      answer.basis !== "DELEGATED" &&
+      input.personTurns[0] !== undefined &&
+      quoteOccursIn(answer.quote, input.personTurns[0])
+        ? verbatimOptionIn(steps.get(answer.stepKey), answer.quote)
+        : null;
+    if (answer.basis !== "DELEGATED" && verbatim === null) {
       const refused = await notStated(answer.stepKey, answer.quote);
       if (refused !== null) return done(refused);
     }
@@ -1409,9 +1452,20 @@ export function createOnboardingPort(input: {
     }
     const resolved = await (warmed.get(answer) ?? resolve(answer));
     if (!resolved.ok) return done(resolved.result);
+    const verbatimMatch =
+      verbatim !== null &&
+      resolved.value.type === "SINGLE_SELECT" &&
+      resolved.value.optionKey === verbatim;
+    if (verbatim !== null && !verbatimMatch) {
+      // Recorded as something other than the choice they named: the
+      // ordinary check decides.
+      const refused = await notStated(answer.stepKey, answer.quote);
+      if (refused !== null) return done(refused);
+    }
     const reading = (await input.authority?.()) ?? null;
     const latestStated =
-      reading !== null && statedIn(reading.stated, resolved.step.stepKey);
+      verbatimMatch ||
+      (reading !== null && statedIn(reading.stated, resolved.step.stepKey));
     const readerStated =
       latestStated ||
       input.statedEarlier?.(resolved.step.stepKey, answer.quote) === true;
@@ -2089,7 +2143,9 @@ export function createOnboardingPort(input: {
           .filter(
             (step): step is OnboardingStepManifest =>
               step !== undefined &&
-              step.configuration.stepType !== "confirmation",
+              step.configuration.stepType !== "confirmation" &&
+              // The journey settles these itself; never a question.
+              !isPlatformReference(step),
           )
           .map((step) => ({
             stepKey: step.stepKey,
@@ -2121,6 +2177,57 @@ export function createOnboardingPort(input: {
           };
         }
       }
+      // They asked to finish: an optional question the journey is waiting
+      // on is set aside (theirs to answer later), so the journey reaches
+      // and settles its own platform steps (live 2026-10-16: an unsaved
+      // optional title held the mandate step back and finishing stalled).
+      for (let guard = 0; guard < 4; guard += 1) {
+        const gapsNow = view.progress.eligibleSteps.filter(
+          (e) => e.required && e.status !== "COMPLETED",
+        );
+        const onlyPlatform =
+          gapsNow.length > 0 &&
+          gapsNow.every((e) => {
+            const step = steps.get(e.stepKey);
+            return (
+              step !== undefined &&
+              (isPlatformReference(step) ||
+                step.configuration.stepType === "confirmation")
+            );
+          }) &&
+          gapsNow.some((e) => {
+            const step = steps.get(e.stepKey);
+            return step !== undefined && isPlatformReference(step);
+          });
+        const waitingOn = view.currentStep;
+        const waitingStep =
+          waitingOn === null || waitingOn === undefined
+            ? undefined
+            : steps.get(waitingOn.stepKey);
+        if (
+          !onlyPlatform ||
+          waitingStep === undefined ||
+          waitingStep.required ||
+          view.responses.some((r) => r.stepKey === waitingStep.stepKey)
+        ) {
+          break;
+        }
+        try {
+          trusted = false;
+          latest = await settle(
+            await skipOnboardingStep(
+              input.session,
+              input.onboardingSessionId,
+              waitingStep.stepKey,
+              { expectedSessionVersion: view.session.version },
+              randomUUID(),
+            ),
+          );
+          view = latest;
+        } catch {
+          break;
+        }
+      }
       const gaps = missing(view);
       if (gaps.length > 0) return { completed: false, missing: gaps };
       // The journey's own review steps, confirmed on the person's word —
@@ -2147,7 +2254,17 @@ export function createOnboardingPort(input: {
         view = await current();
       }
       if (!view.progress.canComplete) {
-        return { completed: false, missing: missing(view) };
+        const left = missing(view);
+        return {
+          completed: false,
+          missing: left,
+          ...(left.length === 0
+            ? {
+                reason:
+                  "The setup is still settling its own steps, so it was not completed yet. Tell them plainly and ask them to confirm again in a moment.",
+              }
+            : {}),
+        };
       }
       try {
         trusted = false;
@@ -2328,6 +2445,80 @@ function normalisedWords(text: string): string {
  * and that one is the choice given. Several named ("dollars ... no, naira")
  * is not unambiguous.
  */
+/**
+ * The open questions that stand between a waiting proposal and the
+ * person: steps its branching reads that are on their path and unanswered.
+ */
+export function proposalPrerequisites(input: {
+  readonly pending: readonly string[];
+  readonly eligible: ReadonlySet<string>;
+  readonly answered: ReadonlySet<string>;
+  readonly stepOf: (
+    stepKey: string,
+  ) => { readonly branching?: unknown } | undefined;
+}): string[] {
+  const out: string[] = [];
+  for (const waiting of input.pending) {
+    if (input.eligible.has(waiting)) continue;
+    for (const key of branchStepKeys(input.stepOf(waiting)?.branching)) {
+      if (
+        input.eligible.has(key) &&
+        !input.answered.has(key) &&
+        !out.includes(key)
+      ) {
+        out.push(key);
+      }
+    }
+  }
+  return out;
+}
+
+/** Every step a branching expression reads, in order, once each. */
+export function branchStepKeys(expression: unknown): string[] {
+  const out: string[] = [];
+  const visit = (node: unknown): void => {
+    if (typeof node !== "object" || node === null) return;
+    const { stepKey, expressions } = node as {
+      readonly stepKey?: unknown;
+      readonly expressions?: unknown;
+    };
+    if (typeof stepKey === "string" && !out.includes(stepKey)) {
+      out.push(stepKey);
+    }
+    if (Array.isArray(expressions))
+      for (const child of expressions) visit(child);
+  };
+  visit(expression);
+  return out;
+}
+
+/**
+ * The one option of a single-choice step whose own label (two words or
+ * more, so never a bare "yes" or "seed") appears verbatim in their words;
+ * null when none does or more than one does.
+ */
+export function verbatimOptionIn(
+  step: { readonly configuration: unknown } | undefined,
+  quote: string,
+): string | null {
+  const configuration = step?.configuration as
+    | {
+        readonly stepType?: string;
+        readonly options?: readonly {
+          readonly optionKey?: string;
+          readonly label?: string;
+        }[];
+      }
+    | undefined;
+  if (configuration?.stepType !== "single_select") return null;
+  const said = normalisedWords(quote);
+  const named = (configuration.options ?? []).filter((option) => {
+    const label = normalisedWords(option.label ?? "");
+    return label.trim().split(" ").length >= 2 && said.includes(label);
+  });
+  return named.length === 1 ? (named[0]?.optionKey ?? null) : null;
+}
+
 export function onlyOptionNamedIn(
   journeyType: "founder" | "investor",
   step: { readonly stepKey: string; readonly configuration: unknown },

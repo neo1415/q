@@ -267,6 +267,14 @@ export function createModelGateway(
     spokenFailures: meter.createCounter("q.model.spoken_failures"),
     policyIneligible: meter.createCounter("q.model.policy_ineligible"),
     budgetRejected: meter.createCounter("q.model.budget_rejected"),
+    /**
+     * Structured output refused, by task class and the first refusal code
+     * (a field path and a Zod code, never a value): which schema field a
+     * model cannot produce (live 2026-10-16: "tool:custom").
+     */
+    structuredRefusals: meter.createCounter("q.model.structured_refusals"),
+    /** Structured output kept after a lenient field or element was dropped. */
+    structuredRepairs: meter.createCounter("q.model.structured_repairs"),
     usageRecordFailures: meter.createCounter("q.model.usage_record_failures"),
     latencyMs: meter.createHistogram("q.model.provider_latency_ms"),
     tokensIn: meter.createHistogram("q.model.tokens_in"),
@@ -446,6 +454,10 @@ export function createModelGateway(
               unknownRootKeys: accept.unknownRootKeys,
             });
             if (accepted.ok && (accepted.dropped?.length ?? 0) > 0) {
+              metrics.structuredRepairs.add(1, {
+                ...labels,
+                repair: (accepted.dropped?.[0] ?? "").slice(0, 80),
+              });
               // Paths and codes only, never a value the model wrote.
               logger?.warn(
                 {
@@ -470,6 +482,12 @@ export function createModelGateway(
                 ...(truncated ? { truncated: true } : {}),
               };
               span.setAttribute("q.model.invalid_output_stage", accepted.stage);
+              metrics.structuredRefusals.add(1, {
+                ...labels,
+                stage: accepted.stage,
+                refusal: (accepted.refusals?.[0] ?? "none").slice(0, 80),
+                truncated,
+              });
               // The stage, and nothing the model wrote: which step of
               // acceptance refused it is ours to act on, and it is the
               // difference between "the model is wrong" and "our schema is

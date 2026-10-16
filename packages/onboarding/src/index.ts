@@ -191,6 +191,7 @@ export {
 } from "./application/follow-ups.js";
 export { getOnboardingMetrics } from "./application/metrics.js";
 export {
+  answeredLine,
   createOwnOnboardingSummaryReader,
   settleOwnCompletion,
   type OwnOnboardingCompletion,

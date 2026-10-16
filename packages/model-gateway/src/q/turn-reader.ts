@@ -231,6 +231,16 @@ export function readerActions(
   };
 }
 
+/** Reading fields whose malformed value is dropped, not the reading. */
+export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
+  "tool",
+  "moreDocuments",
+];
+
+/** Said once after a refused reading: what to fix, never the reading. */
+export const TURN_READER_CORRECTION =
+  "Your last reading did not match the required JSON schema, so it was refused. Answer again with exactly the schema's fields. A tool carries only its own kind's parameters (NAVIGATE: destination or unknownScreen; SET_VISIBILITY: visibility; PREPARE_DOCUMENT: documentType), the others null. A declared action such as a reminder, a meeting or a message goes in appAction or askedAction, never in tool. Use null for anything you are unsure of.";
+
 export function createQTurnReader(dependencies: {
   readonly gateway: ModelGateway;
   readonly logger: Logger;
@@ -292,34 +302,66 @@ export function createQTurnReader(dependencies: {
             "You classify one turn and nothing else; Capital Q decides what follows from it.",
           variables,
         });
-        const response = await gateway.execute<TurnReaderV52Result>(
-          {
-            taskClass: "FAST_CLASSIFICATION",
-            // A closed classification needs little thought; left unset, a
-            // reasoning model thinks at length before a one-line answer.
-            reasoning: "LOW",
-            sensitivity,
-            ...(dependencies.dataPosture === undefined
-              ? {}
-              : { dataPosture: dependencies.dataPosture }),
-            budget: TURN_READER_BUDGET,
-            messages: [...rendered.messages],
-            output: rendered.output,
-            attribution: input.attribution,
-          },
-          {
-            schema: TurnReaderV52ResultSchema,
-            // Live 2026-10-13: a reading that wrote a tool's own fields at
-            // the root was refused and re-asked (~3.3 s of a ~6 s wait
-            // before the answer started). Those keys mean nothing at the
-            // root; the reading is kept and its tool stays unread (null).
-            unknownRootKeys: "DROP",
-            ...(input.signal === undefined ? {} : { signal: input.signal }),
-            ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
-              ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
-              : {}),
-          },
-        );
+        const ask = (
+          messages: typeof rendered.messages,
+        ): ReturnType<typeof gateway.execute<TurnReaderV52Result>> =>
+          gateway.execute<TurnReaderV52Result>(
+            {
+              taskClass: "FAST_CLASSIFICATION",
+              // A closed classification needs little thought; left unset, a
+              // reasoning model thinks at length before a one-line answer.
+              reasoning: "LOW",
+              sensitivity,
+              ...(dependencies.dataPosture === undefined
+                ? {}
+                : { dataPosture: dependencies.dataPosture }),
+              budget: TURN_READER_BUDGET,
+              messages: [...messages],
+              output: rendered.output,
+              attribution: input.attribution,
+            },
+            {
+              schema: TurnReaderV52ResultSchema,
+              // Live 2026-10-13: a reading that wrote a tool's own fields at
+              // the root was refused and re-asked (~3.3 s of a ~6 s wait
+              // before the answer started). Those keys mean nothing at the
+              // root; the reading is kept and its tool stays unread (null).
+              unknownRootKeys: "DROP",
+              // Live 2026-10-16 ("tool:custom"): a tool written with another
+              // kind's parameters failed the tool's own refinement, and the
+              // whole reading was refused -- "Set me a reminder…" then went
+              // to the general answer, which asked for the city itself. A
+              // malformed hand costs the hand (read as none), never the
+              // reading: its kind, appAction and askedAction still route it.
+              lenientFields: TURN_READER_LENIENT_FIELDS,
+              ...(input.signal === undefined ? {} : { signal: input.signal }),
+              ...(dependencies.dataPosture === "SYNTHETIC_DEMO"
+                ? { firstAttemptTimeoutMs: TURN_READER_FAST_FIRST_ATTEMPT_MS }
+                : {}),
+            },
+          );
+        let response: Awaited<ReturnType<typeof ask>>;
+        try {
+          response = await ask(rendered.messages);
+        } catch (error: unknown) {
+          // Still refused: once more, told what was wrong, before the turn
+          // is answered unread. Never for a cancellation or a provider
+          // failure, which a correction cannot help.
+          if (
+            !isModelGatewayError(error) ||
+            error.failureClass !== "INVALID_MODEL_OUTPUT"
+          ) {
+            throw error;
+          }
+          logger.info(
+            { correlationId: input.attribution.correlationId },
+            "the turn reading was refused; asked once more with a correction",
+          );
+          response = await ask([
+            ...rendered.messages,
+            { role: "USER", content: TURN_READER_CORRECTION },
+          ]);
+        }
         if (response.output.kind !== "STRUCTURED") return null;
         const parsed = TurnReaderV52ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
