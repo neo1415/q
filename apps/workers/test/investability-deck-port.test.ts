@@ -53,12 +53,15 @@ function room(
         sections: DECK_SECTIONS.map(reading),
         createdAt: "2026-10-02T00:00:00.000Z",
         confirmed: false,
+        readingNumber: 1,
+        setAside: [],
+        readAgain: { used: 0, pending: false },
         reviews: [
           { section: "TRACTION", action: "CONFIRM", correction: null },
           { section: "TEAM", action: "DISMISS", correction: null },
         ],
       }),
-  } as InvestabilityDeckRoom;
+  };
 }
 
 describe("investability deck port", () => {
