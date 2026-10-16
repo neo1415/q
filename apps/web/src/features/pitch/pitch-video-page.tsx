@@ -8,6 +8,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { ChevronLeft, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { PitchUpload } from "./pitch-upload";
+import { useT } from "@/features/i18n/language";
 
 /**
  * One video's page (ADR 0022): a new one (`mediaAssetId` null) or one the
@@ -22,6 +23,7 @@ export function PitchVideoPage({
   readonly companyId: string;
   readonly mediaAssetId: string | null;
 }) {
+  const t = useT();
   const router = useRouter();
   const onDeleted = useCallback(() => {
     router.push("/pitch");
@@ -40,7 +42,7 @@ export function PitchVideoPage({
       <div>
         <Link href="/pitch" className={buttonClassName("quiet", "compact")}>
           <ChevronLeft size={ICON_SIZE.regular} aria-hidden="true" />
-          All videos
+          {t("All videos")}
         </Link>
       </div>
       <PitchUpload

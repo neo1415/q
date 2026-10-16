@@ -172,7 +172,7 @@ export function JoinCard({
         <p className="cq-body text-(--cq-text-secondary)">
           {inviter} invited you as {preview.role === "ADMIN" ? "an" : "a"}{" "}
           <b className="font-medium text-(--cq-text-primary)">
-            {ROLE[preview.role]}
+            {t(ROLE[preview.role])}
           </b>
           .{" "}
           {preview.kind === "COMPANY"

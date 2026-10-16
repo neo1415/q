@@ -10,6 +10,7 @@ import {
   disconnectGmail,
   readGmailConnection,
 } from "./integration-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Google on Settings → Connections (BIZ-007): connect, see which address,
@@ -30,6 +31,7 @@ export function GmailConnection({
   /** `?reconnect=google`: start reconnecting when Google isn't connected. */
   readonly reconnect?: boolean | undefined;
 }) {
+  const t = useT();
   const [connection, setConnection] = useState<GoogleConnectionDto | null>(
     null,
   );
@@ -91,10 +93,10 @@ export function GmailConnection({
       data-gmail-connection={connection?.status ?? "LOADING"}
     >
       {connection === null ? (
-        <p className="cq-body-sm text-(--cq-text-tertiary)">Checking…</p>
+        <p className="cq-body-sm text-(--cq-text-tertiary)">{t("Checking…")}</p>
       ) : connection.status === "UNAVAILABLE" ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Gmail isn&apos;t available yet.
+          {t("Gmail isn't available yet.")}
         </p>
       ) : connection.status === "CONNECTED" ? (
         <div className="flex flex-wrap items-center gap-3">
@@ -107,7 +109,7 @@ export function GmailConnection({
             disabled={pending}
             onClick={disconnect}
           >
-            Disconnect
+            {t("Disconnect")}
           </button>
         </div>
       ) : connection.status === "REVOKED" ? (
@@ -125,14 +127,15 @@ export function GmailConnection({
             disabled={pending}
             onClick={connect}
           >
-            Reconnect Google
+            {t("Reconnect Google")}
           </button>
         </div>
       ) : (
         <div className="flex flex-col items-start gap-2">
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Q drafts emails you approve, tells you when they reply, and books
-            calls with a Meet link.
+            {t(
+              "Q drafts emails you approve, tells you when they reply, and books calls with a Meet link.",
+            )}
           </p>
           <button
             type="button"
@@ -140,7 +143,7 @@ export function GmailConnection({
             disabled={pending}
             onClick={connect}
           >
-            Connect Google
+            {t("Connect Google")}
           </button>
         </div>
       )}

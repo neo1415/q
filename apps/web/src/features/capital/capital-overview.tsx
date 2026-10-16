@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 import type {
@@ -13,6 +15,7 @@ import { capitalTabHref } from "./capital-tabs";
 import { money, percent, shareOf } from "./money";
 import { instrumentLabel } from "./round-labels";
 import { NOTICE_WORDS, STATUS_WORDS } from "./round-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Capital's Overview tab (design: docs/design/2026-10-08/capital-tabs): a
@@ -69,6 +72,7 @@ export function RaiseSummary({
 }: {
   readonly ledger: CapitalLedgerDto | null;
 }) {
+  const t = useT();
   if (ledger === null) {
     return (
       <section
@@ -161,7 +165,7 @@ export function RaiseSummary({
               data-notice={notice}
               className="cq-body-sm text-(--cq-text-secondary)"
             >
-              {NOTICE_WORDS[notice]}
+              {t(NOTICE_WORDS[notice])}
             </li>
           ))}
         </ul>
@@ -245,6 +249,7 @@ export function NextSteps({
 }: {
   readonly readiness: ReadinessDto | null;
 }) {
+  const t = useT();
   const steps = readiness === null ? [] : nextSteps(readiness);
   return (
     <QControl id="section.next-steps" kind="SECTION">
@@ -288,7 +293,7 @@ export function NextSteps({
                   <span className="cq-body font-semibold text-(--cq-text-primary)">
                     {step.title}{" "}
                     <span className="cq-caption border border-(--cq-border-subtle) px-2 py-0.5 font-normal text-(--cq-text-secondary)">
-                      {PRIORITY_WORDS[step.priority]}
+                      {t(PRIORITY_WORDS[step.priority])}
                     </span>
                   </span>
                   <span className="cq-body-sm text-(--cq-text-secondary)">

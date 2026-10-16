@@ -36,7 +36,7 @@ export function SoundSetting() {
                 : "cq-appearance-option"
             }
           >
-            {SOUND_MODE_LABELS[choice]}
+            {t(SOUND_MODE_LABELS[choice])}
           </button>
         ))}
       </div>

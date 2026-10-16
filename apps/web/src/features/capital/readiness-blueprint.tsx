@@ -14,6 +14,7 @@ import { qApiSession } from "@/features/q/context";
 import { PrivateNote } from "@/features/readiness/readiness-section";
 
 import { ReadinessBlueprintEntry } from "./readiness-blueprint-entry";
+import { serverT } from "@/features/i18n/server";
 
 /**
  * "Your 3/6/12-month plan" (Q.04; design docs/design/2026-10-07/overdeliver,
@@ -109,18 +110,21 @@ export async function ReadinessBlueprintSection({
   readonly companyId: string;
   readonly horizon: BlueprintHorizon;
 }) {
+  const t = await serverT();
   const load = await loadBlueprint(companyId, horizon);
   if (load.kind === "NOT_ON_PLAN") return <ReadinessBlueprintEntry />;
   return (
     <PageSection
       id="readiness-blueprint"
-      title="Your 3/6/12-month plan"
-      description="Q's action plan, sequenced. Each step names the gap it closes."
+      title={t("Your 3/6/12-month plan")}
+      description={t(
+        "Q's action plan, sequenced. Each step names the gap it closes.",
+      )}
     >
       <div className="flex flex-col gap-4">
         <PrivateNote />
         <nav
-          aria-label="Plan horizon"
+          aria-label={t("Plan horizon")}
           className="inline-flex self-start border border-(--cq-border) p-1"
         >
           {BLUEPRINT_HORIZONS.map((months) => (
@@ -141,7 +145,7 @@ export async function ReadinessBlueprintSection({
         </nav>
         {load.kind === "UNAVAILABLE" ? (
           <p className="cq-body text-(--cq-text-secondary)" data-state="error">
-            Your plan couldn&apos;t load. Reload to try again.
+            {t("Your plan couldn't load. Reload to try again.")}
           </p>
         ) : (
           <BlueprintBody blueprint={load.blueprint} />

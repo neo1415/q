@@ -89,6 +89,7 @@ export {
 } from "./language.js";
 export {
   READINESS_LEAD_ARABIC_STEPS,
+  READINESS_STEPS_ARABIC,
   readinessLeadCopy,
   type ReadinessLeadCopy,
 } from "./readiness-lead-copy.js";

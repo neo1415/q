@@ -10,6 +10,7 @@ import { useGlobalQ } from "@/components/app-shell/global-q";
 
 import { markPlanStepAction } from "./readiness-actions";
 import { ReadinessStatusBadge } from "./readiness-status";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The action plan (Q.04): what to improve, why it matters to investors,
@@ -57,6 +58,7 @@ function doneLine(action: ReadinessAction): string {
 }
 
 function PlanCard({ action }: { readonly action: ReadinessAction }) {
+  const t = useT();
   const router = useRouter();
   const { askNow } = useGlobalQ();
   const [pending, startTransition] = useTransition();
@@ -90,28 +92,29 @@ function PlanCard({ action }: { readonly action: ReadinessAction }) {
       <h4
         className={`cq-body font-semibold text-(--cq-text-primary) ${action.state === "OPEN" ? "" : "line-through decoration-(--cq-text-tertiary)"}`}
       >
-        {action.title}
+        {t(action.title)}
       </h4>
       {action.state === "OPEN" ? (
         <dl className="cq-body-sm grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-          <dt className="text-(--cq-text-tertiary)">Why</dt>
-          <dd className="text-(--cq-text-secondary)">{action.why}</dd>
-          <dt className="text-(--cq-text-tertiary)">Next</dt>
-          <dd className="text-(--cq-text-secondary)">{action.next}</dd>
-          <dt className="text-(--cq-text-tertiary)">Done when</dt>
-          <dd className="text-(--cq-text-secondary)">{action.doneWhen}</dd>
-          <dt className="text-(--cq-text-tertiary)">Owner</dt>
-          <dd className="text-(--cq-text-secondary)">{action.ownerLabel}</dd>
+          <dt className="text-(--cq-text-tertiary)">{t("Why")}</dt>
+          <dd className="text-(--cq-text-secondary)">{t(action.why)}</dd>
+          <dt className="text-(--cq-text-tertiary)">{t("Next")}</dt>
+          <dd className="text-(--cq-text-secondary)">{t(action.next)}</dd>
+          <dt className="text-(--cq-text-tertiary)">{t("Done when")}</dt>
+          <dd className="text-(--cq-text-secondary)">{t(action.doneWhen)}</dd>
+          <dt className="text-(--cq-text-tertiary)">{t("Owner")}</dt>
+          <dd className="text-(--cq-text-secondary)">{t(action.ownerLabel)}</dd>
         </dl>
       ) : (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          {doneLine(action)}
+          {t(doneLine(action))}
         </p>
       )}
       {action.state === "OPEN" && action.askQ !== null ? (
         <p className="cq-caption flex items-start gap-2 border-t border-dashed border-(--cq-border) pt-2 text-(--cq-text-secondary)">
-          Q can do this for you. It prepares it and nothing is saved until you
-          approve it.
+          {t(
+            "Q can do this for you. It prepares it and nothing is saved until you approve it.",
+          )}
         </p>
       ) : null}
       <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -123,7 +126,7 @@ function PlanCard({ action }: { readonly action: ReadinessAction }) {
             }}
             className="cq-label inline-flex min-h-11 items-center bg-(--cq-accent) px-3 text-(--cq-text-inverse) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
           >
-            Let Q do it
+            {t("Let Q do it")}
           </button>
         ) : null}
         {action.state === "OPEN" && action.href !== null ? (
@@ -143,7 +146,7 @@ function PlanCard({ action }: { readonly action: ReadinessAction }) {
               disabled={pending}
               onChange={(event) => toggle(event.target.checked)}
             />
-            {action.state === "MARKED_DONE" ? "Done" : "Mark done"}
+            {t(action.state === "MARKED_DONE" ? "Done" : "Mark done")}
           </label>
         )}
       </div>
@@ -161,6 +164,7 @@ export function ActionPlanBoard({
 }: {
   readonly readiness: ReadinessDto;
 }) {
+  const t = useT();
   const [shown, setShown] = useState<Column>("NOW");
   const byColumn = (column: Column) =>
     readiness.actions.filter((action) => columnOf(action) === column);
@@ -169,7 +173,7 @@ export function ActionPlanBoard({
     <div className="flex flex-col gap-4" data-action-plan>
       <div
         role="tablist"
-        aria-label="Plan columns"
+        aria-label={t("Plan columns")}
         className="flex gap-1 border border-(--cq-border) p-1 lg:hidden"
       >
         {COLUMNS.map((column) => (

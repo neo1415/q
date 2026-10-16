@@ -12,6 +12,7 @@ import { QMarkdown } from "@/features/q/markdown";
 
 import { removeMyGuideAction, saveMyGuideAction } from "./etiquette-actions";
 import { EMPTY_DRAFT, GuideInput, type GuideDraft } from "./guide-input";
+import { useT } from "@/features/i18n/language";
 
 /**
  * How Q speaks for you (ADR 0050): the person's own guide to their tone,
@@ -40,6 +41,7 @@ export function MyGuide({
 }: {
   readonly initial: MyEtiquetteGuideDto;
 }) {
+  const t = useT();
   const [mine, setMine] = useState(initial);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<GuideDraft>(EMPTY_DRAFT);
@@ -98,7 +100,7 @@ export function MyGuide({
   // A row of the Settings card's list: its term is read by screen readers.
   return (
     <div className="px-5 py-4">
-      <dt className="sr-only">Your guide</dt>
+      <dt className="sr-only">{t("Your guide")}</dt>
       <dd className="flex flex-col gap-4">
         <p className="cq-body-sm text-(--cq-text-secondary)">
           Tell Q how you like to come across when it writes or speaks for you:
@@ -111,7 +113,7 @@ export function MyGuide({
         {editing ? (
           <div className="flex flex-col gap-3">
             <GuideInput
-              label="Your guide"
+              label={t("Your guide")}
               placeholder={PLACEHOLDER}
               maxCharacters={PERSONAL_ETIQUETTE_TEXT_MAX}
               draft={draft}
@@ -131,13 +133,13 @@ export function MyGuide({
                 onClick={() => setEditing(false)}
                 disabled={pending}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
             </div>
           </div>
         ) : guide === null ? (
           <div>
-            <Button onClick={startEditing}>Write your guide</Button>
+            <Button onClick={startEditing}>{t("Write your guide")}</Button>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -151,7 +153,7 @@ export function MyGuide({
             </div>
             <div className="flex flex-wrap gap-2">
               <Button onClick={startEditing} disabled={pending}>
-                Replace
+                {t("Replace")}
               </Button>
               <Button variant="quiet" onClick={remove} disabled={pending}>
                 {pending ? "Removing…" : "Remove"}

@@ -8,6 +8,7 @@ import { Textarea } from "@capital-q/ui/input";
 import { Select } from "@capital-q/ui/select";
 
 import { requestReviewAction, type FormResult } from "./review-actions";
+import { useT } from "@/features/i18n/language";
 
 export const SUBJECT_OPTIONS = [
   { value: "VERIFICATION_DECISION", label: "A verification decision" },
@@ -29,6 +30,7 @@ export function ReviewForm({
   readonly subject: string;
   readonly subjectRef: string | null;
 }) {
+  const t = useT();
   const router = useRouter();
   const [subjectType, setSubjectType] = useState(
     SUBJECT_OPTIONS.some((o) => o.value === subject) ? subject : "OTHER",
@@ -64,15 +66,17 @@ export function ReviewForm({
     >
       <Select
         id={subjectId}
-        label="What should a person look at?"
+        label={t("What should a person look at?")}
         value={subjectType}
         options={SUBJECT_OPTIONS}
         onChange={(event) => setSubjectType(event.target.value)}
       />
       <Textarea
         id={reasonId}
-        label="Why"
-        description="In your own words. If you have new evidence, add it to your profile or documents first; the reviewer reads it there."
+        label={t("Why")}
+        description={t(
+          "In your own words. If you have new evidence, add it to your profile or documents first; the reviewer reads it there.",
+        )}
         value={reason}
         onChange={(event) => setReason(event.target.value)}
       />

@@ -236,7 +236,7 @@ export function NotificationCenter() {
                     className="cq-body-sm min-h-11 underline"
                     onClick={() => void load()}
                   >
-                    Try again
+                    {t("Try again")}
                   </button>
                 }
                 compact

@@ -98,7 +98,7 @@ export default async function DocumentsPage({
           (first?.ok === true ? first.value.items.length : 0) +
           (owner?.documents.length ?? 0)
         }
-        label="your documents"
+        label={t("your documents")}
       >
         <PageHeader title={t("Documents")} />
         {companyId === null ? null : (

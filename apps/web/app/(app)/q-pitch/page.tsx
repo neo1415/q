@@ -9,6 +9,7 @@ import { atlasChapters, tourOptions } from "@/features/q-pitch/atlas";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
 import { resolveTourSubject } from "@/features/q-pitch/subject";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Q Pitch" };
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export const dynamic = "force-dynamic";
  * accounts; nothing here grants access to anything.
  */
 export default async function QPitchPage() {
+  const t = await serverT();
   if (!qPitchEnabled()) notFound();
   const context = await resolveOwnContext();
   const now = new Date().toISOString();
@@ -28,8 +30,10 @@ export default async function QPitchPage() {
   if (context.kind !== "INVESTOR") {
     return (
       <PageContainer width="reading">
-        <QSection id="q-pitch" kind="PITCH" label="the Capital Q tour">
-          <h1 className="cq-title-xl text-(--cq-text-primary)">Q Pitch</h1>
+        <QSection id="q-pitch" kind="PITCH" label={t("the Capital Q tour")}>
+          <h1 className="cq-title-xl text-(--cq-text-primary)">
+            {t("Q Pitch")}
+          </h1>
           <p className="mt-3 cq-body text-(--cq-text-secondary)">
             {context.kind === "FOUNDER"
               ? "The guided tour is written for an investor workspace today. A founder edition has not been built yet, so there is nothing to start here."
@@ -45,12 +49,12 @@ export default async function QPitchPage() {
   const chapters = atlasChapters(now);
   return (
     <PageContainer width="reading">
-      <QSection id="q-pitch" kind="PITCH" label="the Capital Q tour">
-        <h1 className="cq-title-xl text-(--cq-text-primary)">Q Pitch</h1>
+      <QSection id="q-pitch" kind="PITCH" label={t("the Capital Q tour")}>
+        <h1 className="cq-title-xl text-(--cq-text-primary)">{t("Q Pitch")}</h1>
         <p className="mt-3 cq-body text-(--cq-text-secondary)">
-          Q guides you through the real app. These are internal rehearsals of a
-          draft script on demonstration data. You can pause, go back, skip or
-          ask a question at any point.
+          {t(
+            "Q guides you through the real app. These are internal rehearsals of a draft script on demonstration data. You can pause, go back, skip or ask a question at any point.",
+          )}
         </p>
         <p className="mt-2 cq-body-sm text-(--cq-text-secondary)">
           {subject === null
@@ -58,7 +62,9 @@ export default async function QPitchPage() {
             : `Subject company: ${subject.name}, as its founder has made it visible to you.`}
         </p>
 
-        <h2 className="mt-8 cq-title text-(--cq-text-primary)">Guided tours</h2>
+        <h2 className="mt-8 cq-title text-(--cq-text-primary)">
+          {t("Guided tours")}
+        </h2>
         <ul className="mt-3 flex flex-col gap-3">
           {options.map((option) => (
             <li
@@ -76,18 +82,19 @@ export default async function QPitchPage() {
               </div>
               {/* A full load: the layout-mounted host reads the address once. */}
               <a href={option.href} className={buttonClassName("primary")}>
-                Start
+                {t("Start")}
               </a>
             </li>
           ))}
         </ul>
 
         <h2 className="mt-8 cq-title text-(--cq-text-primary)">
-          Feature Atlas
+          {t("Feature Atlas")}
         </h2>
         <p className="mt-2 cq-body-sm text-(--cq-text-secondary)">
-          Start at any chapter. Chapters marked internal show code-verified
-          behaviour without a browser receipt yet.
+          {t(
+            "Start at any chapter. Chapters marked internal show code-verified behaviour without a browser receipt yet.",
+          )}
         </p>
         <ul className="mt-3 flex flex-col gap-2">
           {chapters.map((chapter) => (
@@ -104,7 +111,7 @@ export default async function QPitchPage() {
                 </span>
               </span>
               <a href={chapter.href} className={buttonClassName("secondary")}>
-                Open
+                {t("Open")}
               </a>
             </li>
           ))}

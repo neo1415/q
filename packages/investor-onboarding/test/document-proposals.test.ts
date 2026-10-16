@@ -34,14 +34,15 @@ const NODES: Readonly<Record<string, string>> = {
   "business_model:b2b software": "bm-b2b",
   "business_model:marketplaces": "bm-market",
   "customer_type:smes": "ct-sme",
+  "customer_type:sme": "ct-sme",
 };
 
-function constraint(dimension: string, value: string) {
+function constraint(dimension: string, value: string, quote = value) {
   return {
     dimension,
     constraintDimension: null,
     value,
-    quote: value,
+    quote,
     preferenceClass: "PREFERENCE",
     proposesExclusion: false,
     confidence: "0.8",
@@ -58,6 +59,13 @@ function world(options: {
     value: unknown;
     sourceRefs: unknown;
     rationale: unknown;
+  }[] = [];
+  const asked: {
+    stepKey: string;
+    reason: string;
+    readings: readonly string[];
+    question: string;
+    sourceRefs: unknown;
   }[] = [];
   const reading = {
     constraints: options.constraints ?? [],
@@ -107,7 +115,18 @@ function world(options: {
       });
       return Promise.resolve(null);
     },
-    recordQuestions: () => Promise.resolve(null),
+    recordQuestions: (command) => {
+      for (const q of command.questions) {
+        asked.push({
+          stepKey: q.stepKey,
+          reason: q.reason,
+          readings: q.readings,
+          question: q.question,
+          sourceRefs: q.sourceRefs,
+        });
+      }
+      return Promise.resolve(null);
+    },
     documents: {
       findInTenant: () =>
         Promise.resolve({
@@ -129,7 +148,7 @@ function world(options: {
       documentId: DOCUMENT,
       documentVersionId: "e0000000-0000-4000-8000-000000000001",
     });
-  return { read, proposed };
+  return { read, proposed, asked };
 }
 
 describe("splitNameList", () => {
@@ -139,6 +158,8 @@ describe("splitNameList", () => {
     ["companies based in Kenya", ["Kenya"]],
     ["Kenya; Ghana & Nigeria.", ["Kenya", "Ghana", "Nigeria"]],
     ["Kenya, kenya", ["Kenya"]],
+    ["companies that sell to SMEs", ["SMEs"]],
+    ["software for SMEs and mid-market firms", ["SMEs", "mid-market firms"]],
   ])("%s", (value, names) => {
     expect(splitNameList(value)).toEqual(names);
   });
@@ -220,12 +241,20 @@ describe("a fund deck's country list (ob2)", () => {
     );
   });
 
-  it("proposes nothing when no country matches", async () => {
-    const { read, proposed } = world({
+  it("proposes nothing when no country matches, and asks with the words it read", async () => {
+    const { read, proposed, asked } = world({
       constraints: [constraint("geography", "Atlantis and Narnia")],
     });
     await read();
     expect(proposed).toEqual([]);
+    expect(asked).toEqual([
+      expect.objectContaining({
+        stepKey: "I3.geography",
+        reason: "MATERIAL_GAP",
+        readings: ["Atlantis", "Narnia"],
+        sourceRefs: CITATION,
+      }),
+    ]);
   });
 });
 
@@ -240,7 +269,7 @@ describe("a fund deck's business models, customers, criteria and portfolio (ob2)
           "Founders who know their market first-hand",
         ),
       ],
-      text: "Portfolio (fictional): Kijani Ledger, Savanna Freight Desk.",
+      text: "We look for founders who know their market first-hand.\nPortfolio (fictional): Kijani Ledger, Savanna Freight Desk.",
     });
     await expect(read()).resolves.toMatchObject({
       kind: "PREPARED",
@@ -290,5 +319,89 @@ describe("a fund deck's business models, customers, criteria and portfolio (ob2)
         },
       ],
     ]);
+  });
+});
+
+describe("customer types and criteria a fund deck states (ob2, release AB)", () => {
+  it("'companies that sell to SMEs' is the SME customer type", async () => {
+    const { read, proposed, asked } = world({
+      constraints: [
+        constraint("customer_types", "companies that sell to SMEs"),
+      ],
+    });
+    await read();
+    expect(proposed.map((p) => [p.stepKey, p.value])).toEqual([
+      [
+        "I4.customer_types",
+        {
+          type: "RESOURCE_REFERENCE",
+          resourceType: "TAXONOMY_NODE",
+          resourceIds: ["ct-sme"],
+        },
+      ],
+    ]);
+    expect(asked).toEqual([]);
+  });
+
+  it("a customer phrase that matches nothing is asked about by name, citing the deck", async () => {
+    const { read, proposed, asked } = world({
+      constraints: [constraint("customer_types", "Martian co-operatives")],
+    });
+    await read();
+    expect(proposed).toEqual([]);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toMatchObject({
+      stepKey: "I4.customer_types",
+      reason: "MATERIAL_GAP",
+      readings: ["Martian co-operatives"],
+      sourceRefs: CITATION,
+    });
+    expect(asked[0]?.question).toContain('"Martian co-operatives"');
+  });
+
+  it("founder, team and traction criteria become custom criteria in the deck's words, never founder preferences", async () => {
+    const { read, proposed } = world({
+      constraints: [
+        constraint(
+          "founder_preferences",
+          "Founder-market fit",
+          "founders who know their market first-hand",
+        ),
+        constraint("green_flags", "repeat customers", "repeat customers"),
+        constraint(
+          "revenue_state",
+          "early revenue",
+          "early revenue or paying pilots",
+        ),
+      ],
+      text: "We look for founders who know their market first-hand. Green flags: repeat customers. We prefer early revenue or paying pilots.",
+    });
+    await read();
+    expect(proposed.map((p) => p.stepKey)).toEqual(["I6.custom_criteria"]);
+    expect(proposed[0]).toMatchObject({
+      value: {
+        type: "TEXT",
+        text: "founders who know their market first-hand\nrepeat customers\nearly revenue or paying pilots",
+      },
+      sourceRefs: CITATION,
+    });
+    expect(proposed.some((p) => p.stepKey === "I5.founder_preferences")).toBe(
+      false,
+    );
+  });
+
+  it("a criterion the deck does not say verbatim is not offered", async () => {
+    const { read, proposed } = world({
+      constraints: [
+        constraint(
+          "founder_preferences",
+          "Strong technical founders",
+          "strong technical founders",
+        ),
+      ],
+      text: "We back teams with engineering depth.",
+    });
+    await read();
+    expect(proposed).toEqual([]);
   });
 });

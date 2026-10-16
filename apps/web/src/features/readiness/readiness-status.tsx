@@ -1,3 +1,6 @@
+"use client";
+
+import { useT } from "@/features/i18n/language";
 import {
   READINESS_STATUS_LABELS,
   type ReadinessStatus,
@@ -71,6 +74,7 @@ export function ReadinessStatusBadge({
   /** Shown after the word in a tally ("Gap 2"). */
   readonly count?: number | undefined;
 }) {
+  const t = useT();
   return (
     <span
       className={`cq-label inline-flex shrink-0 items-center gap-1.5 py-0.5 ps-2 pe-2.5 whitespace-nowrap ${TONE[status]}`}
@@ -79,7 +83,7 @@ export function ReadinessStatusBadge({
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
         <Shape status={status} />
       </svg>
-      {READINESS_STATUS_LABELS[status]}
+      {t(READINESS_STATUS_LABELS[status])}
       {count === undefined ? null : ` ${String(count)}`}
     </span>
   );

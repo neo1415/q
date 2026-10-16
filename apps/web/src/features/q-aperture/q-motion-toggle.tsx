@@ -55,7 +55,7 @@ export function QMotionToggle({
             choice === option ? "is-active" : "",
           )}
         >
-          {Q_MOTION_LABELS[option]}
+          {t(Q_MOTION_LABELS[option])}
         </button>
       ))}
       {reduced ? (

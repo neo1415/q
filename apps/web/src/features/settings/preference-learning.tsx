@@ -80,7 +80,7 @@ export function PreferenceLearningAsk({
       data-q-learning-ask
     >
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        {PREFERENCE_LEARNING_QUESTION}
+        {t(PREFERENCE_LEARNING_QUESTION)}
       </p>
       <div className="flex flex-wrap gap-2">
         <Button

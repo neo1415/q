@@ -49,6 +49,7 @@ import {
   horizonFrom,
   ReadinessBlueprintSection,
 } from "./readiness-blueprint";
+import { serverT } from "@/features/i18n/server";
 
 /**
  * Capital (founder direction 2026-10-04: "is capital divided into
@@ -142,6 +143,7 @@ export async function CapitalScreen({
   /** Q.04: the plan horizon from `?horizon=3|6|12`; anything else is 6. */
   readonly horizon?: string | undefined;
 } = {}) {
+  const t = await serverT();
   const context = await resolveOwnContext();
   if (context.kind === "FOUNDER") {
     const companyId = context.companyId;
@@ -194,14 +196,14 @@ export async function CapitalScreen({
     <div className="flex flex-col gap-10">
       {context.kind === "INVESTOR" ? (
         <>
-          <PageSection id="commitments" title="My commitments">
+          <PageSection id="commitments" title={t("My commitments")}>
             {mine === null ? (
               <QuietEmpty sentence="Your commitments couldn't load." retry />
             ) : (
               <InvestorBook mine={mine} />
             )}
           </PageSection>
-          <PageSection id="mandate" title="Your mandate">
+          <PageSection id="mandate" title={t("Your mandate")}>
             <MandateSummary
               investorOrganisationId={context.investorOrganisationId}
             />
@@ -211,7 +213,7 @@ export async function CapitalScreen({
           </PageSection>
         </>
       ) : (
-        <PageSection id="rounds" title="Your raise">
+        <PageSection id="rounds" title={t("Your raise")}>
           <QuietEmpty sentence="Your rounds couldn't load." retry />
         </PageSection>
       )}
@@ -237,6 +239,7 @@ export async function FounderTab({
   readonly context: FounderContext;
   readonly horizon: BlueprintHorizon;
 }) {
+  const t = await serverT();
   switch (tab) {
     case "overview": {
       const [ledger, readiness] = await Promise.all([
@@ -261,7 +264,7 @@ export async function FounderTab({
         ledgerOf(context.companyId),
       ]);
       return (
-        <PageSection id="rounds" title="Your raise">
+        <PageSection id="rounds" title={t("Your raise")}>
           {/* Q room R1: every round on this page, by id, for Q. */}
           {ledger === null ? null : (
             <QSection
@@ -308,8 +311,10 @@ export async function FounderTab({
       return (
         <PageSection
           id="readiness"
-          title="Readiness"
-          description="How ready your company looks to an investor today, from what you have shared. Each pillar in words, with the evidence behind it."
+          title={t("Readiness")}
+          description={t(
+            "How ready your company looks to an investor today, from what you have shared. Each pillar in words, with the evidence behind it.",
+          )}
         >
           <div className="flex flex-col gap-4">
             <PrivateNote />
@@ -327,8 +332,10 @@ export async function FounderTab({
       return (
         <PageSection
           id="action-plan"
-          title="Action plan"
-          description="Built from your readiness gaps. Steps close themselves when Q sees the evidence."
+          title={t("Action plan")}
+          description={t(
+            "Built from your readiness gaps. Steps close themselves when Q sees the evidence.",
+          )}
         >
           <div className="flex flex-col gap-4">
             <PrivateNote />

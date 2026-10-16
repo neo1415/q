@@ -1,6 +1,7 @@
 "use client";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { useT } from "@/features/i18n/language";
 
 /**
  * One-tap asks to Q (founder direction 2026-09-29: states and actions, not
@@ -11,9 +12,10 @@ export function AskQChips({
 }: {
   readonly asks: readonly { readonly label: string; readonly prompt: string }[];
 }) {
+  const t = useT();
   const { askNow } = useGlobalQ();
   return (
-    <ul className="flex flex-wrap gap-2" aria-label="Ask Q">
+    <ul className="flex flex-wrap gap-2" aria-label={t("Ask Q")}>
       {asks.map((ask) => (
         <li key={ask.label}>
           <button

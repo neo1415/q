@@ -7,6 +7,7 @@ import type { ThesisReadingDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
 import { applySuggestionAction } from "@/features/assumptions/assumption-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q.02 "How Q reads your thesis" (2026-10-07; design "thesis"): what the
@@ -23,6 +24,7 @@ export function ThesisSection({
   readonly reading: ThesisReadingDto;
   readonly investorOrganisationId: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const [hidden, setHidden] = useState<readonly string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -65,22 +67,24 @@ export function ThesisSection({
     >
       <div className="flex flex-col gap-1">
         <h2 id="thesis-title" className="cq-title-md text-(--cq-text-primary)">
-          How Q reads your thesis
+          {t("How Q reads your thesis")}
         </h2>
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          What you declared decides your feed. What you did and what Q reads
-          from it are shown apart, and never change your rules unless you
-          approve.
+          {t(
+            "What you declared decides your feed. What you did and what Q reads from it are shown apart, and never change your rules unless you approve.",
+          )}
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         <div className="flex flex-col gap-2" data-thesis-declared>
           <h3 className="cq-title-sm text-(--cq-text-primary)">
-            What you declared
+            {t("What you declared")}
           </h3>
           {reading.declared.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              No active mandate yet. Your answers above become your rules.
+              {t(
+                "No active mandate yet. Your answers above become your rules.",
+              )}
             </p>
           ) : (
             <dl className="flex flex-col divide-y divide-(--cq-border-subtle)">
@@ -101,7 +105,9 @@ export function ThesisSection({
           )}
         </div>
         <div className="flex flex-col gap-2" data-thesis-observed>
-          <h3 className="cq-title-sm text-(--cq-text-primary)">What you did</h3>
+          <h3 className="cq-title-sm text-(--cq-text-primary)">
+            {t("What you did")}
+          </h3>
           <p className="cq-body-sm text-(--cq-text-secondary)">
             Saved {String(reading.observed.saved)} · Passed{" "}
             {String(reading.observed.passed)}
@@ -134,19 +140,19 @@ export function ThesisSection({
             )}
           </ul>
           <p className="cq-caption text-(--cq-text-tertiary)">
-            Saving isn&rsquo;t interest, and viewing counts for nothing here.
+            {t("Saving isn’t interest, and viewing counts for nothing here.")}
           </p>
         </div>
         <div className="flex flex-col gap-2" data-thesis-inferred>
           <h3 className="cq-title-sm flex flex-wrap items-center gap-2 text-(--cq-text-primary)">
-            What Q reads from it
+            {t("What Q reads from it")}
             <span className="cq-caption border border-dashed border-(--cq-border) px-1.5 text-(--cq-text-secondary)">
-              Q&rsquo;s inference
+              {t("Q’s inference")}
             </span>
           </h3>
           {reading.inferred.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              Not enough saves and passes yet for Q to read anything.
+              {t("Not enough saves and passes yet for Q to read anything.")}
             </p>
           ) : (
             reading.inferred.map((line) => (
@@ -164,7 +170,9 @@ export function ThesisSection({
       </div>
       {suggestions.length === 0 ? null : (
         <div className="flex flex-col gap-3" data-thesis-suggestions>
-          <h3 className="cq-title-sm text-(--cq-text-primary)">Q suggests</h3>
+          <h3 className="cq-title-sm text-(--cq-text-primary)">
+            {t("Q suggests")}
+          </h3>
           {suggestions.map((suggestion) => (
             <div
               key={suggestion.id}
@@ -183,7 +191,7 @@ export function ThesisSection({
                   onClick={() => approve(suggestion.id)}
                   data-apply-suggestion={suggestion.id}
                 >
-                  Approve this change
+                  {t("Approve this change")}
                 </Button>
                 <Button
                   variant="quiet"
@@ -191,7 +199,7 @@ export function ThesisSection({
                     setHidden((current) => [...current, suggestion.id])
                   }
                 >
-                  Not now
+                  {t("Not now")}
                 </Button>
               </div>
             </div>

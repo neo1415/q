@@ -92,7 +92,14 @@ function Reasons({
   );
 }
 
-function Notes({ notes }: { readonly notes: readonly DiscoveryNoteDto[] }) {
+function Notes({
+  notes,
+  t = (english: string) => english,
+}: {
+  readonly notes: readonly DiscoveryNoteDto[];
+  /** The reader's language (a server component: handed in, not a hook). */
+  readonly t?: ((english: string) => string) | undefined;
+}) {
   if (notes.length === 0) return null;
   // How the list was built, said once and quietly: it is context, not news.
   return (
@@ -107,7 +114,7 @@ function Notes({ notes }: { readonly notes: readonly DiscoveryNoteDto[] }) {
             aria-hidden="true"
             className="mt-0.5 shrink-0"
           />
-          {NOTE_TEXT[note]}
+          {t(NOTE_TEXT[note])}
         </p>
       ))}
     </div>
@@ -117,13 +124,16 @@ function Notes({ notes }: { readonly notes: readonly DiscoveryNoteDto[] }) {
 export function DiscoverCompanies({
   items,
   notes,
+  translate,
 }: {
+  /** The reader's language, from the page. */
+  readonly translate?: ((english: string) => string) | undefined;
   readonly items: readonly DiscoveredCompanyDto[];
   readonly notes: readonly DiscoveryNoteDto[];
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <Notes notes={notes} />
+      <Notes notes={notes} t={translate} />
       {items.length === 0 ? (
         <EmptyState
           title="No companies are discoverable yet."
@@ -181,7 +191,7 @@ export function DiscoverInvestors({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <Notes notes={notes} />
+      <Notes notes={notes} t={translate} />
       {items.length === 0 ? (
         <EmptyState
           title="No investors are discoverable yet."
