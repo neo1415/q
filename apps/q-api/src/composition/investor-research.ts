@@ -25,6 +25,7 @@ import {
   FOUNDER_READER_OPTIONS,
   ownWebsiteFinding,
   validateFounderReading,
+  type FounderResearchAnchors,
 } from "../voice/founder-research.js";
 
 /**
@@ -423,11 +424,13 @@ export function createFounderResearchReader(dependencies: {
             request.pages,
             request.identity.websiteUrl,
             request.identity.firmName,
+            anchorsOf(request.identity),
           )
         : ownWebsiteFinding(
             request.pages,
             request.identity.websiteUrl,
             request.identity.firmName,
+            anchorsOf(request.identity),
           );
     } catch (error: unknown) {
       logger?.warn(
@@ -440,7 +443,19 @@ export function createFounderResearchReader(dependencies: {
         request.pages,
         request.identity.websiteUrl,
         request.identity.firmName,
+        anchorsOf(request.identity),
       );
     }
+  };
+}
+
+/** What ties a page to this company, not a namesake (lane ob1). */
+function anchorsOf(identity: {
+  readonly personName?: string | null | undefined;
+  readonly country?: string | null | undefined;
+}): FounderResearchAnchors {
+  return {
+    personName: identity.personName ?? null,
+    country: identity.country ?? null,
   };
 }

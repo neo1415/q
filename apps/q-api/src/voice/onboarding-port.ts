@@ -400,6 +400,7 @@ export function createOnboardingPort(input: {
               resourceType,
               resourceIds: [suggested],
             },
+            channel: "CONVERSATION",
           },
           expectedSessionVersion: view.session.version,
         },
@@ -606,7 +607,12 @@ export function createOnboardingPort(input: {
         input.onboardingSessionId,
         {
           stepKey,
-          response: { value, ...(note === undefined ? {} : { note }) },
+          response: {
+            value,
+            ...(note === undefined ? {} : { note }),
+            // Given in the conversation with Q, not the form (lane ob1).
+            channel: "CONVERSATION",
+          },
           expectedSessionVersion: view.session.version,
         },
         randomUUID(),
@@ -2025,10 +2031,13 @@ export function createOnboardingPort(input: {
           const value = OnboardingResponseValueSchema.parse(
             write.response.value,
           );
-          const response =
-            write.response.note === undefined
-              ? { value }
-              : { value, note: write.response.note };
+          const response = {
+            value,
+            ...(write.response.note === undefined
+              ? {}
+              : { note: write.response.note }),
+            channel: "CONVERSATION" as const,
+          };
           latest = await settle(
             await submitOnboardingResponse(
               input.session,

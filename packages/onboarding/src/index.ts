@@ -341,3 +341,9 @@ export {
   onboardingDocumentTreatment,
   type OnboardingDocumentTreatment,
 } from "./application/documents.js";
+export {
+  createOwnOnboardingTranscriptReader,
+  type OwnOnboardingTranscriptReader,
+  type OwnTranscriptLine,
+  type OwnTranscriptSession,
+} from "./application/own-transcript.js";

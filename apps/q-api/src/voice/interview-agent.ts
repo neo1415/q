@@ -10,7 +10,10 @@ import {
   type ModelMessage,
   type OnboardingSessionView,
 } from "@capital-q/contracts";
-import { FOUNDER_STEPS } from "@capital-q/founder-onboarding";
+import {
+  COUNTRY_OPTIONS_V5,
+  FOUNDER_STEPS,
+} from "@capital-q/founder-onboarding";
 import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
 import {
   acceptStructuredOutput,
@@ -407,6 +410,20 @@ export type JourneyOpenings = {
   readonly givenEarlier?:
     readonly { readonly stepKey: string; readonly words: string }[] | undefined;
 };
+
+/** The company's country on the record, in words: a research anchor (lane ob1). */
+function countryLabelOf(view: OnboardingSessionView | null): string | null {
+  const value = view?.responses.find(
+    (r) => r.stepKey === FOUNDER_STEPS.country,
+  )?.value;
+  if (value?.type !== "SINGLE_SELECT" || value.optionKey === "other") {
+    return null;
+  }
+  return (
+    COUNTRY_OPTIONS_V5.find((o) => o.optionKey === value.optionKey)?.label ??
+    null
+  );
+}
 
 export function turnNotesFor(input: {
   readonly pausing: boolean;
@@ -895,6 +912,8 @@ export function createInterviewAgent(
               : textAnswerOf(view, FOUNDER_STEPS.website) || null),
           profileUrls: links?.profileUrls ?? [],
           personName: input.signup?.displayName ?? null,
+          country:
+            input.journeyType === "founder" ? countryLabelOf(view) : null,
         },
       }) ?? false;
     const linksTool =

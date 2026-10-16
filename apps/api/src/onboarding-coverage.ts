@@ -80,7 +80,17 @@ export function createOnboardingCoverageReader(dependencies: {
              where d.company_id = ${view.session.subject.id}
                and d.status = 'ACTIVE'
              limit 40`
-        : Promise.resolve([]),
+        : view.session.subject?.type === "INVESTOR_ORGANISATION"
+          ? // An investor's own uploads (fund deck, thesis, LP letter):
+            // types only, theirs only.
+            sql`
+              select distinct d.document_type
+                from evidence.documents d
+               where d.created_by_user_id = ${actor.userId}
+                 and d.company_id is null
+                 and d.status = 'ACTIVE'
+               limit 40`
+          : Promise.resolve([]),
       pending.listPending(sql, view.session.id, actor.userId),
     ]);
     const registration = registrationRows[0];

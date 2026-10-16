@@ -106,6 +106,7 @@ export function viewOf(
         value,
         sourceModality: "VOICE_TRANSCRIPT" as const,
         note: null,
+        channel: null,
         createdAt: NOW.toISOString(),
       })),
     pendingQuestions: (extra.contradictions ?? []).map((c) => ({
