@@ -213,7 +213,7 @@ export function deckReadSection(
       where === null
         ? null
         : `${where} · ${downloadable ? "deck can be downloaded" : "deck is view only"}`,
-    askHref: `/q?ask=${encodeURIComponent(`About ${companyName}'s ${label.toLowerCase()}: `)}`,
+    askHref: `/home?ask=${encodeURIComponent(`About ${companyName}'s ${label.toLowerCase()}: `)}`,
     askLabel: `Ask Q about ${label.toLowerCase()}`,
   };
 }
@@ -387,6 +387,34 @@ export function ReadCarousel({
   const chips = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(index);
 
+  // The parent's callback is read through a ref so a new function on every
+  // render (an inline arrow) never re-subscribes the observer. Re-subscribing
+  // fired its initial callback on each render, which set the parent's state
+  // and scrolled the page back to the chips: the Overview "jump" (sc,
+  // 2026-10-16).
+  const report = useRef(onIndex);
+  useEffect(() => {
+    report.current = onIndex;
+  }, [onIndex]);
+
+  // Only the chip strip moves sideways; never scrollIntoView, which also
+  // scrolls every scrollable ancestor (the page) to bring the chip in view.
+  const revealChip = useCallback((at: number) => {
+    const strip = chips.current;
+    const chip = strip?.children[at];
+    if (
+      strip === null ||
+      !(chip instanceof HTMLElement) ||
+      typeof strip.scrollTo !== "function"
+    )
+      return;
+    const left = chip.offsetLeft;
+    const right = left + chip.offsetWidth;
+    if (left < strip.scrollLeft) strip.scrollTo({ left });
+    else if (right > strip.scrollLeft + strip.clientWidth)
+      strip.scrollTo({ left: right - strip.clientWidth });
+  }, []);
+
   const go = useCallback(
     (next: number) => {
       const clamped = Math.max(0, Math.min(sections.length - 1, next));
@@ -399,9 +427,9 @@ export function ReadCarousel({
       ) {
         root.scrollTo({ left: card.offsetLeft, behavior: "smooth" });
       }
-      onIndex(clamped);
+      report.current(clamped);
     },
-    [sections.length, onIndex],
+    [sections.length],
   );
 
   // Only an outside pick (the summary grid) moves the track here.
@@ -414,7 +442,7 @@ export function ReadCarousel({
   }, [index, go]);
 
   // A section asked for from outside (Q, a link) is where the track opens,
-  // before the observer reads which card is in view.
+  // before the observer reads which card is in view. Horizontal only.
   const opening = useRef(index);
   useEffect(() => {
     const root = track.current;
@@ -440,12 +468,13 @@ export function ReadCarousel({
               root.children,
               entry.target,
             );
-            if (at >= 0) {
+            // Report only a change of card, so the observer's first
+            // callback (or a repeat) never sets the parent's state.
+            if (at >= 0 && at !== shown.current) {
+              shown.current = at;
               setVisible(at);
-              onIndex(at);
-              const chip = chips.current?.children[at];
-              if (chip instanceof HTMLElement)
-                chip.scrollIntoView({ block: "nearest", inline: "nearest" });
+              report.current(at);
+              revealChip(at);
             }
           }
         }
@@ -454,7 +483,7 @@ export function ReadCarousel({
     );
     for (const child of Array.from(root.children)) observer.observe(child);
     return () => observer.disconnect();
-  }, [onIndex]);
+  }, [sections.length, revealChip]);
 
   const onKey = (event: KeyboardEvent) => {
     if (event.key === "ArrowRight") {

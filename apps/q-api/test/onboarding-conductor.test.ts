@@ -424,6 +424,52 @@ describe("Q leads", () => {
     }
   });
 
+  it("a section link resumed in Arabic: the section's hand question, kept once as said", async () => {
+    const base = stuckView();
+    const view: OnboardingSessionView = {
+      ...base,
+      progress: {
+        ...base.progress,
+        eligibleSteps: [
+          ...base.progress.eligibleSteps,
+          { stepKey: "F9.moats", required: false, status: "PENDING" },
+        ],
+      },
+    };
+    const kept = [
+      { role: "Q" as const, text: "Hi Aria, welcome to Capital Q." },
+      { role: "PERSON" as const, text: "مرحبا" },
+    ];
+    const { fetch: f, appended } = api({ kept });
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!"))),
+      portFor: fakePorts(view).portFor,
+      logger,
+      languageOf: () => Promise.resolve("ar"),
+      localiseWords: (_actor, _language, texts) =>
+        Promise.resolve(texts.map((text) => `[ar] ${text}`)),
+    });
+    const outcome = await conductor.turn(input(f, "", { focus: "moats" }));
+    expect(outcome.askingAbout).toEqual(["F9.moats"]);
+    expect(outcome.reply).toContain("ما الذي يجعل موقعكم صعب التقليد؟");
+    expect(outcome.reply).not.toMatch(/hard to copy/iu);
+    await tick();
+    // What is kept is the reply as said, in Arabic; a second open with it
+    // already last keeps nothing more.
+    expect(appended).toEqual([outcome.reply]);
+    const again = api({ kept: [...kept, { role: "Q", text: outcome.reply }] });
+    await createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!"))),
+      portFor: fakePorts(view).portFor,
+      logger,
+      languageOf: () => Promise.resolve("ar"),
+      localiseWords: (_actor, _language, texts) =>
+        Promise.resolve(texts.map((text) => `[ar] ${text}`)),
+    }).turn(input(again.fetch, "", { focus: "moats" }));
+    await tick();
+    expect(again.appended).toEqual([]);
+  });
+
   it("a reopening whose resume line is already last keeps it once, not again (live AG: twice per load)", async () => {
     const agent = fakeAgent(() => Promise.resolve(outcomeOf("Hi Aria!")));
     const line = resumeLine(stuckView(), "founder");
@@ -726,5 +772,80 @@ describe("the typed contract carries the conductor's additions", () => {
         confirming: { kind: "WEBSITE", key: "website:x.org" },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("the conductor's own lines in the person's language (ob1 live on AF)", () => {
+  const view = stuckView({ answered: ["F0.intent", "F1.company_name"] });
+  const next = nextUnansweredStep(view, "founder");
+
+  it("a chosen language: the hand step copy for its subtag, translateLines for the rest", async () => {
+    const asked: string[] = [];
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("تم الحفظ."))),
+      portFor: fakePorts().portFor,
+      logger,
+      languageOf: () => Promise.resolve("ar"),
+      localiseWords: (_actor, _language, texts) => {
+        asked.push(...texts);
+        return Promise.resolve(texts.map((text) => `[ar] ${text}`));
+      },
+    });
+    const outcome = await conductor.turn(input(api({}).fetch, "نعم"));
+    expect(outcome.reply).not.toContain(next?.question ?? "@@");
+    expect(outcome.reply.startsWith("تم الحفظ. ")).toBe(true);
+    // The step has hand Arabic: nothing needed translating.
+    expect(asked).toEqual([]);
+  });
+
+  it("any other chosen language: through translateLines", async () => {
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("C'est noté."))),
+      portFor: fakePorts().portFor,
+      logger,
+      languageOf: () => Promise.resolve("fr"),
+      localiseWords: (_actor, _language, texts) =>
+        Promise.resolve(texts.map((text) => `[fr] ${text}`)),
+    });
+    const outcome = await conductor.turn(input(api({}).fetch, "Oui."));
+    expect(outcome.reply).toBe(`C'est noté. [fr] ${next?.question ?? ""}`);
+  });
+
+  it("Automatic and their words not in English: no English line is added", async () => {
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("C'est noté."))),
+      portFor: fakePorts().portFor,
+      logger,
+      languageOf: () => Promise.resolve(null),
+    });
+    const outcome = await conductor.turn(
+      input(api({}).fetch, "Nous sommes une fintech basée à Nairobi."),
+    );
+    expect(outcome.reply).toBe("C'est noté.");
+  });
+
+  it("the resume is said in the chosen language too", async () => {
+    const { fetch: f } = api({
+      kept: [
+        { role: "Q", text: "Bienvenue." },
+        { role: "PERSON", text: "Bonjour." },
+      ],
+    });
+    const conductor = createOnboardingConductor({
+      agent: fakeAgent(() => Promise.resolve(outcomeOf("unused"))),
+      portFor: fakePorts().portFor,
+      logger,
+      languageOf: () => Promise.resolve("fr"),
+      localiseWords: (_actor, _language, texts) =>
+        Promise.resolve(texts.map((text) => `[fr] ${text}`)),
+    });
+    const outcome = await conductor.turn(input(f, "", { channel: "voice" }));
+    expect(outcome.resumed).toBe(true);
+    expect(outcome.reply).toBe(
+      resumeLine(stuckView(), "founder").replace(
+        "Picking up where we left off. ",
+        "[fr] Picking up where we left off. [fr] ",
+      ),
+    );
   });
 });

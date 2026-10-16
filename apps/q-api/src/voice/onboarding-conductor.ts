@@ -27,7 +27,11 @@ import {
 } from "./interview-steps.js";
 import type { FoundRecommendation } from "./onboarding-port.js";
 import type { PresenceFound, PresenceTrigger } from "./presence-trigger.js";
+import { languageInfo } from "@capital-q/q-core/language";
+
+import { replyLanguageOf } from "./reply-language.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import { HAND_STEP_COPY } from "./step-copy-language.js";
 import {
   answersKnownFromJourney,
   settleKnownAnswers,
@@ -149,6 +153,28 @@ export function nextUnansweredStep(
 // ---------------------------------------------------------------------------
 // Q leads
 // ---------------------------------------------------------------------------
+
+const PICKING_UP = "Picking up where we left off.";
+
+/** The resume as lines, so each can be said in the person's language. */
+export function resumeLines(
+  view: OnboardingSessionView,
+  journeyType: "founder" | "investor",
+): readonly Line[] {
+  if (view.session.status === "COMPLETED") {
+    return [
+      { text: "Your setup is complete. What would you like to look at next?" },
+    ];
+  }
+  const next = nextUnansweredStep(view, journeyType);
+  return next === null
+    ? [
+        {
+          text: "Picking up where we left off: I have what I need. Shall I finish your setup?",
+        },
+      ]
+    : [{ text: PICKING_UP }, { text: next.question, stepKey: next.stepKey }];
+}
 
 /** What Q says when a conversation already under way is opened again. */
 export function resumeLine(
@@ -483,7 +509,25 @@ export type OnboardingConductorDependencies = {
   readonly queue?: ConfirmationQueue | undefined;
   readonly serializer?: TurnSerializer | undefined;
   readonly logger: Logger;
+  /**
+   * Multilingual Q: the language they chose (a tag), or null for
+   * Automatic. With it, the conductor's own lines (resume, the next
+   * question, a look-up line, a finding) are said in that language.
+   */
+  readonly languageOf?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
+  /** Q's shared translation layer (translateLines): each line, or null. */
+  readonly localiseWords?:
+    | ((
+        actor: ActorContext,
+        language: string,
+        texts: readonly string[],
+      ) => Promise<readonly (string | null)[]>)
+    | undefined;
 };
+
+/** One line the conductor says; a step's question carries its step. */
+type Line = { readonly text: string; readonly stepKey?: string | undefined };
 
 export type OnboardingConductor = InterviewAgent & {
   /** Findings that landed between turns, for the next natural gap. */
@@ -583,6 +627,45 @@ export function createOnboardingConductor(
     );
   };
 
+  /**
+   * The conductor's lines in the reply's language (ob1 live on AF): their
+   * chosen language, or with Automatic the language of `turnText`. The
+   * language's hand step copy first (by subtag), else translateLines; a
+   * line with neither stays English. Null: Automatic and their words are
+   * not English, with no language to translate into, so no English line
+   * should be added.
+   */
+  const sayIn = async (
+    input: InterviewAgentTurnInput,
+    lines: readonly Line[],
+    turnText: string,
+  ): Promise<readonly string[] | null> => {
+    const actor = input.actor;
+    const chosen =
+      actor === undefined || dependencies.languageOf === undefined
+        ? null
+        : await dependencies.languageOf(actor).catch(() => null);
+    const language = replyLanguageOf(chosen, turnText);
+    if (language.kind === "ENGLISH") return lines.map((line) => line.text);
+    if (language.kind === "THEIRS") return null;
+    const hand = HAND_STEP_COPY[languageInfo(language.tag)?.primary ?? ""];
+    const handOf = (line: Line) =>
+      line.stepKey === undefined ? undefined : hand?.questions[line.stepKey];
+    const machine =
+      actor === undefined ||
+      dependencies.localiseWords === undefined ||
+      lines.every((line) => handOf(line) !== undefined)
+        ? []
+        : await dependencies
+            .localiseWords(
+              actor,
+              language.tag,
+              lines.map((line) => line.text),
+            )
+            .catch(() => []);
+    return lines.map((line, i) => handOf(line) ?? machine[i] ?? line.text);
+  };
+
   const resumeOpening = async (
     input: InterviewAgentTurnInput,
   ): Promise<InterviewTurnOutcome | null> => {
@@ -615,7 +698,8 @@ export function createOnboardingConductor(
     );
     // The profile section they came to fill (lane ov's Overview link,
     // ?section=): its first open step is asked on resume too (live AG
-    // 2026-10-16: a resumed conversation ignored the section).
+    // 2026-10-16: a resumed conversation ignored the section). A line with
+    // its step key, so it is said in their language like any other.
     const section =
       input.journeyType === "founder" && input.focus !== undefined
         ? FOUNDER_PROFILE_SECTIONS.find((s) => s.key === input.focus)
@@ -625,21 +709,33 @@ export function createOnboardingConductor(
         ? null
         : nextUnansweredStep(view, input.journeyType, section.stepKeys);
     const next = focused ?? nextUnansweredStep(view, input.journeyType);
-    let reply =
+    let lines: readonly Line[] =
       focused === null
-        ? resumeLine(view, input.journeyType)
-        : `Picking up where we left off. ${focused.question}`;
+        ? resumeLines(view, input.journeyType)
+        : [
+            { text: PICKING_UP },
+            { text: focused.question, stepKey: focused.stepKey },
+          ];
     let asking =
       next === null ? null : askingFor(next.stepKey, input.journeyType, view);
     // What research found while they were away is the first thing said.
     const waiting = queue.take(input.onboardingSessionId);
     let confirming: InterviewTurnOutcome["confirming"] = undefined;
     if (waiting !== null && view.session.status !== "COMPLETED") {
-      reply = `Picking up where we left off. ${waiting.line}`;
+      lines = [{ text: PICKING_UP }, { text: waiting.line }];
       asking = null;
       confirming = { key: waiting.key, kind: waiting.kind };
       await hold(input, waiting);
     }
+    // In their language: the one they chose, or (Automatic) the language
+    // of their last words; with neither known, English.
+    const lastWords =
+      kept?.items.findLast((t) => t.role !== "Q")?.text ??
+      input.recentTurns.findLast((t) => t.role === "person")?.text ??
+      "";
+    const reply = (
+      (await sayIn(input, lines, lastWords)) ?? lines.map((line) => line.text)
+    ).join(" ");
     searchByName(input, view);
     // Once per reopening (live AG 2026-10-16: each load kept the resume line
     // twice). The same line already last in the conversation is not kept
@@ -710,7 +806,7 @@ export function createOnboardingConductor(
     const outcome = await agent.turn(input);
     if (input.signal?.aborted === true) return outcome;
     const view = outcome.view;
-    const extra: string[] = [];
+    const extra: Line[] = [];
     let asking = outcome.asking;
     let askingAbout = outcome.askingAbout;
     let confirming: InterviewTurnOutcome["confirming"] = undefined;
@@ -727,13 +823,13 @@ export function createOnboardingConductor(
         outcome.questionForQ,
         [company, person].filter((n): n is string => n !== null),
       );
-      extra.push(
-        lookupLine({
+      extra.push({
+        text: lookupLine({
           selfLookup: self,
           companyName: company,
           personName: person,
         }),
-      );
+      });
       if (self) searchByName(input, view);
       agent.researchEnded(input.onboardingSessionId, true);
       logger.info(
@@ -757,7 +853,7 @@ export function createOnboardingConductor(
         : null;
     if (waiting !== null) {
       await hold(input, waiting);
-      extra.push(waiting.line);
+      extra.push({ text: waiting.line });
       asking = null;
       askingAbout = [];
       confirming = { key: waiting.key, kind: waiting.kind };
@@ -765,13 +861,15 @@ export function createOnboardingConductor(
       // Q leads: the reply always ends on the next unanswered step.
       const leadable = {
         ...outcome,
-        reply: [outcome.reply, ...extra].join(" ").trim(),
+        reply: [outcome.reply, ...extra.map((line) => line.text)]
+          .join(" ")
+          .trim(),
         questionForQ: null,
       };
       if (shouldLead(leadable)) {
         const next = nextUnansweredStep(view, input.journeyType);
         if (next !== null) {
-          extra.push(next.question);
+          extra.push({ text: next.question, stepKey: next.stepKey });
           asking = askingFor(next.stepKey, input.journeyType, view);
           askingAbout = [next.stepKey];
         }
@@ -779,7 +877,14 @@ export function createOnboardingConductor(
     }
     if (extra.length === 0)
       return { ...outcome, questionForQ: null, researching: null };
-    const added = extra.join(" ");
+    // The conductor's own lines, in their language (ob1 live on AF). With
+    // Automatic and words not in English, no English line is added: the
+    // interviewer was told to end on the next question in their language.
+    const said = await sayIn(input, extra, input.utterance);
+    if (said === null) {
+      return { ...outcome, questionForQ: null, researching: null };
+    }
+    const added = said.join(" ");
     keep(input, added, asking?.stepKey ?? null);
     const tail = outcome.reply.trim().length === 0 ? added : ` ${added}`;
     // Streamed voice already said the loop's sentences; the voice path

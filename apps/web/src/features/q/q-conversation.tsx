@@ -157,6 +157,8 @@ export type QSurfaceContext = {
 export type QConversationPanelProps = {
   /** False when this build has no Q API configured. */
   readonly connected: boolean;
+  /** Words the composer starts with (`/home?ask=`); never sent by itself. */
+  readonly initialAsk?: string | undefined;
   /** Open on the Board (from the answer chip on another page, C6). */
   readonly openBoard?: boolean | undefined;
   readonly context: QSurfaceContext;
@@ -335,6 +337,7 @@ export function QConversationPanel({
   briefing,
   openBoard = false,
   stageLayer,
+  initialAsk,
 }: QConversationPanelProps) {
   const t = useT();
   const session = useQSession();
@@ -1585,6 +1588,9 @@ export function QConversationPanel({
               <QComposer
                 id={COMPOSER_ID}
                 showContext={false}
+                {...(initialAsk === undefined
+                  ? {}
+                  : { initialValue: initialAsk })}
                 disabled={q.working && !voice.active}
                 {...(voice.active
                   ? {

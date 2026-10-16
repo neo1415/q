@@ -29,8 +29,46 @@ import { useFounderOnboarding } from "./controller/use-founder-onboarding";
 import { renderStep } from "./steps/registry";
 import { PreferenceLearningAsk } from "../settings/preference-learning";
 import { useT } from "@/features/i18n/language";
+import { FOUNDER_PROFILE_SECTIONS } from "@capital-q/founder-onboarding/profile-sections";
 
 const STEP_FORM_ID = "founder-onboarding-step";
+
+/** A finished setup's way to a profile section's question: Q, on Home. */
+export function FinishedSectionAsk({
+  sectionKey,
+}: {
+  readonly sectionKey: string | undefined;
+}) {
+  const t = useT();
+  const section = FOUNDER_PROFILE_SECTIONS.find(
+    (one) => one.key === sectionKey,
+  );
+  if (section === undefined) return null;
+  const question =
+    section.question ??
+    `What should investors know about ${section.title.toLowerCase()}?`;
+  return (
+    <section
+      className="flex flex-col gap-3 border border-(--cq-border) p-5"
+      aria-labelledby="finished-section-ask"
+      data-finished-section-ask={section.key}
+    >
+      <h2
+        id="finished-section-ask"
+        className="cq-title-sm text-(--cq-text-primary)"
+      >
+        {section.title}
+      </h2>
+      <p className="cq-body text-(--cq-text-primary)">{question}</p>
+      <Link
+        href={`/home?ask=${encodeURIComponent(`For my profile's ${section.title} section: `)}`}
+        className={buttonClassName("primary", "regular", "self-start")}
+      >
+        {t("Tell Q")}
+      </Link>
+    </section>
+  );
+}
 
 /**
  * The founder onboarding controller. Composes the configured client, drives
@@ -178,6 +216,10 @@ export function FounderOnboardingScreen({
         {/* Whether investors see the company is the visibility setting's
             to say; this screen does not know it, so it does not claim it
             (R30 #19). */}
+        {/* Lane ov live check 2026-10-16: a profile gap linked from the
+            Overview lands here after setup is finished; the section's
+            question goes to Q (Home), typed for them, never sent. */}
+        <FinishedSectionAsk sectionKey={focusSection} />
         <EmptyState
           title={t("Founder setup is complete.")}
           description={t(
