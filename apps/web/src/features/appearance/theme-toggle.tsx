@@ -106,7 +106,7 @@ export function ThemeToggle({
                 : "cq-appearance-option"
             }
           >
-            {THEME_LABELS[option]}
+            {t(THEME_LABELS[option])}
           </button>
         ))}
       </div>

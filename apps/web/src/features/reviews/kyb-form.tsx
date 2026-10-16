@@ -19,6 +19,7 @@ import {
 } from "@/features/verification/verify-state";
 
 import { submitKybAction, type FormResult } from "./review-actions";
+import { useT } from "@/features/i18n/language";
 
 type Standing = KybDto["standing"];
 
@@ -134,6 +135,7 @@ async function upload(
  * checks each; verification is not an endorsement.
  */
 export function KybSection({ kyb }: { readonly kyb: KybDto }) {
+  const t = useT();
   const router = useRouter();
   const parts = verifyParts(kyb);
   const optional = personVerificationOptional(kyb);
@@ -183,7 +185,7 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
     <div className="flex flex-col gap-4">
       <ul
         className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)"
-        aria-label="Where verification stands"
+        aria-label={t("Where verification stands")}
       >
         <StandingRow
           who="You"
@@ -274,11 +276,11 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
             {parts.person ? (
               <fieldset className="flex flex-col gap-3">
                 <legend className="cq-label mb-2 text-(--cq-text-primary)">
-                  You
+                  {t("You")}
                 </legend>
                 <Input
                   id={ids.nameOnId}
-                  label="Your name as on your ID"
+                  label={t("Your name as on your ID")}
                   autoComplete="name"
                   value={person.nameOnId}
                   onChange={(e) =>
@@ -310,8 +312,9 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
                     ID document (optional)
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    A passport or national ID. Kept in your private documents
-                    and seen only by the person at Capital Q who checks it.
+                    {t(
+                      "A passport or national ID. Kept in your private documents and seen only by the person at Capital Q who checks it.",
+                    )}
                   </span>
                   <input
                     id={ids.personFile}
@@ -330,26 +333,27 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
                 </legend>
                 {auto ? (
                   <p className="cq-caption text-(--cq-text-secondary)">
-                    Capital Q has already asked from what you&apos;d told us.
-                    Add the registered details and a document to speed it up.
+                    {t(
+                      "Capital Q has already asked from what you'd told us. Add the registered details and a document to speed it up.",
+                    )}
                   </p>
                 ) : null}
                 <Input
                   id={ids.legalName}
-                  label="Registered legal name"
+                  label={t("Registered legal name")}
                   value={organisation.legalName}
                   onChange={(e) => setOrg("legalName")(e.target.value)}
                 />
                 <Input
                   id={ids.registrationNumber}
-                  label="Registration number"
+                  label={t("Registration number")}
                   value={organisation.registrationNumber}
                   onChange={(e) => setOrg("registrationNumber")(e.target.value)}
                 />
                 <Input
                   id={ids.jurisdictionCode}
-                  label="Country of registration"
-                  description="2-letter code, e.g. NG, GB, US."
+                  label={t("Country of registration")}
+                  description={t("2-letter code, e.g. NG, GB, US.")}
                   maxLength={2}
                   value={organisation.jurisdictionCode}
                   onChange={(e) =>
@@ -358,13 +362,13 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
                 />
                 <Input
                   id={ids.registeredAddress}
-                  label="Registered address (optional)"
+                  label={t("Registered address (optional)")}
                   value={organisation.registeredAddress}
                   onChange={(e) => setOrg("registeredAddress")(e.target.value)}
                 />
                 <Input
                   id={ids.websiteUrl}
-                  label="Website (optional)"
+                  label={t("Website (optional)")}
                   type="url"
                   value={organisation.websiteUrl}
                   onChange={(e) => setOrg("websiteUrl")(e.target.value)}
@@ -377,8 +381,9 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
                     Registration certificate (optional)
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    Your certificate of incorporation or a registry extract.
-                    Kept in your private documents.
+                    {t(
+                      "Your certificate of incorporation or a registry extract. Kept in your private documents.",
+                    )}
                   </span>
                   <input
                     id={ids.organisationFile}

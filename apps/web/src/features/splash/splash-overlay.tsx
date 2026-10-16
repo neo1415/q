@@ -11,6 +11,7 @@ import {
   SPLASH_SEEN_KEY,
   splashWasSkipped,
 } from "./splash-policy";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The cold-start splash (founder handoff revision 3, 2026-09-29).
@@ -24,6 +25,7 @@ import {
  * When it leaves it tells the page (Discover starts playing then).
  */
 export function SplashOverlay() {
+  const t = useT();
   const root = useRef<HTMLDivElement>(null);
   const controller = useRef<SplashController | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -88,7 +90,7 @@ export function SplashOverlay() {
       className="cq-splash"
       data-leaving={leaving ? "true" : undefined}
       role="img"
-      aria-label="Capital Q. Opportunity, intelligently connected."
+      aria-label={t("Capital Q. Opportunity, intelligently connected.")}
     >
       <div className="cq-splash-atmosphere" aria-hidden="true" />
       <canvas className="cq-splash-canvas" aria-hidden="true" />
@@ -116,18 +118,18 @@ export function SplashOverlay() {
           <path d="M123 121 L175 173" strokeWidth="18" strokeDasharray="1 3" />
         </svg>
         <p className="cq-splash-tagline" aria-hidden="true">
-          Opportunity, intelligently connected.
+          {t("Opportunity, intelligently connected.")}
         </p>
       </div>
       <div className="cq-splash-foot" aria-hidden="true">
-        <span>Discover</span>
+        <span>{t("Discover")}</span>
         <i />
-        <span>Connect</span>
+        <span>{t("Connect")}</span>
         <i />
-        <span>Build</span>
+        <span>{t("Build")}</span>
       </div>
       {/* The tap already skips; now it says so. */}
-      <p className="cq-splash-skip">Tap to skip</p>
+      <p className="cq-splash-skip">{t("Tap to skip")}</p>
     </div>
   );
 }

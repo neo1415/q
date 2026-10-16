@@ -131,7 +131,7 @@ export function InvestorVisibilityScreen({
 
   if (error !== null && loaded === null) {
     return (
-      <InlineNotice tone="danger" title="Visibility couldn't load">
+      <InlineNotice tone="danger" title={t("Visibility couldn't load")}>
         {error}
       </InlineNotice>
     );
@@ -140,7 +140,7 @@ export function InvestorVisibilityScreen({
     return (
       <div
         aria-busy="true"
-        aria-label="Loading visibility"
+        aria-label={t("Loading visibility")}
         className="flex flex-col gap-4"
       >
         <Skeleton lines={1} className="w-1/2" />
@@ -155,12 +155,12 @@ export function InvestorVisibilityScreen({
   return (
     <div className="flex flex-col gap-10" data-investor-visibility-screen>
       {saved !== null ? (
-        <InlineNotice tone="positive" title="Saved">
+        <InlineNotice tone="positive" title={t("Saved")}>
           {saved}
         </InlineNotice>
       ) : null}
       {error !== null ? (
-        <InlineNotice tone="danger" title="That didn't go through">
+        <InlineNotice tone="danger" title={t("That didn't go through")}>
           {error}
         </InlineNotice>
       ) : null}
@@ -218,7 +218,7 @@ export function InvestorVisibilityScreen({
                 disabled={busy}
                 onClick={() => void choose("organisation_private")}
               >
-                Make private
+                {t("Make private")}
               </Button>
             ) : (
               <Button
@@ -226,7 +226,7 @@ export function InvestorVisibilityScreen({
                 disabled={busy}
                 onClick={() => void choose("network_visible")}
               >
-                Let founders find me
+                {t("Let founders find me")}
               </Button>
             )}
           </div>
@@ -252,30 +252,34 @@ export function InvestorVisibilityScreen({
             id="investor-preview"
             className="cq-title-md text-(--cq-text-primary)"
           >
-            What founders will see
+            {t("What founders will see")}
           </h2>
           <p className="cq-body-sm max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
-            This is the whole profile. Your mandate, cheque size, portfolio and
-            anything you have discussed with Q are not part of it.
+            {t(
+              "This is the whole profile. Your mandate, cheque size, portfolio and anything you have discussed with Q are not part of it.",
+            )}
           </p>
         </div>
         <dl className="cq-panel cq-panel-rows max-w-(--cq-layout-reading)">
-          <PreviewRow label="Investor" value={preview.displayName} />
-          <PreviewRow label="Type" value={typeLabel(preview.investorType)} />
-          <PreviewRow label="Website" value={preview.websiteUrl} />
-          <PreviewRow label="Based in" value={preview.hqCountry} />
+          <PreviewRow label={t("Investor")} value={preview.displayName} />
           <PreviewRow
-            label="Deploying"
+            label={t("Type")}
+            value={typeLabel(preview.investorType)}
+          />
+          <PreviewRow label={t("Website")} value={preview.websiteUrl} />
+          <PreviewRow label={t("Based in")} value={preview.hqCountry} />
+          <PreviewRow
+            label={t("Deploying")}
             value={deploymentLabel(preview.deploymentState)}
           />
-          <PreviewRow label="In short" value={preview.publicDescription} />
+          <PreviewRow label={t("In short")} value={preview.publicDescription} />
         </dl>
         <div>
           <Link
             href="/onboarding/investor?review=1"
             className={buttonClassName("quiet", "compact")}
           >
-            Change what the profile says
+            {t("Change what the profile says")}
           </Link>
         </div>
       </section>
@@ -296,6 +300,7 @@ function PreviewRow({
   readonly label: string;
   readonly value: string | null;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-0.5 px-5 py-3 sm:flex-row sm:gap-4">
       <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-32">
@@ -303,7 +308,7 @@ function PreviewRow({
       </dt>
       <dd className="cq-body text-(--cq-text-primary)">
         {value === null || value.length === 0 ? (
-          <span className="text-(--cq-text-tertiary)">Not shared</span>
+          <span className="text-(--cq-text-tertiary)">{t("Not shared")}</span>
         ) : (
           value
         )}
@@ -317,25 +322,27 @@ function PreviewRow({
  * frame around an absence.
  */
 export function InvestorVisibilityUnavailable() {
+  const t = useT();
   return (
     <section
-      aria-label="No investor profile to show yet."
+      aria-label={t("No investor profile to show yet.")}
       className="flex max-w-(--cq-layout-reading) flex-col gap-3"
       data-state="empty"
     >
       <p className="cq-body text-(--cq-text-primary)">
-        No investor profile to show yet.
+        {t("No investor profile to show yet.")}
       </p>
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        Set up your mandate first. Until then there is nothing founders could
-        see.
+        {t(
+          "Set up your mandate first. Until then there is nothing founders could see.",
+        )}
       </p>
       <div className="pt-1">
         <Link
           href="/onboarding/investor"
           className={buttonClassName("secondary")}
         >
-          Set up your mandate
+          {t("Set up your mandate")}
         </Link>
       </div>
     </section>
@@ -376,6 +383,7 @@ function InboundPreference({
   readonly onSaved: (message: string) => Promise<void>;
   readonly onError: (message: string) => void;
 }) {
+  const t = useT();
   const current = investor.inboundPreference ?? null;
   const [choice, setChoice] = useState<string | null>(current);
   const [busy, setBusy] = useState(false);
@@ -408,14 +416,14 @@ function InboundPreference({
           id="investor-inbound"
           className="cq-title-md text-(--cq-text-primary)"
         >
-          How founders can reach you
+          {t("How founders can reach you")}
         </h2>
       </header>
       <fieldset className="cq-panel-body flex flex-col gap-3">
-        <legend className="sr-only">How founders can reach you</legend>
+        <legend className="sr-only">{t("How founders can reach you")}</legend>
         {current === null ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Not set yet, so founders can&apos;t send you requests.
+            {t("Not set yet, so founders can't send you requests.")}
           </p>
         ) : null}
         {INBOUND_CHOICES.map((option) => (

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 import {
@@ -8,6 +10,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { VERIFY_NUDGE_WORDS, type VerifyNudge } from "./verify-state";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The shell's quiet "Verify you and <organisation>" item (founder direction
@@ -22,6 +25,7 @@ export function VerifyNudgeLink({
   readonly nudge: VerifyNudge;
   readonly onNavigate?: (() => void) | undefined;
 }) {
+  const t = useT();
   return (
     <Link
       href="/verification"
@@ -40,7 +44,7 @@ export function VerifyNudgeLink({
           {nudge.title}
         </span>
         <span className="cq-caption truncate text-(--cq-text-secondary)">
-          {VERIFY_NUDGE_WORDS[nudge.state]}
+          {t(VERIFY_NUDGE_WORDS[nudge.state])}
           {nudge.state === "NOT_STARTED" ? " · Start" : ""}
         </span>
       </span>

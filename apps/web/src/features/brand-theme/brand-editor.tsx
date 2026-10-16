@@ -19,6 +19,7 @@ import {
   type BrandPreset,
   type PresetMode,
 } from "./brand-presets";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The console's brand control (K3; design B's brand board): pick a theme
@@ -36,6 +37,7 @@ export function BrandEditor({
   /** The colour on top of the preset, or null for the preset's own. */
   readonly savedHex: string | null;
 }) {
+  const t = useT();
   const [preset, setPreset] = useState<BrandPresetKey>(savedPreset);
   const [accent, setAccent] = useState<string | null>(savedHex);
   const [typed, setTyped] = useState(savedHex ?? "");
@@ -68,16 +70,17 @@ export function BrandEditor({
       <div className="cq-panel flex flex-col gap-6 p-5">
         <fieldset className="flex flex-col gap-3">
           <legend className="cq-label pb-1 text-(--cq-text-primary)">
-            Theme
+            {t("Theme")}
           </legend>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            A theme sets the page, the menu bar, the buttons and Q&apos;s light
-            together. Your own colour can still go on top.
+            {t(
+              "A theme sets the page, the menu bar, the buttons and Q's light together. Your own colour can still go on top.",
+            )}
           </p>
           <div
             className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-2"
             role="group"
-            aria-label="Theme"
+            aria-label={t("Theme")}
           >
             {BRAND_THEME_PRESET_LIST.map((item) => (
               <PresetButton
@@ -101,7 +104,7 @@ export function BrandEditor({
               onClick={() => chooseAccent(null)}
               className="cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary) aria-pressed:border-2 aria-pressed:border-(--cq-accent)"
             >
-              The theme&apos;s own
+              {t("The theme's own")}
             </button>
             {ACCENT_PICKS.map((pick) => (
               <button
@@ -119,7 +122,7 @@ export function BrandEditor({
           <div className="flex items-center gap-2">
             <input
               type="color"
-              aria-label="Pick a colour"
+              aria-label={t("Pick a colour")}
               value={accent ?? chosen.swatch[1]}
               onChange={(event) => chooseAccent(event.target.value)}
               className="size-11 shrink-0 cursor-pointer border border-(--cq-border) bg-(--cq-surface) p-1"
@@ -131,8 +134,8 @@ export function BrandEditor({
               spellCheck={false}
               maxLength={7}
               value={typed}
-              placeholder="#rrggbb"
-              aria-label="Accent colour as hex"
+              placeholder={t("#rrggbb")}
+              aria-label={t("Accent colour as hex")}
               aria-invalid={typedValid ? undefined : true}
               aria-describedby="brand-hex-help"
               onChange={(event) => {
@@ -191,10 +194,10 @@ export function BrandEditor({
               )
             }
           >
-            Reset to black and gold
+            {t("Reset to black and gold")}
           </Button>
           <span className="cq-caption text-(--cq-text-secondary)">
-            Everyone in your firm sees it from their next page.
+            {t("Everyone in your firm sees it from their next page.")}
           </span>
         </div>
         <ResultLine result={result} />
@@ -252,6 +255,7 @@ function ContrastPanel({
   readonly preset: BrandPreset;
   readonly accent: string | null;
 }) {
+  const t = useT();
   const palette = preset.palette;
   const custom = accent === null ? null : brandPalette(accent);
   const modes = (["light", "dark"] as const).flatMap((theme) => {
@@ -284,16 +288,18 @@ function ContrastPanel({
       aria-labelledby="brand-contrast"
     >
       <h3 id="brand-contrast" className="cq-label text-(--cq-text-primary)">
-        Contrast
+        {t("Contrast")}
       </h3>
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        Every pair is checked against WCAG AA. Gold is a fill or a deep bronze
-        for text, never pale gold text on white.
+        {t(
+          "Every pair is checked against WCAG AA. Gold is a fill or a deep bronze for text, never pale gold text on white.",
+        )}
       </p>
       {palette === null ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Capital Q blue is the product&apos;s classic look; its pairs are
-          checked in the design tokens.
+          {t(
+            "Capital Q blue is the product's classic look; its pairs are checked in the design tokens.",
+          )}
         </p>
       ) : (
         modes.map(({ theme, rows }) => (
@@ -303,9 +309,9 @@ function ContrastPanel({
             </caption>
             <thead className="sr-only">
               <tr>
-                <th scope="col">Pair</th>
-                <th scope="col">Sample</th>
-                <th scope="col">Ratio</th>
+                <th scope="col">{t("Pair")}</th>
+                <th scope="col">{t("Sample")}</th>
+                <th scope="col">{t("Ratio")}</th>
               </tr>
             </thead>
             <tbody>
@@ -328,7 +334,7 @@ function ContrastPanel({
                       }
                       aria-hidden="true"
                     >
-                      Aa
+                      {t("Aa")}
                     </span>
                   </td>
                   <td className="cq-numeric py-1.5 text-end whitespace-nowrap text-(--cq-text-secondary)">

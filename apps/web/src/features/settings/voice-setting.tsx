@@ -41,7 +41,7 @@ export function VoiceSetting() {
               : "cq-appearance-option"
           }
         >
-          {VOICE_LABELS[choice]}
+          {t(VOICE_LABELS[choice])}
         </button>
       ))}
     </div>
@@ -85,7 +85,7 @@ export function ListeningSetting() {
                 : "cq-appearance-option"
             }
           >
-            {LISTENING_LABELS[choice]}
+            {t(LISTENING_LABELS[choice])}
           </button>
         ))}
       </div>

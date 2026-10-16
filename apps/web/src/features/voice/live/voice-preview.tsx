@@ -186,7 +186,7 @@ export function VoicePreview({
                 setChoice(key);
               }}
             />
-            {LABELS[key]}
+            {t(LABELS[key])}
             {available[key] ? null : (
               <span className="cq-caption text-(--cq-text-tertiary)">
                 {t("not configured")}

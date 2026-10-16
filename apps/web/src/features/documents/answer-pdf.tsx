@@ -60,7 +60,7 @@ export function AnswerPdf({
         className={buttonClassName("quiet", "compact")}
         onClick={() => void file()}
         disabled={state.kind === "busy" || state.kind === "done"}
-        aria-label="Save this answer as a PDF"
+        aria-label={t("Save this answer as a PDF")}
         data-q-answer-pdf-button={state.kind}
       >
         <Download

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 import {
@@ -15,6 +17,7 @@ import {
   lengthWords,
 } from "./meet";
 import { ReviewRefresh } from "./review-refresh";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The review after a rehearsal (REHEARSE): how it ended, a score computed
@@ -49,6 +52,7 @@ export function RehearsalReview({
 }: {
   readonly rehearsal: QRehearsalDto;
 }) {
+  const t = useT();
   const name = rehearsal.counterpart.name;
   const review = rehearsal.review;
   const length =
@@ -165,7 +169,7 @@ export function RehearsalReview({
                           : "text-(--cq-text-secondary)"
                       }
                     >
-                      {RATING_WORDS[dimension.rating]}
+                      {t(RATING_WORDS[dimension.rating])}
                     </span>
                   </dt>
                   <dd className="cq-body-sm text-(--cq-text-secondary)">

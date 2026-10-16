@@ -226,7 +226,7 @@ function YourCompanyCard({
       </div>
       <div className="cq-yours-info">
         <p className="cq-yours-chip" data-your-company-label={item.label}>
-          {YOUR_COMPANY_LABEL_WORDS[item.label]}
+          {t(YOUR_COMPANY_LABEL_WORDS[item.label])}
         </p>
         <div className="cq-feed-company">
           <span className="cq-feed-panel-mark">

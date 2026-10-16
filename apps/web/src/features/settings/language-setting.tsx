@@ -33,7 +33,7 @@ export const ARABIC_NOW =
   "In Arabic: every page of Capital Q, your conversation with Q (typed and spoken), voice calls, rehearsals, video interviews, onboarding, notifications and emails.";
 /** What does not, yet. */
 export const STILL_ENGLISH =
-  "Still in English: the one-line summary on a decision card and the stories in The Q Daily, which Q quotes as written. What people and companies wrote themselves stays in their own words.";
+  "Still in English: some of Q's ready-made answers (what needs you, a person or company looked up, fit and mandate summaries), the questions Q prepared about your company, the one-line summary on a decision card and stories in The Q Daily. What people and companies wrote themselves stays in their own words.";
 export const VIDEO_FALLBACK =
   "Video rehearsals in Arabic depend on the face's voice; if it does not sound right, use a voice or text rehearsal.";
 
@@ -68,10 +68,12 @@ export function LanguageSetting({
       const result = await setLanguageAction(next);
       if (!result.ok) {
         setChosen(before);
-        setMessage(t("Couldn't save that just now. Please try again."));
+        setMessage("Couldn't save that just now. Please try again.");
         return;
       }
-      setMessage(t("Saved. Q uses this from your next message or call."));
+      // Kept in English and said in the language at render: the choice
+      // just switched the language, so the words follow it.
+      setMessage("Saved. Q uses this from your next message or call.");
       // Every provider switches at once and the server words refresh.
       announceLanguage(next);
     });
@@ -122,7 +124,7 @@ export function LanguageSetting({
       ) : null}
       {message === null ? null : (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>

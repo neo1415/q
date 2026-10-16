@@ -109,7 +109,7 @@ export function VoicePanel({
                 disabled={busy}
                 onClick={() => onChooseVoice(choice)}
               >
-                {VOICE_LABELS[choice]}
+                {t(VOICE_LABELS[choice])}
               </Button>
             ))}
           </div>

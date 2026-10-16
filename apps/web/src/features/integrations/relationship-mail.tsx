@@ -5,6 +5,7 @@ import type { RelationshipMailItem } from "@capital-q/contracts";
 
 import { apiSession } from "@/features/q/context";
 import { formatRelationshipDate } from "@/features/relationships/relationship-words";
+import { serverT } from "@/features/i18n/server";
 
 /**
  * The person's own email on one relationship (BIZ-007): what they sent
@@ -19,6 +20,7 @@ export async function RelationshipMail({
   readonly relationshipId: string;
   readonly counterpart: string;
 }) {
+  const t = await serverT();
   const session = await apiSession();
   if (session === null) return null;
   let items: readonly RelationshipMailItem[];
@@ -37,7 +39,7 @@ export async function RelationshipMail({
         id="relationship-mail"
         className="cq-title-sm text-(--cq-text-primary)"
       >
-        Email
+        {t("Email")}
       </h2>
       <ol
         className="flex max-w-(--cq-layout-reading) flex-col gap-3"

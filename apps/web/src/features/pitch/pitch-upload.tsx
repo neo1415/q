@@ -63,6 +63,7 @@ import {
   type ResumeRecord,
 } from "./resume-store";
 import { uploadBytes, type UploadOutcome } from "./upload-bytes";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The founder's pitch upload (CQ-WEB-023, CQ-MEDIA-011; doc 17 §35; doc
@@ -169,6 +170,7 @@ export function PitchUpload({
   onCreated,
   onDeleted,
 }: PitchUploadProps) {
+  const t = useT();
   const [flow, dispatch] = useReducer(pitchFlowReducer, INITIAL_PITCH_FLOW);
   const [company, setCompany] = useState<CompanyDto | null>(null);
   // What stands between the company and investor feeds (PADL #58), read
@@ -604,7 +606,7 @@ export function PitchUpload({
 
   if (loadError !== null) {
     return (
-      <InlineNotice tone="warning" title="Your pitch couldn't load">
+      <InlineNotice tone="warning" title={t("Your pitch couldn't load")}>
         {loadError}
       </InlineNotice>
     );
@@ -636,8 +638,10 @@ export function PitchUpload({
       <PageSection
         id="pitch-status"
         className={sideBySide ? "lg:col-start-2 lg:row-start-1" : undefined}
-        title="The video"
-        description="Investors watch this first. Keep it to what you'd say across a table."
+        title={t("The video")}
+        description={t(
+          "Investors watch this first. Keep it to what you'd say across a table.",
+        )}
       >
         <section className="cq-panel">
           <header className="cq-panel-header">
@@ -663,7 +667,7 @@ export function PitchUpload({
                     disabled={cancelling}
                     onClick={() => void cancel(flow.pitch)}
                   >
-                    Cancel upload
+                    {t("Cancel upload")}
                   </Button>
                 </div>
               </>
@@ -671,7 +675,7 @@ export function PitchUpload({
             {flow.kind === "INTERRUPTED" ? (
               <InlineNotice
                 tone="info"
-                title="Upload paused"
+                title={t("Upload paused")}
                 action={
                   <span className="flex flex-wrap items-center gap-3">
                     <Button
@@ -689,7 +693,7 @@ export function PitchUpload({
                       disabled={cancelling}
                       onClick={() => void cancel(flow.pitch)}
                     >
-                      Cancel upload
+                      {t("Cancel upload")}
                     </Button>
                   </span>
                 }
@@ -700,7 +704,9 @@ export function PitchUpload({
               </InlineNotice>
             ) : null}
             {flow.kind === "PROCESSING" ? (
-              <Progress label="The video service is preparing your pitch" />
+              <Progress
+                label={t("The video service is preparing your pitch")}
+              />
             ) : null}
             {flow.kind === "FAILED" ? (
               <InlineNotice
@@ -719,7 +725,7 @@ export function PitchUpload({
                         if (flow.pitch !== null) void cancel(flow.pitch);
                       }}
                     >
-                      Cancel that upload
+                      {t("Cancel that upload")}
                     </Button>
                   ) : undefined
                 }
@@ -734,7 +740,7 @@ export function PitchUpload({
               <dl className="cq-panel-rows">
                 <div className="flex justify-between gap-4 py-3">
                   <dt className="cq-label text-(--cq-text-secondary)">
-                    Length
+                    {t("Length")}
                   </dt>
                   <dd className="cq-body cq-numeric">
                     {formatDuration(flow.pitch.durationSeconds) ??
@@ -743,7 +749,7 @@ export function PitchUpload({
                 </div>
                 <div className="flex justify-between gap-4 py-3">
                   <dt className="cq-label text-(--cq-text-secondary)">
-                    Format
+                    {t("Format")}
                   </dt>
                   <dd className="cq-body cq-numeric">
                     {flow.pitch.aspectRatio ?? "Not known yet"}
@@ -757,7 +763,7 @@ export function PitchUpload({
                 type="file"
                 accept="video/*"
                 className="sr-only"
-                aria-label="Choose a pitch video"
+                aria-label={t("Choose a pitch video")}
                 onChange={(event) => void onFile(event)}
                 disabled={busy || cancelling}
               />
@@ -789,14 +795,16 @@ export function PitchUpload({
         <PageSection
           id="pitch-preview"
           className="lg:sticky lg:top-6 lg:col-start-1 lg:row-span-2 lg:row-start-1"
-          title="Preview"
-          description="What an investor's player will show. Muted until they turn the sound on."
+          title={t("Preview")}
+          description={t(
+            "What an investor's player will show. Muted until they turn the sound on.",
+          )}
         >
           {preview === null ||
           preview.mediaAssetId !== flow.pitch.mediaAssetId ? (
             <Skeleton lines={2} />
           ) : preview.kind === "UNAVAILABLE" ? (
-            <InlineNotice tone="info" title="Preview is not available yet">
+            <InlineNotice tone="info" title={t("Preview is not available yet")}>
               {preview.reason}
             </InlineNotice>
           ) : (
@@ -817,8 +825,10 @@ export function PitchUpload({
       <PageSection
         id="pitch-standing"
         className={sideBySide ? "lg:col-start-2 lg:row-start-2" : undefined}
-        title="Who sees it"
-        description="A pitch reaches investors through the same door as the rest of your profile."
+        title={t("Who sees it")}
+        description={t(
+          "A pitch reaches investors through the same door as the rest of your profile.",
+        )}
       >
         {flow.kind === "READY" ? (
           <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -828,20 +838,20 @@ export function PitchUpload({
                 disabled={deciding}
                 onClick={() => void decide(flow.pitch, "AUTHORISED")}
               >
-                Let investors play this pitch
+                {t("Let investors play this pitch")}
               </Button>
             ) : (
               <>
                 <span className="cq-status-line">
                   <Check size={ICON_SIZE.compact} aria-hidden="true" />
-                  Investors may play this pitch
+                  {t("Investors may play this pitch")}
                 </span>
                 <Button
                   variant="quiet"
                   disabled={deciding}
                   onClick={() => void decide(flow.pitch, "PRIVATE")}
                 >
-                  Keep it private
+                  {t("Keep it private")}
                 </Button>
               </>
             )}
@@ -900,7 +910,7 @@ export function PitchUpload({
         ) : null}
         <p className="mt-3">
           <Link href="/company/visibility" className={buttonClassName("quiet")}>
-            Visibility and discovery
+            {t("Visibility and discovery")}
           </Link>
         </p>
       </PageSection>

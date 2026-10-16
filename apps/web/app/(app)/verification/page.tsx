@@ -21,6 +21,7 @@ import {
 import { VerificationStandings } from "@/features/verification/verification-standings";
 import { personVerificationOptional } from "@/features/verification/verify-state";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Verification" };
 
@@ -52,6 +53,7 @@ export default async function VerificationPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await serverT();
   const [context, params] = await Promise.all([
     resolveOwnContext(),
     searchParams,
@@ -83,7 +85,7 @@ export default async function VerificationPage({
     <PageContainer>
       <QSection id="verification" kind="VERIFICATION" label="verification">
         <PageHeader
-          title="Verification"
+          title={t("Verification")}
           description={
             context.kind === "INVESTOR"
               ? "Capital Q verifies your identity as an investor and your fund's registered details before either can show as verified."
@@ -109,7 +111,7 @@ export default async function VerificationPage({
                 Your setup is done. Verifying now lets Capital Q show you as
                 verified sooner.{" "}
                 <Link href={skipTo} className="underline underline-offset-4">
-                  Skip for now
+                  {t("Skip for now")}
                 </Link>
               </p>
             ) : null}
@@ -121,24 +123,28 @@ export default async function VerificationPage({
         ) : loaded !== null ||
           (context.kind === "NONE" && context.unavailable === true) ? (
           <EmptyState
-            title="Verification couldn't load."
-            description="Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment."
+            title={t("Verification couldn't load.")}
+            description={t(
+              "Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment.",
+            )}
             action={
               <Link
                 href="/verification"
                 className={buttonClassName("secondary")}
               >
-                Try again
+                {t("Try again")}
               </Link>
             }
           />
         ) : context.kind === "INVESTOR" ? null : (
           <EmptyState
-            title="Verification belongs to a company."
-            description="Founders ask Capital Q to verify their identity and their organisation once their company is set up."
+            title={t("Verification belongs to a company.")}
+            description={t(
+              "Founders ask Capital Q to verify their identity and their organisation once their company is set up.",
+            )}
             action={
               <Link href="/home" className={buttonClassName("secondary")}>
-                Go to Home
+                {t("Go to Home")}
               </Link>
             }
           />
@@ -150,7 +156,7 @@ export default async function VerificationPage({
               href="/reviews?subject=VERIFICATION_DECISION"
               className="underline underline-offset-4"
             >
-              Ask a person to review it
+              {t("Ask a person to review it")}
             </Link>
             .
           </p>

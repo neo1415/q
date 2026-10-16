@@ -77,6 +77,7 @@ import {
   type QuickChip,
   type StillNeeded,
 } from "./conversation";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Q-led onboarding workspace (CQ-PRE-REC-001 §15-§30; CQ-Q-VOICE-001 B
@@ -220,6 +221,7 @@ export function QOnboardingWorkspace({
   talkOnOpen = false,
   greeted = false,
 }: QOnboardingWorkspaceProps) {
+  const t = useT();
   const view = session.raw;
   const router = useRouter();
   // The greeting is read once, from persisted state, when the workspace
@@ -1447,8 +1449,8 @@ export function QOnboardingWorkspace({
 
   if (view === undefined) {
     return (
-      <InlineNotice tone="info" title="Q can't lead this setup right now.">
-        Use the form instead; everything you enter is kept the same way.
+      <InlineNotice tone="info" title={t("Q can't lead this setup right now.")}>
+        {t("Use the form instead; everything you enter is kept the same way.")}
       </InlineNotice>
     );
   }
@@ -1553,7 +1555,7 @@ export function QOnboardingWorkspace({
       {!voice.active && voice.notice !== null ? (
         <InlineNotice tone="warning" title={voice.notice}>
           <Button size="compact" variant="quiet" onClick={voice.clearNotice}>
-            Dismiss
+            {t("Dismiss")}
           </Button>
         </InlineNotice>
       ) : null}
@@ -1577,21 +1579,21 @@ export function QOnboardingWorkspace({
             variant="secondary"
             onClick={() => void uploadWhileTalking(askKind, "PITCH_DECK")}
           >
-            Pitch deck
+            {t("Pitch deck")}
           </Button>
           <Button
             size="compact"
             variant="secondary"
             onClick={() => void uploadWhileTalking(askKind, "COMPANY_PROFILE")}
           >
-            Company or product profile
+            {t("Company or product profile")}
           </Button>
           <Button
             size="compact"
             variant="quiet"
             onClick={() => void uploadWhileTalking(askKind, "OTHER")}
           >
-            Something private
+            {t("Something private")}
           </Button>
         </div>
       )}
@@ -1632,7 +1634,7 @@ export function QOnboardingWorkspace({
 
       {otherProposals.length > 0 ? (
         <section
-          aria-label="What Q picked up"
+          aria-label={t("What Q picked up")}
           className="flex flex-col gap-3 border border-(--cq-border-subtle) p-3"
           data-q-picked-up
         >
@@ -1688,7 +1690,7 @@ export function QOnboardingWorkspace({
                     disabled={working}
                     onClick={() => void keep(item.suggestion.id)}
                   >
-                    Keep
+                    {t("Keep")}
                   </Button>
                   {item.editorId === undefined ? null : (
                     <Button
@@ -1697,7 +1699,7 @@ export function QOnboardingWorkspace({
                       disabled={working}
                       onClick={() => onEdit(item.editorId ?? "")}
                     >
-                      Change
+                      {t("Change")}
                     </Button>
                   )}
                   <Button
@@ -1706,7 +1708,7 @@ export function QOnboardingWorkspace({
                     disabled={working}
                     onClick={() => void notThis(item.suggestion.id)}
                   >
-                    Not this
+                    {t("Not this")}
                   </Button>
                 </span>
               </li>
@@ -1719,7 +1721,7 @@ export function QOnboardingWorkspace({
                 disabled={working}
                 onClick={() => void keepAll()}
               >
-                Keep all
+                {t("Keep all")}
               </Button>
             </div>
           ) : null}
@@ -1733,7 +1735,7 @@ export function QOnboardingWorkspace({
       ) : null}
 
       {errorMessage !== undefined ? (
-        <InlineNotice tone="warning" title="That didn't go through">
+        <InlineNotice tone="warning" title={t("That didn't go through")}>
           {errorMessage}
         </InlineNotice>
       ) : null}
@@ -1784,7 +1786,7 @@ export function QOnboardingWorkspace({
                     disabled={working}
                     onClick={() => void submitPicks()}
                   >
-                    Done
+                    {t("Done")}
                   </Button>
                   <span className="cq-caption text-(--cq-text-tertiary)">
                     {picks.length === 1
@@ -1803,14 +1805,16 @@ export function QOnboardingWorkspace({
             <div className="flex flex-col gap-3" data-q-taxonomy>
               {taxonomy !== null && taxonomyPicks === null ? (
                 <p className="cq-body text-(--cq-text-primary)">
-                  I think these are the closest fits. Keep them, or adjust.
+                  {t(
+                    "I think these are the closest fits. Keep them, or adjust.",
+                  )}
                 </p>
               ) : null}
               {keptTaxonomy.length > 0 ? (
                 <div
                   className="flex flex-wrap items-center gap-2"
                   role="group"
-                  aria-label="Categories to keep"
+                  aria-label={t("Categories to keep")}
                 >
                   {keptTaxonomy.map((node) => (
                     <ChoiceChip
@@ -1825,15 +1829,15 @@ export function QOnboardingWorkspace({
                 </div>
               ) : (
                 <p className="cq-caption text-(--cq-text-secondary)">
-                  Say it in a sentence, or search the categories below.
+                  {t("Say it in a sentence, or search the categories below.")}
                 </p>
               )}
               <div className="flex flex-col gap-2">
                 <Input
                   id={`q-taxonomy-search-${prompt.stepKey}`}
-                  label="Search categories"
+                  label={t("Search categories")}
                   labelHidden
-                  placeholder="Search categories"
+                  placeholder={t("Search categories")}
                   autoComplete="off"
                   value={taxonomyQuery}
                   disabled={working}
@@ -1843,7 +1847,7 @@ export function QOnboardingWorkspace({
                   <div
                     className="flex flex-wrap items-center gap-2"
                     role="group"
-                    aria-label="Matching categories"
+                    aria-label={t("Matching categories")}
                   >
                     {taxonomyResults
                       .filter(
@@ -1956,7 +1960,7 @@ export function QOnboardingWorkspace({
                 disabled={working}
                 onClick={() => void say("I don't know")}
               >
-                I don&apos;t know
+                {t("I don't know")}
               </Button>
             ) : null}
             {prompt.optional ? (
@@ -1977,7 +1981,7 @@ export function QOnboardingWorkspace({
                   void actions.skip();
                 }}
               >
-                Skip
+                {t("Skip")}
               </Button>
             ) : null}
           </div>
@@ -1994,7 +1998,7 @@ export function QOnboardingWorkspace({
 
       {gaps.length > 0 ? (
         <section
-          aria-label="What Q still needs"
+          aria-label={t("What Q still needs")}
           className="flex flex-col gap-3"
           data-q-still-needs
         >
@@ -2067,14 +2071,14 @@ export function QOnboardingWorkspace({
               }
             }}
           >
-            Review as form
+            {t("Review as form")}
           </Button>
         ) : null}
       </div>
 
       {showReview ? (
         <section
-          aria-label="What Q knows"
+          aria-label={t("What Q knows")}
           className="flex flex-col gap-3 border border-(--cq-border-subtle) p-3"
           data-q-review
         >
@@ -2101,7 +2105,7 @@ export function QOnboardingWorkspace({
                         variant="quiet"
                         onClick={() => onEdit(item.editorId ?? "")}
                       >
-                        Change
+                        {t("Change")}
                       </Button>
                     )}
                   </li>
@@ -2158,6 +2162,7 @@ function GapItem({
   readonly onSkip: () => void;
   readonly onEdit: (editorId: string) => void;
 }) {
+  const t = useT();
   const { question, control, editorId } = gap;
   const typedValue =
     control.kind === "figure" || control.kind === "text"
@@ -2233,7 +2238,7 @@ function GapItem({
                   )
                 }
               >
-                Done
+                {t("Done")}
               </Button>
             ) : null}
           </>
@@ -2268,7 +2273,7 @@ function GapItem({
               size="compact"
               disabled={working || typedValue === null}
             >
-              Save
+              {t("Save")}
             </Button>
           </form>
         ) : null}
@@ -2279,7 +2284,7 @@ function GapItem({
             disabled={working}
             onClick={() => onEdit(editorId)}
           >
-            Open in the form
+            {t("Open in the form")}
           </Button>
         ) : null}
         <Button
@@ -2288,7 +2293,7 @@ function GapItem({
           disabled={working}
           onClick={onSkip}
         >
-          Skip this
+          {t("Skip this")}
         </Button>
       </div>
     </li>

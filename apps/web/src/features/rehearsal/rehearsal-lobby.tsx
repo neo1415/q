@@ -345,7 +345,7 @@ export function RehearsalLobby({
             </div>
           )}
           <p className="cq-caption text-(--cq-text-tertiary)">
-            {GROUNDING_WORDS[persona.grounding]}
+            {t(GROUNDING_WORDS[persona.grounding])}
           </p>
         </div>
 

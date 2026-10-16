@@ -151,10 +151,10 @@ export function DeckReadingReview({
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="cq-body text-(--cq-text-primary)">
-                  {DECK_SECTION_LABELS[section.section]}
+                  {t(DECK_SECTION_LABELS[section.section])}
                 </span>
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  {STATE_WORDS[state]}
+                  {t(STATE_WORDS[state])}
                 </span>
               </div>
               {status === null ? null : (

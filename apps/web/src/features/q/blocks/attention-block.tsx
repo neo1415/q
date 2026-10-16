@@ -6,6 +6,7 @@ import type { QAttentionItem, QAttentionReport } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { unreadWords } from "@/features/briefing/attention";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Anything that needs my attention", as Q answered it (RECOVERY-2026-10
@@ -57,6 +58,7 @@ export function AttentionBody({
 }: {
   readonly report: QAttentionReport;
 }) {
+  const t = useT();
   const unread = unreadWords(report.unread);
   return (
     <div
@@ -94,7 +96,7 @@ export function AttentionBody({
                 href={attentionItemHref(item)}
                 className={buttonClassName("quiet", "compact")}
               >
-                Open
+                {t("Open")}
               </Link>
             </li>
           ))}
