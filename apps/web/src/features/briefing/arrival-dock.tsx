@@ -10,6 +10,7 @@ import { useQSessionOptional } from "@/features/q/q-session";
 import { ArrivalBriefing } from "./arrival-briefing";
 import { useArrivalStatus } from "./arrival-store";
 import { useOverPane } from "./over-pane";
+import { useT } from "@/features/i18n/language";
 
 /** The Q page gives the briefing itself; everywhere else, the dock does. */
 const Q_PAGE = "/home";
@@ -24,6 +25,7 @@ const SETTLE_MS = 4_000;
  * Needs you on Work.
  */
 export function ArrivalDock() {
+  const t = useT();
   const pathname = usePathname();
   const session = useQSessionOptional();
   const [closed, setClosed] = useState(false);
@@ -74,7 +76,7 @@ export function ArrivalDock() {
   return (
     <aside
       ref={box}
-      aria-label="Q's briefing"
+      aria-label={t("Q's briefing")}
       className={
         tucked
           ? "fixed end-4 bottom-24 z-(--cq-z-presence) has-[>div:empty]:hidden sm:bottom-6"
@@ -90,7 +92,7 @@ export function ArrivalDock() {
           onClick={() => setOpened(true)}
           className="cq-body-sm inline-flex min-h-11 items-center gap-2 border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 font-medium text-(--cq-text-primary) shadow-(--cq-shadow-overlay) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
-          Q&apos;s briefing
+          {t("Q's briefing")}
           <ChevronUp size={ICON_SIZE.compact} aria-hidden="true" />
         </button>
       ) : null}

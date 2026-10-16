@@ -14,6 +14,7 @@ import {
 } from "../voice-line";
 import type { LiveBridgeState } from "./bridge";
 import { startLiveCall, type LiveCall, type LiveCallStats } from "./live-call";
+import { useT } from "@/features/i18n/language";
 
 /**
  * V: the developer-only voice comparison preview. A = GPT-Live (this
@@ -36,6 +37,7 @@ export function VoicePreview({
 }: {
   readonly available: Readonly<Record<Choice, boolean>>;
 }) {
+  const t = useT();
   const [choice, setChoice] = useState<Choice>("A");
   const [voice, setVoice] = useState<"FEMALE" | "MALE">("FEMALE");
   const [briefing, setBriefing] = useState(true);
@@ -171,7 +173,7 @@ export function VoicePreview({
   return (
     <div className="flex flex-col gap-6">
       <fieldset className="flex flex-col gap-2" disabled={live}>
-        <legend className="cq-label">Line</legend>
+        <legend className="cq-label">{t("Line")}</legend>
         {(Object.keys(LABELS) as Choice[]).map((key) => (
           <label key={key} className="flex min-h-11 items-center gap-2 cq-body">
             <input
@@ -187,13 +189,13 @@ export function VoicePreview({
             {LABELS[key]}
             {available[key] ? null : (
               <span className="cq-caption text-(--cq-text-tertiary)">
-                not configured
+                {t("not configured")}
               </span>
             )}
           </label>
         ))}
         <label className="flex min-h-11 items-center gap-2 cq-body">
-          Voice
+          {t("Voice")}
           <select
             value={voice}
             onChange={(event) => {
@@ -220,9 +222,11 @@ export function VoicePreview({
 
       <div className="flex items-center gap-3">
         {live ? (
-          <Button onClick={() => void stop()}>End call</Button>
+          <Button onClick={() => void stop()}>{t("End call")}</Button>
         ) : (
-          <Button onClick={() => void start()}>Start conversation</Button>
+          <Button onClick={() => void start()}>
+            {t("Start conversation")}
+          </Button>
         )}
         <span className="cq-caption text-(--cq-text-secondary)" role="status">
           {status}
@@ -230,7 +234,7 @@ export function VoicePreview({
       </div>
 
       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 cq-caption">
-        <dt>Active provider</dt>
+        <dt>{t("Active provider")}</dt>
         <dd>{choice === "A" ? "OpenAI GPT-Live" : (issued ?? "—")}</dd>
         <dt>Model (provider-reported)</dt>
         <dd>
@@ -248,13 +252,13 @@ export function VoicePreview({
                 ? "—"
                 : stats.latenciesMs.map((ms) => `${String(ms)} ms`).join(", ")}
             </dd>
-            <dt>Billed seconds</dt>
+            <dt>{t("Billed seconds")}</dt>
             <dd>
               {stats?.billedSeconds === null || stats === null
                 ? "—"
                 : `${String(stats.billedSeconds)} s ${stats.usageConfirmed ? "(final)" : "(running)"}`}
             </dd>
-            <dt>Delegations</dt>
+            <dt>{t("Delegations")}</dt>
             <dd>
               {(bridge?.delegations ?? [])
                 .map((d) => `${d.status}: ${d.request || "…"}`)
@@ -262,7 +266,7 @@ export function VoicePreview({
             </dd>
             {stats?.closedReason === null || stats === null ? null : (
               <>
-                <dt>Closed</dt>
+                <dt>{t("Closed")}</dt>
                 <dd>{stats.closedReason}</dd>
               </>
             )}
@@ -270,7 +274,7 @@ export function VoicePreview({
         ) : null}
       </dl>
 
-      <ol className="flex flex-col gap-2" aria-label="Live transcript">
+      <ol className="flex flex-col gap-2" aria-label={t("Live transcript")}>
         {transcript.map((line) => (
           <li key={line.id} className="cq-body">
             <span className="cq-label">{line.who}: </span>

@@ -203,7 +203,11 @@ export function DesktopSidebar({
         {collapsed ? null : (
           <div className="min-w-0 px-3 pb-1">
             {/* Where this person is acting: the scope, out of the input. */}
-            <ContextIndicator scope={context.scope} detail={context.label} />
+            <ContextIndicator
+              translate={t}
+              scope={context.scope}
+              detail={context.label}
+            />
           </div>
         )}
         <div

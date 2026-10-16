@@ -112,6 +112,7 @@ export function QSheetConversation({
             {label}
           </span>
           <ContextIndicator
+            translate={t}
             scope={subject.scope}
             detail={subject.kind === "NONE" ? undefined : subject.label}
           />

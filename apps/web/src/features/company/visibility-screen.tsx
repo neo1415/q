@@ -188,6 +188,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
               : "Private to your organisation"}
           </h2>
           <ContextIndicator
+            translate={t}
             scope={visible ? "network_visible" : "organisation_private"}
           />
         </header>

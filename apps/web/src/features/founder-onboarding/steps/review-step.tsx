@@ -213,6 +213,7 @@ export function ReviewStep({
         </div>
       </dl>
       <ContextIndicator
+        translate={t}
         scope="organisation_private"
         detail="Entered by you. Q hasn't reviewed it, and investors can't see it."
       />

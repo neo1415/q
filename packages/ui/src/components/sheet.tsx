@@ -7,6 +7,7 @@ import { ICON_SIZE, ICON_STROKE, X } from "../icons/index.js";
 import { cx } from "../primitives/class-names.js";
 import { OverlayLayerContext } from "../primitives/overlay-layer.js";
 import { IconButton } from "./button.js";
+import { useUiText } from "../primitives/ui-text.js";
 
 /**
  * Sheet on Base UI's modal dialog. Mobile-first: a bottom sheet with
@@ -61,6 +62,7 @@ export function SheetContent({
   readonly children: ReactNode;
   readonly className?: string | undefined;
 }) {
+  const t = useUiText();
   return (
     <OverlayLayerContext.Provider value="modal">
       <BaseDialog.Portal>
@@ -85,7 +87,7 @@ export function SheetContent({
             </div>
             <BaseDialog.Close
               render={
-                <IconButton aria-label="Close" variant="quiet">
+                <IconButton aria-label={t("Close")} variant="quiet">
                   <X
                     aria-hidden="true"
                     size={ICON_SIZE.prominent}

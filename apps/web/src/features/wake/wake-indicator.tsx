@@ -9,6 +9,7 @@ import {
   useWakeStatus,
   type WakeStatus,
 } from "./wake-status";
+import { useT } from "@/features/i18n/language";
 
 /**
  * D2 privacy: whenever "Hey Q" has the microphone, the shell says so in
@@ -35,6 +36,7 @@ export function wakeIndicatorText(status: WakeStatus): string | null {
 }
 
 export function WakeIndicator() {
+  const t = useT();
   const status = useWakeStatus();
   const text = wakeIndicatorText(status);
   if (text === null) return null;
@@ -69,7 +71,7 @@ export function WakeIndicator() {
             href="/settings#q"
             className="inline-flex min-h-11 items-center px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           >
-            Settings
+            {t("Settings")}
           </Link>
         )}
       </div>

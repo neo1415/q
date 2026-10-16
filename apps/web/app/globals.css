@@ -2523,7 +2523,7 @@
   .cq-q-dock {
     position: absolute;
     top: 0;
-    inset-inline-start: 0;
+    left: 0; /* JS places it in physical px (q-dock.tsx) */
     display: flex;
     pointer-events: auto;
     touch-action: none;
@@ -3723,4 +3723,32 @@
     .lucide-panel-left
   ) {
   transform: scaleX(-1);
+}
+
+/*
+ * Multilingual Q (RTL): a paragraph keeps the direction of its own
+ * language, so an English name, a figure or a quoted English line inside
+ * an Arabic page reads in its own order (and the reverse), instead of
+ * taking the page's direction and moving its punctuation.
+ */
+[dir="rtl"]
+  :is(
+    p,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    li,
+    dd,
+    dt,
+    blockquote,
+    figcaption,
+    td,
+    th,
+    label,
+    legend
+  ) {
+  unicode-bidi: plaintext;
 }

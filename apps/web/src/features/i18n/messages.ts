@@ -8,6 +8,7 @@ import { CORE_AR } from "./catalog/core";
 import { DISCOVER_AR } from "./catalog/discover";
 import { Q_AR } from "./catalog/q";
 import { SETUP_AR } from "./catalog/setup";
+import { SHELL_AR } from "./catalog/shell";
 
 /**
  * The interface's language (multilingual Q, Arabic first, 2026-10-16).
@@ -32,6 +33,7 @@ const ARABIC: Readonly<Record<string, string>> = {
   ...DISCOVER_AR,
   ...COMPANY_AR,
   ...SETUP_AR,
+  ...SHELL_AR,
 };
 
 export function uiLanguageOf(

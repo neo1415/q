@@ -1001,12 +1001,13 @@ export function QConversationPanel({
                     />
                   </ViewTransition>
                   <span className="cq-caption text-(--cq-text-secondary) max-sm:sr-only">
-                    {stateLabel}
+                    {t(stateLabel)}
                   </span>
                 </span>
               )}
               <div className="min-w-0 max-lg:hidden" data-q-scope>
                 <ContextIndicator
+                  translate={t}
                   scope={context.scope}
                   detail={context.label}
                 />
@@ -1403,7 +1404,7 @@ export function QConversationPanel({
                   >
                     {q.working ? <QSwarm state="WORKING" pixels={40} /> : null}
                     <span className="cq-caption text-(--cq-text-secondary)">
-                      {stateLabel}
+                      {t(stateLabel)}
                       {q.working &&
                       stage !== undefined &&
                       (!voice.active || documentStage)
@@ -1471,7 +1472,7 @@ export function QConversationPanel({
                     role="status"
                   >
                     <span className="cq-label text-(--cq-text-primary)">
-                      {stateLabel}
+                      {t(stateLabel)}
                     </span>
                     {!voice.active && q.working && stage !== undefined ? (
                       <span className="cq-caption text-(--cq-text-secondary)">

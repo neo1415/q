@@ -296,7 +296,7 @@ function MoreSheet({
         )}
         <div className="mt-3 flex flex-col gap-2 border-t border-(--cq-border-subtle) px-3 pt-4">
           <span className="cq-label text-(--cq-text-secondary)">
-            Appearance
+            {t("Appearance")}
           </span>
           <ThemeToggle />
         </div>

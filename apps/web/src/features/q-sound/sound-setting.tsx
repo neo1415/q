@@ -3,6 +3,7 @@
 import { playSound } from "./sound-engine";
 import { storeSoundPreference, useSoundPreference } from "./sound-preference";
 import { SOUND_MODES, SOUND_MODE_LABELS } from "./sound-rules";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Settings → Appearance: Q's sounds On, Quiet or Off on this device (I2).
@@ -10,12 +11,13 @@ import { SOUND_MODES, SOUND_MODE_LABELS } from "./sound-rules";
  * hears what they chose.
  */
 export function SoundSetting() {
+  const t = useT();
   const mode = useSoundPreference();
   return (
     <div className="flex flex-col gap-1.5">
       <div
         role="group"
-        aria-label="Q's sounds"
+        aria-label={t("Q's sounds")}
         className="flex flex-wrap gap-1"
         data-sound-setting
       >
@@ -39,9 +41,9 @@ export function SoundSetting() {
         ))}
       </div>
       <p className="cq-caption text-(--cq-text-secondary)">
-        Small sounds when Q wakes, listens, works and has a result. Quiet keeps
-        only a soft tone as Q starts working, Result ready, Needs you and
-        errors. Never while Q speaks.
+        {t(
+          "Small sounds when Q wakes, listens, works and has a result. Quiet keeps only a soft tone as Q starts working, Result ready, Needs you and errors. Never while Q speaks.",
+        )}
       </p>
     </div>
   );

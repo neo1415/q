@@ -9,6 +9,7 @@ import { ICON_SIZE, ICON_STROKE, LogOut } from "@capital-q/ui/icons";
 import { Tooltip } from "@capital-q/ui/tooltip";
 
 import { SubmitButton } from "./submit-button";
+import { useT } from "@/features/i18n/language";
 
 /**
  * What this browser keeps for the person signing out: which chat each Q
@@ -22,6 +23,7 @@ function forgetThisPerson(): void {
 
 /** Sign out is a server action: the provider session ends, not a React state. */
 export function SignOutButton() {
+  const t = useT();
   return (
     <form
       action={signOutAction}
@@ -35,7 +37,7 @@ export function SignOutButton() {
         fullWidth={false}
         pendingLabel="Signing out…"
       >
-        Sign out
+        {t("Sign out")}
       </SubmitButton>
     </form>
   );
@@ -51,6 +53,7 @@ export function SignOutControl({
 }: {
   readonly appearance: "icon" | "row";
 }) {
+  const t = useT();
   const button = (
     <button
       type="submit"
@@ -67,7 +70,7 @@ export function SignOutControl({
         size={ICON_SIZE.regular}
         strokeWidth={ICON_STROKE}
       />
-      {appearance === "row" ? <span>Sign out</span> : null}
+      {appearance === "row" ? <span>{t("Sign out")}</span> : null}
     </button>
   );
   return (

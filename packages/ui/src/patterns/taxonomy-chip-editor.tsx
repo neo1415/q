@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "../components/button.js";
 import { ChoiceChip } from "../components/chip.js";
 import { Input } from "../components/input.js";
+import { useUiText } from "../primitives/ui-text.js";
 
 /**
  * Human-readable classification chips the founder can confirm, remove or
@@ -36,6 +37,7 @@ export function TaxonomyChipEditor({
   onChange,
   disabled = false,
 }: TaxonomyChipEditorProps) {
+  const t = useUiText();
   const [draft, setDraft] = useState("");
 
   function toggle(label: string) {
@@ -86,9 +88,9 @@ export function TaxonomyChipEditor({
         <div className="min-w-0 flex-1">
           <Input
             id={`${id}-add`}
-            label="Add a category"
+            label={t("Add a category")}
             labelHidden
-            placeholder="Add a category"
+            placeholder={t("Add a category")}
             value={draft}
             disabled={disabled}
             onChange={(event) => setDraft(event.target.value)}
@@ -105,7 +107,7 @@ export function TaxonomyChipEditor({
           onClick={add}
           disabled={disabled || draft.trim().length === 0}
         >
-          Add
+          {t("Add")}
         </Button>
       </div>
     </fieldset>

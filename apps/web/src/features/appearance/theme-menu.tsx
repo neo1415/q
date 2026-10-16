@@ -19,6 +19,7 @@ import {
 
 import { isThemeChoice, THEME_DISPLAY_ORDER, type ThemeChoice } from "./theme";
 import { THEME_LABELS, useThemeChoice } from "./theme-toggle";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The theme as one icon (R24): the icon of the current choice, opening a
@@ -42,6 +43,7 @@ export function ThemeMenu({
 }: {
   readonly align?: "start" | "center" | "end" | undefined;
 }) {
+  const t = useT();
   const [choice, choose] = useThemeChoice();
   const Icon = ICONS[choice];
   const current =
@@ -64,7 +66,7 @@ export function ThemeMenu({
       </MenuTrigger>
       <MenuContent align={align} className="min-w-40">
         <MenuRadioGroup
-          label="Theme"
+          label={t("Theme")}
           value={choice}
           onValueChange={(next) => {
             if (isThemeChoice(next)) choose(next);

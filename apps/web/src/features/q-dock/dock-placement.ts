@@ -396,7 +396,13 @@ function readAll(): Partial<Record<DockClass, DockPlacement>> {
 const snapshots = new Map<string, DockPlacement>();
 
 export function readPlacement(dockClass: DockClass): DockPlacement {
-  const stored = readAll()[dockClass] ?? DEFAULT_PLACEMENT;
+  // Multilingual Q: right-to-left, Q waits at the reading end (the left)
+  // until the person moves it; a placement they chose is kept as it is.
+  const rtl =
+    typeof document !== "undefined" && document.documentElement.dir === "rtl";
+  const stored =
+    readAll()[dockClass] ??
+    (rtl ? { ...DEFAULT_PLACEMENT, side: "left" as const } : DEFAULT_PLACEMENT);
   const value = normalise(stored, dockClass);
   const key = `${dockClass}:${value.side}:${value.slot}:${String(value.stashed)}`;
   const known = snapshots.get(key);

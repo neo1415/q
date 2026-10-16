@@ -6,6 +6,7 @@ import { MultiChoiceList } from "@capital-q/ui/choice-list";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F2. A declaration of what exists, nothing more: no file picker, no
@@ -18,6 +19,7 @@ export function MultiChoiceStep({
   busy,
   actions,
 }: StepProps<"multi_choice">) {
+  const t = useT();
   const [values, setValues] = useState<readonly string[]>(
     step.response?.values ?? [],
   );
@@ -55,6 +57,7 @@ export function MultiChoiceStep({
         }}
       />
       <ContextIndicator
+        translate={t}
         scope="organisation_private"
         detail="Your files stay private to your company. You can't upload files here yet, so nothing is collected."
       />
