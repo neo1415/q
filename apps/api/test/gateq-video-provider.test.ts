@@ -54,6 +54,7 @@ describe("GateQ video provider bridge URL", () => {
       maxSeconds: 180,
       testMode: false,
       greeting: "Hello",
+      fund: "Savanna Seed Partners",
       bridge: { path: GATEQ_VIDEO_BRIDGE_PATH, bearer: "b".repeat(43) },
       joinGraceSeconds: 30,
       events: { path: GATEQ_VIDEO_EVENTS_PATH, token: "e".repeat(43) },
@@ -62,9 +63,12 @@ describe("GateQ video provider bridge URL", () => {
     const baseUrl = (pal?.body as { layers: { llm: { base_url: string } } })
       .layers.llm.base_url;
     expect(baseUrl).toBe("https://api.example/v1/gateq/video/bridge");
-    // The applicant's room shows the interviewer as "Q", never an id; the
-    // conversation keeps the session id for tracing on the provider's side.
-    expect((pal?.body as { pal_name: string }).pal_name).toBe("Q");
+    // The applicant's room shows who Q is (the fund's AI interviewer),
+    // never the stock face's own name or an id; the conversation keeps the
+    // session id for tracing on the provider's side.
+    expect((pal?.body as { pal_name: string }).pal_name).toBe(
+      "Q · Savanna Seed Partners (AI interviewer)",
+    );
     const conversation = bodies.find((b) =>
       b.url.endsWith("/v2/conversations"),
     );

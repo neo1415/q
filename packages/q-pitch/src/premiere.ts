@@ -169,6 +169,12 @@ function v5Entries(): CertificationEntry[] {
         "A relationship record shows its stage and a dated history of what happened, each entry marked with who can see it",
       ],
       ["Any figure on screen as a Capital Q result"],
+      {
+        receipt:
+          'v5 acceptance run 5 (Playwright, savanna-seed, live): scene 10 complete; section.relationship-history SCROLL_TO DONE, dated entries each marked "Only your side can see this" (scene-10.png); scratchpad v5-acc/run5',
+        commit: "web production 7735ec77 (batches T+U)",
+        at: "2026-10-16 09:19 UTC",
+      },
     ),
     entry(
       "MEETING-PREP-VIEW",

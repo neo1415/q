@@ -1,5 +1,6 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -14,6 +15,12 @@ import {
 } from "./auth-errors";
 import type { AuthFormState } from "./form-state";
 import { DEFAULT_RETURN_PATH, resolveSafeReturnPath } from "./redirect-safety";
+import {
+  INTENDED_JOURNEY_KEY,
+  isInvitationReturn,
+  RegistrationJourneySchema,
+  WORKSPACE_CHOSEN_COOKIE,
+} from "./registration";
 import { getSessionUser } from "./session";
 import { createServerSupabaseClient } from "./supabase-server";
 
@@ -143,12 +150,20 @@ export async function signUpWithPasswordAction(
        */
       fullName: z.string().trim().min(1).max(80),
       organisationName: z.string().trim().max(120).optional(),
+      /**
+       * Raising or investing (owner directive 2026-10-16): the journey this
+       * account starts in. Required, except for somebody following an
+       * invitation, whose organisation and role the invitation already
+       * names. It initialises a journey; it never classifies the person.
+       */
+      journey: RegistrationJourneySchema.optional(),
     })
     .safeParse({
       email: field(formData, "email"),
       password: field(formData, "password"),
       fullName: field(formData, "fullName"),
       organisationName: field(formData, "organisationName") || undefined,
+      journey: field(formData, "journey") || undefined,
     });
 
   if (!input.success) {
@@ -158,6 +173,17 @@ export async function signUpWithPasswordAction(
         "Enter your name, a valid email, and a password of at least 8 characters.",
     };
   }
+  const invited = isInvitationReturn(next);
+  if (!invited && input.data.journey === undefined) {
+    return {
+      status: "error",
+      message: "Choose whether you are raising capital or investing it.",
+    };
+  }
+  // An invitation decides the organisation; a journey chosen alongside one
+  // is ignored rather than carried, so the invitee is never steered into
+  // setting up a second company next to the one they were invited into.
+  const journey = invited ? undefined : input.data.journey;
 
   const { auth } = loadWebServerConfig();
   const supabase = await createServerSupabaseClient();
@@ -176,9 +202,10 @@ export async function signUpWithPasswordAction(
        */
       data: {
         display_name: input.data.fullName,
-        ...(input.data.organisationName === undefined
+        ...(input.data.organisationName === undefined || invited
           ? {}
           : { organisation_name: input.data.organisationName }),
+        ...(journey === undefined ? {} : { [INTENDED_JOURNEY_KEY]: journey }),
       },
     },
   });
@@ -302,6 +329,8 @@ export async function signOutAction(): Promise<void> {
   // their own sessions; ending those is a security-settings feature, not
   // a sign-out button.
   await supabase.auth.signOut({ scope: "local" });
+  // The next sign-in chooses its workspace afresh.
+  (await cookies()).delete(WORKSPACE_CHOSEN_COOKIE);
 
   redirect("/auth/sign-in?notice=signed-out");
 }

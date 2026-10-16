@@ -245,3 +245,35 @@ Every other atlas feature currently has no certification entry and must not be p
 - **Promoted to PRODUCTION_LIVE_VERIFIED:** `FEED-VIEW`, `GATEQ-DOSSIER-VIEW`, `DOCUMENT-OPEN`.
 - **Stays CODE_VERIFIED:** `CRM-RECORD-VIEW`. The history is on screen with dates, but the tour strip covers part of it, and "each entry marked with who can see it" was not legible in the receipt.
 - **Speech:** with the allowance at 300, no 429 in the whole run; narration ran to the end.
+
+## Premiere v5 acceptance run 5 — production `7735ec77` (batches T+U), 16 Oct 2026 09:15–09:22 UTC (Lane P, lead-approved)
+
+- **Method:** as runs 3–4: Playwright, `investor.savanna-seed@fictional.capitalq.local`, `?qpitch=premiere`, "Start the tour", nothing blocked, microphone denied (standard voice), `CQ_SPEECH_LINES_PER_10MIN=300`. Receipts: scratchpad `v5-acc/run5/`, not committed.
+- **Result:** RUNNING 27 s after Start; **17 of 17 scenes complete, 0 fallbacks, in 6:43** (tour complete at 403 s); hand-over: the strip left by itself, Q on `/home`. 0 page errors, 0 console errors, 0 speech refusals; 61 narration lines played (about 7 minutes of audio, including the rehearsal's two voices and the spoken answer).
+
+| #   | Scene                                       | Start (s) | Took (s) |
+| --- | ------------------------------------------- | --------- | -------- |
+| 1   | Hello, I'm Q                                | 0         | 39       |
+| 2   | Your mandate                                | 40        | 19       |
+| 3   | Discover: pitches                           | 60        | 11       |
+| 4   | Save one for later                          | 72        | 8        |
+| 5   | Top three                                   | 82        | 15       |
+| 6   | Harbourline Cargo                           | 98        | 33       |
+| 7   | Harbourline vs Clinicrest (+ live question) | 132       | 42       |
+| 8   | GateQ: Maji Loop                            | 175       | 27       |
+| 9   | CRM overview                                | 203       | 11       |
+| 10  | Clinicrest record                           | 216       | 10       |
+| 11  | Preparing a meeting                         | 227       | 10       |
+| 12  | Q Work                                      | 238       | 10       |
+| 13  | Documents                                   | 249       | 15       |
+| 14  | Notifications                               | 265       | 7        |
+| 15  | Q-to-Q rehearsal                            | 274       | 92       |
+| 16  | Capital Q's own profile                     | 369       | 13       |
+| 17  | Your move (Home)                            | 383       | 20       |
+
+- **Live question: PASS.** Asked during scene 7; paused 8 s later, answered (run at 09:17:39, "USD 250,000–1,000,000"), visible in the Q panel, resumed by itself 3 s later. No false pause from loaded history (the run-4 defect is gone).
+- **Promoted:** `CRM-RECORD-VIEW`. The history is on screen above the strip, each dated entry marked "Only your side can see this" (`scene-10.png`).
+- **DEFECT, scene 6 (content, not timing):** the scene completed, but Q's answer described **Basketari** (the feed's last card, `5be654c3…`), not Harbourline. Evidence: run at 09:16:47 has `screen.companyId` = Harbourline, but its page manifest was still `LOADING` with no focus, and `subject_refs` lists `5be654c3…` first. The question went while the profile was loading, and "this company" resolved from the conversation's earlier subject. **Scene 6 is not certified by this run.**
+  - **Fix (tour):** `claude/p-premiere-fix3-oct16`: before every tour question, wait (up to 8 s) until the page has stopped loading and, on a company page, declares that company in focus (`pageSettled`, with tests).
+  - **Open (q-api, not changed here):** when the screen names a company but the manifest has no focus yet, "this company" should resolve to `screen.companyId`, not to an older subject in the conversation. This also affects a person who asks quickly after opening a profile.
+- **Provider usage (estimate, not reconciled with billing):** 4 Q text runs (top three, profile, comparison, the live question) plus 1 short rehearsal (counterpart turns and review), and about 7 minutes of standard-voice speech. Roughly $0.3–0.6.

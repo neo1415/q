@@ -44,6 +44,14 @@ export const DOCUMENT_TYPES = [
   "CUSTOMER",
   "OPERATIONAL",
   "OTHER",
+  /**
+   * An investor's own materials (owner directive 2026-10-16): optional in
+   * investor setup, held as the firm's organisation documents, never a
+   * company's. Q may read them for the mandate; they are not a data room.
+   */
+  "FUND_DECK",
+  "INVESTMENT_THESIS",
+  "LP_LETTER",
 ] as const;
 export const DocumentTypeSchema = z.enum(DOCUMENT_TYPES);
 export type DocumentType = z.infer<typeof DocumentTypeSchema>;

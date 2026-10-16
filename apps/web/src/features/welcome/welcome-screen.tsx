@@ -1,6 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+
+import type { RegistrationJourney } from "@/auth/registration";
 
 import { PersonaCards } from "../persona/persona-cards";
 import { destinationPath } from "../voice/destinations";
@@ -55,12 +58,24 @@ import { QAperture } from "../q-aperture";
  * must not wait on a provider. The name is the only thing that varies,
  * and only when Capital Q already has one.
  */
-function introduction(knownName: string | null): readonly string[] {
+function introduction(
+  knownName: string | null,
+  journey: RegistrationJourney | null,
+): readonly string[] {
   return [
     knownName === null ? "Hi, I'm Q." : `Hi ${knownName}, I'm Q.`,
     "I'll help you understand where you are, prepare what you need, and move through the capital process without making you repeat yourself.",
-    "I work from whatever you already have. You can talk to me or type — whichever you prefer.",
+    journey === "founder"
+      ? "Let's set up your company. I'll use what you've already told me, and you can talk to me or type."
+      : journey === "investor"
+        ? "Let's set up your mandate. I'll use what you've already told me, and you can talk to me or type."
+        : "I work from whatever you already have. You can talk to me or type — whichever you prefer.",
   ];
+}
+
+/** Where each journey's setup opens: by voice, or as the form. */
+function journeyPath(journey: RegistrationJourney, talk: boolean): string {
+  return talk ? `/onboarding/${journey}?talk=1` : `/onboarding/${journey}`;
 }
 
 export function WelcomeScreen({
@@ -68,8 +83,16 @@ export function WelcomeScreen({
   knownOrganisation = null,
   returning = false,
   invitations = null,
+  journey: chosenJourney = null,
 }: {
   readonly knownName: string | null;
+  /**
+   * Raising or investing, as chosen at registration (owner directive
+   * 2026-10-16). Known: Start and "Prefer to type?" open that journey's
+   * setup directly, and the role question is not asked again. Null (Google
+   * sign-up, an older account, a deliberate `?again=1`): as before.
+   */
+  readonly journey?: RegistrationJourney | null | undefined;
   /**
    * F2: invitations to their verified email, rendered on the server, so an
    * invitee can join from where they land instead of only from the email.
@@ -85,6 +108,10 @@ export function WelcomeScreen({
 }) {
   const voice = useVoiceInterview();
   const speech = useQSpeech();
+  const router = useRouter();
+  /** "Choose differently": the registration choice set aside for the cards. */
+  const [overridden, setOverridden] = useState(false);
+  const journey = overridden ? null : chosenJourney;
   /** "Prefer to type?": the role cards and the typed setup. */
   const [typing, setTyping] = useState(false);
   /** Start was pressed: the gesture, so audio may play from here. */
@@ -94,7 +121,7 @@ export function WelcomeScreen({
   /** Q has handed them to their setup by voice; the next screen carries it. */
   const [leaving, setLeaving] = useState<string | null>(null);
 
-  const lines = introduction(knownName);
+  const lines = introduction(knownName, journey);
   const spoken = lines.join(" ");
 
   /**
@@ -126,6 +153,19 @@ export function WelcomeScreen({
   }, [voice.active, stopSpeaking]);
 
   const begin = async () => {
+    if (journey !== null) {
+      // The journey is already chosen: straight into its interview, by
+      // voice. A client navigation, so the press still counts as the
+      // gesture audio needs on the next screen.
+      stopSpeaking();
+      setLeaving(
+        journey === "founder"
+          ? "Setting up your company"
+          : "Setting up your investor profile",
+      );
+      router.push(journeyPath(journey, true));
+      return;
+    }
     setPressed(true);
     setTyping(false);
     setConnecting(true);
@@ -336,12 +376,34 @@ export function WelcomeScreen({
               className="cq-stage-quiet"
               onClick={() => {
                 stopSpeaking();
+                if (journey !== null) {
+                  router.push(journeyPath(journey, false));
+                  return;
+                }
                 setTyping(true);
               }}
               data-q-welcome-type
             >
               Prefer to type?
             </button>
+            {journey === null ? null : (
+              // A correction, not a second question: the cards, for
+              // somebody who meant the other journey.
+              <button
+                type="button"
+                className="cq-stage-quiet"
+                onClick={() => {
+                  stopSpeaking();
+                  setOverridden(true);
+                  setTyping(true);
+                }}
+                data-q-welcome-other-journey
+              >
+                {journey === "founder"
+                  ? "Here to invest instead?"
+                  : "Here to raise instead?"}
+              </button>
+            )}
             {/* F8: someone joining a team that is already here asks its
                 admins to let them in; setting up would make a second
                 company. */}

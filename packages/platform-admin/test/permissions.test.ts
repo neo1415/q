@@ -180,17 +180,70 @@ describe("email deliverability", () => {
       { available: true, send },
       { sql, source: "workers.reminders", provider: "BREVO_API" },
     );
-    await sender.send({ to: "Person@Example.com" });
-    await expect(sender.send({ to: "x@example.org" })).rejects.toBe(failure);
+    await sender.send({ to: "Person@Acme-Freight.co.uk" });
+    await expect(sender.send({ to: "x@acme-freight.co.uk" })).rejects.toBe(
+      failure,
+    );
     expect(inserted[0]?.slice(0, 5)).toEqual([
       "workers.reminders",
       "BREVO_API",
       "SENT",
       null,
-      "example.com",
+      "acme-freight.co.uk",
     ]);
     expect(String(inserted[0]?.[5])).toMatch(/^[0-9a-f]{64}$/);
     expect(inserted[1]?.slice(2, 4)).toEqual(["FAILED", "EAPI"]);
     expect(JSON.stringify(inserted)).not.toContain("Person@");
+  });
+
+  it("suppresses reserved test domains at the one sender: recorded, never sent, never retried", async () => {
+    const inserted: unknown[][] = [];
+    const sql = ((_strings: TemplateStringsArray, ...values: unknown[]) => {
+      inserted.push(values);
+      return Promise.resolve([]);
+    }) as never;
+    const send = vi.fn<(message: { to: string }) => Promise<void>>();
+    const sender = recordingEmailSender(
+      { available: true, send },
+      { sql, source: "api.team_invitation", provider: "SMTP" },
+    );
+    for (const to of [
+      "teammate@fictional.capitalq.local",
+      "a@b.test",
+      "a@b.invalid",
+      "a@shop.example",
+      "a@example.com",
+      "a@mail.example.net",
+      "a@EXAMPLE.ORG",
+    ]) {
+      // Resolves: a suppressed message is not a failure to retry.
+      await expect(sender.send({ to })).resolves.toBeUndefined();
+    }
+    expect(send).not.toHaveBeenCalled();
+    expect(inserted).toHaveLength(7);
+    for (const row of inserted) {
+      expect(row.slice(2, 4)).toEqual(["SUPPRESSED", "RESERVED_TEST_DOMAIN"]);
+    }
+    expect(JSON.stringify(inserted)).not.toContain("teammate@");
+  });
+
+  it("still delivers to real domains that merely look like test names", async () => {
+    const sql = (() => Promise.resolve([])) as never;
+    const send = vi.fn<(message: { to: string }) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    const sender = recordingEmailSender(
+      { available: true, send },
+      { sql, source: "api.team_invitation", provider: "SMTP" },
+    );
+    for (const to of [
+      "a@examples.com",
+      "a@test.io",
+      "a@localco.ng",
+      "a@notexample.com",
+    ]) {
+      await sender.send({ to });
+    }
+    expect(send).toHaveBeenCalledTimes(4);
   });
 });
