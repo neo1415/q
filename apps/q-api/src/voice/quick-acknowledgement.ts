@@ -42,7 +42,8 @@ export function quickAcknowledgement(input: {
   const items: string[] = [];
   for (const result of results) {
     const label = input.labelOf(result.stepKey);
-    const value = result.recorded?.trim() ?? "";
+    // Their own sentence keeps its words, not its full stop ("schools..").
+    const value = (result.recorded?.trim() ?? "").replace(/[.!?;:,\s]+$/u, "");
     if (label === undefined || value.length === 0) return null;
     // Each with its label, as a receipt ("stage: Seed"): a choice like
     // "Yes, actively" means nothing on its own; long text is named only.
