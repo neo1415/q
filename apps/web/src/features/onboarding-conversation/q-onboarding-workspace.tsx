@@ -1245,6 +1245,7 @@ export function QOnboardingWorkspace({
         onboarding: {
           sessionId: view.session.id,
           journeyType: vocabulary.subject,
+          ...(focus === undefined ? {} : { focus }),
         },
         ...(qSubject === undefined
           ? {}

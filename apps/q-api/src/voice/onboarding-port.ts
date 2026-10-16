@@ -47,6 +47,7 @@ import { quoteOccursIn } from "@capital-q/q-knowledge";
 import {
   figureCountIn,
   figureStatedIn,
+  scaleDroppedIn,
   textStatedIn,
 } from "./value-support.js";
 import type { UserId } from "@capital-q/security";
@@ -67,6 +68,7 @@ import {
   optionsOf,
   readRefusal,
   recordedCurrency,
+  SCALE_WORDS,
   spokenFiguresIn,
   toOpenStep,
   toResponseValue,
@@ -232,6 +234,17 @@ export type BoundOnboardingPort = OnboardingToolPort &
      * name exactly one currency (owner 2026-10-16: never ask for a currency
      * already stated). Null when nothing was recorded.
      */
+    /**
+     * A step their latest words state that is not on their path (revenue
+     * for a pre-seed company): its part of their words kept with their
+     * notes, never lost (live AI 2026-10-16: "first revenue only, from two
+     * co-ops" was stated and nothing kept it). Null when no clause of their
+     * words carries the step's own words.
+     */
+    readonly keepStated: (
+      stepKey: string,
+      said: string,
+    ) => Promise<OnboardingRecordResult | null>;
     readonly recordStatedCurrency: (options?: {
       /** Only their earlier words: the latest are the acting model's first. */
       readonly earlierOnly?: boolean;
@@ -1264,6 +1277,13 @@ export function createOnboardingPort(input: {
       reason,
     });
     if (value.type === "RANGE") {
+      // "400 mille euros" is 400,000: a figure recorded without the scale
+      // its words carry is refused (live AJ 2026-10-16: saved as 400).
+      if (scaleDroppedIn(value.value, answer.quote)) {
+        return refuse(
+          "Their figure carries a scale word (thousand, million, mille, mil…) that this value leaves out, so nothing was recorded. Record the full figure.",
+        );
+      }
       const stated = figureStatedIn(value.value, answer.quote);
       if (stated === true) {
         // One stated figure answers one step: the same figure from the
@@ -2512,10 +2532,15 @@ export function createOnboardingPort(input: {
         warmed.set(answer, resolving);
       }
       const plans: Planned[] = [];
-      for (const answer of answers) {
-        const plan = await planOne(answer).catch((error: unknown): Planned =>
-          done(refused(answer.stepKey, error)),
-        );
+      // Answers whose planning failed on a service call (a category lookup
+      // refused before this turn's first answers set up their profile).
+      const failedToPlan = new Set<number>();
+      const writtenBefore = written.length;
+      for (const [index, answer] of answers.entries()) {
+        const plan = await planOne(answer).catch((error: unknown): Planned => {
+          failedToPlan.add(index);
+          return done(refused(answer.stepKey, error));
+        });
         // A figure planned for one step is not also another's in the same
         // breath (one stated figure answers one step), as if each had
         // committed in turn.
@@ -2562,6 +2587,18 @@ export function createOnboardingPort(input: {
         // take as one: the single path, in the order they spoke.
         results.push(await safely(answer));
       }
+      // Live AI 2026-10-16: a new investor's first answer set up their
+      // profile in this batch, and the category look-ups planned before it
+      // were refused (no organisation context yet), so geography and
+      // sectors were lost. Once anything committed, they are planned again.
+      if (written.length > writtenBefore) {
+        for (const index of failedToPlan) {
+          const answer = answers[index];
+          if (answer !== undefined && results[index]?.outcome !== "COMMITTED") {
+            results[index] = await safely(answer);
+          }
+        }
+      }
       // A refused step whose prerequisite landed later in the batch gets
       // one more try, so the order they spoke in does not matter.
       for (const [index, result] of results.entries()) {
@@ -2581,6 +2618,30 @@ export function createOnboardingPort(input: {
     recorded: () => [...written],
     recordFromSignup: (stepKey, text) => recordPlatformHeld(stepKey, text),
     recordKnown: (stepKey, raw) => recordPlatformHeld(stepKey, raw),
+    keepStated: async (stepKey, said) => {
+      const step = steps.get(stepKey);
+      if (step === undefined || written.includes(stepKey)) return null;
+      const view = await current();
+      if (view.responses.some((r) => r.stepKey === stepKey)) return null;
+      const configuration: unknown = step.configuration;
+      const optionLabels =
+        typeof configuration === "object" &&
+        configuration !== null &&
+        "options" in configuration &&
+        Array.isArray(configuration.options)
+          ? (
+              configuration.options as readonly { readonly label?: unknown }[]
+            ).map((o) => (typeof o.label === "string" ? o.label : ""))
+          : [];
+      const about = [
+        coverageProfileFor(input.journeyType).fields[stepKey]?.label ?? "",
+        SPOKEN_QUESTIONS[stepKey] ?? step.configuration.prompt,
+        ...optionLabels,
+      ].join(" ");
+      const words = fieldClausesOf(said, about);
+      if (words === null) return null;
+      return keepOffPath(step, words);
+    },
     recordStatedCurrency: async (options) => {
       const stepKey =
         input.journeyType === "founder" ? "F6.currency" : "I2.currency";
@@ -2989,18 +3050,10 @@ export function optionNamedIn(
   return { optionKey: only[0], quote: only[1] };
 }
 
-/** The scale a figure's word or letter multiplies it by. */
+/** The scale a figure's word or letter multiplies it by, in any language spoken. */
 const FIGURE_SCALES: Readonly<Record<string, number>> = {
-  k: 1_000,
-  thousand: 1_000,
+  ...SCALE_WORDS,
   grand: 1_000,
-  m: 1_000_000,
-  mn: 1_000_000,
-  mil: 1_000_000,
-  million: 1_000_000,
-  bn: 1_000_000_000,
-  b: 1_000_000_000,
-  billion: 1_000_000_000,
 };
 
 /**
@@ -3014,8 +3067,7 @@ export function moneyFiguresIn(
 ): readonly { readonly value: number; readonly text: string }[] {
   const out: { value: number; text: string }[] = [];
   const digits = asciiDigits(text);
-  const pattern =
-    /(?:[$€£₦]\s*)?(\d+(?:[.,]\d+)*)(?:\s*(k|m|mn|mil|bn|b|thousand|grand|million|billion)\b)?/giu;
+  const pattern = /(?:[$€£₦]\s*)?(\d+(?:[.,]\d+)*)(?:\s*([\p{L}]+))?/giu;
   for (const match of digits.matchAll(pattern)) {
     const raw = match[1] ?? "";
     // "1,500,000" and "1.5": a comma before three digits groups thousands.
@@ -3025,8 +3077,16 @@ export function moneyFiguresIn(
         : raw.replace(/,/gu, "."),
     );
     if (!Number.isFinite(number)) continue;
-    const scale = FIGURE_SCALES[(match[2] ?? "").toLowerCase()] ?? 1;
-    out.push({ value: Math.round(number * scale), text: match[0].trim() });
+    const word = (match[2] ?? "").toLowerCase();
+    const scale = FIGURE_SCALES[word];
+    out.push({
+      value: Math.round(number * (scale ?? 1)),
+      // Only the figure and its scale: a following word is not part of it.
+      text: (scale === undefined
+        ? match[0].slice(0, match[0].length - word.length)
+        : match[0]
+      ).trim(),
+    });
   }
   if (out.length === 0) {
     for (const value of spokenFiguresIn(text)) {

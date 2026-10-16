@@ -76,6 +76,11 @@ export type WorldOptions = {
   readonly refuseSkipOfAnswered?: boolean | undefined;
   /** Taxonomy nodes the classifier returns, by phrase. */
   readonly taxonomy?: Readonly<Record<string, string>> | undefined;
+  /**
+   * The category look-up is refused (400, no organisation context) until
+   * this step holds an answer, as for a brand-new investor (live AI).
+   */
+  readonly taxonomyUntil?: string | undefined;
   /** Each vocabulary's top-level categories, by display name -> node id. */
   readonly taxonomyRoots?: Readonly<Record<string, string>> | undefined;
   /** The mandate candidate context the view carries on the I1 step. */
@@ -314,6 +319,27 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       );
     }
 
+    if (
+      url.includes("/taxonomy/candidates") &&
+      options.taxonomyUntil !== undefined &&
+      !held.has(options.taxonomyUntil)
+    ) {
+      return Promise.resolve(
+        Response.json(
+          {
+            type: "urn:capitalq:problem:actor-context-required",
+            title: "Organisation context required",
+            status: 400,
+            code: "ACTOR_CONTEXT_REQUIRED",
+            detail: "Choose an organisation context.",
+          },
+          {
+            status: 400,
+            headers: { "content-type": "application/problem+json" },
+          },
+        ),
+      );
+    }
     if (url.includes("/taxonomy/candidates")) {
       const body = JSON.parse(readBody(init)) as {
         text?: string;

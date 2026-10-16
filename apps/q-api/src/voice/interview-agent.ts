@@ -60,6 +60,7 @@ import {
   createQToolRegistry,
   HOME_Q_CAPABILITY_GROUPS,
   OnboardingRecordResultSchema,
+  type OnboardingRecordResult,
   type QCapabilityGroup,
 } from "@capital-q/q-tools";
 import type { ActorContext } from "@capital-q/security";
@@ -1818,6 +1819,25 @@ export function createInterviewAgent(
       const open = unrecordedStatedIn(state, stated).filter(
         (key) => !done.has(key),
       );
+      // Stated, but not on their path: kept with their notes in their words.
+      const offPath = [...stated].filter(
+        (key) =>
+          !done.has(key) &&
+          !state.steps.some((row) => row.stepKey === key) &&
+          journeySteps.some((step) => step.stepKey === key),
+      );
+      const kept: OnboardingRecordResult[] = [];
+      for (const key of offPath) {
+        const result = await port.keepStated(key, utterance).catch(() => null);
+        if (result !== null) kept.push(result);
+      }
+      if (kept.length > 0) {
+        actions.push({
+          tool: "record_answers",
+          input: { by: "code: stated, kept with their notes" },
+          result: { ok: true, data: { results: kept } },
+        });
+      }
       if (open.length === 0) return;
       const answers: {
         stepKey: string;

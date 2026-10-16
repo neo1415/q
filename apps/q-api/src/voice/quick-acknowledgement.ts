@@ -27,6 +27,11 @@ const MAX_VALUE = 80;
 /** The lead used where the reply is translated: one line per language. */
 export const FIXED_LEAD = "Got it, saved";
 
+/** The full stop after the receipt, unless it already ends on a cut ("…"). */
+function endOf(said: string): string {
+  return /[….!?]$/u.test(said) ? "" : ".";
+}
+
 /** A long answer's opening words, cut at a word, marked as cut. */
 function openingWords(text: string): string {
   const head = text.slice(0, 60);
@@ -116,13 +121,18 @@ export function acknowledgementParts(
         kind: "KEPT",
         text: kept[1]
           .slice(0, MAX_VALUE)
-          .replace(/^([^:]+):/u, (l) => l.toLowerCase()),
+          .replace(/^([^:]+):/u, (l) => l.toLowerCase())
+          .replace(/[.!?;:,\s]+$/u, ""),
       });
       continue;
     }
     const label = input.labelOf(result.stepKey);
     // Their own sentence keeps its words, not its full stop ("schools..").
-    const value = (result.recorded?.trim() ?? "").replace(/[.!?;:,\s]+$/u, "");
+    // Their own words are read back as theirs, with no English note
+    // (live AJ: "basés au Sénégal (in their words)" in a French reply).
+    const value = (result.recorded?.trim() ?? "")
+      .replace(/\s*\(in their words\)$/u, "")
+      .replace(/[.!?;:,\s]+$/u, "");
     if (label === undefined || value.length === 0) return null;
     // Each with its label, as a receipt ("stage: Seed"): a choice like
     // "Yes, actively" means nothing on its own. Long text is read back by
@@ -164,7 +174,7 @@ export function quickAcknowledgement(
   if (parts === null) return null;
   const said = parts.items.map(acknowledgedLine).join("; ");
   const aside = parts.aside === undefined ? "" : `${parts.aside} `;
-  return `${parts.lead}: ${said}. ${aside}${parts.question}${parts.optional ? ` ${OPTIONAL_ACKNOWLEDGEMENT_TAIL}` : ""}`;
+  return `${parts.lead}: ${said}${endOf(said)} ${aside}${parts.question}${parts.optional ? ` ${OPTIONAL_ACKNOWLEDGEMENT_TAIL}` : ""}`;
 }
 
 /**
@@ -256,7 +266,8 @@ export function acknowledgementIn(
   const aside = parts.aside === undefined ? "" : words(parts.aside);
   if (aside === null) return null;
   const opening = lead.replace(/[.!:;,\s]+$/u, "");
-  return `${opening}: ${said.join(separators.items)}. ${aside === "" ? "" : `${aside} `}${question}${tail === "" ? "" : ` ${tail}`}`;
+  const joined = said.join(separators.items);
+  return `${opening}: ${joined}${endOf(joined)} ${aside === "" ? "" : `${aside} `}${question}${tail === "" ? "" : ` ${tail}`}`;
 }
 
 /** Latin-script words only: the code-written reply is English (lane ml owns others). */

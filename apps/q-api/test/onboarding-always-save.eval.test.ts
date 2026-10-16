@@ -38,6 +38,11 @@ type Case = {
   /** What the saved value must hold, and must not (only this field's part). */
   readonly holds?: string;
   readonly notHolds?: string;
+  /**
+   * A brand-new investor: category look-ups are refused until their first
+   * answer (how they invest) sets up the profile, given in the same breath.
+   */
+  readonly newInvestor?: true;
 };
 
 const F = "founder" as const;
@@ -49,6 +54,43 @@ const AG_INVESTOR =
   "Hey, so I'm a partner at Corvo Ventures, it's a small VC fund out of Lisbon. We're actively investing, cheques usually 150k to 400k euros, typical maybe 250k, mostly seed, sometimes pre-seed. We like climate, logistics and anything that makes ports less painful. Europe and North Africa. Honestly we also back a lot of second-time founders, and we never do gambling or tobacco.";
 
 export const ALWAYS_SAVE_CASES: readonly Case[] = [
+  // Logged misses (live AJ, 2026-10-16).
+  {
+    id: "aj-400-mille-euros",
+    journey: F,
+    said: "Oui, nous levons activement 400 mille euros, via un SAFE.",
+    stepKey: "F6.target_amount",
+    value: 400_000,
+    quote: "400 mille euros",
+  },
+  {
+    id: "aj-2-millones",
+    journey: F,
+    said: "Estamos levantando 2 millones de dólares.",
+    stepKey: "F6.target_amount",
+    value: 2_000_000,
+    quote: "2 millones de dólares",
+  },
+  // Logged misses (live AI, 2026-10-16).
+  {
+    id: "ai-geography-new-investor",
+    journey: I,
+    said: AG_INVESTOR,
+    stepKey: "I3.geography",
+    value: ["Europe", "North Africa"],
+    quote: "Europe and North Africa",
+    newInvestor: true,
+  },
+  {
+    id: "ai-sectors-new-investor",
+    journey: I,
+    said: AG_INVESTOR,
+    stepKey: "I3.sectors",
+    value: ["climate", "logistics"],
+    quote:
+      "We like climate, logistics and anything that makes ports less painful",
+    newInvestor: true,
+  },
   // Logged misses (live AG, 2026-10-16).
   {
     id: "ag-uganda",
@@ -526,7 +568,10 @@ async function persisted(c: Case): Promise<{
     recorded:
       c.journey === "founder"
         ? { "F0.intent": "raising_now", "F1.company_name": "Lumora Grid" }
-        : { "I0.investor_type": "vc" },
+        : c.newInvestor === true
+          ? {}
+          : { "I0.investor_type": "vc" },
+    ...(c.newInvestor === true ? { taxonomyUntil: "I0.investor_type" } : {}),
     taxonomy: {
       fintech: FINTECH,
       europe: "a0000000-0000-4000-8000-0000000000e1",
@@ -564,6 +609,17 @@ async function persisted(c: Case): Promise<{
       ? [await (async () => port.recordStatedCurrency())().catch(() => null)]
       : await port
           .record([
+            ...(c.newInvestor === true
+              ? [
+                  {
+                    stepKey: "I0.investor_type",
+                    value: "vc",
+                    quote: "a small VC fund",
+                    basis: "STATED" as const,
+                    ownWords: false,
+                  },
+                ]
+              : []),
             {
               stepKey: c.stepKey,
               value: typeof c.value === "object" ? [...c.value] : c.value,
