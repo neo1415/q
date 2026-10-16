@@ -32,6 +32,14 @@ const { WORKFORCE_SCENARIOS, gradeWorkforce, planFromPayload } =
 const DRY = process.argv.includes("--dry-run");
 const APPROVE = process.argv.includes("--approve");
 const only = process.argv.find((arg) => arg.startsWith("--only="))?.slice(7);
+/** One case only: ask in these words instead of the scenario's own. */
+const goalOverride = process.argv
+  .find((arg) => arg.startsWith("--goal="))
+  ?.slice(7);
+/** Continue this conversation (e.g. a go-ahead after "Shall I plan this anyway?"). */
+const conversationId = process.argv
+  .find((arg) => arg.startsWith("--conversation="))
+  ?.slice(15);
 const CALLS_PER_CASE = 4;
 const MAX_CALLS = Number(process.env.MAX_CALLS ?? "10");
 
@@ -174,7 +182,8 @@ for (const scenario of cases) {
   await sleep(2_000);
   const asked = await qApi(token, "POST", "/v1/q/runs", {
     capability: "ANSWER",
-    message: { text: scenario.goal },
+    message: { text: goalOverride ?? scenario.goal },
+    ...(conversationId === undefined ? {} : { conversationId }),
     modality: "TEXT",
   });
   const runId = asked.body?.runId ?? asked.body?.id ?? null;
@@ -200,7 +209,11 @@ for (const scenario of cases) {
       `/v1/q/approvals/${card.approval_id}/approve`,
       {},
     );
-    for (let i = 0; i < 40 && progress?.done !== progress?.total; i++) {
+    for (
+      let i = 0;
+      i < 40 && (progress === null || progress.done < progress.total);
+      i++
+    ) {
       await sleep(6_000);
       const jobs = await qApi(token, "GET", "/v1/q/workforce/jobs?limit=5");
       const job =
