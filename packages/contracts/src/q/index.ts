@@ -601,6 +601,7 @@ export {
   type QScreenAct,
   type QScreenActIntent,
   QOpenRecordPageIntentSchema,
+  QProfileSectionKeySchema,
   QOpenSetupIntentSchema,
   QSetDiscoverFiltersIntentSchema,
   type QSetDiscoverFiltersIntent,

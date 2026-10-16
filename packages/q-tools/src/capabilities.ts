@@ -240,7 +240,7 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   DISCOVER: "Opens Discover (the feed).",
   COMPANY_VISIBILITY: "Opens their company's visibility settings.",
   RELATIONSHIPS:
-    "Opens their Relationships page: every company-investor relationship of their side, where each stands.",
+    "Opens the CRM (their Relationships hub) on its Overview: every company-investor relationship of their side, where each stands.",
   SETTINGS:
     "Opens Settings: theme, Q motion, Q's voice and connected accounts (Gmail).",
   VERIFICATION:
@@ -315,6 +315,10 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
     "Opens Capital on its 12-month plan tab (a founder's): the 3/6/12-month Readiness Blueprint.",
   CAPITAL_INVESTORS:
     "Opens Capital on its Investors tab (a founder's): their investor relationships.",
+  // Lane ov 2026-10-16: the CRM by its tabs (RELATIONSHIPS is the CRM's
+  // Overview, CAPITAL its Capital tab).
+  CRM_PIPELINE:
+    "Opens the CRM's Pipeline tab: every relationship as a list, table or board, by stage.",
 };
 
 /** Screens that belong to a company's own people. */
