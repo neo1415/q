@@ -9,6 +9,7 @@ import type { Briefing, BriefingItem } from "./briefing";
 import { decideBriefing } from "./briefing-gate";
 import { remindSetupLaterAction } from "./setup-nudge-actions";
 import { useClaimWhenSeen } from "./use-claim-when-seen";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q's briefing on arrival (R35): one short line and a few cards, each a
@@ -46,6 +47,7 @@ function SetupNudgeCard({
   readonly item: BriefingItem;
   readonly onLater: () => void;
 }) {
+  const t = useT();
   // Today's reminder is counted once this card is really seen.
   const ref = useRef<HTMLDivElement>(null);
   useClaimWhenSeen(ref, true);
@@ -68,7 +70,7 @@ function SetupNudgeCard({
           href={item.href}
           className={`${QUIET_CONTROL_CLASS} font-medium text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)`}
         >
-          Continue
+          {t("Continue")}
         </Link>
         <button
           type="button"
@@ -76,7 +78,7 @@ function SetupNudgeCard({
           className={`${QUIET_CONTROL_CLASS} text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)`}
           data-setup-nudge-later
         >
-          Remind me next week
+          {t("Remind me next week")}
         </button>
       </span>
     </div>

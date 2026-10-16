@@ -4,6 +4,7 @@ import {
 } from "@capital-q/contracts";
 
 import { CORE_AR } from "./catalog/core";
+import { Q_AR } from "./catalog/q";
 
 /**
  * The interface's language (multilingual Q, Arabic first, 2026-10-16).
@@ -24,6 +25,7 @@ export type UiLanguage = "en" | "ar";
  */
 const ARABIC: Readonly<Record<string, string>> = {
   ...CORE_AR,
+  ...Q_AR,
 };
 
 export function uiLanguageOf(

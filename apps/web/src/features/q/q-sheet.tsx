@@ -38,6 +38,7 @@ import { QBoard } from "./q-board";
 import { viewingOf, type QMoment } from "./q-moment";
 import { useQSession } from "./q-session";
 import { readTypedDraft } from "./control/fast-navigation";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q beside the page: the dock's expanded view of the one conversation
@@ -59,6 +60,7 @@ export function QSheetConversation({
   /** Where in a pitch the person was when this opening happened. */
   readonly moment?: QMoment | null | undefined;
 }) {
+  const t = useT();
   const session = useQSession();
   const { q, turns, voice, subject, presence, spokenOnly } = session;
   const endRef = useRef<HTMLDivElement>(null);
@@ -176,7 +178,7 @@ export function QSheetConversation({
       {voice.notice !== null ? (
         <InlineNotice tone="warning" title={voice.notice}>
           <Button size="compact" variant="quiet" onClick={voice.clearNotice}>
-            Dismiss
+            {t("Dismiss")}
           </Button>
         </InlineNotice>
       ) : null}
@@ -197,7 +199,7 @@ export function QSheetConversation({
             className="cq-body-sm self-end bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)"
             data-q-panel-person
           >
-            <span className="sr-only">You: </span>
+            <span className="sr-only">{t("You:")} </span>
             {lastPerson}
           </p>
         ) : null}
@@ -229,12 +231,12 @@ export function QSheetConversation({
           skipNoteOf={latestAnswer?.id}
         />
         {q.state.failure !== null ? (
-          <InlineNotice tone="warning" title="Q couldn't finish that">
+          <InlineNotice tone="warning" title={t("Q couldn't finish that")}>
             {failureMessage(q.state.failure)} {recoveryHint(q.state.failure)}
           </InlineNotice>
         ) : null}
         {q.notice !== null && q.state.failure === null ? (
-          <InlineNotice tone="warning" title="That didn't go through">
+          <InlineNotice tone="warning" title={t("That didn't go through")}>
             {q.notice}
           </InlineNotice>
         ) : null}
@@ -289,7 +291,7 @@ export function QSheetConversation({
                   size={ICON_SIZE.compact}
                   strokeWidth={ICON_STROKE}
                 />
-                Move Q
+                {t("Move Q")}
               </button>
             </MenuTrigger>
             <MenuContent>
@@ -305,7 +307,7 @@ export function QSheetConversation({
             className="inline-flex min-h-11 items-center px-2 cq-label text-(--cq-accent) underline-offset-2 hover:underline"
             data-q-open-page
           >
-            Open Q
+            {t("Open Q")}
           </Link>
         </div>
       </div>

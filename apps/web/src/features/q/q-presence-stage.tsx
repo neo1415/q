@@ -30,6 +30,7 @@ import { whenIdle } from "./room/room-read";
 import { roomStage } from "./room/room-stage";
 import { useWire } from "./use-wire";
 import { RenderedMark } from "./artifact-rendered";
+import { useT } from "@/features/i18n/language";
 
 /** W7: how long after the stage mounts its likely next code is fetched. */
 const PREFETCH_AFTER_MS = 800;
@@ -171,6 +172,7 @@ export function QPresenceStage({
   readonly onAsk?: ((question: string) => void) | undefined;
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
 }) {
+  const t = useT();
   const listId = useId();
   const own = useMemo(() => shownItems(turns), [turns]);
   // INC-1: every set shown in this tab stays reachable, whatever happens
@@ -429,7 +431,7 @@ export function QPresenceStage({
             onClick={() => reopen(note.item)}
             data-q-stage-note-reopen={note.item.id}
           >
-            Show again
+            {t("Show again")}
           </button>
         </p>
       )}
@@ -530,13 +532,13 @@ export function QPresenceStage({
               size={ICON_SIZE.compact}
               strokeWidth={ICON_STROKE}
             />
-            Shown recently
+            {t("Shown recently")}
           </button>
           {listOpen ? (
             <ul
               id={listId}
               className="flex w-full flex-col gap-1"
-              aria-label="Shown recently"
+              aria-label={t("Shown recently")}
             >
               {recent.map((item) => (
                 <li key={item.id}>

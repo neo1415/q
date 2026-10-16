@@ -16,6 +16,7 @@ import {
 import { NEW_CHAT_HREF } from "./active-conversation";
 import { Q_CONVERSATIONS_CHANGED_EVENT } from "./use-q-conversation";
 import { formatStamp } from "@/components/date-format";
+import { useT } from "@/features/i18n/language";
 
 /**
  * A person's conversations with Q, as a collapsible list (ADR 0012).
@@ -66,6 +67,7 @@ export function ChatsList({
    */
   readonly active?: string | null;
 }) {
+  const t = useT();
   const router = useRouter();
   const [items, setItems] = useState<readonly QConversationSummary[] | null>(
     null,
@@ -147,12 +149,12 @@ export function ChatsList({
               folded ? "-rotate-90" : "",
             )}
           />
-          Chats
+          {t("Chats")}
         </button>
         <Link
           href={NEW_CHAT_HREF}
-          aria-label="New chat"
-          title="New chat"
+          aria-label={t("New chat")}
+          title={t("New chat")}
           className={buttonClassName("quiet", "compact", "min-h-10")}
         >
           <Plus
@@ -161,7 +163,7 @@ export function ChatsList({
             strokeWidth={ICON_STROKE}
           />
           <span className={variant === "sidebar" ? "sr-only" : ""}>
-            New chat
+            {t("New chat")}
           </span>
         </Link>
       </div>
@@ -169,7 +171,7 @@ export function ChatsList({
         <div id={listId} className="min-h-0 overflow-y-auto">
           {items === null ? (
             <p className="px-3 py-2 cq-caption text-(--cq-text-tertiary)">
-              Loading your chats…
+              {t("Loading your chats…")}
             </p>
           ) : items.length === 0 ? (
             <p className="px-3 py-2 cq-caption text-(--cq-text-tertiary)">
@@ -207,7 +209,7 @@ export function ChatsList({
                       )}
                       aria-label={`Archive ${item.title}`}
                     >
-                      Archive
+                      {t("Archive")}
                     </button>
                   </li>
                 );

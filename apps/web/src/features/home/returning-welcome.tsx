@@ -22,6 +22,7 @@ import { QBriefing } from "./q-briefing";
 import type { ReturningCard, ReturningGreeting } from "./returning";
 import { remindSetupLaterAction } from "./setup-nudge-actions";
 import { useClaimWhenSeen } from "./use-claim-when-seen";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q welcoming somebody back (CQ-WEB-030; acceptance A and K).
@@ -83,6 +84,7 @@ export function ReturningWelcome({
   /** Today's setup reminder, as `setupRemindersWaiting` counts it. */
   readonly setupReminders?: 0 | 1 | undefined;
 }) {
+  const t = useT();
   const router = useRouter();
   const tools = useQSurfaceTools();
   const arrival = useArrivalStatus();
@@ -174,7 +176,7 @@ export function ReturningWelcome({
           data-q-left-off
         >
           <figcaption className="cq-caption text-(--cq-text-tertiary)">
-            Where we left off
+            {t("Where we left off")}
           </figcaption>
           <blockquote className="cq-body text-(--cq-text-primary)">
             {greeting.leftOff}
@@ -194,7 +196,7 @@ export function ReturningWelcome({
       {shownCards.length > 0 ? (
         <ul
           ref={cardsRef}
-          aria-label="Where to start"
+          aria-label={t("Where to start")}
           className="grid w-full gap-2 sm:grid-cols-2"
           data-q-returning-cards
         >
@@ -254,7 +256,7 @@ export function ReturningWelcome({
           className="inline-flex min-h-11 items-center px-3 cq-body-sm text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           data-setup-reminder-later
         >
-          Remind me next week
+          {t("Remind me next week")}
         </button>
       ) : null}
 

@@ -43,6 +43,7 @@ import {
   subjectPagePath,
 } from "./client-actions";
 import { currentNavigationViewer } from "./control/app-routes";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q's answer as cards on the Q page (C1-C3; mockup answer-canvas.html).
@@ -174,6 +175,7 @@ function SourceLinks({
     readonly status?: string | undefined;
   }[];
 }) {
+  const t = useT();
   const link = (source: {
     readonly label: string;
     readonly url: string;
@@ -205,7 +207,7 @@ function SourceLinks({
       {rest.length === 0 ? null : (
         <details className="cq-body-sm text-(--cq-text-secondary)">
           <summary className="inline-flex min-h-11 cursor-pointer items-center">
-            More sources
+            {t("More sources")}
           </summary>
           <ul className="m-0 flex list-none flex-col gap-1 p-0">
             {rest.map(link)}
@@ -229,6 +231,7 @@ function FitHow({
   readonly explanation: FitExplanation;
   readonly name?: string | undefined;
 }) {
+  const t = useT();
   return (
     <details className="cq-ac-how" data-ac-fit-how>
       <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 text-(--cq-text-primary)">
@@ -238,8 +241,9 @@ function FitHow({
       </summary>
       <div className="flex flex-col gap-2 pb-2">
         <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
-          Mandate fit measures how well this company matches the mandate you
-          declared. It is not a judgement of the business.
+          {t(
+            "Mandate fit measures how well this company matches the mandate you declared. It is not a judgement of the business.",
+          )}
         </p>
         <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
           {explanation.rows.map((row) => (
@@ -296,6 +300,7 @@ function AnswerCard({
   /** G-D17: this card's tie with others on mandate fit, said in words. */
   readonly tie?: string | null | undefined;
 }) {
+  const t = useT();
   const number = fitNumber(card);
   const words = fitWords(card);
   const provenance = fitProvenance(card);
@@ -332,7 +337,7 @@ function AnswerCard({
         >
           {spot ? (
             <span className="cq-ac-spot-label" data-ac-spot-label>
-              In focus
+              {t("In focus")}
             </span>
           ) : null}
           <h3>
@@ -341,7 +346,7 @@ function AnswerCard({
             <span
               className="cq-ac-talking"
               role="img"
-              aria-label="Q is talking about this"
+              aria-label={t("Q is talking about this")}
             >
               <i />
               <i />
@@ -375,7 +380,7 @@ function AnswerCard({
               {number}
             </span>
             <span className="of" aria-hidden="true">
-              mandate fit, out of 10
+              {t("mandate fit, out of 10")}
             </span>
           </div>
         )}
@@ -393,7 +398,7 @@ function AnswerCard({
             }}
             data-ac-open={card.key}
           >
-            Open
+            {t("Open")}
           </button>
         ) : null}
         <button
@@ -467,7 +472,9 @@ function AnswerCard({
             )}
             {card.view === null ? null : (
               <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
-                <span className="text-(--cq-text-primary)">Q’s view: </span>
+                <span className="text-(--cq-text-primary)">
+                  {t("Q’s view:")}{" "}
+                </span>
                 {card.view}
               </p>
             )}
@@ -506,7 +513,7 @@ function AnswerCard({
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Open profile
+                  {t("Open profile")}
                 </a>
               )}
               {!rehearseOffered(
@@ -540,7 +547,7 @@ function AnswerCard({
                     actions.onAsk?.(`Tell me more about ${card.name}.`)
                   }
                 >
-                  Ask about this
+                  {t("Ask about this")}
                 </button>
               )}
               {actions.onPin === undefined ? null : (
@@ -575,6 +582,7 @@ function CompareTable({
   readonly onClose?: (() => void) | undefined;
   readonly onPin?: (() => void) | undefined;
 }) {
+  const t = useT();
   const cards = block.cards;
   const labels = compareRows(block);
   const hasView = cards.some((card) => card.view !== null);
@@ -586,13 +594,13 @@ function CompareTable({
   return (
     <div className="cq-ac-compare" data-ac-compare>
       <div className="cq-ac-compare-head">
-        <h3>Side by side</h3>
+        <h3>{t("Side by side")}</h3>
         <div className="flex">
           {onPin === undefined ? null : (
             <button
               type="button"
               className="cq-ac-x"
-              aria-label="Pin to the Board"
+              aria-label={t("Pin to the Board")}
               onClick={onPin}
             >
               <Icon of={Pin} />
@@ -601,8 +609,8 @@ function CompareTable({
           <button
             type="button"
             className="cq-ac-x"
-            aria-label="More: ask Q for a file of this"
-            title="Ask Q for a file of this"
+            aria-label={t("More: ask Q for a file of this")}
+            title={t("Ask Q for a file of this")}
           >
             <Icon of={MoreHorizontal} />
           </button>
@@ -610,7 +618,7 @@ function CompareTable({
             <button
               type="button"
               className="cq-ac-x"
-              aria-label="Close the comparison"
+              aria-label={t("Close the comparison")}
               onClick={onClose}
             >
               <Icon of={X} />
@@ -641,7 +649,7 @@ function CompareTable({
                     aria-label={fitWords(card) ?? undefined}
                   >
                     {card.fit.score.toFixed(1)}
-                    <small>mandate fit, of 10</small>
+                    <small>{t("mandate fit, of 10")}</small>
                   </div>
                 )}
                 {/* G-D17: how it was made, and a tie said as a tie. */}
@@ -678,7 +686,7 @@ function CompareTable({
                       data-hue={String(card.hue)}
                       data-ac-not-recorded
                     >
-                      <span className="s">Not recorded</span>
+                      <span className="s">{t("Not recorded")}</span>
                     </td>
                   );
                 }
@@ -703,10 +711,10 @@ function CompareTable({
           {hasView
             ? [
                 <tr key="view-label" className="label" aria-hidden="true">
-                  <td colSpan={cards.length}>Q’s view</td>
+                  <td colSpan={cards.length}>{t("Q’s view")}</td>
                 </tr>,
                 <tr key="view">
-                  <th scope="row">Q’s view</th>
+                  <th scope="row">{t("Q’s view")}</th>
                   {cards.map((card, index) => (
                     <td
                       key={card.key}
@@ -816,6 +824,7 @@ export function AnswerCanvas({
   spotlight = null,
   ...actions
 }: AnswerCanvasProps) {
+  const t = useT();
   const wide = useWideCanvas();
   const reduced = useReducedMotion() === true;
   // Founder P5: cards the person cleared, by voice or click, are not drawn
@@ -858,7 +867,7 @@ export function AnswerCanvas({
               <button
                 type="button"
                 className="cq-ac-x"
-                aria-label="Close this answer"
+                aria-label={t("Close this answer")}
                 onClick={onCloseAll}
                 data-ac-close-all
               >
@@ -901,7 +910,7 @@ export function AnswerCanvas({
                 spot
               />
             </div>
-            <ul className="cq-ac-strip" aria-label="The other results">
+            <ul className="cq-ac-strip" aria-label={t("The other results")}>
               {shown
                 .filter((card) => card.key !== spotCard.key)
                 .map((card) => (
@@ -956,7 +965,7 @@ export function AnswerCanvas({
           <div
             className="cq-ac-followups"
             role="group"
-            aria-label="Ask next"
+            aria-label={t("Ask next")}
             data-ac-followups
           >
             {block.followUps.map((question) => (

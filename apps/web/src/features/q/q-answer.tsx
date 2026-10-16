@@ -14,6 +14,7 @@ import {
   AnswerPdf,
   ANSWER_PDF_MIN_CHARS,
 } from "@/features/documents/answer-pdf";
+import { useT } from "@/features/i18n/language";
 
 /**
  * One Q reply as a chat row (founder direction A, 2026-09-28; ADR 0018).
@@ -96,6 +97,7 @@ export function QAnswer({
   /** The dock has no separate answer stage. */
   readonly cardsInline?: boolean | undefined;
 }) {
+  const t = useT();
   const id = useId();
   const [open, setOpen] = useState<Panel | null>(null);
   const { inline, companies, investors } = replyParts(turn.blocks, cardsInline);
@@ -156,7 +158,7 @@ export function QAnswer({
           <div
             className="flex flex-wrap gap-2"
             role="group"
-            aria-label="About this answer"
+            aria-label={t("About this answer")}
             data-q-chips
           >
             {chips.map((chip) => (
