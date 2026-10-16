@@ -114,6 +114,26 @@ describe("code-written answers in any language", () => {
     expect(fake.seen).toEqual(["{v1} is waiting for your reply."]);
   });
 
+  it("cachedOnly: unseen lines come back untranslated at once, and are ready for the next caller", async () => {
+    const { store } = memoryStore();
+    const fake = translator();
+    const translateLines = createLineTranslator({
+      store,
+      translate: fake.translate,
+      cap: cap(),
+    });
+    const line = "What stage is the company at?";
+    const first = await translateLines("fr", [line], who, { cachedOnly: true });
+    expect(first.size).toBe(0);
+    // The translation was started anyway; the next caller has it.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const second = await translateLines("fr", [line], who, {
+      cachedOnly: true,
+    });
+    expect(second.get(line)).toBe(`[fr] ${line}`);
+    expect(fake.seen).toEqual([line]);
+  });
+
   it("works the same for Arabic: no per-language path", async () => {
     const { store } = memoryStore();
     const fake = translator();
