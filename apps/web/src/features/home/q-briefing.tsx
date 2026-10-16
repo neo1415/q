@@ -76,7 +76,7 @@ function SetupNudgeCard({
           className={`${QUIET_CONTROL_CLASS} text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)`}
           data-setup-nudge-later
         >
-          Later
+          Remind me next week
         </button>
       </span>
     </div>

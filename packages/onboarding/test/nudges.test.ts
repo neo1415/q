@@ -9,7 +9,11 @@ import {
   type OnboardingNudgeStateRepository,
 } from "../src/application/nudges.js";
 import type { OwnOnboardingSummary } from "../src/application/own-summary.js";
-import type { OnboardingNudgeState } from "../src/domain/nudge-policy.js";
+import {
+  ONBOARDING_NUDGE_POLICY,
+  type OnboardingNudgePolicyConfig,
+  type OnboardingNudgeState,
+} from "../src/domain/nudge-policy.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 const START = Date.parse("2026-09-01T10:00:00Z");
@@ -38,7 +42,16 @@ function summary(
   };
 }
 
-function harness(summaries: readonly OwnOnboardingSummary[]) {
+/** The pre-2026-10-16 surfaces, to keep the Q-conversation mechanics tested. */
+const BOTH_SURFACES = {
+  ...ONBOARDING_NUDGE_POLICY,
+  surfaces: ["BRIEFING", "Q_NOTE"] as const,
+};
+
+function harness(
+  summaries: readonly OwnOnboardingSummary[],
+  config: OnboardingNudgePolicyConfig = ONBOARDING_NUDGE_POLICY,
+) {
   const rows = new Map<string, OnboardingNudgeState>();
   const states: OnboardingNudgeStateRepository = {
     find: (_executor, userId) => Promise.resolve(rows.get(userId) ?? null),
@@ -53,6 +66,7 @@ function harness(summaries: readonly OwnOnboardingSummary[]) {
     states,
     summaries: { read: () => Promise.resolve(summaries) },
     now: () => new Date(clock),
+    config,
   });
   return {
     nudges,
@@ -93,8 +107,19 @@ describe("onboarding nudges", () => {
         expect((await nudges.claimBriefing(USER))?.day).toBe("2026-09-02");
       });
 
-      it("mentions it in a Q conversation at most once", async () => {
-        const { nudges, advance } = harness([summary(journey)]);
+      it("never interrupts a Q conversation (owner 2026-10-16: Home only)", async () => {
+        const { nudges } = harness([summary(journey)]);
+        expect(
+          await nudges.peek(USER, {
+            surface: "Q_NOTE",
+            conversationId: CONVERSATION,
+          }),
+        ).toBeNull();
+        expect(await nudges.claimBriefing(USER)).not.toBeNull();
+      });
+
+      it("mentions it in a Q conversation at most once, where that surface is on", async () => {
+        const { nudges, advance } = harness([summary(journey)], BOTH_SURFACES);
         const request = {
           surface: "Q_NOTE" as const,
           conversationId: CONVERSATION,
@@ -114,9 +139,12 @@ describe("onboarding nudges", () => {
 
       it("honours 'later' and 'stop'", async () => {
         const { nudges, advance } = harness([summary(journey)]);
+        // "Remind me next week": nothing for seven days, then it returns.
         await nudges.choose(USER, "LATER");
         expect(await nudges.claimBriefing(USER)).toBeNull();
-        advance(3 * DAY);
+        advance(6 * DAY);
+        expect(await nudges.claimBriefing(USER)).toBeNull();
+        advance(DAY);
         expect(await nudges.claimBriefing(USER)).not.toBeNull();
         await nudges.choose(USER, "STOP");
         advance(30 * DAY);
@@ -147,7 +175,7 @@ describe("onboarding nudges", () => {
   });
 
   it("does not remember a conversation id that is not one", async () => {
-    const { nudges, rows } = harness([summary("founder")]);
+    const { nudges, rows } = harness([summary("founder")], BOTH_SURFACES);
     await nudges.markShown(USER, { surface: "Q_NOTE", conversationId: "x" });
     expect(rows.get(USER)?.lastConversationId).toBeNull();
   });

@@ -43,9 +43,10 @@ export default async function WelcomePage({
   if (config.qApiBaseUrl === undefined) {
     redirect("/discover");
   }
-  // Founder direction 2026-09-30: whoever has not finished onboarding goes
-  // straight back into it, with Q. Founder decision 2026-10-03 (demo
-  // audit): whoever has lands on the Q page, Home, for both roles.
+  // Founder decision 2026-10-03 (demo audit): whoever is set up lands on
+  // the Q page, Home, for both roles. Owner 2026-10-16 (supersedes the
+  // 2026-09-30 direction to send them back into it): so does somebody
+  // whose setup is unfinished; Home offers it back, at most once a day.
   //
   // Owner directive 2026-10-16: somebody with more than one workspace picks
   // one on arrival, and somebody who chose a journey at registration is not
@@ -68,8 +69,6 @@ export default async function WelcomePage({
       RegistrationJourneySchema.safeParse(params["journey"]).data ??
       null,
   });
-  // F15: back to the screen they were on, not live voice.
-  if (arrival.kind === "RESUME") redirect(arrival.path);
   if (arrival.kind === "HOME") redirect("/home");
   let knownName: string | null = null;
   let knownOrganisation: string | null = null;

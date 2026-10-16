@@ -231,7 +231,7 @@ export function ReturningWelcome({
           className="inline-flex min-h-11 items-center px-3 cq-body-sm text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           data-setup-reminder-later
         >
-          Remind me later
+          Remind me next week
         </button>
       ) : null}
 

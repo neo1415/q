@@ -1729,7 +1729,12 @@ export function createInterviewAgent(
             : "PROFILE"
           : conduct.action === "ROUTE_AWAY"
             ? "DISCOVER"
-            : null,
+            : // Owner 2026-10-16, "continue later": Q has acknowledged it
+              // in one line (the pausing note), and the person is let
+              // into the app; their saved answers wait where they are.
+              pausing
+              ? "HOME"
+              : null,
       handoff: null,
       pronounce,
       warnings: conduct.state.strikes,
