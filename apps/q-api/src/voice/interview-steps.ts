@@ -753,6 +753,14 @@ export function spokenFiguresIn(text: string): readonly number[] {
     // the "million" read from its second word.
     if (!opens) continue;
     const previous = tokens[start - 1] ?? "";
+    // "half a million" is 500,000, not "a million".
+    if (previous === "half" && first === "a") {
+      const scale = SCALE_WORDS[tokens[start + 1] ?? ""];
+      if (scale !== undefined) {
+        figures.push(scale / 2);
+        continue;
+      }
+    }
     if (
       start > 0 &&
       (NUMBER_WORDS[previous.replace(/-.*/, "")] !== undefined ||
