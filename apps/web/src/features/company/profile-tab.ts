@@ -1,5 +1,6 @@
 /** A company profile's tabs, and `?tab=` as the URL says it. */
-export type ProfileTab = "overview" | "elevator" | "dataroom" | "deck" | "team";
+export type ProfileTab =
+  "overview" | "diligence" | "elevator" | "dataroom" | "deck" | "team";
 
 /** `?tab=` as the URL says it; "videos" is the old name of Elevator. */
 export function profileTabOf(
@@ -7,6 +8,7 @@ export function profileTabOf(
 ): ProfileTab | null {
   switch (requested) {
     case "overview":
+    case "diligence":
     case "elevator":
     case "dataroom":
     case "deck":

@@ -168,6 +168,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('media',    'media_assets',              'INTERNAL_SERVER_ONLY', '{}'),
   ('media',    'pitch_requests',            'INTERNAL_SERVER_ONLY', '{}'),
   ('media',    'pitch_transcripts',         'INTERNAL_SERVER_ONLY', '{}'),
+  ('media',    'pitch_section_readings',    'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'conversations',            'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'conversation_messages',    'INTERNAL_SERVER_ONLY', '{}'),
   -- Voice line transcripts (both sides), server-only; suite 889.

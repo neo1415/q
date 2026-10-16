@@ -304,6 +304,17 @@ export {
   type DiligenceDocumentSummariser,
 } from "./diligence-summary.js";
 export {
+  createPitchSectionReader,
+  normalisePitchSectionReading,
+  PITCH_SECTION_READER_PROMPT_VERSION,
+  pitchTranscriptText,
+  type PitchCue,
+  type PitchSectionReader,
+  type PitchSectionReadFact,
+  type PitchSectionReading,
+  type PitchSectionSpec,
+} from "./pitch-section-reader.js";
+export {
   createDeckReader,
   DECK_READER_PROMPT_VERSION,
   DECK_READER_TEXT_MAX,

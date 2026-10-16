@@ -70,7 +70,12 @@ const FACETS: readonly FacetWords[] = [
   { facet: "ELEVATOR", words: "pitch(?:\\s+video)?", properOnly: true },
   { facet: "TEAM", words: "team" },
   { facet: "CHAT", words: "chat|messages|conversation\\s+thread" },
-  { facet: "RELATIONSHIP", words: "relationship|deal|pipeline\\s+entry" },
+  // Lane ov 2026-10-16: a CRM record is the relationship's own page.
+  {
+    facet: "RELATIONSHIP",
+    words:
+      "relationship|deal|pipeline\\s+entry|crm\\s+(?:record|entry|page)|record\\s+in\\s+(?:the\\s+|my\\s+)?crm|(?:in|on)\\s+(?:the\\s+|my\\s+)?crm",
+  },
   { facet: "PAGE", words: "company|profile|page|investor\\s+page" },
 ];
 
