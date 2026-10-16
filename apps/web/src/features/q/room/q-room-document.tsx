@@ -26,6 +26,7 @@ import {
 } from "./document-room";
 import { PdfPage, usePdfDocument } from "./pdf-page";
 import { RoomLoadFailed } from "./room-load-failed";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q room W3 (R3, design scene 2): the data-room document Q opened, in the
@@ -65,6 +66,7 @@ export function QRoomDocument({
   readonly onDownload: () => void;
   readonly onClose: () => void;
 }) {
+  const t = useT();
   const [pageText, setPageText] = useState<{
     readonly page: number;
     readonly text: string;
@@ -98,20 +100,20 @@ export function QRoomDocument({
           {file !== null && !file.downloadable ? (
             <span className="cq-caption flex items-center gap-1 text-(--cq-text-secondary)">
               <Lock aria-hidden="true" size={ICON_SIZE.compact} />
-              View only
+              {t("View only")}
             </span>
           ) : null}
         </div>
         <div
           className="flex items-center"
           role="group"
-          aria-label="Pages"
+          aria-label={t("Pages")}
           data-q-room-document-pager
         >
           <button
             type="button"
             className="cq-stage-quiet min-h-11 min-w-11 justify-center"
-            aria-label="Previous page"
+            aria-label={t("Previous page")}
             disabled={!canBack}
             onClick={() => onPage(page - 1)}
             data-q-room-document-previous
@@ -140,7 +142,7 @@ export function QRoomDocument({
           <button
             type="button"
             className="cq-stage-quiet min-h-11 min-w-11 justify-center"
-            aria-label="Next page"
+            aria-label={t("Next page")}
             disabled={!canForward}
             onClick={() => onPage(page + 1)}
             data-q-room-document-next
@@ -198,7 +200,7 @@ export function QRoomDocument({
             data-q-room-document-stop
           >
             <Square aria-hidden="true" size={ICON_SIZE.compact} />
-            Stop
+            {t("Stop")}
           </button>
         </div>
       ) : null}
@@ -236,7 +238,7 @@ export function QRoomDocument({
             {summary.length === 0 ? null : (
               <>
                 <h3 className="cq-body-sm font-medium text-(--cq-text-primary)">
-                  Summary
+                  {t("Summary")}
                 </h3>
                 <ul className="flex flex-col gap-2">
                   {summary.map((line, index) => (
@@ -257,7 +259,7 @@ export function QRoomDocument({
                   ))}
                 </ul>
                 <p className="cq-caption text-(--cq-text-secondary)">
-                  From the document only. Each line cites its page.
+                  {t("From the document only. Each line cites its page.")}
                 </p>
               </>
             )}

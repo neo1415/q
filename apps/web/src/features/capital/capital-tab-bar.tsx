@@ -18,6 +18,7 @@ import {
   tabForHash,
   type CapitalTab,
 } from "./capital-tabs";
+import { useT } from "@/features/i18n/language";
 
 /** Q's ids for the tabs (literal, for the capability parity matrix). */
 const Q_CAPITAL_TABS: Readonly<Record<string, string>> = {
@@ -47,6 +48,7 @@ export function CapitalTabBar({
   readonly hadTabParam: boolean;
   readonly badges?: Partial<Record<CapitalTab, ReactNode>>;
 }) {
+  const t = useT();
   const router = useRouter();
   const listRef = useRef<HTMLDivElement>(null);
   // RECOVERY-2026-10 (C1): each tab, for Q, by its own data-tab marker.
@@ -128,7 +130,7 @@ export function CapitalTabBar({
     <div
       ref={listRef}
       role="tablist"
-      aria-label="Capital"
+      aria-label={t("Capital")}
       // The second level under the CRM's tabs (owner 2026-10-16): a
       // segmented strip, filled when selected, so it never reads as a
       // second copy of the underlined row above it.

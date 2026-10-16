@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { CompanyScoresLive } from "@/features/scores";
+
 import { EXPLORE_SEARCH_TABS, type ExploreTileDto } from "@capital-q/contracts";
 import { ChevronRight, ICON_SIZE, Search, X } from "@capital-q/ui/icons";
 
@@ -75,6 +77,9 @@ function ResultRow({ result }: { readonly result: ProfileResult }) {
           <span className="cq-caption block truncate text-(--cq-text-secondary)">
             {result.meta}
           </span>
+          {result.kind === "company" ? (
+            <CompanyScoresLive companyId={result.id} />
+          ) : null}
         </span>
         <ChevronRight
           size={ICON_SIZE.regular}
@@ -171,7 +176,7 @@ export function ExploreSearchResults({
                 : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
             }`}
           >
-            {SEARCH_TAB_LABELS[option]}
+            {t(SEARCH_TAB_LABELS[option])}
           </Link>
         ))}
       </nav>

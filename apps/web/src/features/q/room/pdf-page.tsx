@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isNetworkFailure } from "@/pwa/resilient";
 
 import { roomRead, useRetryWhenOnline } from "./room-read";
+import { useT } from "@/features/i18n/language";
 
 /**
  * One page of a PDF, drawn on a canvas (Q room W3). The bytes come from
@@ -144,6 +145,7 @@ export function PdfPage({
   readonly title: string;
   readonly onText: (page: number, text: string) => void;
 }) {
+  const t = useT();
   const canvas = useRef<HTMLCanvasElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
@@ -203,7 +205,7 @@ export function PdfPage({
     >
       {failed ? (
         <p className="cq-body-sm p-4 text-(--cq-text-secondary)">
-          This page couldn&apos;t be drawn.
+          {t("This page couldn't be drawn.")}
         </p>
       ) : (
         <canvas

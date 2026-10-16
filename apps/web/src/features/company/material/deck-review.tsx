@@ -11,6 +11,7 @@ import {
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
+import { deckReviewLine } from "./deck-pending";
 import { readAgainAction, reviewSectionAction } from "./material-actions";
 import { useT } from "@/features/i18n/language";
 
@@ -104,6 +105,36 @@ export function DeckReadingReview({
       );
     });
 
+  // Lead 2026-10-16: accept many at once. Only sections Q read as present
+  // and still not checked; each is confirmed through the same per-section
+  // review (the Write Gate), one after another, so a failure stops there.
+  const pendingPresent = shown.filter(
+    (s) =>
+      s.status === "PRESENT" &&
+      (states.get(s.section) ?? "PENDING") === "PENDING",
+  );
+  const [chosen, setChosen] = useState<ReadonlySet<DeckSectionCode>>(
+    new Set(pendingPresent.map((s) => s.section)),
+  );
+  const confirmChosen = () =>
+    start(async () => {
+      for (const section of pendingPresent) {
+        if (!chosen.has(section.section)) continue;
+        const result = await reviewSectionAction({
+          ...ids,
+          section: section.section,
+          action: "CONFIRM",
+          correction: null,
+        });
+        if (!result.ok) {
+          setMessage(result.message);
+          return;
+        }
+        setStates((was) => new Map(was).set(section.section, "CONFIRMED"));
+      }
+      setMessage(null);
+    });
+
   const readAgain = () =>
     start(async () => {
       const result = await readAgainAction(ids);
@@ -138,6 +169,56 @@ export function DeckReadingReview({
           "Confirm what’s right, mark what’s wrong, or say it in your own words. Investors see only the sections you confirm or write.",
         )}
       </p>
+      {pendingPresent.length === 0 ? null : (
+        <div
+          className="flex flex-col gap-2 border border-(--cq-border-subtle) p-3"
+          data-deck-review-all
+        >
+          <p className="cq-body-sm text-(--cq-text-primary)">
+            {deckReviewLine(pendingPresent.length)}
+          </p>
+          <fieldset className="flex flex-col gap-1">
+            <legend className="cq-caption text-(--cq-text-secondary)">
+              {t("Sections to confirm as Q read them")}
+            </legend>
+            {pendingPresent.map((s) => (
+              <label
+                key={s.section}
+                className="cq-body-sm flex min-h-11 items-center gap-2 text-(--cq-text-primary)"
+              >
+                <input
+                  type="checkbox"
+                  className="size-5 accent-(--cq-accent)"
+                  checked={chosen.has(s.section)}
+                  onChange={(event) =>
+                    setChosen((was) => {
+                      const next = new Set(was);
+                      if (event.target.checked) next.add(s.section);
+                      else next.delete(s.section);
+                      return next;
+                    })
+                  }
+                />
+                {DECK_SECTION_LABELS[s.section]}
+              </label>
+            ))}
+          </fieldset>
+          <button
+            type="button"
+            disabled={
+              pending || pendingPresent.every((s) => !chosen.has(s.section))
+            }
+            onClick={confirmChosen}
+            className={buttonClassName(
+              "primary",
+              "compact",
+              "min-h-11 self-start",
+            )}
+          >
+            {t("Confirm the selected sections")}
+          </button>
+        </div>
+      )}
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
         {shown.map((section) => {
           const state = states.get(section.section) ?? "PENDING";
@@ -151,10 +232,10 @@ export function DeckReadingReview({
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="cq-body text-(--cq-text-primary)">
-                  {DECK_SECTION_LABELS[section.section]}
+                  {t(DECK_SECTION_LABELS[section.section])}
                 </span>
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  {STATE_WORDS[state]}
+                  {t(STATE_WORDS[state])}
                 </span>
               </div>
               {status === null ? null : (

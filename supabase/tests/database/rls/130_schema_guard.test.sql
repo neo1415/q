@@ -78,6 +78,9 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   -- Founder readiness (Q.03/Q.04): founder-private, members only (suite 883).
   ('core', 'company_readiness_assessments', 'RLS_REQUIRED',         '{SELECT}'),
   ('core', 'company_readiness_action_events', 'RLS_REQUIRED',       '{SELECT}'),
+  -- 2026-10-16 Investability (InvestIQ) and Suitability; suite 976.
+  ('core', 'company_investability_assessments', 'RLS_REQUIRED',     '{SELECT}'),
+  ('core', 'investor_company_suitability', 'RLS_REQUIRED',          '{SELECT}'),
   -- Capital rounds (2026-10-04): the company's organisation reads them (suite 760).
   ('core', 'capital_rounds',                'RLS_REQUIRED',         '{SELECT}'),
   -- Round history (P8, 2026-10-06): append-only, the company's organisation reads it (suite 765).
@@ -182,6 +185,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   -- 2026-10 build (classified by the lead from the live grants + RLS state).
   ('q_runtime', 'errands',                  'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'person_standing',          'RLS_REQUIRED',         '{SELECT}'),
+  -- Lane lang: shared machine translations of the interface; suite 974.
+  ('q_runtime', 'ui_translations',          'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'rehearsals',               'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'persona_profiles',         'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'rehearsal_external_subjects', 'RLS_REQUIRED',      '{SELECT}'),

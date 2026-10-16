@@ -3,6 +3,7 @@
 import { Button } from "@capital-q/ui/button";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Ask Q about fit" on an investor (ux spec §9.6): opens the one Q with the
@@ -11,6 +12,7 @@ import { useGlobalQ } from "@/components/app-shell/global-q";
  */
 export function AskQAboutFit({ name }: { readonly name: string }) {
   const { askNow } = useGlobalQ();
+  const t = useT();
   return (
     <Button
       variant="quiet"
@@ -18,12 +20,14 @@ export function AskQAboutFit({ name }: { readonly name: string }) {
       className="min-h-11 self-start"
       onClick={() =>
         askNow(
-          `How well does ${name} fit my raise, from what they have declared publicly? What is unknown?`,
+          t(
+            `How well does ${name} fit my raise, from what they have declared publicly? What is unknown?`,
+          ),
         )
       }
     >
       {/* Words only: Q's mark on every card read as icon spam. */}
-      Ask Q about fit
+      {t("Ask Q about fit")}
     </Button>
   );
 }

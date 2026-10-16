@@ -180,7 +180,7 @@ export function RehearsalLobby({
       <div className="flex flex-col gap-3">
         {voiceNote === null ? null : (
           <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-            {voiceNote}
+            {t(voiceNote)}
           </p>
         )}
         <RehearsalRoom initial={rehearsal} seeYou={seeYou} />
@@ -241,7 +241,11 @@ export function RehearsalLobby({
                 opened.value.mode === "VOICE_FALLBACK" &&
                 opened.value.reason === "CONCURRENCY_LIMIT"
               ? "Video rooms are busy. You can carry on in the voice room."
-              : "Video isn’t available just now, so you’re in the voice room instead.",
+              : opened.ok &&
+                  opened.value.mode === "VOICE_FALLBACK" &&
+                  opened.value.reason === "LANGUAGE_UNAVAILABLE"
+                ? "Video rehearsals don’t run in your language yet, so you’re in the rehearsal room instead."
+                : "Video isn’t available just now, so you’re in the voice room instead.",
         );
         setRehearsal(result.value);
       } else if (result.ok) setRehearsal(result.value);
@@ -345,7 +349,7 @@ export function RehearsalLobby({
             </div>
           )}
           <p className="cq-caption text-(--cq-text-tertiary)">
-            {GROUNDING_WORDS[persona.grounding]}
+            {t(GROUNDING_WORDS[persona.grounding])}
           </p>
         </div>
 

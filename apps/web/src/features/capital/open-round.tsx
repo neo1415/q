@@ -19,6 +19,7 @@ import {
   type LeadOption,
   type RoundOption,
 } from "./round-terms-fields";
+import { useT } from "@/features/i18n/language";
 
 const CURRENCIES = [
   { code: "USD", label: "USD" },
@@ -69,6 +70,7 @@ export function OpenRound({
   readonly leads?: readonly LeadOption[];
   readonly rounds?: readonly RoundOption[];
 }) {
+  const t = useT();
   const [open, setOpen] = useState<"NEW" | "PAST" | null>(null);
   if (open === null) {
     return (
@@ -77,10 +79,10 @@ export function OpenRound({
           variant={prominent ? "primary" : "secondary"}
           onClick={() => setOpen("NEW")}
         >
-          Add a round
+          {t("Add a round")}
         </Button>
         <Button variant="quiet" onClick={() => setOpen("PAST")}>
-          Record a past round
+          {t("Record a past round")}
         </Button>
       </div>
     );
@@ -109,6 +111,7 @@ function RoundForm({
   readonly rounds: readonly RoundOption[];
   readonly onDone: () => void;
 }) {
+  const t = useT();
   const id = useId();
   const router = useRouter();
   const [name, setName] = useState(draft.name);
@@ -175,13 +178,14 @@ function RoundForm({
       <h3 className="cq-title-sm text-(--cq-text-primary)">{title}</h3>
       {past ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          A round you raised before Capital Q. It goes into your history and
-          never becomes your current round.
+          {t(
+            "A round you raised before Capital Q. It goes into your history and never becomes your current round.",
+          )}
         </p>
       ) : null}
       <Input
         id={`${id}-name`}
-        label="Name"
+        label={t("Name")}
         placeholder={past ? "Pre-seed" : "Seed"}
         value={name}
         maxLength={80}
@@ -189,7 +193,7 @@ function RoundForm({
       />
       <MoneyInput
         id={`${id}-target`}
-        label="Target"
+        label={t("Target")}
         value={target}
         currencies={CURRENCIES}
         onChange={setTarget}
@@ -207,7 +211,7 @@ function RoundForm({
           <Input
             id={`${id}-closed`}
             type="date"
-            label="Closed"
+            label={t("Closed")}
             value={closedOn}
             onChange={(event) => setClosedOn(event.target.value)}
           />
@@ -246,7 +250,7 @@ function RoundForm({
             variant="primary"
             disabled={pending || incomplete}
           >
-            Add to history
+            {t("Add to history")}
           </Button>
         ) : (
           <>
@@ -255,19 +259,19 @@ function RoundForm({
               variant="primary"
               disabled={pending || incomplete}
             >
-              Open now
+              {t("Open now")}
             </Button>
             <Button
               variant="secondary"
               disabled={pending || incomplete}
               onClick={() => submit("PLANNED")}
             >
-              Plan it
+              {t("Plan it")}
             </Button>
           </>
         )}
         <Button variant="quiet" disabled={pending} onClick={onDone}>
-          Cancel
+          {t("Cancel")}
         </Button>
       </div>
     </form>

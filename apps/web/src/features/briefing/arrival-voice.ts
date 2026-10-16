@@ -22,10 +22,10 @@ function browserZone(): string | null {
 export async function voiceBriefing(): Promise<string | null> {
   const data = await arrivalForVoice(loadArrival, VOICE_BRIEFING_WAIT_MS);
   if (data === null) return null;
-  // Multilingual Q: the page's language is the person's chosen one.
+  // Any language: the page's language is the person's chosen one.
   const language =
-    typeof document !== "undefined" && document.documentElement.lang === "ar"
-      ? "ar"
+    typeof document !== "undefined" && document.documentElement.lang !== ""
+      ? document.documentElement.lang
       : "en";
   return arrivalWords(data, new Date(), browserZone(), language).spoken;
 }

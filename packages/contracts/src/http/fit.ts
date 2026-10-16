@@ -5,6 +5,14 @@ import { MoneySchema } from "../common/money.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { EvidenceStatusSchema } from "../evidence/vocabulary.js";
 import { CompanyRaiseViewSchema } from "./company-raise.js";
+import {
+  CompanyScoresDtoSchema,
+  SUITABILITY_FIT_BANDS,
+  SUITABILITY_FIT_CONFIDENCE,
+  type ScoreFactor,
+  type SuitabilityDto,
+  type SuitabilityStatus,
+} from "./company-scores.js";
 
 /**
  * Fit with your mandate (founder brief 2026-10-05, B1-B4; ADR 0052).
@@ -195,6 +203,11 @@ export const FitCompanyDtoSchema = z
     /** "Seed · Kenya"; null when nothing is known. */
     line: z.string().max(200).nullable(),
     profile: FitProfileDtoSchema,
+    /**
+     * 2026-10-16: Investability and Suitability (company-scores.ts), two
+     * separate scores. Absent from an older server.
+     */
+    scores: CompanyScoresDtoSchema.optional(),
   })
   .strict();
 export type FitCompanyDto = z.infer<typeof FitCompanyDtoSchema>;
@@ -281,6 +294,8 @@ export const FitComparisonEntryDtoSchema = z
     raiseView: CompanyRaiseViewSchema.optional(),
     sources: z.array(FitCandidateSourceSchema).min(1).max(3),
     profile: FitProfileDtoSchema,
+    /** 2026-10-16: Investability and Suitability; absent from an older server. */
+    scores: CompanyScoresDtoSchema.optional(),
     /** Rows where this entry is the best of the set (shown with a word, never colour alone). */
     bestOn: z.array(FitParameterSchema).max(FIT_PARAMETERS.length),
   })
@@ -439,3 +454,85 @@ export const Q_VIEW_VERDICT_LABELS: Readonly<Record<QViewVerdict, string>> = {
   MAYBE: "Maybe",
   PROBABLY_NOT: "Probably not",
 };
+
+// ---------------------------------------------------------------------------
+// Suitability (2026-10-16): the fit as a 0-100 score (company-scores.ts)
+// ---------------------------------------------------------------------------
+
+// The two vocabularies must stay identical, in both directions.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+const _bandsAgree: Same<FitBand, (typeof SUITABILITY_FIT_BANDS)[number]> = true;
+const _confidenceAgree: Same<
+  FitConfidence,
+  (typeof SUITABILITY_FIT_CONFIDENCE)[number]
+> = true;
+void _bandsAgree;
+void _confidenceAgree;
+
+/**
+ * Suitability from the fit profile the reader already sees: the same
+ * outcomes and the same score (fitScoreOutOf10 × 10), so the two can never
+ * disagree. Deterministic; no model; unknown rows are coverage, never a
+ * low score.
+ */
+export function suitabilityFromFit(profile: FitProfileDto): SuitabilityDto {
+  const applicable = profile.parameters.filter((p) => p.applicable);
+  const known = applicable.filter((p) => p.outcome !== "UNKNOWN");
+  // ADR 0075: a number whenever anything is known, labelled with its
+  // coverage; the fit's own x/10 (3+ known) is used when it shows one, so
+  // the two agree wherever both are shown.
+  const points = known
+    .map((p) => FIT_SCORE_POINTS[p.outcome])
+    .filter((n): n is number => n !== null);
+  const shownFit = fitScoreOutOf10(profile);
+  const shown =
+    shownFit ??
+    (points.length === 0
+      ? null
+      : String(
+          Math.round(
+            (points.reduce((sum, n) => sum + n, 0) / points.length) * 10,
+          ) / 10,
+        ));
+  const status: SuitabilityStatus =
+    profile.band === "OUTSIDE_MANDATE"
+      ? "OUTSIDE_MANDATE"
+      : shown === null
+        ? "NOT_ENOUGH_INFORMATION"
+        : "SCORED";
+  const factor = (p: FitParameterResultDto): ScoreFactor => ({
+    label: FIT_PARAMETER_LABELS[p.parameter],
+    detail: p.reason,
+  });
+  const up = [
+    ...applicable.filter((p) => p.outcome === "STRONG"),
+    ...applicable.filter((p) => p.outcome === "PARTIAL"),
+  ]
+    .slice(0, 3)
+    .map(factor);
+  const down: ScoreFactor[] = [];
+  if (profile.hardRule !== null) {
+    down.push({ label: "Declared rule", detail: profile.hardRule.label });
+  }
+  for (const p of applicable) {
+    if (p.outcome === "MISMATCH" && down.length < 3) down.push(factor(p));
+  }
+  const missing = applicable
+    .filter((p) => p.outcome === "UNKNOWN")
+    .slice(0, 4)
+    .map((p) => `${FIT_PARAMETER_LABELS[p.parameter]}: not known yet`);
+  return {
+    status,
+    score:
+      status === "SCORED" && shown !== null
+        ? Math.round(Number(shown) * 10)
+        : null,
+    band: profile.band,
+    confidence: profile.confidence,
+    coverage: { known: known.length, applicable: applicable.length },
+    up,
+    down,
+    missing,
+    configVersion: profile.configVersion,
+  };
+}

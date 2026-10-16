@@ -20,6 +20,7 @@ import { FitContextValues } from "./fit-context";
 import { FitGlyph, glyphKindOf, outcomeWord } from "./fit-glyph";
 import { QViewMark, useQView, type QViewPort } from "./q-view-note";
 import type { CompanyFit } from "./use-company-fit";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Fit with your mandate" on a company's profile (B3; company.html rail).
@@ -51,17 +52,18 @@ export function FitPanel({
   readonly qViewPort?: QViewPort | undefined;
   readonly className?: string | undefined;
 }) {
+  const t = useT();
   if (fit.status === "NONE") return null;
   return (
     <aside
-      aria-label="Fit and Q's view"
+      aria-label={t("Fit and Q's view")}
       className={cx("flex flex-col gap-3", className)}
       data-fit-panel={fit.status}
     >
       {fit.status === "LOADING" ? (
         <section className="flex flex-col gap-3.5 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-[18px]">
           <h2 className="cq-label text-(--cq-text-secondary)">
-            Fit with your mandate
+            {t("Fit with your mandate")}
           </h2>
           <Skeleton lines={5} />
         </section>
@@ -94,6 +96,7 @@ function ReadyPanel({
   readonly qView: QViewDto | null | undefined;
   readonly qViewPort: QViewPort | undefined;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(defaultOpen);
   const view = useQView(companyId, qView, qViewPort);
   const profile = fit.fit.profile;
@@ -101,11 +104,11 @@ function ReadyPanel({
     <>
       <section className="flex flex-col gap-3.5 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-[18px]">
         <h2 className="cq-label text-(--cq-text-secondary)">
-          Fit with your mandate
+          {t("Fit with your mandate")}
         </h2>
         <p className="flex items-baseline gap-2">
           <span className="cq-title-md text-(--cq-text-primary)">
-            {FIT_BAND_LABELS[profile.band]}
+            {t(FIT_BAND_LABELS[profile.band])}
           </span>
           <span className="cq-body-sm text-(--cq-text-secondary)">
             · {FIT_CONFIDENCE_LABELS[profile.confidence]}
@@ -127,7 +130,7 @@ function ReadyPanel({
                   <span className="flex min-h-[30px] items-center gap-2.5 text-sm">
                     <FitGlyph kind={kind} />
                     <span className="flex-1 text-(--cq-text-primary)">
-                      {FIT_PARAMETER_LABELS[p.parameter]}
+                      {t(FIT_PARAMETER_LABELS[p.parameter])}
                     </span>
                     <span className="text-(--cq-text-secondary)">
                       {outcomeWord(kind)}
@@ -149,7 +152,7 @@ function ReadyPanel({
           className="self-start"
           onClick={() => setOpen(true)}
         >
-          See why
+          {t("See why")}
         </Button>
       </section>
       {view === null || view.status !== "READY" ? null : (
@@ -160,7 +163,7 @@ function ReadyPanel({
           <div className="flex items-center gap-2.5">
             <QViewMark size={22} />
             <span className="cq-caption text-(--cq-text-secondary)">
-              Q&apos;s view · not verified
+              {t("Q's view · not verified")}
             </span>
           </div>
           <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -172,7 +175,7 @@ function ReadyPanel({
           {view.mainRisk === null ? null : (
             <div className="flex flex-col gap-0.5" data-q-view-part="RISK">
               <span className="cq-caption text-(--cq-text-secondary)">
-                Main qualification
+                {t("Main qualification")}
               </span>
               <p className="cq-body-sm text-(--cq-text-primary)">
                 {view.mainRisk}
@@ -206,12 +209,13 @@ function OpenQuestions({
   readonly name: string;
   readonly questions: readonly string[];
 }) {
+  const t = useT();
   const { askNow } = useGlobalQ();
   if (questions.length === 0) return null;
   return (
     <div className="flex flex-col gap-1" data-q-view-part="UNKNOWNS">
       <span className="cq-caption text-(--cq-text-secondary)">
-        Open questions
+        {t("Open questions")}
       </span>
       <ul className="flex flex-col gap-1">
         {questions.map((question) => (

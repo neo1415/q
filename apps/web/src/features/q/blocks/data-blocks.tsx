@@ -15,6 +15,7 @@ import {
   timelineDate,
   valueScale,
 } from "./data-block-logic";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The bodies of the laid-out blocks (RECOVERY-2026-10 E4): a table with
@@ -48,13 +49,14 @@ function ColumnHead({
 }
 
 export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
+  const t = useT();
   return (
     <div className="relative overflow-x-auto" data-q-table>
       <table className="w-full border-collapse text-start">
         <thead>
           <tr>
             <th className="px-0 py-2 pe-4">
-              <span className="sr-only">Attribute</span>
+              <span className="sr-only">{t("Attribute")}</span>
             </th>
             {block.columns.map((column, index) => (
               <th
@@ -88,7 +90,9 @@ export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
                   className="cq-body-sm px-4 py-2 align-top text-(--cq-text-primary)"
                 >
                   {cell === "" ? (
-                    <span className="text-(--cq-text-tertiary)">Not known</span>
+                    <span className="text-(--cq-text-tertiary)">
+                      {t("Not known")}
+                    </span>
                   ) : (
                     cell
                   )}
@@ -114,6 +118,7 @@ const SERIES_TONES = [
 const SERIES_DASH = [undefined, "6 3", "2 3", "8 2 2 2"] as const;
 
 export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
+  const t = useT();
   const titleId = useId();
   const values = block.series.flatMap((series) =>
     series.points.map((point) => point.value),
@@ -127,8 +132,9 @@ export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
     return (
       <figure data-q-chart={block.chart}>
         <figcaption>
-          These series have incompatible categories. The original figures are
-          shown below.
+          {t(
+            "These series have incompatible categories. The original figures are shown below.",
+          )}
         </figcaption>
         {block.series.map((series, s) => (
           <table key={s}>
@@ -254,12 +260,12 @@ export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
         ))}
       </figcaption>
       <details className="cq-caption text-(--cq-text-secondary)">
-        <summary className="cursor-pointer">The figures</summary>
+        <summary className="cursor-pointer">{t("The figures")}</summary>
         <table className="mt-1 border-collapse text-start" data-q-chart-table>
           <thead>
             <tr>
               <th className="pe-3">
-                <span className="sr-only">Point</span>
+                <span className="sr-only">{t("Point")}</span>
               </th>
               {block.series.map((series) => (
                 <th key={series.label} scope="col" className="pe-3">

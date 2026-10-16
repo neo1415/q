@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 
-import type { ExploreTileDto } from "@capital-q/contracts";
+import type { CompanyScoresDto, ExploreTileDto } from "@capital-q/contracts";
 import { Play } from "@capital-q/ui/icons";
 
 import { companyPhotoPath } from "@/features/entity/entity-avatar";
@@ -20,6 +20,11 @@ import {
 } from "./grid-preview-player";
 import { mosaicCellStyle, mosaicLayouts } from "./mosaic";
 import { useT } from "@/features/i18n/language";
+import {
+  CompanyScores,
+  companyScoresLabel,
+  useCompanyScores,
+} from "@/features/scores";
 
 /**
  * Explore's grid (E2; owner 2026-10-16, "the Instagram Explore feel"): one
@@ -100,8 +105,11 @@ export function ExploreTile({
   style,
   index,
   preview = null,
+  scores,
 }: {
   readonly tile: ExploreTileDto;
+  /** Investability and Suitability, when the reader has them (minimal). */
+  readonly scores?: CompanyScoresDto | undefined;
   readonly poster: string | null;
   readonly sectorLabels: ReadonlyMap<string, string>;
   readonly onOpen: () => void;
@@ -132,6 +140,7 @@ export function ExploreTile({
     meta,
     duration === null ? "Pitch video" : `Pitch video, ${duration}`,
     reason.text,
+    scores === undefined ? "" : companyScoresLabel(scores),
   ]
     .filter((part) => part.length > 0)
     .join(". ");
@@ -187,6 +196,9 @@ export function ExploreTile({
           <span className="cq-explore-why" data-reason={tile.reason}>
             {reason.text}
           </span>
+          {scores === undefined ? null : (
+            <CompanyScores scores={scores} variant="minimal" />
+          )}
         </span>
       </button>
     </li>
@@ -226,6 +238,8 @@ export function ExploreGrid({
     preview === null ? [] : order,
     preview?.suspended ?? true,
   );
+  // One batched read for every tile (investors only; others get none).
+  const scores = useCompanyScores(tiles.map((tile) => tile.companyId));
   return (
     <div className="cq-explore-mosaic-host">
       <ul ref={host} className="cq-explore-mosaic" aria-label={label}>
@@ -239,6 +253,7 @@ export function ExploreGrid({
             onOpen={() => onOpen(index)}
             onIntent={onIntent && (() => onIntent(index))}
             style={mosaicCellStyle(layouts, index)}
+            scores={scores.get(tile.companyId)}
             preview={
               preview === null
                 ? null

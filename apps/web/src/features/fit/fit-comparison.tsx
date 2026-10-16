@@ -19,9 +19,12 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 
+import { CompanyScores } from "@/features/scores";
+
 import { fitHeadline } from "./fit-breakdown";
 import { FitGlyph, glyphKindOf } from "./fit-glyph";
 import { QViewMark, useQViews, type QViewPort } from "./q-view-note";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Top N side by side (brief B2; match.html "top3"). Q does not choose:
@@ -83,13 +86,14 @@ function Actions({
   readonly onSave?: ((companyId: string) => void) | undefined;
   readonly onPass?: ((companyId: string) => void) | undefined;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-wrap gap-2">
       <Link
         href={`/company/${entry.companyId}`}
         className={buttonClassName("primary", "compact")}
       >
-        Open profile
+        {t("Open profile")}
       </Link>
       {onSave === undefined ? null : (
         <Button
@@ -97,7 +101,7 @@ function Actions({
           size="compact"
           onClick={() => onSave(entry.companyId)}
         >
-          Save
+          {t("Save")}
         </Button>
       )}
       {onPass === undefined ? null : (
@@ -106,7 +110,7 @@ function Actions({
           size="compact"
           onClick={() => onPass(entry.companyId)}
         >
-          Pass
+          {t("Pass")}
         </Button>
       )}
     </div>
@@ -114,15 +118,18 @@ function Actions({
 }
 
 function ViewText({ view }: { readonly view: QViewDto | null }) {
+  const t = useT();
   if (view === null || view.status !== "READY") {
     return (
-      <span className="cq-body-sm text-(--cq-text-tertiary)">No view yet.</span>
+      <span className="cq-body-sm text-(--cq-text-tertiary)">
+        {t("No view yet.")}
+      </span>
     );
   }
   return (
     <>
       <b className="text-(--cq-text-primary)">
-        {Q_VIEW_VERDICT_LABELS[view.verdict]}
+        {t(Q_VIEW_VERDICT_LABELS[view.verdict])}
       </b>
       <span className="cq-body-sm text-(--cq-text-secondary)">
         {view.summary}
@@ -147,6 +154,7 @@ export function FitComparisonView({
   /** The column Q is talking about (C2): highlighted on desktop, open on a phone. */
   readonly active?: number | undefined;
 }) {
+  const t = useT();
   const entries = comparison.entries;
   const byId = useQViews(
     entries.map((e) => e.companyId),
@@ -234,22 +242,25 @@ export function FitComparisonView({
                   {fitHeadline(e.profile)}
                 </span>
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  {FIT_CONFIDENCE_LABELS[e.profile.confidence]}
+                  {t(FIT_CONFIDENCE_LABELS[e.profile.confidence])}
                 </span>
               </span>
+              {e.scores === undefined ? null : (
+                <CompanyScores scores={e.scores} variant="compact" />
+              )}
             </div>
           ))}
           {comparison.parameters.map((parameter) => (
             <div key={parameter} role="row" className="contents">
               <div role="rowheader" className={cx(label, "sticky start-0")}>
-                {FIT_PARAMETER_LABELS[parameter]}
+                {t(FIT_PARAMETER_LABELS[parameter])}
               </div>
               {row(parameter)}
             </div>
           ))}
           <div role="row" className="contents">
             <div role="rowheader" className={cx(label, "sticky start-0")}>
-              Q&apos;s view
+              {t("Q's view")}
             </div>
             {entries.map((e, j) => (
               <div
@@ -309,6 +320,9 @@ export function FitComparisonView({
                     {fitHeadline(e.profile)} ·{" "}
                     {FIT_CONFIDENCE_LABELS[e.profile.confidence].toLowerCase()}
                   </span>
+                  {e.scores === undefined ? null : (
+                    <CompanyScores scores={e.scores} variant="compact" />
+                  )}
                 </span>
                 <ChevronDown
                   size={ICON_SIZE.compact}
@@ -334,7 +348,7 @@ export function FitComparisonView({
                       >
                         <FitGlyph kind={glyphKindOf(r)} className="mt-0.5" />
                         <span className="text-(--cq-text-secondary)">
-                          {FIT_PARAMETER_LABELS[r.parameter]}
+                          {t(FIT_PARAMETER_LABELS[r.parameter])}
                         </span>
                         <span className="text-(--cq-text-primary)">
                           {r.reason}

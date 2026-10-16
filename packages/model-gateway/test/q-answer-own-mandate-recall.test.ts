@@ -97,7 +97,11 @@ const FULL = {
   ],
 };
 
-function build(said: string, data: unknown) {
+function build(
+  said: string,
+  data: unknown,
+  extra: Partial<Parameters<typeof createModelGatewayQAnswer>[0]> = {},
+) {
   const alpha = createFakeModelProvider({
     code: "alpha",
     script: [
@@ -175,6 +179,7 @@ function build(said: string, data: unknown) {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     tools,
+    ...extra,
   });
   const subject = {
     kind: "INVESTOR_ORGANISATION" as const,
@@ -296,5 +301,33 @@ describe("a one-stage mandate (live 2026-10-10: 'seed to seed')", () => {
     });
     expect(text).toContain("Stages: seed");
     expect(text).not.toContain("seed to seed");
+  });
+});
+
+describe("a code-written answer in the person's language (any language)", () => {
+  it("is localised through the shared layer, with no dialogue call", async () => {
+    const asked: string[][] = [];
+    const { seam, request, alpha, persisted } = build(
+      "What is my mandate?",
+      FULL,
+      {
+        localiseWords: (_who, texts) => {
+          asked.push([...texts]);
+          return Promise.resolve(texts.map((text) => `[sw] ${text}`));
+        },
+      },
+    );
+    await seam.answer(request);
+    expect(alpha.calls).toHaveLength(0);
+    expect(asked).toHaveLength(1);
+    expect(persisted.join("\n")).toMatch(/^\[sw\] /u);
+  });
+
+  it("stays English when the layer has no translation", async () => {
+    const { seam, request, persisted } = build("What is my mandate?", FULL, {
+      localiseWords: (_who, texts) => Promise.resolve(texts.map(() => null)),
+    });
+    await seam.answer(request);
+    expect(persisted.join("\n")).toContain("Sectors: fintech");
   });
 });

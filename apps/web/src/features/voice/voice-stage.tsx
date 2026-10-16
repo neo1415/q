@@ -494,7 +494,7 @@ export function VoiceStage({
                   aria-pressed={choice === voice}
                   onClick={() => onChooseVoice(choice)}
                 >
-                  {VOICE_LABELS[choice]}
+                  {t(VOICE_LABELS[choice])}
                 </button>
               ))}
             </div>

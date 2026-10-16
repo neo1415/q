@@ -145,8 +145,10 @@ describe("the agent's speak settings", () => {
   it.each([
     ["en-GB", "flux-general-en", "en"],
     [undefined, "flux-general-en", "en"],
-    ["fr-FR", "flux-general-multi", "multi"],
-    ["yo", "flux-general-multi", "multi"],
+    // Any language: ElevenLabs is told the person's language when it lists
+    // it (q-core capability table), so the voice does not guess.
+    ["fr-FR", "flux-general-multi", "fr"],
+    ["yo", "flux-general-multi", "yo"],
   ])(
     "hears and speaks in the person's language (device %s; founder direction 2026-10-01)",
     (locale, model, spoken) => {

@@ -8,6 +8,7 @@ import { apiSession } from "@/features/q/context";
 import { JoinCard } from "@/features/team/join-card";
 import { loadMyOrganisations } from "@/features/team/load-organisations";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Join your team" };
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ export default async function JoinPage({
 }: {
   readonly params: Promise<{ readonly token: string }>;
 }) {
+  const t = await serverT();
   const { token } = await params;
   const valid = InvitationTokenSchema.safeParse(token);
   const [session, user, organisations] = await Promise.all([
@@ -41,7 +43,7 @@ export default async function JoinPage({
       id="invitation"
       kind="OTHER"
       total={0}
-      label="an invitation to join"
+      label={t("an invitation to join")}
     >
       <JoinCard
         token={valid.success ? valid.data : ""}

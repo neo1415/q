@@ -364,7 +364,7 @@ export function GlobalQTrigger({
         data-global-q="home"
       >
         {presence}
-        {variant === "sidebar" ? "Ask Q" : null}
+        {variant === "sidebar" ? t("Ask Q") : null}
       </Link>
     );
   }
@@ -385,7 +385,7 @@ export function GlobalQTrigger({
       data-global-q-state={session?.presence.state ?? "IDLE"}
     >
       {presence}
-      {variant === "sidebar" ? "Ask Q" : null}
+      {variant === "sidebar" ? t("Ask Q") : null}
     </button>
   );
 }

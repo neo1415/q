@@ -10,6 +10,7 @@ import { EntityAvatar } from "../entity/entity-avatar";
 
 import { AskQAboutFit } from "./ask-q-about-fit";
 import { inboundLabel, investorTypeLabel } from "./investor-labels";
+import { Words } from "@/features/i18n/language";
 
 /**
  * Investors a founder may look at (ADR 0023), as cards: cover (theirs, or
@@ -92,7 +93,9 @@ function InvestorCard({
               {item.displayName}
             </h3>
             <p className="cq-caption flex flex-wrap items-center gap-x-1.5 text-(--cq-text-tertiary)">
-              <span>{investorTypeLabel(item.investorType)}</span>
+              <span>
+                <Words>{investorTypeLabel(item.investorType)}</Words>
+              </span>
               {where === null ? null : (
                 <span className="inline-flex items-center gap-1">
                   <MapPin size={ICON_SIZE.compact} aria-hidden="true" />
@@ -109,7 +112,7 @@ function InvestorCard({
           {footer}
           {inboundLabel(item.inboundPreference) === null ? null : (
             <span className="cq-caption mt-auto self-start border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)">
-              {inboundLabel(item.inboundPreference)}
+              <Words>{inboundLabel(item.inboundPreference) ?? ""}</Words>
             </span>
           )}
         </div>

@@ -207,11 +207,12 @@ export function duplexInstructions(input: {
     ...(input.guided === true ? [GUIDED_CONDUCT] : []),
     "THIS LINE",
   ];
-  // Multilingual Q: a person who chose Arabic hears Arabic from the first
-  // word, not only once they speak it.
-  const arabic = spokenLanguageNote(supportedLanguageOf(input.locale));
-  if (arabic !== null) {
-    parts.push(arabic);
+  // Any language: a person who chose one hears it from the first word, not
+  // only once they speak it (the note names the language; no branch per
+  // language). A tag the registry cannot offer gets the device hint only.
+  const note = spokenLanguageNote(supportedLanguageOf(input.locale));
+  if (note !== null) {
+    parts.push(note);
   } else if (input.locale !== undefined && !/^en\b/i.test(input.locale)) {
     parts.push(
       `The person's device language is ${input.locale}; answer in the language they speak.`,

@@ -20,6 +20,7 @@ import {
   answerConnectionRequestAction,
   type ConnectionActionResult,
 } from "./connection-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Company requests (ADR 0023; renamed by brief B4, ADR 0052): the
@@ -72,6 +73,7 @@ function Row({
   readonly now: number;
   readonly waitingLongest: boolean;
 }) {
+  const t = useT();
   const [current, setCurrent] = useState(item);
   const [phase, setPhase] = useState<Phase>({ kind: "IDLE" });
   const key = useRef<string | null>(null);
@@ -122,7 +124,7 @@ function Row({
           href={`/relationships/company/${current.companyId}`}
           className="cq-body-sm text-(--cq-text-primary) underline underline-offset-4"
         >
-          Open the relationship
+          {t("Open the relationship")}
         </Link>
       </div>
     );
@@ -139,7 +141,7 @@ function Row({
           href={`/relationships/company/${current.companyId}`}
           className="cq-body-sm text-(--cq-text-primary) underline underline-offset-4"
         >
-          Open the relationship
+          {t("Open the relationship")}
         </Link>
       </div>
     );
@@ -174,7 +176,7 @@ function Row({
             {phase.decision === "ACCEPTED" ? "Accept" : "Decline"}
           </Button>
           <Button variant="quiet" onClick={() => setPhase({ kind: "IDLE" })}>
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
       </div>
@@ -199,7 +201,7 @@ function Row({
               variant="secondary"
               onClick={() => void send(phase.decision)}
             >
-              Try again
+              {t("Try again")}
             </Button>
           ) : (
             <>
@@ -211,7 +213,7 @@ function Row({
                   setPhase({ kind: "CONFIRMING", decision: "ACCEPTED" })
                 }
               >
-                Accept
+                {t("Accept")}
               </Button>
               <Button
                 variant="secondary"
@@ -221,7 +223,7 @@ function Row({
                   setPhase({ kind: "CONFIRMING", decision: "DECLINED" })
                 }
               >
-                Decline
+                {t("Decline")}
               </Button>
             </>
           )}
@@ -284,12 +286,15 @@ export function ConnectionRequestsInbox({
   readonly answerable?: boolean;
   readonly now?: number;
 }) {
+  const t = useT();
   const [sort, setSort] = useState<Sort>("BEST_FIT");
   if (items.length === 0) {
     return (
       <EmptyState
-        title="No company requests yet."
-        description="When a founder asks to connect, their company shows up here with how well it fits your mandate. Who can ask follows the choice you set under Visibility."
+        title={t("No company requests yet.")}
+        description={t(
+          "When a founder asks to connect, their company shows up here with how well it fits your mandate. Who can ask follows the choice you set under Visibility.",
+        )}
       />
     );
   }
@@ -317,7 +322,7 @@ export function ConnectionRequestsInbox({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div
           role="group"
-          aria-label="Sort"
+          aria-label={t("Sort")}
           className="relative flex gap-2 overflow-x-auto py-0.5"
         >
           {SORTS.map(([value, label]) => (
@@ -337,7 +342,7 @@ export function ConnectionRequestsInbox({
         </span>
       </div>
       <ul
-        aria-label="Companies that asked to connect"
+        aria-label={t("Companies that asked to connect")}
         className="grid gap-3 min-[1200px]:grid-cols-2 min-[1200px]:gap-4"
       >
         {sorted.map((item) => (

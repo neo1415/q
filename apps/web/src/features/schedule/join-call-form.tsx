@@ -7,6 +7,7 @@ import { Button } from "@capital-q/ui/button";
 import { Input } from "@capital-q/ui/input";
 
 import { joinCallAction } from "./schedule-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * meet-47: "Have Q join a call" -- a Google Meet already running. One form
@@ -27,6 +28,7 @@ export function JoinCallForm({
   readonly onJoined?: ((meeting: MeetingDto) => void) | undefined;
   readonly onCancel?: (() => void) | undefined;
 }) {
+  const t = useT();
   const [link, setLink] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -58,7 +60,7 @@ export function JoinCallForm({
     >
       <Input
         id={`join-call-link-${relationshipId}`}
-        label="Google Meet link"
+        label={t("Google Meet link")}
         type="url"
         inputMode="url"
         autoComplete="off"
@@ -76,7 +78,7 @@ export function JoinCallForm({
           variant="secondary"
           disabled={pending || link.trim() === ""}
         >
-          Send Q in
+          {t("Send Q in")}
         </Button>
         {onCancel === undefined ? null : (
           <Button
@@ -85,7 +87,7 @@ export function JoinCallForm({
             disabled={pending}
             onClick={onCancel}
           >
-            Not now
+            {t("Not now")}
           </Button>
         )}
       </div>

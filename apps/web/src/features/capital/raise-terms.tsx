@@ -13,6 +13,7 @@ import { Input } from "@capital-q/ui/input";
 import { Select } from "@capital-q/ui/select";
 
 import { saveRaiseTermsAction } from "./capital-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F5: the raise's terms on /capital. Everything is optional and unknown
@@ -109,6 +110,7 @@ export function RaiseTerms({
 }: {
   readonly objective: CapitalObjectiveDto;
 }) {
+  const t = useT();
   const id = useId();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -132,7 +134,7 @@ export function RaiseTerms({
   return (
     <form
       className="flex flex-col gap-4"
-      aria-label="Raise terms"
+      aria-label={t("Raise terms")}
       data-raise-terms
       onSubmit={(event) => {
         event.preventDefault();
@@ -161,29 +163,30 @@ export function RaiseTerms({
         });
       }}
     >
-      <h3 className="cq-title-sm text-(--cq-text-primary)">Terms</h3>
+      <h3 className="cq-title-sm text-(--cq-text-primary)">{t("Terms")}</h3>
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        Private to your company. Leave a field empty when it isn&apos;t decided;
-        Q never fills it in for you.
+        {t(
+          "Private to your company. Leave a field empty when it isn't decided; Q never fills it in for you.",
+        )}
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <Select
           id={`${id}-instrument`}
-          label="Instrument"
+          label={t("Instrument")}
           value={instrument}
           options={INSTRUMENTS}
           onChange={(event) => setInstrument(event.target.value)}
         />
         <Input
           id={`${id}-close`}
-          label="Target close date"
+          label={t("Target close date")}
           type="date"
           value={closeDate}
           onChange={(event) => setCloseDate(event.target.value)}
         />
         <Select
           id={`${id}-valuation-kind`}
-          label="Valuation"
+          label={t("Valuation")}
           value={valuationKind}
           options={VALUATION_KINDS}
           onChange={(event) =>
@@ -209,15 +212,15 @@ export function RaiseTerms({
       </div>
       <Input
         id={`${id}-use`}
-        label="Use of funds"
+        label={t("Use of funds")}
         value={useOfFunds}
         maxLength={2000}
-        placeholder="18 months of runway: two engineers, a sales lead"
+        placeholder={t("18 months of runway: two engineers, a sales lead")}
         onChange={(event) => setUseOfFunds(event.target.value)}
       />
       <div className="flex items-center gap-3">
         <Button type="submit" variant="secondary" disabled={pending}>
-          Save terms
+          {t("Save terms")}
         </Button>
         {message === null ? null : (
           <p role="status" className="cq-body-sm text-(--cq-text-secondary)">

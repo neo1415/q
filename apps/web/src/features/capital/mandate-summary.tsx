@@ -11,6 +11,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 
 import { apiSession } from "@/features/q/context";
+import { serverT } from "@/features/i18n/server";
 
 /**
  * The investor's side of Capital (demo audit 2026-10-03): the page was
@@ -99,11 +100,12 @@ export async function MandateSummary({
 }: {
   readonly investorOrganisationId: string;
 }) {
+  const t = await serverT();
   const mandate = await activeMandate(investorOrganisationId);
   if (mandate === undefined) {
     return (
       <p className="cq-body text-(--cq-text-secondary)">
-        Your mandate couldn&apos;t load. Try again in a moment.
+        {t("Your mandate couldn't load. Try again in a moment.")}
       </p>
     );
   }
@@ -111,14 +113,15 @@ export async function MandateSummary({
     return (
       <div className="flex flex-col items-start gap-3">
         <p className="cq-body text-(--cq-text-secondary)">
-          No active mandate yet. Tell Q what you invest in and Discover orders
-          companies against it.
+          {t(
+            "No active mandate yet. Tell Q what you invest in and Discover orders companies against it.",
+          )}
         </p>
         <Link
           href="/onboarding/investor"
           className={buttonClassName("primary")}
         >
-          Set your mandate
+          {t("Set your mandate")}
         </Link>
       </div>
     );
@@ -197,14 +200,14 @@ export async function MandateSummary({
           href="/onboarding/investor?review=1"
           className={buttonClassName("primary")}
         >
-          Review my mandate
+          {t("Review my mandate")}
         </Link>
         {/* One primary; the rest are quiet ways out, not equal choices. */}
         <Link href="/discover/saved" className={buttonClassName("quiet")}>
-          Saved companies
+          {t("Saved companies")}
         </Link>
         <Link href="/gateq?tab=gate" className={buttonClassName("quiet")}>
-          Your gateway
+          {t("Your gateway")}
         </Link>
       </div>
     </div>

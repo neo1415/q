@@ -1,5 +1,7 @@
 # InvestIQ quantitative methodology — proposed experiment v0.2
 
+> **Superseded for production on 2026-10-16** by [INVESTIQ-METHODOLOGY.md](INVESTIQ-METHODOLOGY.md) (owner direction; ADR 0074). This file is kept unchanged below as the design history.
+
 **PROPOSED, not approved FDN methodology, not a production score.** This internal design may be prototyped offline under the founder's October 11 directive. No application import, database write, investor ranking change or replacement of existing fit/readiness is authorized by this document alone. Numerical constants below are hypotheses for calibration, not recovered institutional policy.
 
 ## Source contract and decisions requiring approval

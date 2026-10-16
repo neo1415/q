@@ -90,7 +90,7 @@ export function NeedsYouQueue({
               : card.relationship.counterpart.name}
           </p>
           <p className="cq-body-sm line-clamp-2 text-(--cq-text-secondary)">
-            {card.relationship === null ? null : t(card.title)}
+            {card.relationship === null ? (card.detail ?? null) : t(card.title)}
             {card.count > 1 ? (
               <span className="cq-numeric text-(--cq-text-tertiary)">
                 {card.relationship === null ? "" : " · "}
@@ -157,6 +157,8 @@ export function NeedsYouQueue({
       count={left.length > 0 ? left.length : undefined}
       lead
       flush
+      collapsible
+      defaultOpen={false}
       data-needs-you
       action={
         left.length > NEEDS_YOU_SHOWN ? (

@@ -111,7 +111,7 @@ async function WorkLists({
             id: approval.approvalId,
           }))}
           total={waiting.length}
-          label="what needs you"
+          label={t("what needs you")}
         />
       )}
       <WorkPage

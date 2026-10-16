@@ -98,25 +98,53 @@ Delegate before giving any answer that depends on backend work, and do not guess
 }
 
 /**
- * Multilingual Q (2026-10-16): a person who chose Arabic (Settings, or an
- * Arabic device with nothing chosen) is spoken to in Arabic. GPT-Live has
- * no language parameter; OpenAI's live-prompting guide sets the language
- * by instruction ("Speak [language] unless the user asks to switch"). The
- * same words as q-core's spokenLanguageNote; inlined because this file
- * stays dependency-free for the recording harness.
+ * Any language (2026-10-16): a person who chose a language (Settings, or a
+ * device language with nothing chosen) is spoken to in it. GPT-Live
+ * publishes no language list and has no language parameter; OpenAI's
+ * live-prompting guide sets the language by instruction ("Speak [language]
+ * unless the user asks to switch"). The language is NAMED from the
+ * runtime's own Intl data, so there is no per-language branch; the same
+ * words as q-core's spokenLanguageNote, inlined because this file stays
+ * dependency-free for the recording harness.
  */
 const ENGLISH_LANGUAGE_RULE =
   "\nLanguage: always speak natural, standard English,";
-const ARABIC_LANGUAGE_RULE =
-  "Language: this person chose Arabic. Speak natural, clear Modern Standard Arabic, the register a Gulf professional uses at work, and understand Gulf and other Arabic dialects and Arabic-English code-switching. If they speak to you in English, or ask you to switch, follow them. Keep names, company names and investment terms as they say them (ARR, SAFE, term sheet). Say amounts as spoken Arabic with the currency named (USD, dirhams, riyals); never convert a currency. Never mimic a dialect they did not use, and never comment on how they speak.";
+
+/** "French (français)", or null for English, nothing, or a tag no runtime can name. */
+function spokenName(locale: string | undefined): string | null {
+  if (locale === undefined) return null;
+  try {
+    const [tag] = Intl.getCanonicalLocales(locale);
+    if (tag === undefined) return null;
+    const parsed = new Intl.Locale(tag);
+    if (parsed.language === "en" || parsed.maximize().script === undefined) {
+      return null;
+    }
+    const of = (inLocale: string) =>
+      new Intl.DisplayNames([inLocale], {
+        type: "language",
+        fallback: "none",
+      }).of(tag);
+    const english = of("en");
+    if (english === undefined || english === tag) return null;
+    const native = of(tag);
+    return native === undefined || native === english
+      ? english
+      : `${english} (${native})`;
+  } catch {
+    return null;
+  }
+}
 
 /** The speaking style for this person's language. */
 export function styleFor(locale: string | undefined): string {
-  if (locale?.split("-")[0]?.toLowerCase() !== "ar") return STYLE;
+  const name = spokenName(locale);
+  if (name === null) return STYLE;
   const at = STYLE.indexOf(ENGLISH_LANGUAGE_RULE);
   if (at < 0) return STYLE;
   const end = STYLE.indexOf("\n", at + 1);
-  return `${STYLE.slice(0, at)}\n${ARABIC_LANGUAGE_RULE}${end < 0 ? "" : STYLE.slice(end)}`.replace(
+  const rule = `Language: this person chose ${name}. Speak natural, clear ${name}, the standard register a professional uses at work, and understand regional accents and dialects and their mixing with English. If they speak to you in another language, or ask you to switch, follow them. Keep names, company names and investment terms as they say them (ARR, SAFE, term sheet). Say amounts in spoken words with the currency named; never convert a currency. Never mimic a dialect they did not use, and never comment on how they speak.`;
+  return `${STYLE.slice(0, at)}\n${rule}${end < 0 ? "" : STYLE.slice(end)}`.replace(
     "Use plain, natural phrasing a fluent English-speaking analyst would use",
     "Use plain, natural phrasing a fluent analyst would use in their language",
   );

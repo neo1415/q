@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@capital-q/ui/button";
 import { ICON_SIZE, Mic, Square } from "@capital-q/ui/icons";
+import { useT } from "@/features/i18n/language";
 
 /**
  * A voice note in the chat composer (R34). Tap to record, tap again to
@@ -51,6 +52,7 @@ export function VoiceRecorder({
   readonly onRecorded: (file: File, durationMs: number) => void;
   readonly onError: (message: string) => void;
 }) {
+  const t = useT();
   const recording = useRef<Recording | null>(null);
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
 
@@ -138,7 +140,7 @@ export function VoiceRecorder({
         type="button"
         disabled={disabled}
         onClick={() => void start()}
-        aria-label="Record a voice note"
+        aria-label={t("Record a voice note")}
         className="flex size-11 shrink-0 items-center justify-center bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover) disabled:opacity-50"
       >
         <Mic size={ICON_SIZE.regular} aria-hidden="true" />
@@ -151,7 +153,7 @@ export function VoiceRecorder({
         onClick={() => void start()}
       >
         <Mic size={ICON_SIZE.regular} aria-hidden="true" />
-        Record a voice note
+        {t("Record a voice note")}
       </Button>
     );
   }
@@ -160,7 +162,7 @@ export function VoiceRecorder({
     <span
       className="flex items-center gap-2"
       role="group"
-      aria-label="Voice note"
+      aria-label={t("Voice note")}
     >
       <Button
         type="button"
@@ -169,7 +171,7 @@ export function VoiceRecorder({
         onClick={() => stop(false)}
       >
         <Square size={ICON_SIZE.regular} aria-hidden="true" />
-        Stop and send
+        {t("Stop and send")}
       </Button>
       <span
         className="cq-body-sm cq-numeric text-(--cq-text-secondary)"
@@ -179,7 +181,7 @@ export function VoiceRecorder({
         {String(seconds % 60).padStart(2, "0")}
       </span>
       <Button type="button" variant="quiet" onClick={() => stop(true)}>
-        Cancel
+        {t("Cancel")}
       </Button>
     </span>
   );

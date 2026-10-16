@@ -4,6 +4,7 @@ import Link from "next/link";
 import { linkClassName } from "@capital-q/ui/link";
 
 import { AuthHeading } from "@/features/auth";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Check your email" };
 
@@ -40,6 +41,7 @@ export default async function CheckEmailPage({
 }: {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const t = await serverT();
   const params = await searchParams;
   const purpose = params["purpose"];
   const copy =
@@ -52,7 +54,7 @@ export default async function CheckEmailPage({
       <p className="cq-body-sm text-(--cq-text-secondary)">
         Didn&apos;t get it? Check your spam folder, or{" "}
         <Link href="/auth/sign-in" className={linkClassName()}>
-          go back to sign in
+          {t("go back to sign in")}
         </Link>
         .
       </p>

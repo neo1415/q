@@ -155,7 +155,8 @@ export function resumeLine(
 }
 
 function asksSomething(reply: string): boolean {
-  return reply.includes("?");
+  // The Arabic question mark asks too (multilingual Q, live 2026-10-16).
+  return reply.includes("?") || reply.includes("؟");
 }
 
 /**

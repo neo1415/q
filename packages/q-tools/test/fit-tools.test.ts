@@ -165,11 +165,34 @@ describe("fit tools", () => {
     ]);
     expect(read).not.toContain(COMPANY_B_PRIVATE);
     expect(data.text).toMatch(/^1\. Sunline Energy: /);
-    // Words only: no internal value, no percentage.
-    const serialised = JSON.stringify(data);
+    // Words only in the fit profile: no internal value, no percentage.
+    // The two scores (2026-10-16) are their own typed object beside it.
+    const serialised = JSON.stringify({
+      ...data,
+      comparison:
+        data.comparison === null
+          ? null
+          : {
+              ...data.comparison,
+              entries: data.comparison.entries.map(
+                ({ scores: _scores, ...entry }) => entry,
+              ),
+            },
+    });
     expect(serialised).not.toMatch(
       /"value"|"score"|confidenceScore|coverage|\d%/,
     );
+    for (const entry of data.comparison?.entries ?? []) {
+      expect(entry.scores?.suitability?.score ?? null).toBe(
+        fitScoreOutOf10(entry.profile) === null
+          ? null
+          : Math.round(Number(fitScoreOutOf10(entry.profile)) * 10),
+      );
+      // Not assessed is said in words, never as a number.
+      expect(entry.scores?.investability.status).toBe("NOT_ASSESSED");
+      expect(entry.scores?.investability.score).toBeNull();
+    }
+    expect(data.text).toContain("Investability not assessed yet");
     // ADR 0059 / autopilot P2: each entry's score out of 10 is the one code
     // computes from its rows, said beside its words; the model is told to
     // repeat it, never to make one.
@@ -216,7 +239,9 @@ describe("fit tools", () => {
     ).comparison;
     if (comparison === null || comparison.entries[0] === undefined)
       throw new Error("expected a candidate");
-    const first = comparison.entries[0];
+    // The bound under test is the reasons' duplication; scores are added
+    // and, if still too large, dropped from the typed entries by the tool.
+    const { scores: _scores, ...first } = comparison.entries[0];
     const rich = {
       ...comparison,
       considered: 10,

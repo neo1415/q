@@ -21,6 +21,7 @@ import { appOrigin, displayUrlFor, loadPublicCard } from "./public-card-data";
 import { QCard, type CardBrand } from "./q-card";
 import { QCardPanel } from "./q-card-panel";
 import { qrSvg } from "./qr";
+import { serverT } from "@/features/i18n/server";
 
 /**
  * The Q Card slot on the profile page (BIZ-004). Reads the organisation's
@@ -79,11 +80,12 @@ export async function QCardSection({
    */
   readonly values?: Readonly<Record<string, string | null>> | undefined;
 }) {
+  const t = await serverT();
   const card = await loadCard(subjectType, subjectId);
   if (card === "UNAVAILABLE") {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        The Q Card couldn&apos;t load just now. Reload in a moment.
+        {t("The Q Card couldn't load just now. Reload in a moment.")}
       </p>
     );
   }

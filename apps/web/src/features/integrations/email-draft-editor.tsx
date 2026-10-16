@@ -6,6 +6,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { Input, Textarea } from "@capital-q/ui/input";
 
 import { readEmailDraft, reviseEmailDraftAction } from "./integration-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Edit the email Q drafted (BIZ-007), on its approval card. Saving is not
@@ -19,6 +20,7 @@ export function EmailDraftEditor({
   readonly approvalId: string;
   readonly onRevised: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<{ subject: string; body: string } | null>(
     null,
   );
@@ -57,7 +59,7 @@ export function EmailDraftEditor({
           disabled={pending}
           onClick={open}
         >
-          Edit email
+          {t("Edit email")}
         </button>
         {message !== null ? (
           <p role="status" className="cq-caption text-(--cq-text-secondary)">
@@ -72,7 +74,7 @@ export function EmailDraftEditor({
     <div className="flex flex-col gap-2" data-email-draft="open">
       <Input
         id={`email-subject-${approvalId}`}
-        label="Subject"
+        label={t("Subject")}
         value={draft.subject}
         maxLength={200}
         onChange={(event) =>
@@ -81,14 +83,14 @@ export function EmailDraftEditor({
       />
       <Textarea
         id={`email-body-${approvalId}`}
-        label="Message"
+        label={t("Message")}
         rows={8}
         value={draft.body}
         maxLength={10_000}
         onChange={(event) => setDraft({ ...draft, body: event.target.value })}
       />
       <p className="cq-caption text-(--cq-text-tertiary)">
-        Saving asks for your approval again, for exactly these words.
+        {t("Saving asks for your approval again, for exactly these words.")}
       </p>
       <div className="flex flex-wrap gap-2">
         <button
@@ -97,7 +99,7 @@ export function EmailDraftEditor({
           disabled={pending}
           onClick={save}
         >
-          Save changes
+          {t("Save changes")}
         </button>
         <button
           type="button"
@@ -105,7 +107,7 @@ export function EmailDraftEditor({
           disabled={pending}
           onClick={() => setDraft(null)}
         >
-          Cancel
+          {t("Cancel")}
         </button>
       </div>
       {message !== null ? (

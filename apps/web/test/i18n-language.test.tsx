@@ -117,23 +117,6 @@ describe("the interface language", () => {
   });
 });
 
-describe("Settings says what is Arabic today", () => {
-  it("names the Arabic surfaces and the pages still in English, in both languages", async () => {
-    const { ARABIC_NOW, STILL_ENGLISH, VIDEO_FALLBACK } =
-      await import("../src/features/settings/language-setting");
-    expect(ARABIC_NOW).toMatch(/conversation with Q/u);
-    expect(ARABIC_NOW).toMatch(/voice/u);
-    expect(ARABIC_NOW).toMatch(/rehearsals/u);
-    expect(ARABIC_NOW).toMatch(/onboarding/u);
-    expect(ARABIC_NOW).toMatch(/every page/u);
-    expect(STILL_ENGLISH).toMatch(/decision card/u);
-    expect(STILL_ENGLISH).not.toMatch(/since your last visit/u);
-    for (const line of [ARABIC_NOW, STILL_ENGLISH, VIDEO_FALLBACK]) {
-      expect(translate("ar", line)).not.toBe(line);
-    }
-  });
-});
-
 describe("changing language by telling Q (live, no reload)", () => {
   beforeAll(async () => {
     await loadWire();
@@ -180,10 +163,18 @@ describe("changing language by telling Q (live, no reload)", () => {
     expect(
       performClientAction({ kind: "SET_LANGUAGE", language: "ar" }, effects),
     ).toBe(true);
+    // Any language: French is a language like any other now.
     expect(
       performClientAction({ kind: "SET_LANGUAGE", language: "fr" }, effects),
+    ).toBe(true);
+    // Not a language tag at all: refused by the contract.
+    expect(
+      performClientAction(
+        { kind: "SET_LANGUAGE", language: "Not A Tag" },
+        effects,
+      ),
     ).toBe(false);
-    expect(seen).toEqual(["ar"]);
+    expect(seen).toEqual(["ar", "fr"]);
   });
 });
 
@@ -227,5 +218,45 @@ describe("data-bearing words in Arabic (taxonomy, reasons, sentences with names)
     );
     expect(translate("ar", "Said in their pitch")).toBe("قالوه في عرضهم");
     expect(translate("en", "Seed, in your range")).toBe("Seed, in your range");
+  });
+});
+
+describe("live Arabic check 2026-10-16: no English half-sentences", () => {
+  it("a joining pattern never grafts Arabic onto an English sentence", () => {
+    // Live: "..., وwhat investors would see." from "{a} and {b}".
+    const prose = "We met them last week, and they would like a deck.";
+    expect(translate("ar", prose)).toBe(prose);
+    expect(
+      translate(
+        "ar",
+        "What Capital Q knows about your company, and what investors would see.",
+      ),
+    ).toBe("ما يعرفه Capital Q عن شركتك، وما سيراه المستثمرون.");
+  });
+
+  it("joins names and known words, and lists inside a sentence", () => {
+    expect(translate("ar", "Zino Aviation and Atlas Health")).toBe(
+      "Zino Aviation وAtlas Health",
+    );
+    expect(translate("ar", "On record: Founders named, Pitch deck.")).toBe(
+      "مسجّل: تسمية المؤسسين، العرض التقديمي.",
+    );
+  });
+
+  it("the readiness plan and the gate say their words in Arabic", () => {
+    expect(translate("ar", "Add 3 months of revenue evidence")).toBe(
+      "أضف إثبات إيرادات لثلاثة أشهر",
+    );
+    expect(
+      translate(
+        "ar",
+        "Meets 2 of their 6 published criteria; 4 Q can't check until you share more.",
+      ),
+    ).toBe(
+      "يستوفي 2 من معاييرهم المنشورة البالغة 6؛ و4 لا يستطيع Q التحقق منها حتى تشارك المزيد.",
+    );
+    expect(translate("ar", "Hi Mariam Al Nuaimi, I'm Q.")).toBe(
+      "مرحباً Mariam Al Nuaimi، أنا Q.",
+    );
   });
 });

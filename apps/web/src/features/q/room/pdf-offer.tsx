@@ -14,6 +14,7 @@ import {
 import type { QTurn } from "../conversation";
 
 import { answerToOffer, offerLine, pdfOfferOf } from "./document-room";
+import { useT } from "@/features/i18n/language";
 
 export type PdfExport = (input: {
   readonly runId: string;
@@ -41,6 +42,7 @@ export function QRoomPdfOffer({
    */
   readonly opened?: ReadonlySet<string> | undefined;
 }) {
+  const t = useT();
   const offer = pdfOfferOf(turns);
   // Per offered answer: "busy", "done", "declined", or what went wrong.
   const [state, setState] = useState<Readonly<Record<string, string>>>({});
@@ -98,7 +100,7 @@ export function QRoomPdfOffer({
   return (
     <section
       className="flex w-full flex-wrap items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
-      aria-label="Make a PDF"
+      aria-label={t("Make a PDF")}
       data-q-room-pdf-offer
     >
       <span className="flex size-9 flex-none items-center justify-center border border-(--cq-border) text-(--cq-text-secondary)">
@@ -136,7 +138,7 @@ export function QRoomPdfOffer({
         }
         data-q-room-pdf-no
       >
-        No thanks
+        {t("No thanks")}
       </button>
     </section>
   );

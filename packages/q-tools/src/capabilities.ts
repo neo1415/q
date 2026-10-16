@@ -1304,7 +1304,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   tool(
     "set_q_language",
     "SETTINGS",
-    "Sets the language Q and their screens use (Arabic, English or automatic), at once and reversibly, as Settings does; asked in any language.",
+    "Sets the language Q and their screens use (any language, or automatic), at once and reversibly, as Settings does; asked in any language.",
     { acts: true },
   ),
   tool(

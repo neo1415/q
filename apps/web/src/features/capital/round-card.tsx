@@ -1,3 +1,5 @@
+"use client";
+
 import type { CSSProperties } from "react";
 
 import type { CapitalLedgerDto } from "@capital-q/contracts";
@@ -14,6 +16,7 @@ import {
   PRO_RATA_WORDS,
   STATUS_WORDS,
 } from "./round-words";
+import { useT } from "@/features/i18n/language";
 
 export { INSTRUMENT_LABELS, instrumentLabel } from "./round-labels";
 
@@ -43,6 +46,7 @@ const day = (value: string | null) =>
 
 /** The status as a word with a shape cue (filled: in progress), never colour alone. */
 function StatusPill({ status }: { readonly status: Round["status"] }) {
+  const t = useT();
   return (
     <span
       className="cq-caption inline-flex items-center gap-1.5 border border-(--cq-border-subtle) px-2.5 py-1 text-(--cq-text-primary)"
@@ -56,7 +60,7 @@ function StatusPill({ status }: { readonly status: Round["status"] }) {
             : "inline-block size-2 rounded-full border border-(--cq-text-tertiary)"
         }
       />
-      {STATUS_WORDS[status]}
+      {t(STATUS_WORDS[status])}
     </span>
   );
 }
@@ -128,6 +132,7 @@ function termsOf(
 }
 
 function Notices({ round }: { readonly round: Round }) {
+  const t = useT();
   if (round.notices.length === 0 && round.otherCurrencies.length === 0) {
     return null;
   }
@@ -139,7 +144,7 @@ function Notices({ round }: { readonly round: Round }) {
           className="cq-body-sm border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)"
           data-notice={notice}
         >
-          {NOTICE_WORDS[notice]}
+          {t(NOTICE_WORDS[notice])}
         </li>
       ))}
       {round.otherCurrencies.map((other) => (

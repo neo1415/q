@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { announceConnectOutcome, type ConnectOutcome } from "./connect-popup";
+import { useT } from "@/features/i18n/language";
 
 const SAID: Readonly<Record<ConnectOutcome, string>> = {
   connected: "Google Calendar is connected. You can close this window.",
@@ -17,6 +18,7 @@ export function ConnectReturn({
 }: {
   readonly outcome: ConnectOutcome;
 }) {
+  const t = useT();
   const [stayed, setStayed] = useState(false);
   useEffect(() => {
     announceConnectOutcome(outcome);
@@ -32,14 +34,14 @@ export function ConnectReturn({
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-4 px-4 py-10">
       <p role="status" className="cq-body text-(--cq-text-primary)">
-        {SAID[outcome]}
+        {t(SAID[outcome])}
       </p>
       {stayed ? (
         <Link
           href="/home"
           className="cq-body text-(--cq-text-secondary) underline"
         >
-          Back to Capital Q
+          {t("Back to Capital Q")}
         </Link>
       ) : null}
     </main>

@@ -2,6 +2,7 @@ import type { QRecordPage } from "@capital-q/contracts";
 import { scoreOrgNames, scorePersonNames } from "@capital-q/q-core/names";
 import { spokenNameScore } from "@capital-q/q-tools";
 import { asksForDrawing, isDrawingObject } from "@capital-q/q-core/speech";
+import { resolveLanguage } from "@capital-q/q-core/language";
 
 import {
   PAGE_VERB,
@@ -155,6 +156,24 @@ function fromObject(object: string): NamedRecordRequest | null {
   return { name, facet: "PAGE", explicit: proper };
 }
 
+/** Filler a language request carries ("French please", "the Swahili language"). */
+const LANGUAGE_FILLER =
+  /^(?:the\s+)?(.+?)(?:\s+(?:language|please|now|instead|for\s+me))*$/iu;
+
+/**
+ * "French", "Swahili please", "the English language", "العربية": a
+ * language by the registry (any language the runtime can name, named in
+ * any language), never a record to look up.
+ */
+function namesLanguage(object: string): boolean {
+  const bare =
+    LANGUAGE_FILLER.exec(object.trim().replace(/[.!?]+$/u, ""))?.[1] ?? "";
+  // A name, not a code: "it", "no", "my", "id" are words before they are
+  // Italian, Norwegian, Burmese or Indonesian.
+  const aName = bare.length >= 4 || /[^\p{Script=Latin}\s]/u.test(bare);
+  return aName && resolveLanguage(bare).ok;
+}
+
 /**
  * The record a navigation request names, or null when the words are not
  * one (a page Capital Q has by name, a question, a pointing word). The last
@@ -175,6 +194,10 @@ export function namedRecordRequestOf(text: string): NamedRecordRequest | null {
     // Owner 2026-10-15: "show me a map of where Tensorgate is" was opened
     // as Tensorgate's profile. A drawing asked for names no record to open.
     if (isDrawingObject(object) || asksForDrawing(sentence)) continue;
+    // Live 2026-10-16: "switch to English" was looked up as a record ("I
+    // can't find English among your relationships"). A language named is
+    // a language change (set_q_language), never a record.
+    if (namesLanguage(object)) continue;
     const found = fromObject(object);
     if (found !== null) return found;
   }

@@ -1201,7 +1201,7 @@ export function OwnerDataRoom({
                                     aria-hidden="true"
                                   />
                                   Requested by {mark.who} ·{" "}
-                                  {REQUESTED_WORDS[mark.status]}
+                                  {t(REQUESTED_WORDS[mark.status])}
                                 </span>
                               ),
                             )}

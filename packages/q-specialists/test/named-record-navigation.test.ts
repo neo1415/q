@@ -537,3 +537,43 @@ describe("W4: a researched entity by name, when it is none of their relationship
     expect(answer.blocks.map((b) => b.kind)).not.toContain("ANSWER_CARDS");
   });
 });
+
+describe("a language named is not a record (live 2026-10-16)", () => {
+  it("leaves any language by name to Q's language tool, never a record (live 2026-10-16)", () => {
+    for (const text of [
+      "Please switch to French.",
+      "switch to Swahili please",
+      "go to Spanish",
+      "switch to the Portuguese language",
+      "switch to français",
+    ]) {
+      expect(namedRecordRequestOf(text), text).toBeNull();
+    }
+    // A short word is a word, not a language code.
+    expect(namedRecordRequestOf("open Shiftwell")).not.toBeNull();
+  });
+
+  it("leaves 'switch to English' and its kin to Q's language tool", () => {
+    for (const words of [
+      "switch to English",
+      "Switch to Arabic please.",
+      "can you switch to english now",
+      "go to the English language",
+    ]) {
+      expect(namedRecordRequestOf(words)).toBeNull();
+    }
+  });
+
+  it("the answer never says it can't find English, and opens nothing", async () => {
+    const q = conversation(["Shiftwell Health", "Ledgerline"]);
+    const answer = await q.say("switch to English");
+    expect(answer.content).not.toMatch(/can't find/u);
+    expect(q.opened).toEqual([]);
+  });
+
+  it("still reads a record whose name only starts like a language", () => {
+    expect(namedRecordRequestOf("open English Bay Capital")?.name).toBe(
+      "English Bay Capital",
+    );
+  });
+});

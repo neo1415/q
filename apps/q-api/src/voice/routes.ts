@@ -5,6 +5,8 @@ import type { ReadableStream as WebReadableStream } from "node:stream/web";
 
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
+  createProblemDetails,
+  PROBLEM_CONTENT_TYPE,
   CreateQSpeechRequestSchema,
   CreateQVoiceSessionRequestSchema,
   CreateQVoiceSessionResponseSchema,
@@ -22,6 +24,7 @@ import {
   type QVoiceDuplexCredential,
 } from "@capital-q/contracts";
 import { effectiveLocale } from "@capital-q/q-core";
+import { languageInfo, voiceLineAvailable } from "@capital-q/q-core/language";
 import { fetchMe } from "@capital-q/api-client";
 import { createCorrelationId, getMeter } from "@capital-q/observability";
 import { AuthenticationRequiredError } from "@capital-q/security";
@@ -706,6 +709,37 @@ export function registerQVoiceRoutes(
         (transport?.voices.includes(input.voice) ?? liveOnly)
           ? input.voice
           : "FEMALE";
+
+      // Any language, honestly: a language the person CHOSE that the
+      // standard line cannot hear or speak (no Deepgram model or no
+      // ElevenLabs voice lists it) is said plainly, never opened as an
+      // English line pretending to listen. Typing still works, in their
+      // language. With nothing chosen the device's language is only a hint.
+      if (
+        !liveOnly &&
+        deepgram !== undefined &&
+        chosen !== null &&
+        chosen !== "AUTO" &&
+        !voiceLineAvailable(chosen)
+      ) {
+        const info = languageInfo(chosen);
+        const name = info?.englishName ?? chosen;
+        request.log.info(
+          { language: chosen, reason: "VOICE_LANGUAGE_UNAVAILABLE" },
+          "voice line refused for its language",
+        );
+        // 422 with a body that says 422 (RFC 9457): live 2026-10-16 the
+        // body said 400 under a 422.
+        const problem = createProblemDetails({
+          code: "VALIDATION_FAILED",
+          requestId: request.id,
+          detail: `Q can't hold a voice conversation in ${name} yet: the speech services Capital Q uses don't support it. Type to Q instead and Q answers in ${name}, or switch to another language for voice.`,
+        });
+        return reply
+          .code(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(problem);
+      }
 
       // Q opens the interview in its own words: a greeting and the live
       // question, from the session's state. Composed here so the browser

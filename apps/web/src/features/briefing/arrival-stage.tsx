@@ -43,6 +43,10 @@ import {
   useOpener,
   type ArrivalLoader,
 } from "./arrival-store";
+import {
+  DECK_REVIEW_TITLE,
+  deckReviewLine,
+} from "@/features/company/material/deck-pending";
 import { FollowUpStack } from "@/features/readiness/follow-up-stack";
 
 import {
@@ -511,7 +515,10 @@ export function ArrivalStage({
   const matches = data?.matches ?? null;
   const hasMatches = matches !== null && matches.items.length > 0;
   const questions = data?.questions ?? null;
-  const hasQuestions = questions !== null && questions.length > 0;
+  const deckReview = data?.deckReview ?? null;
+  const hasDeckReview = deckReview !== null && deckReview.pending > 0;
+  const hasQuestions =
+    (questions !== null && questions.length > 0) || hasDeckReview;
   const attentionShown =
     data?.attention !== null &&
     data?.attention !== undefined &&
@@ -673,9 +680,7 @@ export function ArrivalStage({
   ) : null;
   // Q.01: the questions Q still has, answerable in place.
   const questionsGroup =
-    shown.includes("QUESTIONS") &&
-    questions !== null &&
-    questions.length > 0 ? (
+    shown.includes("QUESTIONS") && hasQuestions ? (
       <section
         ref={questionsRef}
         aria-label={t("Q still wants to know")}
@@ -685,9 +690,30 @@ export function ArrivalStage({
       >
         <GroupHead
           title={t("Q still wants to know")}
-          count={questions.length}
+          count={(questions?.length ?? 0) + (hasDeckReview ? 1 : 0)}
         />
-        <FollowUpStack followUps={questions} heading={false} />
+        {hasDeckReview ? (
+          <div
+            className="flex flex-col gap-2 border border-(--cq-border-subtle) p-3"
+            data-arrival-deck-review
+          >
+            <p className="cq-body-sm font-semibold text-(--cq-text-primary)">
+              {t(DECK_REVIEW_TITLE)}
+            </p>
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {deckReviewLine(deckReview.pending)}
+            </p>
+            <Link
+              href={deckReview.href}
+              className={buttonClassName("secondary", "compact", "self-start")}
+            >
+              {t("Review sections")}
+            </Link>
+          </div>
+        ) : null}
+        {questions === null || questions.length === 0 ? null : (
+          <FollowUpStack followUps={questions} heading={false} />
+        )}
       </section>
     ) : null;
   const matchesGroup =

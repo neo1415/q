@@ -11,6 +11,7 @@ import {
 import { apiSession } from "@/features/q/context";
 import { ReviewForm, SUBJECT_OPTIONS } from "@/features/reviews/review-form";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Human review" };
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ export default async function ReviewsPage({
 }: {
   readonly searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  const t = await serverT();
   const params = await searchParams;
   const subjectRef =
     params["ref"] !== undefined && REF.test(params["ref"])
@@ -56,24 +58,26 @@ export default async function ReviewsPage({
     <PageContainer width="reading">
       <QSection id="reviews" kind="REVIEW_LIST" label="reviews">
         <PageHeader
-          title="Human review"
-          description="Disagree with something Capital Q or Q decided? A person at Capital Q will look at it and answer within 3 days. A review checks the evidence; it doesn't bypass it."
+          title={t("Human review")}
+          description={t(
+            "Disagree with something Capital Q or Q decided? A person at Capital Q will look at it and answer within 3 days. A review checks the evidence; it doesn't bypass it.",
+          )}
         />
         <div className="flex flex-col gap-10">
-          <PageSection id="ask" title="Ask for a review">
+          <PageSection id="ask" title={t("Ask for a review")}>
             <ReviewForm
               subject={params["subject"] ?? "OTHER"}
               subjectRef={subjectRef}
             />
           </PageSection>
-          <PageSection id="yours" title="Your reviews">
+          <PageSection id="yours" title={t("Your reviews")}>
             {reviews === null ? (
               <ErrorState
-                title="Your reviews couldn't load"
-                description="Try again in a moment. Nothing is lost."
+                title={t("Your reviews couldn't load")}
+                description={t("Try again in a moment. Nothing is lost.")}
               />
             ) : reviews.length === 0 ? (
-              <EmptyState compact title="No reviews yet" />
+              <EmptyState compact title={t("No reviews yet")} />
             ) : (
               <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
                 {reviews.map((review) => (

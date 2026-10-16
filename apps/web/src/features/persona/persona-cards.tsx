@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type KeyboardEvent } from "react";
 
 import { Check, ICON_SIZE } from "@capital-q/ui/icons";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Which side of the table you are on (QX-001 §12; QX-002 §A5).
@@ -65,6 +66,7 @@ export function PersonaCards({
    */
   readonly onChoose?: ((persona: PersonaId) => void) | undefined;
 } = {}) {
+  const t = useT();
   const router = useRouter();
   const [selected, setSelected] = useState<PersonaId>("founder");
   const [going, setGoing] = useState(false);
@@ -117,7 +119,7 @@ export function PersonaCards({
       */}
       <div
         role="radiogroup"
-        aria-label="What are you here to do?"
+        aria-label={t("What are you here to do?")}
         onKeyDown={onKeyDown}
         className="grid gap-3 sm:grid-cols-2"
         data-persona-cards
@@ -174,7 +176,7 @@ export function PersonaCards({
                 <span className="cq-body-sm text-(--cq-text-secondary)">
                   {persona.role} · {persona.description}
                   {isSelected ? (
-                    <span className="sr-only"> · selected</span>
+                    <span className="sr-only"> {t("· selected")}</span>
                   ) : null}
                 </span>
               </span>

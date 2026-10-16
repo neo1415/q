@@ -156,7 +156,7 @@ export function FounderApplications({
                   <>
                     <X {...icon} />
                     {t("Passed:")}{" "}
-                    {REASON_WORDS[application.reasonCode ?? "OTHER"]}
+                    {t(REASON_WORDS[application.reasonCode ?? "OTHER"] ?? "")}
                   </>
                 ) : application.status === "REPLIED" ? (
                   <>

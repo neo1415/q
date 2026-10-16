@@ -3,6 +3,7 @@ import {
   type AssumptionStanding,
   type GateCriterionStanding,
 } from "@capital-q/contracts";
+import { Words } from "@/features/i18n/language";
 
 /**
  * A claim's standing (evidenced, claimed, not known yet) and a gate
@@ -83,7 +84,7 @@ function Badge({
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
         <Mark shape={shape} />
       </svg>
-      {word}
+      <Words>{word}</Words>
     </span>
   );
 }

@@ -1,3 +1,5 @@
+import { listSeparator } from "@capital-q/q-core/language";
+
 /**
  * Sentences with a name, a figure or a date in them (multilingual Q).
  *
@@ -14,7 +16,21 @@ type Compiled = {
   readonly regex: RegExp;
   readonly names: readonly string[];
   readonly template: string;
+  /**
+   * Only placeholders and a joining word ("{a} and {b}"): such a key would
+   * match any English sentence with "and" in it, so it applies only when
+   * no captured part is English prose left untranslated.
+   */
+  readonly connective: boolean;
 };
+
+/**
+ * Lower-case words a sentence is made of and a name is not. Live
+ * 2026-10-16: "{a} and {b}" turned "What Capital Q knows about your
+ * company, and what investors would see." into "..., وwhat investors...".
+ */
+const PROSE =
+  /(?:^|[^\p{L}])(?:the|what|which|who|why|how|your|you|they|their|it|its|we|our|is|are|was|were|be|would|could|should|might|can|will|to|for|with|about|this|that|have|has|not|before|after|when|if|so|but)(?=$|[^\p{L}])/u;
 
 const PLACEHOLDER = /\{([A-Za-z][A-Za-z0-9]*)\}/g;
 // Not global: a global regex's `test` moves lastIndex, which `matchAll`
@@ -39,7 +55,13 @@ function compile(key: string, template: string): Compiled {
     last = match.index + match[0].length;
   }
   source += escape(key.slice(last));
-  return { regex: new RegExp(`^${source}$`, "s"), names, template };
+  const literal = key.replace(PLACEHOLDER, " ").match(/\p{L}+/gu) ?? [];
+  return {
+    regex: new RegExp(`^${source}$`, "s"),
+    names,
+    template,
+    connective: literal.length <= 1,
+  };
 }
 
 /** Bucketed by the pattern's first character, so a miss stays cheap. */
@@ -73,10 +95,28 @@ export function indexPatterns(
   return { byFirst, open };
 }
 
+/**
+ * "Founders named, Pitch deck" inside a sentence: translated only when
+ * every item has a translation, joined with the language's script comma;
+ * otherwise as written.
+ */
+function listOf(
+  catalogue: Readonly<Record<string, string>>,
+  value: string,
+  language: string,
+): string | undefined {
+  if (!value.includes(", ")) return undefined;
+  const items = value.split(", ").map((item) => catalogue[item]);
+  return items.every((item): item is string => item !== undefined)
+    ? items.join(listSeparator(language))
+    : undefined;
+}
+
 export function matchPattern(
   index: PatternIndex,
   catalogue: Readonly<Record<string, string>>,
   english: string,
+  language: string,
 ): string | undefined {
   const candidates = [
     ...(index.byFirst.get(english.charAt(0)) ?? []),
@@ -94,18 +134,22 @@ export function matchPattern(
       continue;
     }
     const values = new Map<string, string>();
+    let prose = false;
     pattern.names.forEach((name, i) => {
       const value = match[i + 1] ?? "";
-      values.set(
-        name,
+      const translated =
         catalogue[value] ??
-          (value.length < english.length
-            ? matchPattern(index, catalogue, value)
-            : undefined) ??
-          localiseDate(value) ??
-          value,
-      );
+        (value.length < english.length
+          ? matchPattern(index, catalogue, value, language)
+          : undefined) ??
+        localiseDate(value, language, catalogue) ??
+        listOf(catalogue, value, language);
+      if (translated === undefined && PROSE.test(value)) prose = true;
+      values.set(name, translated ?? value);
     });
+    // A joining pattern over English prose would graft Arabic onto an
+    // English sentence: the sentence stays as written instead.
+    if (pattern.connective && prose) continue;
     return pattern.template.replace(
       PLACEHOLDER,
       (whole, name: string) => values.get(name) ?? whole,
@@ -114,52 +158,36 @@ export function matchPattern(
   return undefined;
 }
 
-const MONTHS_AR: Readonly<Record<string, string>> = {
-  Jan: "يناير",
-  January: "يناير",
-  Feb: "فبراير",
-  February: "فبراير",
-  Mar: "مارس",
-  March: "مارس",
-  Apr: "أبريل",
-  April: "أبريل",
-  May: "مايو",
-  Jun: "يونيو",
-  June: "يونيو",
-  Jul: "يوليو",
-  July: "يوليو",
-  Aug: "أغسطس",
-  August: "أغسطس",
-  Sep: "سبتمبر",
-  Sept: "سبتمبر",
-  September: "سبتمبر",
-  Oct: "أكتوبر",
-  October: "أكتوبر",
-  Nov: "نوفمبر",
-  November: "نوفمبر",
-  Dec: "ديسمبر",
-  December: "ديسمبر",
-};
+/** English month and weekday words as the app writes them (en-GB), by index. */
+const MONTHS_EN: readonly (readonly string[])[] = [
+  ["Jan", "January"],
+  ["Feb", "February"],
+  ["Mar", "March"],
+  ["Apr", "April"],
+  ["May"],
+  ["Jun", "June"],
+  ["Jul", "July"],
+  ["Aug", "August"],
+  ["Sep", "Sept", "September"],
+  ["Oct", "October"],
+  ["Nov", "November"],
+  ["Dec", "December"],
+];
+const DAYS_EN: readonly (readonly string[])[] = [
+  ["Sun", "Sunday"],
+  ["Mon", "Monday"],
+  ["Tue", "Tuesday"],
+  ["Wed", "Wednesday"],
+  ["Thu", "Thursday"],
+  ["Fri", "Friday"],
+  ["Sat", "Saturday"],
+];
+const LONG_FORMS = new Set(
+  [...MONTHS_EN, ...DAYS_EN].map((forms) => forms.at(-1) ?? ""),
+);
 
-const DAYS_AR: Readonly<Record<string, string>> = {
-  Mon: "الاثنين",
-  Monday: "الاثنين",
-  Tue: "الثلاثاء",
-  Tuesday: "الثلاثاء",
-  Wed: "الأربعاء",
-  Wednesday: "الأربعاء",
-  Thu: "الخميس",
-  Thursday: "الخميس",
-  Fri: "الجمعة",
-  Friday: "الجمعة",
-  Sat: "السبت",
-  Saturday: "السبت",
-  Sun: "الأحد",
-  Sunday: "الأحد",
-};
-
-const MONTH = Object.keys(MONTHS_AR).join("|");
-const DAY = Object.keys(DAYS_AR).join("|");
+const MONTH = MONTHS_EN.flat().join("|");
+const DAY = DAYS_EN.flat().join("|");
 /**
  * A date as the app writes it in English (en-GB: "18 Sept", "27 Sept 2026",
  * "Tue 18 Sept, 14:00", "Thu 09:03"), and nothing else.
@@ -171,19 +199,93 @@ const DATE_ONLY = new RegExp(
 );
 const WORD = new RegExp(`\\b(${MONTH}|${DAY}|at|am|pm)\\b`, "g");
 
-/**
- * The same date with Arabic month and day names; digits stay Western, as
- * everywhere in the Arabic interface. Undefined when it is not a date.
- */
-export function localiseDate(text: string): string | undefined {
-  if (!DATE_ONLY.test(text)) return undefined;
-  return text.replace(WORD, (word) =>
-    word === "at"
-      ? "الساعة"
-      : word === "am"
-        ? "ص"
-        : word === "pm"
-          ? "م"
-          : (MONTHS_AR[word] ?? DAYS_AR[word] ?? word),
+type DateWords = {
+  readonly month: (index: number, long: boolean) => string;
+  readonly day: (index: number, long: boolean) => string;
+  readonly am: string;
+  readonly pm: string;
+};
+
+const WORDS = new Map<string, DateWords | null>();
+/** A marker no date contains, for a word that has no translation. */
+const DROP = "\u2063";
+
+/** Month, weekday and day-period words in a language, from Intl (Gregorian calendar). */
+function dateWords(language: string): DateWords | null {
+  const cached = WORDS.get(language);
+  if (cached !== undefined) return cached;
+  let words: DateWords | null;
+  try {
+    // Gregorian, whatever the locale's default calendar: the dates are.
+    const locale = `${language}-u-ca-gregory`;
+    const format = (options: Intl.DateTimeFormatOptions, at: Date) =>
+      new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" }).format(
+        at,
+      );
+    const period = (hour: number) =>
+      new Intl.DateTimeFormat(locale, {
+        hour: "numeric",
+        hour12: true,
+        timeZone: "UTC",
+      })
+        .formatToParts(new Date(Date.UTC(2026, 0, 5, hour)))
+        .find((part) => part.type === "dayPeriod")?.value ??
+      (hour < 12 ? "am" : "pm");
+    words = {
+      month: (index, long) =>
+        format(
+          { month: long ? "long" : "short" },
+          new Date(Date.UTC(2026, index, 15)),
+        ),
+      // 2026-01-04 was a Sunday.
+      day: (index, long) =>
+        format(
+          { weekday: long ? "long" : "short" },
+          new Date(Date.UTC(2026, 0, 4 + index)),
+        ),
+      am: period(9),
+      pm: period(15),
+    };
+  } catch {
+    words = null;
+  }
+  WORDS.set(language, words);
+  return words;
+}
+
+const indexIn = (table: readonly (readonly string[])[], word: string): number =>
+  table.findIndex((forms) =>
+    forms.some((form) => form.toLowerCase() === word.toLowerCase()),
   );
+
+/**
+ * The same date with the language's month and day names (Intl); digits
+ * stay Western, as everywhere in the interface. "at" is the catalogue's
+ * word for it when there is one, else left out. Undefined when it is not
+ * a date, or for English.
+ */
+export function localiseDate(
+  text: string,
+  language: string,
+  catalogue: Readonly<Record<string, string>> = {},
+): string | undefined {
+  if (!DATE_ONLY.test(text)) return undefined;
+  if ((language.split("-")[0] ?? "").toLowerCase() === "en") return undefined;
+  const words = dateWords(language);
+  if (words === null) return undefined;
+  return text
+    .replace(WORD, (word) => {
+      const lower = word.toLowerCase();
+      // No word for "at" in this language: the word and its space go.
+      if (lower === "at") return catalogue["at"] ?? DROP;
+      if (lower === "am") return words.am;
+      if (lower === "pm") return words.pm;
+      const long = LONG_FORMS.has(word);
+      const month = indexIn(MONTHS_EN, word);
+      if (month >= 0) return words.month(month, long);
+      const day = indexIn(DAYS_EN, word);
+      return day >= 0 ? words.day(day, long) : word;
+    })
+    .replaceAll(` ${DROP}`, "")
+    .replaceAll(DROP, "");
 }

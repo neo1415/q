@@ -104,7 +104,7 @@ export function WakeSetting() {
       </p>
       {shown === null ? null : (
         <p role="alert" className="cq-caption text-(--cq-text-primary)">
-          {NOTICE_TEXT[shown]}
+          {t(NOTICE_TEXT[shown])}
         </p>
       )}
     </div>

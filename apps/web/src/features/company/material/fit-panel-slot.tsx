@@ -7,6 +7,7 @@ import { ChevronDown, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { FitPanel, useCompanyFit, type CompanyFit } from "@/features/fit";
 import { useT } from "@/features/i18n/language";
+import { CompanyScores } from "@/features/scores";
 
 /**
  * The fit panel's place on a company profile (overnight plan A1/B3/B4).
@@ -54,12 +55,34 @@ export function FitStripCell() {
         {t("Fit with you")}
       </dt>
       <dd className="cq-title-sm text-(--cq-text-primary)">
-        {FIT_BAND_LABELS[band]}
+        {t(FIT_BAND_LABELS[band])}
         <span className="cq-caption block font-normal text-(--cq-text-secondary)">
-          {FIT_CONFIDENCE_LABELS[confidence]}
+          {t(FIT_CONFIDENCE_LABELS[confidence])}
         </span>
       </dd>
     </div>
+  );
+}
+
+/**
+ * Investability and Suitability at the top of the profile, beside "Fit
+ * with you" (owner 2026-10-16): from the same single fit read, so the
+ * Suitability shown is exactly the fit the panel explains. Exported for the
+ * overview's own slot; renders nothing until the scores are known.
+ */
+export function ProfileCompanyScores({
+  className,
+}: {
+  readonly className?: string | undefined;
+}) {
+  const fit = useContext(ProfileFit);
+  if (fit.status !== "READY" || fit.fit.scores === undefined) return null;
+  return (
+    <CompanyScores
+      scores={fit.fit.scores}
+      variant="full"
+      className={className}
+    />
   );
 }
 
@@ -99,6 +122,7 @@ export function FitPanelSlot({
         role="region"
         className="pb-3 empty:hidden lg:pb-0"
       >
+        <ProfileCompanyScores className="mb-3" />
         <FitPanel companyId={companyId} name={companyName} fit={fit} />
       </div>
     </details>

@@ -35,6 +35,7 @@ import { RESUME_KEY } from "./resume";
 import { openTourVoice } from "./tour-voice";
 import { viewerQuestions } from "./live-question";
 import { useTourPorts, type TranscriptSink } from "./use-tour-ports";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q Pitch host (QP-F08/F09): Q narrates the real app. Mounted once in the
@@ -156,6 +157,7 @@ export function QPitchHost({
   readonly chapter: string | null;
   readonly onExit: () => void;
 }) {
+  const t = useT();
   const choice = TOURS[tour];
   const actor = useMemo<TourActor | null>(() => {
     const parsed = TourActorSchema.safeParse({ role, account });
@@ -367,8 +369,9 @@ export function QPitchHost({
     return (
       <TourFrame label={choice.label} onExit={onExit}>
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Q Pitch runs only on a fictional demo account. This account is not
-          one, so the tour has not started.
+          {t(
+            "Q Pitch runs only on a fictional demo account. This account is not one, so the tour has not started.",
+          )}
         </p>
       </TourFrame>
     );
@@ -384,12 +387,12 @@ export function QPitchHost({
         {phase === "WAITING" ? (
           <div className="flex flex-wrap gap-2">
             <TourButton
-              label="Start the tour"
+              label={t("Start the tour")}
               primary
               onPress={() => void begin(true)}
             />
             <TourButton
-              label="Captions only"
+              label={t("Captions only")}
               onPress={() => void begin(false)}
             />
           </div>
@@ -482,6 +485,7 @@ function TourOverlay({
   readonly tour: TourChoice;
   readonly onExit: () => void;
 }) {
+  const t = useT();
   const snapshot = useSnapshot(runner);
   const [menuOpen, setMenuOpen] = useState(false);
   // After the finale, normal Q (owner 16 Oct): the tour hands over and ends
@@ -602,7 +606,7 @@ function TourOverlay({
 
   return (
     <section
-      aria-label="Q Pitch tour"
+      aria-label={t("Q Pitch tour")}
       data-q-pitch
       className="fixed inset-x-4 bottom-24 z-(--cq-z-presence) mx-auto flex max-w-2xl items-end gap-3 border border-(--cq-border) bg-(--cq-surface-raised) px-4 py-3 shadow-(--cq-shadow-overlay) lg:bottom-6"
     >
@@ -673,6 +677,7 @@ function TourMenu({
   readonly onControl: (kind: TourControlKind, chapterId?: string) => void;
   readonly onExit: () => void;
 }) {
+  const t = useT();
   const [chaptersOpen, setChaptersOpen] = useState(false);
   const act = (kind: TourControlKind, chapterId?: string) => {
     onOpenChange(false);
@@ -690,12 +695,12 @@ function TourMenu({
         onClick={() => onOpenChange(!open)}
         className="inline-flex min-h-11 items-center border border-(--cq-border) bg-(--cq-surface) px-3 cq-body-sm text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)"
       >
-        Tour
+        {t("Tour")}
       </button>
       {open ? (
         <div
           role="menu"
-          aria-label="Tour"
+          aria-label={t("Tour")}
           className={`absolute end-0 z-(--cq-z-popover) flex max-h-96 w-72 flex-col gap-1 overflow-y-auto border border-(--cq-border) bg-(--cq-surface-raised) p-2 shadow-(--cq-shadow-overlay) ${placement === "up" ? "bottom-full mb-2" : "top-full mt-2"}`}
         >
           <p className="px-3 py-1 cq-body-sm text-(--cq-text-secondary)">
@@ -715,7 +720,7 @@ function TourMenu({
             className={item}
             onClick={() => act("BACK")}
           >
-            Back
+            {t("Back")}
           </button>
           <button
             type="button"
@@ -723,7 +728,7 @@ function TourMenu({
             className={item}
             onClick={() => act("REPEAT")}
           >
-            Show me that again
+            {t("Show me that again")}
           </button>
           <button
             type="button"
@@ -731,7 +736,7 @@ function TourMenu({
             className={item}
             onClick={() => act("SKIP")}
           >
-            Skip
+            {t("Skip")}
           </button>
           <button
             type="button"
@@ -740,10 +745,10 @@ function TourMenu({
             className={item}
             onClick={() => setChaptersOpen((value) => !value)}
           >
-            Chapters
+            {t("Chapters")}
           </button>
           {chaptersOpen ? (
-            <ul className="flex flex-col gap-1 ps-3" aria-label="Chapters">
+            <ul className="flex flex-col gap-1 ps-3" aria-label={t("Chapters")}>
               {chapters.map((chapter) => (
                 <li key={chapter.chapterId}>
                   <button
@@ -767,7 +772,7 @@ function TourMenu({
               onExit();
             }}
           >
-            End tour
+            {t("End tour")}
           </button>
         </div>
       ) : null}
@@ -784,15 +789,16 @@ function TourFrame({
   readonly label: string;
   readonly onExit: () => void;
 }) {
+  const t = useT();
   return (
     <section
-      aria-label="Q Pitch tour"
+      aria-label={t("Q Pitch tour")}
       data-q-pitch
       className="fixed inset-x-4 bottom-24 z-(--cq-z-presence) mx-auto flex max-w-xl flex-col gap-3 border border-(--cq-border) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
     >
       <div className="flex items-center justify-between gap-3">
         <p className="cq-body-sm text-(--cq-text-secondary)">{label}</p>
-        <TourButton label="End tour" onPress={onExit} />
+        <TourButton label={t("End tour")} onPress={onExit} />
       </div>
       {children}
     </section>

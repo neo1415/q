@@ -17,6 +17,7 @@ import { useGlobalQ } from "@/components/app-shell/global-q";
 import { sendQuestionsAction } from "./assumption-actions";
 import { StandingBadge } from "./standing-badge";
 import { assumptionLabels, claimLine } from "./words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q.07 "Questions to investigate" (was "Assumptions to test") on an
@@ -61,6 +62,7 @@ export function AssumptionsSection({
   /** The profile's Data room tab, where documents are requested. */
   readonly dataRoomHref?: string | undefined;
 }) {
+  const t = useT();
   const { askNow } = useGlobalQ();
   const [picked, setPicked] = useState<readonly string[]>([]);
   const [open, setOpen] = useState(false);
@@ -129,7 +131,7 @@ export function AssumptionsSection({
           id="assumptions-title"
           className="cq-title-sm text-(--cq-text-primary)"
         >
-          Questions to investigate
+          {t("Questions to investigate")}
         </h2>
         {/* The insight first; how the three paths work is one tap away
             (progressive disclosure, 2026-10-12). */}
@@ -140,11 +142,11 @@ export function AssumptionsSection({
         </p>
         <details className="group" data-assumptions-help>
           <summary className="cq-caption min-h-[44px] cursor-pointer text-(--cq-text-tertiary) underline underline-offset-4 sm:min-h-0">
-            How to settle one
+            {t("How to settle one")}
           </summary>
           <p className="cq-body-sm pt-1 text-(--cq-text-secondary)">
             <b className="font-medium text-(--cq-text-primary)">
-              Ask Q to check
+              {t("Ask Q to check")}
             </b>{" "}
             the evidence you already have,{" "}
             <b className="font-medium text-(--cq-text-primary)">
@@ -152,13 +154,13 @@ export function AssumptionsSection({
             </b>{" "}
             directly, or{" "}
             <b className="font-medium text-(--cq-text-primary)">
-              request a document
+              {t("request a document")}
             </b>{" "}
             that would settle it.
           </p>
         </details>
       </div>
-      <div className="flex flex-wrap gap-2" aria-label="Evidence board">
+      <div className="flex flex-wrap gap-2" aria-label={t("Evidence board")}>
         <StandingBadge standing="EVIDENCED" count={board.counts.evidenced} />
         <StandingBadge standing="CLAIMED" count={board.counts.claimed} />
         <StandingBadge standing="UNKNOWN" count={board.counts.unknown} />
@@ -200,7 +202,7 @@ export function AssumptionsSection({
               {assumption.restsOn.length === 0 ? null : (
                 <p className="cq-body-sm text-(--cq-text-secondary)">
                   <span className="cq-caption block text-(--cq-text-tertiary)">
-                    Rests on
+                    {t("Rests on")}
                   </span>
                   {assumption.restsOn.join(" · ")}
                 </p>
@@ -237,14 +239,14 @@ export function AssumptionsSection({
                     )
                   }
                 >
-                  Ask Q to check the evidence
+                  {t("Ask Q to check the evidence")}
                 </button>
                 {dataRoomHref === undefined ? null : (
                   <Link
                     href={dataRoomHref}
                     className="cq-body-sm inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-4"
                   >
-                    Request a document
+                    {t("Request a document")}
                   </Link>
                 )}
               </div>
@@ -324,17 +326,19 @@ export function AssumptionsSection({
       <SheetRoot open={open} onOpenChange={setOpen}>
         <SheetContent
           title={`Send ${questions.length === 1 ? "1 question" : `${String(questions.length)} questions`} to ${companyName}`}
-          description="Q prepared this from the assumptions you picked. Nothing is sent until you approve."
+          description={t(
+            "Q prepared this from the assumptions you picked. Nothing is sent until you approve.",
+          )}
         >
           <div className="flex flex-col gap-4 px-4 pb-4">
             <dl className="cq-body-sm grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
-              <dt className="text-(--cq-text-tertiary)">How</dt>
+              <dt className="text-(--cq-text-tertiary)">{t("How")}</dt>
               <dd className="text-(--cq-text-primary)">
                 {route.kind === "DILIGENCE"
                   ? "A diligence request on your relationship"
                   : "One message in your chat with them"}
               </dd>
-              <dt className="text-(--cq-text-tertiary)">They see</dt>
+              <dt className="text-(--cq-text-tertiary)">{t("They see")}</dt>
               <dd className="text-(--cq-text-primary)">
                 {route.kind === "DILIGENCE"
                   ? `"${text.title}" on their diligence checklist`
@@ -347,12 +351,13 @@ export function AssumptionsSection({
               ))}
             </ol>
             <p className="cq-caption text-(--cq-text-tertiary)">
-              To change the wording, close this and pick again, or ask Q to
-              draft it with you. Sending twice sends it once.
+              {t(
+                "To change the wording, close this and pick again, or ask Q to draft it with you. Sending twice sends it once.",
+              )}
             </p>
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="quiet" onClick={() => setOpen(false)}>
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 variant="primary"

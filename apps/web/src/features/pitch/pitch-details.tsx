@@ -14,6 +14,7 @@ import { Select } from "@capital-q/ui/select";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import { deletePitchMediaAction, setPitchDetailsAction } from "./pitch-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * One video's name and who may watch it (ADR 0021/0022), and deleting it.
@@ -71,6 +72,7 @@ export function PitchDetails({
   /** Where the page goes once the video is gone. */
   readonly onDeleted: () => void;
 }) {
+  const t = useT();
   const id = useId();
   // The newest version this form has seen: its own save, or a newer record
   // the screen read since (the video can move on while it processes).
@@ -163,16 +165,18 @@ export function PitchDetails({
     <div className="flex flex-col gap-4" data-pitch-details>
       <Input
         id={`${id}-title`}
-        label="Title"
-        description="Shown with the video. Leave blank to show it as your pitch."
+        label={t("Title")}
+        description={t(
+          "Shown with the video. Leave blank to show it as your pitch.",
+        )}
         value={title}
         maxLength={PITCH_TITLE_MAX}
         onChange={(event) => setTitle(event.target.value)}
-        placeholder="Pitch"
+        placeholder={t("Pitch")}
       />
       <Select
         id={`${id}-audience`}
-        label="Who can watch it"
+        label={t("Who can watch it")}
         description={
           sharing === "ORGANISATION"
             ? "Private: only people in your organisation can play it."
@@ -198,7 +202,7 @@ export function PitchDetails({
             className="cq-body font-medium text-(--cq-text-primary)"
             id={`${id}-downloads`}
           >
-            Let investors download my pitch
+            {t("Let investors download my pitch")}
           </span>
           <span
             className="cq-body-sm text-(--cq-text-secondary)"
@@ -245,17 +249,19 @@ export function PitchDetails({
           onClick={() => setConfirmDelete(true)}
           data-pitch-delete
         >
-          Delete video
+          {t("Delete video")}
         </Button>
       </div>
       <DialogRoot open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent
-          title="Delete this video?"
-          description="It stops playing everywhere on Capital Q straight away. Your other videos stay."
+          title={t("Delete this video?")}
+          description={t(
+            "It stops playing everywhere on Capital Q straight away. Your other videos stay.",
+          )}
           actions={
             <>
               <Button variant="quiet" onClick={() => setConfirmDelete(false)}>
-                Keep it
+                {t("Keep it")}
               </Button>
               <Button
                 variant="primary"
