@@ -288,7 +288,7 @@ export function FounderPerson({
           {t("Message")}
         </Link>
         <Link
-          href={`/q?ask=${encodeURIComponent(`Tell me about ${person.name} of ${person.companyName}.`)}`}
+          href={`/home?ask=${encodeURIComponent(`Tell me about ${person.name} of ${person.companyName}.`)}`}
           className={buttonClassName("quiet", "regular")}
         >
           <Search size={ICON_SIZE.compact} aria-hidden="true" /> Ask Q about{" "}

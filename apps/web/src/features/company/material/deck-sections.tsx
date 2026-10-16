@@ -213,7 +213,7 @@ export function deckReadSection(
       where === null
         ? null
         : `${where} · ${downloadable ? "deck can be downloaded" : "deck is view only"}`,
-    askHref: `/q?ask=${encodeURIComponent(`About ${companyName}'s ${label.toLowerCase()}: `)}`,
+    askHref: `/home?ask=${encodeURIComponent(`About ${companyName}'s ${label.toLowerCase()}: `)}`,
     askLabel: `Ask Q about ${label.toLowerCase()}`,
   };
 }

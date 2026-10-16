@@ -158,7 +158,14 @@ export async function HomeScreen({
   conversationId = null,
   fresh = false,
   openBoard = false,
+  ask,
 }: {
+  /**
+   * Lane ov 2026-10-16: words to start the composer with ("Ask Q about
+   * their market", a profile section to tell Q about). Only typed for
+   * them; nothing is sent until they press Send.
+   */
+  readonly ask?: string | undefined;
   /** The conversation the URL names, resolved on the server. */
   readonly conversationId?: string | null | undefined;
   /** "New chat" (`?new=1`): a new conversation; a bare /home keeps this tab's. */
@@ -296,6 +303,7 @@ export async function HomeScreen({
           // E1: what Q did, what needs them and new matches, beside Q for
           // as long as the page lives (not only before the first word).
           stageLayer={arrival === "RETURNING" ? <ArrivalStage /> : undefined}
+          initialAsk={ask}
         />
       </section>
     </div>

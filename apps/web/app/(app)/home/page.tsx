@@ -60,6 +60,11 @@ export default async function HomePage({
         conversationId={conversationId}
         fresh={params["new"] === "1"}
         openBoard={params["board"] === "1"}
+        ask={
+          typeof params["ask"] === "string" && params["ask"].length <= 300
+            ? params["ask"]
+            : undefined
+        }
       />
     </>
   );
