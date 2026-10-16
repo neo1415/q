@@ -3,6 +3,7 @@ import {
   type QLanguagePreference,
 } from "@capital-q/contracts";
 
+import { COMPANY_AR } from "./catalog/company";
 import { CORE_AR } from "./catalog/core";
 import { DISCOVER_AR } from "./catalog/discover";
 import { Q_AR } from "./catalog/q";
@@ -28,6 +29,7 @@ const ARABIC: Readonly<Record<string, string>> = {
   ...CORE_AR,
   ...Q_AR,
   ...DISCOVER_AR,
+  ...COMPANY_AR,
 };
 
 export function uiLanguageOf(

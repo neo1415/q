@@ -29,6 +29,7 @@ import { ProfileHero } from "@/features/profile/profile-header";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QControl } from "@/features/q/control/q-control";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Investor" };
 export const dynamic = "force-dynamic";
@@ -44,6 +45,7 @@ export default async function InvestorPage({
 }: {
   readonly params: Promise<{ readonly investorOrganisationId: string }>;
 }) {
+  const t = await serverT();
   const { investorOrganisationId } = await params;
   const context = await resolveOwnContext();
   const session = await apiSession();
@@ -56,14 +58,16 @@ export default async function InvestorPage({
           kind="INVESTOR_PROFILE"
           refs={[{ kind: "INVESTOR_ORGANISATION", id: investorOrganisationId }]}
           total={1}
-          label="an investor profile"
+          label={t("an investor profile")}
         >
           <EmptyState
-            title="This page is for founders."
-            description="Founders see investors who chose to be discoverable, and can ask to connect."
+            title={t("This page is for founders.")}
+            description={t(
+              "Founders see investors who chose to be discoverable, and can ask to connect.",
+            )}
             action={
               <Link href="/home" className={buttonClassName("secondary")}>
-                Go to Q
+                {t("Go to Q")}
               </Link>
             }
           />
@@ -87,17 +91,19 @@ export default async function InvestorPage({
           kind="INVESTOR_PROFILE"
           refs={[{ kind: "INVESTOR_ORGANISATION", id: investorOrganisationId }]}
           total={1}
-          label="an investor profile"
+          label={t("an investor profile")}
         >
           <EmptyState
-            title="This investor couldn't load."
-            description="Nothing is wrong with your profile. Try again in a moment."
+            title={t("This investor couldn't load.")}
+            description={t(
+              "Nothing is wrong with your profile. Try again in a moment.",
+            )}
             action={
               <Link
                 href={`/investors/${investorOrganisationId}`}
                 className={buttonClassName("secondary")}
               >
-                Try again
+                {t("Try again")}
               </Link>
             }
           />
@@ -160,7 +166,7 @@ export default async function InvestorPage({
         kind="INVESTOR_PROFILE"
         refs={[{ kind: "INVESTOR_ORGANISATION", id: investorOrganisationId }]}
         total={1}
-        label="an investor profile"
+        label={t("an investor profile")}
       >
         {/*
           The investor as their own profile shows them (owner 2026-10-16:
@@ -175,7 +181,7 @@ export default async function InvestorPage({
             className="cq-body-sm inline-flex min-h-11 items-center gap-1 self-start text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
           >
             <ChevronLeft size={ICON_SIZE.compact} aria-hidden="true" />
-            Investors
+            {t("Investors")}
           </Link>
           <ProfileHero
             name={investor.displayName}
@@ -216,7 +222,7 @@ export default async function InvestorPage({
                         : "primary",
                     )}
                   >
-                    Apply via GateQ
+                    {t("Apply via GateQ")}
                   </a>
                   {cta.kind === "REQUEST" ? (
                     <a href="#connect" className={buttonClassName("secondary")}>
@@ -227,14 +233,14 @@ export default async function InvestorPage({
                     href={`/rehearsals/investor/${encodeURIComponent(id)}`}
                     className={buttonClassName("secondary")}
                   >
-                    Rehearse
+                    {t("Rehearse")}
                   </Link>
                   {cta.kind === "ENDED" ? (
                     <Link
                       href={recordHref}
                       className={buttonClassName("quiet")}
                     >
-                      Open in CRM
+                      {t("Open in CRM")}
                     </Link>
                   ) : null}
                 </div>
@@ -245,7 +251,7 @@ export default async function InvestorPage({
             <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
               {investor.publicDescription === null ? null : (
                 <QControl id="section.about" kind="SECTION">
-                  <ProfileSectionShell id="investor-about" title="About">
+                  <ProfileSectionShell id="investor-about" title={t("About")}>
                     <p className="cq-body whitespace-pre-line text-(--cq-text-secondary)">
                       {investor.publicDescription}
                     </p>
@@ -267,7 +273,7 @@ export default async function InvestorPage({
               <QControl id="section.connect" kind="SECTION">
                 <ProfileSectionShell
                   id="connect"
-                  title="Connect"
+                  title={t("Connect")}
                   description={
                     cta.kind !== "REQUEST"
                       ? undefined
@@ -289,8 +295,9 @@ export default async function InvestorPage({
                     </p>
                   ) : status === null ? (
                     <p className="cq-body-sm text-(--cq-text-secondary)">
-                      Whether you can send a request couldn&apos;t be checked
-                      just now. Reload to try again.
+                      {t(
+                        "Whether you can send a request couldn't be checked just now. Reload to try again.",
+                      )}
                     </p>
                   ) : (
                     <ConnectionRequest
@@ -301,7 +308,7 @@ export default async function InvestorPage({
                   )}
                 </ProfileSectionShell>
               </QControl>
-              <ProfileSectionShell id="investor-facts" title="At a glance">
+              <ProfileSectionShell id="investor-facts" title={t("At a glance")}>
                 <dl className="cq-body-sm flex flex-col divide-y divide-(--cq-border-subtle)">
                   {facts.map((fact) => (
                     <div

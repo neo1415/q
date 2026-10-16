@@ -29,6 +29,7 @@ import {
   shareRaiseWithNetworkAction,
 } from "./visibility-actions";
 import { formatLongDay } from "@/components/date-format";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The visibility control centre (CQ-BIZ-003; business research §6.2).
@@ -104,6 +105,7 @@ export function VisibilityCentre({
   /** Changes whenever the page changed who can see the profile. */
   readonly refreshKey: string;
 }) {
+  const t = useT();
   const [state, setState] = useState<VisibilityStateDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -137,11 +139,11 @@ export function VisibilityCentre({
 
   if (state === null) {
     return error === null ? (
-      <div aria-busy="true" aria-label="Loading who can see what">
+      <div aria-busy="true" aria-label={t("Loading who can see what")}>
         <Skeleton lines={4} />
       </div>
     ) : (
-      <InlineNotice tone="danger" title="Visibility couldn't load">
+      <InlineNotice tone="danger" title={t("Visibility couldn't load")}>
         {error}
       </InlineNotice>
     );
@@ -153,12 +155,12 @@ export function VisibilityCentre({
       data-visibility-centre
     >
       {notice !== null ? (
-        <InlineNotice tone="positive" title="Done">
+        <InlineNotice tone="positive" title={t("Done")}>
           {notice}
         </InlineNotice>
       ) : null}
       {error !== null ? (
-        <InlineNotice tone="danger" title="That didn't go through">
+        <InlineNotice tone="danger" title={t("That didn't go through")}>
           {error}
         </InlineNotice>
       ) : null}
@@ -194,6 +196,7 @@ function WhoSeesWhat({
   readonly onChanged: (message: string) => Promise<void>;
   readonly onError: (message: string) => void;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [recipient, setRecipient] = useState("");
   // One key per intended share, reused if the same share is retried.
@@ -285,7 +288,7 @@ function WhoSeesWhat({
   return (
     <section aria-labelledby="who-sees-what" className="flex flex-col gap-4">
       <h2 id="who-sees-what" className="cq-title-md text-(--cq-text-primary)">
-        Who can see what
+        {t("Who can see what")}
       </h2>
       <ul className="cq-panel-rows flex max-w-(--cq-layout-reading) flex-col border-y border-(--cq-border-subtle)">
         {state.objects.map((object) => (
@@ -313,20 +316,21 @@ function WhoSeesWhat({
           data-visibility-object="PRIVATE"
         >
           <span className="cq-label text-(--cq-text-primary)">
-            Everything else
+            {t("Everything else")}
           </span>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Your setup answers, documents, what Q read from them, your
-            conversations with Q and the use of funds. Private to your
-            organisation, whatever you choose here.
+            {t(
+              "Your setup answers, documents, what Q read from them, your conversations with Q and the use of funds. Private to your organisation, whatever you choose here.",
+            )}
           </p>
         </li>
       </ul>
 
       {raise === undefined ? (
         <p className="cq-status-line">
-          No raise to share yet. Once you set your raise, you can share it with
-          an investor you have a relationship with.
+          {t(
+            "No raise to share yet. Once you set your raise, you can share it with an investor you have a relationship with.",
+          )}
         </p>
       ) : (
         <div className="flex max-w-(--cq-layout-reading) flex-col gap-3">
@@ -340,7 +344,7 @@ function WhoSeesWhat({
                 id="network-raise-label"
                 className="cq-label text-(--cq-text-primary)"
               >
-                Show my raise to every investor on Capital Q
+                {t("Show my raise to every investor on Capital Q")}
               </span>
               <span
                 id="network-raise-help"
@@ -371,15 +375,15 @@ function WhoSeesWhat({
             </button>
           </div>
           <h3 className="cq-label text-(--cq-text-primary)">
-            Shared with investors
+            {t("Shared with investors")}
           </h3>
           {state.shares.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              Nothing is shared with a specific investor.
+              {t("Nothing is shared with a specific investor.")}
             </p>
           ) : (
             <ul
-              aria-label="Active shares"
+              aria-label={t("Active shares")}
               className="flex flex-col border-y border-(--cq-border-subtle)"
             >
               {state.shares.map((share) => {
@@ -406,7 +410,7 @@ function WhoSeesWhat({
                       disabled={busy}
                       onClick={() => void revoke(share.policyId, name)}
                     >
-                      Revoke
+                      {t("Revoke")}
                     </Button>
                   </li>
                 );
@@ -415,8 +419,9 @@ function WhoSeesWhat({
           )}
           {state.shares.length > 0 ? (
             <p className="cq-caption text-(--cq-text-tertiary)">
-              Revoking removes future access. What was already seen can&apos;t
-              be recalled.
+              {t(
+                "Revoking removes future access. What was already seen can't be recalled.",
+              )}
             </p>
           ) : null}
           {candidates.length === 0 ? (
@@ -430,8 +435,8 @@ function WhoSeesWhat({
               <div className="min-w-56 flex-1">
                 <Select
                   id="share-raise-with"
-                  label="Share your raise with"
-                  placeholder="Choose an investor"
+                  label={t("Share your raise with")}
+                  placeholder={t("Choose an investor")}
                   value={recipient}
                   onChange={(event) => setRecipient(event.target.value)}
                   options={candidates.map((r) => ({
@@ -445,7 +450,7 @@ function WhoSeesWhat({
                 disabled={busy || recipient === ""}
                 onClick={() => void share()}
               >
-                Share
+                {t("Share")}
               </Button>
             </div>
           )}
@@ -464,6 +469,7 @@ function AudiencePreview({
   readonly relationships: VisibilityStateDto["relationships"];
   readonly refreshKey: string;
 }) {
+  const t = useT();
   const [audience, setAudience] = useState<VisibilityAudience>("NETWORK");
   const [relationshipId, setRelationshipId] = useState<string>(
     relationships[0]?.relationshipId ?? "",
@@ -518,16 +524,17 @@ function AudiencePreview({
           id="audience-preview"
           className="cq-title-md text-(--cq-text-primary)"
         >
-          Preview as
+          {t("Preview as")}
         </h2>
         <p className="cq-status-line">
-          Exactly what each audience is shown, decided by the same rules as
-          every real view. Read-only.
+          {t(
+            "Exactly what each audience is shown, decided by the same rules as every real view. Read-only.",
+          )}
         </p>
       </div>
       <div
         role="tablist"
-        aria-label="Audience"
+        aria-label={t("Audience")}
         className="flex max-w-(--cq-layout-reading) flex-wrap gap-1 border-b border-(--cq-border-subtle)"
       >
         {AUDIENCES.map((option, index) => {
@@ -570,13 +577,14 @@ function AudiencePreview({
         {needsInvestor ? (
           relationships.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              No investor has a relationship with you yet, so there is no one to
-              preview as.
+              {t(
+                "No investor has a relationship with you yet, so there is no one to preview as.",
+              )}
             </p>
           ) : (
             <Select
               id="preview-as-investor"
-              label="Investor"
+              label={t("Investor")}
               value={relationshipId}
               onChange={(event) => setRelationshipId(event.target.value)}
               options={relationships.map((r) => ({
@@ -587,7 +595,7 @@ function AudiencePreview({
           )
         ) : null}
         {error !== null ? (
-          <InlineNotice tone="danger" title="That preview couldn't load">
+          <InlineNotice tone="danger" title={t("That preview couldn't load")}>
             {error}
           </InlineNotice>
         ) : !ready ? null : preview === null ||
@@ -605,12 +613,14 @@ function AudiencePreview({
 }
 
 function PreviewBody({ preview }: { readonly preview: AudiencePreviewDto }) {
+  const t = useT();
   const { profile, capitalObjective } = preview;
   if (profile === null && capitalObjective === null) {
     return (
       <p className="cq-body text-(--cq-text-primary)" data-sees="nothing">
-        This audience sees nothing of your company. Q will not mention it to
-        them.
+        {t(
+          "This audience sees nothing of your company. Q will not mention it to them.",
+        )}
       </p>
     );
   }
@@ -647,7 +657,7 @@ function PreviewBody({ preview }: { readonly preview: AudiencePreviewDto }) {
           className="cq-body-sm text-(--cq-text-secondary)"
           data-sees="no-profile"
         >
-          Your company profile is not shown to this audience.
+          {t("Your company profile is not shown to this audience.")}
         </p>
       ) : (
         <dl className="cq-panel cq-panel-rows" data-sees="profile">
@@ -661,16 +671,16 @@ function PreviewBody({ preview }: { readonly preview: AudiencePreviewDto }) {
           className="cq-body-sm text-(--cq-text-secondary)"
           data-sees="no-raise"
         >
-          Your raise is not shown to this audience.
+          {t("Your raise is not shown to this audience.")}
         </p>
       ) : (
         <dl className="cq-panel cq-panel-rows" data-sees="raise">
           <PreviewRow
-            label="Raising"
+            label={t("Raising")}
             value={`${capitalObjective.target.currency} ${formatAmountForDisplay(capitalObjective.target.amount)}`}
           />
           <PreviewRow
-            label="Instrument"
+            label={t("Instrument")}
             value={
               capitalObjective.instrumentCode === null
                 ? null
@@ -679,11 +689,11 @@ function PreviewBody({ preview }: { readonly preview: AudiencePreviewDto }) {
             }
           />
           <PreviewRow
-            label="Stage"
+            label={t("Stage")}
             value={stageLabel(capitalObjective.targetStage)}
           />
           <PreviewRow
-            label="Target close"
+            label={t("Target close")}
             value={capitalObjective.targetCloseDate}
           />
         </dl>
@@ -699,6 +709,7 @@ function PreviewRow({
   readonly label: string;
   readonly value: string | null;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-0.5 px-5 py-3 sm:flex-row sm:gap-4">
       <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-32">
@@ -706,7 +717,7 @@ function PreviewRow({
       </dt>
       <dd className="cq-body text-(--cq-text-primary)">
         {value === null || value.length === 0 ? (
-          <span className="text-(--cq-text-tertiary)">Not stated</span>
+          <span className="text-(--cq-text-tertiary)">{t("Not stated")}</span>
         ) : (
           value
         )}

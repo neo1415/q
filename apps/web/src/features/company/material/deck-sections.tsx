@@ -19,6 +19,7 @@ import {
   Search,
   UserRound,
 } from "@capital-q/ui/icons";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q's read of the deck, as twelve sub-tabs in the same order for every
@@ -88,6 +89,7 @@ export function DeckReadSummary({
   readonly onPick: (index: number) => void;
   readonly current: number;
 }) {
+  const t = useT();
   const present = sections.filter(
     (section) => section.status === "PRESENT",
   ).length;
@@ -109,7 +111,7 @@ export function DeckReadSummary({
             id="deck-read-title"
             className="cq-title-sm text-(--cq-text-primary)"
           >
-            Q&rsquo;s read of the deck
+            {t("Q’s read of the deck")}
           </h3>
           <span
             className="cq-body-sm text-(--cq-text-secondary)"
@@ -122,8 +124,8 @@ export function DeckReadSummary({
           </span>
         </span>
         <span className="cq-body-sm inline-flex items-center gap-1 text-(--cq-text-primary) underline underline-offset-4">
-          <span className="group-open:hidden">View coverage</span>
-          <span className="hidden group-open:inline">Hide coverage</span>
+          <span className="group-open:hidden">{t("View coverage")}</span>
+          <span className="hidden group-open:inline">{t("Hide coverage")}</span>
         </span>
       </summary>
       <div className="flex flex-col gap-3 px-4 pb-4">
@@ -160,13 +162,13 @@ export function DeckReadSummary({
         </ul>
         <p className="cq-caption flex flex-wrap items-center gap-x-3 gap-y-1 text-(--cq-text-secondary)">
           <span className="inline-flex items-center gap-1">
-            <StatusMark status="PRESENT" /> In the deck
+            <StatusMark status="PRESENT" /> {t("In the deck")}
           </span>
           <span className="inline-flex items-center gap-1">
-            <StatusMark status="NOT_IN_DECK" /> Not in the deck yet
+            <StatusMark status="NOT_IN_DECK" /> {t("Not in the deck yet")}
           </span>
           <span className="inline-flex items-center gap-1">
-            <StatusMark status="UNCLEAR" /> Unclear
+            <StatusMark status="UNCLEAR" /> {t("Unclear")}
           </span>
         </p>
         <p className="cq-caption text-(--cq-text-secondary)">
@@ -193,6 +195,7 @@ function SectionCard({
   readonly downloadable: boolean;
   readonly companyName: string;
 }) {
+  const t = useT();
   const label = DECK_SECTION_LABELS[section.section];
   const where = slides(section.pages);
   return (
@@ -241,7 +244,7 @@ function SectionCard({
               <dd className="cq-title-sm cq-numeric text-end text-(--cq-text-primary)">
                 {fact.value ?? (
                   <span className="cq-body-sm text-(--cq-text-secondary)">
-                    Not in the deck
+                    {t("Not in the deck")}
                   </span>
                 )}
               </dd>
@@ -287,6 +290,7 @@ export function DeckCarousel({
   readonly index: number;
   readonly onIndex: (index: number) => void;
 }) {
+  const t = useT();
   const track = useRef<HTMLDivElement>(null);
   const chips = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(index);
@@ -358,14 +362,14 @@ export function DeckCarousel({
     <section
       className="flex flex-col gap-3"
       aria-roledescription="carousel"
-      aria-label="The deck, section by section"
+      aria-label={t("The deck, section by section")}
       data-deck-carousel
     >
       <div
         ref={chips}
         className="relative flex gap-2 overflow-x-auto pb-1"
         role="tablist"
-        aria-label="Sections"
+        aria-label={t("Sections")}
       >
         {sections.map((section, at) => (
           <button
@@ -413,7 +417,7 @@ export function DeckCarousel({
             type="button"
             onClick={() => go(visible - 1)}
             disabled={visible === 0}
-            aria-label="Previous section"
+            aria-label={t("Previous section")}
             className="flex size-11 items-center justify-center border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
           >
             <ChevronLeft size={ICON_SIZE.regular} aria-hidden="true" />
@@ -425,7 +429,7 @@ export function DeckCarousel({
             type="button"
             onClick={() => go(visible + 1)}
             disabled={visible === sections.length - 1}
-            aria-label="Next section"
+            aria-label={t("Next section")}
             className="flex size-11 items-center justify-center border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
           >
             <ChevronRight size={ICON_SIZE.regular} aria-hidden="true" />

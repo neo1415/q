@@ -8,6 +8,7 @@ import { EmptyState, ErrorState } from "@capital-q/ui/states";
 import { PageContainer } from "@/components/app-shell/page-container";
 import { resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Data room and deck" };
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function OwnDataRoomPage({
     Readonly<Record<string, string | string[] | undefined>>
   >;
 } = {}) {
+  const t = await serverT();
   const params = (await searchParams) ?? {};
   const asked = params["tab"];
   const tab = typeof asked === "string" && TABS.has(asked) ? asked : "dataroom";
@@ -41,37 +43,48 @@ export default async function OwnDataRoomPage({
   }
   return (
     <PageContainer>
-      <QSection id="data-room" kind="DATA_ROOM" total={0} label="the data room">
+      <QSection
+        id="data-room"
+        kind="DATA_ROOM"
+        total={0}
+        label={t("the data room")}
+      >
         {context.kind === "INVESTOR" ? (
           <EmptyState
-            title="Data rooms belong to companies"
-            description="A company's data room opens from its page, as far as it has shared it with you."
+            title={t("Data rooms belong to companies")}
+            description={t(
+              "A company's data room opens from its page, as far as it has shared it with you.",
+            )}
             action={
               <Link className={buttonClassName("secondary")} href="/discover">
-                Open Discover
+                {t("Open Discover")}
               </Link>
             }
           />
         ) : context.unavailable === true ? (
           <ErrorState
-            title="Your data room couldn't open"
-            description="Capital Q didn't answer just now. Nothing is lost; try again in a moment."
+            title={t("Your data room couldn't open")}
+            description={t(
+              "Capital Q didn't answer just now. Nothing is lost; try again in a moment.",
+            )}
             action={
               <Link
                 className={buttonClassName("secondary")}
                 href={`/company/data-room?tab=${tab}`}
               >
-                Try again
+                {t("Try again")}
               </Link>
             }
           />
         ) : (
           <EmptyState
-            title="Set up your company first"
-            description="Your data room and deck live on your company's page once it is set up."
+            title={t("Set up your company first")}
+            description={t(
+              "Your data room and deck live on your company's page once it is set up.",
+            )}
             action={
               <Link className={buttonClassName("primary")} href="/welcome">
-                Set up with Q
+                {t("Set up with Q")}
               </Link>
             }
           />

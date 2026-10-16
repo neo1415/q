@@ -14,6 +14,7 @@ import {
 
 import { NotScannedNote } from "../documents/not-scanned-note";
 import { downloadDeckAction } from "./profile-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The interactive parts of a company's profile (founder request
@@ -38,6 +39,7 @@ export function ProfilePass({
   readonly companyId: string;
   readonly companyName: string;
 }) {
+  const t = useT();
   const [passed, setPassed] = useState(false);
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function ProfilePass({
             disabled={pending}
             onClick={() => void undo()}
           >
-            Undo
+            {t("Undo")}
           </Button>
         </>
       ) : (
@@ -98,7 +100,7 @@ export function ProfilePass({
           className="min-h-11"
           onClick={() => void pass()}
         >
-          Pass
+          {t("Pass")}
         </Button>
       )}
       {notice === null ? null : (
@@ -125,6 +127,7 @@ export function DeckDownload({
   /** False: "Not virus-scanned yet" beside it (ADR 0042). */
   readonly scanned?: boolean;
 }) {
+  const t = useT();
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const download = async () => {
@@ -144,7 +147,7 @@ export function DeckDownload({
         aria-describedby="deck-title"
       >
         <Download size={ICON_SIZE.compact} aria-hidden="true" />
-        Download pitch deck
+        {t("Download pitch deck")}
       </Button>
       <span id="deck-title" className="cq-caption text-(--cq-text-tertiary)">
         {title}
@@ -185,11 +188,12 @@ export function CompanyVideos({
   };
   readonly videos: readonly PitchSummaryDto[];
 }) {
+  const t = useT();
   const [active, setActive] = useState<string | null>(null);
   if (videos.length === 0) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        No videos you can watch yet.
+        {t("No videos you can watch yet.")}
       </p>
     );
   }
@@ -221,7 +225,7 @@ export function CompanyVideos({
                 aria-label={`Play ${label}`}
               >
                 <Play size={ICON_SIZE.prominent} aria-hidden="true" />
-                <span className="cq-body-sm">Play</span>
+                <span className="cq-body-sm">{t("Play")}</span>
               </button>
             )}
             <p className="cq-body-sm text-(--cq-text-primary)">
