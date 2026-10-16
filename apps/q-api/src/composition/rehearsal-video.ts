@@ -119,6 +119,31 @@ export function enabledInterviewersFrom(raw: string | undefined): Set<string> {
   return new Set(chosen);
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+
+/**
+ * Who may have a video Rehearsal (owner, 2026-10-15/16: Tavus for every
+ * eligible account). Every account is admitted by default; what bounds the
+ * spend is the database on every reservation (5 shared sessions a person a
+ * week, 180 s each, the monthly safeguard, concurrency), plus the fresh
+ * canonical membership check on every turn. The paid-user list no longer
+ * decides eligibility; CQ_TAVUS_ALL_ACCOUNTS=false is the explicit switch
+ * back to list-only admission (an incident brake, not the default).
+ */
+export function videoAdmissionFrom(env: {
+  readonly CQ_TAVUS_ALL_ACCOUNTS?: string | undefined;
+  readonly CQ_TAVUS_PAID_USER_IDS?: string | undefined;
+}): { readonly allAccounts: boolean; readonly paidUserIds: Set<string> } {
+  return {
+    allAccounts: env.CQ_TAVUS_ALL_ACCOUNTS?.trim() !== "false",
+    paidUserIds: new Set(
+      (env.CQ_TAVUS_PAID_USER_IDS ?? "")
+        .split(/[\s,]+/u)
+        .filter((id) => UUID.test(id)),
+    ),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
