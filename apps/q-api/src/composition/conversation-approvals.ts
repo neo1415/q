@@ -5,6 +5,7 @@ import {
   QRunIdSchema,
   type QApprovalView,
 } from "@capital-q/contracts";
+import { APP_ACTIONS, PERSON_ACTIONS } from "@capital-q/app-actions";
 import type { Logger } from "@capital-q/observability";
 import {
   QActionPayloadMismatchError,
@@ -13,12 +14,15 @@ import {
   type QActionService,
 } from "@capital-q/q-actions";
 import type { QOrchestrator, QRuntimeService } from "@capital-q/q-runtime";
-import type {
-  ConversationProposal,
-  PendingProposalContext,
-  PendingProposalPort,
-  ProposalPlainStatus,
+import {
+  mayStandAsApproval,
+  readApprovalWords,
+  type ConversationProposal,
+  type PendingProposalContext,
+  type PendingProposalPort,
+  type ProposalPlainStatus,
 } from "@capital-q/q-tools";
+import type { QDecisionVia } from "@capital-q/q-actions";
 import type { ActorContext } from "@capital-q/security";
 
 import type { PendingDecisionPort } from "@capital-q/q-specialists";
@@ -64,6 +68,77 @@ export function plainProposalStatus(view: QApprovalView): ProposalPlainStatus {
   }
 }
 
+/**
+ * The kinds that keep their card's own Approve (owner 2026-10-16; the
+ * brief's high-risk tier): money movement and terms (ADR 0043's MONEY and
+ * TERMS consequences: a raise, a round, a commitment amount, deal terms,
+ * sharing the raise), and sharing a private document with someone outside
+ * the company (diligence shares). Words never approve these; the card's
+ * button does, after its explicit confirmation. Everything else Q
+ * prepares (messages, emails, meetings, reminders, profile and record
+ * changes, interest, connection requests) is approvable by the person's
+ * own typed or spoken words.
+ */
+const CARD_ONLY_CONSEQUENCES: ReadonlySet<string> = new Set(["MONEY", "TERMS"]);
+const CARD_ONLY_APP_ACTIONS: ReadonlySet<string> = new Set([
+  "diligence.document.share",
+  "diligence.request.fulfil",
+  "diligence.request.upload_fulfil",
+]);
+
+type DeclaredAction = {
+  readonly name: string;
+  readonly consequence?: string | undefined;
+  readonly viaTool?: string | undefined;
+  readonly tool?: { readonly name: string } | undefined;
+};
+
+const DECLARED: readonly DeclaredAction[] = [
+  ...(APP_ACTIONS as readonly DeclaredAction[]),
+  ...(PERSON_ACTIONS as readonly DeclaredAction[]),
+];
+
+function cardOnlyAction(action: DeclaredAction): boolean {
+  return (
+    (action.consequence !== undefined &&
+      CARD_ONLY_CONSEQUENCES.has(action.consequence)) ||
+    CARD_ONLY_APP_ACTIONS.has(action.name)
+  );
+}
+
+/**
+ * Whether this prepared action keeps its card's Approve: never approved by
+ * words. Anything outside the one approvable class keeps it too.
+ */
+export function keepsItsCard(input: {
+  readonly actionType: string;
+  readonly actionClass: string;
+  readonly payload?: Readonly<Record<string, unknown>> | undefined;
+}): boolean {
+  if (input.actionClass !== "CONFIRM_REQUIRED") return true;
+  if (!input.actionType.startsWith("app.")) return false;
+  const name = input.actionType.slice("app.".length);
+  const action = DECLARED.find((candidate) => candidate.name === name);
+  if (action === undefined) return false;
+  if (cardOnlyAction(action)) return true;
+  // A family ("diligence.change"): its member is the payload's operation.
+  const toolName = action.tool?.name;
+  if (toolName === undefined) return false;
+  const members = DECLARED.filter((member) => member.viaTool === toolName);
+  if (!members.some(cardOnlyAction)) return false;
+  const operation = input.payload?.["operation"];
+  const member =
+    typeof operation === "string"
+      ? members.filter((candidate) =>
+          candidate.name.endsWith(`.${operation.toLowerCase()}`),
+        )
+      : [];
+  // Not known which member: as the strictest of them.
+  return member.length === 1 && member[0] !== undefined
+    ? cardOnlyAction(member[0])
+    : true;
+}
+
 export type ConversationApprovalDependencies = {
   readonly runtime: Pick<QRuntimeService, "getRun" | "getConversation">;
   /**
@@ -77,6 +152,7 @@ export type ConversationApprovalDependencies = {
       QActionService,
       | "findApprovalForAction"
       | "getApproval"
+      | "readProposal"
       | "approve"
       | "reject"
       | "listPendingApprovals"
@@ -134,9 +210,8 @@ export function createConversationApprovalPort(
       .catch(() => null);
   };
 
-  const inConversation = async (
-    context: PendingProposalContext,
-  ): Promise<readonly ConversationProposal[]> => {
+  /** This run's conversation, read as the person; empty without one. */
+  const messagesOf = async (context: PendingProposalContext) => {
     const { actor } = context;
     const correlationId = CorrelationIdSchema.parse(context.correlationId);
     const { run } = await runtime.getRun({
@@ -150,6 +225,65 @@ export function createConversationApprovalPort(
       conversationId: run.conversationId,
       correlationId,
     });
+    return messages;
+  };
+
+  /**
+   * The person's own words that stand as their decision on this card, by
+   * code (owner 2026-10-16): their latest message in this conversation,
+   * sent in this run, after the card was shown (its message here, or its
+   * request time for a card from elsewhere), and neither a refusal nor a
+   * change asked for. Null: nothing they said approves it, whoever asks
+   * -- the decision reading or the model's tool -- so nothing is approved.
+   * Never auto-approval: no utterance, no approval.
+   */
+  const theirWords = async (
+    context: PendingProposalContext,
+    view: QApprovalView,
+    decision: "APPROVE" | "DECLINE",
+  ): Promise<QDecisionVia | null> => {
+    const messages = await messagesOf(context);
+    const shownIn = messages.find((message) =>
+      (message.blocks ?? []).some(
+        (block) =>
+          block.kind === "ACTION_PROPOSAL" &&
+          block.proposal.proposalId === view.action.actionId,
+      ),
+    );
+    const shownAt = Date.parse(shownIn?.createdAt ?? view.requestedAt);
+    const latest = messages.findLast((message) => message.role === "USER");
+    if (
+      latest === undefined ||
+      latest.runId !== context.runId ||
+      !(Date.parse(latest.createdAt) > shownAt)
+    ) {
+      return null;
+    }
+    if (
+      decision === "APPROVE" &&
+      !mayStandAsApproval(latest.content, [view.action.summary])
+    ) {
+      return null;
+    }
+    // Nor is a yes ever turned into a no.
+    if (
+      decision === "DECLINE" &&
+      readApprovalWords(latest.content, { summaries: [view.action.summary] })
+        .kind === "APPROVE"
+    ) {
+      return null;
+    }
+    return {
+      channel: latest.utteranceRef === undefined ? "TEXT" : "VOICE",
+      evidenceRef: latest.id,
+    };
+  };
+
+  const inConversation = async (
+    context: PendingProposalContext,
+  ): Promise<readonly ConversationProposal[]> => {
+    const { actor } = context;
+    const messages = await messagesOf(context);
     const seen = new Map<string, string>();
     for (const message of messages) {
       for (const block of message.blocks ?? []) {
@@ -174,7 +308,9 @@ export function createConversationApprovalPort(
   const approve = async (
     context: PendingProposalContext,
     proposalId: string,
-  ): Promise<{ readonly status: ProposalPlainStatus | "CHANGED" }> => {
+  ): Promise<{
+    readonly status: ProposalPlainStatus | "CHANGED" | "CARD_ONLY";
+  }> => {
     const { actor } = context;
     const correlationId = CorrelationIdSchema.parse(context.correlationId);
     const before = await viewOf(actor, proposalId, context.correlationId);
@@ -182,6 +318,34 @@ export function createConversationApprovalPort(
       throw new Error("the proposal is not readable as this person");
     }
     const { actions, orchestrator, continueApproved } = late();
+    // Only a decision still open is made here by words; a repeat of one
+    // already made goes to the engine as before (its retry is idempotent,
+    // and continues an approved action whose continuation was lost).
+    let via: QDecisionVia | undefined;
+    if (before.status === "PENDING") {
+      const proposal = await actions
+        .readProposal({ actor, approvalId: before.approvalId, correlationId })
+        .catch(() => null);
+      if (
+        proposal === null ||
+        keepsItsCard({
+          actionType: proposal.actionType,
+          actionClass: before.action.actionClass,
+          payload: proposal.payload,
+        })
+      ) {
+        return { status: "CARD_ONLY" };
+      }
+      const words = await theirWords(context, before, "APPROVE");
+      if (words === null) {
+        logger?.info(
+          { qRunId: context.runId, actionId: proposalId, correlationId },
+          "no words of theirs since the card was shown approve it; nothing approved",
+        );
+        return { status: "PENDING" };
+      }
+      via = words;
+    }
     // Whether the continuation finished within the wait: "applying" is
     // said only while it may still be running (live 2026-10-01: Q said
     // "It's being applied now" about an action whose continuation had
@@ -192,6 +356,7 @@ export function createConversationApprovalPort(
         actor,
         approvalId: before.approvalId,
         correlationId,
+        ...(via === undefined ? {} : { via }),
       });
       // A repeated approve of an action still waiting to run (its first
       // continuation was lost) continues it again; the gate's claim makes
@@ -280,11 +445,19 @@ export function createConversationApprovalPort(
     if (before === null) {
       throw new Error("the proposal is not readable as this person");
     }
+    const via =
+      before.status === "PENDING"
+        ? await theirWords(context, before, "DECLINE")
+        : undefined;
+    if (via === null) {
+      return { status: plainProposalStatus(before) };
+    }
     try {
       await late().actions.reject({
         actor,
         approvalId: before.approvalId,
         correlationId: CorrelationIdSchema.parse(context.correlationId),
+        ...(via === undefined ? {} : { via }),
       });
     } catch (error: unknown) {
       if (

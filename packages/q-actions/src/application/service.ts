@@ -162,12 +162,50 @@ export type QApprovalQuery = {
   readonly correlationId?: CorrelationId | undefined;
 };
 
+/**
+ * How the person decided (owner 2026-10-16): the card's button, or their
+ * own typed or spoken words in the conversation. Recorded on the audit
+ * row with the message or transcript the words are in, so a decision by
+ * words is the human's, with its evidence -- never the model's. It is a
+ * record, not authority: every channel meets the same checks.
+ */
+export const Q_DECISION_CHANNELS = ["CARD", "TEXT", "VOICE"] as const;
+export type QDecisionChannel = (typeof Q_DECISION_CHANNELS)[number];
+
+export type QDecisionVia = {
+  readonly channel: QDecisionChannel;
+  /** The conversation message (TEXT) or utterance (VOICE) that decided it. */
+  readonly evidenceRef?: string | undefined;
+};
+
 export type DecideQApprovalCommand = {
   readonly actor: ActorContext;
   readonly approvalId: QApprovalId;
   readonly correlationId: CorrelationId;
   readonly reason?: string | undefined;
+  /** Absent: the card (the only channel before words could decide). */
+  readonly via?: QDecisionVia | undefined;
 };
+
+const EVIDENCE_REF = /^[A-Za-z0-9:_.-]{1,200}$/u;
+
+/** The decision's channel and evidence, as the audit row records them. */
+function decidedVia(via: QDecisionVia | undefined): {
+  readonly decidedVia: QDecisionChannel;
+  readonly evidenceRef: string | null;
+} {
+  const channel =
+    via !== undefined &&
+    (Q_DECISION_CHANNELS as readonly string[]).includes(via.channel)
+      ? via.channel
+      : "CARD";
+  // An opaque id only: never the words themselves.
+  const ref =
+    via?.evidenceRef !== undefined && EVIDENCE_REF.test(via.evidenceRef)
+      ? via.evidenceRef
+      : null;
+  return { decidedVia: channel, evidenceRef: ref };
+}
 
 /**
  * An edit of a pending proposal by the person it waits on (BIZ-007). The
@@ -1485,6 +1523,8 @@ export function createQActionService(
                 metadata: auditMetadata(moved, {
                   approvalId: approval.id,
                   approvalPayloadHash: recomputed,
+                  idempotencyKey: moved.idempotencyKey,
+                  ...decidedVia(command.via),
                 }),
                 correlationId,
               });
@@ -1557,6 +1597,8 @@ export function createQActionService(
               metadata: auditMetadata(moved, {
                 approvalId: approval.id,
                 reasonGiven: command.reason !== undefined,
+                idempotencyKey: moved.idempotencyKey,
+                ...decidedVia(command.via),
               }),
               correlationId,
             });
@@ -1598,6 +1640,7 @@ export function createQActionService(
               qRunId: result.action.runId,
               decision,
               outcome,
+              decidedVia: decidedVia(command.via).decidedVia,
               correlationId,
             },
             "q approval decided",

@@ -185,6 +185,7 @@ export type QApiModules = {
   readonly thesis?: InvestorPromiseRoutesDependencies["thesis"] | undefined;
   /** What Q remembers about the person, for them to read and correct. */
   readonly memory?: MemoryRoutesDependencies["memory"] | undefined;
+  readonly learningConsent?: MemoryRoutesDependencies["learningConsent"];
   /** Errands: the person's own, read and stopped. */
   readonly errands?: ErrandRoutesDependencies["errands"] | undefined;
   /** AUTO: Q's delegated work, the person's own, read, answered, stopped. */
@@ -543,6 +544,7 @@ export function createApp(
       authenticator: security.authenticator,
       resolver: security.resolver,
       memory: modules.memory,
+      learningConsent: modules.learningConsent,
     });
   }
 

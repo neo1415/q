@@ -237,4 +237,52 @@ describe("deriveOnboardingCoverage (founder)", () => {
     });
     expect(custom.saved(["x"])).toBe("تم الحفظ");
   });
+
+  it("a registration fact, once saved, reads as saved, credited to where it was given", () => {
+    const known = knownFactsFromRegistration(FOUNDER_COVERAGE_PROFILE, {
+      organisationName: "Harbourline Cargo",
+    });
+    const view = viewOf(FOUNDER_DEFINITION_CURRENT, {
+      [FOUNDER_STEPS.companyName]: { type: "TEXT", text: "Harbourline Cargo" },
+    });
+    const conversational = {
+      ...view,
+      responses: view.responses.map((r) => ({
+        ...r,
+        sourceModality: "TYPED_TEXT" as const,
+        channel: "CONVERSATION" as const,
+      })),
+    };
+    const c = deriveOnboardingCoverage({
+      profile: FOUNDER_COVERAGE_PROFILE,
+      definition: FOUNDER_DEFINITION_CURRENT,
+      view: conversational,
+      known,
+      now: NOW,
+    });
+    const name = field(c, FOUNDER_STEPS.companyName);
+    expect(name.state).toBe("CONFIRMED_SAVED");
+    // Typed in the conversation is the conversation, never "the form".
+    expect(name.source).toBe("CONVERSATION");
+    const formView = {
+      ...view,
+      responses: view.responses.map((r) => ({
+        ...r,
+        sourceModality: "TYPED_TEXT" as const,
+        channel: "FORM" as const,
+      })),
+    };
+    expect(
+      field(
+        deriveOnboardingCoverage({
+          profile: FOUNDER_COVERAGE_PROFILE,
+          definition: FOUNDER_DEFINITION_CURRENT,
+          view: formView,
+          known,
+          now: NOW,
+        }),
+        FOUNDER_STEPS.companyName,
+      ).source,
+    ).toBe("FORM");
+  });
 });

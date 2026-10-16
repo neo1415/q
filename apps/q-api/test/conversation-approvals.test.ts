@@ -12,6 +12,7 @@ import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 import {
   createConversationApprovalPort,
   createRecentPendingElsewhere,
+  keepsItsCard,
   plainProposalStatus,
   type ConversationApprovalDependencies,
 } from "../src/composition/conversation-approvals.js";
@@ -40,6 +41,7 @@ const CONVERSATION = randomUUID();
 const RUN_NOW = randomUUID();
 const RUN_EARLIER = randomUUID();
 const CORRELATION = `cor_${randomUUID()}`;
+const SAID_MESSAGE = randomUUID();
 
 type Row = {
   proposalId: string;
@@ -50,6 +52,18 @@ type Row = {
   action: QApprovalView["action"]["actionStatus"];
   canDecide: boolean;
   tampered?: boolean;
+  /** The engine's action type (default person.profile.update). */
+  actionType?: string;
+  payload?: Record<string, unknown>;
+};
+
+/** What the person said in this run after the cards were shown. */
+type Said = {
+  readonly text: string;
+  readonly runId?: string;
+  readonly utteranceRef?: string;
+  /** Before the card was shown, instead of after. */
+  readonly beforeCard?: boolean;
 };
 
 function viewOf(row: Row): QApprovalView {
@@ -78,8 +92,13 @@ function harness(
   options: {
     readonly continueApproved?: () => Promise<void>;
     readonly applyWithinMs?: number;
+    /** Null: nothing said since the cards. Default: "yes, go ahead". */
+    readonly said?: Said | null;
   } = {},
 ) {
+  const said =
+    options.said === undefined ? { text: "yes, go ahead" } : options.said;
+  const commands: { approvalId: string; via: unknown }[] = [];
   const approvals: string[] = [];
   const declines: string[] = [];
   const resumed: string[] = [];
@@ -90,18 +109,45 @@ function harness(
         Promise.resolve({
           run: { conversationId: CONVERSATION, id: query.runId },
         } as never),
-      getConversation: () =>
-        Promise.resolve({
-          messages: rows.map((row) => ({
-            role: "ASSISTANT",
-            blocks: [
-              {
-                kind: "ACTION_PROPOSAL",
-                proposal: { proposalId: row.proposalId, summary: row.summary },
-              },
-            ],
-          })),
-        } as never),
+      getConversation: () => {
+        const cards = rows.map((row) => ({
+          id: randomUUID(),
+          role: "Q",
+          runId: RUN_EARLIER,
+          content: row.summary,
+          createdAt: "2026-09-27T10:00:01.000Z",
+          blocks: [
+            {
+              kind: "ACTION_PROPOSAL",
+              proposal: { proposalId: row.proposalId, summary: row.summary },
+            },
+          ],
+        }));
+        const theirs =
+          said === null
+            ? []
+            : [
+                {
+                  id: SAID_MESSAGE,
+                  role: "USER",
+                  runId: said.runId ?? RUN_NOW,
+                  content: said.text,
+                  createdAt:
+                    said.beforeCard === true
+                      ? "2026-09-27T09:59:00.000Z"
+                      : "2026-09-27T10:05:00.000Z",
+                  ...(said.utteranceRef === undefined
+                    ? {}
+                    : { utteranceRef: said.utteranceRef }),
+                },
+              ];
+        return Promise.resolve({
+          messages:
+            said?.beforeCard === true
+              ? [...theirs, ...cards]
+              : [...cards, ...theirs],
+        } as never);
+      },
     },
     late: () => ({
       actions: {
@@ -120,7 +166,19 @@ function harness(
           }
           return Promise.resolve(viewOf(row));
         },
+        readProposal: (query) => {
+          const row = byApproval(query.approvalId);
+          if (row === undefined || row.owner !== query.actor.userId) {
+            return Promise.reject(new QApprovalNotPermittedError());
+          }
+          return Promise.resolve({
+            view: viewOf(row),
+            actionType: row.actionType ?? "person.profile.update",
+            payload: row.payload ?? {},
+          } as never);
+        },
         approve: (command) => {
+          commands.push({ approvalId: command.approvalId, via: command.via });
           const row = byApproval(command.approvalId);
           if (row === undefined || row.owner !== command.actor.userId) {
             return Promise.reject(new QApprovalNotPermittedError());
@@ -141,6 +199,7 @@ function harness(
           } as never);
         },
         reject: (command) => {
+          commands.push({ approvalId: command.approvalId, via: command.via });
           const row = byApproval(command.approvalId);
           if (row === undefined || row.owner !== command.actor.userId) {
             return Promise.reject(new QApprovalNotPermittedError());
@@ -186,6 +245,7 @@ function harness(
     approvals,
     declines,
     resumed,
+    commands,
   };
 }
 
@@ -312,7 +372,9 @@ describe("createConversationApprovalPort", () => {
 describe("declining by conversation (R33)", () => {
   it("rejects through the engine as the person, once, and nothing executes", async () => {
     const row = pending();
-    const { port, declines, resumed } = harness([row]);
+    const { port, declines, resumed, commands } = harness([row], {
+      said: { text: "no, cancel that" },
+    });
     const decline = port.decline;
     expect(decline).toBeDefined();
     if (decline === undefined) return;
@@ -324,6 +386,22 @@ describe("declining by conversation (R33)", () => {
     });
     expect(declines).toEqual([row.proposalId]);
     expect(resumed).toEqual([]);
+    // Recorded as their refusal, typed, with the message as evidence.
+    expect(commands[0]?.via).toEqual({
+      channel: "TEXT",
+      evidenceRef: SAID_MESSAGE,
+    });
+  });
+
+  it("never turns their yes into a no", async () => {
+    const row = pending();
+    const { port, declines } = harness([row], {
+      said: { text: "yes, send it" },
+    });
+    expect(await port.decline?.(at(OWNER), row.proposalId)).toEqual({
+      status: "PENDING",
+    });
+    expect(declines).toEqual([]);
   });
 
   it("never declines another person's change", async () => {
@@ -361,6 +439,7 @@ describe("changes waiting in their other conversations (live 2026-10-01)", () =>
       late: () => ({
         actions: {
           findApprovalForAction: () => Promise.reject(new Error("unused")),
+          readProposal: () => Promise.reject(new Error("unused")),
           approve: () => Promise.reject(new Error("unused")),
           reject: () => Promise.reject(new Error("unused")),
           listPendingApprovals: (query) =>
@@ -424,5 +503,126 @@ describe("changes waiting in their other conversations (live 2026-10-01)", () =>
     expect(await read(context(OWNER))).toEqual([]);
     const all = elsewhere(rows, [row(mine, randomUUID(), 5)]);
     expect(await all(context(STRANGER))).toEqual([]);
+  });
+});
+
+describe("approval by the person's own words (owner 2026-10-16)", () => {
+  it("records a typed approval as theirs: channel TEXT, the message as evidence", async () => {
+    const row = pending();
+    const { port, approvals, commands } = harness([row], {
+      said: { text: "I approve" },
+    });
+    expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+      status: "SAVED",
+    });
+    expect(approvals).toEqual([row.proposalId]);
+    expect(commands).toEqual([
+      {
+        approvalId: row.approvalId,
+        via: { channel: "TEXT", evidenceRef: SAID_MESSAGE },
+      },
+    ]);
+  });
+
+  it("records a spoken approval with channel VOICE", async () => {
+    const row = pending();
+    const { port, commands } = harness([row], {
+      said: { text: "yes, go ahead", utteranceRef: "utt_1" },
+    });
+    await port.approve(at(OWNER), row.proposalId);
+    expect(commands[0]?.via).toEqual({
+      channel: "VOICE",
+      evidenceRef: SAID_MESSAGE,
+    });
+  });
+
+  it("approves nothing when the person has said nothing since the card was shown", async () => {
+    for (const said of [
+      null,
+      { text: "yes, go ahead", beforeCard: true },
+      // Said in an earlier run: not this turn's words.
+      { text: "yes, go ahead", runId: randomUUID() },
+    ]) {
+      const row = pending();
+      const { port, approvals, commands } = harness([row], { said });
+      expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+        status: "PENDING",
+      });
+      expect(approvals).toEqual([]);
+      expect(commands).toEqual([]);
+    }
+  });
+
+  it("a change asked for, or a no, never stands as approval, whoever asks (the model's tool included)", async () => {
+    for (const text of [
+      "sounds good, but change the date",
+      "yes but make it Friday instead",
+      "no, don't send it",
+    ]) {
+      const row = pending();
+      const { port, approvals } = harness([row], { said: { text } });
+      expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+        status: "PENDING",
+      });
+      expect(approvals).toEqual([]);
+    }
+  });
+
+  it("keeps the card's Approve for money, terms and a private document share", async () => {
+    for (const kind of [
+      { actionType: "app.capital.commitment.confirm_amount" },
+      { actionType: "app.relationship.deal.change" },
+      { actionType: "app.disclosure.raise.share" },
+      { actionType: "app.diligence.document.share" },
+      {
+        actionType: "app.diligence.change",
+        payload: { operation: "SHARE", input: {} },
+      },
+    ]) {
+      const row = pending(kind);
+      const { port, approvals, commands } = harness([row], {
+        said: { text: "I approve" },
+      });
+      expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+        status: "CARD_ONLY",
+      });
+      expect(approvals).toEqual([]);
+      expect(commands).toEqual([]);
+    }
+  });
+
+  it("approves a message, a meeting or a diligence request by words", async () => {
+    for (const kind of [
+      { actionType: "app.chat.message.send" },
+      { actionType: "app.schedule.meeting.book" },
+      { actionType: "email.send" },
+      {
+        actionType: "app.diligence.change",
+        payload: { operation: "REQUEST", input: {} },
+      },
+    ]) {
+      const row = pending(kind);
+      const { port, approvals } = harness([row], {
+        said: { text: "yes, send it" },
+      });
+      expect(await port.approve(at(OWNER), row.proposalId)).toEqual({
+        status: "SAVED",
+      });
+      expect(approvals).toEqual([row.proposalId]);
+    }
+  });
+});
+
+describe("keepsItsCard", () => {
+  it("keeps any class but the one approvable class on its card", () => {
+    expect(
+      keepsItsCard({ actionType: "email.send", actionClass: "RESTRICTED" }),
+    ).toBe(true);
+    expect(
+      keepsItsCard({
+        actionType: "email.send",
+        actionClass: "CONFIRM_REQUIRED",
+      }),
+    ).toBe(false);
   });
 });

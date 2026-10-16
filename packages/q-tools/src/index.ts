@@ -154,6 +154,13 @@ export {
   type ProfileAnswerField,
 } from "./ports.js";
 export {
+  explicitlyApproves,
+  mayStandAsApproval,
+  readApprovalWords,
+  type ApprovalScope,
+  type ApprovalWords,
+} from "./approval-words.js";
+export {
   APPROVE_PENDING_OUTCOMES,
   APPROVE_PENDING_PROPOSAL,
   ApprovePendingProposalInputSchema,
@@ -743,3 +750,21 @@ export {
   type BriefPublicEntityInput,
   type BriefPublicEntityOutput,
 } from "./tools/brief-public-entity.js";
+export {
+  createRecallMySetupTool,
+  RECALL_MY_SETUP,
+  RecallMySetupInputSchema,
+  RecallMySetupOutputSchema,
+  type OnboardingTranscriptPort,
+  type RecallMySetupInput,
+  type RecallMySetupOutput,
+} from "./tools/onboarding-transcript.js";
+export {
+  createSetPreferenceLearningTool,
+  SET_PREFERENCE_LEARNING,
+  SetPreferenceLearningInputSchema,
+  SetPreferenceLearningOutputSchema,
+  type PreferenceLearningPort,
+  type SetPreferenceLearningInput,
+  type SetPreferenceLearningOutput,
+} from "./tools/preference-learning.js";

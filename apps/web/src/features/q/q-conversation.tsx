@@ -42,6 +42,10 @@ import {
 } from "@/features/briefing/arrival-store";
 import { voiceBriefing } from "@/features/briefing/arrival-voice";
 import {
+  spokenOpenerAnswer,
+  typedOpenerAnswer,
+} from "@/features/briefing/opener-answer";
+import {
   ArrivalRoom,
   RoomBelow,
   StageModeProvider,
@@ -204,6 +208,8 @@ export function welcomeNow(input: {
 }
 
 const COMPOSER_ID = "home-q";
+/** How long their spoken words rest before they are read as an answer. */
+const OPENER_SETTLE_MS = 1_200;
 const ENDED_KEY = "cq.q.voice-ended";
 
 /** The conversation as plain text, for saving. */
@@ -770,6 +776,39 @@ export function QConversationPanel({
     },
     [lineOpen, sendText, qAsk],
   );
+
+  // Owner 2026-10-16: Q opens by asking whether to look at what waits or
+  // talk about something else. A typed "yes" or "something else" is that
+  // answer (it brings the cards up, or moves on) and goes no further; a
+  // question of its own is answered as asked.
+  const submitTyped = useCallback(
+    async (text: string) => {
+      if (typedOpenerAnswer(text, lineOpen)) return;
+      if (lineOpen) {
+        sendText(text);
+        return;
+      }
+      await qAsk(text);
+    },
+    [lineOpen, sendText, qAsk],
+  );
+
+  // The same answer, said on a voice line: the person's own transcript,
+  // read once it settles. The voice answers them itself; the screen
+  // follows (the cards come up on a yes).
+  const lastSpokenByThem = spoken.findLast((line) => line.role === "user");
+  const heardId = lastSpokenByThem?.id;
+  const heardText = lastSpokenByThem?.text;
+  const answeredLine = useRef<string | null>(null);
+  useEffect(() => {
+    if (heardId === undefined || heardText === undefined) return;
+    if (answeredLine.current === heardId) return;
+    const timer = window.setTimeout(() => {
+      answeredLine.current = heardId;
+      spokenOpenerAnswer(heardText);
+    }, OPENER_SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [heardId, heardText]);
 
   // What the welcome's cards do, in this surface rather than elsewhere.
   const tools = useMemo<QSurfaceTools>(
@@ -1594,15 +1633,7 @@ export function QConversationPanel({
                 {...(connected && context.companyId !== undefined
                   ? { onAttach: attach, attachLabel: "Attach a document" }
                   : {})}
-                {...(connected
-                  ? {
-                      onSubmit: lineOpen
-                        ? (text: string) => {
-                            client.sendText(text);
-                          }
-                        : qAsk,
-                    }
-                  : {})}
+                {...(connected ? { onSubmit: submitTyped } : {})}
               />
             </div>
           </div>

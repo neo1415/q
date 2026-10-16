@@ -231,7 +231,7 @@ describe("the setup reminder on the welcome (one prompt a day, at most)", () => 
   it("Later takes the reminder away at once and puts it off", async () => {
     renderFor(partway("WELCOME"));
     await userEvent.click(
-      screen.getByRole("button", { name: "Remind me later" }),
+      screen.getByRole("button", { name: "Remind me next week" }),
     );
     expect(remindSetupLaterAction).toHaveBeenCalledTimes(1);
     expect(
@@ -248,7 +248,7 @@ describe("the setup reminder on the welcome (one prompt a day, at most)", () => 
       expect(screen.queryByRole("link", { name: /Continue/ })).toBeNull();
       expect(screen.queryByText("What cheque size do you write?")).toBeNull();
       expect(
-        screen.queryByRole("button", { name: "Remind me later" }),
+        screen.queryByRole("button", { name: "Remind me next week" }),
       ).toBeNull();
       expect(claimSetupReminderAction).not.toHaveBeenCalled();
     });

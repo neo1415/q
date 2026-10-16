@@ -47,3 +47,34 @@ export const QMemoryListDtoSchema = z
   .object({ items: z.array(QMemoryItemDtoSchema).max(200) })
   .strict();
 export type QMemoryListDto = z.infer<typeof QMemoryListDtoSchema>;
+
+/**
+ * Consent to learn how the person likes to work (lane ob1; owner decision
+ * 2026-10-16). `GET` reads the caller's own decision in their current
+ * workspace; `POST` records one. What they state explicitly is kept
+ * either way; this governs only what Q infers.
+ */
+export const Q_MEMORY_LEARNING_PATH = "/v1/q/memory/learning" as const;
+
+export const QPreferenceLearningDtoSchema = z
+  .object({
+    status: z.enum(["NOT_ASKED", "GRANTED", "DECLINED", "REVOKED"]),
+    /** Whether Q may put the question now. */
+    mayAsk: z.boolean(),
+    askAgainAfter: UtcTimestampSchema.nullable(),
+  })
+  .strict();
+export type QPreferenceLearningDto = z.infer<
+  typeof QPreferenceLearningDtoSchema
+>;
+
+export const QPreferenceLearningChoiceRequestSchema = z
+  .object({
+    choice: z.enum(["ALLOW", "NOT_NOW", "TURN_OFF"]),
+    /** PROMPT: the one-line question; SETTINGS: the switch. */
+    via: z.enum(["PROMPT", "SETTINGS"]),
+  })
+  .strict();
+export type QPreferenceLearningChoiceRequest = z.infer<
+  typeof QPreferenceLearningChoiceRequestSchema
+>;

@@ -107,6 +107,48 @@ function nameLabels(companyName: string): ReadonlySet<string> {
 }
 
 /**
+ * What ties a public page to THIS company rather than a namesake (lane ob1;
+ * live 2026-10-16: the registered name "Kestrel Freightworks" pulled in an
+ * unrelated UK shipping agent's description). A name alone is never
+ * enough. A page counts only when it is on the website they gave, is a
+ * link they gave themselves, or names their founder or their country.
+ * With no anchor at all, nothing is proposed: Q asks for the website.
+ */
+export type FounderResearchAnchors = {
+  readonly personName?: string | null | undefined;
+  /** The company's country in words ("Nigeria"), when known. */
+  readonly country?: string | null | undefined;
+};
+
+function mentions(excerpt: string, words: string | null | undefined): boolean {
+  const wanted = words?.trim().toLowerCase() ?? "";
+  if (wanted.length < 3) return false;
+  // The whole name: a surname alone matches too many namesakes.
+  return excerpt.toLowerCase().includes(wanted);
+}
+
+export function anchoredToCompany(
+  page: ResearchPage,
+  websiteUrl: string | null,
+  anchors: FounderResearchAnchors,
+): boolean {
+  if (page.provider === "public_profile") return true;
+  const site = domainOf(websiteUrl);
+  const host = domainOf(page.url);
+  if (
+    site !== null &&
+    host !== null &&
+    (host === site || host.endsWith(`.${site}`))
+  ) {
+    return true;
+  }
+  return (
+    mentions(page.excerpt, anchors.personName) ||
+    mentions(page.excerpt, anchors.country)
+  );
+}
+
+/**
  * Their own site, when research met it and they have not given one (live
  * 2026-09-30: Q asked a YC founder for the website it had just read).
  * Structural, and independent of the reader model: a web page whose host
@@ -118,8 +160,16 @@ export function ownWebsiteFinding(
   pages: readonly ResearchPage[],
   websiteUrl: string | null,
   companyName: string,
+  anchors?: FounderResearchAnchors,
 ): readonly ResearchFinding[] {
   if (websiteUrl !== null) return [];
+  // A domain named like the company is still a namesake until the page
+  // names their founder or country (lane ob1).
+  if (anchors !== undefined) {
+    pages = pages.filter((page) =>
+      anchoredToCompany(page, websiteUrl, anchors),
+    );
+  }
   const names = nameLabels(companyName);
   if (names.size === 0) return [];
   const own = pages.find((page) => {
@@ -161,10 +211,11 @@ export function validateFounderReading(
   pages: readonly ResearchPage[],
   websiteUrl: string | null,
   companyName = "",
+  anchors?: FounderResearchAnchors,
 ): readonly ResearchFinding[] {
   if (reading.wrongSubject) return [];
   const findings: ResearchFinding[] = [];
-  findings.push(...ownWebsiteFinding(pages, websiteUrl, companyName));
+  findings.push(...ownWebsiteFinding(pages, websiteUrl, companyName, anchors));
   const push = (
     stepKey: string,
     value: ResearchFinding["value"],
@@ -172,6 +223,13 @@ export function validateFounderReading(
   ) => {
     const page = pages[field.sourceIndex];
     if (page === undefined) return;
+    // Lane ob1: nothing is proposed from a page not tied to this company.
+    if (
+      anchors !== undefined &&
+      !anchoredToCompany(page, websiteUrl, anchors)
+    ) {
+      return;
+    }
     if (!quoteOccursIn(field.quote, page.excerpt)) return;
     const source = sourceOf(page, websiteUrl);
     findings.push({

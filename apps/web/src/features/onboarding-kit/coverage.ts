@@ -2,88 +2,31 @@ import type {
   OnboardingCoverage,
   OnboardingCoverageField,
   OnboardingCoverageSource,
-  OnboardingSessionView,
 } from "@capital-q/contracts";
-import {
-  FOUNDER_COVERAGE_PROFILE,
-  FOUNDER_DEFINITION_CURRENT,
-} from "@capital-q/founder-onboarding/definition";
-import {
-  INVESTOR_COVERAGE_PROFILE,
-  INVESTOR_DEFINITION_V1,
-} from "@capital-q/investor-onboarding/definition";
-import {
-  deriveOnboardingCoverage,
-  knownFactsFromRegistration,
-} from "@capital-q/onboarding";
+import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding/definition";
+import { INVESTOR_DEFINITION_V1 } from "@capital-q/investor-onboarding/definition";
 
 /**
  * The form's view of onboarding coverage (owner directive 2026-10-16, "Form
  * onboarding equally capable").
  *
- * The form does not keep its own list of fields or its own idea of what is
- * done: it renders lane ob1's canonical coverage, derived by the same pure
- * `deriveOnboardingCoverage` over the same published definition, the same
- * session view and the same registration facts Q uses. So an answer given to
- * Q shows here as on the record, and a value Q only proposed shows here as
- * waiting for confirmation, never as saved.
- *
- * Integration point: when ob1's `GET /v1/onboarding/sessions/:id/coverage`
- * ships, it adds what only the server knows (held saves, the subject's
- * document types, code checks). The form should then read that response in
- * place of `coverageFor`; the rendering below already handles every field.
+ * The form keeps no list of fields and no idea of its own about what is
+ * done: it renders lane ob1's canonical coverage, read from
+ * `GET /v1/onboarding/sessions/:id/coverage` (the same projection Q reads,
+ * with held saves, document types and registration facts the server
+ * knows). So an answer given to Q shows here as on the record, and a value
+ * Q only proposed shows as waiting for confirmation, never as saved.
  */
 
 export type CoverageJourney = "founder" | "investor";
-
-function setupFor(journey: CoverageJourney) {
-  return journey === "founder"
-    ? {
-        profile: FOUNDER_COVERAGE_PROFILE,
-        definition: FOUNDER_DEFINITION_CURRENT,
-      }
-    : {
-        profile: INVESTOR_COVERAGE_PROFILE,
-        definition: INVESTOR_DEFINITION_V1,
-      };
-}
-
-export function coverageFor(input: {
-  readonly journey: CoverageJourney;
-  readonly view: OnboardingSessionView;
-  /** The organisation typed at sign-up, for this journey (registration-defaults-for). */
-  readonly registeredOrganisation: string | null;
-  /** Plain labels for reference ids (taxonomy nodes) the view mentions. */
-  readonly labels?: Readonly<Record<string, string>> | undefined;
-  readonly now?: Date | undefined;
-}): OnboardingCoverage {
-  const { profile, definition } = setupFor(input.journey);
-  const labels = input.labels ?? {};
-  return deriveOnboardingCoverage({
-    profile,
-    definition,
-    view: input.view,
-    known: knownFactsFromRegistration(profile, {
-      organisationName: input.registeredOrganisation,
-    }),
-    now: input.now ?? new Date(),
-    labelFor: (_stepKey, value) => {
-      if (value.type !== "RESOURCE_REFERENCE") return null;
-      const words = value.resourceIds
-        .map((id) => labels[id])
-        .filter((label): label is string => label !== undefined);
-      return words.length === value.resourceIds.length && words.length > 0
-        ? words.join(", ")
-        : null;
-    },
-  });
-}
 
 /** The journey's phases, in order, as the overview groups fields. */
 export function phasesFor(
   journey: CoverageJourney,
 ): readonly { readonly phaseKey: string; readonly label: string }[] {
-  return setupFor(journey).definition.schema.phases;
+  return (
+    journey === "founder" ? FOUNDER_DEFINITION_CURRENT : INVESTOR_DEFINITION_V1
+  ).schema.phases;
 }
 
 /**

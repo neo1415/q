@@ -31,16 +31,31 @@ export type OnboardingNudgePolicyConfig = {
   readonly quietAfterActivityHours: number;
   /** For "about N minutes left"; a steady estimate, never a promise. */
   readonly secondsPerStep: number;
+  /**
+   * Where a reminder may be given at all. Owner 2026-10-16: only on Home
+   * arrival (the BRIEFING surface, one of the things waiting in the
+   * greeting); never interrupting a Q conversation.
+   */
+  readonly surfaces: readonly OnboardingNudgeSurface[];
 };
 
+/**
+ * Owner 2026-10-16 ("continue later" plus occasional reminders): at most one
+ * a day, on Home arrival only; daily for the first three days, then every
+ * three to four days, then weekly; "remind me next week" snoozes seven days;
+ * it stops once the essentials (the journey's required steps) are in. The
+ * same cadence whatever the share done: lighter wording, not a lighter
+ * schedule, so the backoff is the one the owner set.
+ */
 export const ONBOARDING_NUDGE_POLICY: OnboardingNudgePolicyConfig = {
-  version: "onboarding-nudge/2026-09-27.1",
-  backoffDays: [1, 2, 4, 7],
+  version: "onboarding-nudge/2026-10-16.1",
+  backoffDays: [1, 1, 3, 4, 7],
   strongAtOrBelow: 0.5,
-  lightBackoffOffset: 1,
-  snoozeDays: 3,
+  lightBackoffOffset: 0,
+  snoozeDays: 7,
   quietAfterActivityHours: 12,
   secondsPerStep: 20,
+  surfaces: ["BRIEFING"],
 };
 
 /** Where a reminder is shown. Both draw on the one cadence. */
@@ -80,6 +95,7 @@ export const EMPTY_NUDGE_STATE: OnboardingNudgeState = {
 
 export type OnboardingNudgeQuiet =
   | "NOT_STARTED"
+  | "SURFACE_OFF"
   | "NOTHING_REQUIRED"
   | "COMPLETE"
   | "STOPPED"
@@ -127,6 +143,9 @@ export function decideOnboardingNudge(input: {
 }): OnboardingNudgeDecision {
   const config = input.config ?? ONBOARDING_NUDGE_POLICY;
   const { progress, state, now } = input;
+  if (!config.surfaces.includes(input.surface)) {
+    return { due: false, reason: "SURFACE_OFF" };
+  }
   if (progress === null || progress.status === "CANCELLED") {
     return { due: false, reason: "NOT_STARTED" };
   }

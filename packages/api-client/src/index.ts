@@ -104,6 +104,7 @@ export {
   claimBriefingOnboardingNudge,
   peekBriefingOnboardingNudge,
   listOnboardingInterviewTurns,
+  getOnboardingCoverage,
   sayToOnboarding,
   completeOnboardingSession,
   dismissOnboardingQuestion,
@@ -299,7 +300,12 @@ export {
   joinMeetingCall,
 } from "./schedule.js";
 
-export { forgetQMemory, listQMemory } from "./memory.js";
+export {
+  forgetQMemory,
+  getQPreferenceLearning,
+  listQMemory,
+  setQPreferenceLearning,
+} from "./memory.js";
 export {
   bringMeetingAssistant,
   dismissMeetingAssistant,

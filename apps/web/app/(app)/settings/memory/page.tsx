@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { listQMemory } from "@capital-q/api-client";
+import { getQPreferenceLearning, listQMemory } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import {
@@ -9,6 +9,7 @@ import {
 } from "@/components/app-shell/page-container";
 import { getSessionAccessToken } from "@/auth/session";
 import { QMemoryList } from "@/features/settings/q-memory-list";
+import { PreferenceLearningSwitch } from "@/features/settings/preference-learning";
 import { QSection } from "@/features/q/q-section";
 
 export const metadata: Metadata = { title: "What Q remembers" };
@@ -27,6 +28,13 @@ export default async function QMemoryPage() {
       : await listQMemory({ baseUrl: qApiBaseUrl, accessToken }).catch(
           () => null,
         );
+  const learning =
+    qApiBaseUrl === undefined || accessToken === null
+      ? null
+      : await getQPreferenceLearning({
+          baseUrl: qApiBaseUrl,
+          accessToken,
+        }).catch(() => null);
   return (
     <PageContainer width="reading" className="flex flex-col gap-6">
       <QSection id="memory" kind="MEMORY" label="what Q remembers">
@@ -34,6 +42,7 @@ export default async function QMemoryPage() {
           title="What Q remembers"
           description="Q uses this in every conversation. Forget anything wrong."
         />
+        <PreferenceLearningSwitch initial={learning} />
         {read === null ? (
           <p
             className="cq-body text-(--cq-text-secondary)"
