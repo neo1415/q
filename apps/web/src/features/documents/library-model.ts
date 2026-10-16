@@ -61,6 +61,9 @@ const UPLOAD_LABELS: Readonly<Partial<Record<DocumentType, string>>> = {
   COMMERCIAL: "Commercial",
   CUSTOMER: "Customers",
   OPERATIONAL: "Operations",
+  FUND_DECK: "Fund deck",
+  INVESTMENT_THESIS: "Investment thesis",
+  LP_LETTER: "LP letter",
 };
 
 function uploadGroup(type: DocumentType): LibraryGroup {

@@ -1,13 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState, type FormEvent } from "react";
 
+import { ChoiceList } from "@capital-q/ui/choice-list";
 import { Input } from "@capital-q/ui/input";
 import { linkClassName } from "@capital-q/ui/link";
 
 import { signUpWithPasswordAction } from "@/auth/actions";
 import { INITIAL_AUTH_FORM_STATE } from "@/auth/form-state";
+import { DEFAULT_RETURN_PATH } from "@/auth/redirect-safety";
+import {
+  isInvitationReturn,
+  organisationFieldFor,
+  RegistrationJourneySchema,
+  type RegistrationJourney,
+} from "@/auth/registration";
 
 import { AuthHeading } from "./auth-heading";
 import { EmailField } from "./email-field";
@@ -17,14 +25,18 @@ import { PasswordField } from "./password-field";
 import { SubmitButton } from "./submit-button";
 
 /**
- * Create account: a name, an email, a password, and optionally what the
- * organisation is called.
+ * Create account: what they are here to do, a name, an email, a password,
+ * and optionally what the organisation is called.
  *
- * Those last two are the least Q needs to be any use from the first
- * sentence: something to call somebody, and something to tell them apart
- * from everybody else with the same name when it goes looking for them.
- * Role, sector, stage and intent still belong to onboarding, after the
- * person exists.
+ * Raising or investing comes first (owner directive 2026-10-16): it decides
+ * which journey starts, which workspace onboarding creates, and how the
+ * organisation field reads. It is a choice of journey, never a label on the
+ * person; either journey can be started later. Name and organisation are
+ * the least Q needs to be any use from the first sentence, and both are
+ * carried into onboarding so neither is asked again.
+ *
+ * Somebody following an invitation chooses no journey and names no
+ * organisation: the invitation already says where they are joining.
  */
 export function SignUpForm({
   next,
@@ -39,27 +51,94 @@ export function SignUpForm({
     INITIAL_AUTH_FORM_STATE,
   );
 
+  const invited = isInvitationReturn(next);
+  const [journey, setJourney] = useState<RegistrationJourney | null>(null);
+  const [journeyError, setJourneyError] = useState<string | undefined>();
+  const organisation = organisationFieldFor(journey);
+
   const signInHref =
-    next === "/home"
+    next === "/home" || next === "/welcome"
       ? "/auth/sign-in"
       : `/auth/sign-in?next=${encodeURIComponent(next)}`;
+
+  // Inline, before the round trip: the server refuses the same thing.
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (!invited && journey === null) {
+      event.preventDefault();
+      setJourneyError("Choose one to continue.");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8">
       <AuthHeading
-        title="Create your account"
-        description="Q works with what you already have. Set up your company or mandate after this."
+        title={invited ? "Create your account to join" : "Create your account"}
+        description={
+          invited
+            ? "You were invited to a team on Capital Q. Create your account, then accept the invitation."
+            : "Q works with what you already have. Set up your company or mandate after this."
+        }
       />
+
+      {invited ? null : (
+        <div data-sign-up-journey>
+          <ChoiceList
+            id="journey"
+            name="journeyChoice"
+            legend="What are you here to do?"
+            options={[
+              {
+                value: "founder",
+                label: "Raise capital",
+                description: "Set up your company as a founder.",
+              },
+              {
+                value: "investor",
+                label: "Invest",
+                description: "Set up your mandate as an investor.",
+              },
+            ]}
+            value={journey ?? undefined}
+            error={journeyError}
+            onChange={(value) => {
+              const parsed = RegistrationJourneySchema.safeParse(value);
+              if (parsed.success) {
+                setJourney(parsed.data);
+                setJourneyError(undefined);
+              }
+            }}
+          />
+          <p className="cq-caption mt-2 text-(--cq-text-secondary)">
+            Joining a team that is already on Capital Q? Open the link in your
+            invitation email instead.
+          </p>
+        </div>
+      )}
 
       {googleEnabled ? (
         <div className="flex flex-col gap-5">
-          <GoogleSignIn next={next} />
+          {/* Google carries the journey on its return path: the provider
+              takes no sign-up fields, and /welcome reads it from there. */}
+          <GoogleSignIn
+            next={
+              journey !== null && next === DEFAULT_RETURN_PATH
+                ? `${DEFAULT_RETURN_PATH}?journey=${journey}`
+                : next
+            }
+          />
           <AuthDivider />
         </div>
       ) : null}
 
-      <form action={action} className="flex flex-col gap-5">
+      <form
+        action={action}
+        onSubmit={onSubmit}
+        className="flex flex-col gap-5"
+        data-sign-up-form
+      >
         <input type="hidden" name="next" value={next} />
+        {/* The choice is shown above, outside this form; it rides here. */}
+        <input type="hidden" name="journey" value={journey ?? ""} />
         <Input
           id="fullName"
           name="fullName"
@@ -69,14 +148,16 @@ export function SignUpForm({
           maxLength={80}
           description="What Q should call you."
         />
-        <Input
-          id="organisationName"
-          name="organisationName"
-          label="Company or fund"
-          autoComplete="organization"
-          maxLength={120}
-          description="Optional. It helps Q find the right you."
-        />
+        {invited ? null : (
+          <Input
+            id="organisationName"
+            name="organisationName"
+            label={organisation.label}
+            autoComplete="organization"
+            maxLength={120}
+            description={organisation.description}
+          />
+        )}
         <EmailField />
         <PasswordField
           id="password"

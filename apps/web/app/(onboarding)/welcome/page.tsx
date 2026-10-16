@@ -1,14 +1,24 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 
-import { resolveOnboardingState } from "@/features/q/context";
+import {
+  resolveMyOrganisations,
+  resolveOnboardingState,
+} from "@/features/q/context";
 import { WelcomeScreen } from "@/features/welcome/welcome-screen";
+import { WorkspaceChoice } from "@/features/welcome/workspace-choice";
 import { PendingInvitations } from "@/features/team/pending-invitations";
 import { fetchMe, updateMe } from "@capital-q/api-client";
 import { accountDetails } from "@/auth/account-details";
 import { getSessionAccessToken } from "@/auth/session";
+import {
+  decideArrival,
+  RegistrationJourneySchema,
+  WORKSPACE_CHOSEN_COOKIE,
+} from "@/auth/registration";
 
 export const metadata: Metadata = {
   title: "Welcome",
@@ -36,14 +46,31 @@ export default async function WelcomePage({
   // Founder direction 2026-09-30: whoever has not finished onboarding goes
   // straight back into it, with Q. Founder decision 2026-10-03 (demo
   // audit): whoever has lands on the Q page, Home, for both roles.
-  const state = await resolveOnboardingState();
-  if (params["again"] !== "1") {
-    if (state.kind === "UNFINISHED") {
-      // F15: back to the screen they were on, not live voice.
-      redirect(`/onboarding/${state.journey}?from=home`);
-    }
-    if (state.kind === "DONE") redirect("/home");
-  }
+  //
+  // Owner directive 2026-10-16: somebody with more than one workspace picks
+  // one on arrival, and somebody who chose a journey at registration is not
+  // asked "raising or investing?" again (`decideArrival`).
+  const [state, workspaces, signedUpWith, jar] = await Promise.all([
+    resolveOnboardingState(),
+    resolveMyOrganisations(),
+    accountDetails(),
+    cookies(),
+  ]);
+  const arrival = decideArrival({
+    state,
+    again: params["again"] === "1",
+    workspaces,
+    workspaceChosen: jar.get(WORKSPACE_CHOSEN_COOKIE)?.value === "1",
+    // The account's own choice first; a Google sign-up, which carries no
+    // sign-up fields, brings it back on the return path instead.
+    intendedJourney:
+      signedUpWith.intendedJourney ??
+      RegistrationJourneySchema.safeParse(params["journey"]).data ??
+      null,
+  });
+  // F15: back to the screen they were on, not live voice.
+  if (arrival.kind === "RESUME") redirect(arrival.path);
+  if (arrival.kind === "HOME") redirect("/home");
   let knownName: string | null = null;
   let knownOrganisation: string | null = null;
   // Back, as opposed to here for the first time: the profile already
@@ -63,7 +90,6 @@ export default async function WelcomePage({
      * does not already have a name — a name they have since changed is
      * theirs and is not overwritten by what they typed once.
      */
-    const signedUpWith = await accountDetails();
     knownOrganisation = signedUpWith.organisationName;
     try {
       const me = await fetchMe({ baseUrl: config.apiBaseUrl, accessToken });
@@ -82,8 +108,12 @@ export default async function WelcomePage({
       knownName = signedUpWith.displayName;
     }
   }
+  if (arrival.kind === "CHOOSE_WORKSPACE") {
+    return <WorkspaceChoice name={knownName} workspaces={workspaces} />;
+  }
   return (
     <WelcomeScreen
+      journey={arrival.journey}
       knownName={knownName}
       knownOrganisation={knownOrganisation}
       returning={returning}
