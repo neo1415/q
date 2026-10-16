@@ -132,14 +132,14 @@ for (const { email, paths } of ACCOUNTS) {
         let clipped = false;
         for (let up = element.parentElement; up; up = up.parentElement) {
           if (
-            getComputedStyle(up).overflowX !== "visible" &&
+            window.getComputedStyle(up).overflowX !== "visible" &&
             up.getBoundingClientRect().right <= edge
           ) {
             clipped = true;
             break;
           }
         }
-        const absolute = getComputedStyle(element).position === "absolute";
+        const absolute = window.getComputedStyle(element).position === "absolute";
         if (!clipped || absolute) {
           culprits.push(
             `${element.tagName.toLowerCase()}.${String(element.className).slice(0, 60)} right=${String(Math.round(box.right))}`,
