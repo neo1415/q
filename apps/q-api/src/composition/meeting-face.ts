@@ -7,7 +7,11 @@ import {
 
 import { addressedToQ } from "@capital-q/communication";
 import type { DatabaseExecutor } from "@capital-q/database";
-import { TavusError, type TavusClient } from "@capital-q/integrations";
+import {
+  TavusError,
+  tavusParticipantLabel,
+  type TavusClient,
+} from "@capital-q/integrations";
 
 import {
   isTavusConnectivityCheck,
@@ -42,7 +46,8 @@ import {
  */
 
 /** The face's name in the call: the host already treats it as Q's own. */
-export const MEETING_FACE_NAME = "Q · Capital Q";
+// Who Q is in the call (lead 2026-10-16), never the stock face's name.
+export const MEETING_FACE_NAME = tavusParticipantLabel({ surface: "MEETING" });
 
 /** Invites by email are never accepted: only Q's own API dispatch joins. */
 const NO_EMAIL_INVITES = ["no-invites@capitalq.invalid"] as const;

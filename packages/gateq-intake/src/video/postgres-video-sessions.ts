@@ -156,6 +156,12 @@ export function createPostgresGateqVideoSessions(deps: {
          returning *`;
       return rows[0] === undefined ? null : toRow(rows[0]);
     },
+    markProviderRequest: async (id) => {
+      await sql`
+        update gateq.application_video_sessions
+           set provider_request_at = now()
+         where id = ${id} and status = 'STARTING' and provider_request_at is null`;
+    },
     markInRoom: async (id) => {
       // Q is in the room: the cap runs from now, never later than the
       // grace allows, so the end only ever moves earlier. Once.
