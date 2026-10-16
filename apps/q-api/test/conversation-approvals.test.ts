@@ -439,6 +439,7 @@ describe("changes waiting in their other conversations (live 2026-10-01)", () =>
       late: () => ({
         actions: {
           findApprovalForAction: () => Promise.reject(new Error("unused")),
+          readProposal: () => Promise.reject(new Error("unused")),
           approve: () => Promise.reject(new Error("unused")),
           reject: () => Promise.reject(new Error("unused")),
           listPendingApprovals: (query) =>
@@ -618,7 +619,10 @@ describe("keepsItsCard", () => {
       keepsItsCard({ actionType: "email.send", actionClass: "RESTRICTED" }),
     ).toBe(true);
     expect(
-      keepsItsCard({ actionType: "email.send", actionClass: "CONFIRM_REQUIRED" }),
+      keepsItsCard({
+        actionType: "email.send",
+        actionClass: "CONFIRM_REQUIRED",
+      }),
     ).toBe(false);
   });
 });

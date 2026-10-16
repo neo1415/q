@@ -426,7 +426,20 @@ export function startPendingDecision(
     // Never an unhandled rejection: conclude re-awaits the same promises.
     staged
       .then((stage) => {
-        if (stage.kind !== "NOTHING") readFor(stage.question).catch(() => null);
+        if (stage.kind === "NOTHING") return;
+        // Plain decision words need no model reading: none is started.
+        if (stage.kind === "WAITING") {
+          const words = readApprovalWords(input.utterance, {
+            summaries: stage.allPending.map((proposal) => proposal.summary),
+          });
+          if (
+            (words.kind === "APPROVE" || words.kind === "DECLINE") &&
+            words.strength === "EXPLICIT"
+          ) {
+            return;
+          }
+        }
+        readFor(stage.question).catch(() => null);
       })
       .catch(() => undefined);
   }

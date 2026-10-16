@@ -1570,6 +1570,8 @@ describe("a spoken question for Q", () => {
         event("q.action.proposed", {
           proposal: {
             proposalId: "p1",
+            actionType: "company.profile.update",
+            actionClass: "CONFIRM_REQUIRED",
             summary:
               "Update your company profile. Website: https://thevaultlyne.com",
           },
@@ -1672,6 +1674,8 @@ describe("a spoken question for Q", () => {
         event("q.action.proposed", {
           proposal: {
             proposalId: "p1",
+            actionType: "company.profile.update",
+            actionClass: "CONFIRM_REQUIRED",
             summary: "Change what I call you to John.",
           },
         }),
@@ -1767,7 +1771,12 @@ describe("a spoken question for Q", () => {
         qRuntime: runtime.service,
         qStream: fakeStream([
           event("q.action.proposed", {
-            proposal: { proposalId: "p1", summary: SUMMARY },
+            proposal: {
+              proposalId: "p1",
+              summary: SUMMARY,
+              actionType: "company.profile.update",
+              actionClass: "CONFIRM_REQUIRED",
+            },
           }),
           event("q.approval.required", {
             approvalId: "33333333-3333-4333-8333-333333333333",
@@ -2014,5 +2023,125 @@ describe("a spoken question for Q", () => {
     expect(outcome).toEqual({ kind: "NOTHING" });
     expect(runtime.calls.createRun).toHaveLength(0);
     expect(speaker.spoken).toEqual([]);
+  });
+});
+
+describe("a spoken approval in plain words (owner 2026-10-16)", () => {
+  const setup = (actionType: string) => {
+    const runtime = fakeRuntime();
+    const approvals = { approve: [] as unknown[], reject: [] as unknown[] };
+    let reads = 0;
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime.service,
+      qStream: fakeStream([
+        event("q.action.proposed", {
+          proposal: {
+            proposalId: "p1",
+            summary: "Send the follow-up to Harbourline",
+            actionType,
+            actionClass: "CONFIRM_REQUIRED",
+          },
+        }),
+        event("q.approval.required", {
+          approvalId: "33333333-3333-4333-8333-333333333333",
+          proposalId: "p1",
+        }),
+      ]),
+      approvals: {
+        approve: (command: unknown) => {
+          approvals.approve.push(command);
+          return Promise.resolve({
+            decided: true,
+            action: { runId: RUN_ID },
+            view: {},
+          } as never);
+        },
+        reject: (command: unknown) => {
+          approvals.reject.push(command);
+          return Promise.resolve({} as never);
+        },
+      },
+      // Plain words never need it; if asked, it reads a yes.
+      decisions: {
+        read: () => {
+          reads += 1;
+          return Promise.resolve({
+            decision: "YES" as const,
+            remainder: null,
+            ...PLAIN_REPLY,
+          });
+        },
+      },
+      logger,
+    });
+    const bound = binding({
+      conversationId: undefined,
+      subjects: undefined,
+      onboarding: undefined,
+    });
+    const say = async (words: string) => {
+      const speaker = fakeSpeaker();
+      await handle(
+        bound,
+        [
+          { role: "user", content: "Follow up with Harbourline." },
+          {
+            role: "agent",
+            content: "Send the follow-up to Harbourline. Shall I go ahead?",
+          },
+          { role: "user", content: words },
+        ],
+        new AbortController().signal,
+        speaker,
+      );
+      return speaker.spoken.join(" ");
+    };
+    return { handle, bound, say, approvals, reads: () => reads };
+  };
+
+  const prepare = async (s: ReturnType<typeof setup>): Promise<void> => {
+    await s.handle(
+      s.bound,
+      [{ role: "user", content: "Follow up with Harbourline." }],
+      new AbortController().signal,
+      fakeSpeaker(),
+    );
+  };
+
+  it("'I have given my approval' approves, by code, recorded as VOICE with where it was said", async () => {
+    const s = setup("app.chat.message.send");
+    await prepare(s);
+    const said = await s.say("I have given my approval");
+    expect(s.approvals.approve).toHaveLength(1);
+    expect(s.reads()).toBe(0);
+    expect(s.approvals.approve[0]).toMatchObject({
+      approvalId: "33333333-3333-4333-8333-333333333333",
+      via: { channel: "VOICE" },
+    });
+    expect(said).toMatch(/Send the follow-up to Harbourline/);
+  });
+
+  it("'yes, but change the date' never approves", async () => {
+    const s = setup("app.chat.message.send");
+    await prepare(s);
+    await s.say("yes, but change the date");
+    expect(s.approvals.approve).toEqual([]);
+    expect(s.approvals.reject).toEqual([]);
+  });
+
+  it("'no, don't send it' declines, recorded as VOICE", async () => {
+    const s = setup("app.chat.message.send");
+    await prepare(s);
+    await s.say("no, don't send it");
+    expect(s.approvals.reject).toHaveLength(1);
+    expect(s.approvals.reject[0]).toMatchObject({ via: { channel: "VOICE" } });
+  });
+
+  it("money keeps its card: words approve nothing and Q says to tap Approve", async () => {
+    const s = setup("app.capital.commitment.confirm_amount");
+    await prepare(s);
+    const said = await s.say("I approve");
+    expect(s.approvals.approve).toEqual([]);
+    expect(said).toMatch(/tap on Approve on its card/);
   });
 });

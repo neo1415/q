@@ -173,7 +173,8 @@ describe("approval by words, read by code", () => {
     expect(outcome).toEqual({
       kind: "ANSWER_THEN",
       before: null,
-      after: "Still waiting for your approval: Send the follow-up to Harbourline.",
+      after:
+        "Still waiting for your approval: Send the follow-up to Harbourline.",
       about: "Send the follow-up to Harbourline",
       aboutId: "f1",
     });

@@ -938,11 +938,23 @@ describe("a decision begun beside the turn reading (speculative)", () => {
   it("approves nothing before the turn has been read", async () => {
     vi.useFakeTimers();
     const { value, seen } = slowPort([REMINDER]);
-    const decision = startPendingDecision(value, turn("yes, go ahead"), {
+    const decision = startPendingDecision(value, turn("yes"), {
       speculative: true,
     });
     await vi.advanceTimersByTimeAsync(5 * READ_MS);
     expect(seen.read).toBe(1);
+    expect(seen.approve).toEqual([]);
+    decision.cancel();
+  });
+
+  it("starts no model reading for plain decision words, and approves nothing before the turn is read (owner 2026-10-16)", async () => {
+    vi.useFakeTimers();
+    const { value, seen } = slowPort([REMINDER]);
+    const decision = startPendingDecision(value, turn("yes, go ahead"), {
+      speculative: true,
+    });
+    await vi.advanceTimersByTimeAsync(5 * READ_MS);
+    expect(seen.read).toBe(0);
     expect(seen.approve).toEqual([]);
     decision.cancel();
   });
