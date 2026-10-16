@@ -101,7 +101,7 @@ export function QCard({
               alt=""
               width={24}
               height={24}
-              className="ml-auto size-10 object-cover"
+              className="ms-auto size-10 object-cover"
               data-card-photo
             />
           )}
@@ -147,7 +147,7 @@ export function QCard({
       </div>
 
       {qrSvg === undefined ? null : (
-        <div className="relative flex w-[34%] shrink-0 items-center justify-center pr-[6%]">
+        <div className="relative flex w-[34%] shrink-0 items-center justify-center pe-[6%]">
           <span
             role="img"
             aria-label={`QR code linking to ${displayUrl}`}

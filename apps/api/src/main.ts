@@ -331,7 +331,7 @@ import { apiServiceIdentity, createApp } from "./app.js";
 import { createChatSafetyAudit } from "./chat-safety-audit.js";
 import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
 import { createApiCompanyRaiseReader } from "./company-raise.js";
-import { createRaiseSharing } from "./pitch-claims.js";
+import { createRaiseSharing, storedPitchSections } from "./pitch-claims.js";
 import { createQWorkPagePort, createWorkforceJobPort } from "./q-work-port.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createInvestorCardFacts } from "./investor-card-facts.js";
@@ -2473,6 +2473,23 @@ const { app, logger } = createApp(config, security, {
         mediaAssetId: parsed.data,
       });
       return view.status === "AVAILABLE" ? view.cues : null;
+    },
+    // Lane ov 2026-10-16: Q's stored section reading of a pitch, only for
+    // a pitch this actor may play (the player's own rule, asked here); the
+    // newest reading of the pitch, never a model call on a page view.
+    pitchSections: async (actor, companyId, mediaAssetId) => {
+      const parsed = MediaAssetIdSchema.safeParse(mediaAssetId);
+      if (!parsed.success) return null;
+      if (
+        !(await media.mayPlayPitch({
+          actor,
+          companyId,
+          mediaAssetId: parsed.data,
+        }))
+      ) {
+        return null;
+      }
+      return storedPitchSections(database.sql, parsed.data);
     },
     raiseSharing: createRaiseSharing({
       sql: database.sql,

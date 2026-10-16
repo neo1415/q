@@ -14,6 +14,7 @@ import { Bell, CalendarDays, ICON_SIZE, Video } from "@capital-q/ui/icons";
 
 import { effectShown } from "@/features/q/control/perform";
 import { useQControl } from "@/features/q/control/q-control";
+import { useT } from "@/features/i18n/language";
 
 function subscribeHash(onChange: () => void): () => void {
   window.addEventListener("hashchange", onChange);
@@ -58,6 +59,8 @@ export function ScheduleDialog({
   readonly primary?: boolean;
   readonly children: ReactNode;
 }) {
+  const t = useT();
+
   const { hash, title, Icon, control } = KINDS[kind];
   const asked = useSyncExternalStore(
     subscribeHash,
@@ -109,11 +112,11 @@ export function ScheduleDialog({
             className={buttonClassName(primary ? "primary" : "secondary")}
           >
             <Icon size={ICON_SIZE.regular} aria-hidden="true" />
-            {title}
+            {t(title)}
           </button>
         </DialogTrigger>
         <DialogContent
-          title={title}
+          title={t(title)}
           className="max-h-[85vh] max-w-lg overflow-y-auto"
         >
           {children}

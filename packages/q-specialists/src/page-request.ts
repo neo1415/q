@@ -124,8 +124,21 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   "investment hub": d("RELATIONSHIPS"),
   "fundraising hub": d("RELATIONSHIPS"),
   relationship: d("RELATIONSHIPS"),
-  pipeline: d("RELATIONSHIPS"),
   deals: d("RELATIONSHIPS"),
+  // Lane ov 2026-10-16 (owner: "Q does not know where the CRM is"): the
+  // CRM is the Hub, by its three tabs. Overview is the CRM's front page,
+  // Pipeline its record list, Capital the old Capital page.
+  crm: d("RELATIONSHIPS"),
+  "crm overview": d("RELATIONSHIPS"),
+  "crm home": d("RELATIONSHIPS"),
+  "crm dashboard": d("RELATIONSHIPS"),
+  pipeline: d("CRM_PIPELINE"),
+  "crm pipeline": d("CRM_PIPELINE"),
+  "deal pipeline": d("CRM_PIPELINE"),
+  "pipeline board": d("CRM_PIPELINE"),
+  "pipeline list": d("CRM_PIPELINE"),
+  "crm records": d("CRM_PIPELINE"),
+  "crm capital": d("CAPITAL"),
   // Settings and its sections
   settings: d("SETTINGS"),
   setting: d("SETTINGS"),

@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
  * Development only, or a production build started with CQ_REVIEW_PAGES=1
  * for the screenshot run.
  *
- * `?tab=overview|elevator|dataroom|deck|team`, `?side=investor|owner`,
+ * `?tab=overview|diligence|elevator|dataroom|deck|team`, `?side=investor|owner`,
  * `?state=full|empty|downloadable`, `?as=investor`, `?view=person`.
  */
 export default async function ProfileReviewPage({

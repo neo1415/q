@@ -80,7 +80,7 @@ export function ProfileHero({
           />
         )}
         {images.editable ? (
-          <div className="absolute top-3 right-3">
+          <div className="absolute top-3 end-3">
             <ProfileImageEditor
               subjectType={images.subjectType}
               subjectId={images.subjectId}
@@ -116,7 +116,7 @@ export function ProfileHero({
               )}
             </div>
             {images.editable ? (
-              <div className="absolute right-0 bottom-0">
+              <div className="absolute end-0 bottom-0">
                 <ProfileImageEditor
                   subjectType={images.subjectType}
                   subjectId={images.subjectId}

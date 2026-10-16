@@ -12,6 +12,7 @@ import {
   relationshipsNeedingYou,
   STATE_WORDS,
 } from "./relationship-words";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /**
  * A side's relationships, as hairline rows (CQ-WEB-030; doc 17 §83;
@@ -31,19 +32,21 @@ export function RelationshipList({
   /** R34: unread chat messages per relationship id. */
   readonly unread?: ReadonlyMap<string, number> | undefined;
 }) {
+  const t = serverTNow();
+
   if (items.length === 0) {
     return (
       <p
         className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)"
         data-state="empty"
       >
-        {emptySentence}
+        {t(emptySentence)}
       </p>
     );
   }
   return (
     <ul
-      aria-label="Relationships"
+      aria-label={t("Relationships")}
       className="cq-panel-rows flex max-w-(--cq-layout-reading) flex-col"
     >
       {items.map((item) => (
@@ -68,6 +71,8 @@ function RelationshipRow({
   readonly item: RelationshipSummaryDto;
   readonly unread: number;
 }) {
+  const t = serverTNow();
+
   return (
     <Link
       href={relationshipHref(item)}
@@ -98,14 +103,14 @@ function RelationshipRow({
           {item.counterpart.name}
         </span>
         <span className="cq-caption text-(--cq-text-secondary)">
-          {STATE_WORDS[item.state]}
+          {t(STATE_WORDS[item.state])}
           <span className="cq-numeric">
             {" "}
-            since {formatRelationshipDate(item.stateSince)}
+            {t("since")} {t(formatRelationshipDate(item.stateSince))}
           </span>
         </span>
         <span className="cq-caption text-(--cq-text-tertiary)">
-          Next: {NEXT_STEP_WORDS[item.nextStep]}
+          {t("Next:")} {t(NEXT_STEP_WORDS[item.nextStep])}
         </span>
       </span>
       {unread > 0 ? (
@@ -116,7 +121,7 @@ function RelationshipRow({
         >
           {unread === 1
             ? "1 new message"
-            : `${unread > 99 ? "99+" : unread} new messages`}
+            : t(`${unread > 99 ? "99+" : unread} new messages`)}
         </span>
       ) : null}
       <ChevronRight
@@ -140,10 +145,15 @@ export function RelationshipNeedsYou({
 }: {
   readonly items: readonly RelationshipSummaryDto[];
 }) {
+  const t = serverTNow();
+
   const needing = relationshipsNeedingYou(items);
   if (needing.length === 0) return null;
   return (
-    <ul aria-label="Relationships needing you" className="flex flex-col gap-1">
+    <ul
+      aria-label={t("Relationships needing you")}
+      className="flex flex-col gap-1"
+    >
       {needing.map((item) => (
         <li key={item.relationshipId} data-needs-you={item.nextStep}>
           <Link
@@ -152,12 +162,12 @@ export function RelationshipNeedsYou({
           >
             <span className="cq-body-sm text-(--cq-text-primary)">
               {item.nextStep === "ANSWER_INTEREST"
-                ? `Answer ${item.counterpart.name}'s interest`
-                : `Arrange a first meeting with ${item.counterpart.name}`}
+                ? t(`Answer ${item.counterpart.name}'s interest`)
+                : t(`Arrange a first meeting with ${item.counterpart.name}`)}
             </span>
             <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
-              {STATE_WORDS[item.state]} since{" "}
-              {formatRelationshipDate(item.stateSince)}
+              {t(STATE_WORDS[item.state])} {t("since")}{" "}
+              {t(formatRelationshipDate(item.stateSince))}
             </span>
           </Link>
         </li>

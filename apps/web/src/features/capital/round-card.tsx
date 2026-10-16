@@ -430,7 +430,7 @@ export function RoundTimeline({
                   : "Nothing planned. Planning the next round early helps Q prepare you for it."}
             </p>
           ) : (
-            <ul className="flex flex-col gap-2 border-l border-(--cq-border-subtle) pl-4">
+            <ul className="flex flex-col gap-2 border-s border-(--cq-border-subtle) ps-4">
               {group.items.map((round) => (
                 <TimelineItem
                   key={round.id}

@@ -62,6 +62,8 @@ import {
   type StageGroup,
   type StageTarget,
 } from "./stage-focus";
+import { useUiLanguage } from "@/features/i18n/language";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The arrival as a layer of the Q stage (RECOVERY-2026-10 E1, audit
@@ -147,21 +149,22 @@ export function ActivityCard({
 }: {
   readonly lines: readonly string[] | null;
 }) {
+  const t = useT();
   const ref = useRef<HTMLElement>(null);
   useQControl({ id: "section.what-i-did", kind: "SECTION", ref });
   return (
     <section
       ref={ref}
-      aria-label="What I did"
+      aria-label={t("What I did")}
       data-q-control="section.what-i-did"
       className="flex flex-col gap-2"
       data-arrival-activity
     >
-      <GroupHead title="What I did" />
+      <GroupHead title={t("What I did")} />
       <div className={CARD}>
         {lines === null ? (
           <p className="m-0 cq-body-sm text-(--cq-text-secondary)">
-            I couldn&apos;t check what my agents did just now.
+            {t("I couldn't check what my agents did just now.")}
           </p>
         ) : (
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
@@ -190,6 +193,7 @@ export function AttentionList({
   /** Founder P5: the lines not cleared by the person (default: all). */
   readonly lines?: ReturnType<typeof attentionLines> | undefined;
 }) {
+  const t = useT();
   const report = data.attention;
   if (report === null || report === undefined) return null;
   const lines = visibleLines ?? attentionLines(report);
@@ -198,7 +202,7 @@ export function AttentionList({
   const links = new Map(Object.entries(data.attentionLinks ?? {}));
   return (
     <ul
-      aria-label="Also waiting on you"
+      aria-label={t("Also waiting on you")}
       className="m-0 flex list-none flex-col gap-1.5 p-0"
       data-arrival-attention
     >
@@ -216,7 +220,7 @@ export function AttentionList({
             href={attentionHref(item, links)}
             className={buttonClassName("quiet", "compact")}
           >
-            Open
+            {t("Open")}
           </Link>
         </li>
       ))}
@@ -252,6 +256,7 @@ export function MatchCard({
   readonly focused: boolean;
   readonly onAsk: (question: string) => void;
 }) {
+  const t = useT();
   const facts = [match.stage, match.country].filter(
     (part): part is string => part !== null && part.length > 0,
   );
@@ -282,7 +287,7 @@ export function MatchCard({
         </p>
       )}
       <p className="m-0 cq-body-sm text-(--cq-text-primary)">
-        <span className="font-semibold">Q&apos;s take: </span>
+        <span className="font-semibold">{t("Q's take:")} </span>
         {match.take.replace(FIT_IS_NOT_QUALITY, "").trim()}{" "}
         <span className="text-(--cq-text-secondary)">{FIT_IS_NOT_QUALITY}</span>
       </p>
@@ -291,7 +296,7 @@ export function MatchCard({
           href={`/company/${encodeURIComponent(match.companyId)}`}
           className={buttonClassName("secondary", "compact")}
         >
-          Open
+          {t("Open")}
         </Link>
         <button
           type="button"
@@ -300,7 +305,7 @@ export function MatchCard({
             onAsk(`What's your view on ${match.name}?`);
           }}
         >
-          Ask Q&apos;s view
+          {t("Ask Q's view")}
         </button>
       </div>
     </article>
@@ -316,6 +321,7 @@ function MatchesGroup({
   readonly focus: string | null;
   readonly onAsk: (question: string) => void;
 }) {
+  const t = useT();
   const [shown, setShown] = useState<string | null>(null);
   const open = focus ?? shown ?? matches.items[0]?.companyId ?? null;
   // "Show me the second one": brings that company's card forward here,
@@ -337,7 +343,7 @@ function MatchesGroup({
   return (
     <section
       ref={ref}
-      aria-label="New for you"
+      aria-label={t("New for you")}
       data-q-control="list.new-matches"
       className="flex flex-col gap-2"
       data-arrival-matches
@@ -363,7 +369,7 @@ function MatchesGroup({
             key={match.companyId}
             type="button"
             onClick={() => setShown(match.companyId)}
-            className="flex min-h-11 w-full items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-left transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            className="flex min-h-11 w-full items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-start transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
             data-arrival-match-line={match.companyId}
             data-q-control-item
           >
@@ -409,6 +415,7 @@ export function ArrivalStage({
   readonly readWords?: ArrivalReadWords;
   readonly now?: (() => Date) | undefined;
 } = {}) {
+  const t = useT();
   const ready = useStageRound(load);
   const mode = useStageMode();
   const room = useRoomSlots();
@@ -474,6 +481,8 @@ export function ArrivalStage({
 
   // Words for the late-landing case below; the same words the head says.
   const setupReminders = useArrivalSetupReminders();
+  // Multilingual Q: the opener in their chosen language.
+  const language = useUiLanguage();
   const words = useMemo(
     () =>
       rawData === null
@@ -482,8 +491,9 @@ export function ArrivalStage({
             { ...rawData, setupReminders },
             now?.() ?? new Date(),
             browserZone(),
+            language,
           ),
-    [rawData, now, setupReminders],
+    [rawData, now, setupReminders, language],
   );
 
   // The opener's question is open whether or not the welcome is still on
@@ -637,12 +647,12 @@ export function ArrivalStage({
   const needs = shown.includes("NEEDS_YOU") ? (
     <section
       ref={needsRef}
-      aria-label="Needs you"
+      aria-label={t("Needs you")}
       data-q-control="section.needs-you"
       className="flex flex-col gap-2"
       data-arrival-needs
     >
-      {data.cards.length === 0 ? <GroupHead title="Needs you" /> : null}
+      {data.cards.length === 0 ? <GroupHead title={t("Needs you")} /> : null}
       {data.cards.length === 0 ? null : (
         <Sequence
           key={ready?.round ?? 0}
@@ -668,12 +678,15 @@ export function ArrivalStage({
     questions.length > 0 ? (
       <section
         ref={questionsRef}
-        aria-label="Q still wants to know"
+        aria-label={t("Q still wants to know")}
         data-q-control="section.q-questions"
         className="flex flex-col gap-2"
         data-arrival-questions
       >
-        <GroupHead title="Q still wants to know" count={questions.length} />
+        <GroupHead
+          title={t("Q still wants to know")}
+          count={questions.length}
+        />
         <FollowUpStack followUps={questions} heading={false} />
       </section>
     ) : null;
@@ -717,7 +730,7 @@ export function ArrivalStage({
               onClick={() => setExpanded(true)}
               data-arrival-stage-show
             >
-              Show
+              {t("Show")}
             </Button>
           </div>
         )}

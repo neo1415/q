@@ -115,6 +115,7 @@ import { TURN_READER_V48 } from "./tasks/turn-reader.v48.js";
 import { TURN_READER_V49 } from "./tasks/turn-reader.v49.js";
 import { TURN_READER_V50 } from "./tasks/turn-reader.v50.js";
 import { TURN_READER_V51 } from "./tasks/turn-reader.v51.js";
+import { TURN_READER_V52 } from "./tasks/turn-reader.v52.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEMORY_EXTRACTOR_V2 } from "./tasks/memory-extractor.v2.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
@@ -143,6 +144,7 @@ import {
 } from "./tasks/workforce.v1.js";
 import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
 import { DECK_EXTRACTION_V1 } from "./tasks/deck-extraction.v1.js";
+import { PITCH_SECTION_EXTRACTION_V1 } from "./tasks/pitch-section-extraction.v1.js";
 import { SPOKEN_REPLY_V1 } from "./tasks/spoken-reply.v1.js";
 import { SMALL_TALK_V1 } from "./tasks/small-talk.v1.js";
 import { TURN_SKIM_V1 } from "./tasks/turn-skim.v1.js";
@@ -496,6 +498,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_READER_V49,
     TURN_READER_V50,
     TURN_READER_V51,
+    TURN_READER_V52,
     MEMORY_EXTRACTOR_V1,
     MEMORY_EXTRACTOR_V2,
     MEETING_NOTES_V1,
@@ -591,6 +594,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     DILIGENCE_DOCUMENT_SUMMARY_V1,
     // PROFILE block (overnight A5)
     DECK_EXTRACTION_V1,
+    PITCH_SECTION_EXTRACTION_V1,
     SPOKEN_REPLY_V1,
     SMALL_TALK_V1,
     TURN_SKIM_V1,

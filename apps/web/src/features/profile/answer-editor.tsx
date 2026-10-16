@@ -20,6 +20,7 @@ import {
   type TaxonomyChoice,
 } from "./answer-actions";
 import type { ProfileJourney } from "./profile-answers";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Edit one profile card's facts (ADR 0024): each fact is the step the
@@ -61,6 +62,7 @@ export function AnswerEditor({
   readonly responses: Readonly<Record<string, OnboardingResponseValue>>;
   readonly labels: Readonly<Record<string, string>>;
 }) {
+  const t = useT();
   const router = useRouter();
   const steps = useMemo(
     () =>
@@ -126,13 +128,15 @@ export function AnswerEditor({
         data-answer-edit
       >
         <Pencil size={ICON_SIZE.compact} aria-hidden="true" />
-        Edit
+        {t("Edit")}
       </Button>
       <DialogRoot open={open} onOpenChange={(next) => !busy && setOpen(next)}>
         {open ? (
           <DialogContent
             title={`Edit ${title.toLowerCase()}`}
-            description="What you change here updates your profile and what Discover works from."
+            description={t(
+              "What you change here updates your profile and what Discover works from.",
+            )}
             className="max-w-xl"
             actions={
               <>
@@ -141,7 +145,7 @@ export function AnswerEditor({
                   disabled={busy}
                   onClick={() => setOpen(false)}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button
                   variant="primary"
@@ -155,9 +159,9 @@ export function AnswerEditor({
               </>
             }
           >
-            <div className="flex max-h-[60vh] flex-col gap-6 overflow-y-auto pr-1">
+            <div className="flex max-h-[60vh] flex-col gap-6 overflow-y-auto pe-1">
               {error === null ? null : (
-                <InlineNotice tone="warning" title="Not saved">
+                <InlineNotice tone="warning" title={t("Not saved")}>
                   {error}
                 </InlineNotice>
               )}
@@ -359,6 +363,7 @@ function CategoryField({
   readonly labels: Readonly<Record<string, string>>;
   readonly onChange: (ids: readonly string[]) => void;
 }) {
+  const t = useT();
   const [choices, setChoices] = useState<readonly TaxonomyChoice[] | null>(
     null,
   );
@@ -393,7 +398,7 @@ function CategoryField({
         {ids.map((id) => (
           <span
             key={id}
-            className="cq-body-sm inline-flex min-h-8 items-center gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) py-1 pr-1 pl-3 text-(--cq-text-primary)"
+            className="cq-body-sm inline-flex min-h-8 items-center gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) py-1 pe-1 ps-3 text-(--cq-text-primary)"
           >
             {nameOf(id)}
             <button
@@ -420,9 +425,9 @@ function CategoryField({
       ) : (
         <Input
           id={`answer-${stepKey.replace(/\W+/g, "-")}-search`}
-          label="Add"
+          label={t("Add")}
           labelHidden
-          placeholder="Type to find a category"
+          placeholder={t("Type to find a category")}
           value={query}
           onFocus={load}
           onChange={(event) => {
@@ -433,7 +438,7 @@ function CategoryField({
       )}
       {failed ? (
         <p className="cq-caption text-(--cq-text-secondary)">
-          Categories couldn&apos;t load just now. Try again in a moment.
+          {t("Categories couldn't load just now. Try again in a moment.")}
         </p>
       ) : null}
       {matches.length === 0 ? null : (

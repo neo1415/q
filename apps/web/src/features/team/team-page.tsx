@@ -45,6 +45,7 @@ import {
   revokeAction,
 } from "./team-actions";
 import { splitEmailInput, teamWords, timeAgo } from "./team-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Settings → Team (G2), built to docs/design/2026-10-06/a/orgs.html.
@@ -73,6 +74,7 @@ const INK =
   "inline-flex h-11 select-none items-center justify-center gap-2 bg-(--cq-text-primary) px-4 cq-body-sm font-medium whitespace-nowrap text-(--cq-canvas) transition-opacity duration-(--cq-motion-fast) hover:opacity-90 disabled:opacity-50 lg:h-10";
 
 export function TeamPage({ initial }: { readonly initial: TeamDto }) {
+  const t = useT();
   const [team, setTeam] = useState(initial);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -140,7 +142,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
   const head = (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <div className="flex min-w-0 flex-col gap-1">
-        <h1 className="cq-title-lg text-(--cq-text-primary)">Team</h1>
+        <h1 className="cq-title-lg text-(--cq-text-primary)">{t("Team")}</h1>
         <p className="cq-body-sm text-(--cq-text-secondary)">
           People who work on{" "}
           {solo && team.organisation.kind === "FIRM" ? "your investing" : name}{" "}
@@ -165,7 +167,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
             size={ICON_SIZE.regular}
             strokeWidth={ICON_STROKE}
           />
-          Invite people
+          {t("Invite people")}
         </button>
       ) : null}
     </div>
@@ -181,7 +183,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
             <span className="cq-body font-medium text-(--cq-text-primary)">
               {me?.name ?? "You"}{" "}
               <span className="cq-caption font-normal text-(--cq-text-tertiary)">
-                You
+                {t("You")}
               </span>
             </span>
             <span className="cq-caption text-(--cq-text-secondary)">
@@ -190,7 +192,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
           </span>
         </div>
         <h2 className="cq-title-sm text-(--cq-text-primary)">
-          Just you, for now
+          {t("Just you, for now")}
         </h2>
         <p className="max-w-[56ch] cq-body-sm text-(--cq-text-secondary)">
           {words.soloLine(name)}
@@ -209,7 +211,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
                 size={ICON_SIZE.regular}
                 strokeWidth={ICON_STROKE}
               />
-              Invite someone
+              {t("Invite someone")}
             </button>
           </div>
         ) : null}
@@ -250,7 +252,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
           </h2>
           {team.members.length > 5 ? (
             <label className="flex min-h-10 w-full items-center gap-2 bg-(--cq-surface-subtle) px-3.5 text-(--cq-text-tertiary) sm:w-56">
-              <span className="sr-only">Search people</span>
+              <span className="sr-only">{t("Search people")}</span>
               <Search
                 aria-hidden="true"
                 size={ICON_SIZE.regular}
@@ -261,7 +263,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
                 onChange={(event) => {
                   setQuery(event.target.value);
                 }}
-                placeholder="Search"
+                placeholder={t("Search")}
                 className="min-w-0 flex-1 bg-transparent cq-body text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary)"
               />
             </label>
@@ -286,7 +288,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
         </ul>
         {shown.length === 0 ? (
           <p className="py-3 cq-body-sm text-(--cq-text-secondary)">
-            Nobody matches that.
+            {t("Nobody matches that.")}
           </p>
         ) : null}
       </section>
@@ -297,7 +299,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
             id="team-invited"
             className="cq-title-sm text-(--cq-text-primary)"
           >
-            Invited
+            {t("Invited")}
           </h2>
           <ul>
             {team.invitations.map((invitation) => (
@@ -336,7 +338,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
                       );
                     }}
                   >
-                    Resend
+                    {t("Resend")}
                   </button>
                   <button
                     type="button"
@@ -349,7 +351,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
                       );
                     }}
                   >
-                    Cancel
+                    {t("Cancel")}
                   </button>
                 </span>
               </li>
@@ -485,7 +487,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
           />
         ) : sheet?.kind === "leave" ? (
           lastOwner ? (
-            <SheetContent side="side" title="You're the only owner">
+            <SheetContent side="side" title={t("You're the only owner")}>
               <div
                 className="flex flex-col gap-3.5"
                 data-team-sheet="leave-owner"
@@ -503,7 +505,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
                         setSheet({ kind: "transfer", member: null });
                       }}
                     >
-                      Choose a new owner
+                      {t("Choose a new owner")}
                     </button>
                   ) : null}
                   <button
@@ -511,13 +513,14 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
                     className={buttonClassName("quiet")}
                     onClick={close}
                   >
-                    Stay
+                    {t("Stay")}
                   </button>
                 </div>
                 {team.members.length > 1 ? null : (
                   <p className="cq-caption text-(--cq-text-tertiary)">
-                    You&apos;re the only person here. Invite someone and make
-                    them owner first.
+                    {t(
+                      "You're the only person here. Invite someone and make them owner first.",
+                    )}
                   </p>
                 )}
               </div>
@@ -526,12 +529,14 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
             <SheetContent side="side" title={`Leave ${name}?`}>
               <div className="flex flex-col gap-3.5" data-team-sheet="leave">
                 <p className="cq-body text-(--cq-text-secondary)">
-                  You&apos;ll lose access to its relationships, notes and
-                  documents straight away. An admin can invite you back.
+                  {t(
+                    "You'll lose access to its relationships, notes and documents straight away. An admin can invite you back.",
+                  )}
                 </p>
                 <p className="cq-body-sm text-(--cq-text-secondary)">
-                  Your own profile and your other companies and firms
-                  aren&apos;t affected.
+                  {t(
+                    "Your own profile and your other companies and firms aren't affected.",
+                  )}
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -551,14 +556,14 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
                       });
                     }}
                   >
-                    Leave
+                    {t("Leave")}
                   </button>
                   <button
                     type="button"
                     className={buttonClassName("quiet")}
                     onClick={close}
                   >
-                    Stay
+                    {t("Stay")}
                   </button>
                 </div>
               </div>
@@ -597,13 +602,14 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
 }
 
 function AskAnAdmin({ team }: { readonly team: TeamDto }) {
+  const t = useT();
   const admin = team.members.find(
     (member) =>
       !member.isYou && member.role !== "MEMBER" && member.email !== null,
   );
   return admin?.email == null ? null : (
     <a href={`mailto:${admin.email}`} className="underline underline-offset-2">
-      Ask an admin
+      {t("Ask an admin")}
     </a>
   );
 }
@@ -619,6 +625,7 @@ function MemberRow({
   readonly onRole: () => void;
   readonly onMore: () => void;
 }) {
+  const t = useT();
   const can = team.you.can;
   // Admins change Admins and Members; owners are changed by hand-over only.
   const roleButton =
@@ -641,8 +648,8 @@ function MemberRow({
         <span className="truncate cq-body font-medium text-(--cq-text-primary)">
           {member.name}
           {member.isYou ? (
-            <span className="ml-1.5 cq-caption font-normal text-(--cq-text-tertiary)">
-              You
+            <span className="ms-1.5 cq-caption font-normal text-(--cq-text-tertiary)">
+              {t("You")}
             </span>
           ) : null}
         </span>
@@ -657,7 +664,7 @@ function MemberRow({
           <button
             type="button"
             aria-label={`Role for ${member.name}: ${ROLE_WORD[member.role]}. Change`}
-            className="inline-flex min-h-11 items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) pr-2.5 pl-3 cq-body-sm whitespace-nowrap text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:min-h-10"
+            className="inline-flex min-h-11 items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) pe-2.5 ps-3 cq-body-sm whitespace-nowrap text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:min-h-10"
             onClick={onRole}
           >
             {ROLE_WORD[member.role]}
@@ -709,6 +716,7 @@ function WaitingForYou({
     done: string,
   ) => void;
 }) {
+  const t = useT();
   const offers = team.ownershipOffers.filter(
     (offer) => offer.direction !== "OTHER",
   );
@@ -717,7 +725,7 @@ function WaitingForYou({
   return (
     <section className="flex flex-col gap-2" aria-labelledby="team-waiting">
       <h2 id="team-waiting" className="cq-title-sm text-(--cq-text-primary)">
-        Waiting for you
+        {t("Waiting for you")}
       </h2>
       {team.joinRequests.map((request) => (
         <Waiting
@@ -738,7 +746,7 @@ function WaitingForYou({
               );
             }}
           >
-            Let in
+            {t("Let in")}
           </button>
           <button
             type="button"
@@ -751,7 +759,7 @@ function WaitingForYou({
               );
             }}
           >
-            Decline
+            {t("Decline")}
           </button>
         </Waiting>
       ))}
@@ -784,7 +792,7 @@ function WaitingForYou({
                   );
                 }}
               >
-                Accept
+                {t("Accept")}
               </button>
               <button
                 type="button"
@@ -797,7 +805,7 @@ function WaitingForYou({
                   );
                 }}
               >
-                Decline
+                {t("Decline")}
               </button>
             </>
           ) : (
@@ -812,7 +820,7 @@ function WaitingForYou({
                 );
               }}
             >
-              Withdraw
+              {t("Withdraw")}
             </button>
           )}
         </Waiting>
@@ -856,10 +864,11 @@ function RolesHelp({
 }: {
   readonly words: ReturnType<typeof teamWords>;
 }) {
+  const t = useT();
   return (
     <section className="flex flex-col gap-2" aria-labelledby="team-roles">
       <h2 id="team-roles" className="cq-title-sm text-(--cq-text-primary)">
-        What each role can do
+        {t("What each role can do")}
       </h2>
       <dl>
         {(
@@ -898,6 +907,7 @@ function InviteSheet({
     message: string,
   ) => void;
 }) {
+  const t = useT();
   const [raw, setRaw] = useState("");
   const [role, setRole] = useState<InvitableRole>("MEMBER");
   const [message, setMessage] = useState("");
@@ -918,7 +928,7 @@ function InviteSheet({
             htmlFor="team-emails"
             className="cq-label text-(--cq-text-primary)"
           >
-            Email addresses
+            {t("Email addresses")}
           </label>
           <textarea
             id="team-emails"
@@ -927,11 +937,11 @@ function InviteSheet({
             onChange={(event) => {
               setRaw(event.target.value);
             }}
-            placeholder="One or more, separated by commas"
+            placeholder={t("One or more, separated by commas")}
             className="w-full border border-(--cq-border) bg-(--cq-surface) px-3.5 py-3 cq-body leading-normal text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) focus-visible:border-(--cq-accent)"
           />
           <span className="cq-caption text-(--cq-text-tertiary)">
-            Personal emails are fine.
+            {t("Personal emails are fine.")}
           </span>
         </div>
         <div className="flex flex-col gap-1.5">
@@ -939,7 +949,7 @@ function InviteSheet({
             id="team-role-label"
             className="cq-label text-(--cq-text-primary)"
           >
-            Role
+            {t("Role")}
           </span>
           <div
             role="radiogroup"
@@ -967,8 +977,9 @@ function InviteSheet({
             ))}
           </div>
           <span className="cq-caption text-(--cq-text-secondary)">
-            Members work day to day. Admins can also invite people and approve
-            what Q sends.
+            {t(
+              "Members work day to day. Admins can also invite people and approve what Q sends.",
+            )}
           </span>
         </div>
         <div className="flex flex-col gap-1.5">
@@ -985,7 +996,7 @@ function InviteSheet({
             onChange={(event) => {
               setMessage(event.target.value);
             }}
-            placeholder="Welcome aboard!"
+            placeholder={t("Welcome aboard!")}
             className="min-h-11 w-full border border-(--cq-border) bg-(--cq-surface) px-3.5 cq-body text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) focus-visible:border-(--cq-accent)"
           />
         </div>
@@ -1014,6 +1025,7 @@ function RoleSheet({
   readonly onSave: (role: InvitableRole) => void;
   readonly onOwner: () => void;
 }) {
+  const t = useT();
   const [role, setRole] = useState<InvitableRole>(
     member.role === "ADMIN" ? "ADMIN" : "MEMBER",
   );
@@ -1062,7 +1074,7 @@ function RoleSheet({
             onSave(role);
           }}
         >
-          Save
+          {t("Save")}
         </button>
         {canOwn ? (
           <button
@@ -1093,6 +1105,7 @@ function RemoveSheet({
   readonly onRemove: (handOverTo: string | null) => void;
   readonly onOwner: (() => void) | null;
 }) {
+  const t = useT();
   const first = firstName(member.name);
   const words = teamWords(team.organisation.kind);
   const heirs = team.members.filter(
@@ -1148,7 +1161,7 @@ function RemoveSheet({
             className={buttonClassName("quiet")}
             onClick={onClose}
           >
-            Cancel
+            {t("Cancel")}
           </button>
         </div>
         {onOwner === null ? null : (
@@ -1180,6 +1193,7 @@ function TransferSheet({
   readonly onClose: () => void;
   readonly onSend: (member: TeamMemberDto) => void;
 }) {
+  const t = useT();
   const choices = team.members.filter((m) => m.role !== "OWNER" && !m.isYou);
   const [chosen, setChosen] = useState<string>(
     member?.membershipId ?? choices[0]?.membershipId ?? "",
@@ -1203,7 +1217,7 @@ function TransferSheet({
               htmlFor="team-owner"
               className="cq-label text-(--cq-text-primary)"
             >
-              New owner
+              {t("New owner")}
             </label>
             <select
               id="team-owner"
@@ -1254,14 +1268,14 @@ function TransferSheet({
               if (target !== null) onSend(target);
             }}
           >
-            Send request
+            {t("Send request")}
           </button>
           <button
             type="button"
             className={buttonClassName("quiet")}
             onClick={onClose}
           >
-            Cancel
+            {t("Cancel")}
           </button>
         </div>
       </div>
@@ -1283,12 +1297,13 @@ export function UnsentInvites({
   readonly items: readonly UnsentInvite[];
   readonly onDismiss: () => void;
 }) {
+  const t = useT();
   const [copied, setCopied] = useState<string | null>(null);
   if (items.length === 0) return null;
   return (
     <section
       role="status"
-      aria-label="Invitations not emailed"
+      aria-label={t("Invitations not emailed")}
       className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-4"
       data-team-unsent
     >
@@ -1298,7 +1313,7 @@ export function UnsentInvites({
           size={ICON_SIZE.compact}
           strokeWidth={ICON_STROKE}
         />
-        Couldn&apos;t send the email — copy the invite link
+        {t("Couldn't send the email — copy the invite link")}
       </p>
       <ul className="flex flex-col gap-2">
         {items.map((item) => (
@@ -1341,7 +1356,7 @@ export function UnsentInvites({
           className="underline underline-offset-2"
           onClick={onDismiss}
         >
-          Done
+          {t("Done")}
         </button>
       </p>
     </section>

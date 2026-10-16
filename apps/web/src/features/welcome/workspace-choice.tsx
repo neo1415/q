@@ -75,7 +75,7 @@ export function WorkspaceChoice({
             <li key={workspace.organisationId}>
               <button
                 type="button"
-                className="flex min-h-14 w-full items-center gap-3 px-3 py-3 text-left transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-50"
+                className="flex min-h-14 w-full items-center gap-3 px-3 py-3 text-start transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-50"
                 disabled={pending}
                 onClick={() => choose(workspace)}
                 data-workspace={workspace.organisationId}

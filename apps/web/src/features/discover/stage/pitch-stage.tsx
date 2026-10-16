@@ -30,6 +30,7 @@ import { useOnline } from "./online";
 import { PitchOptionsSheet } from "./pitch-options";
 import { rateLabel, stepPlaybackRate, usePlaybackRate } from "./playback-rate";
 import { PitchScrubber, SEEK_STEP_SECONDS, seekBy } from "./scrubber";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The pitch stage: the one full-bleed player surface every feed of pitches
@@ -109,6 +110,7 @@ function FeedMedia({
   readonly onMutedChange: (muted: boolean) => void;
   readonly mediaRef: React.Ref<HTMLDivElement>;
 }) {
+  const t = useT();
   const slots: {
     readonly key: string;
     readonly offset: number;
@@ -153,7 +155,7 @@ function FeedMedia({
                 {item.canonicalName}
               </span>
               <span className="cq-caption text-(--cq-text-secondary)">
-                No pitch to show yet
+                {t("No pitch to show yet")}
               </span>
             </div>
           ) : (
@@ -298,6 +300,7 @@ export function PitchStage({
   onExtraKey,
   onStage,
 }: PitchStageProps) {
+  const t = useT();
   const stageRef = useRef<HTMLDivElement | null>(null);
   // The feed may want the stage too (Discover reads the pitch's moment).
   const setStage = useCallback(
@@ -735,7 +738,7 @@ export function PitchStage({
           stated in words rather than by a progress bar, which would read as
           a score.
         */}
-        <nav className="cq-feed-nav" aria-label="Move through the feed">
+        <nav className="cq-feed-nav" aria-label={t("Move through the feed")}>
           <button
             type="button"
             className="cq-feed-nav-button"
@@ -789,28 +792,29 @@ export function PitchStage({
  * only while the feed has focus (spec §9.3; WCAG 2.1.4).
  */
 export function KeyHints() {
+  const t = useT();
   return (
-    <ul className="cq-feed-keys" aria-label="Keyboard shortcuts">
+    <ul className="cq-feed-keys" aria-label={t("Keyboard shortcuts")}>
       <li>
         <kbd>↑</kbd>
-        <kbd>↓</kbd> Previous, next
+        <kbd>↓</kbd> {t("Previous, next")}
       </li>
       <li>
-        <kbd>Space</kbd> Pause
+        <kbd>{t("Space")}</kbd> {t("Pause")}
       </li>
       <li>
         <kbd>←</kbd>
-        <kbd>→</kbd> Back, forward 5 s
+        <kbd>→</kbd> {t("Back, forward 5 s")}
       </li>
       <li>
-        <kbd>M</kbd> Sound
+        <kbd>M</kbd> {t("Sound")}
       </li>
       <li>
         <kbd>&lt;</kbd>
-        <kbd>&gt;</kbd> Speed
+        <kbd>&gt;</kbd> {t("Speed")}
       </li>
       <li>
-        <kbd>C</kbd> Captions
+        <kbd>C</kbd> {t("Captions")}
       </li>
     </ul>
   );

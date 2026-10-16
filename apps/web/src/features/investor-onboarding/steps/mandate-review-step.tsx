@@ -11,6 +11,7 @@ import { InlineNotice } from "@capital-q/ui/states";
 
 import type { AskedQuestionView, QReadingItem } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 type Row = {
   readonly id: string;
@@ -247,6 +248,7 @@ export function MandateReviewStep({
   busy,
   actions,
 }: StepProps<"mandate_review">) {
+  const t = useT();
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void actions.submit({ kind: "mandate_review", confirmed: true });
@@ -264,8 +266,10 @@ export function MandateReviewStep({
         actions={actions}
       />
       {review === undefined ? (
-        <InlineNotice tone="info" title="Nothing to review yet">
-          Answer the earlier screens and your mandate will be listed here.
+        <InlineNotice tone="info" title={t("Nothing to review yet")}>
+          {t(
+            "Answer the earlier screens and your mandate will be listed here.",
+          )}
         </InlineNotice>
       ) : (
         <>
@@ -291,7 +295,8 @@ export function MandateReviewStep({
                   disabled={busy}
                   onClick={() => void actions.openStep(row.editStepId)}
                 >
-                  Change<span className="sr-only"> {row.label}</span>
+                  {t("Change")}
+                  <span className="sr-only"> {row.label}</span>
                 </Button>
               </div>
             ))}
@@ -306,16 +311,16 @@ export function MandateReviewStep({
             >
               <div className="flex min-w-0 flex-col gap-1">
                 <dt className="cq-caption flex flex-wrap items-center gap-2 text-(--cq-text-tertiary)">
-                  Never show me
-                  <Badge tone="neutral">Hard exclusion</Badge>
+                  {t("Never show me")}
+                  <Badge tone="neutral">{t("Hard exclusion")}</Badge>
                 </dt>
                 <dd className="cq-body text-(--cq-text-primary)">
                   {list(review.mandate.hardExclusions)}
                 </dd>
                 <dd className="cq-caption text-(--cq-text-tertiary)">
-                  Not shown in your recommendations, whatever your discovery
-                  style. Different from “rather not see”, which only ranks
-                  lower.
+                  {t(
+                    "Not shown in your recommendations, whatever your discovery style. Different from “rather not see”, which only ranks lower.",
+                  )}
                 </dd>
               </div>
               <Button
@@ -325,7 +330,8 @@ export function MandateReviewStep({
                 disabled={busy}
                 onClick={() => void actions.openStep("red_flags")}
               >
-                Change<span className="sr-only"> hard exclusions</span>
+                {t("Change")}
+                <span className="sr-only"> {t("hard exclusions")}</span>
               </Button>
             </div>
           </dl>
@@ -343,6 +349,7 @@ export function MandateReviewStep({
         </>
       )}
       <ContextIndicator
+        translate={t}
         scope="investor_private"
         detail="Declared by you. Founders never see your mandate."
       />
@@ -361,6 +368,7 @@ function QReading({
   readonly busy: boolean;
   readonly actions: StepProps<"mandate_review">["actions"];
 }) {
+  const t = useT();
   if (reading.length === 0 && questions.length === 0) {
     return null;
   }
@@ -373,11 +381,12 @@ function QReading({
     >
       <div className="flex flex-col gap-1">
         <h2 id="q-reading" className="cq-label text-(--cq-text-primary)">
-          What I read from your description
+          {t("What I read from your description")}
         </h2>
         <p className="cq-caption text-(--cq-text-tertiary)">
-          Proposals, not decisions. Nothing below is part of your mandate until
-          you keep it.
+          {t(
+            "Proposals, not decisions. Nothing below is part of your mandate until you keep it.",
+          )}
         </p>
       </div>
       {reading.length > 0 ? (
@@ -393,6 +402,14 @@ function QReading({
                   {item.label}
                 </p>
                 <p className="cq-body text-(--cq-text-primary)">{item.value}</p>
+                {item.note === undefined ? null : (
+                  <p
+                    className="cq-caption text-(--cq-text-secondary)"
+                    data-q-proposal-note
+                  >
+                    {item.note}
+                  </p>
+                )}
               </div>
               <div className="flex shrink-0 gap-2">
                 <Button
@@ -407,7 +424,8 @@ function QReading({
                     })
                   }
                 >
-                  Keep<span className="sr-only"> {item.label}</span>
+                  {t("Keep")}
+                  <span className="sr-only"> {item.label}</span>
                 </Button>
                 <Button
                   type="button"
@@ -416,7 +434,8 @@ function QReading({
                   disabled={busy}
                   onClick={() => void actions.openStep(item.stepId)}
                 >
-                  Change<span className="sr-only"> {item.label}</span>
+                  {t("Change")}
+                  <span className="sr-only"> {item.label}</span>
                 </Button>
                 <Button
                   type="button"
@@ -430,7 +449,8 @@ function QReading({
                     })
                   }
                 >
-                  Not this<span className="sr-only"> {item.label}</span>
+                  {t("Not this")}
+                  <span className="sr-only"> {item.label}</span>
                 </Button>
               </div>
             </li>
@@ -486,7 +506,7 @@ function QReading({
                       }
                     }}
                   >
-                    Answer
+                    {t("Answer")}
                   </Button>
                 ) : null}
                 <Button
@@ -496,7 +516,7 @@ function QReading({
                   disabled={busy}
                   onClick={() => void actions.dismissQuestion(question.id)}
                 >
-                  Leave it
+                  {t("Leave it")}
                 </Button>
               </div>
             </li>

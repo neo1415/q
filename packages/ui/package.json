@@ -133,6 +133,10 @@
     "./intelligence-snapshot": {
       "types": "./dist/patterns/intelligence-snapshot.d.ts",
       "default": "./dist/patterns/intelligence-snapshot.js"
+    },
+    "./ui-text": {
+      "types": "./dist/primitives/ui-text.d.ts",
+      "default": "./dist/primitives/ui-text.js"
     }
   },
   "main": "./dist/index.js",

@@ -7,6 +7,7 @@ import type { AdminQErrorsDto } from "@capital-q/contracts";
 
 import { qErrorsAction } from "./console-actions";
 import { when, words } from "./words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The live error stream: the latest failed model calls and runs, refreshed
@@ -19,6 +20,8 @@ export function ErrorStream({
   readonly initial: AdminQErrorsDto["rows"];
   readonly canTrace: boolean;
 }) {
+  const t = useT();
+
   const [rows, setRows] = useState(initial);
   const [stale, setStale] = useState(false);
   useEffect(() => {
@@ -38,7 +41,7 @@ export function ErrorStream({
   if (rows.length === 0) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        No failures recorded.
+        {t("No failures recorded.")}
       </p>
     );
   }
@@ -46,7 +49,7 @@ export function ErrorStream({
     <div className="flex flex-col gap-2">
       {stale ? (
         <p role="status" className="cq-caption text-(--cq-text-secondary)">
-          Couldn&apos;t refresh. Showing the last list.
+          {t("Couldn't refresh. Showing the last list.")}
         </p>
       ) : null}
       <ul
@@ -59,14 +62,16 @@ export function ErrorStream({
             className="flex flex-wrap items-baseline justify-between gap-2 py-2"
           >
             <span className="cq-body-sm text-(--cq-text-primary)">
-              {row.kind === "RUN" ? "Run failed" : "Model call failed"}:{" "}
-              {words(row.code)}
-              {row.taskClass === null ? "" : ` · ${words(row.taskClass)}`}
-              {row.model === null ? "" : ` · ${row.model}`}
-              {row.latencyMs === null ? "" : ` · ${String(row.latencyMs)} ms`}
+              {row.kind === "RUN" ? t("Run failed") : t("Model call failed")}:{" "}
+              {t(words(row.code))}
+              {row.taskClass === null ? "" : t(` · ${words(row.taskClass)}`)}
+              {row.model === null ? "" : t(` · ${row.model}`)}
+              {row.latencyMs === null
+                ? ""
+                : t(` · ${String(row.latencyMs)} ms`)}
             </span>
             <span className="cq-caption text-(--cq-text-secondary)">
-              {when(row.at)}
+              {t(when(row.at))}
               {canTrace && row.runId !== null ? (
                 <>
                   {" · "}
@@ -74,7 +79,7 @@ export function ErrorStream({
                     className="underline underline-offset-4"
                     href={`/admin/q/runs/${row.runId}`}
                   >
-                    Open run
+                    {t("Open run")}
                   </Link>
                 </>
               ) : null}

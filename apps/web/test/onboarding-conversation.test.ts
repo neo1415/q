@@ -483,6 +483,7 @@ describe("taxonomyProposal", () => {
             confidence: "0.9",
             status: "PENDING",
             sourceRefs: [],
+            rationale: null,
             createdAt: "2026-09-13T10:02:00.000Z",
           },
         ],
@@ -521,6 +522,7 @@ describe("publicSourceOf", () => {
     confidence: null,
     status: "PENDING",
     sourceRefs,
+    rationale: null,
     createdAt: "2026-09-13T10:02:00.000Z",
   });
 

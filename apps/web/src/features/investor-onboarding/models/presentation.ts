@@ -183,6 +183,8 @@ export type QReadingItem = {
   readonly stepId: string;
   readonly label: string;
   readonly value: string;
+  /** What the person should know about it, e.g. names not matched (ob2). */
+  readonly note?: string | undefined;
 };
 
 /** A persisted question with the screen that answers it. */

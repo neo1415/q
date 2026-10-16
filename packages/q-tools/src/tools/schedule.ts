@@ -752,6 +752,12 @@ export function createScheduleTools(
   ): Promise<{
     readonly iso: string;
     readonly timeZone: string | undefined;
+    /**
+     * The zone they named themselves when their profile has none: offered
+     * on the card to be kept as theirs, so Q never asks again (owner
+     * 2026-10-16). Undefined otherwise.
+     */
+    readonly toRemember?: string | undefined;
   }> => {
     // Precedence: the zone they named, the one saved on their profile,
     // their device's (unless it only says UTC, which privacy browsers and
@@ -767,12 +773,20 @@ export function createScheduleTools(
           : (zoneFromWords(input.timeZone) ??
             (isKnownTimeZone(input.timeZone) ? input.timeZone : undefined));
     let zone = named;
-    if (zone === undefined && schedule.profileTimeZoneOf !== undefined) {
-      const saved = await schedule
+    let saved: string | null | undefined;
+    if (schedule.profileTimeZoneOf !== undefined) {
+      saved = await schedule
         .profileTimeZoneOf(context.actor)
-        .catch(() => null);
-      if (saved !== null && isKnownTimeZone(saved)) zone = saved;
+        .catch(() => undefined);
+      if (zone === undefined && saved != null && isKnownTimeZone(saved)) {
+        zone = saved;
+      }
     }
+    // Known to have none saved (read, and empty): theirs to keep.
+    const toRemember =
+      named !== undefined && saved === null && named.includes("/")
+        ? named
+        : undefined;
     const device = context.plan.screen?.timeZone;
     if (
       zone === undefined &&
@@ -793,7 +807,11 @@ export function createScheduleTools(
           "Give the time: when (their day and HH:MM) or startsAt (a slot find_meeting_times returned).",
         );
       }
-      return { iso: new Date(input.startsAt).toISOString(), timeZone: zone };
+      return {
+        iso: new Date(input.startsAt).toISOString(),
+        timeZone: zone,
+        ...(toRemember === undefined ? {} : { toRemember }),
+      };
     }
     const resolved = resolveLocalWhen(input.when, zone, now());
     if (resolved.kind === "NO_TIME_ZONE") {
@@ -805,6 +823,9 @@ export function createScheduleTools(
     return {
       iso: resolved.instant.toISOString(),
       timeZone: resolved.timeZone,
+      ...(toRemember === undefined || toRemember !== resolved.timeZone
+        ? {}
+        : { toRemember }),
     };
   };
   const labelled = (summary: string, iso: string, zone: string | undefined) =>
@@ -1086,6 +1107,10 @@ export function createScheduleTools(
               title: input.title,
               remindAt: at.iso,
               ...(at.timeZone === undefined ? {} : { timeZone: at.timeZone }),
+              // Kept as their time zone on approval: part of the card.
+              ...(at.toRemember === undefined
+                ? {}
+                : { saveTimeZone: at.toRemember }),
               ...(input.note === undefined ? {} : { note: input.note }),
               channel: input.byEmail ? "EMAIL" : "IN_APP",
             },

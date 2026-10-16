@@ -37,6 +37,7 @@ import { subjectHref } from "./blocks/data-block-logic";
 import { useSubjectNames } from "./blocks/use-subject-names";
 import { useWire } from "./use-wire";
 import { wireNow } from "./wire";
+import { useT } from "@/features/i18n/language";
 
 /**
  * What Q attached to an answer, as things you can act on (QX-001 §8-§10).
@@ -82,6 +83,7 @@ const INTENT_ROUTES: Readonly<
       | "OPEN_WEBSITE"
       | "SET_Q_MOTION"
       | "SET_VOICE"
+      | "SET_LANGUAGE"
       | "SIGN_OUT"
       | "OPEN_RECORD_PAGE"
       | "OPEN_SETUP"
@@ -128,6 +130,7 @@ export function intentHref(intent: QUiIntent): string | null {
     intent.kind === "OPEN_WEBSITE" ||
     intent.kind === "SET_Q_MOTION" ||
     intent.kind === "SET_VOICE" ||
+    intent.kind === "SET_LANGUAGE" ||
     intent.kind === "SIGN_OUT" ||
     // Done on the page as the answer arrives; there is nowhere to link.
     intent.kind === "SCREEN_ACT" ||
@@ -213,6 +216,8 @@ function intentLabel(intent: QUiIntent): string {
       return "Q motion";
     case "SET_VOICE":
       return "Q's voice";
+    case "SET_LANGUAGE":
+      return "Language";
     case "SIGN_OUT":
       return "Sign out";
     case "OPEN_RECORD_PAGE":
@@ -314,6 +319,7 @@ const DESTINATION_LABELS: Readonly<
   CAPITAL_ACTION_PLAN: "Open your action plan",
   CAPITAL_PLAN: "Open your 12-month plan",
   CAPITAL_INVESTORS: "Open your investors on Capital",
+  CRM_PIPELINE: "Open your pipeline",
 };
 
 function subjectLabel(subject: QSubjectRef): string {
@@ -388,6 +394,7 @@ export function QResultBlocks({
   onAsk,
   onOpenArtifact,
 }: QResultBlocksProps) {
+  const t = useT();
   // W7: drawn again once the wire's contracts are in (safeWebsite).
   useWire();
   // Prose, findings, uncertainties and the source count are the answer's
@@ -408,14 +415,14 @@ export function QResultBlocks({
             return (
               <QResultCard
                 key={key}
-                label="Company"
+                label={t("Company")}
                 actions={
                   <>
                     <Link
                       href={recordPagePath("COMPANY", block.companyId)}
                       className={buttonClassName("secondary", "compact")}
                     >
-                      Open the company
+                      {t("Open the company")}
                     </Link>
                     {onAsk === undefined ? null : (
                       <button
@@ -425,7 +432,7 @@ export function QResultBlocks({
                           onAsk("Tell me more about that company.");
                         }}
                       >
-                        Ask Q about it
+                        {t("Ask Q about it")}
                       </button>
                     )}
                   </>
@@ -461,32 +468,36 @@ export function QResultBlocks({
           // E4: laid-out data, built by code from validated reads.
           case "TABLE":
             return (
-              <QResultCard key={key} label="Side by side" title={block.title}>
+              <QResultCard
+                key={key}
+                label={t("Side by side")}
+                title={block.title}
+              >
                 <TableBody block={block} />
               </QResultCard>
             );
           case "CHART":
             return (
-              <QResultCard key={key} label="Chart" title={block.title}>
+              <QResultCard key={key} label={t("Chart")} title={block.title}>
                 <ChartBody block={block} />
               </QResultCard>
             );
           case "MAP":
             return (
-              <QResultCard key={key} label="Map" title={block.title}>
+              <QResultCard key={key} label={t("Map")} title={block.title}>
                 <MapBody map={block} />
               </QResultCard>
             );
           case "ATTENTION":
             // G-R4: everything that needs them, and what was not read.
             return (
-              <QResultCard key={key} label="Needs you">
+              <QResultCard key={key} label={t("Needs you")}>
                 <AttentionBody report={block.report} />
               </QResultCard>
             );
           case "TIMELINE":
             return (
-              <QResultCard key={key} label="Timeline" title={block.title}>
+              <QResultCard key={key} label={t("Timeline")} title={block.title}>
                 <TimelineBody block={block} />
               </QResultCard>
             );
@@ -495,7 +506,7 @@ export function QResultBlocks({
             return (
               <QResultCard
                 key={key}
-                label="Q needs to know"
+                label={t("Q needs to know")}
                 title={block.question}
                 actions={
                   block.options === undefined ||
@@ -527,11 +538,11 @@ export function QResultBlocks({
             return (
               <QResultCard
                 key={key}
-                label="Q has prepared something"
+                label={t("Q has prepared something")}
                 title={block.proposal.summary}
               >
                 <p className="cq-body-sm text-(--cq-text-secondary)">
-                  Nothing happens until you approve it below.
+                  {t("Nothing happens until you approve it below.")}
                 </p>
               </QResultCard>
             );
@@ -571,7 +582,7 @@ export function QResultBlocks({
               return (
                 <QResultCard
                   key={key}
-                  label="Your website"
+                  label={t("Your website")}
                   actions={
                     <a
                       href={website}
@@ -594,7 +605,7 @@ export function QResultBlocks({
             return (
               <QResultCard
                 key={key}
-                label="Where this lives"
+                label={t("Where this lives")}
                 actions={
                   <Link
                     href={href}
@@ -623,6 +634,7 @@ function InvestorReference({
   readonly investorOrganisationId: string;
   readonly onAsk?: ((question: string) => void) | undefined;
 }) {
+  const t = useT();
   const subject = {
     kind: "INVESTOR_ORGANISATION" as const,
     investorOrganisationId,
@@ -631,7 +643,7 @@ function InvestorReference({
   const href = subjectHref(subject);
   return (
     <QResultCard
-      label="Investor"
+      label={t("Investor")}
       title={name ?? undefined}
       actions={
         <>
@@ -641,7 +653,7 @@ function InvestorReference({
               className={buttonClassName("secondary", "compact")}
               data-q-investor-open
             >
-              Open profile
+              {t("Open profile")}
             </Link>
           )}
           {onAsk === undefined ? null : (
@@ -681,15 +693,16 @@ function ComparisonTable({
 }: {
   readonly block: Extract<QTurnObjectBlock, { kind: "COMPARISON" }>;
 }) {
+  const t = useT();
   const nameOf = useSubjectNames(block.subjects);
   return (
-    <QResultCard label="Side by side">
+    <QResultCard label={t("Side by side")}>
       <div className="relative overflow-x-auto">
-        <table className="w-full border-collapse text-left">
+        <table className="w-full border-collapse text-start">
           <thead>
             <tr>
-              <th className="cq-label px-0 py-2 pr-4 text-(--cq-text-tertiary)">
-                <span className="sr-only">Attribute</span>
+              <th className="cq-label px-0 py-2 pe-4 text-(--cq-text-tertiary)">
+                <span className="sr-only">{t("Attribute")}</span>
               </th>
               {block.subjects.map((subject, column) => {
                 const name = nameOf(subject);
@@ -726,7 +739,7 @@ function ComparisonTable({
               >
                 <th
                   scope="row"
-                  className="cq-body-sm px-0 py-2 pr-4 font-normal text-(--cq-text-secondary)"
+                  className="cq-body-sm px-0 py-2 pe-4 font-normal text-(--cq-text-secondary)"
                 >
                   {row.label}
                 </th>
@@ -739,7 +752,7 @@ function ComparisonTable({
                         Never a zero, never a dash that could be read as one. */}
                     {value === "" ? (
                       <span className="text-(--cq-text-tertiary)">
-                        Not known
+                        {t("Not known")}
                       </span>
                     ) : (
                       value

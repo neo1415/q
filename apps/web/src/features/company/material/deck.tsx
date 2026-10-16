@@ -33,6 +33,7 @@ import {
   openDeckAction,
   type OpenedFile,
 } from "./material-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Pitch deck tab (overnight plan A4-A6; design-a "deck-*" and "coach-*").
@@ -64,6 +65,7 @@ function DeckViewer({
   /** N2: Q was asked to open the deck ("open Nixo's pitch deck"): open it now. */
   readonly autoOpen: boolean;
 }) {
+  const t = useT();
   const [file, setFile] = useState<OpenedFile | null>(null);
   const [slide, setSlide] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
@@ -100,7 +102,7 @@ function DeckViewer({
             type="button"
             onClick={open}
             disabled={pending}
-            className="flex h-full w-full flex-col items-start justify-center gap-2 p-6 text-left sm:p-10"
+            className="flex h-full w-full flex-col items-start justify-center gap-2 p-6 text-start sm:p-10"
           >
             <span className="cq-caption text-(--cq-text-tertiary)">
               {deck.title}
@@ -134,7 +136,7 @@ function DeckViewer({
           type="button"
           onClick={() => move(-1)}
           disabled={file === null || slide === 1}
-          aria-label="Previous slide"
+          aria-label={t("Previous slide")}
           className="flex size-11 items-center justify-center border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
         >
           <ChevronLeft size={ICON_SIZE.regular} aria-hidden="true" />
@@ -146,7 +148,7 @@ function DeckViewer({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            aria-label="Full screen"
+            aria-label={t("Full screen")}
             disabled={file === null}
             onClick={() =>
               void frame.current?.requestFullscreen?.().catch(() => undefined)
@@ -159,7 +161,7 @@ function DeckViewer({
             type="button"
             onClick={() => move(1)}
             disabled={file === null || (total !== null && slide >= total)}
-            aria-label="Next slide"
+            aria-label={t("Next slide")}
             className="flex size-11 items-center justify-center border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
           >
             <ChevronRight size={ICON_SIZE.regular} aria-hidden="true" />
@@ -177,8 +179,8 @@ function DeckViewer({
           download
           className={buttonClassName("secondary", "regular", "self-start")}
         >
-          <Download size={ICON_SIZE.compact} aria-hidden="true" /> Download the
-          deck
+          <Download size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+          {t("Download the deck")}
         </a>
       ) : null}
     </div>
@@ -195,6 +197,7 @@ export function DeckForReaders({
   readonly companyName: string;
   readonly view: CompanyDeckView;
 }) {
+  const t = useT();
   const [picked, setPicked] = useState<number | null>(null);
   const carousel = useRef<HTMLDivElement>(null);
   const { deck, extraction } = view;
@@ -221,7 +224,7 @@ export function DeckForReaders({
           {companyName} hasn&rsquo;t shared a deck with you yet.
         </p>
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          When they do, it appears here with Q&rsquo;s read of it.
+          {t("When they do, it appears here with Q’s read of it.")}
         </p>
       </div>
     );
@@ -244,18 +247,19 @@ export function DeckForReaders({
         <p className="cq-caption mt-1 inline-flex w-fit items-center gap-1.5 border border-(--cq-border) px-3 py-1 text-(--cq-text-primary)">
           {deck.downloadable ? (
             <>
-              <Download size={ICON_SIZE.compact} aria-hidden="true" /> Can be
-              downloaded
+              <Download size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+              {t("Can be downloaded")}
             </>
           ) : (
             <>
-              <Lock size={ICON_SIZE.compact} aria-hidden="true" /> View only
+              <Lock size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+              {t("View only")}
             </>
           )}
         </p>
         {deck.scanned ? null : (
           <p className="cq-caption text-(--cq-text-secondary)">
-            Not virus-scanned yet.
+            {t("Not virus-scanned yet.")}
           </p>
         )}
       </div>
@@ -359,6 +363,7 @@ export function DeckCoach({
   readonly view: CompanyDeckView;
   readonly coaching: DeckCoaching;
 }) {
+  const t = useT();
   const deck = view.deck;
   const [confirmed, setConfirmed] = useState(
     view.extraction?.confirmed ?? false,
@@ -402,7 +407,7 @@ export function DeckCoach({
               id="coach-title"
               className="cq-title-lg text-(--cq-text-primary)"
             >
-              Your pitch deck
+              {t("Your pitch deck")}
             </h2>
             <p className="cq-body-sm text-(--cq-text-secondary)">
               Version {deck.versionNumber}
@@ -416,8 +421,8 @@ export function DeckCoach({
             href="/documents"
             className={buttonClassName("secondary", "regular")}
           >
-            <Upload size={ICON_SIZE.compact} aria-hidden="true" /> Upload a new
-            version
+            <Upload size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+            {t("Upload a new version")}
           </Link>
         </div>
 
@@ -438,7 +443,7 @@ export function DeckCoach({
               onClick={confirm}
               className={buttonClassName("primary", "regular")}
             >
-              Confirm all and show
+              {t("Confirm all and show")}
             </button>
           </div>
         ) : null}
@@ -508,10 +513,9 @@ export function DeckCoach({
             ))}
           </ul>
           <p className="cq-caption text-(--cq-text-secondary)">
-            Q shows investors the same twelve sections for every company, so
-            missing ones read &ldquo;Not in the deck yet&rdquo; until you add
-            them. They never see these notes, and deck quality is never used to
-            rank you.
+            {t(
+              "Q shows investors the same twelve sections for every company, so missing ones read “Not in the deck yet” until you add them. They never see these notes, and deck quality is never used to rank you.",
+            )}
           </p>
           <div className="flex flex-wrap items-center gap-3">
             {first === undefined ? null : (
@@ -528,7 +532,7 @@ export function DeckCoach({
               href={`/company/${companyId}?tab=deck&as=investor`}
               className={buttonClassName("quiet", "regular")}
             >
-              See what investors see
+              {t("See what investors see")}
             </Link>
           </div>
         </div>
@@ -539,10 +543,10 @@ export function DeckCoach({
               id="by-section"
               className="cq-title-sm text-(--cq-text-primary)"
             >
-              Section by section
+              {t("Section by section")}
             </h3>
             <span className="cq-caption text-(--cq-text-secondary)">
-              Weakest first
+              {t("Weakest first")}
             </span>
           </div>
           <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
@@ -576,10 +580,10 @@ export function DeckCoach({
                         className="text-(--cq-text-tertiary) transition-transform group-open:rotate-180"
                       />
                     </summary>
-                    <div className="flex flex-col gap-3 pb-4 pl-8">
+                    <div className="flex flex-col gap-3 pb-4 ps-8">
                       {section.gaps.length === 0 && section.improve === null ? (
                         <p className="cq-body-sm text-(--cq-text-secondary)">
-                          Nothing to add here.
+                          {t("Nothing to add here.")}
                         </p>
                       ) : (
                         <p className="cq-body-sm text-(--cq-text-primary)">
@@ -600,7 +604,7 @@ export function DeckCoach({
                               "min-h-11",
                             )}
                           >
-                            Let Q draft it
+                            {t("Let Q draft it")}
                           </Link>
                           <Link
                             href={qAsk(
@@ -612,7 +616,7 @@ export function DeckCoach({
                               "min-h-11",
                             )}
                           >
-                            Answer a question
+                            {t("Answer a question")}
                           </Link>
                         </div>
                       )}
@@ -627,16 +631,18 @@ export function DeckCoach({
 
       <aside
         className="flex flex-col gap-4 lg:sticky lg:top-6"
-        aria-label="Who can see your deck"
+        aria-label={t("Who can see your deck")}
       >
         <div className="flex aspect-video flex-col justify-center gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5">
-          <p className="cq-caption text-(--cq-text-tertiary)">Your deck</p>
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            {t("Your deck")}
+          </p>
           <p className="cq-title-sm text-(--cq-text-primary)">{deck.title}</p>
         </div>
         <dl className="flex flex-col divide-y divide-(--cq-border-subtle)">
           <div className="flex justify-between gap-3 py-3">
             <dt className="cq-body-sm text-(--cq-text-secondary)">
-              Investors can
+              {t("Investors can")}
             </dt>
             <dd className="cq-body-sm text-(--cq-text-primary)">
               {deck.downloadable ? "Download it" : "View only"}
@@ -644,7 +650,7 @@ export function DeckCoach({
           </div>
           <div className="flex justify-between gap-3 py-3">
             <dt className="cq-body-sm text-(--cq-text-secondary)">
-              Q&rsquo;s sections
+              {t("Q’s sections")}
             </dt>
             <dd className="cq-body-sm text-(--cq-text-primary)">
               {confirmed ? "Shown to investors" : "Waiting for you"}
@@ -655,7 +661,7 @@ export function DeckCoach({
           href="/documents"
           className="cq-body-sm inline-flex min-h-11 items-center underline underline-offset-4"
         >
-          Change who can download it
+          {t("Change who can download it")}
         </Link>
       </aside>
     </div>

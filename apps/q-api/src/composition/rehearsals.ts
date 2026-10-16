@@ -2966,6 +2966,13 @@ const ANY_OBJECT = z.record(z.string(), z.unknown());
 
 export function createRehearsalComposer(dependencies: {
   readonly gateway: ModelGateway;
+  /**
+   * Multilingual Q: the founder's chosen language for Q, as a spoken note
+   * (q-core spokenLanguageNote), or null. The played investor and the
+   * review then use it; a failed read is English, never a lost turn.
+   */
+  readonly languageOf?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger | undefined;
 }): RehearsalComposer {
@@ -2983,12 +2990,19 @@ export function createRehearsalComposer(dependencies: {
     views: RehearsalViews = { screen: null, camera: null },
     signal?: AbortSignal,
   ): Promise<R | null> {
+    const language =
+      dependencies.languageOf === undefined
+        ? null
+        : await dependencies.languageOf(actor).catch(() => null);
     const rendered = renderPrompt<V>(registry, {
       task,
       operatingMode: "CONTINUOUS_INTELLIGENCE",
       communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
-      environmentNotes:
-        "A private rehearsal on Capital Q. Practice only: nothing here is evidence or is shown to the other person.",
+      environmentNotes: `A private rehearsal on Capital Q. Practice only: nothing here is evidence or is shown to the other person.${
+        language === null
+          ? ""
+          : ` ${language} This applies to every line the person hears or reads; structured fields and codes stay as specified.`
+      }`,
       variables,
     });
     const messages = [...rendered.messages];

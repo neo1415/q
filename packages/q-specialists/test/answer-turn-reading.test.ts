@@ -1099,6 +1099,7 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           "CAPITAL_ACTION_PLAN",
           "CAPITAL_PLAN",
           "CAPITAL_INVESTORS",
+          "CRM_PIPELINE",
         ],
         documents: [],
         visibilityChange: false,
@@ -3176,6 +3177,139 @@ describe("a declared app action the reading names is done by code (ADR 0040, par
     ]);
   });
 
+  it("a reply read as 'do it again' still continues the waiting action with the zone, never repeats it without (live 2026-10-16: 'Lagos. Set both reminders.')", async () => {
+    const asked =
+      "Which city are you in, so Friday at 10:00 is right? Then I'll set the reminder.";
+    const first = {
+      title: "Review the cash forecast",
+      when: { day: "friday", time: "10:00" },
+    };
+    const reading = (kind: string, appAction: unknown, retryLast: boolean) =>
+      ({
+        kind,
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        handOver: null,
+        appAction,
+        askedAction: null,
+        reference: {
+          open: null,
+          name: null,
+          shown: null,
+          retryLast,
+          sameFor: null,
+        },
+      }) as unknown as TurnReaderResult;
+    let turn = 0;
+    const ran: TurnAppAction[] = [];
+    const run = seam({
+      said: "Set a reminder for Friday at 10am to review the cash forecast.",
+      reading: () =>
+        turn === 0
+          ? reading(
+              "TOOL_REQUEST",
+              { tool: "propose_reminder", arguments: first },
+              false,
+            )
+          : reading("ANSWER", null, true),
+      outcomes: [],
+      appActions: {
+        tools: new Set(["propose_reminder"]),
+        run: (_request, action) => {
+          ran.push(action);
+          return Promise.resolve(
+            ran.length === 1
+              ? { asks: asked, needs: "TIME_ZONE" }
+              : { prepared: "Reminder: Review the cash forecast" },
+          );
+        },
+      },
+      appActionArguments: () => Promise.resolve({}),
+    });
+    await run.answer.answer(request());
+    turn = 1;
+    (run.message as { content: string }).content = "Lagos. Set both reminders.";
+    await run.answer.answer(request());
+    expect(ran).toEqual([
+      { tool: "propose_reminder", arguments: first },
+      {
+        tool: "propose_reminder",
+        arguments: { ...first, timeZone: "Africa/Lagos" },
+      },
+    ]);
+  });
+
+  it("a city given to Q's own city question continues the reminder it was asked for (live 2026-10-16)", async () => {
+    const reading = (kind: string) =>
+      ({
+        kind,
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        handOver: null,
+        appAction: null,
+        askedAction: null,
+      }) as unknown as TurnReaderResult;
+    const ran: TurnAppAction[] = [];
+    const read: { tool: string; utterance: string }[] = [];
+    const run = seam({
+      said: "Lagos.",
+      earlier: [
+        {
+          role: "USER",
+          content:
+            "Set me a reminder for Friday at 10am to review the cash forecast.",
+        },
+        {
+          role: "Q",
+          content:
+            "Which city or time zone should I use for Friday at 10:00? I can also save it to your profile.",
+        },
+      ],
+      reading: () => reading("ANSWER"),
+      outcomes: [],
+      appActions: {
+        tools: new Set(["propose_reminder"]),
+        run: (_request, action) => {
+          ran.push(action);
+          return Promise.resolve({
+            prepared: "Reminder: Review the cash forecast",
+          });
+        },
+      },
+      appActionArguments: (_request, input) => {
+        read.push(input);
+        return Promise.resolve({
+          title: "Review the cash forecast",
+          when: { day: "friday", time: "10:00" },
+        });
+      },
+    });
+    await run.answer.answer(request());
+    expect(read).toEqual([
+      {
+        tool: "propose_reminder",
+        utterance:
+          "Set me a reminder for Friday at 10am to review the cash forecast.",
+      },
+    ]);
+    expect(ran).toEqual([
+      {
+        tool: "propose_reminder",
+        arguments: {
+          title: "Review the cash forecast",
+          when: { day: "friday", time: "10:00" },
+          timeZone: "Africa/Lagos",
+        },
+      },
+    ]);
+  });
+
   it("a legacy proposal tool's PREPARED output is a prepared card (QA run 4e3b1903)", async () => {
     const port = createToolAppActionPort({
       names: ["propose_express_interest"],
@@ -4461,13 +4595,14 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
 });
 
 describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)", () => {
-  const advice = (aboutNamedOther = false) =>
+  const advice = (aboutNamedOther = false, nextSteps = true) =>
     ({
       kind: "QUESTION_TO_Q",
       confidence: "HIGH",
       transcript: "CLEAR",
       question: { kind: "ADVICE", text: "what should I do next" },
       aboutNamedOther,
+      nextSteps,
       tool: null,
       handOver: null,
     }) as unknown as TurnReaderResult;
@@ -4505,6 +4640,22 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
     });
     await ready.answer.answer(request());
     expect(ready.leads).toEqual([undefined]);
+  });
+  it("not on advice that does not ask for next steps (live 2026-10-16: explain a SAFE)", async () => {
+    let asked = 0;
+    const safe = seam({
+      said: "اشرح لي باختصار ما هو SAFE",
+      reading: advice(false, false),
+      outcomes: [],
+      readinessLead: () => {
+        asked += 1;
+        return Promise.resolve(LEAD);
+      },
+    });
+    await safe.answer.answer(request());
+    expect(safe.leads).toEqual([undefined]);
+    // The readiness record is not even read for such a turn.
+    expect(asked).toBe(0);
   });
 });
 

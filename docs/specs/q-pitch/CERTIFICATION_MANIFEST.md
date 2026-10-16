@@ -286,3 +286,36 @@ Every other atlas feature currently has no certification entry and must not be p
   - **Fix (tour):** `claude/p-premiere-fix4-oct16`: on a company page, a tour question also waits until Q's subject is that company (`pageSettled`, with a test).
   - **Open (web, real users):** a person who asks right after opening a profile can send the previous page's subject. Either the page subject should follow the route at once, or the server should let the screen's company lead over a named one that contradicts it on a company route. That is a rule change, for the lead to decide.
 - The other three Q runs had Harbourline first: the comparison, the live question and the run-5 profile order are unchanged.
+
+## Premiere v5 acceptance run 7 — production `f688c48e` (release X), 16 Oct 2026 12:32–12:39 UTC (Lane P, lead-approved)
+
+- **Method:** as runs 3–6 (Playwright, savanna-seed, nothing blocked, microphone denied: standard voice). Receipts: scratchpad `v5-acc/run7/`, not committed.
+- **Result:** RUNNING 28 s after Start; **17 of 17 scenes complete, 0 fallbacks, 0 page or console errors, 0 speech refusals, in 6:52** (tour complete at 412 s); 60 narration lines; hand-over: the strip left by itself, Q on `/home`. The live question passed: paused, answered (run `cae4abff`), visible in the panel, resumed by itself.
+- **Scene 6: CERTIFIED (PRODUCTION_LIVE_VERIFIED, content and timing).** Run `bec093d3` (12:33:10). Subjects in order: Harbourline (`ceb6ec2d`), then Savanna's organisation; no stale feed card. Its answer opens "Harbourline Cargo provides port-to-warehouse container trucking for Lagos importers…" and states the fit with unknowns kept unknown (`scene-06.png`). The comparison (`f26b1723`) and the live question also carried Harbourline first.
+- **Certified scenes now: 15 of 17** in the main cut (every feature PRODUCTION_LIVE_VERIFIED). Not yet:
+  - **15, Q-to-Q rehearsal:** `REH-Q2Q-SHORT` waits on the microphone "skip" test, which only a human can run.
+  - **16, Capital Q's own profile:** `QP-SUBJECT` is CODE_VERIFIED. The scene completed in runs 3–7; promoting it needs a lead decision on its claims.
+- **Defect (cosmetic, not tour-specific):** the scene 6 answer showed a literal `\n\n` between paragraphs ("Apapa.\n\nThe fit…"). An escaped newline in the model's text reached the panel unrendered.
+- **Provider usage (estimate):** 4 Q text runs (top three, profile, comparison, live question), 1 short rehearsal, about 7 minutes of standard voice. Roughly $0.3–0.5.
+
+## Scene 16 (Capital Q's own profile): promoted, conditional on migration 20261228141700 (16 Oct, lead decision)
+
+- **Rule (lead):** Capital Q's profile may claim only what is on its record: pre-seed, bootstrapped, the USD 2M raise as a founder claim, and the product description. No verified traction, customers, revenue or investors; every claim labelled with its evidence status.
+- **Run 7 check (`scene-16.png` and the scene's narration):**
+  - Pre-seed; "$2M · Said in their pitch"; the product description; "Traction: Nothing stated in their pitch yet"; "Q's view · not verified".
+  - The narration calls the fundraising details the founders' own statements.
+  - No traction, customers, revenue or investors are claimed. Compliant, except one statement:
+- **The one breach:** the badge **"Demo verified (synthetic)"** under the name. Its source is data: Capital Q's organisation (`f95c3469…`) has a current `evidence.verification_claims` revision 2, VERIFIED by `SYNTHETIC_DEMO_ATTESTATION` (15 Oct 10:48 UTC, on a request from a synthetic-marked account).
+  - **Fix:** `supabase/migrations/20261228141700_capital_q_revoke_synthetic_attestation.sql` appends a REVOKED revision naming that row. It runs only while that attestation is current, updates and deletes nothing, and changes no grant or policy.
+  - **pgTAP:** `rls/972_capital_q_synthetic_revocation.test.sql`.
+- **Status:** `QP-SUBJECT` is **PRODUCTION_LIVE_VERIFIED once the migration is applied in production** and the profile shows no verification badge (a read-only check: the current revision is REVOKED). The ledger entry in `premiere.ts` stays CODE_VERIFIED until then, so no audience run shows the badge. With it, **16 of 17** scenes are certified; scene 15 waits on the human microphone test.
+
+## Scene 16 (Capital Q's own profile): PRODUCTION_LIVE_VERIFIED, production `6d7b521d` (release Y), 16 Oct 2026 about 13:10 UTC
+
+- **Hosted read:** Capital Q's organisation (`f95c3469…`) shows revision 3 REVOKED (`c3c9a446…`, 12:59 UTC, migration 20261228141700), ending the synthetic attestation (revision 2). Revisions 1 and 2 are kept unchanged.
+- **Browser, as savanna-seed (GET only on the profile; the tour in captions only):**
+  - `/company/ee75a7d8…` shows no "Demo verified (synthetic)" and no verification badge.
+  - Q Pitch reached scene 16 ("Capital Q, on its own platform · Scene 16 of 17 · Done on screen") on the same page, also without a badge.
+  - Receipts: scratchpad `v5-acc/badge/capital-q-profile.png` and `capital-q-scene16.png`.
+- **Ledger:** `QP-SUBJECT` promoted in `premiere.ts`. The forbidden list now names verified traction, customers, revenue and investors.
+- **Certified scenes: 16 of 17.** Scene 15 (Q-to-Q rehearsal) waits on the human microphone "skip" test.

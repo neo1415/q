@@ -1,8 +1,11 @@
+"use client";
+
 import { Suspense } from "react";
 
 import { PageContainer } from "@/components/app-shell/page-container";
 
 import { HubLoadingTabs } from "./hub-loading-tabs";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Loading shapes for the CRM (research 2026-10-15 §3.4): each block at its
@@ -52,15 +55,17 @@ function PanelShape({
   readonly label: string;
   readonly lead?: boolean;
 }) {
+  const t = useT();
+
   return (
     <div
-      className={`border border-(--cq-border-subtle) bg-(--cq-surface) ${lead ? "border-l-[3px] border-l-(--cq-border-strong)" : ""}`}
+      className={`border border-(--cq-border-subtle) bg-(--cq-surface) ${lead ? "border-s-[3px] border-s-(--cq-border-strong)" : ""}`}
     >
       <span className="flex min-h-[3.25rem] items-center border-b border-(--cq-border-subtle) px-4 sm:px-5">
         <span className={`${bar} h-4 w-28`} />
       </span>
       <div className="px-4 sm:px-5">
-        <Rows count={rows} label={label} ruled={false} />
+        <Rows count={rows} label={t(label)} ruled={false} />
       </div>
     </div>
   );
@@ -72,13 +77,15 @@ function PanelShape({
  * switch answers the click before the server does.
  */
 export function HubLoading() {
+  const t = useT();
+
   return (
     <PageContainer className="flex flex-col gap-6 sm:gap-8">
       <div
         className="flex flex-col gap-2"
         role="status"
         aria-busy="true"
-        aria-label="Loading your CRM"
+        aria-label={t("Loading your CRM")}
       >
         {/* The h1's line box and the tab strip at their real heights. */}
         <span className="flex min-h-8 items-center">
@@ -100,13 +107,15 @@ export function HubLoading() {
 
 /** A relationship record: back link, name and state line, tabs, two columns. */
 export function RecordLoading() {
+  const t = useT();
+
   return (
     <PageContainer>
       <div
         className="flex flex-col gap-6"
         role="status"
         aria-busy="true"
-        aria-label="Loading the relationship"
+        aria-label={t("Loading the relationship")}
       >
         <span className="flex min-h-11 items-center">
           <span className={`${bar} h-4 w-36`} />
@@ -120,8 +129,8 @@ export function RecordLoading() {
         </div>
         <span className={`${bar} h-4 w-2/3 max-w-md`} />
         <span className="flex min-h-11 items-end gap-1 border-b border-(--cq-border-subtle)">
-          <span className={`${bar} mb-3 ml-3 h-3.5 w-16`} />
-          <span className={`${bar} mb-3 ml-6 h-3.5 w-16`} />
+          <span className={`${bar} mb-3 ms-3 h-3.5 w-16`} />
+          <span className={`${bar} mb-3 ms-6 h-3.5 w-16`} />
         </span>
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-5">

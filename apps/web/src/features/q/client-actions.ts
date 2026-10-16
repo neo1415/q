@@ -21,6 +21,7 @@ import {
 } from "./control/navigation-lifecycle";
 import { currentRoute } from "./control/route-state";
 import { performUiAct, requestMove } from "./ui-act-controller";
+import { announceLanguage } from "@/features/i18n/language";
 
 /**
  * What the browser does when Q's answer carries a client action (R20/R33;
@@ -36,6 +37,11 @@ export type ClientActionEffects = {
   readonly openTab: (url: string) => boolean;
   readonly setQMotion: (motion: "full" | "calm" | "off") => void;
   readonly setVoice: (voice: "FEMALE" | "MALE") => void;
+  /**
+   * Multilingual Q: the language they just chose by telling Q, already
+   * saved; the screen follows it at once. Absent: nothing to switch.
+   */
+  readonly setLanguage?: ((language: "AUTO" | "en" | "ar") => void) | undefined;
   readonly signOut: () => void;
   /** Goes to an in-app path built below from the fixed route map. */
   readonly goTo: (path: string) => void;
@@ -140,6 +146,7 @@ const COMPANY_PROFILE_PAGES: readonly QRecordPage[] = [
 ];
 const COMPANY_PROFILE_TAB_NAMES: readonly string[] = [
   "overview",
+  "diligence",
   "elevator",
   "dataroom",
   "deck",
@@ -164,8 +171,15 @@ export function recordIntentPath(
   if (intent.page === "DAILY_EDITION") {
     return intent.anchor === undefined ? base : `${base}#${intent.anchor}`;
   }
-  if (intent.tab === undefined) return base;
   const safe = encodeURIComponent(intent.id.toLowerCase());
+  if (
+    intent.tab === undefined &&
+    intent.page === "COMPANY" &&
+    intent.section !== undefined
+  ) {
+    return `/company/${safe}?${new URLSearchParams({ tab: "overview", sub: intent.section }).toString()}`;
+  }
+  if (intent.tab === undefined) return base;
   const { page, tab } = intent;
   if (COMPANY_PROFILE_PAGES.includes(page)) {
     // The server checked the tab against the page (the contract); the
@@ -176,6 +190,11 @@ export function recordIntentPath(
       params.set("sub", intent.subTab.toLowerCase());
     }
     if (tab === "deck" && intent.viewer === "OPEN") params.set("open", "1");
+    // Lane ov: one section of the Overview; the page follows only the keys
+    // its own section list has.
+    if (tab === "overview" && intent.section !== undefined) {
+      params.set("sub", intent.section);
+    }
     return `/company/${safe}?${params.toString()}`;
   }
   if (!RELATIONSHIP_TAB_NAMES.includes(tab)) return base;
@@ -495,6 +514,9 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   setVoice: (voice) => {
     storeVoicePreference(voice);
   },
+  setLanguage: (language) => {
+    announceLanguage(language);
+  },
   // The Sign out button's own steps: forget which chats were open on this
   // tab, then the server action that ends the session and redirects.
   goTo: (path) => {
@@ -578,6 +600,9 @@ function performChecked(
       return true;
     case "SET_VOICE":
       effects.setVoice(action.voice);
+      return true;
+    case "SET_LANGUAGE":
+      effects.setLanguage?.(action.language);
       return true;
     case "SIGN_OUT":
       effects.signOut();

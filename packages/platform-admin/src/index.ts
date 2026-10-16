@@ -477,6 +477,7 @@ export type {
 export {
   checkSenderDomain,
   recordingEmailSender,
+  recipientLanguage,
   senderAddressOf,
   type DnsCheck,
   type DnsTxtResolver,

@@ -225,7 +225,7 @@ export function RehearsalReview({
               <h2 className="cq-title-sm text-(--cq-text-primary)">
                 Tips for meeting {name}
               </h2>
-              <ul className="cq-body-sm flex list-disc flex-col gap-1 pl-5 text-(--cq-text-secondary)">
+              <ul className="cq-body-sm flex list-disc flex-col gap-1 ps-5 text-(--cq-text-secondary)">
                 {review.tips.map((tip) => (
                   <li key={tip}>{tip}</li>
                 ))}

@@ -50,6 +50,7 @@ import {
   setOutlineAction,
   type OpenedFile,
 } from "./material-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Data room tab (overnight plan A3; design-a "dataroom-*" mockups).
@@ -116,7 +117,7 @@ function FolderHeader({
       type="button"
       onClick={onToggle}
       aria-expanded={open}
-      className="flex min-h-14 w-full items-center gap-3 py-3 text-left"
+      className="flex min-h-14 w-full items-center gap-3 py-3 text-start"
       data-folder={folder.code}
     >
       <span className="flex size-9 shrink-0 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
@@ -202,11 +203,12 @@ export function LockedDataRoom({
   readonly interest?: InterestDto | null | undefined;
   readonly relationshipState?: RelationshipStateV2 | null | undefined;
 }) {
+  const t = useT();
   const pending = locked.reason === "INTEREST_PENDING";
   return (
     <section
       className="flex flex-col gap-4 py-2"
-      aria-label="Data room"
+      aria-label={t("Data room")}
       data-data-room="investor-locked"
       data-locked-reason={locked.reason}
     >
@@ -243,7 +245,7 @@ export function LockedDataRoom({
       {locked.outline === null || locked.outline.length === 0 ? null : (
         <div className="flex flex-col gap-2" data-locked-outline>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            What&rsquo;s in it, folder by folder:
+            {t("What’s in it, folder by folder:")}
           </p>
           <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
             {locked.outline.map((folder) => (
@@ -308,6 +310,7 @@ function ConnectedDataRoom({
   readonly companyName: string;
   readonly view: DataRoomInvestorView;
 }) {
+  const t = useT();
   const [filter, setFilter] = useState<Filter>("ALL");
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const [asking, setAsking] = useState<DataRoomInvestorDocument | "ALL" | null>(
@@ -350,9 +353,9 @@ function ConnectedDataRoom({
           Nothing in {companyName}&rsquo;s data room is open to you yet.
         </p>
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Documents they share with you, or list for you to request, appear
-          here. Nothing here means nothing is shared with you yet, not that
-          nothing exists.
+          {t(
+            "Documents they share with you, or list for you to request, appear here. Nothing here means nothing is shared with you yet, not that nothing exists.",
+          )}
         </p>
       </div>
     );
@@ -368,7 +371,7 @@ function ConnectedDataRoom({
   return (
     <section
       className="flex flex-col gap-4"
-      aria-label="Data room"
+      aria-label={t("Data room")}
       data-data-room="investor"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -383,14 +386,14 @@ function ConnectedDataRoom({
             className={buttonClassName("secondary", "regular")}
             onClick={() => setAsking("ALL")}
           >
-            Request all on-request documents
+            {t("Request all on-request documents")}
           </button>
         ) : null}
       </div>
       <div
         className="relative flex gap-2 overflow-x-auto pb-1"
         role="group"
-        aria-label="Show"
+        aria-label={t("Show")}
       >
         {FILTERS.map(([value, label]) => (
           <button
@@ -443,7 +446,7 @@ function ConnectedDataRoom({
                   {inFolder.map((document) => (
                     <li
                       key={document.documentId}
-                      className="flex items-start gap-3 py-3 pl-1"
+                      className="flex items-start gap-3 py-3 ps-1"
                       data-room-document={document.access}
                     >
                       <FileText
@@ -505,7 +508,7 @@ function ConnectedDataRoom({
                           )}
                           onClick={() => open(document)}
                         >
-                          Open
+                          {t("Open")}
                         </button>
                       ) : document.access === "REQUESTED" ? (
                         <span className="cq-caption inline-flex min-h-11 items-center gap-1 text-(--cq-text-secondary)">
@@ -525,7 +528,7 @@ function ConnectedDataRoom({
                           )}
                           onClick={() => setAsking(document)}
                         >
-                          Request
+                          {t("Request")}
                         </button>
                       )}
                     </li>
@@ -578,6 +581,7 @@ function RequestSheet({
   readonly onClose: () => void;
   readonly onSent: (target: DataRoomInvestorDocument | "ALL") => void;
 }) {
+  const t = useT();
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -631,13 +635,16 @@ function RequestSheet({
                 maxLength={1000}
                 rows={3}
                 onChange={(event) => setNote(event.target.value)}
-                placeholder="For example: we're preparing for our investment committee on 20 October."
+                placeholder={t(
+                  "For example: we're preparing for our investment committee on 20 October.",
+                )}
                 className="cq-body border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
               />
             </label>
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              The founders will see your name, your firm and your note.
-              You&rsquo;ll get a message here when they answer.
+              {t(
+                "The founders will see your name, your firm and your note. You’ll get a message here when they answer.",
+              )}
             </p>
             {error === null ? null : (
               <p role="alert" className="cq-body-sm text-(--cq-text-primary)">
@@ -651,14 +658,14 @@ function RequestSheet({
                 onClick={send}
                 className={buttonClassName("primary", "large")}
               >
-                Send request
+                {t("Send request")}
               </button>
               <button
                 type="button"
                 onClick={onClose}
                 className={buttonClassName("quiet", "large")}
               >
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </div>
@@ -752,6 +759,7 @@ export function OwnerDataRoom({
    */
   readonly inDocuments?: boolean | undefined;
 }) {
+  const t = useT();
   const [documents, setDocuments] = useState(view.documents);
   const [closed, setClosed] = useState<ReadonlySet<string>>(
     new Set(view.folders.map((folder) => folder.code).slice(3)),
@@ -895,18 +903,20 @@ export function OwnerDataRoom({
             id="data-room-title"
             className="cq-title-md text-(--cq-text-primary)"
           >
-            Data room
+            {t("Data room")}
           </h2>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            What investors can see, folder by folder. You choose for each
-            document. Investors see it once you accept their interest.
+            {t(
+              "What investors can see, folder by folder. You choose for each document. Investors see it once you accept their interest.",
+            )}
           </p>
         </div>
         <Link
           href={inDocuments ? "/documents?tab=mine" : "/documents"}
           className={buttonClassName("primary", "regular")}
         >
-          <Upload size={ICON_SIZE.compact} aria-hidden="true" /> Upload files
+          <Upload size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+          {t("Upload files")}
         </Link>
       </div>
 
@@ -916,7 +926,7 @@ export function OwnerDataRoom({
       >
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="cq-body-sm text-(--cq-text-primary)">
-            Before you connect
+            {t("Before you connect")}
           </p>
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {outline
@@ -933,13 +943,13 @@ export function OwnerDataRoom({
         >
           {outline ? (
             <>
-              <EyeOff size={ICON_SIZE.compact} aria-hidden="true" /> Hide folder
-              names
+              <EyeOff size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+              {t("Hide folder names")}
             </>
           ) : (
             <>
-              <Eye size={ICON_SIZE.compact} aria-hidden="true" /> Show folder
-              names
+              <Eye size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+              {t("Show folder names")}
             </>
           )}
         </button>
@@ -964,7 +974,7 @@ export function OwnerDataRoom({
           </div>
           {missing.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              Everything investors usually ask for at this stage is here.
+              {t("Everything investors usually ask for at this stage is here.")}
             </p>
           ) : (
             <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -992,7 +1002,7 @@ export function OwnerDataRoom({
             href="/documents?tab=requested"
             className="text-(--cq-text-primary) underline underline-offset-2"
           >
-            Answer on Requested
+            {t("Answer on Requested")}
           </Link>
         </p>
       ) : (
@@ -1004,7 +1014,7 @@ export function OwnerDataRoom({
             id="waiting-title"
             className="cq-title-sm text-(--cq-text-primary)"
           >
-            Waiting for you
+            {t("Waiting for you")}
           </h3>
           <ul className="flex flex-col gap-2">
             {waiting.map((request) => (
@@ -1029,7 +1039,7 @@ export function OwnerDataRoom({
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="cq-caption flex items-center gap-1 text-(--cq-text-secondary)">
-                    <span className="sr-only">How long</span>
+                    <span className="sr-only">{t("How long")}</span>
                     <select
                       value={
                         days[request.requestId] ?? DATA_ROOM_GRANT_DEFAULT_DAYS
@@ -1059,7 +1069,7 @@ export function OwnerDataRoom({
                       "min-h-11",
                     )}
                   >
-                    Share
+                    {t("Share")}
                   </button>
                   <button
                     type="button"
@@ -1071,7 +1081,7 @@ export function OwnerDataRoom({
                       "min-h-11",
                     )}
                   >
-                    Not now
+                    {t("Not now")}
                   </button>
                 </div>
               </li>
@@ -1087,7 +1097,7 @@ export function OwnerDataRoom({
 
       {documents.length === 0 && missing.length === 0 ? (
         <p className="cq-body text-(--cq-text-secondary)">
-          Nothing here yet. Upload anything; you decide who sees it.
+          {t("Nothing here yet. Upload anything; you decide who sees it.")}
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-t border-(--cq-border-subtle)">
@@ -1131,9 +1141,9 @@ export function OwnerDataRoom({
                     >
                       <Users size={ICON_SIZE.compact} aria-hidden="true" />
                       <span className="hidden sm:inline">
-                        Who can see this folder
+                        {t("Who can see this folder")}
                       </span>
-                      <span className="sm:hidden">Access</span>
+                      <span className="sm:hidden">{t("Access")}</span>
                     </button>
                   )}
                 </div>
@@ -1142,7 +1152,7 @@ export function OwnerDataRoom({
                     {inFolder.map((document) => (
                       <li
                         key={document.documentId}
-                        className="flex flex-col gap-2 py-3 pl-1 lg:flex-row lg:items-center"
+                        className="flex flex-col gap-2 py-3 ps-1 lg:flex-row lg:items-center"
                         data-owner-document={document.level}
                       >
                         <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -1220,7 +1230,7 @@ export function OwnerDataRoom({
                             )}
                             data-document-access={document.documentId}
                           >
-                            Access
+                            {t("Access")}
                           </button>
                         )}
                       </li>
@@ -1228,7 +1238,7 @@ export function OwnerDataRoom({
                     {gaps.map((item) => (
                       <li
                         key={item.code}
-                        className="flex items-center gap-3 py-3 pl-1"
+                        className="flex items-center gap-3 py-3 ps-1"
                         data-checklist-gap={item.code}
                       >
                         <Plus
@@ -1241,7 +1251,7 @@ export function OwnerDataRoom({
                             {item.label}
                           </p>
                           <p className="cq-caption text-(--cq-text-tertiary)">
-                            Usually expected
+                            {t("Usually expected")}
                           </p>
                         </div>
                         <Link
@@ -1252,7 +1262,7 @@ export function OwnerDataRoom({
                             "min-h-11",
                           )}
                         >
-                          Add
+                          {t("Add")}
                         </Link>
                       </li>
                     ))}

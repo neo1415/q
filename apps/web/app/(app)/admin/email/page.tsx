@@ -8,8 +8,12 @@ import { EmptyState, ErrorState, InlineNotice } from "@capital-q/ui/states";
 import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
 import { when, words } from "@/features/admin/words";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Email · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Email · Admin") };
+}
 
 const STATUS_WORDS = {
   PASS: "Set up",
@@ -28,6 +32,8 @@ export default async function AdminEmailPage({
 }: {
   readonly searchParams: Promise<{ readonly refresh?: string | undefined }>;
 }) {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("email.read")) notFound();
   const refresh = (await searchParams).refresh === "1";
@@ -35,8 +41,8 @@ export default async function AdminEmailPage({
   if (panel === null) {
     return (
       <ErrorState
-        title="Email status couldn't load"
-        description="Try again in a moment."
+        title={t("Email status couldn't load")}
+        description={t("Try again in a moment.")}
       />
     );
   }
@@ -44,41 +50,46 @@ export default async function AdminEmailPage({
     <div className="flex flex-col gap-10">
       <PageSection
         id="sender"
-        title="Sender"
-        description="Capital Q's own emails: reminders, briefs and notices."
+        title={t("Sender")}
+        description={t(
+          "Capital Q's own emails: reminders, briefs and notices.",
+        )}
       >
         <div className="flex flex-col gap-4">
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-1">
-              <dt className="cq-caption text-(--cq-text-secondary)">From</dt>
+              <dt className="cq-caption text-(--cq-text-secondary)">
+                {t("From")}
+              </dt>
               <dd className="cq-body break-all text-(--cq-text-primary)">
-                {panel.sender ?? "Not stated"}
+                {panel.sender ?? t("Not stated")}
               </dd>
             </div>
             <div className="flex flex-col gap-1">
               <dt className="cq-caption text-(--cq-text-secondary)">
-                Sent through
+                {t("Sent through")}
               </dt>
               <dd className="cq-body text-(--cq-text-primary)">
-                {PROVIDER_WORDS[panel.provider]}
+                {t(PROVIDER_WORDS[panel.provider])}
               </dd>
             </div>
             <div className="flex flex-col gap-1">
               <dt className="cq-caption text-(--cq-text-secondary)">
-                Domain checked
+                {t("Domain checked")}
               </dt>
               <dd className="cq-body text-(--cq-text-primary)">
-                {when(panel.checkedAt)}
+                {t(when(panel.checkedAt))}
               </dd>
             </div>
           </dl>
           {panel.freeMailbox ? (
             <InlineNotice
               tone="warning"
-              title="Emails are likely to land in spam"
+              title={t("Emails are likely to land in spam")}
             >
-              The sender is a free mailbox. Verify a domain you own in Brevo
-              (SPF, DKIM, DMARC) and set SMTP_SENDER to an address on it.
+              {t(
+                "The sender is a free mailbox. Verify a domain you own in Brevo (SPF, DKIM, DMARC) and set SMTP_SENDER to an address on it.",
+              )}
             </InlineNotice>
           ) : null}
           {panel.checks.length === 0 ? null : (
@@ -86,10 +97,10 @@ export default async function AdminEmailPage({
               {panel.checks.map((check) => (
                 <li key={check.name} className="flex flex-col gap-0.5">
                   <span className="cq-body-sm font-medium text-(--cq-text-primary)">
-                    {check.name}: {STATUS_WORDS[check.status]}
+                    {check.name}: {t(STATUS_WORDS[check.status])}
                   </span>
                   <span className="cq-caption break-all text-(--cq-text-secondary)">
-                    {check.detail}
+                    {t(check.detail)}
                   </span>
                 </li>
               ))}
@@ -99,17 +110,17 @@ export default async function AdminEmailPage({
             href="/admin/email?refresh=1"
             className="cq-body-sm inline-flex min-h-11 items-center self-start underline underline-offset-4"
           >
-            Check DNS again
+            {t("Check DNS again")}
           </Link>
         </div>
       </PageSection>
 
-      <PageSection id="deliveries" title="Last 30 days">
+      <PageSection id="deliveries" title={t("Last 30 days")}>
         {panel.deliveries.length === 0 ? (
           <EmptyState
             compact
-            title="No emails recorded yet"
-            description="Sends are counted from when this panel was added."
+            title={t("No emails recorded yet")}
+            description={t("Sends are counted from when this panel was added.")}
           />
         ) : (
           <ul className="flex flex-col gap-1">
@@ -118,9 +129,9 @@ export default async function AdminEmailPage({
                 key={row.source}
                 className="cq-body-sm flex justify-between gap-3 text-(--cq-text-primary)"
               >
-                <span>{words(row.source)}</span>
+                <span>{t(words(row.source))}</span>
                 <span className="tabular-nums">
-                  {row.sent} sent · {row.failed} failed
+                  {row.sent} {t("sent ·")} {row.failed} {t("failed")}
                 </span>
               </li>
             ))}
@@ -128,9 +139,9 @@ export default async function AdminEmailPage({
         )}
       </PageSection>
 
-      <PageSection id="failures" title="Recent failures">
+      <PageSection id="failures" title={t("Recent failures")}>
         {panel.recentFailures.length === 0 ? (
-          <EmptyState compact title="No failures" />
+          <EmptyState compact title={t("No failures")} />
         ) : (
           <ul className="flex flex-col gap-1">
             {panel.recentFailures.map((row, index) => (
@@ -138,8 +149,8 @@ export default async function AdminEmailPage({
                 key={`${row.at}-${String(index)}`}
                 className="cq-body-sm text-(--cq-text-primary)"
               >
-                {words(row.source)} to {row.recipientDomain}:{" "}
-                {words(row.errorClass)} · {when(row.at)}
+                {t(words(row.source))} {t("to")} {t(row.recipientDomain)}:{" "}
+                {t(words(row.errorClass))} · {t(when(row.at))}
               </li>
             ))}
           </ul>

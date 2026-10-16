@@ -99,9 +99,7 @@ export function ProfileRows({
           className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-3"
         >
           <dt className="cq-label text-(--cq-text-secondary)">{term}</dt>
-          <dd className="cq-body text-right text-(--cq-text-primary)">
-            {value}
-          </dd>
+          <dd className="cq-body text-end text-(--cq-text-primary)">{value}</dd>
         </div>
       ))}
     </dl>
@@ -125,7 +123,7 @@ export function PitchQuote({
     claim.pitchTitle === null ? "Pitch video" : `“${claim.pitchTitle}”`;
   return (
     <blockquote
-      className="flex flex-col gap-1 border-l-2 border-(--cq-border) pl-3"
+      className="flex flex-col gap-1 border-s-2 border-(--cq-border) ps-3"
       data-pitch-claim={claim.kind}
     >
       <p className="cq-body text-(--cq-text-primary)">

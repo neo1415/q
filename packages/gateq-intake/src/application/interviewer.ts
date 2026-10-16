@@ -14,6 +14,8 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   personalityOf,
   renderPrompt,
+  supportedLanguageOf,
+  writtenLanguageNote,
   GateQInterviewerResultSchema,
   GateQTurnIntentSchema,
   type GateQInterviewerResult,
@@ -87,6 +89,11 @@ export type InterviewTurnInput = {
   /** PUBLIC before an application exists; APPLICATION once it does. */
   readonly stage: "PUBLIC" | "APPLICATION";
   readonly channel: InterviewChannel;
+  /**
+   * Lane ml: the applicant's language (BCP 47) when known, e.g. from the
+   * video room they opened. Absent: the language of what they wrote.
+   */
+  readonly locale?: string | undefined;
   /** What the world may see of this gateway. Never the private policy. */
   readonly publicGateway: PublicGateway;
   /** Absent in PUBLIC stage. */
@@ -240,6 +247,41 @@ function renderPublicGateway(gateway: PublicGateway): string {
     .join("\n");
 }
 
+/** Share of an utterance's letters that are Arabic script. */
+function arabicShare(text: string): number {
+  const letters = text.match(/\p{L}/gu)?.length ?? 0;
+  if (letters === 0) return 0;
+  return (text.match(/[\u0600-\u06FF\u0750-\u077F]/gu)?.length ?? 0) / letters;
+}
+
+/**
+ * Lane ml: the language Q asks in. The applicant's stated language wins;
+ * otherwise what they last wrote or said, read from its script by code
+ * (an Arabic answer is asked in Arabic, an English one in English). Fund
+ * names, figures and terms stay as recorded in either.
+ */
+export function interviewLanguageOf(
+  input: Pick<InterviewTurnInput, "locale" | "utterance" | "recentTurns">,
+): "ar" | null {
+  const stated = supportedLanguageOf(input.locale);
+  if (stated !== null) return stated === "ar" ? "ar" : null;
+  const lastSaid =
+    input.utterance.trim().length > 0
+      ? input.utterance
+      : ([...input.recentTurns].reverse().find((t) => t.role === "person")
+          ?.text ?? "");
+  return arabicShare(lastSaid) > 0.5 ? "ar" : null;
+}
+
+function interviewLanguageNote(
+  input: Pick<InterviewTurnInput, "locale" | "utterance" | "recentTurns">,
+): string {
+  const note = writtenLanguageNote(interviewLanguageOf(input));
+  return note === null
+    ? ""
+    : ` ${note} Ask every question and say every reply in Arabic; the fund's name, the gateway's criteria as named, amounts and currencies stay exactly as recorded.`;
+}
+
 export function createGateQInterviewer(
   dependencies: InterviewerDependencies,
 ): GateQInterviewer {
@@ -345,8 +387,7 @@ export function createGateQInterviewer(
         charter: "Q_SYSTEM_VOICE",
         operatingMode: "ASSESSMENT",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
-        environmentNotes:
-          "You cannot record, decide or send anything yourself; Capital Q validates what you read and its own rules decide whether an application qualifies.",
+        environmentNotes: `You cannot record, decide or send anything yourself; Capital Q validates what you read and its own rules decide whether an application qualifies.${interviewLanguageNote(input)}`,
         variables,
       });
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { QLanguagePreferenceSchema } from "./conduct.js";
 import { QUiActIntentSchema } from "./ui-act.js";
 import { UuidSchema } from "../common/ids.js";
 import { StageCodeSchema } from "../http/companies.js";
@@ -39,6 +40,7 @@ export const Q_UI_INTENT_KINDS = [
   "OPEN_WEBSITE",
   "SET_Q_MOTION",
   "SET_VOICE",
+  "SET_LANGUAGE",
   "SIGN_OUT",
   "OPEN_RECORD_PAGE",
   "OPEN_SETUP",
@@ -173,6 +175,8 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "CAPITAL_ACTION_PLAN",
   "CAPITAL_PLAN",
   "CAPITAL_INVESTORS",
+  // Lane ov 2026-10-16: the CRM's Pipeline tab ("open the pipeline").
+  "CRM_PIPELINE",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];
@@ -254,6 +258,20 @@ export const QSetQMotionIntentSchema = z
  * sets it. The same two values as `Q_VOICE_CHOICES` (voice.ts), restated
  * because voice.ts reads this module's schemas at load time.
  */
+/**
+ * Multilingual Q: the language the person just chose by telling Q, already
+ * saved by the server (set_q_language). The screen switches language and
+ * direction at once, without a reload; Settings and every later reply read
+ * the same saved choice.
+ */
+export const QSetLanguageIntentSchema = z
+  .object({
+    kind: z.literal("SET_LANGUAGE"),
+    language: QLanguagePreferenceSchema,
+  })
+  .strict();
+export type QSetLanguageIntent = z.infer<typeof QSetLanguageIntentSchema>;
+
 export const QSetVoiceIntentSchema = z
   .object({
     kind: z.literal("SET_VOICE"),
@@ -328,6 +346,9 @@ export type QRecordPage = z.infer<typeof QRecordPageSchema>;
  */
 export const Q_COMPANY_PROFILE_TABS = [
   "overview",
+  // Lane ov 2026-10-16: the profile's Diligence tab (questions, evidence,
+  // risks); a relationship page has its own "diligence" tab too.
+  "diligence",
   "elevator",
   "dataroom",
   "deck",
@@ -338,10 +359,19 @@ export const Q_RELATIONSHIP_TABS = [
   "calls",
   "diligence",
 ] as const satisfies readonly QManifestTab[];
+/** Both lists, each tab once ("diligence" is on both pages). */
 export const Q_RECORD_TABS = [
-  ...Q_COMPANY_PROFILE_TABS,
-  ...Q_RELATIONSHIP_TABS,
-] as const;
+  "overview",
+  "diligence",
+  "elevator",
+  "dataroom",
+  "deck",
+  "team",
+  "messages",
+  "calls",
+] as const satisfies readonly (
+  (typeof Q_COMPANY_PROFILE_TABS)[number] | (typeof Q_RELATIONSHIP_TABS)[number]
+)[];
 export const QRecordTabSchema = z.enum(Q_RECORD_TABS);
 export type QRecordTab = z.infer<typeof QRecordTabSchema>;
 
@@ -370,6 +400,17 @@ export function recordPageHasTab(page: QRecordPage, tab: QRecordTab): boolean {
   return false;
 }
 
+/**
+ * Lane ov 2026-10-16: one section of a company profile's Overview (the
+ * founder profile's standard sections, `FOUNDER_PROFILE_SECTIONS` in
+ * @capital-q/founder-onboarding), by its key. An identifier, never text:
+ * the list itself is versioned there, so the contract bounds the shape and
+ * the browser follows only keys its own copy of the list has.
+ */
+export const QProfileSectionKeySchema = z
+  .string()
+  .regex(/^[a-z][a-z0-9_]{0,47}$/u);
+
 /** An element id inside a Q Daily edition page (story or section). */
 export const QDailyAnchorSchema = z
   .string()
@@ -388,6 +429,8 @@ export const QOpenRecordPageIntentSchema = z
     tab: QRecordTabSchema.optional(),
     /** N2: a section of the pitch deck's read (a deck sub-tab). */
     subTab: DeckSectionCodeSchema.optional(),
+    /** Lane ov: one section of the profile's Overview (the overview tab only). */
+    section: QProfileSectionKeySchema.optional(),
     /** N2: open the deck in its viewer at once (the deck tab only). */
     viewer: z.literal("OPEN").optional(),
     /**
@@ -420,6 +463,16 @@ export const QOpenRecordPageIntentSchema = z
     {
       message: "a sub-tab and the viewer belong to the deck tab",
       path: ["subTab"],
+    },
+  )
+  .refine(
+    (intent) =>
+      intent.section === undefined ||
+      intent.tab === "overview" ||
+      (intent.tab === undefined && intent.page === "COMPANY"),
+    {
+      message: "a profile section belongs to the overview tab",
+      path: ["section"],
     },
   );
 
@@ -751,6 +804,7 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QOpenWebsiteIntentSchema,
   QSetQMotionIntentSchema,
   QSetVoiceIntentSchema,
+  QSetLanguageIntentSchema,
   QSignOutIntentSchema,
   QOpenSetupIntentSchema,
   QOpenSettingsIntentSchema,
@@ -837,6 +891,7 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "dismiss_reminder",
   "set_notification_settings",
   "set_q_personality",
+  "set_q_language",
   // ADR 0050: their own speaking guide, versioned in Settings. (Removing it
   // deletes every version, so it is prepared for approval: RECOVERY-2026-10.)
   "set_my_speaking_guide",
@@ -882,6 +937,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QOpenWebsiteIntentSchema,
   QSetQMotionIntentSchema,
   QSetVoiceIntentSchema,
+  QSetLanguageIntentSchema,
   QSignOutIntentSchema,
   QOpenRecordPageIntentSchema,
   QOpenSetupIntentSchema,

@@ -122,7 +122,7 @@ export function UsageView({ usage }: { readonly usage: QUsageDto }) {
                     }}
                   />
                 </span>
-                <span className="cq-numeric text-right text-(--cq-text-secondary)">
+                <span className="cq-numeric text-end text-(--cq-text-secondary)">
                   {dollars(row.usd)}
                 </span>
               </li>
@@ -145,20 +145,14 @@ export function UsageView({ usage }: { readonly usage: QUsageDto }) {
           <div className="relative overflow-x-auto">
             <table className="cq-body-sm w-full border-collapse">
               <thead>
-                <tr className="cq-caption text-left text-(--cq-text-secondary)">
+                <tr className="cq-caption text-start text-(--cq-text-secondary)">
                   <th scope="col" className="px-5 py-2.5 font-medium">
                     Purpose
                   </th>
-                  <th
-                    scope="col"
-                    className="px-3 py-2.5 text-right font-medium"
-                  >
+                  <th scope="col" className="px-3 py-2.5 text-end font-medium">
                     Cost
                   </th>
-                  <th
-                    scope="col"
-                    className="px-5 py-2.5 text-right font-medium"
-                  >
+                  <th scope="col" className="px-5 py-2.5 text-end font-medium">
                     Share
                   </th>
                 </tr>
@@ -171,14 +165,14 @@ export function UsageView({ usage }: { readonly usage: QUsageDto }) {
                   >
                     <th
                       scope="row"
-                      className="px-5 py-3 text-left font-normal text-(--cq-text-primary)"
+                      className="px-5 py-3 text-start font-normal text-(--cq-text-primary)"
                     >
                       {taskName(row.purpose)}
                     </th>
-                    <td className="px-3 py-3 text-right text-(--cq-text-primary)">
+                    <td className="px-3 py-3 text-end text-(--cq-text-primary)">
                       {dollars(row.usd)}
                     </td>
-                    <td className="px-5 py-3 text-right text-(--cq-text-secondary)">
+                    <td className="px-5 py-3 text-end text-(--cq-text-secondary)">
                       {totalUsd > 0
                         ? `${String(Math.round((Number(row.usd) / totalUsd) * 100))}%`
                         : "—"}

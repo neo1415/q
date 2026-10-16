@@ -11,6 +11,7 @@ import { qRef } from "@/features/q/q-ref";
 
 import { CompanyPitch } from "./company-pitch";
 import { undoPassAction } from "./feed/feed-actions";
+import { useT } from "@/features/i18n/language";
 
 export type PassedCompanyRow = {
   readonly companyId: string;
@@ -35,6 +36,7 @@ export function PassedCompanies({
 }: {
   readonly companies: readonly PassedCompanyRow[];
 }) {
+  const t = useT();
   const [undone, setUndone] = useState<ReadonlySet<string>>(new Set());
   const [pending, setPending] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -98,7 +100,7 @@ export function PassedCompanies({
                     className="cq-body-sm text-(--cq-text-secondary)"
                     aria-live="polite"
                   >
-                    Back in Discover from your next page
+                    {t("Back in Discover from your next page")}
                   </span>
                 ) : (
                   <Button
@@ -106,7 +108,7 @@ export function PassedCompanies({
                     disabled={pending === company.companyId}
                     onClick={() => void undo(company.companyId)}
                   >
-                    Undo pass
+                    {t("Undo pass")}
                   </Button>
                 )}
               </div>

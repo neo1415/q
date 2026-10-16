@@ -15,7 +15,9 @@ import type { MandateDimension } from "@capital-q/q-core";
 import type { TenantId } from "@capital-q/security";
 
 import {
+  BUSINESS_MODEL_VOCABULARIES,
   CURRENCY_OPTIONS,
+  CUSTOMER_TYPE_VOCABULARIES,
   DISCOVERY_MODE_OPTIONS,
   INVESTOR_COVERAGE_PROFILE,
   INVESTOR_DOCUMENT_FIELDS,
@@ -150,6 +152,8 @@ export type MandateReviewServiceDependencies = {
       readonly sourceId: string;
     }[];
     readonly confidence: string | null;
+    /** What the person should know about the proposal (e.g. names not matched). */
+    readonly rationale?: string | null | undefined;
   }) => Promise<unknown>;
   readonly recordQuestions: (command: {
     readonly sessionId: string;
@@ -174,8 +178,8 @@ export type MandateReviewServiceDependencies = {
   readonly logger?: Logger | undefined;
   /**
    * Lane ob1: an investor's own fund deck or investment thesis, read by
-   * the same path as their narrative. Structural ports (the evidence and
-   * knowledge repositories satisfy them). Absent: uploads are not read.
+   * the same path as their narrative. Structural ports (the evidence
+   * repositories satisfy them). Absent: uploads are not read.
    */
   readonly documents?:
     | {
@@ -187,23 +191,52 @@ export type MandateReviewServiceDependencies = {
           readonly documentType: string;
           readonly sensitivityClass: string;
           readonly companyId: string | null;
+          readonly ownerOrganisationId: string | null;
           readonly createdByUserId: string;
         } | null>;
       }
     | undefined;
-  readonly chunks?:
+  /**
+   * The document's own extracted text, page by page (evidence pages,
+   * written with the extraction). Not the knowledge passages: those are cut
+   * only for a company's documents and feed retrieval, and a firm's fund
+   * deck has no company (ob2 2026-10-16). Scoped by the owning
+   * organisation, so naming another organisation's document reads nothing.
+   */
+  readonly pages?:
     | {
-        readonly listActiveByVersion: (
+        readonly listByVersion: (
           executor: DatabaseExecutor,
           tenantId: TenantId,
-          documentVersionId: never,
-        ) => Promise<readonly { readonly content: string }[]>;
+          document: {
+            readonly documentId: string;
+            readonly documentVersionId: string;
+            readonly ownerOrganisationId: string;
+          },
+        ) => Promise<readonly { readonly text: string }[]>;
+      }
+    | undefined;
+  /**
+   * The same document's text from its stored extraction, for a document
+   * with no pages (a Word or plain-text thesis). Asked only when the pages
+   * hold nothing, and only after the type, firm and session checks; scoped
+   * by the same tenant, document, version and owner.
+   */
+  readonly extractionText?:
+    | {
+        readonly read: (document: {
+          readonly tenantId: string;
+          readonly documentId: string;
+          readonly documentVersionId: string;
+          readonly ownerOrganisationId: string;
+          readonly maxChars: number;
+        }) => Promise<string>;
       }
     | undefined;
 };
 
-/** How much of an investor document is read: the first passages, bounded. */
-const DOCUMENT_PASSAGES = 24;
+/** How much of an investor document is read: the first pages, bounded. */
+const DOCUMENT_PAGES = 24;
 const DOCUMENT_CHARS = 12_000;
 
 export type MandateReview = {
@@ -340,6 +373,9 @@ const STEP_FOR_DIMENSION: Readonly<Partial<Record<MandateDimension, string>>> =
     geography: INVESTOR_STEPS.geography,
     sectors: INVESTOR_STEPS.sectors,
     sectors_avoid: INVESTOR_STEPS.sectorsAvoid,
+    business_models: INVESTOR_STEPS.businessModels,
+    customer_types: INVESTOR_STEPS.customerTypes,
+    custom_criteria: INVESTOR_STEPS.customCriteria,
     hard_exclusions: INVESTOR_STEPS.hardExclusions,
     discovery_mode: INVESTOR_STEPS.discoveryMode,
   };
@@ -357,7 +393,89 @@ type Draft = {
   readonly targetField: string;
   readonly value: OnboardingResponseValue;
   readonly confidence: string | null;
+  /** Shown with the proposal: e.g. the names that matched nothing. */
+  readonly rationale?: string | undefined;
 };
+
+/**
+ * The names in a list as the investor wrote it ("Kenya, Nigeria and
+ * Ghana", "East Africa: Kenya, Tanzania, Uganda"), one per entry. A label
+ * before a colon introduces the list and is not itself an entry; a
+ * leading "in"/"across" phrase is the sentence, not the name. Nothing is
+ * guessed: each entry is still resolved on its own, and what does not
+ * resolve is reported, never dropped.
+ */
+export function splitNameList(
+  value: string,
+  options: { readonly stripLeadIn?: boolean } = {},
+): readonly string[] {
+  const stripLeadIn = options.stripLeadIn ?? true;
+  const colon = value.indexOf(":");
+  const listed =
+    colon >= 0 && value.slice(colon + 1).trim().length > 0
+      ? value.slice(colon + 1)
+      : value;
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const raw of listed.split(
+    /\s*(?:[,;/&\n•·()]|\band\b|\bor\b|\bplus\b)\s*/i,
+  )) {
+    const name = (
+      stripLeadIn
+        ? raw
+            .replace(/^.*\b(?:in|across|throughout|from)\s+/i, "")
+            .replace(/^(?:the|also|only)\s+/i, "")
+        : raw
+    )
+      .replace(/[.!?:]+$/, "")
+      .trim();
+    if (
+      name.length < 2 ||
+      name.length > 80 ||
+      /^(?:etc|others?)$/i.test(name)
+    ) {
+      continue;
+    }
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
+}
+
+/** "Not matched: Atlantis, Narnia." for a proposal; undefined when all matched. */
+function unmatchedNote(names: readonly string[]): string | undefined {
+  if (names.length === 0) return undefined;
+  const listed = names.join(", ");
+  return `Not matched to Capital Q's list, so not included: ${listed}.`.slice(
+    0,
+    300,
+  );
+}
+
+/**
+ * Portfolio company names the investor's own text lists after the word
+ * "portfolio" ("Portfolio: Kijani Ledger, Savanna Freight Desk";
+ * "our portfolio includes A and B"). Deterministic and verbatim: names
+ * only, up to five, nothing looked up or linked.
+ */
+export function portfolioNames(text: string): readonly string[] {
+  const names: string[] = [];
+  const pattern =
+    /\bportfolio\b(?:\s+compan(?:y|ies))?(?:\s*\([^)]*\))?\s*(?::|-|–|—|\binclud(?:es|ing|e)\b|\bsuch as\b)\s*([^\n.]+)/gi;
+  for (const match of text.matchAll(pattern)) {
+    // A company's own name is kept whole ("Made in Africa Ltd").
+    for (const name of splitNameList(match[1] ?? "", { stripLeadIn: false })) {
+      if (!/^\p{Lu}/u.test(name)) continue;
+      if (!names.some((n) => n.toLowerCase() === name.toLowerCase())) {
+        names.push(name);
+      }
+      if (names.length === 5) return names;
+    }
+  }
+  return names;
+}
 
 type Question = Parameters<
   MandateReviewServiceDependencies["recordQuestions"]
@@ -542,6 +660,42 @@ export function createMandateReview(
     const roleKeys = new Set<string>();
     const avoidFlags = new Set<string>();
     const exclusionFlags: { code: string; quote: string | null }[] = [];
+    // Lists resolved entry by entry, gathered into ONE proposal per step;
+    // entries that match nothing are named on it, never silently dropped.
+    const listed = new Map<
+      string,
+      {
+        readonly ids: Set<string>;
+        readonly unmatched: string[];
+        readonly confidence: string | null;
+      }
+    >();
+    const resolveList = async (
+      stepKey: string,
+      value: string,
+      vocabularies: readonly string[],
+      confidence: string | null,
+    ): Promise<void> => {
+      const entry = listed.get(stepKey) ?? {
+        ids: new Set<string>(),
+        unmatched: [],
+        confidence,
+      };
+      listed.set(stepKey, entry);
+      for (const name of splitNameList(value)) {
+        // One name is one place (or model, or customer type): the best
+        // match only, so "Kenya" never brings a neighbour along.
+        const [id] = await taxonomy.resolve(name, vocabularies);
+        if (id !== undefined) {
+          entry.ids.add(id);
+        } else if (
+          !entry.unmatched.some((n) => n.toLowerCase() === name.toLowerCase())
+        ) {
+          entry.unmatched.push(name);
+        }
+      }
+    };
+    const criteria: string[] = [];
     const seen = (item: ProposedConstraint): boolean => {
       const stepKey = STEP_FOR_DIMENSION[item.dimension];
       return stepKey !== undefined && open(stepKey);
@@ -579,23 +733,33 @@ export function createMandateReview(
           }
         }
       } else if (item.dimension === "geography") {
-        // Geography phrases resolve through the taxonomy; the remaining
-        // dimensions have no closed option list Q may fill.
-        const nodeIds = await taxonomy.resolve(
+        // A list of places is resolved place by place (ob2 2026-10-16):
+        // "Kenya, Nigeria and Ghana" as one phrase matched one country.
+        await resolveList(
+          INVESTOR_STEPS.geography,
           item.value,
           GEOGRAPHY_VOCABULARIES,
+          confidenceOf(item.confidence),
         );
-        if (nodeIds.length > 0 && open(INVESTOR_STEPS.geography)) {
-          drafts.push({
-            stepKey: INVESTOR_STEPS.geography,
-            targetField: "mandate.geography",
-            value: {
-              type: "RESOURCE_REFERENCE",
-              resourceType: "TAXONOMY_NODE",
-              resourceIds: [...new Set(nodeIds)].slice(0, 20),
-            },
-            confidence: confidenceOf(item.confidence),
-          });
+      } else if (item.dimension === "business_models") {
+        await resolveList(
+          INVESTOR_STEPS.businessModels,
+          item.value,
+          BUSINESS_MODEL_VOCABULARIES,
+          confidenceOf(item.confidence),
+        );
+      } else if (item.dimension === "customer_types") {
+        await resolveList(
+          INVESTOR_STEPS.customerTypes,
+          item.value,
+          CUSTOMER_TYPE_VOCABULARIES,
+          confidenceOf(item.confidence),
+        );
+      } else if (item.dimension === "custom_criteria") {
+        // Free text for people to read; it never becomes a filter.
+        const words = item.value.trim();
+        if (words.length > 0 && !criteria.includes(words)) {
+          criteria.push(words);
         }
       }
     }
@@ -626,6 +790,40 @@ export function createMandateReview(
         phrase.nodeIds.length > 0
           ? phrase.nodeIds
           : await taxonomy.resolve(phrase.phrase, SECTOR_VOCABULARIES);
+      if (
+        nodeIds.length === 0 &&
+        !phrase.proposesExclusion &&
+        phrase.preferenceClass !== "AVOID"
+      ) {
+        // What an investor calls a sector is sometimes a business model
+        // ("marketplaces") or a customer type ("SMEs"): offered there, as
+        // the same kind of proposal, rather than dropped.
+        const [model] = await taxonomy.resolve(
+          phrase.phrase,
+          BUSINESS_MODEL_VOCABULARIES,
+        );
+        const [customer] =
+          model === undefined
+            ? await taxonomy.resolve(phrase.phrase, CUSTOMER_TYPE_VOCABULARIES)
+            : [];
+        const stepKey =
+          model !== undefined
+            ? INVESTOR_STEPS.businessModels
+            : customer !== undefined
+              ? INVESTOR_STEPS.customerTypes
+              : undefined;
+        const id = model ?? customer;
+        if (stepKey !== undefined && id !== undefined) {
+          const entry = listed.get(stepKey) ?? {
+            ids: new Set<string>(),
+            unmatched: [],
+            confidence: null,
+          };
+          listed.set(stepKey, entry);
+          entry.ids.add(id);
+          continue;
+        }
+      }
       if (nodeIds.length === 0) {
         // Not a category Capital Q classifies companies by. Some of what
         // an investor calls a sector is a red flag in the published
@@ -795,6 +993,57 @@ export function createMandateReview(
       });
     }
 
+    const LISTED_TARGETS: Readonly<Record<string, string>> = {
+      [INVESTOR_STEPS.geography]: "mandate.geography",
+      [INVESTOR_STEPS.businessModels]: "mandate.business_models",
+      [INVESTOR_STEPS.customerTypes]: "mandate.customer_types",
+    };
+    for (const [stepKey, entry] of listed) {
+      const targetField = LISTED_TARGETS[stepKey];
+      if (targetField === undefined || entry.ids.size === 0 || !open(stepKey)) {
+        // Nothing matched at all: there is no value to propose. The
+        // unmatched names stay in the investor's own words, unchanged.
+        if (entry.unmatched.length > 0) {
+          logger?.info(
+            {
+              sessionId: session.id,
+              stepKey,
+              unmatched: entry.unmatched.length,
+            },
+            "mandate reading list matched nothing; not proposed",
+          );
+        }
+        continue;
+      }
+      drafts.push({
+        stepKey,
+        targetField,
+        value: {
+          type: "RESOURCE_REFERENCE",
+          resourceType: "TAXONOMY_NODE",
+          resourceIds: [...entry.ids].slice(0, 20),
+        },
+        confidence: entry.confidence,
+        rationale: unmatchedNote(entry.unmatched),
+      });
+    }
+    if (criteria.length > 0 && open(INVESTOR_STEPS.customCriteria)) {
+      drafts.push({
+        stepKey: INVESTOR_STEPS.customCriteria,
+        targetField: "mandate.custom_criteria",
+        value: { type: "TEXT", text: criteria.join("\n").slice(0, 1000) },
+        confidence: null,
+      });
+    }
+    const portfolio = portfolioNames(narrative);
+    if (portfolio.length > 0 && open(INVESTOR_STEPS.portfolio)) {
+      drafts.push({
+        stepKey: INVESTOR_STEPS.portfolio,
+        targetField: "mandate.portfolio",
+        value: { type: "TEXT", text: portfolio.join("\n") },
+        confidence: null,
+      });
+    }
     let created = 0;
     for (const draft of drafts) {
       if (allowedSteps !== undefined && !allowedSteps.has(draft.stepKey)) {
@@ -808,6 +1057,9 @@ export function createMandateReview(
           suggestedValue: draft.value,
           sourceRefs,
           confidence: draft.confidence,
+          ...(draft.rationale === undefined
+            ? {}
+            : { rationale: draft.rationale }),
         });
         created += 1;
       } catch (error: unknown) {
@@ -884,8 +1136,8 @@ export function createMandateReview(
     },
 
     onDocumentReady: async (event): Promise<MandateReviewResult> => {
-      const { documents, chunks } = dependencies;
-      if (documents === undefined || chunks === undefined) {
+      const { documents, pages } = dependencies;
+      if (documents === undefined || pages === undefined) {
         return { kind: "SKIPPED", reason: "NOT_FOR_ONBOARDING_READING" };
       }
       const document = await documents.findInTenant(
@@ -913,16 +1165,39 @@ export function createMandateReview(
       if (active.kind === "SKIPPED") {
         return active;
       }
-      const passages = await chunks.listActiveByVersion(
-        sql,
-        event.tenantId as TenantId,
-        event.documentVersionId as never,
-      );
-      const text = passages
-        .slice(0, DOCUMENT_PASSAGES)
-        .map((p) => p.content)
+      // The firm's own document only: it must belong to the organisation
+      // this setup is for. An uploader who also acts for another firm (or a
+      // company) never has that organisation's document read into this
+      // mandate.
+      const owner = document.ownerOrganisationId;
+      if (owner === null || active.session.organisationId !== owner) {
+        return { kind: "SKIPPED", reason: "NOT_FOR_ONBOARDING_READING" };
+      }
+      const documentPages = await pages.listByVersion(sql, active.tenantId, {
+        documentId: event.documentId,
+        documentVersionId: event.documentVersionId,
+        ownerOrganisationId: owner,
+      });
+      let text = documentPages
+        .slice(0, DOCUMENT_PAGES)
+        .map((page) => page.text)
         .join("\n\n")
         .slice(0, DOCUMENT_CHARS);
+      if (
+        text.trim().length === 0 &&
+        dependencies.extractionText !== undefined
+      ) {
+        // No pages: an unpaged document's text lives only in its extraction.
+        text = (
+          await dependencies.extractionText.read({
+            tenantId: active.tenantId,
+            documentId: event.documentId,
+            documentVersionId: event.documentVersionId,
+            ownerOrganisationId: owner,
+            maxChars: DOCUMENT_CHARS,
+          })
+        ).slice(0, DOCUMENT_CHARS);
+      }
       if (text.trim().length === 0) {
         return { kind: "SKIPPED", reason: "NO_NARRATIVE" };
       }

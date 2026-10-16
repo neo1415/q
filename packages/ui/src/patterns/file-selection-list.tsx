@@ -142,7 +142,7 @@ export function FileSelectionList({
               />
             ) : null}
             {failed ? (
-              <div className="flex flex-wrap gap-2 pl-8">
+              <div className="flex flex-wrap gap-2 ps-8">
                 <Button
                   variant="secondary"
                   size="compact"

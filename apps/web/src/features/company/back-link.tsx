@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { buttonClassName } from "@capital-q/ui/button";
 import { ArrowLeft, ICON_SIZE } from "@capital-q/ui/icons";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Back" for an owner on their own company page (founder 2026-10-08: "Back
@@ -13,6 +14,7 @@ import { ArrowLeft, ICON_SIZE } from "@capital-q/ui/icons";
  * the fallback (Home) otherwise. A real link, so it works without script.
  */
 export function BackLink({ fallbackHref }: { readonly fallbackHref: string }) {
+  const t = useT();
   const router = useRouter();
   return (
     <Link
@@ -26,7 +28,7 @@ export function BackLink({ fallbackHref }: { readonly fallbackHref: string }) {
       }}
     >
       <ArrowLeft size={ICON_SIZE.compact} aria-hidden="true" />
-      Back
+      {t("Back")}
     </Link>
   );
 }

@@ -218,7 +218,7 @@ function BlueprintBody({
           <h3 className="cq-title-sm text-(--cq-text-primary)">
             What Q could not assess
           </h3>
-          <ul className="cq-body-sm mt-2 flex list-disc flex-col gap-1 pl-5 text-(--cq-text-secondary)">
+          <ul className="cq-body-sm mt-2 flex list-disc flex-col gap-1 ps-5 text-(--cq-text-secondary)">
             {blueprint.uncertainty.map((line) => (
               <li key={line}>{line}</li>
             ))}

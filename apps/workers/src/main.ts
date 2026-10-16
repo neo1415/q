@@ -69,6 +69,7 @@ import {
 import { createOutboxWriter, DOMAIN_EVENTS_QUEUE } from "@capital-q/eventing";
 import {
   createDocumentProcessingService,
+  createPostgresDocumentPageTextReader,
   createPostgresEvidenceRepositories,
   createSupabaseDocumentStorageProvider,
   createPostgresDataRoom,
@@ -118,6 +119,7 @@ import {
   createWordsReaders,
   budgetForTaskClass,
   createDeckReader,
+  createPitchSectionReader,
   createDiligenceDocumentSummariser,
 } from "@capital-q/model-gateway/q";
 import {
@@ -170,6 +172,7 @@ import {
   withDeckReadings,
 } from "./evidence/deck-reading-handler.js";
 import { runDeckReadingHeal } from "./evidence/deck-reading-backfill.js";
+import { runPitchSectionSweep } from "./media/pitch-section-readings.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { runRetentionTicker } from "./retention/retention.js";
 import { createParserSandbox } from "./parser/sandbox.js";
@@ -403,9 +406,25 @@ const mandateReview =
         responses: createPostgresOnboardingResponseRepository(),
         suggestions: createPostgresOnboardingSuggestionRepository(),
         utterances: createPostgresOnboardingUtteranceRepository(),
-        // Lane ob1: an investor's fund deck or thesis feeds mandate proposals.
+        // Lane ob1: an investor's fund deck or thesis feeds mandate proposals,
+        // read from the firm's own extracted pages (ob2): a firm's document
+        // has no company, so it is never cut into knowledge passages.
         documents: createPostgresEvidenceRepositories().documents,
-        chunks: createPostgresChunkRepository(),
+        pages: createPostgresDocumentPageTextReader(),
+        // An unpaged deck or thesis (Word, plain text): its own extraction,
+        // read only when it has no pages. `storage` is resolved per call
+        // (it is composed further down); without it, nothing is read.
+        extractionText: {
+          read: (query) =>
+            storage === undefined
+              ? Promise.resolve("")
+              : createDocumentProcessingService({
+                  sql: database.sql,
+                  transactions: database.transactions,
+                  outbox: createOutboxWriter({ registry }),
+                  storage,
+                }).readOwnDocumentText(query),
+        },
         synthesis: createMandateSynthesis({
           gateway: {
             execute: (request, options) =>
@@ -848,6 +867,19 @@ const withDeckReading = (
             ),
         },
         logger,
+      });
+/**
+ * Lane ov 2026-10-16: Q reads each pitch's transcript into the profile's
+ * sections, once per pitch, so the Overview fills from the video where the
+ * deck lacks a section. Composed only with a model provider.
+ */
+const pitchSectionReader =
+  modelProviders.length === 0
+    ? undefined
+    : createPitchSectionReader({
+        gateway: modelGateway,
+        logger,
+        dataPosture: demoDataPosture,
       });
 /** Diligence summaries and deck readings both wait on a read document. */
 const withDocumentReadings = (
@@ -1415,6 +1447,22 @@ await Promise.all([
           logger,
           limit: COMPANY_EMBEDDING_REFRESH_LIMIT,
           intervalMs: 30 * 60 * 1000,
+          signal: shutdownController.signal,
+        }),
+      ]),
+  // Lane ov: new pitch transcripts read into the profile's sections, at
+  // most 5 pitches every 5 minutes (~$0.01 each), each once per process.
+  ...(pitchSectionReader === undefined
+    ? []
+    : [
+        runPitchSectionSweep({
+          reading: {
+            sql: database.sql,
+            reader: pitchSectionReader,
+            logger,
+          },
+          intervalMs: 5 * 60 * 1000,
+          perSweep: 5,
           signal: shutdownController.signal,
         }),
       ]),

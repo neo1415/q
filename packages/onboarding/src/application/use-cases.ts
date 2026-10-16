@@ -409,6 +409,8 @@ export type CreateOnboardingSuggestionCommand = {
     readonly { sourceType: string; sourceId: string }[] | undefined;
   readonly confidence?: string | null | undefined;
   readonly modelRunId?: string | null | undefined;
+  /** Shown with the proposal (ob2): e.g. names it could not match. Plain text. */
+  readonly rationale?: string | null | undefined;
 };
 
 /** Internal trusted operation: what a planner decided is worth asking. Never browser-reachable. */
@@ -1809,6 +1811,7 @@ export function createOnboardingUseCases(
         confidence:
           OnboardingSuggestionConfidenceSchema.nullable().default(null),
         modelRunId: UuidSchema.nullable().default(null),
+        rationale: z.string().trim().max(300).nullable().default(null),
       })
       .strict()
       .parse(raw);
@@ -1850,6 +1853,10 @@ export function createOnboardingUseCases(
         sourceRefs: command.sourceRefs,
         confidence: command.confidence,
         modelRunId: command.modelRunId,
+        rationale:
+          command.rationale === null || command.rationale.length === 0
+            ? null
+            : command.rationale,
       });
     });
   };

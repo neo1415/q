@@ -1,4 +1,5 @@
-import type { AuthorisedFact } from "@capital-q/q-core";
+import type { QLanguageCode } from "@capital-q/contracts";
+import { readinessLeadCopy, type AuthorisedFact } from "@capital-q/q-core";
 
 /**
  * A founder's own readiness, read for them when they ask what to do next
@@ -122,7 +123,11 @@ export function ownReadinessFact(
  * when the company is ready or nothing is outstanding: then the model
  * answers as usual.
  */
-export function readinessLeadLines(read: unknown): string | null {
+export function readinessLeadLines(
+  read: unknown,
+  language: QLanguageCode | null = null,
+): string | null {
+  const copy = readinessLeadCopy(language);
   if (typeof read !== "object" || read === null) return null;
   const { status, data } = read as { status?: unknown; data?: unknown };
   if (status !== "FOUND" || typeof data !== "object" || data === null) {
@@ -149,13 +154,10 @@ export function readinessLeadLines(read: unknown): string | null {
     .slice(0, 3)
     .map(
       (entry, index) =>
-        `${String(index + 1)}. ${String(entry.description).replace(/\s+/gu, " ").trim().slice(0, 200)}`,
+        `${String(index + 1)}. ${copy.step(String(entry.description).replace(/\s+/gu, " ").trim()).slice(0, 200)}`,
     );
   if (open.length === 0) return null;
-  return [
-    "Investors can't find your company in Discover yet. What to do next, most important first:",
-    ...open,
-  ].join("\n");
+  return [copy.notFindableHeading, ...open].join("\n");
 }
 
 /**

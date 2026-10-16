@@ -1,4 +1,9 @@
-import { Q_PERSONALITIES, type QPersonality } from "@capital-q/contracts";
+import {
+  Q_PERSONALITIES,
+  QLanguagePreferenceSchema,
+  type QLanguagePreference,
+  type QPersonality,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 
 import { INITIAL_CONDUCT, type ConductState } from "./conduct.js";
@@ -37,6 +42,8 @@ const VISIT_GAP_MS = 30 * 60 * 1000;
 
 export type PersonStanding = {
   readonly personality: QPersonality;
+  /** Their chosen language for Q; AUTO when never chosen (multilingual Q). */
+  readonly language: QLanguagePreference;
   readonly conduct: ConductState;
 };
 
@@ -56,6 +63,11 @@ export type StandingStore = {
     tenantId: string,
     personality: QPersonality,
   ) => Promise<void>;
+  readonly setLanguage: (
+    userId: string,
+    tenantId: string,
+    language: QLanguagePreference,
+  ) => Promise<void>;
   /** Pause the account; true only the first time. */
   readonly suspend: (
     userId: string,
@@ -66,6 +78,7 @@ export type StandingStore = {
 
 type Row = {
   personality: string;
+  language: string | null;
   streak: number;
   q_started: boolean;
   rounds: number;
@@ -80,25 +93,36 @@ function personalityOf(value: string): QPersonality {
     : "AUTO";
 }
 
+/** A stored tag Capital Q no longer offers reads as AUTO, never an error. */
+function languageOf(value: string | null): QLanguagePreference {
+  const parsed = QLanguagePreferenceSchema.safeParse(value);
+  return parsed.success ? parsed.data : "AUTO";
+}
+
 export function createPostgresStandingStore(
   sql: DatabaseExecutor,
 ): StandingStore {
   return {
     read: async (userId, _tenantId, now) => {
       const rows = await sql<Row[]>`
-        select personality, streak, q_started, rounds, strikes,
+        select personality, language, streak, q_started, rounds, strikes,
                suspended_at, updated_at
           from q_runtime.person_standing
          where user_id = ${userId}
          limit 1`;
       const row = rows[0];
       if (row === undefined) {
-        return { personality: "AUTO", conduct: INITIAL_CONDUCT };
+        return {
+          personality: "AUTO",
+          language: "AUTO",
+          conduct: INITIAL_CONDUCT,
+        };
       }
       // A new visit starts its rounds afresh; strikes are remembered.
       const newVisit = now.getTime() - row.updated_at.getTime() > VISIT_GAP_MS;
       return {
         personality: personalityOf(row.personality),
+        language: languageOf(row.language),
         conduct: {
           streak: newVisit ? 0 : row.streak,
           qStarted: newVisit ? false : row.q_started,
@@ -127,6 +151,17 @@ export function createPostgresStandingStore(
         values (${userId}, ${tenantId}, ${personality})
         on conflict (user_id) do update
           set personality = excluded.personality,
+              updated_at = clock_timestamp()`;
+    },
+    setLanguage: async (userId, tenantId, language) => {
+      // AUTO is stored as null: nothing chosen, follow the device. Like the
+      // personality, a choice does not touch Q's patience counters.
+      const stored = language === "AUTO" ? null : language;
+      await sql`
+        insert into q_runtime.person_standing (user_id, tenant_id, language)
+        values (${userId}, ${tenantId}, ${stored})
+        on conflict (user_id) do update
+          set language = excluded.language,
               updated_at = clock_timestamp()`;
     },
     suspend: async (userId, tenantId, reason) => {

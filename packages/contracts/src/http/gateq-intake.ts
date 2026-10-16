@@ -413,6 +413,25 @@ export const GateqVideoBridgeBodySchema = z
       .max(300),
   })
   .passthrough();
+/**
+ * POST GATEQ_APPLY_VIDEO_PATH (optional body). The applicant's language
+ * for the room (lane ml): their saved Capital Q choice when signed in,
+ * otherwise the device's. A presentation hint, never authority; absent or
+ * empty is English, as before.
+ */
+export const GateqVideoStartRequestSchema = z
+  .object({
+    locale: z
+      .string()
+      .regex(/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/u)
+      .max(35)
+      .optional(),
+  })
+  .strict();
+export type GateqVideoStartRequest = z.infer<
+  typeof GateqVideoStartRequestSchema
+>;
+
 export const GateqVideoEndRequestSchema = z
   .object({ continueByTyping: z.boolean() })
   .strict();

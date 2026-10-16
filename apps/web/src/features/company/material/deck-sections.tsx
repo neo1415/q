@@ -19,6 +19,15 @@ import {
   Search,
   UserRound,
 } from "@capital-q/ui/icons";
+import { useT } from "@/features/i18n/language";
+
+import {
+  deckFactSource,
+  slidesLine as slides,
+  type ReadSection,
+} from "./read-section";
+
+export type { ReadFact, ReadSection } from "./read-section";
 
 /**
  * Q's read of the deck, as twelve sub-tabs in the same order for every
@@ -38,16 +47,6 @@ const STATUS_WORDS: Readonly<Record<DeckSection["status"], string>> = {
   UNCLEAR: "Unclear",
   CONTRADICTORY: "Numbers disagree",
 };
-
-function slides(pages: readonly number[]): string | null {
-  const unique = [...new Set(pages)].sort((a, b) => a - b);
-  if (unique.length === 0) return null;
-  const first = unique[0] ?? 0;
-  const last = unique.at(-1) ?? first;
-  return first === last
-    ? `Slide ${String(first)}`
-    : `Slides ${String(first)}–${String(last)}`;
-}
 
 export function StatusMark({
   status,
@@ -88,6 +87,7 @@ export function DeckReadSummary({
   readonly onPick: (index: number) => void;
   readonly current: number;
 }) {
+  const t = useT();
   const present = sections.filter(
     (section) => section.status === "PRESENT",
   ).length;
@@ -109,7 +109,7 @@ export function DeckReadSummary({
             id="deck-read-title"
             className="cq-title-sm text-(--cq-text-primary)"
           >
-            Q&rsquo;s read of the deck
+            {t("Q’s read of the deck")}
           </h3>
           <span
             className="cq-body-sm text-(--cq-text-secondary)"
@@ -122,8 +122,8 @@ export function DeckReadSummary({
           </span>
         </span>
         <span className="cq-body-sm inline-flex items-center gap-1 text-(--cq-text-primary) underline underline-offset-4">
-          <span className="group-open:hidden">View coverage</span>
-          <span className="hidden group-open:inline">Hide coverage</span>
+          <span className="group-open:hidden">{t("View coverage")}</span>
+          <span className="hidden group-open:inline">{t("Hide coverage")}</span>
         </span>
       </summary>
       <div className="flex flex-col gap-3 px-4 pb-4">
@@ -139,7 +139,7 @@ export function DeckReadSummary({
                 type="button"
                 onClick={() => onPick(index)}
                 aria-current={current === index ? "true" : undefined}
-                className={`cq-body-sm flex min-h-11 w-full items-center gap-2 border px-3 py-2 text-left text-(--cq-text-primary) ${
+                className={`cq-body-sm flex min-h-11 w-full items-center gap-2 border px-3 py-2 text-start text-(--cq-text-primary) ${
                   current === index
                     ? "border-(--cq-text-primary) border-2"
                     : section.status === "NOT_IN_DECK"
@@ -160,13 +160,13 @@ export function DeckReadSummary({
         </ul>
         <p className="cq-caption flex flex-wrap items-center gap-x-3 gap-y-1 text-(--cq-text-secondary)">
           <span className="inline-flex items-center gap-1">
-            <StatusMark status="PRESENT" /> In the deck
+            <StatusMark status="PRESENT" /> {t("In the deck")}
           </span>
           <span className="inline-flex items-center gap-1">
-            <StatusMark status="NOT_IN_DECK" /> Not in the deck yet
+            <StatusMark status="NOT_IN_DECK" /> {t("Not in the deck yet")}
           </span>
           <span className="inline-flex items-center gap-1">
-            <StatusMark status="UNCLEAR" /> Unclear
+            <StatusMark status="UNCLEAR" /> {t("Unclear")}
           </span>
         </p>
         <p className="cq-caption text-(--cq-text-secondary)">
@@ -184,96 +184,158 @@ export function DeckReadSummary({
   );
 }
 
-function SectionCard({
-  section,
-  downloadable,
-  companyName,
-}: {
-  readonly section: DeckSection;
-  readonly downloadable: boolean;
-  readonly companyName: string;
-}) {
+/** A deck section in the shared card's shape (the Pitch deck tab). */
+export function deckReadSection(
+  section: DeckSection,
+  downloadable: boolean,
+  companyName: string,
+): ReadSection {
   const label = DECK_SECTION_LABELS[section.section];
   const where = slides(section.pages);
+  return {
+    key: section.section,
+    label,
+    chip: label,
+    status: section.status,
+    statusWords: STATUS_WORDS[section.status],
+    summary: section.summary,
+    emptyText:
+      section.status === "NOT_IN_DECK"
+        ? `${companyName}'s deck doesn't cover this yet. Unknown, not zero: ask them.`
+        : "Q couldn't read this part clearly.",
+    facts: section.facts.map((fact) => ({
+      key: `${fact.label}-${fact.pages.join(",")}`,
+      label: fact.label,
+      value: fact.value ?? null,
+      source: deckFactSource(fact),
+    })),
+    where:
+      where === null
+        ? null
+        : `${where} · ${downloadable ? "deck can be downloaded" : "deck is view only"}`,
+    askHref: `/q?ask=${encodeURIComponent(`About ${companyName}'s ${label.toLowerCase()}: `)}`,
+    askLabel: `Ask Q about ${label.toLowerCase()}`,
+  };
+}
+
+export function ReadSectionCard({
+  section,
+  attribute,
+}: {
+  readonly section: ReadSection;
+  readonly attribute: "deck" | "profile";
+}) {
+  const t = useT();
   return (
     <article
       className="flex h-full flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
-      aria-label={label}
-      data-deck-section={section.section}
+      aria-label={section.label}
+      {...(attribute === "deck"
+        ? { "data-deck-section": section.key }
+        : { "data-profile-section": section.key })}
     >
       <header className="flex items-start justify-between gap-3">
-        <h4 className="cq-title-md text-(--cq-text-primary)">{label}</h4>
-        <span className="cq-caption inline-flex items-center gap-1.5 text-(--cq-text-secondary)">
-          <StatusMark status={section.status} /> {STATUS_WORDS[section.status]}
+        <h4 className="cq-title-md text-(--cq-text-primary)">
+          {section.label}
+        </h4>
+        <span className="cq-caption inline-flex shrink-0 items-center gap-1.5 text-(--cq-text-secondary)">
+          <StatusMark status={section.status} /> {section.statusWords}
         </span>
       </header>
       {section.summary === null ? (
-        <p className="cq-body text-(--cq-text-secondary)">
-          {section.status === "NOT_IN_DECK"
-            ? `${companyName}'s deck doesn't cover this yet. Unknown, not zero: ask them.`
-            : "Q couldn't read this part clearly."}
-        </p>
+        section.emptyText === "" ? null : (
+          <p className="cq-body text-(--cq-text-secondary)">
+            {section.emptyText}
+          </p>
+        )
       ) : (
-        <p className="cq-body text-(--cq-text-primary)">{section.summary}</p>
+        <div className="flex flex-col gap-1">
+          <p className="cq-body text-(--cq-text-primary)">{section.summary}</p>
+          {section.summarySource === undefined ||
+          section.summarySource === null ? null : (
+            <span className="cq-caption inline-flex flex-wrap items-center gap-1 text-(--cq-text-secondary)">
+              <UserRound size={ICON_SIZE.compact} aria-hidden="true" />
+              {section.summarySource}
+            </span>
+          )}
+        </div>
       )}
       {section.facts.length === 0 ? null : (
         <dl className="flex flex-col divide-y divide-(--cq-border-subtle) border-t border-(--cq-border-subtle)">
-          {section.facts.map((fact) => (
-            <div
-              key={`${fact.label}-${fact.pages.join(",")}`}
-              className="flex items-start justify-between gap-4 py-3"
-            >
-              <dt className="flex min-w-0 flex-col gap-1">
-                <span className="cq-body-sm text-(--cq-text-primary)">
-                  {fact.label}
-                </span>
-                <span className="cq-caption inline-flex flex-wrap items-center gap-1 text-(--cq-text-secondary)">
-                  <UserRound size={ICON_SIZE.compact} aria-hidden="true" />
-                  {fact.truthClass === "Q_INFERENCE"
-                    ? "Q's inference"
-                    : "Founder's claim"}
-                  {slides(fact.pages) === null
-                    ? ""
-                    : ` · ${slides(fact.pages) ?? ""}`}
-                  {fact.asOf === null ? "" : ` · as of ${fact.asOf}`}
-                </span>
-              </dt>
-              <dd className="cq-title-sm cq-numeric text-right text-(--cq-text-primary)">
-                {fact.value ?? (
-                  <span className="cq-body-sm text-(--cq-text-secondary)">
-                    Not in the deck
-                  </span>
+          {section.facts.map((fact, at) => {
+            const previous = section.facts[at - 1]?.group ?? null;
+            const heading =
+              fact.group !== undefined &&
+              fact.group !== null &&
+              fact.group !== previous
+                ? fact.group
+                : null;
+            return (
+              <div key={fact.key} className="flex flex-col">
+                {heading === null ? null : (
+                  <p className="cq-label pt-3 text-(--cq-text-secondary)">
+                    {heading}
+                  </p>
                 )}
-              </dd>
-            </div>
-          ))}
+                <div className="flex items-start justify-between gap-4 py-3">
+                  <dt className="flex min-w-0 flex-col gap-1">
+                    <span className="cq-body-sm text-(--cq-text-primary)">
+                      {fact.label}
+                    </span>
+                    <span className="cq-caption inline-flex flex-wrap items-center gap-1 text-(--cq-text-secondary)">
+                      <UserRound size={ICON_SIZE.compact} aria-hidden="true" />
+                      {fact.source}
+                    </span>
+                  </dt>
+                  <dd className="cq-title-sm cq-numeric text-end text-(--cq-text-primary)">
+                    {fact.value ?? (
+                      <span className="cq-body-sm text-(--cq-text-secondary)">
+                        {t("Not in the deck")}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              </div>
+            );
+          })}
         </dl>
       )}
       <footer className="mt-auto flex flex-col gap-2">
-        {where === null ? null : (
+        {section.where === null ? null : (
           <p className="cq-caption inline-flex items-center gap-1 text-(--cq-text-secondary)">
             <FileText size={ICON_SIZE.compact} aria-hidden="true" />
-            {where} ·{" "}
-            {downloadable ? "deck can be downloaded" : "deck is view only"}
+            {section.where}
           </p>
         )}
+        {section.prompt === undefined ? null : (
+          <div className="flex flex-col gap-2">
+            {section.prompt.question === null ? null : (
+              <p className="cq-body-sm text-(--cq-text-secondary)">
+                Q will ask: &ldquo;{section.prompt.question}&rdquo;
+              </p>
+            )}
+            <Link
+              href={section.prompt.href}
+              className="cq-body-sm inline-flex min-h-11 w-fit items-center gap-2 border border-(--cq-border) px-4 text-(--cq-text-primary) hover:border-(--cq-text-primary)"
+              data-profile-section-prompt={section.key}
+            >
+              {section.prompt.label}
+            </Link>
+          </div>
+        )}
         <Link
-          href={`/q?ask=${encodeURIComponent(`About ${companyName}'s ${label.toLowerCase()}: `)}`}
+          href={section.askHref}
           className="cq-body-sm inline-flex min-h-11 items-center gap-2 text-(--cq-text-primary) hover:underline"
         >
-          <Search size={ICON_SIZE.compact} aria-hidden="true" /> Ask Q about{" "}
-          {label.toLowerCase()}
+          <Search size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+          {section.askLabel}
         </Link>
       </footer>
     </article>
   );
 }
 
-/**
- * The twelve as a carousel. The chips and the summary grid move it; the
- * track's own scroll position moves the chips (an observer, not a scroll
- * handler), so a swipe and a tap stay in step.
- */
+/** Q's read of the deck as the shared carousel (the Pitch deck tab). */
 export function DeckCarousel({
   sections,
   downloadable,
@@ -287,6 +349,40 @@ export function DeckCarousel({
   readonly index: number;
   readonly onIndex: (index: number) => void;
 }) {
+  const t = useT();
+  return (
+    <ReadCarousel
+      sections={sections.map((section) =>
+        deckReadSection(section, downloadable, companyName),
+      )}
+      attribute="deck"
+      label={t("The deck, section by section")}
+      index={index}
+      onIndex={onIndex}
+    />
+  );
+}
+
+/**
+ * Sections as a carousel: Q's read of the deck and the profile Overview.
+ * The chips and the summary grid move it; the track's own scroll position
+ * moves the chips (an observer, not a scroll handler), so a swipe and a
+ * tap stay in step.
+ */
+export function ReadCarousel({
+  sections,
+  attribute,
+  label,
+  index,
+  onIndex,
+}: {
+  readonly sections: readonly ReadSection[];
+  readonly attribute: "deck" | "profile";
+  readonly label: string;
+  readonly index: number;
+  readonly onIndex: (index: number) => void;
+}) {
+  const t = useT();
   const track = useRef<HTMLDivElement>(null);
   const chips = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(index);
@@ -316,6 +412,22 @@ export function DeckCarousel({
   useEffect(() => {
     if (index !== shown.current) go(index);
   }, [index, go]);
+
+  // A section asked for from outside (Q, a link) is where the track opens,
+  // before the observer reads which card is in view.
+  const opening = useRef(index);
+  useEffect(() => {
+    const root = track.current;
+    const card = root?.children[opening.current];
+    if (
+      opening.current > 0 &&
+      root !== null &&
+      card instanceof HTMLElement &&
+      typeof root.scrollTo === "function"
+    ) {
+      root.scrollTo({ left: card.offsetLeft });
+    }
+  }, []);
 
   useEffect(() => {
     const root = track.current;
@@ -358,18 +470,20 @@ export function DeckCarousel({
     <section
       className="flex flex-col gap-3"
       aria-roledescription="carousel"
-      aria-label="The deck, section by section"
-      data-deck-carousel
+      aria-label={label}
+      {...(attribute === "deck"
+        ? { "data-deck-carousel": "" }
+        : { "data-profile-carousel": "" })}
     >
       <div
         ref={chips}
         className="relative flex gap-2 overflow-x-auto pb-1"
         role="tablist"
-        aria-label="Sections"
+        aria-label={t("Sections")}
       >
         {sections.map((section, at) => (
           <button
-            key={section.section}
+            key={section.key}
             type="button"
             role="tab"
             aria-selected={visible === at}
@@ -380,7 +494,7 @@ export function DeckCarousel({
                 : "border-(--cq-border) text-(--cq-text-primary)"
             }`}
           >
-            {DECK_SECTION_LABELS[section.section]}
+            {section.chip}
           </button>
         ))}
       </div>
@@ -394,17 +508,13 @@ export function DeckCarousel({
         >
           {sections.map((section, at) => (
             <div
-              key={section.section}
+              key={section.key}
               className="w-[86%] shrink-0 snap-start sm:w-full"
               role="group"
               aria-roledescription="slide"
               aria-label={`${String(at + 1)} of ${String(sections.length)}`}
             >
-              <SectionCard
-                section={section}
-                downloadable={downloadable}
-                companyName={companyName}
-              />
+              <ReadSectionCard section={section} attribute={attribute} />
             </div>
           ))}
         </div>
@@ -413,7 +523,7 @@ export function DeckCarousel({
             type="button"
             onClick={() => go(visible - 1)}
             disabled={visible === 0}
-            aria-label="Previous section"
+            aria-label={t("Previous section")}
             className="flex size-11 items-center justify-center border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
           >
             <ChevronLeft size={ICON_SIZE.regular} aria-hidden="true" />
@@ -425,7 +535,7 @@ export function DeckCarousel({
             type="button"
             onClick={() => go(visible + 1)}
             disabled={visible === sections.length - 1}
-            aria-label="Next section"
+            aria-label={t("Next section")}
             className="flex size-11 items-center justify-center border border-(--cq-border) text-(--cq-text-primary) disabled:opacity-40"
           >
             <ChevronRight size={ICON_SIZE.regular} aria-hidden="true" />
@@ -435,7 +545,7 @@ export function DeckCarousel({
       <div className="flex justify-center gap-1.5 sm:hidden" aria-hidden="true">
         {sections.map((section, at) => (
           <span
-            key={section.section}
+            key={section.key}
             className={`h-1.5 rounded-full ${visible === at ? "w-5 bg-(--cq-text-primary)" : "w-1.5 bg-(--cq-border)"}`}
           />
         ))}

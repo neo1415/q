@@ -18,6 +18,7 @@ import { artifactTypeLabel } from "./artifact-type";
 import { ArtifactDownloads } from "./artifact-download";
 import type { QTurnObjectBlock } from "./conversation";
 import { qArtifactExportFormats } from "./wire-constants";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Something Q composed, as a card (QX-003E; R36).
@@ -121,6 +122,7 @@ export function ArtifactCard({
   /** The Board draws its own frame around every object. */
   readonly framed?: boolean | undefined;
 }) {
+  const t = useT();
   const status = useSettledStatus(given.artifactId, given.status);
   const block = status === given.status ? given : { ...given, status };
   const ready = block.status === "READY";
@@ -152,7 +154,7 @@ export function ArtifactCard({
             {/* The Board names the type in its own header. */}
             {framed ? <span>{artifactTypeLabel(block.type)}</span> : null}
             {framed && ready ? " · " : null}
-            {ready ? <span>Private draft, not shared</span> : null}
+            {ready ? <span>{t("Private draft, not shared")}</span> : null}
           </p>
           <p className="cq-body line-clamp-2 font-medium text-(--cq-text-primary)">
             {block.title}
@@ -171,7 +173,7 @@ export function ArtifactCard({
               }}
               data-q-artifact-open={block.artifactId}
             >
-              Open
+              {t("Open")}
             </button>
           )}
           {/*
@@ -197,7 +199,7 @@ export function ArtifactCard({
               }}
               data-q-artifact-edit
             >
-              Edit with Q
+              {t("Edit with Q")}
             </button>
           )}
         </div>
@@ -205,7 +207,9 @@ export function ArtifactCard({
         <div className="flex items-center gap-3" data-q-artifact-preparing>
           <QSwarm state="WORKING" pixels={48} />
           <p className="cq-caption text-(--cq-text-secondary)">
-            Q is writing this. Please wait; it opens here when it&apos;s ready.
+            {t(
+              "Q is writing this. Please wait; it opens here when it's ready.",
+            )}
           </p>
         </div>
       ) : (
@@ -218,7 +222,7 @@ export function ArtifactCard({
               strokeWidth={ICON_STROKE}
             />
             <span>
-              Q couldn&apos;t finish preparing this one. Nothing was sent.
+              {t("Q couldn't finish preparing this one. Nothing was sent.")}
             </span>
           </p>
           {onAsk === undefined ? null : (
@@ -231,7 +235,7 @@ export function ArtifactCard({
                 }}
                 data-q-artifact-retry
               >
-                Ask Q to try again
+                {t("Ask Q to try again")}
               </button>
             </div>
           )}

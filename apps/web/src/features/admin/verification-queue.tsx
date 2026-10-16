@@ -12,6 +12,7 @@ import {
 import { ReasonAction } from "./console-ui";
 import { DecisionBar, QUEUE_ITEM } from "./queue-keys";
 import { verificationGroups } from "./verification-groups";
+import { useT } from "@/features/i18n/language";
 
 const CLAIM_WORDS: Readonly<Record<string, string>> = {
   FOUNDER_IDENTITY: "Founder identity",
@@ -32,6 +33,8 @@ export function VerificationQueue({
   readonly rows: readonly AdminVerificationRowDto[];
   readonly canDecide: boolean;
 }) {
+  const t = useT();
+
   // ADMIN-4 block: a person and their organisation, side by side.
   return (
     <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
@@ -47,9 +50,13 @@ export function VerificationQueue({
           {canDecide && group.pair !== null ? (
             <div className="flex flex-wrap gap-2">
               <ReasonAction
-                label="Verify both"
-                title={`Verify the person and ${group.rows[0]?.organisationName ?? "the organisation"}?`}
-                description="Each is decided and recorded on its own, with what you checked. Say what you checked for both."
+                label={t("Verify both")}
+                title={t(
+                  `Verify the person and ${group.rows[0]?.organisationName ?? "the organisation"}?`,
+                )}
+                description={t(
+                  "Each is decided and recorded on its own, with what you checked. Say what you checked for both.",
+                )}
                 confirm="Verify both"
                 variant="primary"
                 reasonLabel="What you checked"
@@ -72,6 +79,8 @@ function VerificationRows({
   readonly rows: readonly AdminVerificationRowDto[];
   readonly canDecide: boolean;
 }) {
+  const t = useT();
+
   return (
     <>
       {rows.map((row) => {
@@ -89,22 +98,24 @@ function VerificationRows({
           >
             <div className="flex flex-col gap-1">
               <span className="cq-body font-medium text-(--cq-text-primary)">
-                {CLAIM_WORDS[row.claimType] ?? row.claimType}: {subject}
+                {t(CLAIM_WORDS[row.claimType] ?? row.claimType)}: {t(subject)}
               </span>
               <span className="cq-caption text-(--cq-text-secondary)">
                 {row.companyName ?? row.organisationName}
-                {row.website === null ? "" : ` · ${row.website}`}
-                {row.country === null ? "" : ` · ${row.country}`} · asked by{" "}
-                {row.requesterName ?? "a member"}
+                {row.website === null ? "" : t(` · ${row.website}`)}
+                {row.country === null ? "" : t(` · ${row.country}`)}{" "}
+                {t("· asked by")} {t(row.requesterName ?? "a member")}
                 {row.requesterEmail === null
                   ? ""
-                  : ` (${row.requesterEmail})`}{" "}
+                  : t(` (${row.requesterEmail})`)}{" "}
                 ·{" "}
-                {`asked ${new Date(row.requestedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
-                {row.synthetic ? " · Fictional account" : ""}
+                {t(
+                  `asked ${new Date(row.requestedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`,
+                )}
+                {row.synthetic ? t(" · Fictional account") : ""}
                 {row.kyb !== null || row.evidenceSourceId === null
                   ? ""
-                  : " · Evidence source attached"}
+                  : t(" · Evidence source attached")}
               </span>
               {row.kyb === null ? null : <KybDetails kyb={row.kyb} />}
               {row.identity === null ? null : (
@@ -114,11 +125,13 @@ function VerificationRows({
             {canDecide ? (
               <DecisionBar>
                 <ReasonAction
-                  label="Verify"
+                  label={t("Verify")}
                   shortcut="v"
                   wide
-                  title={`Verify ${subject}?`}
-                  description="Capital Q will show this as verified by an operator. Say what you checked."
+                  title={t(`Verify ${subject}?`)}
+                  description={t(
+                    "Capital Q will show this as verified by an operator. Say what you checked.",
+                  )}
                   confirm="Verify"
                   variant="primary"
                   reasonLabel="What you checked"
@@ -131,11 +144,13 @@ function VerificationRows({
                   }
                 />
                 <ReasonAction
-                  label="Decline"
+                  label={t("Decline")}
                   shortcut="d"
                   wide
-                  title={`Decline verification for ${subject}?`}
-                  description="They can ask again. Say why, plainly; it is kept with the decision."
+                  title={t(`Decline verification for ${subject}?`)}
+                  description={t(
+                    "They can ask again. Say why, plainly; it is kept with the decision.",
+                  )}
                   confirm="Decline"
                   variant="secondary"
                   reasonLabel="Why it can't be verified"
@@ -162,11 +177,13 @@ function IdentityDetails({
 }: {
   readonly identity: NonNullable<AdminVerificationRowDto["identity"]>;
 }) {
+  const t = useT();
+
   const [note, setNote] = useState<string | null>(null);
   return (
     <div className="mt-1 flex flex-col gap-0.5 border border-(--cq-border-subtle) px-3 py-2">
       <span className="cq-body-sm text-(--cq-text-primary)">
-        Name on ID: {identity.nameOnId} · {identity.role}
+        {t("Name on ID:")} {identity.nameOnId} · {t(identity.role)}
       </span>
       {identity.hasDocument ? (
         <button
@@ -180,11 +197,11 @@ function IdentityDetails({
             });
           }}
         >
-          Open the ID document
+          {t("Open the ID document")}
         </button>
       ) : (
         <span className="cq-caption text-(--cq-text-secondary)">
-          No ID document sent
+          {t("No ID document sent")}
         </span>
       )}
       {note === null ? null : (
@@ -211,29 +228,35 @@ function KybDetails({
 }: {
   readonly kyb: NonNullable<AdminVerificationRowDto["kyb"]>;
 }) {
+  const t = useT();
+
   const [note, setNote] = useState<string | null>(null);
   return (
     <div className="mt-1 flex flex-col gap-0.5 border border-(--cq-border-subtle) px-3 py-2">
       {/* ADMIN-4 block: automatic requests and the email-domain signal. */}
       {kyb.source === "AUTO" ? (
         <span className="cq-caption text-(--cq-text-secondary)">
-          Requested automatically from what the organisation had already given
+          {t(
+            "Requested automatically from what the organisation had already given",
+          )}
         </span>
       ) : null}
       <span className="cq-body-sm text-(--cq-text-primary)">
-        {[
-          kyb.legalName ?? kyb.organisationName ?? "Legal name not given",
-          kyb.registrationNumber ?? "Registration number not given",
-          kyb.jurisdictionCode ?? "Jurisdiction not given",
-        ].join(" · ")}
+        {t(
+          [
+            kyb.legalName ?? kyb.organisationName ?? "Legal name not given",
+            kyb.registrationNumber ?? "Registration number not given",
+            kyb.jurisdictionCode ?? "Jurisdiction not given",
+          ].join(" · "),
+        )}
       </span>
       <span className="cq-caption text-(--cq-text-secondary)">
-        {domainSignal(kyb.contactEmailDomain, kyb.emailDomainMatchesWebsite)}
+        {t(domainSignal(kyb.contactEmailDomain, kyb.emailDomainMatchesWebsite))}
       </span>
       <span className="cq-caption text-(--cq-text-secondary)">
         {[kyb.registeredAddress, kyb.websiteUrl]
           .filter((part) => part !== null)
-          .join(" · ") || "No address or website given"}
+          .join(" · ") || t("No address or website given")}
       </span>
       {kyb.hasDocument ? (
         <button
@@ -247,11 +270,11 @@ function KybDetails({
             });
           }}
         >
-          Open the registration document
+          {t("Open the registration document")}
         </button>
       ) : (
         <span className="cq-caption text-(--cq-text-secondary)">
-          No document sent
+          {t("No document sent")}
         </span>
       )}
       {note === null ? null : (

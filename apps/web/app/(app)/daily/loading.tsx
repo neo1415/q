@@ -1,13 +1,16 @@
+import { serverT } from "@/features/i18n/server";
 /**
  * The Q Daily while it loads: the newspaper's own shape (masthead, lead,
  * two columns), quiet and still under reduced motion.
  */
-export default function Loading() {
+export default async function Loading() {
+  const t = await serverT();
+
   return (
     <div
       className="mx-auto flex w-full max-w-(--cq-layout-content) flex-col gap-8 px-4 py-6 motion-safe:animate-pulse"
       aria-busy="true"
-      aria-label="Loading The Q Daily"
+      aria-label={t("Loading The Q Daily")}
       data-daily-loading
     >
       <div className="flex flex-col items-center gap-3">

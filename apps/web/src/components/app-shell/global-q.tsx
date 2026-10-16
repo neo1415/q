@@ -38,6 +38,7 @@ import {
 import { QSounds } from "@/features/q-sound/q-sounds";
 import { QEdgeFlow } from "@/features/q-swarm/q-edge-flow";
 import { WakeWord } from "@/features/wake/wake-word";
+import { useT } from "@/features/i18n/language";
 
 /**
  * P9: the side panel's conversation is code most page views never run,
@@ -62,11 +63,12 @@ function preloadQSheet(): void {
 
 /** Holds the panel's shape while its code arrives; no spinner. */
 function QSheetPending() {
+  const t = useT();
   return (
     <div
       className="flex flex-1 flex-col gap-3 p-4"
       aria-busy="true"
-      aria-label="Opening Q"
+      aria-label={t("Opening Q")}
     >
       <div className="h-4 w-2/3 bg-(--cq-surface-subtle)" />
       <div className="h-4 w-1/2 bg-(--cq-surface-subtle)" />
@@ -336,6 +338,7 @@ export function GlobalQTrigger({
 }: {
   readonly variant: "sidebar" | "header";
 }) {
+  const t = useT();
   const pathname = usePathname();
   const { open, setOpen } = useContext(GlobalQContext);
   const session = useQSessionOptional();
@@ -352,7 +355,7 @@ export function GlobalQTrigger({
     return (
       <Link
         href={`${home}#home-q`}
-        aria-label="Ask Q"
+        aria-label={t("Ask Q")}
         className={buttonClassName(
           "secondary",
           "regular",
@@ -368,7 +371,7 @@ export function GlobalQTrigger({
   return (
     <button
       type="button"
-      aria-label="Ask Q"
+      aria-label={t("Ask Q")}
       aria-expanded={open}
       onPointerEnter={preloadQSheet}
       onFocus={preloadQSheet}

@@ -20,6 +20,7 @@ import {
   THEME_DISPLAY_ORDER,
   type ThemeChoice,
 } from "./theme";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The appearance choice, as three buttons rather than a switch: a switch
@@ -80,13 +81,14 @@ export function ThemeToggle({
   readonly size?: "regular" | "touch" | undefined;
   readonly className?: string | undefined;
 }) {
+  const t = useT();
   const [choice, choose] = useThemeChoice();
 
   if (display === "labels") {
     return (
       <div
         role="group"
-        aria-label="Appearance"
+        aria-label={t("Appearance")}
         className={cx("flex flex-wrap gap-1", className)}
         data-appearance-toggle
       >
@@ -114,7 +116,7 @@ export function ThemeToggle({
   return (
     <div
       role="group"
-      aria-label="Theme"
+      aria-label={t("Theme")}
       className={cx(
         "cq-theme-switch",
         size === "touch" ? "is-touch" : "",

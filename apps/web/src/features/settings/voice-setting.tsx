@@ -11,17 +11,19 @@ import {
   useVoicePreference,
 } from "../voice/voice-preference";
 import { VOICE_LABELS } from "../voice/voice-menu";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q's voice on the Settings page: the same choice as the small icon on the
  * Q page, worded, and remembered on this device (R28).
  */
 export function VoiceSetting() {
+  const t = useT();
   const voice = useVoicePreference();
   return (
     <div
       role="group"
-      aria-label="Q's voice"
+      aria-label={t("Q's voice")}
       className="flex flex-wrap gap-1"
       data-voice-setting
     >
@@ -59,12 +61,13 @@ const LISTENING_LABELS = {
  * and Q remembers that for you.
  */
 export function ListeningSetting() {
+  const t = useT();
   const level = useListeningPreference();
   return (
     <div className="flex flex-col gap-1.5">
       <div
         role="group"
-        aria-label="Listening sounds"
+        aria-label={t("Listening sounds")}
         className="flex flex-wrap gap-1"
         data-listening-setting
       >
@@ -87,8 +90,9 @@ export function ListeningSetting() {
         ))}
       </div>
       <p className="cq-caption text-(--cq-text-secondary)">
-        On live voice: small reactions while you talk, and a short line while an
-        answer takes a moment.
+        {t(
+          "On live voice: small reactions while you talk, and a short line while an answer takes a moment.",
+        )}
       </p>
     </div>
   );

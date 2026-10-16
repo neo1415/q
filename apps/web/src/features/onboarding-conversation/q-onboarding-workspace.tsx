@@ -1684,6 +1684,14 @@ export function QOnboardingWorkspace({
                       </>
                     );
                   })()}
+                  {item.suggestion.rationale === null ? null : (
+                    <span
+                      className="block cq-caption text-(--cq-text-secondary)"
+                      data-suggestion-note
+                    >
+                      {item.suggestion.rationale}
+                    </span>
+                  )}
                 </span>
                 <span className="flex gap-1">
                   <Button

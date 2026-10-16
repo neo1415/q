@@ -7,6 +7,7 @@ import { ChoiceList } from "@capital-q/ui/choice-list";
 
 import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
 import { StepHeading, StrengthNote, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 function Picker({
   id,
@@ -23,10 +24,13 @@ function Picker({
   readonly busy: boolean;
   readonly onToggle: (nodeId: string) => void;
 }) {
+  const t = useT();
   return (
     <fieldset className="flex flex-col gap-2" id={id}>
       <legend className="cq-label text-(--cq-text-primary)">{legend}</legend>
-      <StrengthNote>Recorded as a strong preference. Optional.</StrengthNote>
+      <StrengthNote>
+        {t("Recorded as a strong preference. Optional.")}
+      </StrengthNote>
       <ul className="flex flex-wrap gap-2" aria-label={legend}>
         {options.map((option) => {
           const pressed = selected.includes(option.nodeId);
@@ -57,6 +61,7 @@ export function AttributesStep({
   busy,
   actions,
 }: StepProps<"attributes">) {
+  const t = useT();
   const saved = step.response;
   const [businessModelIds, setBusinessModelIds] = useState<readonly string[]>(
     saved?.businessModelIds ?? [],
@@ -122,7 +127,7 @@ export function AttributesStep({
         id="attributes-capital"
         name="capitalIntensity"
         legend="Capital intensity"
-        description="Optional."
+        description={t("Optional.")}
         options={step.capitalOptions}
         value={capitalIntensity}
         disabled={busy}
@@ -132,7 +137,7 @@ export function AttributesStep({
         id="attributes-regulatory"
         name="regulatoryAppetite"
         legend="Regulated markets"
-        description="Optional."
+        description={t("Optional.")}
         options={step.regulatoryOptions}
         value={regulatoryAppetite}
         disabled={busy}
@@ -142,7 +147,9 @@ export function AttributesStep({
         id="attributes-revenue"
         name="revenueState"
         legend="Revenue expectations"
-        description="Optional. Kept on record; not yet used to filter companies."
+        description={t(
+          "Optional. Kept on record; not yet used to filter companies.",
+        )}
         options={step.revenueOptions}
         value={revenueState}
         disabled={busy}

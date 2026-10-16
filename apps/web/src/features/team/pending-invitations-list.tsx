@@ -11,6 +11,7 @@ import {
   declineInvitationAction,
 } from "./team-actions";
 import { teamWords } from "./team-words";
+import { useT } from "@/features/i18n/language";
 
 const ROLE = { ADMIN: "Admin", MEMBER: "Member" } as const;
 
@@ -25,6 +26,7 @@ export function PendingInvitationsList({
 }: {
   readonly items: readonly MyInvitationDto[];
 }) {
+  const t = useT();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [gone, setGone] = useState<readonly string[]>([]);
@@ -33,7 +35,7 @@ export function PendingInvitationsList({
   if (shown.length === 0) return null;
   return (
     <section
-      aria-label="Invitations to join a team"
+      aria-label={t("Invitations to join a team")}
       className="mx-auto flex w-full max-w-[560px] flex-col gap-3"
       data-pending-invitations
     >
@@ -95,7 +97,7 @@ export function PendingInvitationsList({
                 }}
                 data-pending-invitation-decline
               >
-                Decline
+                {t("Decline")}
               </button>
             </div>
           </div>

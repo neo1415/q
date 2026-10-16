@@ -186,7 +186,7 @@ export async function MandateSummary({
             className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-3"
           >
             <dt className="cq-label text-(--cq-text-secondary)">{term}</dt>
-            <dd className="cq-body text-right text-(--cq-text-primary)">
+            <dd className="cq-body text-end text-(--cq-text-primary)">
               {value}
             </dd>
           </div>

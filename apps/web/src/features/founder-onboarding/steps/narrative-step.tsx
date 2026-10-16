@@ -8,6 +8,7 @@ import { InlineNotice } from "@capital-q/ui/states";
 
 import type { AskedQuestionView } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Short, optional narrative. Skipping is an explicit state ("Skipped for
@@ -26,6 +27,7 @@ export function NarrativeStep({
   busy,
   actions,
 }: StepProps<"narrative">) {
+  const t = useT();
   const [text, setText] = useState(step.response?.text ?? "");
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -66,13 +68,14 @@ export function NarrativeStep({
           className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)"
           data-follow-up-questions={0}
         >
-          Nothing I still need from you. Everything important is answered or
-          waiting on your review.
+          {t(
+            "Nothing I still need from you. Everything important is answered or waiting on your review.",
+          )}
         </p>
       ) : null}
       {step.skipped && text.length === 0 ? (
         <InlineNotice tone="info">
-          Skipped for now. You can add this later.
+          {t("Skipped for now. You can add this later.")}
         </InlineNotice>
       ) : null}
       {nothingNeeded ? null : (
@@ -105,11 +108,13 @@ function FollowUpQuestions({
   readonly busy: boolean;
   readonly actions: StepProps<"narrative">["actions"];
 }) {
+  const t = useT();
   if (questions.length === 0) {
     return (
-      <InlineNotice tone="info" title="Nothing I still need from you">
-        Everything important is answered or waiting on your review. Add anything
-        else below, or continue.
+      <InlineNotice tone="info" title={t("Nothing I still need from you")}>
+        {t(
+          "Everything important is answered or waiting on your review. Add anything else below, or continue.",
+        )}
       </InlineNotice>
     );
   }
@@ -181,7 +186,7 @@ function FollowUpQuestions({
                 disabled={busy}
                 onClick={() => void actions.dismissQuestion(question.id)}
               >
-                I don&apos;t know
+                {t("I don't know")}
               </Button>
             </div>
           </li>
@@ -200,6 +205,7 @@ function AnswerOnStep({
   readonly busy: boolean;
   readonly onOpen: (stepId: string) => void;
 }) {
+  const t = useT();
   return (
     <Button
       type="button"
@@ -208,7 +214,7 @@ function AnswerOnStep({
       disabled={busy}
       onClick={() => onOpen(stepId)}
     >
-      Answer
+      {t("Answer")}
     </Button>
   );
 }

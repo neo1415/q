@@ -145,7 +145,7 @@ export function PersonaCards({
               }}
               data-persona={persona.id}
               className={[
-                "flex min-h-11 items-start gap-3 border px-4 py-3 text-left transition-colors duration-(--cq-motion-fast)",
+                "flex min-h-11 items-start gap-3 border px-4 py-3 text-start transition-colors duration-(--cq-motion-fast)",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
                 isSelected
                   ? "border-(--cq-border-strong) bg-(--cq-accent-soft)"

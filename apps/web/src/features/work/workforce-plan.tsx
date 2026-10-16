@@ -1,4 +1,5 @@
 import type { WorkforcePlanProgress } from "@capital-q/contracts";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The approved plan as it stands (wf 2026-10-16): the outcome Q's team is
@@ -31,6 +32,8 @@ export function WorkforcePlan({
 }: {
   readonly plan: WorkforcePlanProgress | undefined;
 }) {
+  const t = useT();
+
   if (plan === undefined || plan.total === 0) return null;
   const missing = plan.prerequisites.filter((one) => one.status !== "MET");
   const steps = new Map(plan.steps.map((step) => [step.key, step.who]));
@@ -40,18 +43,18 @@ export function WorkforcePlan({
       data-workforce-plan
     >
       <summary className="cq-label flex min-h-11 cursor-pointer items-center gap-2 font-normal">
-        <span className="font-medium">The plan</span>
+        <span className="font-medium">{t("The plan")}</span>
         <span className="cq-numeric text-(--cq-text-secondary)">
-          {plan.done} of {plan.total} steps done
+          {plan.done} {t(`of ${String(plan.total)} steps done`)}
         </span>
       </summary>
       <div className="pb-3">
         {plan.outcome === null ? null : (
           <p className="cq-body-sm m-0 mb-3">
             <span className="text-(--cq-text-secondary)">
-              Working towards:{" "}
+              {t("Working towards:")}{" "}
             </span>
-            {plan.outcome}
+            {t(plan.outcome)}
           </p>
         )}
         <ol className="m-0 mb-3 list-none space-y-2.5 p-0">
@@ -60,27 +63,33 @@ export function WorkforcePlan({
               <p className="cq-body-sm m-0">
                 <span className="font-medium">{step.who}</span>
                 {": "}
-                {step.does}
+                {t(step.does)}
               </p>
               <p className="m-0 text-[13px] text-(--cq-text-secondary)">
-                {STATUS_WORDS[step.status]}
+                {t(STATUS_WORDS[step.status])}
                 {step.fallbackFor === null
                   ? ""
-                  : ` · only if ${steps.get(step.fallbackFor) ?? "an earlier step"} cannot`}
+                  : t(
+                      ` · only if ${steps.get(step.fallbackFor) ?? "an earlier step"} cannot`,
+                    )}
                 {step.dependsOn.length === 0
                   ? ""
-                  : ` · after ${step.dependsOn.map((key) => steps.get(key) ?? key).join(", ")}`}
-                {step.summary === null ? "" : ` · ${step.summary}`}
+                  : t(
+                      ` · after ${step.dependsOn.map((key) => steps.get(key) ?? key).join(", ")}`,
+                    )}
+                {step.summary === null ? "" : t(` · ${step.summary}`)}
               </p>
               {step.why === null ? null : (
                 <p className="m-0 text-[13px] text-(--cq-text-secondary)">
-                  Why: {step.why}
+                  {t("Why:")} {t(step.why)}
                 </p>
               )}
               {step.evidence.length === 0 ? null : (
                 <ul className="m-0 mt-0.5 list-none p-0 text-[13px] text-(--cq-text-tertiary)">
                   {step.evidence.map((fact) => (
-                    <li key={fact.ref}>Based on: {fact.text}</li>
+                    <li key={fact.ref}>
+                      {t("Based on:")} {fact.text}
+                    </li>
                   ))}
                 </ul>
               )}
@@ -88,20 +97,20 @@ export function WorkforcePlan({
           ))}
         </ol>
         {missing.length === 0 ? null : (
-          <section aria-label="Missing or not known" className="mb-3">
+          <section aria-label={t("Missing or not known")} className="mb-3">
             <h5 className="cq-label m-0 mb-1 font-medium">
-              Missing or not known
+              {t("Missing or not known")}
             </h5>
-            <ul className="cq-body-sm m-0 list-disc space-y-1 pl-5">
+            <ul className="cq-body-sm m-0 list-disc space-y-1 ps-5">
               {missing.map((one) => (
                 <li key={one.what}>
-                  {one.what}{" "}
+                  {t(one.what)}{" "}
                   <span className="text-(--cq-text-secondary)">
-                    ({PREREQUISITE_WORDS[one.status]}
-                    {one.blocking ? ", needed for the outcome" : ""}
+                    ({t(PREREQUISITE_WORDS[one.status])}
+                    {one.blocking ? t(", needed for the outcome") : ""}
                     {one.resolvedBy === null
                       ? ""
-                      : `; ${steps.get(one.resolvedBy) ?? "a step"} gets it`}
+                      : t(`; ${steps.get(one.resolvedBy) ?? "a step"} gets it`)}
                     )
                   </span>
                 </li>
@@ -110,19 +119,19 @@ export function WorkforcePlan({
           </section>
         )}
         {plan.signals.length === 0 ? null : (
-          <section aria-label="What the team found" className="mb-3">
+          <section aria-label={t("What the team found")} className="mb-3">
             <h5 className="cq-label m-0 mb-1 font-medium">
-              What the team found
+              {t("What the team found")}
             </h5>
-            <ul className="cq-body-sm m-0 list-disc space-y-1 pl-5">
+            <ul className="cq-body-sm m-0 list-disc space-y-1 ps-5">
               {plan.signals.map((one) => (
                 <li key={`${one.stepKey}:${one.note}`}>
                   <span className="font-medium">
                     {one.kind === "CONTRADICTION"
-                      ? "Contradiction"
+                      ? t("Contradiction")
                       : one.kind === "MISSING_INFORMATION"
-                        ? "Not known"
-                        : "Changed"}
+                        ? t("Not known")
+                        : t("Changed")}
                     :
                   </span>{" "}
                   {one.note}
@@ -132,15 +141,17 @@ export function WorkforcePlan({
           </section>
         )}
         {plan.nextActions.length === 0 ? null : (
-          <section aria-label="What comes next">
-            <h5 className="cq-label m-0 mb-1 font-medium">What comes next</h5>
-            <ol className="cq-body-sm m-0 list-decimal space-y-1.5 pl-5">
+          <section aria-label={t("What comes next")}>
+            <h5 className="cq-label m-0 mb-1 font-medium">
+              {t("What comes next")}
+            </h5>
+            <ol className="cq-body-sm m-0 list-decimal space-y-1.5 ps-5">
               {plan.nextActions.map((one) => (
                 <li key={one.action}>
-                  {one.action}
+                  {t(one.action)}
                   <span className="block text-[13px] text-(--cq-text-secondary)">
-                    {one.why}
-                    {one.needsApproval ? " Needs your approval." : ""}
+                    {t(one.why)}
+                    {one.needsApproval ? t(" Needs your approval.") : ""}
                   </span>
                 </li>
               ))}

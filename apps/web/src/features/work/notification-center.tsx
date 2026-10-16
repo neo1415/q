@@ -21,6 +21,7 @@ import {
   refreshNotices,
   useNotices,
 } from "./notice-store";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The notification centre (AUTO; spec auto.md §3.5): one bell with the
@@ -51,6 +52,8 @@ function NoticeRow({
   readonly onOpen: () => void;
   readonly needsYou?: boolean;
 }) {
+  const t = useT();
+
   const { notice, count, unread } = group;
   const linked = notice.linkPath !== null && /^\/(?!\/)/.test(notice.linkPath);
   // One line per notice on a phone (design-48 v2): the title and its time.
@@ -79,17 +82,19 @@ function NoticeRow({
       <span
         className={`cq-body-sm min-w-0 flex-1 line-clamp-2 text-(--cq-text-primary) ${unread ? "font-medium" : ""}`}
       >
-        {unread ? <span className="sr-only">New: </span> : null}
-        {notice.title}
+        {unread ? <span className="sr-only">{t("New:")} </span> : null}
+        {t(notice.title)}
       </span>
       <span className="cq-caption cq-numeric shrink-0 text-(--cq-text-tertiary)">
         <time dateTime={notice.createdAt} suppressHydrationWarning>
-          {when(notice.createdAt)}
+          {t(when(notice.createdAt))}
         </time>
         {count > 1 ? (
           <>
             <span aria-hidden="true"> ×{count}</span>
-            <span className="sr-only">, latest of {count} like this</span>
+            <span className="sr-only">
+              {t(`, latest of ${String(count)} like this`)}
+            </span>
           </>
         ) : null}
       </span>
@@ -117,7 +122,7 @@ function NoticeRow({
               aria-hidden="true"
               className={buttonClassName("secondary", "compact")}
             >
-              Open
+              {t("Open")}
             </span>
           ) : null}
         </Link>
@@ -135,6 +140,8 @@ function NoticeRow({
 }
 
 export function NotificationCenter() {
+  const t = useT();
+
   const [open, setOpen] = useState(false);
   // Q Pitch (premiere v5) and Q's own UI acts: open or close this panel
   // deterministically, DONE once it shows. Reading is not consequential.
@@ -193,8 +200,8 @@ export function NotificationCenter() {
           <IconButton
             aria-label={
               unread === 0
-                ? "Notifications"
-                : `Notifications, ${String(unread)} new`
+                ? t("Notifications")
+                : t(`Notifications, ${String(unread)} new`)
             }
             variant="quiet"
             className="relative text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
@@ -215,14 +222,14 @@ export function NotificationCenter() {
             )}
           </IconButton>
         </SheetTrigger>
-        <SheetContent title="Notifications" side="side">
+        <SheetContent title={t("Notifications")} side="side">
           <div className="flex flex-col gap-5 pt-1">
             {items === null && !failed ? (
               <Skeleton lines={4} />
             ) : failed && items === null ? (
               <ErrorState
-                title="Notifications couldn't load"
-                description="What needs you is also on Q's work."
+                title={t("Notifications couldn't load")}
+                description={t("What needs you is also on Q's work.")}
                 action={
                   <button
                     type="button"
@@ -236,8 +243,8 @@ export function NotificationCenter() {
               />
             ) : (items ?? []).length === 0 ? (
               <EmptyState
-                title="You're up to date"
-                description="What needs you shows first."
+                title={t("You're up to date")}
+                description={t("What needs you shows first.")}
                 compact
               />
             ) : (
@@ -248,7 +255,7 @@ export function NotificationCenter() {
                       id="notices-needs-you"
                       className="cq-title-sm text-(--cq-text-primary)"
                     >
-                      Needs you
+                      {t("Needs you")}
                     </h3>
                     <ul>
                       {needsYou.map((group) => (
@@ -265,11 +272,11 @@ export function NotificationCenter() {
                 {days.map((day) => (
                   <section
                     key={day.label}
-                    aria-label={`Updates, ${day.label}`}
+                    aria-label={t(`Updates, ${day.label}`)}
                     data-notice-day={day.label}
                   >
                     <h3 className="cq-label text-(--cq-text-secondary)">
-                      {day.label}
+                      {t(day.label)}
                     </h3>
                     <ul>
                       {day.groups.map((group) => (
@@ -289,7 +296,7 @@ export function NotificationCenter() {
                     onClick={() => void loadOlderNotices()}
                     data-notices-older
                   >
-                    Show older
+                    {t("Show older")}
                   </button>
                 )}
               </>
@@ -301,7 +308,7 @@ export function NotificationCenter() {
                 onClick={close}
                 className="cq-body-sm mt-3 inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-4"
               >
-                Open Q&rsquo;s work
+                {t("Open Q’s work")}
               </Link>
             </div>
           </div>

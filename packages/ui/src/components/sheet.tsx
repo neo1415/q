@@ -7,6 +7,7 @@ import { ICON_SIZE, ICON_STROKE, X } from "../icons/index.js";
 import { cx } from "../primitives/class-names.js";
 import { OverlayLayerContext } from "../primitives/overlay-layer.js";
 import { IconButton } from "./button.js";
+import { useUiText } from "../primitives/ui-text.js";
 
 /**
  * Sheet on Base UI's modal dialog. Mobile-first: a bottom sheet with
@@ -45,7 +46,7 @@ const sideClass: Record<SheetSide, string> = {
   bottom:
     "inset-x-0 bottom-0 max-h-[85dvh] data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",
   full: "inset-0 data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",
-  side: "inset-x-0 bottom-0 max-h-[85dvh] data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full lg:inset-y-0 lg:right-0 lg:left-auto lg:h-full lg:max-h-none lg:w-[420px] lg:data-[ending-style]:translate-x-full lg:data-[ending-style]:translate-y-0 lg:data-[starting-style]:translate-x-full lg:data-[starting-style]:translate-y-0",
+  side: "inset-x-0 bottom-0 max-h-[85dvh] data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full lg:inset-y-0 lg:end-0 lg:start-auto lg:h-full lg:max-h-none lg:w-[420px] lg:data-[ending-style]:translate-x-full lg:data-[ending-style]:translate-y-0 lg:data-[starting-style]:translate-x-full lg:data-[starting-style]:translate-y-0",
 };
 
 export function SheetContent({
@@ -61,6 +62,7 @@ export function SheetContent({
   readonly children: ReactNode;
   readonly className?: string | undefined;
 }) {
+  const t = useUiText();
   return (
     <OverlayLayerContext.Provider value="modal">
       <BaseDialog.Portal>
@@ -85,7 +87,7 @@ export function SheetContent({
             </div>
             <BaseDialog.Close
               render={
-                <IconButton aria-label="Close" variant="quiet">
+                <IconButton aria-label={t("Close")} variant="quiet">
                   <X
                     aria-hidden="true"
                     size={ICON_SIZE.prominent}

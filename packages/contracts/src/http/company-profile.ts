@@ -138,6 +138,30 @@ export const PitchClaimDtoSchema = z
 export type PitchClaimDto = z.infer<typeof PitchClaimDtoSchema>;
 
 /**
+ * Lane ov 2026-10-16: what a founder says in a pitch this reader may play,
+ * filed by Q under one of the founder profile's standard sections
+ * (`sectionKey`: the section's factKey, else its key, in
+ * FOUNDER_PROFILE_SECTIONS). Read once per pitch from its transcript and
+ * stored; served only from pitches this reader may play (the transcript is
+ * part of the pitch, never a separate disclosure). Always the company's
+ * own claim with the moment it is said.
+ */
+export const PitchSectionFactDtoSchema = z
+  .object({
+    sectionKey: z.string().regex(/^[a-z][a-z0-9_]{0,47}$/u),
+    label: z.string().min(1).max(80),
+    value: z.string().min(1).max(300),
+    pitchId: UuidSchema,
+    pitchTitle: z.string().max(200).nullable(),
+    atSeconds: z.number().int().min(0).max(86_400),
+    truthClass: z.literal("USER_CLAIM"),
+    evidenceStatus: z.literal("SELF_REPORTED"),
+    source: z.literal("PITCH_VIDEO"),
+  })
+  .strict();
+export type PitchSectionFactDto = z.infer<typeof PitchSectionFactDtoSchema>;
+
+/**
  * The owner's view only: their pitch states a raise their profile does not
  * show as declared. The founder is told; nothing is decided for them.
  *
@@ -197,6 +221,11 @@ export const CompanyProfileOverviewSchema = z
      * server decides; null otherwise.
      */
     raiseFromPitch: PitchClaimDtoSchema.nullable().default(null),
+    /**
+     * Lane ov: the pitches this reader may play, read into the profile's
+     * sections (founder claims with their moments); absent from older servers.
+     */
+    pitchSections: z.array(PitchSectionFactDtoSchema).max(160).optional(),
     /** OWNER only: the pitch and the declared raise disagree in what shows. */
     pitchRaiseNotice: PitchRaiseNoticeSchema.nullable().default(null),
     /**

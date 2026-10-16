@@ -449,6 +449,10 @@ export function createDomainEventHandler(
             eventId: event.id,
             documentVersionId: ready.documentVersionId,
             outcome: outcome.kind,
+            investorOutcome: investorOutcome.kind,
+            ...("reason" in investorOutcome
+              ? { investorReason: investorOutcome.reason }
+              : {}),
           },
           "founder onboarding review handled",
         );

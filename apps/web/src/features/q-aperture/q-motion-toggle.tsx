@@ -11,6 +11,7 @@ import {
   storeQMotion,
   useQMotion,
 } from "./q-motion";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Q motion: Full · Calm · Off", beside the theme wherever the theme is
@@ -25,13 +26,14 @@ export function QMotionToggle({
   readonly size?: "regular" | "touch" | undefined;
   readonly className?: string | undefined;
 }) {
+  const t = useT();
   const { choice, motion } = useQMotion();
   const reduced = choice === "full" && motion === "calm";
   const noteId = useId();
   return (
     <div
       role="group"
-      aria-label="Q motion"
+      aria-label={t("Q motion")}
       aria-describedby={reduced ? noteId : undefined}
       className={cx(
         "cq-theme-switch is-text",
@@ -58,7 +60,7 @@ export function QMotionToggle({
       ))}
       {reduced ? (
         <span id={noteId} className="sr-only">
-          Your device asks for reduced motion, so Q stays calm.
+          {t("Your device asks for reduced motion, so Q stays calm.")}
         </span>
       ) : null}
     </div>

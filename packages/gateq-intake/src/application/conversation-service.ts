@@ -103,6 +103,8 @@ export type ConversationService = {
     readonly token: string;
     readonly channel?: InterviewChannel | undefined;
     readonly correlationId: string;
+    /** Lane ml: the applicant's language, when the caller knows it. */
+    readonly locale?: string | undefined;
   }) => Promise<string>;
   readonly turn: (input: {
     readonly token: string;
@@ -110,6 +112,8 @@ export type ConversationService = {
     readonly clientTurnId: string;
     readonly channel?: InterviewChannel | undefined;
     readonly correlationId: string;
+    /** Lane ml: the applicant's language, when the caller knows it. */
+    readonly locale?: string | undefined;
   }) => Promise<ApplicantTurnResult>;
   /** The applicant's own view, with the deterministic answer attached. */
   readonly summary: (token: string) => Promise<ApplicantTurnResult>;
@@ -288,6 +292,7 @@ export function createConversationService(
           ? await interviewer.turn({
               stage: "APPLICATION",
               channel: input.channel ?? "text",
+              ...(input.locale === undefined ? {} : { locale: input.locale }),
               publicGateway,
               application: {
                 policy,

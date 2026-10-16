@@ -9,6 +9,7 @@ import type { Briefing, BriefingItem } from "./briefing";
 import { decideBriefing } from "./briefing-gate";
 import { remindSetupLaterAction } from "./setup-nudge-actions";
 import { useClaimWhenSeen } from "./use-claim-when-seen";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q's briefing on arrival (R35): one short line and a few cards, each a
@@ -23,7 +24,7 @@ import { useClaimWhenSeen } from "./use-claim-when-seen";
  */
 
 const CARD_CLASS = [
-  "group flex min-h-11 w-full items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-left",
+  "group flex min-h-11 w-full items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-start",
   "transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:bg-(--cq-surface-subtle)",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
 ].join(" ");
@@ -46,6 +47,7 @@ function SetupNudgeCard({
   readonly item: BriefingItem;
   readonly onLater: () => void;
 }) {
+  const t = useT();
   // Today's reminder is counted once this card is really seen.
   const ref = useRef<HTMLDivElement>(null);
   useClaimWhenSeen(ref, true);
@@ -68,7 +70,7 @@ function SetupNudgeCard({
           href={item.href}
           className={`${QUIET_CONTROL_CLASS} font-medium text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)`}
         >
-          Continue
+          {t("Continue")}
         </Link>
         <button
           type="button"
@@ -76,7 +78,7 @@ function SetupNudgeCard({
           className={`${QUIET_CONTROL_CLASS} text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)`}
           data-setup-nudge-later
         >
-          Remind me next week
+          {t("Remind me next week")}
         </button>
       </span>
     </div>
@@ -91,6 +93,7 @@ export function QBriefing({
   /** Only today's setup reminder card, without the line (the arrival's). */
   readonly onlyReminder?: boolean | undefined;
 }) {
+  const t = useT();
   const [shown, setShown] = useState<Briefing | null>(null);
   const [putOff, setPutOff] = useState<ReadonlySet<string>>(new Set());
 
@@ -126,7 +129,7 @@ export function QBriefing({
     >
       {onlyReminder ? null : (
         <p id="q-briefing-line" className="cq-body text-(--cq-text-primary)">
-          {shown.line}
+          {t(shown.line)}
         </p>
       )}
       <ul className="grid w-full gap-2 sm:grid-cols-2">
@@ -147,10 +150,10 @@ export function QBriefing({
               >
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="cq-body-sm font-medium text-(--cq-text-primary)">
-                    {item.title}
+                    {t(item.title)}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {item.description}
+                    {t(item.description)}
                   </span>
                 </span>
                 <ChevronRight

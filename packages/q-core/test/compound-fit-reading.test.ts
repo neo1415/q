@@ -15,8 +15,8 @@ import {
 describe("compound fit meaning in the existing readers", () => {
   it("publishes new versions without rewriting historical prompts", () => {
     const registry = createDefaultPromptRegistry();
-    // v51 (decision with work) keeps v50's compound-fit rule as it was.
-    expect(registry.getActive("TURN_READER").definition.version).toBe(51);
+    // v52 (lane ml nextSteps) on v51 (decision with work) keeps v50's compound-fit rule.
+    expect(registry.getActive("TURN_READER").definition.version).toBe(52);
     expect(registry.getActive("TURN_READER").definition.template).toContain(
       V50_FIT,
     );

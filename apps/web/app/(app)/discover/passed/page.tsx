@@ -16,6 +16,7 @@ import { countryLabel, stageLabel } from "@/features/company/declared-labels";
 import { PassedCompanies } from "@/features/discover/passed-companies";
 import { apiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Passed" };
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export const dynamic = "force-dynamic";
  * not shown.
  */
 export default async function PassedPage() {
+  const t = await serverT();
   const session = await apiSession();
   const passed =
     session === null
@@ -54,32 +56,38 @@ export default async function PassedPage() {
           id: company.companyId,
         }))}
         total={companies.length}
-        label="companies you passed"
+        label={t("companies you passed")}
       >
         <PageHeader
-          title="Passed"
-          description="Passing only hides a company from your feed. The company isn't told, and your mandate doesn't change."
+          title={t("Passed")}
+          description={t(
+            "Passing only hides a company from your feed. The company isn't told, and your mandate doesn't change.",
+          )}
         />
         {passed === null ? (
           <EmptyState
-            title="Passed couldn't load."
-            description="Nothing is lost. Capital Q didn't answer just now; try again in a moment."
+            title={t("Passed couldn't load.")}
+            description={t(
+              "Nothing is lost. Capital Q didn't answer just now; try again in a moment.",
+            )}
             action={
               <Link
                 href="/discover/passed"
                 className={buttonClassName("secondary")}
               >
-                Try again
+                {t("Try again")}
               </Link>
             }
           />
         ) : companies.length === 0 ? (
           <EmptyState
-            title="Nothing passed."
-            description="Companies you pass on in Discover are listed here, so you can bring any of them back."
+            title={t("Nothing passed.")}
+            description={t(
+              "Companies you pass on in Discover are listed here, so you can bring any of them back.",
+            )}
             action={
               <Link href="/discover" className={buttonClassName("secondary")}>
-                Go to Discover
+                {t("Go to Discover")}
               </Link>
             }
           />

@@ -555,6 +555,7 @@ describe("a spoken category confirmation", () => {
           confidence: "0.9",
           status: "PENDING",
           sourceRefs: [],
+          rationale: null,
           createdAt: NOW,
         },
       ],
@@ -2124,9 +2125,12 @@ describe("a spoken approval in plain words (owner 2026-10-16)", () => {
   it("'yes, but change the date' never approves", async () => {
     const s = setup("app.chat.message.send");
     await prepare(s);
-    await s.say("yes, but change the date");
+    const said = await s.say("yes, but change the date");
     expect(s.approvals.approve).toEqual([]);
     expect(s.approvals.reject).toEqual([]);
+    // Q asks for the new date; never "waiting for your yes" (2026-10-16).
+    expect(said).toMatch(/What should the new date be/);
+    expect(said).not.toMatch(/waiting for your yes/);
   });
 
   it("'no, don't send it' declines, recorded as VOICE", async () => {

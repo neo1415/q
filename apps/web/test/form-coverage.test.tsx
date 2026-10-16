@@ -220,6 +220,62 @@ describe("the overview", () => {
   });
 });
 
+describe("provenance of what a document proposed (ob2)", () => {
+  it("an accepted proposal from a fund deck reads as from the document; a pending one names what did not match", async () => {
+    const coverage = deriveOnboardingCoverage({
+      profile: INVESTOR_COVERAGE_PROFILE,
+      definition: INVESTOR_DEFINITION_V1,
+      view: viewOf(
+        INVESTOR_DEFINITION_V1,
+        { "I2.stages": { type: "MULTI_SELECT", optionKeys: ["seed"] } },
+        {
+          modalities: { "I2.stages": "SUGGESTION_ACCEPT" },
+          suggestions: [
+            {
+              stepKey: "I3.geography",
+              value: {
+                type: "RESOURCE_REFERENCE",
+                resourceType: "TAXONOMY_NODE",
+                resourceIds: ["geo-ke", "geo-gh"],
+              },
+              sourceType: "EVIDENCE_DOCUMENT",
+              rationale:
+                "Not matched to Capital Q's list, so not included: Atlantis.",
+            },
+          ],
+        },
+      ),
+      acceptedSuggestions: [
+        {
+          stepKey: "I2.stages",
+          sourceRefs: [{ sourceType: "EVIDENCE_DOCUMENT" }],
+        },
+      ],
+      now: new Date("2026-10-16T10:00:00.000Z"),
+    });
+    render(
+      <CoverageOverview
+        coverage={coverage}
+        phases={phasesFor("investor")}
+        busy={false}
+        onOpen={undefined}
+        onResolve={() => Promise.resolve(true)}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "What Q has" }));
+    const row = (key: string) => {
+      const element = document.querySelector(`[data-coverage-field="${key}"]`);
+      if (!(element instanceof HTMLElement)) throw new Error(`no row ${key}`);
+      return within(element);
+    };
+    row("I2.stages").getByText(/from a document you shared/);
+    expect(row("I2.stages").queryByText(/Q's suggestion/)).toBeNull();
+    row("I3.geography").getByText(
+      "Not matched to Capital Q's list, so not included: Atlantis.",
+    );
+  });
+});
+
 describe("the form reads coverage from the route, in every state", () => {
   const SESSION = "00000000-0000-4000-8000-000000000001";
   const ready = founderCoverage({}, {}, "Harbourline Cargo");

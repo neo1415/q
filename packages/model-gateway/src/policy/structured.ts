@@ -108,6 +108,29 @@ const describe = (issue: Issue): string =>
       : ""
   }`;
 
+/**
+ * A model that escapes its line breaks twice writes `\\n` inside a JSON
+ * string, which decodes to a backslash and an "n", not a line break, and a
+ * person saw "Apapa.\n\nThe fit…" in Q's answer (run 7, 16 Oct). Here,
+ * where model output becomes data, a string that holds such sequences and
+ * no real line break gets real ones. A string that already has real line
+ * breaks is left as written: there the backslash is the model's own text.
+ */
+export function undoubleNewlines(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.includes("\\n") && !value.includes("\n")
+      ? value.replace(/\\r\\n|\\n/gu, "\n")
+      : value;
+  }
+  if (Array.isArray(value)) return value.map(undoubleNewlines);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, undoubleNewlines(item)]),
+    );
+  }
+  return value;
+}
+
 export function acceptStructuredOutput<T>(
   text: string,
   schema: z.ZodType<T>,
@@ -146,7 +169,7 @@ export function acceptStructuredOutput<T>(
   const body = (fenced?.[1] ?? text).trim();
   let decoded: unknown;
   try {
-    decoded = JSON.parse(body);
+    decoded = undoubleNewlines(JSON.parse(body));
   } catch {
     return { ok: false, stage: "JSON" };
   }

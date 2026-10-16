@@ -63,13 +63,16 @@ const NOTE_TEXT: Readonly<Record<DiscoveryNoteDto, string>> = {
 
 function Reasons({
   reasons,
+  t = (english: string) => english,
 }: {
   readonly reasons: readonly DiscoveryReasonDto[];
+  /** The reader's language (a server component: handed in, not a hook). */
+  readonly t?: ((english: string) => string) | undefined;
 }) {
   if (reasons.length === 0) {
     return (
       <p className="cq-caption text-(--cq-text-tertiary)">
-        Nothing in common with your company yet.
+        {t("Nothing in common with your company yet.")}
       </p>
     );
   }
@@ -78,10 +81,10 @@ function Reasons({
       {reasons.map((reason) => (
         <div key={`${reason.kind}-${reason.detail}`} className="flex gap-1.5">
           <dt className="cq-caption text-(--cq-text-tertiary)">
-            {REASON_LABELS[reason.kind]}
+            {t(REASON_LABELS[reason.kind])}
           </dt>
           <dd className="cq-caption text-(--cq-text-secondary)">
-            {reason.detail}
+            {t(reason.detail)}
           </dd>
         </div>
       ))}
@@ -167,7 +170,10 @@ export function DiscoverInvestors({
   items,
   notes,
   gates = new Map(),
+  translate,
 }: {
+  /** The reader's language, from the page. */
+  readonly translate?: ((english: string) => string) | undefined;
   readonly items: readonly DiscoveredInvestorDto[];
   readonly notes: readonly DiscoveryNoteDto[];
   /** Q.05: published gates checked for the founder's own company. */
@@ -195,7 +201,7 @@ export function DiscoverInvestors({
             const gate = gates.get(item.investorOrganisationId);
             return (
               <div className="flex flex-col gap-3">
-                <Reasons reasons={item.reasons} />
+                <Reasons reasons={item.reasons} t={translate} />
                 {gate === undefined ? null : (
                   <GateFit gate={gate} apply={false} compact />
                 )}

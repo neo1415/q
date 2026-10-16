@@ -81,6 +81,17 @@ export {
   type QPersonality,
   type QPersonalityCode,
 } from "./personality.js";
+export {
+  effectiveLocale,
+  spokenLanguageNote,
+  supportedLanguageOf,
+  writtenLanguageNote,
+} from "./language.js";
+export {
+  READINESS_LEAD_ARABIC_STEPS,
+  readinessLeadCopy,
+  type ReadinessLeadCopy,
+} from "./readiness-lead-copy.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { GATEQ_INTERVIEWER_V1 } from "./prompts/tasks/gateq-interviewer.v1.js";
 export {
@@ -384,6 +395,9 @@ export {
   TURN_READER_V49_SCHEMA_VERSION,
   TurnReaderV49ResultSchema,
   type TurnReaderV49Result,
+  TURN_READER_V52_SCHEMA_VERSION,
+  TurnReaderV52ResultSchema,
+  type TurnReaderV52Result,
   type TurnReference,
   type TurnReferenceOpenKind,
   TurnReaderV30ResultSchema,
@@ -1411,6 +1425,21 @@ export {
 } from "./prompts/schemas/workforce.js";
 // PROFILE block (overnight A5): the deck into twelve sections.
 export { DECK_EXTRACTION_V1 } from "./prompts/tasks/deck-extraction.v1.js";
+export { PITCH_SECTION_EXTRACTION_V1 } from "./prompts/tasks/pitch-section-extraction.v1.js";
+export {
+  PITCH_SECTION_EXTRACTION_SCHEMA_NAME,
+  PITCH_SECTION_EXTRACTION_SCHEMA_VERSION,
+  PITCH_SECTION_EXTRACTION_UNTRUSTED,
+  PITCH_SECTION_FACTS_MAX,
+  PITCH_SECTION_SECTIONS_MAX,
+  PITCH_SECTION_TRANSCRIPT_MAX,
+  PitchSectionExtractionResultSchema,
+  PitchSectionExtractionVariablesSchema,
+  PitchSectionFactSchema,
+  type PitchSectionExtractionResult,
+  type PitchSectionExtractionVariables,
+  type PitchSectionFact,
+} from "./prompts/schemas/pitch-section-extraction.js";
 export {
   SPEAK_FROM_FACTS_V1,
   SPOKEN_REPLY_V1,
@@ -1572,6 +1601,10 @@ export {
   TURN_READER_V51,
   V51_DECISION_WITH_WORK,
 } from "./prompts/tasks/turn-reader.v51.js";
+export {
+  TURN_READER_V52,
+  V52_NEXT_STEPS,
+} from "./prompts/tasks/turn-reader.v52.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 
 export {

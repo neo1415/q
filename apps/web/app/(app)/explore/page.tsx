@@ -9,6 +9,7 @@ import { authorisePostersAction } from "@/features/discover/feed/playback-source
 import { apiSession } from "@/features/q/context";
 import { withTimeout } from "@/pwa/resilient";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Explore" };
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export default async function ExplorePage({
     readonly tab?: string | string[];
   }>;
 } = {}) {
+  const t = await serverT();
   const params = (await searchParams) ?? {};
   const query =
     typeof params.q === "string" ? params.q.trim().slice(0, 80) : "";
@@ -67,8 +69,8 @@ export default async function ExplorePage({
     }).catch(() => undefined);
     return (
       <div className="flex w-full flex-col gap-4 px-4 pt-4 pb-[calc(var(--cq-bottom-nav-height)+88px)] sm:px-6 lg:px-8 lg:pt-7 lg:pb-16">
-        <h1 className="cq-title-md lg:sr-only">Explore</h1>
-        <QSection id="explore" kind="EXPLORE" label="Explore">
+        <h1 className="cq-title-md lg:sr-only">{t("Explore")}</h1>
+        <QSection id="explore" kind="EXPLORE" label={t("Explore")}>
           <ExploreScreen
             search={
               search ?? {
@@ -111,7 +113,7 @@ export default async function ExplorePage({
         ).catch(() => ({}));
   return (
     <div className="flex w-full flex-col gap-4 px-4 pt-4 pb-[calc(var(--cq-bottom-nav-height)+88px)] sm:px-6 lg:px-8 lg:pt-7 lg:pb-16">
-      <h1 className="cq-title-md lg:sr-only">Explore</h1>
+      <h1 className="cq-title-md lg:sr-only">{t("Explore")}</h1>
       <QSection
         id="explore"
         kind="EXPLORE"
@@ -119,7 +121,7 @@ export default async function ExplorePage({
           .slice(0, 12)
           .map((tile) => ({ kind: "COMPANY" as const, id: tile.companyId }))}
         total={initial?.items.length ?? 0}
-        label="Explore"
+        label={t("Explore")}
       >
         <ExploreScreen
           initial={initial}

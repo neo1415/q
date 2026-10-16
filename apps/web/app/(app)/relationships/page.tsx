@@ -73,8 +73,12 @@ import {
   needsYouCards,
   pageAfter,
 } from "@/features/relationships/relationships-view";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Relationships" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Relationships") };
+}
 
 // Read under the person's own session on every request.
 export const dynamic = "force-dynamic";
@@ -90,6 +94,8 @@ export default async function RelationshipsPage({
 }: {
   readonly searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  const t = await serverT();
+
   const params = await searchParams;
   // An old Relationships link opens the Pipeline's List layout.
   const listed = pipelineListHref(params);
@@ -161,8 +167,10 @@ export default async function RelationshipsPage({
         side === "NONE" ||
         !parsed.success ? (
           <ErrorState
-            title="Pipeline couldn't load"
-            description="Start this view again. Your relationships are unchanged."
+            title={t("Pipeline couldn't load")}
+            description={t(
+              "Start this view again. Your relationships are unchanged.",
+            )}
             action={
               <Link
                 className={buttonClassName("secondary")}
@@ -183,7 +191,7 @@ export default async function RelationshipsPage({
                 id: row.counterpart.id,
               }))}
             total={data.total}
-            label="Pipeline relationships"
+            label={t("Pipeline relationships")}
           >
             <RelationshipPipeline
               key={pipelineStorageKey(user.authUserId, side, subjectId)}
@@ -294,8 +302,10 @@ export default async function RelationshipsPage({
         <HubHeader side={side} view={view} />
         {unset ? (
           <EmptyState
-            title="Set up your organisation"
-            description="Your relationships and capital activity will gather here."
+            title={t("Set up your organisation")}
+            description={t(
+              "Your relationships and capital activity will gather here.",
+            )}
             action={
               <Link className={buttonClassName("primary")} href="/welcome">
                 Set up
@@ -335,8 +345,10 @@ export default async function RelationshipsPage({
         {unset ? null : !available || results === null ? (
           // Partial: the queue above still stands when the period cannot.
           <ErrorState
-            title="The period report couldn't load"
-            description="Your records are unchanged. Try again in a moment."
+            title={t("The period report couldn't load")}
+            description={t(
+              "Your records are unchanged. Try again in a moment.",
+            )}
             action={
               <Link
                 className={buttonClassName("secondary")}
@@ -352,11 +364,11 @@ export default async function RelationshipsPage({
             kind="RELATIONSHIP_LIST"
             refs={hubOverviewRefs(results, stage)}
             total={hubOverviewRefs(results, stage).length}
-            label="Relationships in the overview"
+            label={t("Relationships in the overview")}
           >
             <QControl id="section.hub-overview" kind="SECTION">
               <ResultsDashboard
-                heading="This period"
+                heading={t("This period")}
                 headingLevel={2}
                 basePath="/relationships?view=overview"
                 range={range}
@@ -445,7 +457,7 @@ export default async function RelationshipsPage({
           id: item.counterpart.id,
         }))}
         total={items?.length ?? 0}
-        label={`${String(items?.length ?? 0)} relationships`}
+        label={t(`${String(items?.length ?? 0)} relationships`)}
       >
         <RelationshipsIndex
           side={side}

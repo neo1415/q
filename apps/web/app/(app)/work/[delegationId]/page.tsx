@@ -13,8 +13,12 @@ import {
 import { qApiSession } from "@/features/q/context";
 import { DoneForYouUndo } from "@/features/work/done-for-you-undo";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "What Q did" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("What Q did") };
+}
 
 /**
  * One delegation in full (AUTO, ADR 0030): who Q picked and on what words,
@@ -26,6 +30,8 @@ export default async function WorkDetailPage({
 }: {
   readonly params: Promise<{ delegationId: string }>;
 }) {
+  const t = await serverT();
+
   const { delegationId } = await params;
   const session = await qApiSession();
   let detail: QWorkDetailDto | null = null;
@@ -40,12 +46,12 @@ export default async function WorkDetailPage({
           kind="WORK_LIST"
           refs={[{ kind: "Q_WORK", id: delegationId }]}
           total={1}
-          label="Q's work"
+          label={t("Q's work")}
         >
-          <PageHeader title="What Q did" />
+          <PageHeader title={t("What Q did")} />
           <ErrorState
-            title="This isn't available"
-            description="It may have been removed, or it isn't yours."
+            title={t("This isn't available")}
+            description={t("It may have been removed, or it isn't yours.")}
             action={
               <Link
                 href="/work"
@@ -67,22 +73,24 @@ export default async function WorkDetailPage({
         kind="WORK_LIST"
         refs={[{ kind: "Q_WORK", id: delegationId }]}
         total={1}
-        label="Q's work"
+        label={t("Q's work")}
       >
         <PageHeader
-          title={work.kind === "INVESTOR_OUTREACH" ? "Outreach" : "Stand-in"}
+          title={
+            work.kind === "INVESTOR_OUTREACH" ? t("Outreach") : t("Stand-in")
+          }
           description={work.summary ?? undefined}
         >
           <Link
             href="/work"
             className="cq-body-sm inline-flex min-h-11 items-center underline underline-offset-4"
           >
-            Back to Q&rsquo;s work
+            {t("Back to Q’s work")}
           </Link>
         </PageHeader>
         <div className="flex flex-col gap-10">
           {work.lanes.some((lane) => lane.reasons.length > 0) ? (
-            <PageSection id="picked" title="Why Q picked them">
+            <PageSection id="picked" title={t("Why Q picked them")}>
               <ul className="flex flex-col gap-4">
                 {work.lanes
                   .filter((lane) => lane.reasons.length > 0)
@@ -96,7 +104,7 @@ export default async function WorkDetailPage({
                           key={reason.quote}
                           className="cq-body-sm text-(--cq-text-secondary)"
                         >
-                          {reason.reason}{" "}
+                          {t(reason.reason)}{" "}
                           <q className="text-(--cq-text-primary)">
                             {reason.quote}
                           </q>
@@ -107,10 +115,10 @@ export default async function WorkDetailPage({
               </ul>
             </PageSection>
           ) : null}
-          <PageSection id="steps" title="Every step">
+          <PageSection id="steps" title={t("Every step")}>
             {steps.length === 0 ? (
               <p className="cq-body-sm text-(--cq-text-secondary)">
-                Nothing yet. Q&rsquo;s first step shows here within a minute.
+                {t("Nothing yet. Q’s first step shows here within a minute.")}
               </p>
             ) : (
               <ol className="flex flex-col">
@@ -120,20 +128,22 @@ export default async function WorkDetailPage({
                     className="flex flex-col gap-0.5 border-b border-(--cq-border-subtle) py-3 last:border-b-0"
                   >
                     <span className="cq-body-sm text-(--cq-text-primary)">
-                      {step.words}
+                      {t(step.words)}
                     </span>
                     <time
                       dateTime={step.at}
                       className="cq-caption cq-numeric text-(--cq-text-tertiary)"
                     >
-                      {new Intl.DateTimeFormat("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        timeZone: "UTC",
-                        timeZoneName: "short",
-                      }).format(new Date(step.at))}
+                      {t(
+                        new Intl.DateTimeFormat("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          timeZone: "UTC",
+                          timeZoneName: "short",
+                        }).format(new Date(step.at)),
+                      )}
                     </time>
                     {step.undo === null ? null : (
                       <DoneForYouUndo

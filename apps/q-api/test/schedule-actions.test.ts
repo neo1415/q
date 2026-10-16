@@ -286,6 +286,75 @@ describe("reminder.create", () => {
   });
 });
 
+describe("a time zone they stated, kept on approval (live 2026-10-16)", () => {
+  const people = (zone: string | null) => {
+    const updates: unknown[] = [];
+    return {
+      updates,
+      store: {
+        read: () =>
+          Promise.resolve({
+            userId: actor.userId,
+            displayName: null,
+            headline: null,
+            timeZone: zone,
+            version: 3,
+            updatedAt: "2026-10-16T00:00:00.000Z",
+          } as never),
+        update: (input: unknown) => {
+          updates.push(input);
+          return Promise.resolve({} as never);
+        },
+      },
+    };
+  };
+  const payload = {
+    ownerUserId: actor.userId,
+    title: "Prepare the board update",
+    remindAt: "2026-10-17T08:00:00.000Z",
+    timeZone: "Africa/Lagos",
+    saveTimeZone: "Africa/Lagos",
+    channel: "IN_APP" as const,
+  };
+
+  it("keeps the approved zone on their profile when none is saved, and says so on the card", async () => {
+    const { schedule } = world();
+    const profile = people(null);
+    const action = createReminderCreateAction({
+      schedule,
+      people: profile.store,
+    });
+    expect(action.describe(payload, []).preview).toMatch(
+      /keeps Africa\/Lagos as your time zone/,
+    );
+    await action.executor.execute(
+      approved(REMINDER_CREATE, payload, "q_action:tz:1"),
+      context,
+    );
+    expect(profile.updates).toEqual([
+      {
+        userId: actor.userId,
+        expectedVersion: 3,
+        changes: { timeZone: "Africa/Lagos" },
+      },
+    ]);
+  });
+
+  it("never overwrites a zone they have since set", async () => {
+    const { schedule } = world();
+    const profile = people("Europe/London");
+    const action = createReminderCreateAction({
+      schedule,
+      people: profile.store,
+    });
+    await action.executor.execute(
+      approved(REMINDER_CREATE, payload, "q_action:tz:2"),
+      context,
+    );
+    expect(profile.updates).toEqual([]);
+  });
+});
+
 describe("a personal reminder (live 2026-09-28: refused at proposal)", () => {
   it("targets its owner, so the Approval Engine can propose it, and is only ever theirs", async () => {
     const { schedule } = world();
