@@ -26,6 +26,7 @@ import {
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   OnboardingJourneyTypeSchema,
+  OnboardingResponseChannelSchema,
   OnboardingResponseValueSchema,
   OnboardingStepKeySchema,
   type SayOnboardingResponse,
@@ -196,6 +197,7 @@ const SubmitInput = z.object({
   value: OnboardingResponseValueSchema,
   expectedSessionVersion: Version,
   idempotencyKey: Uuid,
+  channel: OnboardingResponseChannelSchema.optional(),
 });
 
 export async function onboardingSubmitAction(
@@ -208,7 +210,10 @@ export async function onboardingSubmitAction(
       input.sessionId,
       {
         stepKey: input.stepKey,
-        response: { value: input.value },
+        response: {
+          value: input.value,
+          ...(input.channel === undefined ? {} : { channel: input.channel }),
+        },
         expectedSessionVersion: input.expectedSessionVersion,
       },
       input.idempotencyKey,
