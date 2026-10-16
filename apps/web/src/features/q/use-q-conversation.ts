@@ -154,9 +154,46 @@ export type QConversationOptions = {
   readonly conversationId?: string | null | undefined;
   /** The server named (or changed) the conversation this surface is in. */
   readonly onConversation?: ((conversationId: string) => void) | undefined;
+  /**
+   * The subject above is the page's (ambient), not one the person picked
+   * for this question. An ambient company or investor organisation is not
+   * sent as a named subject: the screen context carries it, and the server
+   * lets the company on screen lead (lead decision, 16 Oct; run 6: a stale
+   * page subject sent as named outranked the profile on screen). A
+   * relationship has no place in the screen context yet, so it is still
+   * named.
+   */
+  readonly ambient?: boolean | undefined;
 };
 
 /** The one subject a surface names, in the order the options document. */
+/**
+ * The subject sent as named with a question: the surface's own, or, for an
+ * ambient page subject, only a relationship (see `ambient`).
+ */
+export function namedSubject(options: QConversationOptions): {
+  readonly companyId?: string;
+  readonly investorOrganisationId?: string;
+  readonly relationshipId?: string;
+} {
+  if (options.ambient === true) {
+    return options.relationshipId === undefined
+      ? {}
+      : { relationshipId: options.relationshipId };
+  }
+  return {
+    ...(options.companyId === undefined
+      ? {}
+      : { companyId: options.companyId }),
+    ...(options.investorOrganisationId === undefined
+      ? {}
+      : { investorOrganisationId: options.investorOrganisationId }),
+    ...(options.relationshipId === undefined
+      ? {}
+      : { relationshipId: options.relationshipId }),
+  };
+}
+
 function subjectInputOf(options: {
   readonly companyId?: string | undefined;
   readonly investorOrganisationId?: string | undefined;
@@ -466,30 +503,24 @@ export function useQConversation(
         // reopens it (CQ-QX-007 H1; pending-ask.ts).
         const idempotencyKey = crypto.randomUUID();
         const startsConversation = conversationId.current === null;
+        const named = namedSubject({
+          companyId: options.companyId,
+          investorOrganisationId: options.investorOrganisationId,
+          relationshipId: options.relationshipId,
+          ambient: options.ambient,
+        });
         if (startsConversation) {
           rememberPendingAsk({
             idempotencyKey,
             text,
             at: placeholder.at,
-            ...(options.companyId === undefined
-              ? {}
-              : { companyId: options.companyId }),
-            ...(options.investorOrganisationId === undefined
-              ? {}
-              : { investorOrganisationId: options.investorOrganisationId }),
-            ...(options.relationshipId === undefined
-              ? {}
-              : { relationshipId: options.relationshipId }),
+            ...named,
           });
         }
         const started = await askQ(
           text,
           conversationId.current ?? undefined,
-          subjectInputOf({
-            companyId: options.companyId,
-            investorOrganisationId: options.investorOrganisationId,
-            relationshipId: options.relationshipId,
-          }),
+          subjectInputOf(named),
           idempotencyKey,
           // R18/R21: the pitch on screen as they ask, read now (the dock
           // may have opened on another card); else the opening's moment.
@@ -515,6 +546,7 @@ export function useQConversation(
       options.companyId,
       options.investorOrganisationId,
       options.relationshipId,
+      options.ambient,
       streaming,
       submitting,
       awaitingPerson,
