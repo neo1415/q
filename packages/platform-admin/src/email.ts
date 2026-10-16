@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { resolveTxt } from "node:dns/promises";
 
+import {
+  RESERVED_TEST_EMAIL_REASON,
+  reservedTestEmailDomain,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 
 import type { AdminGrant } from "./access.js";
@@ -282,6 +286,12 @@ function errorClassOf(error: unknown): string {
  * Wraps Capital Q's own email sender so every send leaves an outcome row.
  * Recording never changes the send: a logging failure is swallowed, and
  * the send's own error is rethrown unchanged for the caller's retry.
+ *
+ * It is also the one place a message to a reserved test domain (.local,
+ * .test, .invalid, .example, example.com/net/org) is stopped (owner
+ * directive 2026-10-16): nothing reaches the provider, the row says
+ * SUPPRESSED with the reason, never SENT, and the call resolves, so no
+ * caller retries a message that must never go.
  */
 export function recordingEmailSender<M extends { readonly to: string }>(
   sender: SenderLike<M>,
@@ -294,7 +304,7 @@ export function recordingEmailSender<M extends { readonly to: string }>(
 ): SenderLike<M> {
   const record = async (
     to: string,
-    outcome: "SENT" | "FAILED",
+    outcome: "SENT" | "FAILED" | "SUPPRESSED",
     errorClass: string | null,
   ) => {
     const address = to.trim().toLowerCase();
@@ -313,6 +323,10 @@ export function recordingEmailSender<M extends { readonly to: string }>(
   return {
     available: sender.available,
     send: async (message) => {
+      if (reservedTestEmailDomain(message.to) !== null) {
+        await record(message.to, "SUPPRESSED", RESERVED_TEST_EMAIL_REASON);
+        return;
+      }
       try {
         await sender.send(message);
       } catch (error: unknown) {
