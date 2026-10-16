@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cityForAskedAction } from "../src/answer.js";
+import { bareCityReply, cityForAskedAction } from "../src/answer.js";
 
 /**
  * Live 2026-10-16: the turn was unread, the answer asked "Which city or
@@ -54,5 +54,25 @@ describe("cityForAskedAction", () => {
     expect(cityForAskedAction([REQUEST, done, LAGOS], LAGOS)).toBeNull();
     const thanks: Line = { id: "u2", role: "USER", content: "thanks" };
     expect(cityForAskedAction([REQUEST, ASKED, thanks], thanks)).toBeNull();
+  });
+});
+
+describe("bareCityReply (live 2026-10-16: 'Lagos.' got 'Your setup is complete…')", () => {
+  it("a bare place after Q's city question is the place, as said", () => {
+    expect(bareCityReply([REQUEST, ASKED, LAGOS], LAGOS)).toEqual({
+      said: "Lagos",
+      zone: "Africa/Lagos",
+    });
+  });
+
+  it("not after another question, and not inside a longer sentence", () => {
+    const done: Line = { id: "q1", role: "Q", content: "Anything else?" };
+    expect(bareCityReply([REQUEST, done, LAGOS], LAGOS)).toBeNull();
+    const long: Line = {
+      id: "u2",
+      role: "USER",
+      content: "Tell me which investors in Lagos fund logistics companies",
+    };
+    expect(bareCityReply([REQUEST, ASKED, long], long)).toBeNull();
   });
 });

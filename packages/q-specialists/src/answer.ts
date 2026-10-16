@@ -4053,6 +4053,21 @@ export function createSpecialistQAnswer(
         }
       }
     }
+    // A bare place answering Q's own city question, with nothing found to
+    // continue: acknowledged as what it is, never an unrelated canned
+    // reply (live 2026-10-16: "Lagos." got "Your setup is complete…").
+    const place = bareCityReply(history, latest);
+    if (place !== null) {
+      logger?.info(
+        { qRunId: request.runId },
+        "a bare place after a city question was acknowledged",
+      );
+      return recordAnswer(
+        request,
+        conversationId,
+        `Got it: ${place.said} time (${place.zone}). What would you like me to set up for you?`,
+      );
+    }
     const readerNamed =
       read !== null &&
       read.kind === "TOOL_REQUEST" &&
@@ -5027,4 +5042,39 @@ export function cityForAskedAction(
       ? "propose_meeting"
       : null;
   return tool === null ? null : { tool, utterance: request.content, zone };
+}
+
+/**
+ * The reply is a place and little else ("Lagos.", "I'm in Abuja"), and
+ * Q's last line asked for their city: the place as said and its zone.
+ */
+export function bareCityReply(
+  history: readonly {
+    readonly id: string;
+    readonly role: string;
+    readonly content: string;
+  }[],
+  latest: { readonly id: string; readonly content: string },
+): { readonly said: string; readonly zone: string } | null {
+  const zone = zoneFromWords(latest.content);
+  if (zone === null) return null;
+  const words = latest.content
+    .replace(/[^\p{L}\s'-]+/gu, " ")
+    .trim()
+    .split(/\s+/u)
+    .filter((word) => word.length > 0);
+  if (words.length === 0 || words.length > 5) return null;
+  const asked = history
+    .filter((message) => message.id !== latest.id)
+    .findLast((message) => message.role !== "USER");
+  if (asked === undefined || !ASKS_CITY.test(asked.content)) return null;
+  const said = words
+    .filter(
+      (word) =>
+        !/^(?:i'?m|i|am|in|based|from|it's|its|the|city|of|yes|ok|okay)$/iu.test(
+          word,
+        ),
+    )
+    .join(" ");
+  return { said: said.length > 0 ? said : zone, zone };
 }
