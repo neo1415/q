@@ -29,11 +29,11 @@ insert into q_runtime.actions
 values
   ('00000000-0000-4000-8000-00000000f921', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-00000000f911',
    pg_temp.rls_id('org_a'), pg_temp.rls_id('user_a'), 'test.confirm_required', 1, 'CONFIRM_REQUIRED',
-   '[]'::jsonb, '{}'::jsonb, 'sha256:' || repeat('b', 64), 'A job for the team.', 'AWAITING_APPROVAL',
+   '[{"kind":"COMPANY","companyId":"00000000-0000-4000-8000-00000000cc01"}]'::jsonb, '{}'::jsonb, 'sha256:' || repeat('b', 64), 'A job for the team.', 'AWAITING_APPROVAL',
    'q_action:00000000-0000-4000-8000-00000000f911:00000000-0000-4000-8000-00000000f921'),
   ('00000000-0000-4000-8000-00000000f922', pg_temp.rls_id('tenant_a'), '00000000-0000-4000-8000-00000000f912',
    pg_temp.rls_id('org_a'), pg_temp.rls_id('user_a'), 'test.confirm_required', 1, 'CONFIRM_REQUIRED',
-   '[]'::jsonb, '{}'::jsonb, 'sha256:' || repeat('c', 64), 'Another card.', 'AWAITING_APPROVAL',
+   '[{"kind":"COMPANY","companyId":"00000000-0000-4000-8000-00000000cc01"}]'::jsonb, '{}'::jsonb, 'sha256:' || repeat('c', 64), 'Another card.', 'AWAITING_APPROVAL',
    'q_action:00000000-0000-4000-8000-00000000f912:00000000-0000-4000-8000-00000000f922');
 
 insert into q_runtime.approvals (id, tenant_id, action_id, requested_from_user_id, status, expires_at) values
