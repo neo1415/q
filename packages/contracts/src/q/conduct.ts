@@ -65,6 +65,43 @@ export function canonicalLanguageTag(value: string): string | null {
   }
 }
 
+/**
+ * Scripts written right to left (Unicode bidi class R/AL). Used only where
+ * a runtime has no Intl.Locale text info.
+ */
+const RTL_SCRIPTS: ReadonlySet<string> = new Set([
+  "Adlm", "Arab", "Aran", "Hebr", "Mand", "Mend", "Nkoo", "Rohg", "Samr",
+  "Syrc", "Thaa", "Yezi",
+]);
+
+type TextInfoLocale = Intl.Locale & {
+  readonly getTextInfo?: () => { readonly direction?: string };
+  readonly textInfo?: { readonly direction?: string };
+};
+
+/**
+ * Writing direction of a tag, from the runtime's own data: Intl.Locale's
+ * text info where the runtime has it, else the script the locale is
+ * likely written in. Left to right for anything unknown. No language is
+ * named here: Arabic, Urdu, Hebrew, Dhivehi and every other right-to-left
+ * language come out of the same lookup.
+ */
+export function languageDirectionOf(value: string | null | undefined): "ltr" | "rtl" {
+  if (value === null || value === undefined) return "ltr";
+  const tag = canonicalLanguageTag(value);
+  if (tag === null) return "ltr";
+  try {
+    const locale = new Intl.Locale(tag) as TextInfoLocale;
+    const info =
+      typeof locale.getTextInfo === "function" ? locale.getTextInfo() : locale.textInfo;
+    if (info?.direction === "rtl" || info?.direction === "ltr") return info.direction;
+    const script = locale.script ?? locale.maximize().script;
+    return script !== undefined && RTL_SCRIPTS.has(script) ? "rtl" : "ltr";
+  } catch {
+    return "ltr";
+  }
+}
+
 /** A canonical, well-formed BCP 47 tag. Whether Capital Q offers it is the registry's call. */
 export const QLanguageCodeSchema = z
   .string()

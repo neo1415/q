@@ -313,10 +313,15 @@ describe("the GateQ video interview session", () => {
       locale: "ar-AE",
     });
     expect(arabic.provider.createRoom).toHaveBeenCalledWith(
-      expect.objectContaining({ language: "ar" }),
+      expect.objectContaining({ language: "ar-AE" }),
+    );
+    const french = world();
+    await french.video.start({ token: TOKEN, correlationId: "c", locale: "fr" });
+    expect(french.provider.createRoom).toHaveBeenCalledWith(
+      expect.objectContaining({ language: "fr" }),
     );
     const english = world();
-    await english.video.start({ token: TOKEN, correlationId: "c" });
+    await english.video.start({ token: TOKEN, correlationId: "c", locale: "en-US" });
     expect(english.provider.createRoom).toHaveBeenCalledWith(
       expect.objectContaining({ language: null }),
     );

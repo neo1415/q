@@ -20,7 +20,7 @@ import { INITIAL_CONDUCT } from "../src/voice/conduct.js";
 import { duplexInstructions } from "../src/voice/duplex/instructions.js";
 import { livePrompt, styleFor } from "../src/voice/live/prompt.js";
 import {
-  arabicRecogniserLanguage,
+  recogniserFor,
   createDeepgramVoiceProvider,
 } from "../src/voice/providers/deepgram.js";
 import { createElevenLabsSpeechRelay } from "../src/voice/providers/elevenlabs-speak.js";
@@ -115,12 +115,14 @@ describe("the language preference", () => {
     expect(QStandingDtoSchema.parse(other.json()).language).toBe("AUTO");
   });
 
-  it("takes only a language Q speaks, and never a user id", async () => {
+  it("takes only a language Capital Q can offer, and never a user id", async () => {
     const store = memoryStandingStore();
     const app = appAs(actorFor(1), store);
     for (const payload of [
       { language: "Arabic" },
-      { language: "fr" },
+      // Well-formed, but no runtime can name and script it.
+      { language: "tlh" },
+      { language: "xx" },
       { language: "ar", userId: actorFor(2).userId },
       {},
     ]) {
@@ -210,20 +212,45 @@ describe("the standard voice line in Arabic", () => {
   });
 
   it("maps Arabic locales to Nova-3's codes, the Gulf ones kept", () => {
-    expect(arabicRecogniserLanguage("ar")).toBe("ar");
-    expect(arabicRecogniserLanguage("ar-SA")).toBe("ar-SA");
-    expect(arabicRecogniserLanguage("ar-qa")).toBe("ar-QA");
+    expect(recogniserFor("ar")).toEqual({ model: "nova-3", language: "ar" });
+    expect(recogniserFor("ar-SA")).toEqual({ model: "nova-3", language: "ar-SA" });
+    expect(recogniserFor("ar-qa")).toEqual({ model: "nova-3", language: "ar-QA" });
     // A region Nova-3 does not list falls back to general Arabic.
-    expect(arabicRecogniserLanguage("ar-OM")).toBe("ar");
-    expect(arabicRecogniserLanguage("en-AE")).toBeNull();
-    expect(arabicRecogniserLanguage(undefined)).toBeNull();
+    expect(recogniserFor("ar-OM")).toEqual({ model: "nova-3", language: "ar" });
+    expect(recogniserFor("en-AE")).toEqual({ model: "flux-general-en" });
+    expect(recogniserFor(undefined)).toEqual({ model: "flux-general-en" });
+  });
+
+  it("picks each language's documented model from the table, with no per-language code", () => {
+    const listenOf = (locale: string) =>
+      (
+        provider.settingsFor({ voice: "FEMALE", greeting: undefined, thinkToken: "t", locale })
+          .agent as { listen: { provider: Record<string, unknown> } }
+      ).listen.provider;
+    const speakOf = (locale: string) =>
+      (
+        provider.settingsFor({ voice: "FEMALE", greeting: undefined, thinkToken: "t", locale })
+          .agent as { speak: { provider: Record<string, unknown> } }
+      ).speak.provider;
+    expect(listenOf("fr-FR")).toMatchObject({ model: "flux-general-multi", version: "v2" });
+    expect(speakOf("fr-FR")).toMatchObject({ language: "fr" });
+    expect(listenOf("ko")).toMatchObject({ model: "nova-3", language: "ko" });
+    expect(listenOf("pt-BR")).toMatchObject({ model: "flux-general-multi" });
+    expect(speakOf("ur")).toMatchObject({ language: "ur" });
+    // Swahili: no Deepgram model lists it. A device hint falls back to the
+    // multilingual model (it hears English); a CHOSEN Swahili line is
+    // refused by the route instead of pretending.
+    expect(listenOf("sw")).toMatchObject({ model: "flux-general-multi" });
   });
 });
 
 describe("Q's spoken instructions in Arabic", () => {
   it("GPT-Live speaks Arabic, not 'always English', when Arabic is chosen", () => {
     const prompt = livePrompt({ locale: "ar", role: "founder" });
-    expect(prompt).toContain("Modern Standard Arabic");
+    expect(prompt).toContain("this person chose Arabic (العربية)");
+    expect(livePrompt({ locale: "sw", role: "founder" })).toContain(
+      "Speak natural, clear Swahili (Kiswahili)",
+    );
     expect(prompt).not.toContain("always speak natural, standard English");
     expect(prompt).toContain("never convert a currency");
     // Everything else in the style survives the swap.
@@ -244,7 +271,11 @@ describe("Q's spoken instructions in Arabic", () => {
       "this person chose Arabic",
     );
     expect(duplexInstructions({ locale: "en" })).not.toContain("Arabic");
+    // Any offered language, by name; a tag nobody can offer gets the hint.
     expect(duplexInstructions({ locale: "fr" })).toContain(
+      "this person chose French (français)",
+    );
+    expect(duplexInstructions({ locale: "tlh" })).toContain(
       "answer in the language they speak",
     );
   });

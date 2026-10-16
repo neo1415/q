@@ -698,7 +698,7 @@ describe("the interview in Arabic (lane ml)", () => {
     const { service } = interviewer(RESULT, captured);
     await service.turn(turn({ locale: "ar-AE", utterance: "We're in Lagos." }));
     expect(asks(captured.prompt)).toBe(true);
-    expect(captured.prompt).toContain("Modern Standard Arabic");
+    expect(captured.prompt).toContain("this person chose Arabic");
     expect(captured.prompt).toContain(
       "the fund's name, the gateway's criteria as named, amounts and currencies stay exactly as recorded",
     );
@@ -738,6 +738,28 @@ describe("the interview in Arabic (lane ml)", () => {
     ).toBe("ar");
     expect(interviewLanguageOf({ utterance: "Hello", recentTurns: [] })).toBe(
       null,
+    );
+  });
+
+  it("asks in any stated language, and reads other scripts with no per-language code", async () => {
+    expect(
+      interviewLanguageOf({ locale: "fr-FR", utterance: "", recentTurns: [] }),
+    ).toBe("fr-FR");
+    expect(
+      interviewLanguageOf({ locale: "en-GB", utterance: "Привет", recentTurns: [] }),
+    ).toBeNull();
+    expect(
+      interviewLanguageOf({ utterance: "Мы находимся в Лагосе", recentTurns: [] }),
+    ).toBe("ru");
+    expect(
+      interviewLanguageOf({ utterance: "हम लागोस में हैं", recentTurns: [] }),
+    ).toBe("hi");
+    const captured: { prompt?: string } = {};
+    await interviewer(RESULT, captured).service.turn(
+      turn({ locale: "sw", utterance: "Tuko Lagos." }),
+    );
+    expect(captured.prompt).toContain(
+      "Ask every question and say every reply in Swahili",
     );
   });
 });

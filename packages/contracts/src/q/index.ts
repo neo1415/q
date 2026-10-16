@@ -987,6 +987,7 @@ export {
   type QErrandListDto,
   type QErrandStoppedDto,
 } from "./errands.js";
+export * from "./ui-text.js";
 // REHEARSE block (2026-10-01)
 export * from "./rehearsals.js";
 export * from "./rehearsal-video.js";
@@ -995,6 +996,7 @@ export {
   Q_CONDUCT_ACTIONS,
   Q_CONDUCT_MOODS,
   canonicalLanguageTag,
+  languageDirectionOf,
   Q_PERSONALITIES,
   Q_STANDING_LANGUAGE_PATH,
   Q_STANDING_PATH,

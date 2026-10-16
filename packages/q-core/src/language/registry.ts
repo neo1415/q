@@ -1,4 +1,4 @@
-import { canonicalLanguageTag } from "@capital-q/contracts";
+import { canonicalLanguageTag, languageDirectionOf } from "@capital-q/contracts";
 
 /**
  * The language registry (owner directive 2026-10-16: "any language, and
@@ -32,25 +32,6 @@ export type LanguageInfo = {
 };
 
 /**
- * Scripts written right to left (Unicode Script_Extensions, bidi class
- * R/AL). Used only where a runtime has no Intl.Locale text info.
- */
-const RTL_SCRIPTS: ReadonlySet<string> = new Set([
-  "Adlm",
-  "Arab",
-  "Aran",
-  "Hebr",
-  "Mand",
-  "Mend",
-  "Nkoo",
-  "Rohg",
-  "Samr",
-  "Syrc",
-  "Thaa",
-  "Yezi",
-]);
-
-/**
  * The individual languages a person picks from: ISO 639-1, the codes
  * every runtime has names for. Data, not behaviour; any other well-formed
  * tag the runtime knows (a region, "fil", "yue") is accepted by `languageInfo`.
@@ -65,11 +46,6 @@ export const ISO_639_1: readonly string[] = (
   "za zh zu"
 ).split(" ");
 
-type TextInfoLocale = Intl.Locale & {
-  readonly getTextInfo?: () => { readonly direction?: string };
-  readonly textInfo?: { readonly direction?: string };
-};
-
 function nameOf(tag: string, inLocale: string): string | undefined {
   try {
     const name = new Intl.DisplayNames([inLocale], {
@@ -82,25 +58,6 @@ function nameOf(tag: string, inLocale: string): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-function directionOfLocale(
-  locale: Intl.Locale,
-  script: string,
-): LanguageDirection {
-  const withInfo = locale as TextInfoLocale;
-  try {
-    const info =
-      typeof withInfo.getTextInfo === "function"
-        ? withInfo.getTextInfo()
-        : withInfo.textInfo;
-    if (info?.direction === "rtl" || info?.direction === "ltr") {
-      return info.direction;
-    }
-  } catch {
-    // Fall through to the script.
-  }
-  return RTL_SCRIPTS.has(script) ? "rtl" : "ltr";
 }
 
 const INFO = new Map<string, LanguageInfo | null>();
@@ -126,7 +83,7 @@ export function languageInfo(
         nativeName: nameOf(tag, tag) ?? englishName,
         englishName,
         script,
-        direction: directionOfLocale(locale, script),
+        direction: languageDirectionOf(tag),
       };
     }
   } catch {

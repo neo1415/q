@@ -1,6 +1,6 @@
 import type { QLanguageCode } from "@capital-q/contracts";
 import { readinessLeadLines } from "@capital-q/model-gateway/q";
-import { readinessLeadCopy } from "@capital-q/q-core";
+import { hasReadinessLeadCopy, readinessLeadCopy } from "@capital-q/q-core";
 import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
 
 /**
@@ -25,6 +25,7 @@ export function planLeadLines(
   read: unknown,
   language: QLanguageCode | null = null,
 ): string | null {
+  if (!hasReadinessLeadCopy(language)) return null;
   const copy = readinessLeadCopy(language);
   if (typeof read !== "object" || read === null) return null;
   const items = (read as { items?: unknown }).items;

@@ -224,6 +224,12 @@ import {
   writtenLanguageNote,
 } from "@capital-q/q-core";
 import { createWorkPage } from "./composition/work/page.js";
+import {
+  createGatewayUiTextTranslator,
+  createPostgresUiTextStore,
+  createUiTextService,
+  parseUiTranslationDailyCapUsd,
+} from "./composition/ui-text.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
 import {
@@ -400,6 +406,7 @@ import {
 } from "@capital-q/model-gateway";
 import { withTestRouting } from "@capital-q/model-gateway";
 import {
+  budgetForTaskClass,
   createQDelegationReader,
   createWordsReaders,
   CLEAR_QUESTION,
@@ -3886,6 +3893,35 @@ const qArtifacts = createQArtifacts({
 // Q's standing with each person (founder direction 2026-09-30): their chosen
 // personality, which every Q surface speaks with, and Q's patience.
 const standingStore = createPostgresStandingStore(database.sql);
+
+/**
+ * Any-language interface (owner 2026-10-16): the English UI catalogue in a
+ * person's chosen language, machine-translated once per language through
+ * the gateway (UI_TRANSLATION) and shared. Its own daily ceiling, USD 2
+ * unless CQ_UI_TRANSLATION_DAILY_CAP_USD says otherwise, counted from the
+ * ledger rows of that class only.
+ */
+const uiText = createUiTextService({
+  store: createPostgresUiTextStore(database.sql),
+  translate: createGatewayUiTextTranslator(
+    modelGateway,
+    budgetForTaskClass("UI_TRANSLATION"),
+  ),
+  cap: createDailySpendCap({
+    capUsd: parseUiTranslationDailyCapUsd(process.env),
+    readSpentSinceUsd: createPostgresDailySpendReader({
+      sql: database.sql,
+      taskClass: "UI_TRANSLATION",
+    }),
+    onReadFailure: (error) => {
+      logger.warn(
+        { err: error, spendCap: "UI_TRANSLATION" },
+        "ui translation cap could not read the ledger; using the last total",
+      );
+    },
+  }),
+  logger,
+});
 // What this conversation already produced, read back from the owning
 // records as the person (CQ-QX-008): a document through the artifact
 // service (owner-scoped), an action through its approval record.
@@ -6627,6 +6663,7 @@ const { app, logger: appLogger } = createApp(
     readinessBlueprints: readinessService,
     // end BILLING-2 block
     standing: standingStore,
+    uiText,
     // RECOVERY B1: the reader Q's what_needs_me tool uses, for the pages.
     attention: qTools.attention,
     arrivalSnapshots,

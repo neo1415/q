@@ -89,6 +89,7 @@ export {
   writtenLanguageNote,
 } from "./language.js";
 export {
+  hasReadinessLeadCopy,
   READINESS_LEAD_ARABIC_STEPS,
   readinessLeadCopy,
   type ReadinessLeadCopy,

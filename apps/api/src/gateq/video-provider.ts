@@ -4,6 +4,7 @@ import {
   type TavusKeyPool,
 } from "@capital-q/integrations";
 import type { GateqVideoProvider } from "@capital-q/gateq-intake";
+import { languageChannels } from "@capital-q/q-core/language";
 
 /**
  * The GateQ video interview's provider adapter (ADR 0066's Tavus client,
@@ -59,23 +60,31 @@ export function isTavusConnectivityCheck(
  * two facts in each: Q is an AI interviewer, and what is said is
  * transcribed into the application.
  */
-export function gateqVideoDisclosure(language: "ar" | null): {
+const ENGLISH_DISCLOSURE = {
+  spoken:
+    "Just so you know, I'm Q, an AI interviewer. What you say is transcribed into your application.",
+  shown:
+    "Q is an AI interviewer. This video interview is transcribed into your application.",
+} as const;
+
+/** Hand-written disclosures by primary subtag (trusted product copy). */
+const DISCLOSURES: Readonly<
+  Record<string, { readonly spoken: string; readonly shown: string }>
+> = {
+  ar: {
+    spoken:
+      "للعلم، أنا Q، محاور يعمل بالذكاء الاصطناعي. ما تقوله يُكتب في طلبك.",
+    shown:
+      "Q محاور يعمل بالذكاء الاصطناعي. تُكتب هذه المقابلة المرئية في طلبك.",
+  },
+};
+
+export function gateqVideoDisclosure(language: string | null): {
   readonly spoken: string;
   readonly shown: string;
 } {
-  return language === "ar"
-    ? {
-        spoken:
-          "للعلم، أنا Q، محاور يعمل بالذكاء الاصطناعي. ما تقوله يُكتب في طلبك.",
-        shown:
-          "Q محاور يعمل بالذكاء الاصطناعي. تُكتب هذه المقابلة المرئية في طلبك.",
-      }
-    : {
-        spoken:
-          "Just so you know, I'm Q, an AI interviewer. What you say is transcribed into your application.",
-        shown:
-          "Q is an AI interviewer. This video interview is transcribed into your application.",
-      };
+  const primary = language?.split("-")[0]?.toLowerCase() ?? "en";
+  return DISCLOSURES[primary] ?? ENGLISH_DISCLOSURE;
 }
 
 /** What the applicant sees on the interviewer's tile in the room. */
@@ -94,6 +103,13 @@ export function createTavusGateqVideoProvider(deps: {
 }): GateqVideoProvider {
   return {
     createRoom: async (input) => {
+      const videoPlan =
+        input.language === undefined || input.language === null
+          ? null
+          : languageChannels(input.language).video;
+      // The room's language decides the disclosure's: an English room
+      // discloses in English.
+      const roomLanguage = videoPlan === null ? null : (input.language ?? null);
       const { value } = await deps.pool.withHealthyKey(async (client) => {
         const { palId } = await client.createPal({
           // The provider shows the PAL's name on Q's tile: the applicant
@@ -106,7 +122,7 @@ export function createTavusGateqVideoProvider(deps: {
           systemPrompt:
             "You are the face and voice of Q, Capital Q's AI interviewer for an investment application. Speak exactly the lines you are given, naturally, and nothing else.",
           faceId: deps.faceId,
-          disclosure: gateqVideoDisclosure(input.language ?? null),
+          disclosure: gateqVideoDisclosure(roomLanguage),
           layers: {
             llm: {
               model: "capital-q-gateq-interview",
@@ -139,8 +155,10 @@ export function createTavusGateqVideoProvider(deps: {
             joinGraceSeconds: input.joinGraceSeconds,
             testMode: input.testMode,
             requireAuth: true,
-            // Lane ml: Arabic first, English understood (Tavus languages).
-            ...(input.language === "ar" ? { languages: ["ar", "en"] } : {}),
+            // Their language first, English understood, when Tavus lists
+            // it (q-core capability table); otherwise the room is English
+            // and the entry page says so before anyone starts.
+            ...(videoPlan === null ? {} : { languages: [...videoPlan.languages] }),
           });
         } catch (error) {
           // A PAL without a room is configuration, not spend; best effort.

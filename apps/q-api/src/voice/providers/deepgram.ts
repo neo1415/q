@@ -1,4 +1,8 @@
 import type { QVoiceChoice } from "@capital-q/contracts";
+import {
+  languageChannels,
+  type VoiceListenPlan,
+} from "@capital-q/q-core/language";
 
 import { ASR_KEYWORDS } from "../vocabulary.js";
 import type { ElevenLabsSpeechRelay } from "./elevenlabs-speak.js";
@@ -117,40 +121,17 @@ export class DeepgramTokenError extends Error {
 }
 
 /**
- * Nova-3 Arabic's language codes (Deepgram changelog 2026-01-27): general
- * Arabic and sixteen regional ones, the Gulf among them. Flux Multilingual
- * does not hear Arabic at all (its ten languages exclude it), so an Arabic
- * line listens with Nova-3 instead. docs/ai-handoff/MULTILINGUAL-2026-10-16.md.
+ * How the standard line listens for a locale: the Deepgram model each
+ * language is documented for (q-core's capability table: Flux English,
+ * Flux Multilingual's ten languages, otherwise Nova-3 with the person's
+ * region when Nova-3 names it). A language none of them lists falls back
+ * to Flux Multilingual, which hears English: the route refuses a line for
+ * a language the person CHOSE that cannot be heard, so this fallback only
+ * meets a device hint. docs/ai-handoff/LANGUAGES-2026-10-16.md.
  */
-const NOVA3_ARABIC = new Set([
-  "ar",
-  "ar-AE",
-  "ar-SA",
-  "ar-QA",
-  "ar-KW",
-  "ar-SY",
-  "ar-LB",
-  "ar-PS",
-  "ar-JO",
-  "ar-EG",
-  "ar-SD",
-  "ar-TD",
-  "ar-MA",
-  "ar-DZ",
-  "ar-TN",
-  "ar-IQ",
-  "ar-IR",
-]);
-
-/** The Nova-3 code for an Arabic locale (its region when Nova-3 has it), else null. */
-export function arabicRecogniserLanguage(
-  locale: string | undefined,
-): string | null {
-  if (locale === undefined) return null;
-  const [primary, region] = locale.split("-");
-  if (primary?.toLowerCase() !== "ar") return null;
-  const regional = region === undefined ? null : `ar-${region.toUpperCase()}`;
-  return regional !== null && NOVA3_ARABIC.has(regional) ? regional : "ar";
+export function recogniserFor(locale: string | undefined): VoiceListenPlan {
+  if (locale === undefined) return { model: "flux-general-en" };
+  return languageChannels(locale).listen ?? { model: "flux-general-multi" };
 }
 
 /** Whether a device language is anything but English. */
@@ -182,7 +163,7 @@ export function createDeepgramVoiceProvider(
     voice: QVoiceChoice,
     thinkToken: string,
     multilingual: boolean,
-    arabic: boolean,
+    languageCode: string | null,
   ): Record<string, unknown> =>
     speak === undefined
       ? { provider: { type: "deepgram", model: SPEAK_MODELS[voice] } }
@@ -190,9 +171,10 @@ export function createDeepgramVoiceProvider(
           provider: {
             type: "eleven_labs",
             model_id: ELEVENLABS_MODEL_ID,
-            // Maps to ElevenLabs' language_code; Arabic is named so the
-            // voice does not guess from a mixed Arabic-English line.
-            language: arabic ? "ar" : multilingual ? "multi" : "en",
+            // Maps to ElevenLabs' language_code: the person's language
+            // when ElevenLabs lists it, so the voice does not guess from a
+            // line that mixes it with English.
+            language: languageCode ?? (multilingual ? "multi" : "en"),
           },
           endpoint: {
             // No voice in the URL: the relay reads the session's voice
@@ -231,7 +213,9 @@ export function createDeepgramVoiceProvider(
     },
     settingsFor: ({ voice, greeting, thinkToken, terms, locale }) => {
       const multilingual = speaksBeyondEnglish(locale);
-      const arabic = arabicRecogniserLanguage(locale);
+      const recogniser = recogniserFor(locale);
+      const speakCode =
+        locale === undefined ? null : (languageChannels(locale).speak?.languageCode ?? null);
       const keyterms = [
         ...new Set([
           ...(terms ?? [])
@@ -246,24 +230,23 @@ export function createDeepgramVoiceProvider(
           ...(greeting === undefined ? {} : { greeting }),
           listen: {
             provider:
-              arabic !== null
+              recogniser.model === "nova-3"
                 ? {
-                    // Multilingual Q: Nova-3 Arabic, which also carries the
-                    // English terms a Gulf founder mixes in. Keyterms stay:
-                    // names are what a recogniser cannot know. Flux's
-                    // end-of-turn fields do not apply to Nova.
+                    // A language Flux does not hear (Arabic, Korean, Urdu...):
+                    // Nova-3 in it, which also carries the English terms
+                    // people mix in. Keyterms stay: names are what a
+                    // recogniser cannot know. Flux's end-of-turn fields do
+                    // not apply to Nova.
                     type: "deepgram",
                     version: "v1",
                     model: "nova-3",
-                    language: arabic,
+                    language: recogniser.language,
                     keyterms,
                   }
                 : {
                     type: "deepgram",
                     version: "v2",
-                    model: multilingual
-                      ? "flux-general-multi"
-                      : "flux-general-en",
+                    model: recogniser.model,
                     keyterms,
                     // When a person has finished. The threshold is how sure the
                     // turn model must be; the timeout is how long it waits for
@@ -299,7 +282,7 @@ export function createDeepgramVoiceProvider(
             },
             prompt: THINK_PROMPT,
           },
-          speak: speakFor(voice, thinkToken, multilingual, arabic !== null),
+          speak: speakFor(voice, thinkToken, multilingual, speakCode),
         },
         audio: {
           input: { encoding: "linear16", sample_rate: 16_000 },
