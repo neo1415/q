@@ -62,6 +62,7 @@ import { capitalTabFrom } from "@/features/capital/capital-tabs";
 import { ResultsDashboard } from "@/features/results/results-dashboard";
 import { commitmentLines, rangeOf } from "@/features/results/results-words";
 import { RelationshipsIndex } from "@/features/relationships/relationships-index";
+import { ownDeckReview } from "@/features/company/material/deck-pending-server";
 import { NeedsYouQueue } from "@/features/relationships/needs-you-queue";
 import {
   portfolioOf,
@@ -272,16 +273,24 @@ export default async function RelationshipsPage({
         ? []
         : relationshipSteps(context, items, needs.reminders, now),
     );
-    const [results, usage, { items, portfolio, commitments }, needs, steps] =
-      await Promise.all([
-        session === null ? null : getResults(session, period).catch(() => null),
-        qSession === null || side !== "INVESTOR"
-          ? null
-          : getMyUsage(qSession).catch(() => null),
-        withCommitments,
-        needsRead,
-        stepsRead,
-      ]);
+    const [
+      results,
+      usage,
+      { items, portfolio, commitments },
+      needs,
+      steps,
+      deckReview,
+    ] = await Promise.all([
+      session === null ? null : getResults(session, period).catch(() => null),
+      qSession === null || side !== "INVESTOR"
+        ? null
+        : getMyUsage(qSession).catch(() => null),
+      withCommitments,
+      needsRead,
+      stepsRead,
+      // Founders: Q's deck reading waiting on their check (lead 2026-10-16).
+      side === "COMPANY" ? ownDeckReview() : Promise.resolve(null),
+    ]);
     // The Results endpoint authorises each projection. A conflicting role read
     // is unavailable, never silently rendered as the other party's perspective.
     const available =
@@ -322,6 +331,14 @@ export default async function RelationshipsPage({
               side,
               now,
               steps,
+              deckReview:
+                deckReview === null
+                  ? null
+                  : {
+                      pending: deckReview.pending,
+                      href: deckReview.href,
+                      at: new Date(now).toISOString(),
+                    },
             })}
             now={now}
             unavailable={needs.unavailable}
