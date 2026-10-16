@@ -9,6 +9,8 @@ import {
   type FitOutcome,
   type FitParameter,
   fitScoreOutOf10,
+  notAssessedInvestability,
+  type InvestabilityDto,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
@@ -616,8 +618,10 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     >;
     readonly mandateId?: string | null;
     readonly unclaimed?: readonly string[];
+    readonly investability?: ReadonlyMap<string, InvestabilityDto>;
   }) {
     const read: string[][] = [];
+    const scored: string[][] = [];
     const evaluated: string[][] = [];
     const service = createFitService({
       investorSubject: {
@@ -672,9 +676,23 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
                 new Set(ids.filter((id) => options.unclaimed?.includes(id))),
               ),
           }),
+      ...(options.investability === undefined
+        ? {}
+        : {
+            investability: (ids: readonly string[]) => {
+              scored.push([...ids]);
+              return Promise.resolve(
+                new Map(
+                  [...(options.investability ?? new Map())].filter(([id]) =>
+                    ids.includes(id),
+                  ),
+                ),
+              );
+            },
+          }),
       clock: () => NOW,
     });
-    return { service, read, evaluated };
+    return { service, read, evaluated, scored };
   }
 
   it("a non-investor gets nothing, and nothing is read", async () => {
@@ -685,6 +703,47 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     expect(await w.service.top(actor, 3)).toEqual({ kind: "NOT_INVESTOR" });
     expect(w.read).toEqual([]);
     expect(w.evaluated).toEqual([]);
+  });
+
+  it("2026-10-16: carries Investability and Suitability as separate scores, read only for admitted companies", async () => {
+    const investability: InvestabilityDto = {
+      ...notAssessedInvestability("investiq/v1+investability-inputs.v1"),
+      status: "SCORED",
+      score: 58,
+      band: "DEVELOPING",
+      confidence: "LOW",
+      coverage: {
+        areasScored: 5,
+        areasTotal: 8,
+        criteriaScored: 15,
+        criteriaApplicable: 46,
+      },
+    };
+    const w = world({
+      reasons: { [ID(2)]: ["COMPANY_NOT_DISCOVERABLE_BY_INVESTOR"] },
+      investability: new Map([
+        [ID(1), investability],
+        [ID(2), investability],
+      ]),
+    });
+    const result = await w.service.profiles(actor, [ID(1), ID(2), ID(3)]);
+    if (result.kind !== "OK") throw new Error("expected OK");
+    // The hidden company's score is never even asked for.
+    expect(w.scored).toEqual([[ID(1), ID(3)]]);
+    const [first, third] = result.items;
+    expect(first?.scores?.investability.score).toBe(58);
+    expect(third?.scores?.investability.status).toBe("NOT_ASSESSED");
+    expect(third?.scores?.investability.score).toBeNull();
+    // Suitability is the fit the reader sees, × 10; never blended.
+    const shown = fitScoreOutOf10(
+      first?.assessment.profile ?? FitProfileDtoSchema.parse(null),
+    );
+    expect(first?.scores?.suitability?.score).toBe(
+      shown === null ? null : Math.round(Number(shown) * 10),
+    );
+    expect(first?.scores?.investability.score).not.toBe(
+      first?.scores?.suitability?.score,
+    );
   });
 
   it("a company the reader may not see is absent, and its inputs are never read", async () => {

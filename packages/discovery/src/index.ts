@@ -773,6 +773,7 @@ export {
 export {
   FIT_TOP_CANDIDATES_MAX,
   buildFitComparison,
+  companyScoresText,
   createFitService,
   fitComparisonText,
   fitProfileText,

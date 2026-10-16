@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   CompanyRaiseViewSchema,
+  CompanyScoresDtoSchema,
   FIT_COMPARISON_MAX,
   FitComparisonDtoSchema,
   FitProfileDtoSchema,
@@ -9,6 +10,7 @@ import {
   MODEL_TOOL_RESULT_MAX_CHARS,
   UuidSchema,
   type CompanyRaiseView,
+  type CompanyScoresDto,
 } from "@capital-q/contracts";
 import { fitComparisonText, fitProfileText } from "@capital-q/discovery";
 
@@ -53,7 +55,7 @@ export const FIT_TOP_CANDIDATES = "fit.top_candidates" as const;
 // code from the rows (`text` carries it as "7.5/10 · Good fit"); the model
 // repeats it, never makes one.
 const GUIDANCE =
-  "Say each company's fit as the score out of 10 given in text beside its profile's band in words (\"7.5/10 · Good fit\"), exactly as given; where no score is given, the band in words alone. Never a percentage, never a score of your own, never a different number. Then the parameter rows that matter, with their reasons. Unknown means not known yet, never bad. Q's view, if you give one, is labelled as your view and does not change the fit. Do not make a document or PDF unless the person asked for a file.";
+  "Say each company's fit as the score out of 10 given in text beside its profile's band in words (\"7.5/10 · Good fit\"), exactly as given; where no score is given, the band in words alone. Never a percentage, never a score of your own, never a different number. Then the parameter rows that matter, with their reasons. Unknown means not known yet, never bad. Q's view, if you give one, is labelled as your view and does not change the fit. When text gives Investability and Suitability, say both exactly as given, each with how much it is based on (\"based on 5 of 8 areas\") and its confidence: Investability is how investable the company is on its shared evidence (FDN InvestIQ), Suitability is its fit with this investor's mandate; they are separate scores, never add or average them. \"Not enough shared evidence yet\" is not a low score. Do not make a document or PDF unless the person asked for a file.";
 
 const STATUSES = [
   "OK",
@@ -87,6 +89,8 @@ export const FitProfileOutputSchema = z
     /** R2: the raise as the Discover card and the profile say it, for display. */
     raiseView: CompanyRaiseViewSchema.optional(),
     profile: FitProfileDtoSchema.nullable(),
+    /** Investability and Suitability, two separate scores (2026-10-16). */
+    scores: CompanyScoresDtoSchema.optional(),
     /** The same profile as plain text. */
     text: z.string(),
     guidance: z.string(),
@@ -215,11 +219,30 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
         raise: item.raise ?? null,
         ...(raiseView === undefined ? {} : { raiseView }),
         profile: item.assessment.profile,
-        text: fitProfileText(item.name, item.assessment.profile),
+        ...(item.scores === undefined ? {} : { scores: item.scores }),
+        text: fitProfileText(item.name, item.assessment.profile, {
+          scores: item.scores,
+        }),
         guidance: GUIDANCE,
       };
     },
   });
+}
+
+/**
+ * Up to ten entries side by side: each keeps both scores, their coverage
+ * and confidence, but not the per-company "why" lists (the profile tool
+ * and the company page carry those), so ten stay inside the tool bound.
+ */
+function compactScores(scores: CompanyScoresDto): CompanyScoresDto {
+  return {
+    ...scores,
+    investability: { ...scores.investability, up: [], down: [], missing: [] },
+    suitability:
+      scores.suitability === null
+        ? null
+        : { ...scores.suitability, up: [], down: [], missing: [] },
+  };
 }
 
 export function createFitTopCandidatesTool(
@@ -258,7 +281,13 @@ export function createFitTopCandidatesTool(
           ...result.comparison,
           entries: result.comparison.entries.map((entry) => {
             const raiseView = views.get(entry.companyId);
-            return raiseView === undefined ? entry : { ...entry, raiseView };
+            const compact =
+              entry.scores === undefined
+                ? entry
+                : { ...entry, scores: compactScores(entry.scores) };
+            return raiseView === undefined
+              ? compact
+              : { ...compact, raiseView };
           }),
         },
         text: fitComparisonText(result.comparison),
@@ -272,6 +301,18 @@ export function createFitTopCandidatesTool(
         output.text = fitComparisonText(result.comparison, {
           summaryOnly: true,
         });
+      }
+      // Still too large: the scores stay in the text, once, per company.
+      if (
+        JSON.stringify(output).length > MODEL_TOOL_RESULT_MAX_CHARS &&
+        output.comparison !== null
+      ) {
+        output.comparison = {
+          ...output.comparison,
+          entries: output.comparison.entries.map(
+            ({ scores: _scores, ...entry }) => entry,
+          ),
+        };
       }
       return output;
     },
