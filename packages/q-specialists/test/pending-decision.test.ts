@@ -302,7 +302,7 @@ describe("a typed decision on a waiting change", () => {
     expect(calls.approve).toEqual([]);
     expect(outcome.kind).toBe("REPLY");
     expect(outcome.kind === "REPLY" ? outcome.line : "").toContain(
-      '"Reminder: Send Savanna the updated deck" and "Update your website"',
+      'Which one should I approve: "Reminder: Send Savanna the updated deck" or "Update your website"? Or say "both".',
     );
   });
 });
@@ -546,7 +546,7 @@ describe("a yes in a new conversation to a change asked for elsewhere (live 2026
     expect(calls.approve).toEqual([]);
     expect(outcome).toEqual({
       kind: "REPLY",
-      line: '2 changes are waiting for your approval: "Q looks after Nixo for you" and "Reminder: Send Savanna the updated deck". Which one do you mean?',
+      line: 'Which one should I approve: "Q looks after Nixo for you" or "Reminder: Send Savanna the updated deck"? Or say "both".',
     });
   });
 
