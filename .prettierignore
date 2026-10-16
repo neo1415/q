@@ -47,3 +47,6 @@ graphify-out
 
 # Archived third-party page captures (verbatim; not ours to format).
 docs/product-sources/landing-capture-*/
+
+# Generated product guide (built by scripts/handoff/docs/build.mjs)
+docs/guide/capital-q-guide.html

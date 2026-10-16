@@ -15,11 +15,12 @@ import {
 describe("compound fit meaning in the existing readers", () => {
   it("publishes new versions without rewriting historical prompts", () => {
     const registry = createDefaultPromptRegistry();
-    expect(registry.getActive("TURN_READER").definition).toMatchObject({
-      version: 50,
-      template: TURN_READER_V50.template,
-      status: "ACTIVE",
-    });
+    // v51 (decision with work) keeps v50's compound-fit rule as it was.
+    expect(registry.getActive("TURN_READER").definition.version).toBe(51);
+    expect(registry.getActive("TURN_READER").definition.template).toContain(
+      V50_FIT,
+    );
+    expect(TURN_READER_V50.status).toBe("DEPRECATED");
     expect(registry.getActive("TURN_SKIM").definition).toMatchObject({
       version: 5,
       template: TURN_SKIM_V5.template,

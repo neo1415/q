@@ -150,3 +150,8 @@ export {
   type TavusKeyHealth,
   type TavusKeyPool,
 } from "./tavus/key-pool.js";
+export {
+  TAVUS_PARTICIPANT_LABEL_MAX,
+  tavusParticipantLabel,
+  type TavusParticipantRole,
+} from "./tavus/participant-label.js";

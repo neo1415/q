@@ -33,7 +33,8 @@ import type { TourSubject } from "./subject-model";
 import { setNarrationVoice, standardVoicePlaying } from "./narrator";
 import { RESUME_KEY } from "./resume";
 import { openTourVoice } from "./tour-voice";
-import { isTourAsk, useTourPorts, type TranscriptSink } from "./use-tour-ports";
+import { viewerQuestions } from "./live-question";
+import { useTourPorts, type TranscriptSink } from "./use-tour-ports";
 
 /**
  * Q Pitch host (QP-F08/F09): Q narrates the real app. Mounted once in the
@@ -242,6 +243,7 @@ export function QPitchHost({
   const turns = session?.turns;
   const working = session?.q.working ?? false;
   const seenTurns = useRef<Set<string> | null>(null);
+  const askedHere = useRef(new Set<string>());
   const answering = useRef(false);
   const answeringAloud = useRef(false);
   useEffect(() => {
@@ -250,14 +252,14 @@ export function QPitchHost({
       seenTurns.current = new Set(turns.map((turn) => turn.id));
       return;
     }
-    for (const turn of turns) {
-      if (seenTurns.current.has(turn.id)) continue;
-      if (turn.kind === "PERSON" && turn.unconfirmed) continue;
-      seenTurns.current.add(turn.id);
-      if (turn.kind !== "PERSON" || isTourAsk(turn.text)) continue;
+    for (const id of viewerQuestions(
+      turns,
+      seenTurns.current,
+      askedHere.current,
+    )) {
       const decision = runner.control(
         {
-          intentId: `qp-ask-${turn.id}`.slice(0, 128),
+          intentId: `qp-ask-${id}`.slice(0, 128),
           source: "AUDIENCE_MIC",
           modality: "KEYBOARD",
           kind: "INTERRUPT",

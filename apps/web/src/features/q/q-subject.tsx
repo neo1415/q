@@ -57,12 +57,17 @@ type SubjectContextValue = {
   readonly own: QSubject;
   readonly page: QSubject | null;
   readonly declare: (subject: QSubject | null) => void;
+  /** The record open on the page, by name, when it is no subject kind. */
+  readonly focus: string | null;
+  readonly focusOn: (label: string | null) => void;
 };
 
 const SubjectContext = createContext<SubjectContextValue>({
   own: NO_SUBJECT,
   page: null,
   declare: () => undefined,
+  focus: null,
+  focusOn: () => undefined,
 });
 
 export function QSubjectProvider({
@@ -73,9 +78,10 @@ export function QSubjectProvider({
   readonly children: ReactNode;
 }) {
   const [page, setPage] = useState<QSubject | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
   const value = useMemo<SubjectContextValue>(
-    () => ({ own, page, declare: setPage }),
-    [own, page],
+    () => ({ own, page, declare: setPage, focus, focusOn: setFocus }),
+    [own, page, focus],
   );
   return (
     <SubjectContext.Provider value={value}>{children}</SubjectContext.Provider>
@@ -101,5 +107,32 @@ export function QPageSubject({ subject }: { readonly subject: QSubject }) {
     declare(JSON.parse(key) as QSubject);
     return () => declare(null);
   }, [declare, key]);
+  return null;
+}
+
+/**
+ * What Q's panel says it is about, in words: the record open on the page
+ * (live check 2026-10-16: on a GateQ application the panel said "About
+ * Savanna Seed Partners", the reader's own organisation), else the
+ * subject's name. Words only: the record itself reaches Q through the
+ * page's manifest focus, resolved and authorised by the Q API as ever.
+ */
+export function useQAboutLabel(): string | null {
+  const { own, page, focus } = useContext(SubjectContext);
+  if (focus !== null) return focus;
+  const subject = page ?? own;
+  return subject.kind === "NONE" ? null : (subject.label ?? null);
+}
+
+/**
+ * Name the record open on the page for Q's panel, for as long as it is
+ * open (a GateQ application: no subject kind, so a name alone).
+ */
+export function QPageFocus({ label }: { readonly label: string | null }) {
+  const { focusOn } = useContext(SubjectContext);
+  useEffect(() => {
+    focusOn(label);
+    return () => focusOn(null);
+  }, [focusOn, label]);
   return null;
 }

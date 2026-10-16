@@ -55,12 +55,35 @@ export function amountStatedIn(amount: string, text: string): boolean {
   return amountsIn(text).some((value) => Math.abs(value - target) < 0.005);
 }
 
-/** "360000 USD", the dossier's summary of an AMOUNT fact, back to its parts. */
+/**
+ * An AMOUNT fact in words for a person: the ISO currency, then the exact
+ * decimal grouped in thousands ("USD 360,000"; live check 2026-10-16:
+ * "360000 USD" read as a raw value). Never through a float.
+ */
+export function amountWords(amount: string, currency: string): string {
+  const [whole = "0", fraction] = amount.split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
+  const cents =
+    fraction === undefined || /^0*$/u.test(fraction)
+      ? ""
+      : `.${fraction.padEnd(2, "0").slice(0, 2)}`;
+  return `${currency} ${grouped}${cents}`;
+}
+
+/**
+ * The dossier's summary of an AMOUNT fact back to its parts: "USD 360,000"
+ * (amountWords) or, in dossiers frozen before it, "360000 USD".
+ */
 export function amountOfSummary(
   summary: string,
 ): { readonly amount: string; readonly currency: string } | null {
-  const match = /^(\d+(?:\.\d{1,2})?) ([A-Z]{3})$/u.exec(summary.trim());
-  return match === null || match[1] === undefined || match[2] === undefined
+  const text = summary.trim();
+  const legacy = /^(\d+(?:\.\d{1,2})?) ([A-Z]{3})$/u.exec(text);
+  if (legacy?.[1] !== undefined && legacy[2] !== undefined) {
+    return { amount: legacy[1], currency: legacy[2] };
+  }
+  const words = /^([A-Z]{3}) (\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)$/u.exec(text);
+  return words?.[1] === undefined || words[2] === undefined
     ? null
-    : { amount: match[1], currency: match[2] };
+    : { amount: words[2].replace(/,/gu, ""), currency: words[1] };
 }

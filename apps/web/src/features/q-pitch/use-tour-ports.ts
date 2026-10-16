@@ -20,6 +20,7 @@ import {
 import { useGlobalQ } from "@/components/app-shell/global-q";
 import { openDocumentViewer } from "@/features/documents/document-ready";
 import { controlOf, registeredControlIds } from "@/features/q/control/registry";
+import { currentManifest } from "@/features/q/manifest";
 import {
   useQSessionOptional,
   type QSessionValue,
@@ -100,6 +101,40 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       { once: true },
     );
   });
+}
+
+/** How long a question waits for the page under it to finish loading. */
+export const PAGE_SETTLE_MS = 8_000;
+
+/**
+ * Before the tour asks Q about the page: the page has finished loading and,
+ * on a company page, declares that company in focus. A question goes with
+ * the screen Q is told about; asked while the new page was still loading,
+ * "this company" was resolved from the previous page's card (run 5, 16 Oct:
+ * on Harbourline, Q answered about the feed's last company). Bounded: a
+ * page that never settles is asked about anyway, and the answer's own
+ * receipt decides the scene.
+ */
+export async function pageSettled(
+  signal: AbortSignal,
+  maxMs: number = PAGE_SETTLE_MS,
+): Promise<boolean> {
+  const until = Date.now() + maxMs;
+  for (;;) {
+    const manifest = currentManifest();
+    const loading = (manifest?.notices ?? []).some(
+      (notice) => notice.kind === "LOADING",
+    );
+    const company = /^\/company\/([0-9a-f-]{36})/iu.exec(
+      window.location.pathname,
+    )?.[1];
+    const focused =
+      company === undefined ||
+      manifest?.focus?.id.toLowerCase() === company.toLowerCase();
+    if (!loading && focused) return true;
+    if (signal.aborted || Date.now() > until) return false;
+    await sleep(150);
+  }
 }
 
 /** A settled Q answer is rendered and laid out (not merely in state). */
@@ -329,6 +364,8 @@ export function useTourPorts(
       const known = new Set<string>(messages().map((m) => m.runId));
       if (q.runId !== null) known.add(q.runId);
       if (q.state.runId !== null) known.add(q.state.runId);
+      await pageSettled(signal);
+      if (signal.aborted) return outcome(false, "CANCELLED");
       setOpen(true);
       TOUR_ASKS.add(text.trim());
       if (TOUR_ASKS.size > 64) {

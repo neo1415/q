@@ -865,6 +865,17 @@ function composeGateqVideo(apply: {
     conversation: apply.conversation,
     bridgePath: GATEQ_VIDEO_BRIDGE_PATH,
     eventsPath: GATEQ_VIDEO_EVENTS_PATH,
+    // Q's tile names the fund it interviews for (its public display name).
+    fundFor: async (gatewayId) => {
+      const gateway = await gateqGateways.findById(
+        gatewayId as Parameters<typeof gateqGateways.findById>[0],
+      );
+      if (gateway === null) return null;
+      return (
+        (await gateq.publicGateway(gateway.publicId))
+          ?.organisationDisplayName ?? null
+      );
+    },
   });
   // Rooms past their deadline are ended even after a restart; the
   // provider's own max_call_duration is the backstop behind this.

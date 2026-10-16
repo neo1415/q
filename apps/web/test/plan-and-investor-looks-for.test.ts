@@ -198,6 +198,23 @@ describe("What this investor looks for (Q.05)", () => {
     ]);
   });
 
+  it("lists matches with the founder only, never 'Deploying now', and nothing the gate already says (live check 2026-10-16)", () => {
+    expect(
+      profileRows([
+        { kind: "DECLARED_DEPLOYING", detail: "Actively investing" },
+      ]),
+    ).toEqual([]);
+    expect(
+      profileRows(
+        [
+          { kind: "SECTOR_MATCH", detail: "Fintech" },
+          { kind: "GEOGRAPHY_MATCH", detail: "Nigeria" },
+        ],
+        [{ label: "Sector", standing: "MET", words: "x", required: true }],
+      ).map((row) => row.label),
+    ).toEqual(["Geography"]);
+  });
+
   it("the room card offers the draft for review, never sends", () => {
     const card = looksForCard(
       investor,

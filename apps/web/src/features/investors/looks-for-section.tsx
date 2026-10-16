@@ -97,17 +97,17 @@ async function readGate(
   );
 }
 
-async function readProfileRows(
+async function readProfileReasons(
   session: ApiSession,
   investorOrganisationId: string,
-): Promise<LooksForRow[]> {
+): Promise<Parameters<typeof profileRows>[0]> {
   const slate = await discoverInvestors(session).catch(() => null);
   const item = slate?.items.find(
     (entry) =>
       entry.investorOrganisationId.toLowerCase() ===
       investorOrganisationId.toLowerCase(),
   );
-  return item === undefined ? [] : profileRows(item.reasons);
+  return item === undefined ? [] : item.reasons;
 }
 
 function Rows({ rows }: { readonly rows: readonly LooksForRow[] }) {
@@ -146,12 +146,14 @@ export async function LooksForSection({
   readonly investorOrganisationId: string;
   readonly investorName: string;
 }) {
-  const [gate, profile, form] = await Promise.all([
+  const [gate, reasons, form] = await Promise.all([
     readGate(session, investorOrganisationId),
-    readProfileRows(session, investorOrganisationId),
+    readProfileReasons(session, investorOrganisationId),
     founderFormContext().catch(() => null),
   ]);
   const criteria = gateRows(gate);
+  // Real matches only, and none the gate already answers; none: no heading.
+  const profile = profileRows(reasons, criteria);
   const href = draftHref(gate);
   const prefill = form?.prefill ?? null;
   return (

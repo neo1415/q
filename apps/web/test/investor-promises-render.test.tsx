@@ -257,6 +257,30 @@ describe("published gates for a founder (Q.05)", () => {
     );
   });
 
+  it("on a card, counts what is met and lists only the rest (live check 2026-10-16)", () => {
+    const many: InvestorGateFitDto = {
+      ...GATE,
+      criteria: [
+        ...GATE.criteria,
+        ...["Lagos", "Fintech", "B2B", "Cheque"].map((label) => ({
+          label,
+          requiredness: "PREFERRED" as const,
+          dimension: "TAXONOMY" as const,
+          standing: "NOT_MET" as const,
+        })),
+      ],
+    };
+    render(<GateFit gate={many} apply={false} compact />);
+    expect(screen.getByText("1 of 6 met; the rest:")).toBeTruthy();
+    expect(screen.queryByText("Seed or pre-seed")).toBeNull();
+    expect(
+      screen.getByRole("list", {
+        name: "Their criteria not met or not known yet",
+      }).children,
+    ).toHaveLength(3);
+    expect(screen.getByText("2 more on their page")).toBeTruthy();
+  });
+
   it("a required criterion not met is said as such", () => {
     const missed: InvestorGateFitDto = {
       ...GATE,
