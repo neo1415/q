@@ -29,15 +29,14 @@ describe("floating boxes and content panes", () => {
   function pane(rect: ReturnType<typeof box>) {
     const element = document.createElement("div");
     element.setAttribute("data-content-pane", "");
-    element.getBoundingClientRect = () =>
-      ({
-        ...rect,
-        x: rect.left,
-        y: rect.top,
-        width: rect.right - rect.left,
-        height: rect.bottom - rect.top,
-        toJSON: () => rect,
-      });
+    element.getBoundingClientRect = () => ({
+      ...rect,
+      x: rect.left,
+      y: rect.top,
+      width: rect.right - rect.left,
+      height: rect.bottom - rect.top,
+      toJSON: () => rect,
+    });
     document.body.append(element);
     return element;
   }
