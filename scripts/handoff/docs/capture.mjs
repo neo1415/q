@@ -90,6 +90,7 @@ const SHOTS = [
   // ---------- Sign-in (signed out) ----------
   { id: "signin", acct: null, title: "Sign in", path: "/auth/sign-in" },
   { id: "signup", acct: null, title: "Create account", path: "/auth/sign-up" },
+  { id: "signup-invited", acct: null, title: "Create account, from an invitation", path: "/auth/sign-up?next=%2Fjoin%2Fexample-invitation" },
   { id: "landing", acct: null, title: "Public home page", path: "/" },
 
   // ---------- Investor ----------
@@ -112,6 +113,8 @@ const SHOTS = [
   { id: "inv-explore-search", acct: "investor", title: "Explore search", path: "/explore?q=fintech" },
   { id: "inv-search", acct: "investor", title: "Search people and handles", path: "/search?q=Ledgerfold" },
   { id: "inv-company", acct: "investor", title: "Company profile, overview", path: () => `/company/${ids.ledgerfold}` },
+  { id: "inv-company-diligence", acct: "investor", title: "Company profile, Diligence tab", path: () => `/company/${ids.ledgerfold}?tab=diligence`, run: async (c) => { await c.scrollTo("Questions to investigate"); } },
+  { id: "inv-company-sections", acct: "investor", title: "Company profile, section by section", path: () => `/company/${ids.ledgerfold}`, run: async (c) => { await c.scrollTo(/section by section/); } },
   { id: "inv-company-full", acct: "investor", title: "Company profile, more", path: () => `/company/${ids.ledgerfold}`, run: async (c) => { await c.scrollTo("Risks and unknowns"); } },
   { id: "inv-company-deck", acct: "investor", title: "Company profile, pitch deck", path: () => `/company/${ids.ledgerfold}?tab=deck`, run: async (c) => { await c.scrollTo(/deck, version/); } },
   { id: "inv-company-dataroom", acct: "investor", title: "Company profile, data room", path: () => `/company/${ids.ledgerfold}?tab=dataroom`, run: async (c) => { await c.scrollToText("Request all on-request documents"); } },
@@ -129,6 +132,10 @@ const SHOTS = [
     } },
   { id: "inv-crm-list", acct: "investor", title: "CRM, pipeline list", path: "/relationships?view=pipeline&layout=list" },
   { id: "inv-crm-overview", acct: "investor", title: "CRM, overview", path: "/relationships?view=overview" },
+  { id: "inv-crm-needs", acct: "investor", title: "CRM, Needs you opened", path: "/relationships?view=overview", run: async (c) => {
+      const b = c.page.locator("main").getByRole("button", { name: /Needs you/ }).first();
+      if (await b.count()) { await b.click().catch(() => {}); await c.page.waitForTimeout(1500); }
+    } },
   { id: "inv-crm-table", acct: "investor", title: "CRM, pipeline table", path: "/relationships?view=pipeline&layout=table" },
   { id: "inv-crm-board", acct: "investor", title: "CRM, pipeline board", path: "/relationships?view=pipeline&layout=board" },
   { id: "inv-crm-record", acct: "investor", title: "CRM record", path: () => `/relationships/company/${ids.ledgerfold}` },
@@ -182,12 +189,20 @@ const SHOTS = [
   { id: "inv-qpitch-tour", acct: "investor", title: "Q Pitch, tour running", path: "/home?qpitch=short", needs: "q", wait: 25000 },
   { id: "inv-notifications", acct: "investor", title: "Notifications", path: "/capital", run: async (c) => { await c.page.locator("[data-notification-center]").first().click(); await c.page.waitForTimeout(3500); } },
   { id: "inv-settings", acct: "investor", title: "Settings", path: "/settings" },
+  { id: "inv-settings-language", acct: "investor", title: "Settings, language", path: "/settings", run: async (c) => {
+      await c.page.locator("[data-language-setting]").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
+      await c.page.evaluate(() => window.scrollBy(0, -80)); await c.page.waitForTimeout(1200);
+    } },
+  { id: "inv-fund-deck", acct: "investor", title: "Mandate, fund deck and thesis", path: "/onboarding/investor?review=1", run: async (c) => {
+      const d = c.page.locator("[data-investor-materials] summary").first();
+      if (await d.count()) { await d.click().catch(() => {}); await d.evaluate((el) => el.scrollIntoView({ block: "center" })); await c.page.waitForTimeout(1500); }
+    } },
   { id: "inv-plan", acct: "investor", title: "Plan", path: "/settings/plan" },
   { id: "inv-verification", acct: "investor", title: "Verification", path: "/verification" },
 
   // ---------- Founder (Harbourline Cargo) ----------
   { id: "fnd-home", acct: "founder", title: "Q (home), founder", path: "/home", wait: 4000 },
-  { id: "fnd-nav", acct: "founder", title: "Sidebar, founder (expanded)", path: "/relationships?view=capital", run: async (c) => { await c.expandNav(); } },
+  { id: "fnd-nav", acct: "founder", title: "Sidebar, founder (expanded)", path: "/relationships?view=pipeline&layout=list", run: async (c) => { await c.expandNav(); } },
   { id: "fnd-discover", acct: "founder", title: "Discover, investors", path: "/discover" },
   { id: "fnd-investor", acct: "founder", title: "Investor profile", path: () => `/investors/${ids.savanna}` },
   { id: "fnd-capital", acct: "founder", title: "Capital, founder", path: "/capital" },
@@ -248,10 +263,18 @@ const SHOTS = [
   { id: "led-crm", acct: "ledgerfold", title: "Fundraising Hub, Ledgerfold", path: "/relationships?view=pipeline&layout=list" },
   { id: "led-crm-board", acct: "ledgerfold", title: "Fundraising Hub board", path: "/relationships?view=pipeline&layout=board" },
   { id: "led-deck", acct: "ledgerfold", title: "Deck Q prepared", path: () => `/company/${ids.ledgerfold}?tab=deck`, run: async (c) => { await c.scrollTo(/deck/i); } },
+  { id: "led-ar-settings", acct: "ledgerfold", title: "Arabic: Settings", path: "/settings", arabic: true, run: async (c) => {
+      await c.page.locator("[data-language-setting]").first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
+      await c.page.waitForTimeout(1200);
+    } },
+  { id: "led-ar-home", acct: "ledgerfold", title: "Arabic: Q page", path: "/home", arabic: true, wait: 4000 },
+  { id: "led-ar-company", acct: "ledgerfold", title: "Arabic: company profile", path: () => `/company/${ids.ledgerfold}`, arabic: true },
+  { id: "led-ar-crm", acct: "ledgerfold", title: "Arabic: CRM", path: "/relationships?view=pipeline&layout=list", arabic: true },
+  { id: "led-ar-home-m", acct: "ledgerfold", title: "Arabic: Q page (phone)", path: "/home", arabic: true, vp: "m", wait: 4000 },
 ];
 
 // Phone (390) copies of the main pages, and tablet (834) where the layout really changes.
-const MOBILE = ["landing", "signup", "inv-home", "inv-discover", "inv-explore", "inv-company", "inv-crm-overview", "inv-crm-list", "inv-crm-record", "inv-gateq-inbox", "inv-work", "fnd-home", "fnd-capital", "fnd-documents", "fnd-gate-form", "fnd-dataroom"];
+const MOBILE = ["landing", "signup", "inv-home", "inv-discover", "inv-explore", "inv-company", "inv-company-sections", "inv-crm-overview", "inv-crm-list", "inv-crm-record", "inv-gateq-inbox", "inv-work", "fnd-home", "fnd-capital", "fnd-documents", "fnd-gate-form", "fnd-dataroom"];
 const TABLET = ["inv-discover", "inv-crm-board", "inv-gateq-inbox"];
 for (const [list, vp] of [[MOBILE, "m"], [TABLET, "t"]]) {
   for (const id of list) {
@@ -504,7 +527,22 @@ async function main() {
         await resolveIds(acct, helpers(idPage));
         await idPage.close();
       }
+      // Arabic shots switch this one demo account's language for a moment and
+      // always switch it back to Automatic, even when a shot fails.
+      const setLanguage = async (tag) => {
+        const pg = await ctx.newPage();
+        try {
+          await helpers(pg).go("/settings");
+          const btn = tag === "AUTO" ? pg.locator("[data-language-setting] [role=group] button").first() : pg.locator(`[data-language-option="${tag}"]`).first();
+          await btn.click({ timeout: 15000 });
+          await pg.waitForTimeout(4000);
+        } finally { await pg.close(); }
+      };
+      let arabicOn = false;
+      try {
       for (const s of shots) {
+        if (s.arabic && !arabicOn) { await setLanguage("ar"); arabicOn = true; }
+        if (!s.arabic && arabicOn) { await setLanguage("AUTO"); arabicOn = false; }
         const p = typeof s.path === "function" ? s.path() : s.path;
         // A fresh tab per shot: a renderer crash on one page (the shared VM
         // runs short of memory) then costs one shot, not the rest of the run.
@@ -530,6 +568,9 @@ async function main() {
           if (/HTTP 5\d\d/.test(String(e.message))) { console.log("Production returned a 5xx; stopping. Wait 5 minutes before re-running."); throw e; }
         }
         await page.close().catch(() => {});
+      }
+      } finally {
+        if (arabicOn) await setLanguage("AUTO").catch((e) => console.log("RESET LANGUAGE BY HAND:", acct, e.message));
       }
       await ctx.close();
     }
