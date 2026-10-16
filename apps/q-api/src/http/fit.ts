@@ -80,6 +80,7 @@ export function registerFitRoutes(
                 name: item.name,
                 line: item.line,
                 profile: item.assessment.profile,
+                ...(item.scores === undefined ? {} : { scores: item.scores }),
               }))
             : [],
       });

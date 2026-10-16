@@ -107,7 +107,7 @@ export const InvestIQV1AssessmentSchema = z
   .object({
     method: z
       .object({
-        version: z.literal("investiq/v1"),
+        version: z.enum(["investiq/v1", "investiq/v2"]),
         status: z.literal("OWNER_DELEGATED_PENDING_CALIBRATION"),
       })
       .strict(),
@@ -309,7 +309,31 @@ function weightedBand(
   };
 }
 
-export function assessInvestIQV1(raw: unknown): InvestIQV1Assessment {
+/**
+ * investiq/v2 (lead 2026-10-16, ADR 0075 amendment): the same method as v1
+ * except that evidence weight no longer pulls a criterion's point estimate
+ * toward the baseline: a criterion scores its graded anchor, and evidence
+ * weight drives confidence (and the evidence range) only. v1 stays
+ * published and reproducible.
+ */
+export type InvestIQArithmetic = {
+  readonly version: "investiq/v1" | "investiq/v2";
+  /** v1: 2 + (anchor - 2) × w. v2: the anchor itself. */
+  readonly shrinkToBaseline: boolean;
+};
+export const INVESTIQ_V1_ARITHMETIC: InvestIQArithmetic = Object.freeze({
+  version: "investiq/v1",
+  shrinkToBaseline: true,
+});
+export const INVESTIQ_V2_ARITHMETIC: InvestIQArithmetic = Object.freeze({
+  version: "investiq/v2",
+  shrinkToBaseline: false,
+});
+
+export function assessInvestIQV1(
+  raw: unknown,
+  arithmetic: InvestIQArithmetic = INVESTIQ_V1_ARITHMETIC,
+): InvestIQV1Assessment {
   const parsed = InvestIQInputSchema.safeParse(raw);
   if (!parsed.success) {
     throw new InvestIQInputError(
@@ -422,7 +446,11 @@ export function assessInvestIQV1(raw: unknown): InvestIQV1Assessment {
     const top = weighted.filter((x) => x.w === maxW);
     const score =
       top.reduce(
-        (s, x) => s + BASELINE_ANCHOR + (anchorOf(x.o) - BASELINE_ANCHOR) * x.w,
+        (s, x) =>
+          s +
+          (arithmetic.shrinkToBaseline
+            ? BASELINE_ANCHOR + (anchorOf(x.o) - BASELINE_ANCHOR) * x.w
+            : anchorOf(x.o)),
         0,
       ) / top.length;
     step(
@@ -539,10 +567,10 @@ export function assessInvestIQV1(raw: unknown): InvestIQV1Assessment {
   });
 
   return InvestIQV1AssessmentSchema.parse({
-    method: { version: INVESTIQ_V1.version, status: INVESTIQ_V1.status },
+    method: { version: arithmetic.version, status: INVESTIQ_V1.status },
     companyRef: input.companyRef,
     asOf: input.asOf,
-    inputHash: investiqInputHash(INVESTIQ_V1.version, input),
+    inputHash: investiqInputHash(arithmetic.version, input),
     stageBand: stage,
     weights: stage === null ? null : { ...STAGE_WEIGHTS[stage] },
     dimensions: dimensionResults.map((d) => d.result),

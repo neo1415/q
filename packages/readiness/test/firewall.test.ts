@@ -48,3 +48,25 @@ describe("readiness firewall", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("investability firewall", () => {
+  it("the investor-facing Investability never imports the founder-private readiness code", () => {
+    const dir = fileURLToPath(
+      new URL("../src/investability/", import.meta.url),
+    );
+    const offenders: string[] = [];
+    for (const file of sources(dir)) {
+      const text = readFileSync(file, "utf8");
+      for (const banned of [
+        "../domain/",
+        "../application/",
+        "../infrastructure/",
+        "../rules/",
+        "legacy-shadow",
+      ]) {
+        if (text.includes(banned)) offenders.push(`${file}: ${banned}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
