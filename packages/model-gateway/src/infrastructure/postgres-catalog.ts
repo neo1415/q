@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { ModelTaskClassSchema } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 
 import {
@@ -176,6 +177,10 @@ export async function loadModelCatalogSnapshot(
     routingPolicies: z
       .array(PolicyRow)
       .parse(policies)
+      // A policy for a task class this build does not know is skipped, not
+      // fatal: a later migration adding a class (UI_TRANSLATION did) must
+      // never stop every model call of a service deployed before it.
+      .filter((r) => ModelTaskClassSchema.safeParse(r.task_class).success)
       .map((r) => ({
         id: r.id,
         code: r.code,

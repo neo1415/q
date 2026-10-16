@@ -46,6 +46,11 @@ export const MODEL_TASK_CLASSES = [
   "EMBEDDING",
   // DOCS: illustrations for documents, through the image adapters only.
   "IMAGE_GENERATION",
+  // Any-language interface (2026-10-16): the English UI catalogue put into
+  // a person's chosen language once per language, cached and shared. Its
+  // own class so its routing (cheapest capable model) and its daily spend
+  // cap are separate from Q's reasoning.
+  "UI_TRANSLATION",
 ] as const;
 export const ModelTaskClassSchema = z.enum(MODEL_TASK_CLASSES);
 export type ModelTaskClass = z.infer<typeof ModelTaskClassSchema>;
@@ -64,6 +69,7 @@ export const MODEL_TEXT_TASK_CLASSES = [
   "EVIDENCE_SYNTHESIS",
   "COMPARISON",
   "DEEP_INVESTIGATION",
+  "UI_TRANSLATION",
 ] as const satisfies readonly ModelTaskClass[];
 export const ModelTextTaskClassSchema = z.enum(MODEL_TEXT_TASK_CLASSES);
 export type ModelTextTaskClass = z.infer<typeof ModelTextTaskClassSchema>;

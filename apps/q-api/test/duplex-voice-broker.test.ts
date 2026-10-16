@@ -418,7 +418,8 @@ describe("opening a duplex line", () => {
       true,
     );
     expect(mint?.instructions).toContain("Hi Ada. I'm listening.");
-    expect(mint?.instructions).toContain("fr-FR");
+    // The device language, named: any offered language gets the same note.
+    expect(mint?.instructions).toContain("this person chose French");
     expect(mint?.instructions).not.toContain("eyPRIVATE");
     if (opened.kind !== "DUPLEX") throw new Error("expected a duplex line");
     expect(opened.credential).toMatchObject({

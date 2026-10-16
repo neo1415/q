@@ -25,6 +25,7 @@ import { PitchWarmup } from "@/features/discover/player/pitch-warmup-trigger";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
 import { QPitchEntrySlot } from "@/features/q-pitch/tour-entry-slot";
 import { LanguageProvider } from "@/features/i18n/language";
+import { machineUiText } from "@/features/i18n/machine";
 import { uiLanguageOf } from "@/features/i18n/messages";
 
 // Session-bound HTML is rendered per request and never prerendered or
@@ -120,10 +121,12 @@ export default async function ApplicationLayout({
     // G2: the switcher's list (shown only for two or more).
     loadMyOrganisations(),
   ]);
-  // Multilingual Q: the interface follows the language they chose.
+  // Any language: the interface follows the language they chose; Q's
+  // machine translations fill what no hand catalogue covers.
   const language = uiLanguageOf(standing?.language);
+  const machine = await machineUiText(language);
   return (
-    <LanguageProvider language={language}>
+    <LanguageProvider language={language} machine={machine}>
       <AppShell
         context={{ ...shell, admin, organisations, qPitch }}
         subject={subject}

@@ -1,3 +1,8 @@
+import {
+  isEnglish,
+  languageChannels,
+  languageInfo,
+} from "@capital-q/q-core/language";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import {
@@ -148,6 +153,15 @@ export function videoAdmissionFrom(env: {
     ),
   };
 }
+
+/**
+ * The room's spoken disclosure where a hand-written line exists (trusted
+ * product copy, by primary subtag); any other language hears the English
+ * line. `{name}` is who Q plays.
+ */
+const REHEARSAL_DISCLOSURES: Readonly<Record<string, string>> = {
+  ar: "للعلم، هذا تدريب بالذكاء الاصطناعي، وليس {name} الحقيقي.",
+};
 
 // ---------------------------------------------------------------------------
 // Store
@@ -661,9 +675,9 @@ export function createRehearsalVideoService(dependencies: {
   readonly eventsPath: (sessionId: string) => string;
   readonly enabledInterviewers: ReadonlySet<string>;
   /**
-   * Multilingual Q: the founder's chosen language for Q. Arabic runs the
-   * room in Arabic first (Tavus `languages`), with the spoken disclosure in
-   * Arabic; the lines themselves come from Q, already in their language.
+   * Any language: the founder's chosen language for Q. The room runs in it
+   * first when Tavus lists it (`languages`); the lines themselves come from
+   * Q, already in their language.
    */
   readonly languageOf?:
     ((actor: ActorContext) => Promise<QLanguagePreference>) | undefined;
@@ -1073,6 +1087,26 @@ export function createRehearsalVideoService(dependencies: {
         };
       }
 
+      // Any language: the room runs in the founder's chosen language when
+      // Tavus lists it (q-core capability table), English understood; one
+      // it does not list opens no face room at all (voice instead).
+      const chosen = await (
+        dependencies.languageOf?.(actor) ?? Promise.resolve("AUTO")
+      ).catch(() => "AUTO");
+      const roomLanguage =
+        chosen === "AUTO" || isEnglish(chosen) ? null : chosen;
+      const videoPlan =
+        roomLanguage === null ? null : languageChannels(roomLanguage).video;
+      if (roomLanguage !== null && videoPlan === null) {
+        return {
+          kind: "OK",
+          response: { mode: "VOICE_FALLBACK", reason: "LANGUAGE_UNAVAILABLE" },
+        };
+      }
+      const spokenDisclosure =
+        roomLanguage === null
+          ? undefined
+          : REHEARSAL_DISCLOSURES[languageInfo(roomLanguage)?.primary ?? ""];
       const bearer = randomBytes(32).toString("base64url");
       const eventsToken = randomBytes(32).toString("base64url");
       const createdAt = now();
@@ -1118,10 +1152,6 @@ export function createRehearsalVideoService(dependencies: {
       }
       const row = claimed.row;
       const greeting = latestThemLine(rehearsal)?.text ?? null;
-      const arabic =
-        (await (
-          dependencies.languageOf?.(actor) ?? Promise.resolve("AUTO")
-        ).catch(() => "AUTO")) === "ar";
       const publicBase = dependencies.publicBaseUrl.replace(/\/+$/u, "");
       const bridgeUrl = `${publicBase}${dependencies.bridgePath(row.id)}`;
       const eventsUrl = `${publicBase}${dependencies.eventsPath(row.id)}/${encodeURIComponent(eventsToken)}`;
@@ -1138,9 +1168,10 @@ export function createRehearsalVideoService(dependencies: {
                 "You are the face and voice of a practice meeting run by Capital Q. Speak exactly the lines you are given, naturally, and nothing else.",
               faceId: interviewer.faceId,
               disclosure: {
-                spoken: arabic
-                  ? `للعلم، هذا تدريب بالذكاء الاصطناعي، وليس ${rehearsal.counterpart.name.slice(0, 80)} الحقيقي.`
-                  : `Just so you know, this is an AI rehearsal, not the real ${rehearsal.counterpart.name.slice(0, 80)}.`,
+                spoken: (
+                  spokenDisclosure ??
+                  "Just so you know, this is an AI rehearsal, not the real {name}."
+                ).replace("{name}", rehearsal.counterpart.name.slice(0, 80)),
                 shown: disclosure.slice(0, 200),
               },
               layers: {
@@ -1192,8 +1223,10 @@ export function createRehearsalVideoService(dependencies: {
                 joinGraceSeconds: REHEARSAL_VIDEO_JOIN_GRACE_SECONDS,
                 testMode: dependencies.testMode === true,
                 requireAuth: true,
-                // Arabic first, English understood: a Gulf founder mixes both.
-                ...(arabic ? { languages: ["ar", "en"] } : {}),
+                // Their language first, English understood: people mix both.
+                ...(videoPlan === null
+                  ? {}
+                  : { languages: [...videoPlan.languages] }),
               });
               return { palId, conversation };
             } catch (error: unknown) {

@@ -1,5 +1,9 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { supportedLanguageOf } from "@capital-q/q-core";
+import { isEnglish, supportedLanguageOf } from "@capital-q/q-core";
+
+/** A language beyond English, or null. */
+const nonEnglish = (language: string | null): string | null =>
+  language === null || isEnglish(language) ? null : language;
 
 import type {
   ApplicantTurnResult,
@@ -219,11 +223,12 @@ export type GateqVideoProvider = {
     /** Where the provider reports room events; the token is the proof. */
     readonly events: { readonly path: string; readonly token: string };
     /**
-     * Lane ml: the applicant's language when Capital Q speaks it beyond
-     * English (Arabic); null is English. The adapter runs the room in it
-     * and discloses in it; Q's lines come from the interview.
+     * The applicant's language beyond English (any the registry offers);
+     * null is English. The adapter runs the room in it when the video
+     * provider lists it, and discloses in it where a hand-written line
+     * exists; Q's lines come from the interview.
      */
-    readonly language?: "ar" | null | undefined;
+    readonly language?: string | null | undefined;
   }) => Promise<{
     readonly conversationId: string;
     readonly joinUrl: string | null;
@@ -473,7 +478,7 @@ export function createGateqVideoInterview(deps: {
           bridge: { path: deps.bridgePath, bearer },
           joinGraceSeconds: GATEQ_VIDEO_JOIN_GRACE_SECONDS,
           events: { path: deps.eventsPath, token: eventsToken },
-          language: supportedLanguageOf(input.locale) === "ar" ? "ar" : null,
+          language: nonEnglish(supportedLanguageOf(input.locale)),
         });
         createdConversationId = room.conversationId;
         const joinUrlSealed =

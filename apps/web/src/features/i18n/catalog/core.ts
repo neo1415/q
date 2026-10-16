@@ -4,6 +4,9 @@
  * parallel without touching each other; keys are the English source.
  */
 export const CORE_AR: Readonly<Record<string, string>> = {
+  // The word a written date puts before its time ("Tue 18 Sept at 14:00");
+  // months and weekdays come from Intl (patterns.ts localiseDate).
+  at: "الساعة",
   // Navigation
   Discover: "اكتشف",
   Explore: "استكشف",

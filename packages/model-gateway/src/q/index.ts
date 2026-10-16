@@ -630,6 +630,16 @@ export function budgetForTaskClass(taskClass: ModelTextTaskClass): ModelBudget {
         maxOutputTokens: 6_144,
         attemptTimeoutMs: 30_000,
       };
+    case "UI_TRANSLATION":
+      // One batch of interface strings into one language: about 60
+      // strings in and out, a few thousand tokens. The day's cap for the
+      // whole class is separate (ui-text daily spend cap).
+      return {
+        maxAttempts: 2,
+        maxEstimatedCostUsd: 0.05,
+        maxOutputTokens: 8_192,
+        attemptTimeoutMs: 60_000,
+      };
     case "NORMAL_DIALOGUE":
       return {
         maxAttempts: 3,

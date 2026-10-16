@@ -100,9 +100,17 @@ describe("sentences with a name, a figure or a date", () => {
   });
 
   it("writes dates with Arabic month names and Western digits", () => {
-    expect(localiseDate("18 Sept")).toBe("18 سبتمبر");
-    expect(localiseDate("27 Sept 2026, 06:54")).toBe("27 سبتمبر 2026, 06:54");
-    expect(localiseDate("Sept is a month")).toBeUndefined();
+    expect(localiseDate("18 Sept", "ar")).toBe("18 سبتمبر");
+    expect(localiseDate("27 Sept 2026, 06:54", "ar")).toBe(
+      "27 سبتمبر 2026, 06:54",
+    );
+    expect(localiseDate("Sept is a month", "ar")).toBeUndefined();
+    // The same words for any language, from Intl: no table per language.
+    expect(localiseDate("18 Sept", "fr")).toBe("18 sept.");
+    expect(localiseDate("Tue 18 Sept, 14:00", "es")).toMatch(
+      /^mar.* 18 sept.*, 14:00$/u,
+    );
+    expect(localiseDate("18 Sept", "en")).toBeUndefined();
     expect(translate("ar", "Call with Ada Obi on 7 Oct.")).toBe(
       "مكالمة مع Ada Obi في 7 أكتوبر.",
     );

@@ -196,10 +196,31 @@ async function run(
 }
 
 /** The sequence and its one way to change: the same for buttons and voice. */
-/** The standard line's lead after a card settles, in Arabic. */
-function arabicOutcome(ok: boolean | null): string | null {
+/**
+ * The standard line's lead after a card settles, hand-written by primary
+ * subtag (Arabic); any other language says the server's message.
+ */
+const OUTCOMES: Readonly<
+  Record<string, { readonly done: string; readonly failed: string }>
+> = {
+  ar: { done: "تمّ.", failed: "لم يتمّ ذلك، ولم يُرسَل شيء." },
+};
+/** "Something new just came in.", hand-written by primary subtag. */
+const NEW_ITEM: Readonly<Record<string, string>> = {
+  ar: "وصل للتوّ أمر جديد.",
+};
+const primaryOf = (language: string): string =>
+  (language.split("-")[0] ?? language).toLowerCase();
+
+function outcomeIn(
+  language: string,
+  ok: boolean | null,
+  english: string | null,
+): string | null {
+  const hand = OUTCOMES[primaryOf(language)];
+  if (hand === undefined) return english;
   if (ok === null) return null;
-  return ok ? "تمّ." : "لم يتمّ ذلك، ولم يُرسَل شيء.";
+  return ok ? hand.done : hand.failed;
 }
 
 function useSequence(
@@ -282,12 +303,12 @@ function useSequence(
             `${note}${done === null ? "" : ` Just now: ${done.replace(/\.$/u, "")}.`} Put this card to them briefly, then stop.`,
             true,
             // The standard line says this as it is (E-03).
-            // In Arabic the outcome is said in Arabic; the server's English
-            // message stays on the page's status line.
+            // Where a hand-written outcome exists (Arabic) it is said in
+            // it; the server's message stays on the page's status line.
             focusSay(
               cards,
               ref.current,
-              language === "ar" ? arabicOutcome(settled) : done,
+              outcomeIn(language, settled, done),
               language,
             ) ?? undefined,
           );
@@ -900,9 +921,7 @@ export function Sequence({
         focusSay(
           data.cards,
           state,
-          language === "ar"
-            ? "وصل للتوّ أمر جديد."
-            : "Something new just came in.",
+          NEW_ITEM[primaryOf(language)] ?? "Something new just came in.",
           language,
         ) ?? undefined,
       );
