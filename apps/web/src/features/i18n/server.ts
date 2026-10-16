@@ -8,7 +8,7 @@ import { rememberServerLanguage } from "./server-now";
 /** The person's interface language, from their saved choice (cached per request). */
 export async function serverUiLanguage(): Promise<UiLanguage> {
   // English whenever the choice cannot be read: a page never fails over it.
-  let language: UiLanguage = "en";
+  let language: UiLanguage;
   try {
     const standing = await resolveQStanding();
     language = uiLanguageOf(standing?.language);
