@@ -124,7 +124,7 @@ export default async function AdminQRunPage({
         {trace.calls.length === 0 ? (
           <EmptyState compact title="No model calls" />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="cq-body-sm w-full min-w-[40rem] text-left">
               <thead className="cq-caption text-(--cq-text-secondary)">
                 <tr>

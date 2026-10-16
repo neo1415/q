@@ -34,6 +34,7 @@ import {
   type TriageProposal,
 } from "./domain.js";
 import { withDerivedAmountsMarked } from "../application/dossier.js";
+import { amountWords } from "../application/stated-amount.js";
 import { buildPack, packFileName, type PackFile } from "./pack.js";
 import type {
   InboxActivityKind,
@@ -929,7 +930,7 @@ export function createInboxService(dependencies: {
           raise:
             profile.raise === null
               ? null
-              : `${profile.raise.amount} ${profile.raise.currency}`,
+              : amountWords(profile.raise.amount, profile.raise.currency),
           instrument: profile.instrument,
           lead: profile.lead,
           website: profile.website,

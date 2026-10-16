@@ -49,6 +49,7 @@ import {
   CURRENCIES,
   DECLINED,
   dimensionWord,
+  ownLabel,
   draftNote,
   FLOW_PROGRESS,
   FORM_STEPS,
@@ -880,8 +881,12 @@ function GateCard({
                     ) : (
                       <span className="gq-t3"> · preferred</span>
                     )}
-                    <br />
-                    <span className="gq-t2">{line.label}</span>
+                    {ownLabel(line) === null ? null : (
+                      <>
+                        <br />
+                        <span className="gq-t2">{ownLabel(line)}</span>
+                      </>
+                    )}
                     {showResults && line.standing !== null ? (
                       <span className="sr-only">
                         : {STANDING_WORDS[line.standing]}
@@ -910,8 +915,12 @@ function ResultLines({ lines }: { readonly lines: readonly RuleLine[] }) {
             <FitGlyph kind={GLYPH[line.standing]} />
             <span>
               <b className="font-medium">{dimensionWord(line.dimension)}</b>
-              <br />
-              <span className="cq-body-sm gq-t2">{line.label}</span>
+              {ownLabel(line) === null ? null : (
+                <>
+                  <br />
+                  <span className="cq-body-sm gq-t2">{ownLabel(line)}</span>
+                </>
+              )}
             </span>
             <span className="gq-status">{STANDING_WORDS[line.standing]}</span>
           </div>

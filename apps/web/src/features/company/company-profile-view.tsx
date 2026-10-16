@@ -453,7 +453,7 @@ export function CompanyProfileView({
 
       <nav
         aria-label={`${profile.canonicalName} profile`}
-        className="flex gap-5 overflow-x-auto border-b border-(--cq-border-subtle) [grid-area:tabs] sm:gap-6"
+        className="relative flex gap-5 overflow-x-auto border-b border-(--cq-border-subtle) [grid-area:tabs] sm:gap-6"
       >
         {tabs.map(([value, label, count]) => (
           <ProfileTabLink

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import type {
   ApplicationCoverageDto,
@@ -69,6 +69,10 @@ export function GateqVideoEntry({
   const [message, setMessage] = useState<string | null>(null);
   const [why, setWhy] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
+  // Pressed Start before ticking consent: ask for it, beside the box.
+  const [askConsent, setAskConsent] = useState(false);
+  const consentRef = useRef<HTMLInputElement>(null);
+  const consentHintId = useId();
   const [pending, startTransition] = useTransition();
   // Latest callbacks, so the state read runs once per token.
   const unavailable = useRef(onUnavailable);
@@ -202,9 +206,15 @@ export function GateqVideoEntry({
       )}
       <label className="cq-body-sm flex min-h-11 cursor-pointer items-start gap-3 text-(--cq-text-secondary)">
         <input
+          ref={consentRef}
           type="checkbox"
           checked={consented}
-          onChange={(event) => setConsented(event.target.checked)}
+          onChange={(event) => {
+            setConsented(event.target.checked);
+            if (event.target.checked) setAskConsent(false);
+          }}
+          aria-invalid={askConsent ? true : undefined}
+          aria-describedby={askConsent ? consentHintId : undefined}
           className="mt-1 size-4 accent-(--cq-accent)"
         />
         <span>
@@ -216,8 +226,16 @@ export function GateqVideoEntry({
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant={primary ? "primary" : "secondary"}
-          disabled={!consented || pending}
-          onClick={() =>
+          // Never a greyed primary (live check 2026-10-16: it lost to
+          // "Skip to review"). Without consent, pressing it asks for the
+          // box above and moves focus there; nothing starts.
+          disabled={pending}
+          onClick={() => {
+            if (!consented) {
+              setAskConsent(true);
+              consentRef.current?.focus();
+              return;
+            }
             startTransition(async () => {
               setMessage(null);
               const result = await startVideoAction(token);
@@ -238,8 +256,8 @@ export function GateqVideoEntry({
                   onUnavailable?.(why);
                 }
               }
-            })
-          }
+            });
+          }}
         >
           {pending
             ? "Opening the video room…"
@@ -257,6 +275,15 @@ export function GateqVideoEntry({
           </span>
         )}
       </div>
+      {askConsent ? (
+        <p
+          id={consentHintId}
+          role="status"
+          className="cq-body-sm text-(--cq-text-primary)"
+        >
+          Tick the box above to start the video interview.
+        </p>
+      ) : null}
       {message === null ? null : (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
           {message}

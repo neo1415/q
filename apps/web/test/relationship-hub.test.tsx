@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   notices: vi.fn(),
   reminders: vi.fn(),
   commitments: vi.fn(),
+  steps: vi.fn(),
 }));
 vi.mock("next/navigation", async (load) => ({
   ...(await load<typeof import("next/navigation")>()),
@@ -49,6 +50,9 @@ vi.mock("@/features/q/context", () => ({
 vi.mock("@/features/relationships/relationship-data", () => ({
   ownRelationships: mocks.relationships,
   relationshipDigests: mocks.digests,
+  relationshipSteps: mocks.steps,
+  unreadByRelationship: vi.fn().mockResolvedValue(new Map()),
+  ownCommitmentFacts: vi.fn().mockResolvedValue({}),
 }));
 vi.mock("@capital-q/api-client", async (load) => ({
   ...(await load<typeof import("@capital-q/api-client")>()),
@@ -87,6 +91,7 @@ beforeEach(() => {
   mocks.relationships.mockResolvedValue([]);
   mocks.notices.mockResolvedValue({ items: [] });
   mocks.reminders.mockResolvedValue({ items: [] });
+  mocks.steps.mockResolvedValue([]);
 });
 
 async function overview() {
@@ -355,6 +360,68 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
     ).toBeTruthy();
   });
 
+  it("lists the Pipeline's own steps and Capital's money steps too (live check 2026-10-16)", async () => {
+    const { nextStepFor } =
+      await import("@/features/relationships/relationships-view");
+    const decide = {
+      ...relationship,
+      relationshipId: "d0000000-0000-4000-8000-000000000010",
+      counterpart: { ...relationship.counterpart, name: "Ajopot" },
+      nextStep: "DECIDE_NEXT_STEP" as const,
+    };
+    const money = {
+      ...relationship,
+      relationshipId: "d0000000-0000-4000-8000-000000000011",
+      counterpart: { ...relationship.counterpart, name: "Ledgerfold" },
+    };
+    const now = Date.parse("2026-10-16T10:00:00.000Z");
+    mocks.relationships.mockResolvedValue([decide, money]);
+    mocks.steps.mockResolvedValue([
+      {
+        item: decide,
+        step: nextStepFor(decide, undefined, "INVESTOR", now, "/r/a"),
+        at: decide.stateSince,
+      },
+      {
+        item: money,
+        step: nextStepFor(
+          money,
+          {
+            unread: 0,
+            followUpDue: false,
+            nextCallAt: null,
+            lastMessageAt: null,
+            diligence: null,
+            commitment: {
+              next: "MARK_SENT",
+              amount: "250000",
+              currencyCode: "USD",
+            },
+          },
+          "INVESTOR",
+          now,
+          "/r/l",
+        ),
+        at: money.stateSince,
+      },
+    ]);
+    await overview();
+    const queue = screen.getByRole("region", { name: /Needs you/u });
+    expect(within(queue).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(queue).getByText("Ajopot")).toBeDefined();
+    expect(
+      within(queue)
+        .getByRole("link", { name: "Mark as sent" })
+        .getAttribute("href"),
+    ).toBe("/relationships?view=capital#commitments");
+    expect(within(queue).getByText("Commitment USD 250,000")).toBeDefined();
+    // A step leaves when it is done: no dismiss on it.
+    expect(
+      within(queue).queryByRole("button", { name: /Dismiss/u }),
+    ).toBeNull();
+    expect(screen.queryByText(/Nothing needs you right now\./u)).toBeNull();
+  });
+
   it("says nothing needs them, not a blank area", async () => {
     await overview();
     expect(screen.getByText(/Nothing needs you right now\./u)).toBeDefined();
@@ -529,6 +596,33 @@ describe("S4: the investor's portfolio on the Overview", () => {
     expect(
       screen.getByText(/Your portfolio couldn't be read just now/u),
     ).toBeDefined();
+  });
+
+  it("says confirmed money is not yet an investment, beside the empty portfolio (live check 2026-10-16)", async () => {
+    mocks.results.mockResolvedValue({
+      side: "INVESTOR",
+      organisationName: "Fund",
+      pipelineFit: [],
+      commitments: [
+        {
+          status: "CONFIRMED",
+          currencyCode: "USD",
+          count: 1,
+          amount: "250000",
+        },
+      ],
+    });
+    await overview();
+    const section = screen.getByRole("region", { name: /Portfolio/u });
+    expect(section.textContent).toContain("No investments recorded yet");
+    expect(section.textContent).toContain(
+      "1 commitment is confirmed and not yet received (USD 250,000).",
+    );
+    expect(
+      within(section)
+        .getByRole("link", { name: "Open Capital" })
+        .getAttribute("href"),
+    ).toBe("/relationships?view=capital#commitments");
   });
 
   it("is the investor's alone: a founder's Overview has no portfolio", async () => {

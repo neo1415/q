@@ -23,6 +23,8 @@ import { LooksForSection } from "@/features/investors/looks-for-section";
 import { ProfileSectionShell } from "@/features/profile/editable-section";
 import { ownRelationships } from "@/features/relationships/relationship-data";
 import { ConnectionRequest } from "@/features/network/connection-request";
+import { connectCta, REQUEST_WORDS } from "@/features/network/connect-cta";
+import { STATE_WORDS } from "@/features/relationships/relationship-words";
 import { ProfileHero } from "@/features/profile/profile-header";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QControl } from "@/features/q/control/q-control";
@@ -116,6 +118,10 @@ export default async function InvestorPage({
       item.counterpart.kind === "INVESTOR_ORGANISATION" &&
       item.counterpart.id === investor.investorOrganisationId,
   );
+  // One way forward, from the canonical relationship's state: the hero and
+  // the Connect panel both read it.
+  const cta = connectCta(record);
+  const recordHref = `/relationships/investor/${encodeURIComponent(investor.investorOrganisationId)}`;
   const where = countryLabel(investor.hqCountry);
   const deployment = deploymentLabel(investor.deploymentState);
   const inbound = inboundLabel(investor.inboundPreference);
@@ -191,26 +197,46 @@ export default async function InvestorPage({
                   className="flex flex-wrap items-center gap-2"
                   data-investor-actions
                 >
-                  <a href="#apply" className={buttonClassName("primary")}>
+                  {/* In touch already: the record leads; else the application. */}
+                  {cta.kind === "OPEN" || cta.kind === "ANSWER" ? (
+                    <Link
+                      href={recordHref}
+                      className={buttonClassName("primary")}
+                    >
+                      {cta.kind === "ANSWER"
+                        ? "Answer their interest"
+                        : "Open in CRM"}
+                    </Link>
+                  ) : null}
+                  <a
+                    href="#apply"
+                    className={buttonClassName(
+                      cta.kind === "OPEN" || cta.kind === "ANSWER"
+                        ? "secondary"
+                        : "primary",
+                    )}
+                  >
                     Apply via GateQ
                   </a>
-                  <a href="#connect" className={buttonClassName("secondary")}>
-                    Request to connect
-                  </a>
+                  {cta.kind === "REQUEST" ? (
+                    <a href="#connect" className={buttonClassName("secondary")}>
+                      {REQUEST_WORDS}
+                    </a>
+                  ) : null}
                   <Link
                     href={`/rehearsals/investor/${encodeURIComponent(id)}`}
                     className={buttonClassName("secondary")}
                   >
                     Rehearse
                   </Link>
-                  {record === undefined ? null : (
+                  {cta.kind === "ENDED" ? (
                     <Link
-                      href={`/relationships/investor/${encodeURIComponent(id)}`}
+                      href={recordHref}
                       className={buttonClassName("quiet")}
                     >
-                      CRM record
+                      Open in CRM
                     </Link>
-                  )}
+                  ) : null}
                 </div>
               </QControl>
             }
@@ -243,12 +269,25 @@ export default async function InvestorPage({
                   id="connect"
                   title="Connect"
                   description={
-                    inbound === null
-                      ? "A Connection Request shows them your company; they accept or decline."
-                      : `${inbound}. A Connection Request shows them your company; they accept or decline.`
+                    cta.kind !== "REQUEST"
+                      ? undefined
+                      : inbound === null
+                        ? "A Connection Request shows them your company; they accept or decline."
+                        : `${inbound}. A Connection Request shows them your company; they accept or decline.`
                   }
                 >
-                  {status === null ? (
+                  {cta.kind === "OPEN" || cta.kind === "ENDED" ? (
+                    <p className="cq-status-line" data-connection={cta.state}>
+                      {cta.kind === "OPEN"
+                        ? `${STATE_WORDS[cta.state]}. You are already in touch; everything with ${investor.displayName} is in your CRM.`
+                        : `${STATE_WORDS[cta.state]}. The record stays in your CRM.`}
+                    </p>
+                  ) : cta.kind === "ANSWER" ? (
+                    <p className="cq-status-line" data-connection="ANSWER">
+                      {investor.displayName} expressed interest in your company.
+                      Answer it from the record.
+                    </p>
+                  ) : status === null ? (
                     <p className="cq-body-sm text-(--cq-text-secondary)">
                       Whether you can send a request couldn&apos;t be checked
                       just now. Reload to try again.

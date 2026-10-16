@@ -340,6 +340,14 @@ describe("the form's rules (pure)", () => {
     ).toEqual({});
   });
 
+  it("shows the investor's own label only when it says more than the topic (live check 2026-10-16)", () => {
+    expect(model.ownLabel({ dimension: "STAGE", label: "Stage" })).toBeNull();
+    expect(model.ownLabel({ dimension: "STAGE", label: " stage " })).toBeNull();
+    expect(
+      model.ownLabel({ dimension: "GEOGRAPHY", label: "Where you're based" }),
+    ).toBe("Where you're based");
+  });
+
   it("reads the engine's answer rule by rule, unknown never as a no", () => {
     const lines = model.ruleLines(
       GATEWAY,
@@ -953,6 +961,28 @@ describe("the interview step, video first", () => {
     expect(
       screen.getByRole("button", { name: "Start the video interview" }),
     ).toBeTruthy();
+  });
+
+  it("makes the video interview the step's primary; pressing it before consent asks for the box (live check 2026-10-16)", async () => {
+    video.state.mockResolvedValue(offered);
+    step();
+    await flush();
+    const start = screen.getByRole("button", {
+      name: "Start the video interview",
+    });
+    expect(start.hasAttribute("disabled")).toBe(false);
+    expect(start.getAttribute("data-variant")).toBe("primary");
+    expect(
+      screen
+        .getByRole("button", { name: "Skip to review" })
+        .getAttribute("data-variant"),
+    ).toBe("secondary");
+    await press("Start the video interview");
+    expect(video.start).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Tick the box above to start the video interview."),
+    ).toBeTruthy();
+    expect(document.activeElement?.getAttribute("type")).toBe("checkbox");
   });
 
   it("types when video is not offered, saying why when the cap is reached", async () => {
