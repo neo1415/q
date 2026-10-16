@@ -205,7 +205,7 @@ export function ProfileFindings({
               <div>
                 <button
                   type="button"
-                  className={buttonClassName("quiet", "regular", "-ml-4")}
+                  className={buttonClassName("quiet", "regular", "-ms-4")}
                   onClick={() => askNow(findingQuestion(subjectLabel, finding))}
                   aria-label={`Ask Q about: ${FINDING_LABELS[finding.key].toLowerCase()}`}
                 >
@@ -369,7 +369,7 @@ export function SignalsAndVerification({
         )}
         <button
           type="button"
-          className={buttonClassName("quiet", "compact", "-ml-2 self-start")}
+          className={buttonClassName("quiet", "compact", "-ms-2 self-start")}
           onClick={() => askNow(lookDraft)}
           data-signals-look
         >
@@ -463,7 +463,7 @@ export function SignalsAndVerification({
         {verificationHref === null ? (
           <button
             type="button"
-            className={buttonClassName("quiet", "compact", "-ml-2 self-start")}
+            className={buttonClassName("quiet", "compact", "-ms-2 self-start")}
             onClick={() =>
               askNow(
                 "How does verification work on Capital Q, and what can be verified for my organisation?",
@@ -475,7 +475,7 @@ export function SignalsAndVerification({
         ) : (
           <Link
             href={verificationHref}
-            className={buttonClassName("quiet", "compact", "-ml-2 self-start")}
+            className={buttonClassName("quiet", "compact", "-ms-2 self-start")}
           >
             How verification works
           </Link>

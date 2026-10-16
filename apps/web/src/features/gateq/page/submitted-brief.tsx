@@ -476,7 +476,7 @@ export function SubmittedTranscript({
           {turns.map((turn) => (
             <li
               key={turn.seq}
-              className="border-l border-(--cq-border-subtle) pl-3"
+              className="border-s border-(--cq-border-subtle) ps-3"
             >
               <p className="cq-caption gq-t2 mb-1">
                 {turn.role === "PERSON" ? "Founder" : "Q"} · Turn {turn.seq} ·{" "}

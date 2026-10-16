@@ -111,18 +111,15 @@ export function AgentSheet({
 
             <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13.5px]">
               <dt className="text-(--cq-text-tertiary)">Job</dt>
-              <dd className="m-0 text-right">{node.job ?? "—"}</dd>
+              <dd className="m-0 text-end">{node.job ?? "—"}</dd>
               <dt className="text-(--cq-text-tertiary)">Since</dt>
-              <dd
-                className="cq-numeric m-0 text-right"
-                suppressHydrationWarning
-              >
+              <dd className="cq-numeric m-0 text-end" suppressHydrationWarning>
                 {since ?? "—"}
               </dd>
               <dt className="text-(--cq-text-tertiary)">Runs today</dt>
-              <dd className="cq-numeric m-0 text-right">{node.runs}</dd>
+              <dd className="cq-numeric m-0 text-end">{node.runs}</dd>
               <dt className="text-(--cq-text-tertiary)">This month</dt>
-              <dd className="cq-numeric m-0 text-right">
+              <dd className="cq-numeric m-0 text-end">
                 {dollars(node.monthUsd)}
               </dd>
             </dl>
@@ -145,12 +142,12 @@ export function AgentSheet({
                         {index === lines.length - 1 ? null : (
                           <span
                             aria-hidden="true"
-                            className="absolute top-[22px] -bottom-2 left-2 w-px bg-(--cq-border-subtle)"
+                            className="absolute top-[22px] -bottom-2 start-2 w-px bg-(--cq-border-subtle)"
                           />
                         )}
                         <span
                           className={cx(
-                            "mt-[5px] ml-1 h-2.5 w-2.5 rounded-full border-2",
+                            "mt-[5px] ms-1 h-2.5 w-2.5 rounded-full border-2",
                             DOT[line.state],
                           )}
                         >

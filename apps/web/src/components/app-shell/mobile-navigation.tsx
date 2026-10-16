@@ -230,7 +230,7 @@ function MoreSheet({
               aria-hidden="true"
               size={ICON_SIZE.regular}
               strokeWidth={ICON_STROKE}
-              className="text-(--cq-text-tertiary) rtl:-scale-x-100"
+              className="text-(--cq-text-tertiary)"
             />
           </Link>
           {groups.map((group) => {

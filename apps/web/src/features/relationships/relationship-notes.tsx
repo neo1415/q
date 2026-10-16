@@ -137,7 +137,7 @@ export function RelationshipNotes({
             </Button>
           )}
           {draft.length >= COUNTER_FROM ? (
-            <span className="cq-caption cq-numeric ml-auto text-(--cq-text-tertiary)">
+            <span className="cq-caption cq-numeric ms-auto text-(--cq-text-tertiary)">
               {RELATIONSHIP_NOTE_MAX_LENGTH - draft.length} left
             </span>
           ) : null}
@@ -185,7 +185,7 @@ export function RelationshipNotes({
                 {note.authoredByMe ? (
                   <button
                     type="button"
-                    className="ml-auto inline-flex min-h-11 items-center px-1 text-(--cq-text-secondary) underline-offset-2 hover:text-(--cq-text-primary) hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                    className="ms-auto inline-flex min-h-11 items-center px-1 text-(--cq-text-secondary) underline-offset-2 hover:text-(--cq-text-primary) hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                     onClick={() => {
                       setCorrecting(note);
                       setDraft(note.body);

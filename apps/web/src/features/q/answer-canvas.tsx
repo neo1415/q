@@ -326,7 +326,7 @@ function AnswerCard({
         </span>
         <button
           type="button"
-          className="cq-ac-head-main border-0 bg-transparent p-0 text-left"
+          className="cq-ac-head-main border-0 bg-transparent p-0 text-start"
           onClick={() => actions.onFocus?.(rank - 1)}
           aria-expanded={state === "focus"}
         >

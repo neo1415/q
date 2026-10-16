@@ -416,7 +416,7 @@ export function ArtifactViewer({
             </nav>
           ) : null}
           <div
-            className="ml-auto flex flex-wrap items-center gap-2"
+            className="ms-auto flex flex-wrap items-center gap-2"
             data-q-artifact-export
           >
             {onEditWithQ === undefined || detail === null ? null : (
@@ -642,7 +642,7 @@ export function ArtifactViewer({
                 </h3>
                 {/* Unknown stays unknown, in the document itself, because
                     an investor should see the shape of the gap. */}
-                <ul className="flex list-disc flex-col gap-1 pl-5">
+                <ul className="flex list-disc flex-col gap-1 ps-5">
                   {current.content.gaps.map((gap) => (
                     <li
                       key={gap}
@@ -695,7 +695,7 @@ function DocumentSection({
       </p>
       {section.findings.length === 0 ? null : (
         <SourcesDisclosure count={section.findings.length}>
-          <dl className="flex flex-col gap-1 border-l-2 border-(--cq-border-subtle) pl-3">
+          <dl className="flex flex-col gap-1 border-s-2 border-(--cq-border-subtle) ps-3">
             {section.findings.map((finding) => (
               <div key={finding.findingId} className="flex flex-col">
                 <dd className="cq-body-sm text-(--cq-text-secondary)">
@@ -770,7 +770,7 @@ function DocumentChecks({ audit }: { readonly audit: QDocumentAudit }) {
         </ul>
       )}
       {audit.suggestions.length === 0 ? null : (
-        <ul className="flex list-disc flex-col gap-1 pl-5">
+        <ul className="flex list-disc flex-col gap-1 ps-5">
           {audit.suggestions.map((suggestion) => (
             <li
               key={suggestion}

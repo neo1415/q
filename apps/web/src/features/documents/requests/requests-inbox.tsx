@@ -261,7 +261,7 @@ function DocumentRequestCard({
         )}
       </div>
       {item.note === null ? null : (
-        <p className="cq-body-sm border-l-2 border-(--cq-border) pl-3 text-(--cq-text-secondary)">
+        <p className="cq-body-sm border-s-2 border-(--cq-border) ps-3 text-(--cq-text-secondary)">
           “{item.note}”
         </p>
       )}

@@ -188,7 +188,7 @@ export function JoinCard({
                 {initials}
               </span>
             ))}
-            <span className="ml-2 cq-caption text-(--cq-text-secondary)">
+            <span className="ms-2 cq-caption text-(--cq-text-secondary)">
               {others > 0
                 ? `and ${String(others)} ${others === 1 ? "other" : "others"}`
                 : `${String(preview.memberCount)} ${preview.memberCount === 1 ? "person" : "people"}`}

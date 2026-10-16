@@ -283,7 +283,7 @@ export function WorkforceTeam({
         <div
           role="group"
           aria-label="Show as"
-          className="ml-auto inline-flex flex-none border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
+          className="ms-auto inline-flex flex-none border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
         >
           {(["map", "list"] as const).map((one) => (
             <button
@@ -331,12 +331,12 @@ export function WorkforceTeam({
               <button
                 type="button"
                 onClick={() => onOpen(node.role)}
-                className="grid min-h-[68px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 px-4 py-3 text-left hover:bg-(--cq-surface-subtle)"
+                className="grid min-h-[68px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 px-4 py-3 text-start hover:bg-(--cq-surface-subtle)"
                 data-agent-row={node.role}
               >
                 <AgentRing node={node} size={38} />
                 <span className="min-w-0">
-                  <span className="mr-2 text-[14.5px] font-semibold">
+                  <span className="me-2 text-[14.5px] font-semibold">
                     {node.name}
                   </span>
                   <StateLabel node={node} />
@@ -344,7 +344,7 @@ export function WorkforceTeam({
                     {node.now}
                   </span>
                 </span>
-                <span className="cq-numeric text-right text-[12.5px] text-(--cq-text-tertiary)">
+                <span className="cq-numeric text-end text-[12.5px] text-(--cq-text-tertiary)">
                   <span suppressHydrationWarning>
                     {ago(node.since, now) ?? ""}
                   </span>
@@ -612,7 +612,7 @@ function TeamMap({
       >
         <div
           className={cx(
-            "absolute top-0 left-0 origin-top-left will-change-transform",
+            "absolute top-0 start-0 origin-top-left will-change-transform",
             eased &&
               "transition-transform duration-(--cq-motion-base) ease-out",
             size === null && "invisible",
@@ -628,7 +628,7 @@ function TeamMap({
             aria-hidden="true"
             width={world.width}
             height={world.height}
-            className="pointer-events-none absolute top-0 left-0 overflow-visible"
+            className="pointer-events-none absolute top-0 start-0 overflow-visible"
           >
             {links.map((link) => {
               const a = layout.at.get(link.from);
@@ -688,7 +688,7 @@ function TeamMap({
                   level === "far"
                     ? "w-auto max-w-[150px] p-1.5"
                     : cx(
-                        "border bg-(--cq-surface-raised) p-3 pl-3.5 hover:border-(--cq-border-strong) hover:shadow-[0_6px_24px_-10px_rgb(0_0_0/0.25)]",
+                        "border bg-(--cq-surface-raised) p-3 ps-3.5 hover:border-(--cq-border-strong) hover:shadow-[0_6px_24px_-10px_rgb(0_0_0/0.25)]",
                         node.lead ? "w-[248px]" : "w-[224px]",
                         node.state === "asking"
                           ? "border-(--cq-accent)"
@@ -727,7 +727,7 @@ function TeamMap({
                   }}
                   aria-label={`${node.name}: ${stateLabel(node)}. ${node.now}`}
                   className={cx(
-                    "grid w-full cursor-pointer items-center text-left",
+                    "grid w-full cursor-pointer items-center text-start",
                     level === "far"
                       ? "justify-items-center gap-2"
                       : "grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1",
@@ -808,7 +808,7 @@ function TeamMap({
           role="group"
           aria-label="Zoom"
           data-map-controls
-          className="absolute right-3 bottom-3 flex items-center gap-0.5 border border-(--cq-border) bg-(--cq-surface-raised) p-[3px] shadow-[0_4px_18px_-8px_rgb(0_0_0/0.25)]"
+          className="absolute end-3 bottom-3 flex items-center gap-0.5 border border-(--cq-border) bg-(--cq-surface-raised) p-[3px] shadow-[0_4px_18px_-8px_rgb(0_0_0/0.25)]"
         >
           <MapButton label="Zoom out" onClick={() => zoomBy(1 / 1.25)}>
             <Minus size={18} strokeWidth={ICON_STROKE} aria-hidden="true" />
@@ -826,7 +826,7 @@ function TeamMap({
             <Maximize2 size={18} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </MapButton>
         </div>
-        <p className="pointer-events-none absolute bottom-3.5 left-3.5 m-0 hidden bg-(--cq-surface) px-1.5 text-[12.5px] text-(--cq-text-tertiary) lg:block">
+        <p className="pointer-events-none absolute bottom-3.5 start-3.5 m-0 hidden bg-(--cq-surface) px-1.5 text-[12.5px] text-(--cq-text-tertiary) lg:block">
           Drag to move · pinch or Ctrl/⌘ + scroll to zoom
         </p>
       </div>
@@ -844,15 +844,15 @@ function TeamMap({
           </p>
           <dl className="mt-2 mb-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-(--cq-text-tertiary)">
             <dt>Job</dt>
-            <dd className="m-0 truncate text-right text-(--cq-text-primary)">
+            <dd className="m-0 truncate text-end text-(--cq-text-primary)">
               {hovered.job ?? "—"}
             </dd>
             <dt>Since</dt>
-            <dd className="cq-numeric m-0 text-right text-(--cq-text-primary)">
+            <dd className="cq-numeric m-0 text-end text-(--cq-text-primary)">
               {ago(hovered.since, now) ?? "—"}
             </dd>
             <dt>This month</dt>
-            <dd className="cq-numeric m-0 text-right text-(--cq-text-primary)">
+            <dd className="cq-numeric m-0 text-end text-(--cq-text-primary)">
               {dollars(hovered.monthUsd)}
             </dd>
           </dl>

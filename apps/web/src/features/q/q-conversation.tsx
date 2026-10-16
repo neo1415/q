@@ -309,7 +309,7 @@ function StageNotice({
       data-q-turn-role={turn === undefined ? undefined : "Q"}
       data-q-disposition={turn?.disposition}
       data-q-failure={turn?.failure ?? undefined}
-      className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 border border-(--cq-border) bg-(--cq-surface) px-4 py-3 text-left"
+      className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 border border-(--cq-border) bg-(--cq-surface) px-4 py-3 text-start"
     >
       <span className="cq-label text-(--cq-text-primary)">{title}</span>
       <span className="cq-body-sm text-(--cq-text-secondary)">{children}</span>

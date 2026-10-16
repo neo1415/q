@@ -185,7 +185,7 @@ export function ChatsList({
                       href={`/home?${Q_CONVERSATION_PARAM}=${encodeURIComponent(item.conversationId)}`}
                       aria-current={current ? "page" : undefined}
                       className={cx(
-                        "flex min-h-10 flex-col justify-center gap-0.5 py-1.5 pr-16 pl-3 transition-colors duration-(--cq-motion-fast)",
+                        "flex min-h-10 flex-col justify-center gap-0.5 py-1.5 pe-16 ps-3 transition-colors duration-(--cq-motion-fast)",
                         current
                           ? "bg-(--cq-accent-soft) text-(--cq-text-primary)"
                           : "text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)",
@@ -200,7 +200,7 @@ export function ChatsList({
                       type="button"
                       onClick={() => void archive(item.conversationId)}
                       className={cx(
-                        "absolute top-1/2 right-1 -translate-y-1/2 px-2 py-1 cq-caption text-(--cq-text-tertiary) hover:text-(--cq-text-primary) focus-visible:opacity-100",
+                        "absolute top-1/2 end-1 -translate-y-1/2 px-2 py-1 cq-caption text-(--cq-text-tertiary) hover:text-(--cq-text-primary) focus-visible:opacity-100",
                         current
                           ? "opacity-100"
                           : "opacity-0 group-hover:opacity-100",

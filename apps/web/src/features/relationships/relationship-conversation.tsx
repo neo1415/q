@@ -206,9 +206,7 @@ function RailFact({
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="cq-caption text-(--cq-text-tertiary)">{label}</dt>
-      <dd className="cq-body-sm text-right text-(--cq-text-primary)">
-        {value}
-      </dd>
+      <dd className="cq-body-sm text-end text-(--cq-text-primary)">{value}</dd>
     </div>
   );
 }

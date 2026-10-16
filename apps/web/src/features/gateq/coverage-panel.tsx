@@ -126,7 +126,7 @@ export function CoveragePanel({
   return (
     <aside
       aria-label="What we have, what's still needed"
-      className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6"
+      className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-4 lg:border-t-0 lg:border-s lg:pt-0 lg:ps-6"
       data-coverage-panel
     >
       {/* Phones and tablets: folded under the conversation, one tap away. */}

@@ -311,7 +311,7 @@ export default async function InvestorPage({
                       <dt className="text-(--cq-text-tertiary)">
                         {fact.label}
                       </dt>
-                      <dd className="min-w-0 text-right text-(--cq-text-primary)">
+                      <dd className="min-w-0 text-end text-(--cq-text-primary)">
                         {fact.value}
                       </dd>
                     </div>

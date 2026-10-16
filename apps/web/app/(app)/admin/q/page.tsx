@@ -104,32 +104,32 @@ export default async function AdminQPage({
           <EmptyState compact title="No model calls in this window" />
         ) : (
           <div className="relative overflow-x-auto">
-            <table className="cq-body-sm w-full min-w-[40rem] text-left">
+            <table className="cq-body-sm w-full min-w-[40rem] text-start">
               <thead className="cq-caption text-(--cq-text-secondary)">
                 <tr>
-                  <th className="py-2 pr-4 font-normal">Task</th>
-                  <th className="py-2 pr-4 font-normal">Model</th>
-                  <th className="py-2 pr-4 text-right font-normal">Calls</th>
-                  <th className="py-2 pr-4 text-right font-normal">Failed</th>
-                  <th className="py-2 pr-4 text-right font-normal">p50</th>
-                  <th className="py-2 pr-4 text-right font-normal">p95</th>
-                  <th className="py-2 text-right font-normal">Spend</th>
+                  <th className="py-2 pe-4 font-normal">Task</th>
+                  <th className="py-2 pe-4 font-normal">Model</th>
+                  <th className="py-2 pe-4 text-end font-normal">Calls</th>
+                  <th className="py-2 pe-4 text-end font-normal">Failed</th>
+                  <th className="py-2 pe-4 text-end font-normal">p50</th>
+                  <th className="py-2 pe-4 text-end font-normal">p95</th>
+                  <th className="py-2 text-end font-normal">Spend</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-(--cq-border-subtle) tabular-nums text-(--cq-text-primary)">
                 {monitor.latency.map((row) => (
                   <tr key={`${row.taskClass}-${row.model}`}>
-                    <td className="py-2 pr-4">{words(row.taskClass)}</td>
-                    <td className="py-2 pr-4">{row.model}</td>
-                    <td className="py-2 pr-4 text-right">{row.calls}</td>
-                    <td className="py-2 pr-4 text-right">{row.failed}</td>
-                    <td className="py-2 pr-4 text-right">
+                    <td className="py-2 pe-4">{words(row.taskClass)}</td>
+                    <td className="py-2 pe-4">{row.model}</td>
+                    <td className="py-2 pe-4 text-end">{row.calls}</td>
+                    <td className="py-2 pe-4 text-end">{row.failed}</td>
+                    <td className="py-2 pe-4 text-end">
                       {(row.p50Ms / 1000).toFixed(1)} s
                     </td>
-                    <td className="py-2 pr-4 text-right">
+                    <td className="py-2 pe-4 text-end">
                       {(row.p95Ms / 1000).toFixed(1)} s
                     </td>
-                    <td className="py-2 text-right">{usd(row.costUsd)}</td>
+                    <td className="py-2 text-end">{usd(row.costUsd)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -162,7 +162,7 @@ export default async function AdminQPage({
                     }}
                   />
                 </span>
-                <span className="cq-body-sm text-right tabular-nums text-(--cq-text-primary)">
+                <span className="cq-body-sm text-end tabular-nums text-(--cq-text-primary)">
                   {usd(day.costUsd)} · {day.calls}
                 </span>
               </li>

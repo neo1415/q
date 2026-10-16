@@ -49,7 +49,7 @@ export function AskQRelationshipPanel({
             <button
               type="button"
               onClick={() => askNow(suggestion.prompt)}
-              className="cq-body-sm flex min-h-11 w-full items-center border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-left text-(--cq-text-primary) hover:bg-(--cq-surface-raised) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+              className="cq-body-sm flex min-h-11 w-full items-center border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-start text-(--cq-text-primary) hover:bg-(--cq-surface-raised) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
             >
               {suggestion.label}
             </button>

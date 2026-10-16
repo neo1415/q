@@ -54,7 +54,7 @@ function PanelShape({
 }) {
   return (
     <div
-      className={`border border-(--cq-border-subtle) bg-(--cq-surface) ${lead ? "border-l-[3px] border-l-(--cq-border-strong)" : ""}`}
+      className={`border border-(--cq-border-subtle) bg-(--cq-surface) ${lead ? "border-s-[3px] border-s-(--cq-border-strong)" : ""}`}
     >
       <span className="flex min-h-[3.25rem] items-center border-b border-(--cq-border-subtle) px-4 sm:px-5">
         <span className={`${bar} h-4 w-28`} />
@@ -120,8 +120,8 @@ export function RecordLoading() {
         </div>
         <span className={`${bar} h-4 w-2/3 max-w-md`} />
         <span className="flex min-h-11 items-end gap-1 border-b border-(--cq-border-subtle)">
-          <span className={`${bar} mb-3 ml-3 h-3.5 w-16`} />
-          <span className={`${bar} mb-3 ml-6 h-3.5 w-16`} />
+          <span className={`${bar} mb-3 ms-3 h-3.5 w-16`} />
+          <span className={`${bar} mb-3 ms-6 h-3.5 w-16`} />
         </span>
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-5">

@@ -1258,7 +1258,7 @@ function Detail({
           </Button>
           {more ? (
             <span
-              className="gq-card absolute right-0 z-10 mt-1 flex min-w-40 flex-col p-1"
+              className="gq-card absolute end-0 z-10 mt-1 flex min-w-40 flex-col p-1"
               role="menu"
             >
               <Button
@@ -1614,7 +1614,7 @@ function Sheets({
                 <li key={member.userId}>
                   <button
                     type="button"
-                    className="flex min-h-13 w-full items-center gap-3 text-left"
+                    className="flex min-h-13 w-full items-center gap-3 text-start"
                     onClick={() => onAssigned(sheet.ids, member.userId)}
                   >
                     <span className="gq-ini">{member.initials}</span>
@@ -1625,7 +1625,7 @@ function Sheets({
               <li>
                 <button
                   type="button"
-                  className="flex min-h-13 w-full items-center gap-3 text-left gq-t2"
+                  className="flex min-h-13 w-full items-center gap-3 text-start gq-t2"
                   onClick={() => onAssigned(sheet.ids, null)}
                 >
                   Nobody

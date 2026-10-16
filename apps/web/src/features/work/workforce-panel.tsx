@@ -168,7 +168,7 @@ export function WorkforcePanel({
             {needs === 1 ? "needs" : "need"} you.
           </p>
         </div>
-        <div className="flex w-full items-baseline gap-2 lg:ml-auto lg:block lg:w-auto lg:text-right">
+        <div className="flex w-full items-baseline gap-2 lg:ms-auto lg:block lg:w-auto lg:text-end">
           <b className="cq-numeric font-(family-name:--cq-font-editorial) text-[22px] leading-none font-medium">
             {dollars(overview.spentUsd)}
           </b>
@@ -344,7 +344,7 @@ function JobCard({
       data-job={job.job.id}
       data-work-state={workStateOf(job.job)}
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 py-3 pr-2 pl-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 py-3 pe-2 ps-4">
         <div className="min-w-0">
           <h4 className="m-0 text-[15.5px] font-semibold">
             {jobTitle(job.job.goal)}
@@ -370,7 +370,7 @@ function JobCard({
         <button
           type="button"
           onClick={() => setAll(true)}
-          className="min-h-11 w-full border-t border-(--cq-border-subtle) px-4 text-left cq-label font-normal text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+          className="min-h-11 w-full border-t border-(--cq-border-subtle) px-4 text-start cq-label font-normal text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
         >
           Show {lines.length - shown.length} earlier steps
         </button>
@@ -381,7 +381,7 @@ function JobCard({
             line.kind === "handoff" ? (
               <li
                 key={line.key}
-                className="flex items-center gap-1.5 pb-0.5 pl-[62px] text-[12.5px] text-(--cq-text-tertiary) lg:pl-[66px]"
+                className="flex items-center gap-1.5 pb-0.5 ps-[62px] text-[12.5px] text-(--cq-text-tertiary) lg:ps-[66px]"
               >
                 <ChevronDown {...ICON} aria-hidden="true" />
                 {line.text}
@@ -588,7 +588,7 @@ function Step({
       {last ? null : (
         <span
           aria-hidden="true"
-          className="absolute top-[30px] -bottom-2 left-2.5 w-[1.5px] bg-(--cq-border-subtle)"
+          className="absolute top-[30px] -bottom-2 start-2.5 w-[1.5px] bg-(--cq-border-subtle)"
         />
       )}
       <StateDot state={line.state} />
@@ -801,7 +801,7 @@ function Cost({
                     style={{ width: `${String(row.share)}%` }}
                   />
                 </td>
-                <td className="cq-numeric w-16 py-[5px] text-right align-middle">
+                <td className="cq-numeric w-16 py-[5px] text-end align-middle">
                   {dollars(row.usd)}
                 </td>
               </tr>

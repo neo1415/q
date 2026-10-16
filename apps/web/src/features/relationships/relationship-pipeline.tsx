@@ -43,7 +43,7 @@ import { PipelineSavedViews, type AppliedView } from "./pipeline-saved-views";
 const inputClass =
   "cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
 /** A select reads as a quiet control in the view bar, not a form field. */
-const selectClass = `${inputClass} max-w-full pr-8`;
+const selectClass = `${inputClass} max-w-full pe-8`;
 const href = (row: RelationshipSummaryDto) =>
   `/relationships/${row.counterpart.kind === "COMPANY" ? "company" : "investor"}/${encodeURIComponent(row.counterpart.id)}`;
 function localStorageOrNull() {
@@ -270,7 +270,7 @@ export function RelationshipPipeline({
             <Search
               size={ICON_SIZE.compact}
               aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-(--cq-text-tertiary)"
+              className="pointer-events-none absolute top-1/2 start-3 -translate-y-1/2 text-(--cq-text-tertiary)"
             />
             <input
               ref={searchRef}
@@ -282,7 +282,7 @@ export function RelationshipPipeline({
               }
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className={`${inputClass} w-full pl-9 lg:min-h-10`}
+              className={`${inputClass} w-full ps-9 lg:min-h-10`}
               maxLength={120}
             />
           </div>
@@ -418,7 +418,7 @@ export function RelationshipPipeline({
             onNotice={setNotice}
           />
           <a
-            className={buttonClassName("quiet", "regular", "md:ml-auto")}
+            className={buttonClassName("quiet", "regular", "md:ms-auto")}
             href={`/relationships/export?${exports.toString()}`}
             // The bar says "Export"; the name says what the file holds.
             aria-label={
@@ -484,26 +484,26 @@ export function RelationshipPipeline({
         <div className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <table
             data-pipeline-records
-            className="cq-body-sm w-full border-collapse text-left"
+            className="cq-body-sm w-full border-collapse text-start"
           >
             <thead className="cq-caption border-b border-(--cq-border) text-(--cq-text-secondary) [&_th]:font-medium [&_th]:whitespace-nowrap">
               <tr>
-                <th className="w-11 py-2 pr-1">
+                <th className="w-11 py-2 pe-1">
                   <span className="sr-only">Select</span>
                 </th>
-                <th className="py-2 pr-4">
+                <th className="py-2 pe-4">
                   {side === "INVESTOR" ? "Company" : "Investor"}
                 </th>
                 {preferences.columns.includes("state") ? (
-                  <th className="py-2 pr-4">State</th>
+                  <th className="py-2 pe-4">State</th>
                 ) : null}
                 {preferences.columns.includes("since") ? (
-                  <th className="py-2 pr-4">State changed</th>
+                  <th className="py-2 pe-4">State changed</th>
                 ) : null}
                 {preferences.columns.includes("next") ? (
-                  <th className="py-2 pr-4">Next step</th>
+                  <th className="py-2 pe-4">Next step</th>
                 ) : null}
-                <th className="py-2 text-right">
+                <th className="py-2 text-end">
                   <span className="sr-only">Details</span>
                 </th>
               </tr>
@@ -514,7 +514,7 @@ export function RelationshipPipeline({
                   key={row.relationshipId}
                   className="relative transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) has-[:checked]:bg-(--cq-surface-subtle)"
                 >
-                  <td className="relative py-0 pr-1 align-middle">
+                  <td className="relative py-0 pe-1 align-middle">
                     <label className="inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center">
                       <input
                         type="checkbox"
@@ -533,7 +533,7 @@ export function RelationshipPipeline({
                       />
                     </label>
                   </td>
-                  <td className="max-w-80 py-3 pr-4">
+                  <td className="max-w-80 py-3 pe-4">
                     {/* The whole row opens the record; the checkbox and
                         Preview sit above the link's stretched area. */}
                     <Link
@@ -545,23 +545,23 @@ export function RelationshipPipeline({
                     </Link>
                   </td>
                   {preferences.columns.includes("state") ? (
-                    <td className="py-3 pr-4 whitespace-nowrap text-(--cq-text-primary)">
+                    <td className="py-3 pe-4 whitespace-nowrap text-(--cq-text-primary)">
                       {STATE_WORDS[row.state]}
                     </td>
                   ) : null}
                   {preferences.columns.includes("since") ? (
-                    <td className="cq-numeric py-3 pr-4 whitespace-nowrap text-(--cq-text-secondary)">
+                    <td className="cq-numeric py-3 pe-4 whitespace-nowrap text-(--cq-text-secondary)">
                       <time dateTime={row.stateSince}>
                         {formatDay(row.stateSince)}
                       </time>
                     </td>
                   ) : null}
                   {preferences.columns.includes("next") ? (
-                    <td className="py-3 pr-4 text-(--cq-text-secondary)">
+                    <td className="py-3 pe-4 text-(--cq-text-secondary)">
                       {PIPELINE_NEXT_WORDS[row.nextStep]}
                     </td>
                   ) : null}
-                  <td className="relative py-1 text-right">
+                  <td className="relative py-1 text-end">
                     <button
                       type="button"
                       className={buttonClassName("quiet", "compact")}
@@ -612,7 +612,7 @@ export function RelationshipPipeline({
                   {column.map((row) => (
                     <li
                       key={row.relationshipId}
-                      className="relative flex items-start justify-between gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2.5 pr-1.5 pl-3 transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border)"
+                      className="relative flex items-start justify-between gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2.5 pe-1.5 ps-3 transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border)"
                     >
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <Link

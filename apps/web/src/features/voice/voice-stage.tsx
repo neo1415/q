@@ -276,7 +276,7 @@ export function VoiceStage({
                   key={line.id}
                   className={
                     line.role === "user"
-                      ? "cq-body text-right text-(--cq-text-secondary)"
+                      ? "cq-body text-end text-(--cq-text-secondary)"
                       : "cq-body text-(--cq-text-primary)"
                   }
                 >

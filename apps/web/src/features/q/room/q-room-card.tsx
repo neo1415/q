@@ -149,7 +149,7 @@ export function QRoomStage({
         )}
       </AnimatePresence>
       <div
-        className="pointer-events-none fixed right-4 bottom-28 z-(--cq-z-toast) flex justify-end sm:right-8"
+        className="pointer-events-none fixed end-4 bottom-28 z-(--cq-z-toast) flex justify-end sm:end-8"
         aria-live="polite"
       >
         <AnimatePresence>
@@ -218,7 +218,7 @@ function RoomCardBody({
       aria-label={title}
       role="region"
     >
-      <div className="flex min-h-11 flex-none items-center justify-between gap-2 border-b border-(--cq-border-subtle) py-1 pr-1 pl-4">
+      <div className="flex min-h-11 flex-none items-center justify-between gap-2 border-b border-(--cq-border-subtle) py-1 pe-1 ps-4">
         <h2 className="cq-body min-w-0 truncate font-medium text-(--cq-text-primary)">
           {title}
         </h2>

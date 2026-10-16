@@ -78,7 +78,7 @@ function ComparisonTable({
     <tr key={key} className="border-t border-(--cq-border-subtle)">
       <th
         scope="row"
-        className="cq-body-sm min-w-44 px-2 py-3 text-left align-top font-medium text-(--cq-text-secondary)"
+        className="cq-body-sm min-w-44 px-2 py-3 text-start align-top font-medium text-(--cq-text-secondary)"
       >
         {label}
       </th>
@@ -99,7 +99,7 @@ function ComparisonTable({
       role="region"
       aria-label="Application comparison table"
     >
-      <table className="w-full border-collapse text-left">
+      <table className="w-full border-collapse text-start">
         <caption className="sr-only">
           Saved submitted applications compared side by side
         </caption>

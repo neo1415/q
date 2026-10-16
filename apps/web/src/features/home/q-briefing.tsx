@@ -23,7 +23,7 @@ import { useClaimWhenSeen } from "./use-claim-when-seen";
  */
 
 const CARD_CLASS = [
-  "group flex min-h-11 w-full items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-left",
+  "group flex min-h-11 w-full items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-start",
   "transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:bg-(--cq-surface-subtle)",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
 ].join(" ");

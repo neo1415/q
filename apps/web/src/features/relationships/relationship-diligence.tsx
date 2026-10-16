@@ -142,7 +142,7 @@ function QuestionAnswers({
       {questions.map((question) => (
         <li
           key={question.questionId}
-          className="flex flex-col gap-1 border-l-2 border-(--cq-border) pl-3"
+          className="flex flex-col gap-1 border-s-2 border-(--cq-border) ps-3"
           data-question-answered={question.answer === null ? "no" : "yes"}
         >
           <p className="cq-body-sm text-(--cq-text-primary)">
@@ -437,7 +437,7 @@ export function RelationshipDiligence({
                     </span>
                   </div>
                   {request.note === null ? null : (
-                    <p className="cq-body-sm border-l-2 border-(--cq-border) pl-3 text-(--cq-text-secondary)">
+                    <p className="cq-body-sm border-s-2 border-(--cq-border) ps-3 text-(--cq-text-secondary)">
                       {request.note}
                     </p>
                   )}

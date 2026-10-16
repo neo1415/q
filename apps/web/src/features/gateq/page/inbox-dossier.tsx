@@ -142,7 +142,7 @@ export function DossierSection({
               Your published rules, criterion by criterion
             </caption>
             <thead>
-              <tr className="gq-t2 text-left">
+              <tr className="gq-t2 text-start">
                 <th scope="col" className="py-1.5 font-medium">
                   Rule
                 </th>
@@ -160,8 +160,8 @@ export function DossierSection({
                   key={criterion.label}
                   className="border-t border-(--cq-border-subtle)"
                 >
-                  <td className="py-2 pr-2">{criterion.label}</td>
-                  <td className="gq-t2 py-2 pr-2">
+                  <td className="py-2 pe-2">{criterion.label}</td>
+                  <td className="gq-t2 py-2 pe-2">
                     {criterion.requiredness === "REQUIRED"
                       ? "Required"
                       : "Preferred"}
@@ -295,7 +295,7 @@ export function DossierSection({
       {dossier.diligenceQuestions.length === 0 ? null : (
         <div className="flex flex-col gap-1.5">
           <h4 className="cq-label">Suggested diligence questions</h4>
-          <ol className="flex list-decimal flex-col gap-1.5 pl-5">
+          <ol className="flex list-decimal flex-col gap-1.5 ps-5">
             {dossier.diligenceQuestions.map((question, index) => (
               <li key={`${question.basis}-${index}`} className="text-sm">
                 {question.question}{" "}

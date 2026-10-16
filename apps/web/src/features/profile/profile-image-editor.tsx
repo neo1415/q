@@ -282,7 +282,7 @@ function Toast({
   return (
     <div
       role={tone === "error" ? "alert" : undefined}
-      className="fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+16px)] z-(--cq-z-toast) mx-auto flex max-w-md items-center justify-between gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2 pr-2 pl-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
+      className="fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+16px)] z-(--cq-z-toast) mx-auto flex max-w-md items-center justify-between gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-2 pe-2 ps-4 shadow-(--cq-shadow-overlay) lg:bottom-6"
       data-image-toast={tone}
       data-q-notice={tone === "error" ? "TOAST:FAILED" : "TOAST:DONE"}
     >
@@ -490,7 +490,7 @@ function CropDialog({
               src={src}
               alt=""
               draggable={false}
-              className="pointer-events-none absolute top-0 left-0 max-w-none origin-top-left"
+              className="pointer-events-none absolute top-0 start-0 max-w-none origin-top-left"
               style={{
                 width: image.width * scale,
                 height: image.height * scale,

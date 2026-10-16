@@ -621,7 +621,7 @@ export function GateQForm({
               Your answers are still here.{" "}
               <Button
                 size="compact"
-                className="ml-1.5"
+                className="ms-1.5"
                 onClick={step === "review" ? onSubmit : onContinue}
                 disabled={pending}
               >
@@ -1432,7 +1432,7 @@ function NoteStep({
           aria-describedby="gq-msg-count"
           onChange={(e) => set("note", e.target.value)}
         />
-        <span id="gq-msg-count" className="cq-caption gq-t3 text-right">
+        <span id="gq-msg-count" className="cq-caption gq-t3 text-end">
           {answers.note.length} of {GATEQ_NOTE_MAX_CHARS}
         </span>
         {errors.note ? <p className="gq-err">{errors.note}</p> : null}

@@ -569,7 +569,7 @@ export function ApplyExperience({
     <header
       className={
         compact
-          ? "flex items-center gap-3 border-b border-(--cq-border-subtle) px-4 py-3 pr-14"
+          ? "flex items-center gap-3 border-b border-(--cq-border-subtle) px-4 py-3 pe-14"
           : "flex flex-col gap-3"
       }
     >

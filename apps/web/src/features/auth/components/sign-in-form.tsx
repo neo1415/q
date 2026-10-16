@@ -110,7 +110,7 @@ export function SignInForm({
         <Button
           variant="quiet"
           size="compact"
-          className="-ml-3"
+          className="-ms-3"
           onClick={() => {
             setMode((current) =>
               current === "password" ? "link" : "password",

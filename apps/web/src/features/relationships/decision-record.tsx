@@ -19,7 +19,7 @@ export function DecisionRecord({ decision }: { readonly decision: Decision }) {
         </time>
       </p>
       {decision.details.length === 0 ? null : (
-        <ul className="cq-body-sm flex max-w-(--cq-layout-reading) flex-col gap-1 border-l-2 border-(--cq-border) pl-3 text-(--cq-text-secondary)">
+        <ul className="cq-body-sm flex max-w-(--cq-layout-reading) flex-col gap-1 border-s-2 border-(--cq-border) ps-3 text-(--cq-text-secondary)">
           {decision.details.map((line) => (
             <li key={line} className="whitespace-pre-wrap">
               {line}

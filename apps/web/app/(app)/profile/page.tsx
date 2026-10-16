@@ -589,7 +589,7 @@ function OrganisationImages({
             // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, browser to storage directly
             <img src={coverUrl} alt="" className="size-full object-cover" />
           )}
-          <div className="absolute top-1/2 right-2 -translate-y-1/2">
+          <div className="absolute top-1/2 end-2 -translate-y-1/2">
             <ProfileImageEditor
               subjectType={subjectType}
               subjectId={subjectId}

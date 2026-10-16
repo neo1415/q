@@ -240,7 +240,7 @@ export function WorkPage({
               ← Back to Work
             </button>
           )}
-          <span className="ml-auto" />
+          <span className="ms-auto" />
           {(
             [
               ["team", "Team map"],
@@ -571,7 +571,7 @@ function TaskComposer() {
     <div className="flex flex-col gap-3">
       <form
         onSubmit={submit}
-        className="flex min-h-14 items-center gap-2 border border-(--cq-border) bg-(--cq-surface-raised) py-1.5 pr-1.5 pl-4 shadow-(--cq-shadow-xs) focus-within:border-(--cq-border-strong) lg:min-h-16"
+        className="flex min-h-14 items-center gap-2 border border-(--cq-border) bg-(--cq-surface-raised) py-1.5 pe-1.5 ps-4 shadow-(--cq-shadow-xs) focus-within:border-(--cq-border-strong) lg:min-h-16"
         data-work-composer
       >
         <label htmlFor="work-task" className="sr-only">
@@ -949,7 +949,7 @@ function SectionHead({
         </span>
       )}
       {aside === undefined ? null : (
-        <span className="ml-auto cq-label cq-numeric font-normal text-(--cq-text-tertiary)">
+        <span className="ms-auto cq-label cq-numeric font-normal text-(--cq-text-tertiary)">
           {aside}
         </span>
       )}
@@ -986,7 +986,7 @@ function Suggestions({
               className={cx(
                 "relative",
                 index > 0 &&
-                  "before:absolute before:top-0 before:right-0 before:left-[4.75rem] before:border-t before:border-(--cq-border-subtle)",
+                  "before:absolute before:top-0 before:end-0 before:start-[4.75rem] before:border-t before:border-(--cq-border-subtle)",
               )}
             >
               <SuggestionCard
@@ -1073,7 +1073,7 @@ function SuggestionCard({
         aria-expanded={open}
         aria-controls={panel}
         onClick={toggle}
-        className="grid min-h-[4.5rem] w-full grid-cols-[3.25rem_minmax(0,1fr)_1.25rem] items-center gap-3 py-3.5 pr-4 pl-3 text-left motion-safe:transition-transform motion-safe:duration-(--cq-motion-fast) active:scale-[0.99]"
+        className="grid min-h-[4.5rem] w-full grid-cols-[3.25rem_minmax(0,1fr)_1.25rem] items-center gap-3 py-3.5 pe-4 ps-3 text-start motion-safe:transition-transform motion-safe:duration-(--cq-motion-fast) active:scale-[0.99]"
       >
         <span className="flex flex-col items-center" aria-hidden="true">
           <span className="text-2xl leading-none font-medium tracking-tight cq-numeric text-(--cq-text-primary)">
@@ -1110,7 +1110,7 @@ function SuggestionCard({
       {open ? (
         <div
           id={panel}
-          className="pr-4 pb-4 pl-[4.75rem] motion-safe:transition-[opacity,transform] motion-safe:duration-(--cq-motion-base) motion-safe:ease-(--cq-ease) starting:opacity-0 motion-safe:starting:-translate-y-1"
+          className="pe-4 pb-4 ps-[4.75rem] motion-safe:transition-[opacity,transform] motion-safe:duration-(--cq-motion-base) motion-safe:ease-(--cq-ease) starting:opacity-0 motion-safe:starting:-translate-y-1"
         >
           {preparedView !== undefined ? (
             <ApprovalPlan
@@ -1313,7 +1313,7 @@ function NeedsYou({
               }
             />
             {open === item.approvalId ? (
-              <div className="pb-4 pl-11">
+              <div className="pb-4 ps-11">
                 <ApprovalPlan
                   approvalId={item.approvalId}
                   onDone={() => {
@@ -1498,7 +1498,7 @@ function TimePicker({
       else setMessage(result?.message ?? "That didn't go through.");
     });
   return (
-    <div className="flex flex-col gap-2 pb-4 pl-11">
+    <div className="flex flex-col gap-2 pb-4 ps-11">
       <div className="flex flex-wrap gap-2">
         {lane.offered.map((slot) => (
           <Button
@@ -1583,7 +1583,7 @@ function Running({
     >
       {bare ? (
         anySpend ? (
-          <p className="mb-1 text-right cq-label font-normal cq-numeric text-(--cq-text-tertiary)">
+          <p className="mb-1 text-end cq-label font-normal cq-numeric text-(--cq-text-tertiary)">
             {dollars(month)} this month
           </p>
         ) : null
@@ -1693,7 +1693,7 @@ function RunningRow({
           </p>
         </div>
         {spent === null || budget === null ? null : (
-          <div className="w-24 shrink-0 text-right">
+          <div className="w-24 shrink-0 text-end">
             <p className="cq-label font-normal cq-numeric whitespace-nowrap text-(--cq-text-secondary)">
               <span className="font-medium text-(--cq-text-primary)">
                 {dollars(spent)}
@@ -1722,7 +1722,7 @@ function RunningRow({
             <IconButton
               aria-label={`Options for ${goal}`}
               size="compact"
-              className="-mr-2 text-(--cq-text-tertiary)"
+              className="-me-2 text-(--cq-text-tertiary)"
               disabled={pending}
             >
               <MoreHorizontal

@@ -364,7 +364,7 @@ export function InterviewStep({
             {problem} {waiting ? "Your message is still here. " : ""}
             <Button
               size="compact"
-              className="ml-1.5"
+              className="ms-1.5"
               onClick={retry}
               disabled={pending}
             >

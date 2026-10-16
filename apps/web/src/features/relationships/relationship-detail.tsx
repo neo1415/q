@@ -1006,7 +1006,7 @@ export function BackToRelationships({
   return (
     <Link
       href={href}
-      className={buttonClassName("quiet", "regular", "-ml-4 self-start")}
+      className={buttonClassName("quiet", "regular", "-ms-4 self-start")}
     >
       <ArrowLeft size={ICON_SIZE.regular} aria-hidden="true" />
       {label}

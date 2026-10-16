@@ -118,7 +118,7 @@ export function ReviewStep({
               <b>Couldn&apos;t load your review.</b> {problem}{" "}
               <Button
                 size="compact"
-                className="ml-1.5"
+                className="ms-1.5"
                 onClick={() => {
                   setProblem(null);
                   setReads((n) => n + 1);

@@ -38,7 +38,7 @@ export function ClarificationPrompt({
           ) : null}
         </div>
       </div>
-      <div className="pl-0 sm:pl-11">{children}</div>
+      <div className="ps-0 sm:ps-11">{children}</div>
     </div>
   );
 }

@@ -143,7 +143,7 @@ function Tile({
   // Hairlines between cells, none around them: two by two on a phone, one
   // row of four from large screens.
   const frame =
-    "flex min-w-0 flex-col gap-1 border-(--cq-border-subtle) p-4 even:border-l sm:p-5 [&:nth-child(n+3)]:border-t lg:border-l lg:first:border-l-0 lg:[&:nth-child(n+3)]:border-t-0";
+    "flex min-w-0 flex-col gap-1 border-(--cq-border-subtle) p-4 even:border-s sm:p-5 [&:nth-child(n+3)]:border-t lg:border-s lg:first:border-s-0 lg:[&:nth-child(n+3)]:border-t-0";
   return href === undefined ? (
     <div className={frame}>{body}</div>
   ) : (
@@ -384,7 +384,7 @@ function Pipeline({
                         }}
                       />
                     </span>
-                    <span className="cq-body-sm text-right tabular-nums text-(--cq-text-primary)">
+                    <span className="cq-body-sm text-end tabular-nums text-(--cq-text-primary)">
                       {stage.count}
                     </span>
                   </Link>
@@ -469,7 +469,7 @@ function Lines({
           <dt className="cq-body-sm text-(--cq-text-secondary)">
             {item.label}
           </dt>
-          <dd className="cq-body-sm text-right tabular-nums text-(--cq-text-primary)">
+          <dd className="cq-body-sm text-end tabular-nums text-(--cq-text-primary)">
             {item.value}
           </dd>
         </div>
@@ -802,11 +802,11 @@ function RaisePanel({ results }: { readonly results: FounderResults }) {
             className="relative h-2.5 overflow-hidden bg-(--cq-surface-subtle)"
           >
             <span
-              className="absolute inset-y-0 left-0 bg-(--cq-accent-soft) [background-image:repeating-linear-gradient(135deg,transparent_0_4px,var(--cq-border)_4px_5px)]"
+              className="absolute inset-y-0 start-0 bg-(--cq-accent-soft) [background-image:repeating-linear-gradient(135deg,transparent_0_4px,var(--cq-border)_4px_5px)]"
               style={{ width: `${String(softPct)}%` }}
             />
             <span
-              className="absolute inset-y-0 left-0 bg-(--cq-accent)"
+              className="absolute inset-y-0 start-0 bg-(--cq-accent)"
               style={{ width: `${String(confirmedPct)}%` }}
             />
           </div>

@@ -119,7 +119,7 @@ export function InstallPrompt() {
       ref={ref}
       aria-label="Install Capital Q"
       data-install-prompt={offer}
-      className="fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+8px)] z-(--cq-z-toast) mx-auto flex max-w-sm flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 lg:right-6 lg:bottom-6 lg:left-auto lg:mx-0"
+      className="fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+8px)] z-(--cq-z-toast) mx-auto flex max-w-sm flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 lg:end-6 lg:bottom-6 lg:start-auto lg:mx-0"
     >
       <p className="cq-body-sm text-(--cq-text-primary)">
         {offer === "PROMPT"

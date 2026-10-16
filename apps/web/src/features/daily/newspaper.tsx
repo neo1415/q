@@ -112,7 +112,7 @@ function Paragraphs({ story }: { readonly story: QDailyStory }) {
       {story.quotes.map((quote, index) => (
         <blockquote
           key={index}
-          className={`${EDITORIAL} border-l-2 border-(--cq-text-primary) pl-3 text-[17px] leading-snug text-(--cq-text-primary)`}
+          className={`${EDITORIAL} border-s-2 border-(--cq-text-primary) ps-3 text-[17px] leading-snug text-(--cq-text-primary)`}
         >
           <p>&ldquo;{quote.text}&rdquo;</p>
           {quote.speaker === null ? null : (

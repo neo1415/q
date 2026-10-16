@@ -103,7 +103,7 @@ export function QCardPanel(props: QCardPanelProps) {
           <div>
             <button
               type="button"
-              className={buttonClassName("quiet", "regular", "-ml-4")}
+              className={buttonClassName("quiet", "regular", "-ms-4")}
               onClick={() =>
                 askAbout(`Make a Q Card for ${props.name} with the handle `)
               }
@@ -442,7 +442,7 @@ function ScopeForm({
       </ul>
       {newlyPublic.length === 0 ? null : (
         <p
-          className="cq-body-sm border-l-2 border-(--cq-warning) py-1 pl-3 text-(--cq-text-primary)"
+          className="cq-body-sm border-s-2 border-(--cq-warning) py-1 ps-3 text-(--cq-text-primary)"
           data-public-warning
         >
           {newlyPublic.map((field) => field.label).join(", ")}{" "}

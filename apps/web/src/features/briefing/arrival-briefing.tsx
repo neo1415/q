@@ -441,7 +441,7 @@ function FocusCard({
         </div>
       </div>
       {card.theySaid === null ? null : (
-        <div className="border-l-2 border-(--cq-border) pl-2.5">
+        <div className="border-s-2 border-(--cq-border) ps-2.5">
           <p className="m-0 cq-caption text-(--cq-text-tertiary)">
             What they said
           </p>
@@ -635,7 +635,7 @@ function CardLine({
     <button
       type="button"
       onClick={onFocus}
-      className="flex min-h-13 w-full items-center gap-2.5 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-left transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+      className="flex min-h-13 w-full items-center gap-2.5 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-start transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
       data-arrival-line={card.key}
     >
       <Mark card={card} size={28} />
@@ -663,7 +663,7 @@ function CommandBar({
   const [text, setText] = useState("");
   return (
     <form
-      className="flex w-full items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) py-1 pr-1 pl-4 focus-within:border-(--cq-border-strong)"
+      className="flex w-full items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) py-1 pe-1 ps-4 focus-within:border-(--cq-border-strong)"
       onSubmit={(event) => {
         event.preventDefault();
         const words = text.trim();
@@ -989,7 +989,7 @@ export function Sequence({
         ) : null}
         <Button
           variant="quiet"
-          className="ml-auto text-(--cq-text-secondary)"
+          className="ms-auto text-(--cq-text-secondary)"
           onClick={() =>
             void send({ type: "COMMAND", command: { kind: "LEAVE" } }, "BUTTON")
           }
@@ -1219,7 +1219,7 @@ export function ArrivalBriefing({
             <Button
               variant="quiet"
               onClick={onClose}
-              className="-mt-2 -mr-2 text-(--cq-text-secondary)"
+              className="-mt-2 -me-2 text-(--cq-text-secondary)"
               aria-label="Close Q's briefing"
             >
               Close

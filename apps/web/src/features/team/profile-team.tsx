@@ -53,7 +53,7 @@ export async function ProfileTeamSection() {
             <span className="min-w-0 flex-1 truncate cq-body-sm text-(--cq-text-primary)">
               {member.name}
               {member.isYou ? (
-                <span className="ml-1.5 cq-caption text-(--cq-text-tertiary)">
+                <span className="ms-1.5 cq-caption text-(--cq-text-tertiary)">
                   You
                 </span>
               ) : null}

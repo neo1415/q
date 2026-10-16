@@ -498,7 +498,7 @@ export function WorkPanel({
             type="button"
             onClick={() => setFolded((now) => !now)}
             aria-expanded={!folded}
-            className="flex min-h-11 flex-1 items-center gap-2 text-left"
+            className="flex min-h-11 flex-1 items-center gap-2 text-start"
           >
             <h2
               id="q-work-home"

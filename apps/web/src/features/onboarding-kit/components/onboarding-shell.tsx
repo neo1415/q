@@ -82,7 +82,6 @@ export function OnboardingShell({
               aria-hidden="true"
               size={ICON_SIZE.prominent}
               strokeWidth={ICON_STROKE}
-              className="rtl:-scale-x-100"
             />
           </IconButton>
           <span className="cq-label text-(--cq-text-primary)">Capital Q</span>

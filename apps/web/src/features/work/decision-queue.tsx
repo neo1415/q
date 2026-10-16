@@ -400,7 +400,7 @@ function Quote({ children }: { readonly children: ReactNode }) {
 
 function Theirs({ text }: { readonly text: string }) {
   return (
-    <p className="m-0 border-l-2 border-(--cq-border) pl-2.5 cq-body-sm text-(--cq-text-secondary)">
+    <p className="m-0 border-s-2 border-(--cq-border) ps-2.5 cq-body-sm text-(--cq-text-secondary)">
       <span className="font-medium text-(--cq-text-tertiary)">They said </span>“
       {text.length > 240 ? `${text.slice(0, 240)}…` : text}”
     </p>
@@ -830,7 +830,7 @@ function Drafts({ drafts }: { readonly drafts: readonly WorkforceDraftDto[] }) {
         {draftsLabel(drafts)}
       </button>
       {open ? (
-        <ol className="m-0 mt-1 flex list-none flex-col gap-2.5 border-l border-(--cq-border-subtle) pl-3">
+        <ol className="m-0 mt-1 flex list-none flex-col gap-2.5 border-s border-(--cq-border-subtle) ps-3">
           {drafts.map((draft) => (
             <li key={draft.id}>
               <p className="m-0">
@@ -938,7 +938,7 @@ export function ThreadPanel({
               {line.body}
             </p>
             {line.byQ === null ? null : (
-              <div className="mt-1.5 border-l-2 border-(--cq-accent) pl-2.5 cq-label font-normal text-(--cq-text-secondary)">
+              <div className="mt-1.5 border-s-2 border-(--cq-accent) ps-2.5 cq-label font-normal text-(--cq-text-secondary)">
                 {line.byQ.why === null ? null : (
                   <p className="m-0">
                     <span className="font-medium">Why Q sent it: </span>
@@ -1110,7 +1110,7 @@ function DoneRow({
             </button>
           )}
           {earlier ? (
-            <ul className="m-0 list-none pl-0">
+            <ul className="m-0 list-none ps-0">
               {rest.map((item) => (
                 <li
                   key={item.id}

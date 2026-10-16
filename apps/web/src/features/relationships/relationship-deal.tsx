@@ -392,7 +392,7 @@ function TermsForm({
         onConfirm={(key) => onRecord(terms, key)}
       >
         <ul
-          className="cq-body flex list-disc flex-col gap-1 pl-5 text-(--cq-text-primary)"
+          className="cq-body flex list-disc flex-col gap-1 ps-5 text-(--cq-text-primary)"
           data-terms-preview
         >
           {preview.map((part) => (
@@ -553,7 +553,7 @@ export function RelationshipDeal({
 
       {view.end?.kind === "PASSED" ? (
         <p
-          className="cq-body border-l-2 border-(--cq-border) pl-3 text-(--cq-text-primary)"
+          className="cq-body border-s-2 border-(--cq-border) ps-3 text-(--cq-text-primary)"
           data-deal-final="PASSED"
         >
           {side === "INVESTOR" ? "You decided" : `${counterpart} decided`} not

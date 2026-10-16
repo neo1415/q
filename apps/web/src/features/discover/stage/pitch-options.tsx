@@ -46,7 +46,7 @@ function openDownload(url: string): void {
 }
 
 const optionRow =
-  "flex min-h-14 w-full items-center gap-3.5 px-2 text-left text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) active:scale-[0.99] disabled:cursor-default disabled:hover:bg-transparent";
+  "flex min-h-14 w-full items-center gap-3.5 px-2 text-start text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) active:scale-[0.99] disabled:cursor-default disabled:hover:bg-transparent";
 
 export function PitchOptionsSheet({
   open,
@@ -112,7 +112,7 @@ export function PitchOptionsSheet({
         {...(duration === null ? {} : { description: duration })}
         side="bottom"
         // A small panel beside the decisions on a desktop, a sheet on a phone.
-        className="lg:inset-x-auto lg:right-6 lg:bottom-6 lg:left-auto lg:w-[360px] lg:pb-0"
+        className="lg:inset-x-auto lg:end-6 lg:bottom-6 lg:start-auto lg:w-[360px] lg:pb-0"
       >
         <div
           className="flex flex-col gap-1"

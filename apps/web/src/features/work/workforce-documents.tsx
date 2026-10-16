@@ -137,7 +137,7 @@ export function DoneJobDocuments({
         </div>
       )}
       {more && others.length > 0 ? (
-        <ul className="m-0 list-none pl-0">
+        <ul className="m-0 list-none ps-0">
           {others.map((document) => (
             <li
               key={document.artifactId}

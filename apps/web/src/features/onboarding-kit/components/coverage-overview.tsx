@@ -165,7 +165,7 @@ function CoverageRow({
         </span>
       ) : null}
       {field.state === "CONTRADICTORY" && field.readings.length > 0 ? (
-        <ul className="cq-body-sm list-disc pl-5 text-(--cq-text-secondary)">
+        <ul className="cq-body-sm list-disc ps-5 text-(--cq-text-secondary)">
           {field.readings.map((reading) => (
             <li key={reading}>{reading}</li>
           ))}

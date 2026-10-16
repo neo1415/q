@@ -205,15 +205,15 @@ export default async function AdminPage() {
               </a>
             </div>
             <div className="relative overflow-x-auto">
-              <table className="cq-body-sm w-full min-w-[48rem] text-left">
+              <table className="cq-body-sm w-full min-w-[48rem] text-start">
                 <thead className="cq-caption text-(--cq-text-secondary)">
                   <tr>
-                    <th className="py-2 pr-4 font-normal">Company</th>
-                    <th className="py-2 pr-4 font-normal">Investor</th>
-                    <th className="py-2 pr-4 font-normal">Began</th>
-                    <th className="py-2 pr-4 font-normal">Connected</th>
-                    <th className="py-2 pr-4 font-normal">Calls</th>
-                    <th className="py-2 pr-4 font-normal">Q heard</th>
+                    <th className="py-2 pe-4 font-normal">Company</th>
+                    <th className="py-2 pe-4 font-normal">Investor</th>
+                    <th className="py-2 pe-4 font-normal">Began</th>
+                    <th className="py-2 pe-4 font-normal">Connected</th>
+                    <th className="py-2 pe-4 font-normal">Calls</th>
+                    <th className="py-2 pe-4 font-normal">Q heard</th>
                     <th className="py-2 font-normal">Confirmed</th>
                   </tr>
                 </thead>
@@ -223,24 +223,24 @@ export default async function AdminPage() {
                       key={row.relationshipId}
                       className="text-(--cq-text-primary)"
                     >
-                      <td className="py-2 pr-4">{row.companyName}</td>
-                      <td className="py-2 pr-4">{row.investorName}</td>
-                      <td className="py-2 pr-4">
+                      <td className="py-2 pe-4">{row.companyName}</td>
+                      <td className="py-2 pe-4">{row.investorName}</td>
+                      <td className="py-2 pe-4">
                         {ORIGIN_WORDS[row.origin] ?? row.origin} ·{" "}
                         {formatDay(row.startedAt.slice(0, 10))}
                       </td>
-                      <td className="py-2 pr-4">
+                      <td className="py-2 pe-4">
                         {row.connectedAt === null
                           ? "—"
                           : formatDay(row.connectedAt.slice(0, 10))}
                       </td>
-                      <td className="py-2 pr-4 tabular-nums">
+                      <td className="py-2 pe-4 tabular-nums">
                         {row.meetingsHeld}
                         {row.recordingsDeclined === 0
                           ? ""
                           : ` (${String(row.recordingsDeclined)} declined)`}
                       </td>
-                      <td className="py-2 pr-4 tabular-nums">
+                      <td className="py-2 pe-4 tabular-nums">
                         {row.detected}
                         {row.disputed === 0
                           ? ""

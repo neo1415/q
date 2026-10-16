@@ -108,7 +108,7 @@ export function PortfolioSection({
                 <span className="cq-body-sm min-w-0 truncate font-semibold text-(--cq-text-primary)">
                   {item.counterpart.name}
                 </span>
-                <span className="cq-caption cq-numeric col-start-2 text-(--cq-text-secondary) sm:col-start-3 sm:text-right">
+                <span className="cq-caption cq-numeric col-start-2 text-(--cq-text-secondary) sm:col-start-3 sm:text-end">
                   {index < PORTFOLIO_READ_LIMIT
                     ? commitmentLine(commitments.get(item.relationshipId))
                     : "Open for the commitment"}

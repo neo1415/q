@@ -125,33 +125,33 @@ export default async function AdminQRunPage({
           <EmptyState compact title="No model calls" />
         ) : (
           <div className="relative overflow-x-auto">
-            <table className="cq-body-sm w-full min-w-[40rem] text-left">
+            <table className="cq-body-sm w-full min-w-[40rem] text-start">
               <thead className="cq-caption text-(--cq-text-secondary)">
                 <tr>
-                  <th className="py-2 pr-4 font-normal">Task</th>
-                  <th className="py-2 pr-4 font-normal">Model</th>
-                  <th className="py-2 pr-4 text-right font-normal">Try</th>
-                  <th className="py-2 pr-4 text-right font-normal">Time</th>
-                  <th className="py-2 pr-4 text-right font-normal">
+                  <th className="py-2 pe-4 font-normal">Task</th>
+                  <th className="py-2 pe-4 font-normal">Model</th>
+                  <th className="py-2 pe-4 text-end font-normal">Try</th>
+                  <th className="py-2 pe-4 text-end font-normal">Time</th>
+                  <th className="py-2 pe-4 text-end font-normal">
                     Tokens in/out
                   </th>
-                  <th className="py-2 pr-4 text-right font-normal">Cost</th>
+                  <th className="py-2 pe-4 text-end font-normal">Cost</th>
                   <th className="py-2 font-normal">Outcome</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-(--cq-border-subtle) tabular-nums text-(--cq-text-primary)">
                 {trace.calls.map((call, index) => (
                   <tr key={`${call.at}-${String(index)}`}>
-                    <td className="py-2 pr-4">{words(call.taskClass)}</td>
-                    <td className="py-2 pr-4">{call.model}</td>
-                    <td className="py-2 pr-4 text-right">{call.attempt}</td>
-                    <td className="py-2 pr-4 text-right">
+                    <td className="py-2 pe-4">{words(call.taskClass)}</td>
+                    <td className="py-2 pe-4">{call.model}</td>
+                    <td className="py-2 pe-4 text-end">{call.attempt}</td>
+                    <td className="py-2 pe-4 text-end">
                       {(call.latencyMs / 1000).toFixed(1)} s
                     </td>
-                    <td className="py-2 pr-4 text-right">
+                    <td className="py-2 pe-4 text-end">
                       {call.inputTokens} / {call.outputTokens}
                     </td>
-                    <td className="py-2 pr-4 text-right">
+                    <td className="py-2 pe-4 text-end">
                       {call.costUsd === null ? "—" : usd(call.costUsd)}
                     </td>
                     <td className="py-2">

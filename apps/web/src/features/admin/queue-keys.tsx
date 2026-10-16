@@ -109,5 +109,5 @@ export const QUEUE_ITEM = {
   "data-queue-item": "",
   tabIndex: -1,
   className:
-    "outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--cq-focus-ring) aria-[current=true]:lg:border-l-2 aria-[current=true]:lg:border-(--cq-accent) aria-[current=true]:lg:pl-3",
+    "outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--cq-focus-ring) aria-[current=true]:lg:border-s-2 aria-[current=true]:lg:border-(--cq-accent) aria-[current=true]:lg:ps-3",
 } as const;

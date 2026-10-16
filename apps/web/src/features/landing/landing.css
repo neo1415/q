@@ -251,7 +251,7 @@
 .lp .nav-links .btn {
   padding: 0 16px;
   min-height: 40px;
-  margin-left: 6px;
+  margin-inline-start: 6px;
 }
 
 /* HERO */
@@ -320,7 +320,7 @@
   }
 }
 .lp .sidebar {
-  border-right: 1px solid var(--cq-border-subtle);
+  border-inline-end: 1px solid var(--cq-border-subtle);
   padding: 18px 12px;
   display: flex;
   flex-direction: column;
@@ -382,7 +382,7 @@
 }
 .lp .stage-state {
   position: absolute;
-  left: 24px;
+  inset-inline-start: 24px;
   top: 20px;
   display: flex;
   align-items: center;
@@ -398,8 +398,8 @@
 }
 .lp .stage-said {
   position: absolute;
-  left: 28px;
-  right: 28px;
+  inset-inline-start: 28px;
+  inset-inline-end: 28px;
   bottom: 84px;
   font-size: 1.5rem;
   line-height: 1.25;
@@ -409,8 +409,8 @@
 }
 .lp .stage-bar {
   position: absolute;
-  left: 20px;
-  right: 20px;
+  inset-inline-start: 20px;
+  inset-inline-end: 20px;
   bottom: 20px;
   height: 48px;
   border-radius: 0;
@@ -442,7 +442,7 @@
   flex-direction: column;
   gap: 12px;
   background: var(--cq-surface);
-  border-left: 1px solid var(--cq-border-subtle);
+  border-inline-start: 1px solid var(--cq-border-subtle);
   overflow: hidden;
 }
 .lp .board h4 {
@@ -533,7 +533,7 @@
   height: 14px;
   border-radius: 50%;
   border: 1.5px solid var(--cq-accent);
-  border-right-color: transparent;
+  border-inline-end-color: transparent;
   flex: none;
   margin-top: 3px;
   animation: lp-spin 1.1s linear infinite;
@@ -740,7 +740,7 @@
 }
 .lp .qwin-presence {
   position: relative;
-  border-right: 1px solid var(--cq-stage-border);
+  border-inline-end: 1px solid var(--cq-stage-border);
 }
 .lp .qwin-presence canvas {
   position: absolute;
@@ -829,8 +829,8 @@
 }
 .lp .acard-body {
   position: absolute;
-  left: 16px;
-  right: 16px;
+  inset-inline-start: 16px;
+  inset-inline-end: 16px;
   top: calc(100% - 14px);
   visibility: hidden;
 }
@@ -897,7 +897,7 @@
 }
 .lp .cursor {
   position: absolute;
-  left: 0;
+  inset-inline-start: 0;
   top: 0;
   width: 22px;
   height: 22px;
@@ -1098,7 +1098,7 @@
 .lp .tl .vis-to {
   font-size: 0.78rem;
   color: var(--cq-text-tertiary);
-  text-align: right;
+  text-align: end;
 }
 
 /* PLAN + PHONE */
@@ -1137,7 +1137,7 @@
   position: absolute;
   top: 4px;
   bottom: 4px;
-  left: 4px;
+  inset-inline-start: 4px;
   border-radius: 0;
   background: var(--cq-surface-raised);
   box-shadow: 0 1px 3px var(--cq-landing-shade-12);
@@ -1295,8 +1295,8 @@
 }
 .lp .vprog {
   position: absolute;
-  left: 14px;
-  right: 14px;
+  inset-inline-start: 14px;
+  inset-inline-end: 14px;
   top: 100px;
   height: 2px;
   border-radius: 0;
@@ -1331,8 +1331,8 @@
 }
 .lp .pmeta {
   position: absolute;
-  left: 18px;
-  right: 84px;
+  inset-inline-start: 18px;
+  inset-inline-end: 84px;
   bottom: 92px;
   color: var(--cq-stage-text);
   display: flex;
@@ -1372,7 +1372,7 @@
 }
 .lp .rail {
   position: absolute;
-  right: 10px;
+  inset-inline-end: 10px;
   bottom: 96px;
   display: flex;
   flex-direction: column;
@@ -1413,8 +1413,8 @@
 .lp .phone-top {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
   height: 96px;
   display: flex;
   justify-content: space-between;
@@ -1427,8 +1427,8 @@
 }
 .lp .tabbar {
   position: absolute;
-  left: 0;
-  right: 0;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
   bottom: 0;
   height: 72px;
   background: var(--cq-stage-canvas);
@@ -1766,8 +1766,8 @@
 }
 .lp .captions {
   position: absolute;
-  left: 28px;
-  right: 28px;
+  inset-inline-start: 28px;
+  inset-inline-end: 28px;
   bottom: 26px;
   display: flex;
   flex-direction: column;
@@ -1810,7 +1810,7 @@
 }
 .lp .back {
   position: absolute;
-  right: 28px;
+  inset-inline-end: 28px;
   top: 50%;
   font-size: 0.95rem;
   color: var(--cq-stage-text);
@@ -1856,7 +1856,7 @@
 }
 .lp .self .lvl {
   position: absolute;
-  left: 16px;
+  inset-inline-start: 16px;
   bottom: 14px;
   display: flex;
   gap: 3px;
@@ -1874,7 +1874,7 @@
 }
 .lp .self .nm {
   position: absolute;
-  right: 16px;
+  inset-inline-end: 16px;
   bottom: 12px;
   font-size: 0.84rem;
   color: var(--cq-stage-text-muted);
@@ -2017,8 +2017,8 @@
 .lp summary .pm::after {
   content: "";
   position: absolute;
-  left: 3px;
-  right: 3px;
+  inset-inline-start: 3px;
+  inset-inline-end: 3px;
   top: 9px;
   height: 1.5px;
   background: currentColor;
@@ -2038,7 +2038,7 @@
 
 .lp .final {
   padding: 150px 0 140px;
-  text-align: left;
+  text-align: start;
 }
 .lp .final .d1 {
   max-width: 13ch;
@@ -2086,7 +2086,7 @@
 .lp .lp-swarm-bloom,
 .lp .lp-swarm-core {
   position: absolute;
-  left: 0;
+  inset-inline-start: 0;
   top: 0;
   width: 0;
   height: 0;
@@ -2250,7 +2250,7 @@ html[data-pwa] .cq-landing {
     height: 440px;
   }
   .lp .window .board {
-    border-left: 0;
+    border-inline-start: 0;
     border-top: 1px solid var(--cq-border-subtle);
   }
   .lp .window .board .mini-card:nth-of-type(n + 3),
@@ -2298,7 +2298,7 @@ html[data-pwa] .cq-landing {
   }
   .lp .qwin-presence {
     height: 200px;
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--cq-stage-border);
   }
   .lp .thread {
@@ -2320,7 +2320,7 @@ html[data-pwa] .cq-landing {
   }
   .lp .tl .vis-to {
     grid-column: 3;
-    text-align: left;
+    text-align: start;
     margin-top: -8px;
   }
   .lp .inputs {
@@ -2345,8 +2345,8 @@ html[data-pwa] .cq-landing {
     height: 460px;
   }
   .lp .captions {
-    left: 16px;
-    right: 16px;
+    inset-inline-start: 16px;
+    inset-inline-end: 16px;
   }
   .lp .cap {
     font-size: 1rem;

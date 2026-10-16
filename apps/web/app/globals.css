@@ -187,7 +187,7 @@
     position: absolute;
     z-index: -1;
     top: -60%;
-    right: -30%;
+    inset-inline-end: -30%;
     width: 90%;
     aspect-ratio: 1;
     border-radius: 0;
@@ -839,7 +839,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding-left: 1.25rem;
+    padding-inline-start: 1.25rem;
   }
   .cq-md-list .cq-md-list {
     margin-top: 4px;
@@ -919,7 +919,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    border-left: 3px solid var(--cq-border);
+    border-inline-start: 3px solid var(--cq-border);
     border-radius: 0;
     padding: 8px 12px;
     color: var(--cq-text-secondary);
@@ -936,27 +936,27 @@
     font-weight: 600;
   }
   .cq-md-callout.is-info {
-    border-left-color: var(--cq-info);
+    border-inline-start-color: var(--cq-info);
   }
   .cq-md-callout.is-info .cq-md-callout-label {
     color: var(--cq-info);
   }
   .cq-md-callout.is-positive {
-    border-left-color: var(--cq-positive);
+    border-inline-start-color: var(--cq-positive);
     background: var(--cq-positive-soft);
   }
   .cq-md-callout.is-positive .cq-md-callout-label {
     color: var(--cq-positive);
   }
   .cq-md-callout.is-warning {
-    border-left-color: var(--cq-warning);
+    border-inline-start-color: var(--cq-warning);
     background: var(--cq-warning-soft);
   }
   .cq-md-callout.is-warning .cq-md-callout-label {
     color: var(--cq-warning);
   }
   .cq-md-callout.is-danger {
-    border-left-color: var(--cq-danger);
+    border-inline-start-color: var(--cq-danger);
     background: var(--cq-danger-soft);
   }
   .cq-md-callout.is-danger .cq-md-callout-label {
@@ -1269,13 +1269,13 @@
   }
   .cq-feed-media[data-swipe="interested"]::after {
     content: "Interested";
-    left: 8%;
+    inset-inline-start: 8%;
     color: var(--cq-accent);
     rotate: -8deg;
   }
   .cq-feed-media[data-swipe="pass"]::after {
     content: "Pass";
-    right: 8%;
+    inset-inline-end: 8%;
     color: var(--cq-stage-text);
     rotate: 8deg;
   }
@@ -1303,7 +1303,7 @@
   .cq-feed-player-controls {
     position: absolute;
     top: calc(4px + var(--cq-safe-top));
-    left: 4px;
+    inset-inline-start: 4px;
     z-index: 2;
     display: flex;
     flex-direction: column;
@@ -1333,7 +1333,7 @@
     min-height: 28px;
     align-items: center;
     gap: 6px;
-    margin-left: 8px;
+    margin-inline-start: 8px;
     padding: 0 10px;
     border-radius: 0;
     background: var(--cq-feed-scrim-deep);
@@ -1420,7 +1420,7 @@
     transform: translate(-50%, -50%);
   }
   .cq-feed-paused > svg {
-    margin-left: 4px;
+    margin-inline-start: 4px;
   }
   .cq-feed-ring {
     width: 30px;
@@ -1522,7 +1522,7 @@
    */
   .cq-feed-rail {
     position: absolute;
-    right: 6px;
+    inset-inline-end: 6px;
     bottom: 16px;
     display: flex;
     width: 64px;
@@ -1574,9 +1574,9 @@
   /* The progress bar, on the seam (Discover v2). */
   .cq-scrubber {
     position: absolute;
-    right: 0;
+    inset-inline-end: 0;
     bottom: 0;
-    left: 0;
+    inset-inline-start: 0;
     z-index: 3;
     height: 28px;
     cursor: pointer;
@@ -1585,9 +1585,9 @@
   }
   .cq-scrubber-track {
     position: absolute;
-    right: 0;
+    inset-inline-end: 0;
     bottom: 0;
-    left: 0;
+    inset-inline-start: 0;
     height: 2px;
     background: color-mix(in oklch, var(--cq-stage-text) 24%, transparent);
     transition: height var(--cq-motion-fast) var(--cq-ease);
@@ -1620,7 +1620,7 @@
   .cq-scrubber-thumb {
     position: absolute;
     top: 50%;
-    left: 0;
+    inset-inline-start: 0;
     width: 14px;
     height: 14px;
     border-radius: var(--cq-radius-circle);
@@ -1696,7 +1696,7 @@
   .cq-feed-nav {
     position: absolute;
     top: 50%;
-    right: 12px;
+    inset-inline-end: 12px;
     z-index: 2;
     display: flex;
     flex-direction: column;
@@ -1738,7 +1738,7 @@
   .cq-feed-filter {
     position: absolute;
     top: calc(4px + var(--cq-safe-top));
-    right: 4px;
+    inset-inline-end: 4px;
     z-index: 2;
   }
   .cq-feed-filter-button {
@@ -1758,7 +1758,7 @@
   .cq-feed-filter-button > span {
     position: absolute;
     top: -4px;
-    right: -4px;
+    inset-inline-end: -4px;
   }
   .cq-feed-keys {
     display: none;
@@ -1778,7 +1778,7 @@
     content: "";
     position: absolute;
     top: 3px;
-    left: 3px;
+    inset-inline-start: 3px;
     width: 20px;
     height: 20px;
     border-radius: var(--cq-radius-circle);
@@ -1835,7 +1835,7 @@
   }
   .cq-skeleton-rail {
     position: absolute;
-    right: 6px;
+    inset-inline-end: 6px;
     bottom: 16px;
     z-index: 2;
     display: flex;
@@ -2087,7 +2087,7 @@
       gap: 10px;
       padding: 72px 28px 28px;
       background: var(--cq-app-canvas);
-      border-left: 1px solid var(--cq-app-border-subtle);
+      border-inline-start: 1px solid var(--cq-app-border-subtle);
       color: var(--cq-app-text-primary);
       text-shadow: none;
       --cq-canvas: var(--cq-app-canvas);
@@ -2155,9 +2155,9 @@
       border-radius: 0;
     }
     .cq-scrubber {
-      right: 12px;
+      inset-inline-end: 12px;
       bottom: 6px;
-      left: 12px;
+      inset-inline-start: 12px;
     }
     .cq-scrubber-track {
       border-radius: 0;
@@ -2181,7 +2181,7 @@
       overflow-y: auto;
       gap: 16px;
       padding: 72px 28px 20px;
-      border-left: 1px solid var(--cq-app-border-subtle);
+      border-inline-start: 1px solid var(--cq-app-border-subtle);
       background: var(--cq-app-canvas);
       color: var(--cq-app-text-primary);
       color-scheme: light dark;
@@ -2249,8 +2249,10 @@
     /* The rail beside the 9:16 stage, on the stage's own tokens. */
     .cq-feed-rail {
       bottom: calc((100cqh - var(--cq-feed-video-h)) / 2 + 4px);
-      left: calc((100cqw - 440px) / 2 + var(--cq-feed-video-h) * 9 / 32 + 14px);
-      right: auto;
+      inset-inline-start: calc(
+        (100cqw - 440px) / 2 + var(--cq-feed-video-h) * 9 / 32 + 14px
+      );
+      inset-inline-end: auto;
       width: 72px;
       gap: 6px;
       padding: 0;
@@ -2288,7 +2290,7 @@
        rail beside the pitch. */
     .cq-feed-nav {
       top: 24px;
-      right: calc(440px + 16px);
+      inset-inline-end: calc(440px + 16px);
       transform: none;
     }
     .cq-feed-keys {
@@ -2306,7 +2308,7 @@
       display: inline-grid;
       min-width: 22px;
       height: 22px;
-      margin-right: 3px;
+      margin-inline-end: 3px;
       place-items: center;
       padding: 0 5px;
       border: 1px solid var(--cq-border);
@@ -2319,8 +2321,10 @@
     }
     .cq-skeleton-rail {
       bottom: calc((100cqh - var(--cq-feed-video-h)) / 2 + 4px);
-      left: calc((100cqw - 440px) / 2 + var(--cq-feed-video-h) * 9 / 32 + 14px);
-      right: auto;
+      inset-inline-start: calc(
+        (100cqw - 440px) / 2 + var(--cq-feed-video-h) * 9 / 32 + 14px
+      );
+      inset-inline-end: auto;
       width: 72px;
     }
     .cq-skeleton-dot {
@@ -2356,7 +2360,7 @@
     .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
       .cq-discover-tabs {
       top: 16px;
-      left: calc(100% - 440px + 22px);
+      inset-inline-start: calc(100% - 440px + 22px);
       transform: none;
     }
     .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
@@ -2410,8 +2414,8 @@
   }
   .cq-q-edge-top,
   .cq-q-edge-bottom {
-    left: 0;
-    right: 0;
+    inset-inline-start: 0;
+    inset-inline-end: 0;
     height: 6px;
   }
   .cq-q-edge-left,
@@ -2427,10 +2431,10 @@
     bottom: var(--cq-edge-at);
   }
   .cq-q-edge-left {
-    left: var(--cq-edge-at);
+    inset-inline-start: var(--cq-edge-at);
   }
   .cq-q-edge-right {
-    right: var(--cq-edge-at);
+    inset-inline-end: var(--cq-edge-at);
   }
   .cq-q-edge-run {
     position: absolute;
@@ -2519,7 +2523,7 @@
   .cq-q-dock {
     position: absolute;
     top: 0;
-    left: 0;
+    inset-inline-start: 0;
     display: flex;
     pointer-events: auto;
     touch-action: none;
@@ -2550,7 +2554,7 @@
   .cq-q-dock-tip {
     position: absolute;
     top: 50%;
-    right: calc(100% + 8px);
+    inset-inline-end: calc(100% + 8px);
     transform: translateY(-50%);
     padding: 4px 10px;
     border-radius: 0;
@@ -2564,8 +2568,8 @@
     transition: opacity var(--cq-motion-fast) var(--cq-ease);
   }
   [data-q-dock-placement^="left"] .cq-q-dock-tip {
-    right: auto;
-    left: calc(100% + 8px);
+    inset-inline-end: auto;
+    inset-inline-start: calc(100% + 8px);
   }
   @media (hover: hover) and (pointer: fine) {
     .cq-q-dock-button:hover .cq-q-dock-tip {
@@ -2597,7 +2601,7 @@
     border: none;
     border-radius: 0;
     background: transparent;
-    text-align: left;
+    text-align: start;
     cursor: pointer;
   }
   .cq-q-dock-mic {
@@ -2653,11 +2657,11 @@
     cursor: pointer;
   }
   .cq-q-dock-stash[data-side="right"] {
-    border-right: none;
+    border-inline-end: none;
     border-radius: 0;
   }
   .cq-q-dock-stash[data-side="left"] {
-    border-left: none;
+    border-inline-start: none;
     border-radius: 0;
     background: linear-gradient(
       to left,
@@ -2707,11 +2711,11 @@
     opacity: 0.55;
   }
   .cq-q-lumen[data-side="right"] {
-    right: 0;
+    inset-inline-end: 0;
     background: linear-gradient(to left, var(--cq-q-bloom), transparent);
   }
   .cq-q-lumen[data-side="left"] {
-    left: 0;
+    inset-inline-start: 0;
     width: calc(24px + var(--cq-safe-left));
     background: linear-gradient(to right, var(--cq-q-bloom), transparent);
   }
@@ -3010,7 +3014,7 @@
       width: var(--cq-sidebar-width);
       flex: none;
       flex-direction: column;
-      border-right: 1px solid var(--cq-border-subtle);
+      border-inline-end: 1px solid var(--cq-border-subtle);
       background-color: var(--cq-surface);
       padding-top: var(--cq-safe-top);
       padding-left: var(--cq-safe-left);
@@ -3156,7 +3160,7 @@
     position: absolute;
     width: 140%;
     height: 110%;
-    left: -20%;
+    inset-inline-start: -20%;
     border-radius: 50%;
     transform: rotate(-27deg);
     pointer-events: none;
@@ -3169,7 +3173,7 @@
   }
   .cq-splash-atmosphere::after {
     top: 77%;
-    left: -12%;
+    inset-inline-start: -12%;
     border-top: 1px solid var(--cq-splash-edge);
     background: linear-gradient(180deg, var(--cq-splash-silk), transparent 25%);
   }
@@ -3229,8 +3233,8 @@
     position: absolute;
     z-index: 3;
     bottom: max(32px, env(safe-area-inset-bottom));
-    left: 24px;
-    right: 24px;
+    inset-inline-start: 24px;
+    inset-inline-end: 24px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -3242,7 +3246,7 @@
     position: absolute;
     z-index: 3;
     top: max(20px, env(safe-area-inset-top));
-    right: 20px;
+    inset-inline-end: 20px;
     margin: 0;
     color: var(--cq-splash-muted);
     font-size: 13px;
@@ -3314,7 +3318,7 @@
     height: var(--cq-h-2);
   }
   .cq-explore-masonry[data-columns="auto"] > .cq-explore-cell {
-    left: var(--l2);
+    inset-inline-start: var(--l2);
     top: var(--t2);
     width: var(--cq-col);
     height: var(--h2);
@@ -3325,7 +3329,7 @@
       height: var(--cq-h-3);
     }
     .cq-explore-masonry[data-columns="auto"] > .cq-explore-cell {
-      left: var(--l3);
+      inset-inline-start: var(--l3);
       top: var(--t3);
       height: var(--h3);
     }
@@ -3336,7 +3340,7 @@
       height: var(--cq-h-4);
     }
     .cq-explore-masonry[data-columns="auto"] > .cq-explore-cell {
-      left: var(--l4);
+      inset-inline-start: var(--l4);
       top: var(--t4);
       height: var(--h4);
     }
@@ -3347,7 +3351,7 @@
       height: var(--cq-h-5);
     }
     .cq-explore-masonry[data-columns="auto"] > .cq-explore-cell {
-      left: var(--l5);
+      inset-inline-start: var(--l5);
       top: var(--t5);
       height: var(--h5);
     }
@@ -3357,7 +3361,7 @@
     width: 100%;
     flex-direction: column;
     gap: 6px;
-    text-align: left;
+    text-align: start;
     border-radius: 0;
   }
   .cq-explore-tile:focus-visible {
@@ -3414,7 +3418,7 @@
   .cq-explore-duration {
     position: absolute;
     top: 8px;
-    right: 8px;
+    inset-inline-end: 8px;
     padding: 2px 6px;
     border-radius: 0;
     font-size: 11.5px;
@@ -3467,7 +3471,7 @@
     height: 100dvh;
   }
   .cq-feed .cq-explore-feed-top {
-    padding-left: 52px;
+    padding-inline-start: 52px;
   }
   .cq-explore-feed-scroller {
     position: relative;
@@ -3499,8 +3503,8 @@
   }
   .cq-explore-stage .cq-feed-player-controls {
     top: calc(4px + var(--cq-safe-top));
-    right: 4px;
-    left: auto;
+    inset-inline-end: 4px;
+    inset-inline-start: auto;
   }
   .cq-explore-stage-scrim {
     position: absolute;
@@ -3539,9 +3543,9 @@
   }
   .cq-explore-info {
     position: absolute;
-    right: 84px;
+    inset-inline-end: 84px;
     bottom: calc(24px + var(--cq-safe-bottom));
-    left: 16px;
+    inset-inline-start: 16px;
     z-index: 2;
     display: flex;
     flex-direction: column;
@@ -3549,7 +3553,7 @@
   }
   .cq-explore-rail {
     position: absolute;
-    right: 8px;
+    inset-inline-end: 8px;
     bottom: calc(24px + var(--cq-safe-bottom));
     z-index: 2;
     display: flex;
@@ -3589,7 +3593,7 @@
   }
   @media (min-width: 1024px) {
     .cq-explore-feed {
-      left: var(--cq-sidebar-width);
+      inset-inline-start: var(--cq-sidebar-width);
     }
     .cq-explore-stage {
       width: auto;
@@ -3607,7 +3611,7 @@
     .cq-explore-updown {
       position: absolute;
       top: 50%;
-      right: 24px;
+      inset-inline-end: 24px;
       z-index: 3;
       display: flex;
       flex-direction: column;
@@ -3632,7 +3636,7 @@
       padding: 28px;
       color: var(--cq-text-primary);
       background: var(--cq-surface);
-      border-left: 1px solid var(--cq-border-subtle);
+      border-inline-start: 1px solid var(--cq-border-subtle);
     }
   }
 }
@@ -3644,4 +3648,33 @@
   outline-offset: 4px;
   scroll-margin-top: 5rem;
   transition: background-color 400ms ease;
+}
+
+/*
+ * Multilingual Q (Arabic, RTL): icons that point along the reading
+ * direction (back, forward, next, send) mirror with it. Up, down and
+ * symmetric icons do not. Layout uses logical properties throughout, so
+ * nothing else needs a right-to-left rule.
+ */
+[dir="rtl"]
+  :is(
+    .lucide-arrow-left,
+    .lucide-arrow-right,
+    .lucide-arrow-up-right,
+    .lucide-arrow-up-left,
+    .lucide-chevron-left,
+    .lucide-chevron-right,
+    .lucide-chevrons-left,
+    .lucide-chevrons-right,
+    .lucide-send,
+    .lucide-send-horizontal,
+    .lucide-corner-down-left,
+    .lucide-reply,
+    .lucide-undo-2,
+    .lucide-redo-2,
+    .lucide-log-out,
+    .lucide-external-link,
+    .lucide-panel-left
+  ) {
+  transform: scaleX(-1);
 }

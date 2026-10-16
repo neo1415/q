@@ -77,8 +77,8 @@ export function ArrivalDock() {
       aria-label="Q's briefing"
       className={
         tucked
-          ? "fixed right-4 bottom-24 z-(--cq-z-presence) has-[>div:empty]:hidden sm:bottom-6"
-          : "fixed right-4 bottom-24 z-(--cq-z-presence) flex w-[min(380px,calc(100vw-32px))] flex-col border border-(--cq-border) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-overlay) has-[>div:empty]:hidden sm:bottom-6"
+          ? "fixed end-4 bottom-24 z-(--cq-z-presence) has-[>div:empty]:hidden sm:bottom-6"
+          : "fixed end-4 bottom-24 z-(--cq-z-presence) flex w-[min(380px,calc(100vw-32px))] flex-col border border-(--cq-border) bg-(--cq-surface-raised) p-3.5 shadow-(--cq-shadow-overlay) has-[>div:empty]:hidden sm:bottom-6"
       }
       data-arrival-dock
       data-tucked={tucked ? "" : undefined}

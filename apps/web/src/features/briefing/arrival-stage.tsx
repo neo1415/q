@@ -360,7 +360,7 @@ function MatchesGroup({
             key={match.companyId}
             type="button"
             onClick={() => setShown(match.companyId)}
-            className="flex min-h-11 w-full items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-left transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            className="flex min-h-11 w-full items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-start transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
             data-arrival-match-line={match.companyId}
             data-q-control-item
           >

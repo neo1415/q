@@ -347,7 +347,7 @@ export function PolicyEditor({
                       {proposal.valueLabels.map((value, index) => (
                         <li
                           key={`${value}-${index}`}
-                          className="cq-caption flex items-center gap-1 bg-(--cq-surface-subtle) py-0.5 pr-0.5 pl-2.5 text-(--cq-text-primary)"
+                          className="cq-caption flex items-center gap-1 bg-(--cq-surface-subtle) py-0.5 pe-0.5 ps-2.5 text-(--cq-text-primary)"
                         >
                           {proposal.config.type === "EXCLUDED_TAXONOMY"
                             ? `Not ${value}`

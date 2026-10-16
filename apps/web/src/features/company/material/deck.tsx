@@ -100,7 +100,7 @@ function DeckViewer({
             type="button"
             onClick={open}
             disabled={pending}
-            className="flex h-full w-full flex-col items-start justify-center gap-2 p-6 text-left sm:p-10"
+            className="flex h-full w-full flex-col items-start justify-center gap-2 p-6 text-start sm:p-10"
           >
             <span className="cq-caption text-(--cq-text-tertiary)">
               {deck.title}
@@ -576,7 +576,7 @@ export function DeckCoach({
                         className="text-(--cq-text-tertiary) transition-transform group-open:rotate-180"
                       />
                     </summary>
-                    <div className="flex flex-col gap-3 pb-4 pl-8">
+                    <div className="flex flex-col gap-3 pb-4 ps-8">
                       {section.gaps.length === 0 && section.improve === null ? (
                         <p className="cq-body-sm text-(--cq-text-secondary)">
                           Nothing to add here.

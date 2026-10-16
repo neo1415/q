@@ -641,7 +641,7 @@ function MemberRow({
         <span className="truncate cq-body font-medium text-(--cq-text-primary)">
           {member.name}
           {member.isYou ? (
-            <span className="ml-1.5 cq-caption font-normal text-(--cq-text-tertiary)">
+            <span className="ms-1.5 cq-caption font-normal text-(--cq-text-tertiary)">
               You
             </span>
           ) : null}
@@ -657,7 +657,7 @@ function MemberRow({
           <button
             type="button"
             aria-label={`Role for ${member.name}: ${ROLE_WORD[member.role]}. Change`}
-            className="inline-flex min-h-11 items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) pr-2.5 pl-3 cq-body-sm whitespace-nowrap text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:min-h-10"
+            className="inline-flex min-h-11 items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) pe-2.5 ps-3 cq-body-sm whitespace-nowrap text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:min-h-10"
             onClick={onRole}
           >
             {ROLE_WORD[member.role]}

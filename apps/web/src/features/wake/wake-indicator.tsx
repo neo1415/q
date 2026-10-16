@@ -48,7 +48,7 @@ export function WakeIndicator() {
     >
       <div
         role="status"
-        className="inline-flex items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-1 pr-1 pl-3 cq-caption text-(--cq-text-secondary)"
+        className="inline-flex items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) py-1 pe-1 ps-3 cq-caption text-(--cq-text-secondary)"
       >
         <Icon
           aria-hidden="true"

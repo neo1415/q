@@ -95,7 +95,7 @@ function OrganisationList({
               switchTo(organisation.organisationId, onPicked);
           }}
           className={cx(
-            "flex min-h-13 w-full items-center gap-2.5 px-2.5 py-1.5 text-left transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
+            "flex min-h-13 w-full items-center gap-2.5 px-2.5 py-1.5 text-start transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
             organisation.active ? "bg-(--cq-surface-subtle)" : null,
           )}
         >
@@ -152,7 +152,7 @@ export function SidebarOrganisationSwitcher({
           type="button"
           aria-label={`Acting for ${active.name}. Switch`}
           className={cx(
-            "flex min-h-12 items-center gap-2.5 text-left transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
+            "flex min-h-12 items-center gap-2.5 text-start transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
             compact ? "w-11 justify-center" : "w-full px-2.5 py-1.5",
           )}
           data-org-switcher

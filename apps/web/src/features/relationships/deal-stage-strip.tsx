@@ -160,7 +160,7 @@ export function DealStageStrip({
           >
             <span
               aria-hidden="true"
-              className={`mr-2 inline-block size-2 rounded-full sm:hidden ${BAR[step.status]}`}
+              className={`me-2 inline-block size-2 rounded-full sm:hidden ${BAR[step.status]}`}
             />
             {step.label}
           </span>

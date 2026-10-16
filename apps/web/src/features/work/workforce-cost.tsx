@@ -89,7 +89,7 @@ export function WorkforceCost({
                   <tr key={row.name}>
                     <th
                       scope="row"
-                      className="w-[120px] py-1.5 text-left font-normal lg:w-[140px]"
+                      className="w-[120px] py-1.5 text-start font-normal lg:w-[140px]"
                     >
                       {row.name}
                     </th>
@@ -101,7 +101,7 @@ export function WorkforceCost({
                         />
                       </div>
                     </td>
-                    <td className="cq-numeric w-16 py-1.5 text-right">
+                    <td className="cq-numeric w-16 py-1.5 text-end">
                       {dollars(row.usd)}
                     </td>
                   </tr>

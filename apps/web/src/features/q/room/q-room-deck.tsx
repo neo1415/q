@@ -567,7 +567,7 @@ export function QRoomDeck({
                       className="block aspect-video h-auto w-full"
                     />
                     {toFill ? (
-                      <span className="cq-caption absolute top-1 right-1 bg-(--cq-surface-raised) px-1 text-(--cq-text-primary)">
+                      <span className="cq-caption absolute top-1 end-1 bg-(--cq-surface-raised) px-1 text-(--cq-text-primary)">
                         To fill
                       </span>
                     ) : null}

@@ -689,10 +689,10 @@ function ComparisonTable({
   return (
     <QResultCard label="Side by side">
       <div className="relative overflow-x-auto">
-        <table className="w-full border-collapse text-left">
+        <table className="w-full border-collapse text-start">
           <thead>
             <tr>
-              <th className="cq-label px-0 py-2 pr-4 text-(--cq-text-tertiary)">
+              <th className="cq-label px-0 py-2 pe-4 text-(--cq-text-tertiary)">
                 <span className="sr-only">Attribute</span>
               </th>
               {block.subjects.map((subject, column) => {
@@ -730,7 +730,7 @@ function ComparisonTable({
               >
                 <th
                   scope="row"
-                  className="cq-body-sm px-0 py-2 pr-4 font-normal text-(--cq-text-secondary)"
+                  className="cq-body-sm px-0 py-2 pe-4 font-normal text-(--cq-text-secondary)"
                 >
                   {row.label}
                 </th>

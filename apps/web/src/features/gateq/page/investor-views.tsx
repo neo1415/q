@@ -396,7 +396,7 @@ export function GateView({
                 <span className="gq-t2">
                   {DIMENSION_WORDS[rule.config.type] ?? rule.config.type}
                 </span>
-                <span className="text-right">
+                <span className="text-end">
                   {rule.label}
                   {rule.requiredness === "REQUIRED" ? (
                     ""
@@ -491,7 +491,7 @@ export function GateView({
           </Link>
         </div>
         <code className="cq-caption block break-all bg-(--cq-surface-subtle) p-3">
-          <Copy {...icon} className="mr-1.5 inline" />
+          <Copy {...icon} className="me-1.5 inline" />
           {snippet}
         </code>
       </section>

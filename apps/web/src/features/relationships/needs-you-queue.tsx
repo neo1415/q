@@ -97,8 +97,8 @@ export function NeedsYouQueue({
           </p>
         </div>
       </div>
-      <div className="ml-11 flex flex-none items-center gap-1 sm:ml-0">
-        <span className="cq-caption cq-numeric mr-2 w-10 text-right text-(--cq-text-tertiary)">
+      <div className="ms-11 flex flex-none items-center gap-1 sm:ms-0">
+        <span className="cq-caption cq-numeric me-2 w-10 text-end text-(--cq-text-tertiary)">
           <time dateTime={card.latestAt}>{since(card.latestAt, now)}</time>
         </span>
         {card.action.href === null ? (

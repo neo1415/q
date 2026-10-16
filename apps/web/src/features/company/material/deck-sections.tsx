@@ -139,7 +139,7 @@ export function DeckReadSummary({
                 type="button"
                 onClick={() => onPick(index)}
                 aria-current={current === index ? "true" : undefined}
-                className={`cq-body-sm flex min-h-11 w-full items-center gap-2 border px-3 py-2 text-left text-(--cq-text-primary) ${
+                className={`cq-body-sm flex min-h-11 w-full items-center gap-2 border px-3 py-2 text-start text-(--cq-text-primary) ${
                   current === index
                     ? "border-(--cq-text-primary) border-2"
                     : section.status === "NOT_IN_DECK"
@@ -238,7 +238,7 @@ function SectionCard({
                   {fact.asOf === null ? "" : ` · as of ${fact.asOf}`}
                 </span>
               </dt>
-              <dd className="cq-title-sm cq-numeric text-right text-(--cq-text-primary)">
+              <dd className="cq-title-sm cq-numeric text-end text-(--cq-text-primary)">
                 {fact.value ?? (
                   <span className="cq-body-sm text-(--cq-text-secondary)">
                     Not in the deck

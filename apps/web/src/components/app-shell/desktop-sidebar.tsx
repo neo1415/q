@@ -76,7 +76,7 @@ export function DesktopSidebar({
       <div
         className={cx(
           "flex items-center gap-2 pt-4 pb-3",
-          collapsed ? "flex-col px-2" : "justify-between pr-2 pl-5",
+          collapsed ? "flex-col px-2" : "justify-between pe-2 ps-5",
         )}
       >
         {collapsed ? null : (
@@ -267,7 +267,7 @@ function SidebarLink({
       {active ? (
         <span
           aria-hidden="true"
-          className="absolute inset-y-2 left-0 w-0.5 bg-(--cq-accent)"
+          className="absolute inset-y-2 start-0 w-0.5 bg-(--cq-accent)"
         />
       ) : null}
       <Icon

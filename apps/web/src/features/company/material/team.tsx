@@ -109,7 +109,7 @@ export function TeamTab({
                   onClick={() => {
                     setOpen(index);
                   }}
-                  className="flex min-h-11 w-full items-start gap-3 py-4 text-left hover:bg-(--cq-surface-subtle)"
+                  className="flex min-h-11 w-full items-start gap-3 py-4 text-start hover:bg-(--cq-surface-subtle)"
                   data-team-member
                 >
                   {/* A person's photo is theirs alone today: initials. */}

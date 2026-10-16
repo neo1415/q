@@ -468,7 +468,7 @@ export function CompanyProfileView({
           >
             {label}
             {count === null ? null : (
-              <span className="cq-caption ml-1.5 text-(--cq-text-tertiary)">
+              <span className="cq-caption ms-1.5 text-(--cq-text-tertiary)">
                 {count}
               </span>
             )}

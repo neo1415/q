@@ -113,7 +113,7 @@ export function EditableProfile({
         <div
           role="alert"
           data-profile-conflict
-          className="mb-3 flex flex-col gap-3 border-l-2 border-(--cq-warning) py-1 pl-4 sm:flex-row sm:items-center sm:justify-between"
+          className="mb-3 flex flex-col gap-3 border-s-2 border-(--cq-warning) py-1 ps-4 sm:flex-row sm:items-center sm:justify-between"
         >
           <p className="cq-body-sm text-(--cq-text-primary)">{conflict}</p>
           <Button

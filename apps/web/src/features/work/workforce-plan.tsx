@@ -92,7 +92,7 @@ export function WorkforcePlan({
             <h5 className="cq-label m-0 mb-1 font-medium">
               Missing or not known
             </h5>
-            <ul className="cq-body-sm m-0 list-disc space-y-1 pl-5">
+            <ul className="cq-body-sm m-0 list-disc space-y-1 ps-5">
               {missing.map((one) => (
                 <li key={one.what}>
                   {one.what}{" "}
@@ -114,7 +114,7 @@ export function WorkforcePlan({
             <h5 className="cq-label m-0 mb-1 font-medium">
               What the team found
             </h5>
-            <ul className="cq-body-sm m-0 list-disc space-y-1 pl-5">
+            <ul className="cq-body-sm m-0 list-disc space-y-1 ps-5">
               {plan.signals.map((one) => (
                 <li key={`${one.stepKey}:${one.note}`}>
                   <span className="font-medium">
@@ -134,7 +134,7 @@ export function WorkforcePlan({
         {plan.nextActions.length === 0 ? null : (
           <section aria-label="What comes next">
             <h5 className="cq-label m-0 mb-1 font-medium">What comes next</h5>
-            <ol className="cq-body-sm m-0 list-decimal space-y-1.5 pl-5">
+            <ol className="cq-body-sm m-0 list-decimal space-y-1.5 ps-5">
               {plan.nextActions.map((one) => (
                 <li key={one.action}>
                   {one.action}

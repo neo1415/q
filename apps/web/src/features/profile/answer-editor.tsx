@@ -155,7 +155,7 @@ export function AnswerEditor({
               </>
             }
           >
-            <div className="flex max-h-[60vh] flex-col gap-6 overflow-y-auto pr-1">
+            <div className="flex max-h-[60vh] flex-col gap-6 overflow-y-auto pe-1">
               {error === null ? null : (
                 <InlineNotice tone="warning" title="Not saved">
                   {error}
@@ -393,7 +393,7 @@ function CategoryField({
         {ids.map((id) => (
           <span
             key={id}
-            className="cq-body-sm inline-flex min-h-8 items-center gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) py-1 pr-1 pl-3 text-(--cq-text-primary)"
+            className="cq-body-sm inline-flex min-h-8 items-center gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) py-1 pe-1 ps-3 text-(--cq-text-primary)"
           >
             {nameOf(id)}
             <button

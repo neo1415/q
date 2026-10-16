@@ -116,7 +116,7 @@ function FolderHeader({
       type="button"
       onClick={onToggle}
       aria-expanded={open}
-      className="flex min-h-14 w-full items-center gap-3 py-3 text-left"
+      className="flex min-h-14 w-full items-center gap-3 py-3 text-start"
       data-folder={folder.code}
     >
       <span className="flex size-9 shrink-0 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
@@ -443,7 +443,7 @@ function ConnectedDataRoom({
                   {inFolder.map((document) => (
                     <li
                       key={document.documentId}
-                      className="flex items-start gap-3 py-3 pl-1"
+                      className="flex items-start gap-3 py-3 ps-1"
                       data-room-document={document.access}
                     >
                       <FileText
@@ -1142,7 +1142,7 @@ export function OwnerDataRoom({
                     {inFolder.map((document) => (
                       <li
                         key={document.documentId}
-                        className="flex flex-col gap-2 py-3 pl-1 lg:flex-row lg:items-center"
+                        className="flex flex-col gap-2 py-3 ps-1 lg:flex-row lg:items-center"
                         data-owner-document={document.level}
                       >
                         <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -1228,7 +1228,7 @@ export function OwnerDataRoom({
                     {gaps.map((item) => (
                       <li
                         key={item.code}
-                        className="flex items-center gap-3 py-3 pl-1"
+                        className="flex items-center gap-3 py-3 ps-1"
                         data-checklist-gap={item.code}
                       >
                         <Plus

@@ -168,12 +168,12 @@ function PagePreview({ item }: { readonly item: LibraryItem }) {
         )}
       </div>
       {item.state === "PREPARING" ? (
-        <span className="absolute bottom-2 left-2 bg-(--cq-surface-raised) px-2 py-0.5 cq-caption text-(--cq-text-secondary)">
+        <span className="absolute bottom-2 start-2 bg-(--cq-surface-raised) px-2 py-0.5 cq-caption text-(--cq-text-secondary)">
           Q is writing this
         </span>
       ) : null}
       {item.state === "FAILED" ? (
-        <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 bg-(--cq-surface-raised) px-2 py-0.5 cq-caption text-(--cq-danger)">
+        <span className="absolute bottom-2 start-2 inline-flex items-center gap-1 bg-(--cq-surface-raised) px-2 py-0.5 cq-caption text-(--cq-danger)">
           <CircleAlert size={14} aria-hidden="true" /> Couldn&apos;t be finished
         </span>
       ) : null}
@@ -281,7 +281,7 @@ function Card({
     >
       <button
         type="button"
-        className="text-left transition-transform duration-(--cq-motion-fast) active:scale-[0.98] disabled:active:scale-100"
+        className="text-start transition-transform duration-(--cq-motion-fast) active:scale-[0.98] disabled:active:scale-100"
         onClick={() => actions.open(item)}
         disabled={item.state !== "READY"}
         aria-label={`Open ${item.title}`}
@@ -289,7 +289,7 @@ function Card({
       >
         <PagePreview item={item} />
       </button>
-      <div className="absolute right-1.5 top-1.5 bg-(--cq-surface-raised) shadow-(--cq-shadow-xs)">
+      <div className="absolute end-1.5 top-1.5 bg-(--cq-surface-raised) shadow-(--cq-shadow-xs)">
         <ItemMenu item={item} actions={actions} />
       </div>
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -324,7 +324,7 @@ function Row({
     >
       <button
         type="button"
-        className="flex min-h-11 min-w-0 items-center gap-3 text-left"
+        className="flex min-h-11 min-w-0 items-center gap-3 text-start"
         onClick={() => actions.open(item)}
         disabled={item.state !== "READY"}
         data-document-open

@@ -126,7 +126,7 @@ export default async function WorkReportPage({
           ))}
           {report.openQuestions.length === 0 ? null : (
             <PageSection id="open" title="Ask next">
-              <ul className="flex list-disc flex-col gap-1 pl-5">
+              <ul className="flex list-disc flex-col gap-1 ps-5">
                 {report.openQuestions.map((question) => (
                   <li
                     key={question}

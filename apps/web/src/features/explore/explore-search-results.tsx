@@ -27,7 +27,7 @@ export function ExploreSearchBar({ value = "" }: { readonly value?: string }) {
         <Search
           size={ICON_SIZE.prominent}
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-(--cq-text-tertiary)"
+          className="pointer-events-none absolute top-1/2 start-3.5 -translate-y-1/2 text-(--cq-text-tertiary)"
         />
         <input
           name="q"
@@ -37,7 +37,7 @@ export function ExploreSearchBar({ value = "" }: { readonly value?: string }) {
           spellCheck={false}
           maxLength={80}
           placeholder="Search companies, investors, people"
-          className="cq-body min-h-12 w-full border border-transparent bg-(--cq-surface-subtle) pr-4 pl-11 text-[16px] text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="cq-body min-h-12 w-full border border-transparent bg-(--cq-surface-subtle) pe-4 ps-11 text-[16px] text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           data-explore-search
         />
       </label>
@@ -140,7 +140,7 @@ export function ExploreSearchResults({
           {view.chips.map((chip) => (
             <span
               key={`${chip.kind}:${chip.label}`}
-              className="inline-flex min-h-8 items-center gap-1 bg-(--cq-accent-soft) py-0 pr-1.5 pl-3 text-[13.5px] text-(--cq-text-primary)"
+              className="inline-flex min-h-8 items-center gap-1 bg-(--cq-accent-soft) py-0 pe-1.5 ps-3 text-[13.5px] text-(--cq-text-primary)"
             >
               {chip.label}
               <Link

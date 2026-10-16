@@ -442,7 +442,7 @@ export function QPresenceStage({
         >
           {/* Its title and Dismiss stay in view while the object scrolls. */}
           <div
-            className="flex min-h-11 flex-none items-center justify-between gap-2 border-b border-(--cq-border-subtle) py-1 pr-1 pl-4"
+            className="flex min-h-11 flex-none items-center justify-between gap-2 border-b border-(--cq-border-subtle) py-1 pe-1 ps-4"
             data-q-shown-header
           >
             <h2

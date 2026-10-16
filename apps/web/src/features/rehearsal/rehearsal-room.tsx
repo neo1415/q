@@ -741,17 +741,17 @@ export function RehearsalRoom({
         <CounterpartMark name={name} simulation={simulation} size="stage" />
       </div>
       {simulation === undefined ? null : (
-        <div className="absolute top-3 left-3 flex max-w-[70%] flex-col items-start gap-1">
+        <div className="absolute top-3 start-3 flex max-w-[70%] flex-col items-start gap-1">
           <SimulationChip simulation={simulation} />
           <SimulationDetails simulation={simulation} />
         </div>
       )}
       {simulation?.headline ? (
-        <span className="cq-caption absolute right-3 bottom-3 max-w-[40%] truncate text-(--cq-stage-text-muted)">
+        <span className="cq-caption absolute end-3 bottom-3 max-w-[40%] truncate text-(--cq-stage-text-muted)">
           {simulation.headline}
         </span>
       ) : null}
-      <span className="cq-body-sm absolute bottom-3 left-3 max-w-[80%] truncate bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
+      <span className="cq-body-sm absolute bottom-3 start-3 max-w-[80%] truncate bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
         {name}
         {thinking ? (
           <span className="text-(--cq-stage-text-muted)"> · thinking</span>
@@ -791,14 +791,14 @@ export function RehearsalRoom({
         </div>
       )}
       {micOn ? null : (
-        <span className="absolute top-2 right-2 bg-(--cq-overlay) p-1 text-(--cq-stage-text)">
+        <span className="absolute top-2 end-2 bg-(--cq-overlay) p-1 text-(--cq-stage-text)">
           <MicOff size={14} aria-label="Your microphone is off" />
         </span>
       )}
       {qSees && camOn ? (
         <span
           role="status"
-          className="cq-caption absolute top-2 left-2 inline-flex items-center gap-1 bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)"
+          className="cq-caption absolute top-2 start-2 inline-flex items-center gap-1 bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)"
         >
           <Eye size={12} aria-hidden="true" />
           {name} can see you
@@ -810,13 +810,13 @@ export function RehearsalRoom({
         <button
           type="button"
           onClick={toggleSeeing}
-          className="cq-caption absolute top-2 left-2 inline-flex min-h-11 items-center gap-1 bg-(--cq-surface-raised) px-2 text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="cq-caption absolute top-2 start-2 inline-flex min-h-11 items-center gap-1 bg-(--cq-surface-raised) px-2 text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
           <EyeOff size={14} aria-hidden="true" />
           {name} can&rsquo;t see you &middot; Let Q see you
         </button>
       ) : null}
-      <span className="cq-caption absolute bottom-2 left-2 bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)">
+      <span className="cq-caption absolute bottom-2 start-2 bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)">
         You
         {hand ? " · hand raised" : ""}
       </span>
@@ -845,7 +845,7 @@ export function RehearsalRoom({
                   playsInline
                   className="h-full w-full object-contain"
                 />
-                <span className="cq-caption absolute top-2 left-2 bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
+                <span className="cq-caption absolute top-2 start-2 bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
                   You’re presenting · {name} can see your screen
                 </span>
               </div>
@@ -862,7 +862,7 @@ export function RehearsalRoom({
           ) : (
             <div className="relative min-h-0 flex-1">
               {personaView}
-              <div className="absolute right-3 bottom-3">{selfView(true)}</div>
+              <div className="absolute end-3 bottom-3">{selfView(true)}</div>
             </div>
           )}
 
@@ -1046,7 +1046,7 @@ export function RehearsalRoom({
                 <button
                   type="button"
                   role="menuitem"
-                  className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-left hover:bg-(--cq-surface-subtle)"
+                  className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-start hover:bg-(--cq-surface-subtle)"
                   onClick={() => {
                     setLayout((now) =>
                       now === "SPOTLIGHT" ? "TILED" : "SPOTLIGHT",
@@ -1061,7 +1061,7 @@ export function RehearsalRoom({
                   type="button"
                   role="menuitemcheckbox"
                   aria-checked={soundsOn}
-                  className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-left hover:bg-(--cq-surface-subtle)"
+                  className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-start hover:bg-(--cq-surface-subtle)"
                   onClick={() => {
                     const next = !soundsOn;
                     sounds.current = next;
@@ -1080,7 +1080,7 @@ export function RehearsalRoom({
                 <button
                   type="button"
                   role="menuitem"
-                  className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-left hover:bg-(--cq-surface-subtle) sm:hidden"
+                  className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-start hover:bg-(--cq-surface-subtle) sm:hidden"
                   onClick={() => {
                     setCaptionsOn((on) => !on);
                     setMore(false);
@@ -1093,7 +1093,7 @@ export function RehearsalRoom({
                   <button
                     type="button"
                     role="menuitem"
-                    className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-left hover:bg-(--cq-surface-subtle) md:hidden"
+                    className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-start hover:bg-(--cq-surface-subtle) md:hidden"
                     onClick={() => {
                       setMore(false);
                       void toggleShare();
@@ -1106,7 +1106,7 @@ export function RehearsalRoom({
                 <button
                   type="button"
                   role="menuitem"
-                  className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-left hover:bg-(--cq-surface-subtle) md:hidden"
+                  className="cq-body-sm flex min-h-11 items-center gap-2 px-3 text-start hover:bg-(--cq-surface-subtle) md:hidden"
                   onClick={() => {
                     setPanel((open) => !open);
                     setMore(false);

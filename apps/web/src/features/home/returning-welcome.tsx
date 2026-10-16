@@ -35,7 +35,7 @@ import { useClaimWhenSeen } from "./use-claim-when-seen";
  */
 
 const CARD_CLASS = [
-  "group flex min-h-11 w-full items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-left",
+  "group flex min-h-11 w-full items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-start",
   "transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:bg-(--cq-surface-subtle)",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
   "disabled:cursor-progress disabled:opacity-70",
@@ -151,7 +151,7 @@ export function ReturningWelcome({
         // Q's own last question, as Q asked it: where they left off is
         // shown, not paraphrased.
         <figure
-          className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 border-l-2 border-(--cq-border-strong) pl-3"
+          className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 border-s-2 border-(--cq-border-strong) ps-3"
           data-q-left-off
         >
           <figcaption className="cq-caption text-(--cq-text-tertiary)">

@@ -61,7 +61,7 @@ export function Select({
           }
           className={cx(
             fieldControlClassName,
-            "h-11 appearance-none cq-body pr-10 lg:h-10",
+            "h-11 appearance-none cq-body pe-10 lg:h-10",
             className,
           )}
           {...rest}
@@ -79,7 +79,7 @@ export function Select({
           aria-hidden="true"
           size={ICON_SIZE.regular}
           strokeWidth={ICON_STROKE}
-          className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-(--cq-text-tertiary)"
+          className="pointer-events-none absolute top-1/2 end-3 -translate-y-1/2 text-(--cq-text-tertiary)"
         />
       </div>
     </FieldFrame>

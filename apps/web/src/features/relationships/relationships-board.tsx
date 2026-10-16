@@ -320,8 +320,8 @@ export function RelationshipsBoard({
             <span />
             <span>Name</span>
             <span>Stage</span>
-            <span className="text-right">Last activity</span>
-            <span className="text-right">Next step</span>
+            <span className="text-end">Last activity</span>
+            <span className="text-end">Next step</span>
           </div>
           {/* One surface with hairline rows, not a card per relationship
               (redesign 2026-10-15). */}
@@ -477,7 +477,7 @@ function RelationshipRow({
         </div>
       </div>
       <div className="hidden lg:block">{pill}</div>
-      <div className="hidden text-right lg:block">{when}</div>
+      <div className="hidden text-end lg:block">{when}</div>
       <div
         className={cx(
           "col-span-2 flex items-center justify-between gap-3 lg:col-span-1 lg:justify-end",

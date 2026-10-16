@@ -152,7 +152,7 @@ export function QEvidenceBody({
 }) {
   const evidence = includeBlocks ? splitBlocks(turn.blocks).evidence : [];
   return (
-    <div className="flex flex-col gap-4 pt-3 text-left">
+    <div className="flex flex-col gap-4 pt-3 text-start">
       {turn.findings.length > 0 ? (
         <dl className="cq-q-answer-findings flex flex-col">
           {turn.findings.map((finding) => (

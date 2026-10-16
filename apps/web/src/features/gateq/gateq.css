@@ -150,7 +150,7 @@ textarea.gq-input {
   font-size: 12px;
   font-weight: 400;
   color: var(--cq-text-tertiary);
-  margin-left: 6px;
+  margin-inline-start: 6px;
 }
 .gq-status {
   display: inline-flex;
@@ -442,7 +442,7 @@ textarea.gq-input {
   }
   .gq-row .gq-right .gq-sla {
     white-space: normal;
-    text-align: right;
+    text-align: end;
   }
 }
 @media (min-width: 1024px) {
@@ -456,7 +456,7 @@ textarea.gq-input {
     background: var(--cq-surface);
   }
   .gq-ibx .gq-list {
-    border-right: 1px solid var(--cq-border-subtle);
+    border-inline-end: 1px solid var(--cq-border-subtle);
     overflow-y: auto;
   }
   .gq-ibx .gq-detail {
@@ -508,7 +508,7 @@ textarea.gq-input {
 .gq-row.gq-unread::before {
   content: "";
   position: absolute;
-  left: 0;
+  inset-inline-start: 0;
   top: 12px;
   bottom: 12px;
   width: 3px;
@@ -680,8 +680,8 @@ textarea.gq-input {
 }
 .gq-pbar {
   position: fixed;
-  left: 0;
-  right: 0;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
   bottom: 0;
   display: flex;
   gap: 8px;
@@ -722,14 +722,14 @@ textarea.gq-input {
 }
 .gq-search svg {
   position: absolute;
-  left: 14px;
+  inset-inline-start: 14px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--cq-text-tertiary);
   pointer-events: none;
 }
 .gq-search .gq-input {
-  padding-left: 44px;
+  padding-inline-start: 44px;
   border-radius: 0;
   background: var(--cq-surface-subtle);
   border-color: transparent;

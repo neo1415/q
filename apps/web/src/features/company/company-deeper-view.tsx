@@ -206,7 +206,7 @@ function Disclosure({
         />
         <h2 className="cq-title-sm">{title}</h2>
       </summary>
-      <div className="flex flex-col gap-4 pb-6 pl-7">{children}</div>
+      <div className="flex flex-col gap-4 pb-6 ps-7">{children}</div>
     </details>
   );
 }

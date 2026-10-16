@@ -166,7 +166,7 @@ export function QComposer({
           with what is typed up to a cap, then scrolls inside itself, so the
           composer never pushes a conversation off a phone's screen. */}
       <div className="flex items-end gap-1" data-q-composer-row>
-        <div className="flex h-11 flex-none items-center pl-1">
+        <div className="flex h-11 flex-none items-center ps-1">
           <QMark size="sm" state={submitting ? "WORKING" : "IDLE"} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col">

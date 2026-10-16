@@ -199,7 +199,7 @@ export function NetworkVideos({
                 type="button"
                 onClick={() => setWatching(at)}
                 aria-label={`Watch ${item.pitch.title ?? "the pitch"} from ${item.canonicalName}`}
-                className="group relative block aspect-9/16 w-full overflow-hidden bg-(--cq-stage-canvas) text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+                className="group relative block aspect-9/16 w-full overflow-hidden bg-(--cq-stage-canvas) text-start focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
                 data-network-tile={item.pitch.mediaAssetId}
               >
                 {poster !== null ? (
