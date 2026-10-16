@@ -76,6 +76,8 @@ const TURNS: readonly {
   readonly answers: Answer[];
   /** Answers that must NOT go on the record (refused); default none. */
   readonly refused?: number;
+  /** Of those refused, saved by code from their words instead. */
+  readonly savedByCode?: number;
   /**
    * What the model sends round by round (default: all answers in round
    * one). Live 2026-10-16: a fact that opens with another answer is
@@ -148,6 +150,8 @@ const TURNS: readonly {
       { stepKey: "F5.monthly_burn", value: 40_000, quote: "40k burn" },
     ],
     refused: 1,
+    // The refused burn is saved by code from the turn's one figure.
+    savedByCode: 1,
   },
   {
     // Off their path (revenue for a pre-seed company): kept with notes. The
@@ -354,7 +358,9 @@ describe("typed interview turn latency, with fakes", () => {
     for (const [index, t] of turns.entries()) {
       const spec = TURNS[index];
       expect(t.committed, `turn ${String(index + 1)}`).toBe(
-        (spec?.answers.length ?? 0) - (spec?.refused ?? 0),
+        (spec?.answers.length ?? 0) -
+          (spec?.refused ?? 0) +
+          (spec?.savedByCode ?? 0),
       );
     }
     // What the code owns, asserted always: a clean save is one model round
@@ -370,7 +376,7 @@ describe("typed interview turn latency, with fakes", () => {
       );
       expect(t.apiCalls, `turn ${String(index + 1)}`).toBeLessThanOrEqual(
         // A fact kept with their notes is one more write.
-        single ? 5 + (spec?.offPath ?? 0) : 8,
+        single ? 5 + (spec?.offPath ?? 0) + (spec?.savedByCode ?? 0) : 8,
       );
     }
     // Wall-clock targets only when benchmarking on purpose: timers on a

@@ -50,7 +50,8 @@ function firewall(): ContextFirewallPort {
   return { plan: () => Promise.resolve({ outcome: "AUTHORISED", plan }) };
 }
 
-const FIRST = "We back founders as a family office, mostly fintech.";
+// No choice of the step is named in it: code cannot decide it either.
+const FIRST = "We back founders our own way, mostly fintech.";
 
 /**
  * Every turn: one round writing an answer no option holds (refused as

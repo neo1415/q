@@ -12,11 +12,24 @@ import {
   turnNotesFor,
   unrecordedStatedIn,
 } from "../src/voice/interview-agent.js";
+import {
+  createAcknowledgementWarmup,
+  onboardingAcknowledgementCopy,
+} from "../src/voice/acknowledgement-warmup.js";
+import { codeReading } from "../src/voice/code-reading.js";
 import { resumeTurnRef } from "../src/voice/onboarding-conductor.js";
+import {
+  acknowledgementParts,
+  FIXED_LEAD,
+  OPTIONAL_ACKNOWLEDGEMENT_TAIL,
+  quickAcknowledgement,
+  RESEARCH_STARTED_LINE,
+} from "../src/voice/quick-acknowledgement.js";
 import { withoutUnbackedFieldClaims } from "../src/voice/onboarding-flow.js";
 import {
   currencyNamedIn,
   fieldPartOf,
+  moneyFiguresIn,
   phrasesNamedIn,
 } from "../src/voice/onboarding-port.js";
 
@@ -250,3 +263,140 @@ const firewall: ContextFirewallPort = {
       } as unknown as PermittedContextPlan,
     }),
 };
+
+describe("live AH: a long answer reads back by its opening words", () => {
+  it("never 'your what the company does'", () => {
+    const reply = quickAcknowledgement({
+      results: [
+        {
+          stepKey: "F1.description",
+          outcome: "COMMITTED",
+          recorded:
+            "We make solar cold rooms for market traders in Accra and Kumasi, rented by the day.",
+        },
+      ],
+      labelOf: () => "What the company does",
+      next: { question: "What stage is the company at?", optional: false },
+      turnIndex: 0,
+    });
+    expect(reply).not.toMatch(/your what/iu);
+    expect(reply).toMatch(
+      /what the company does: We make solar cold rooms for market traders in Accra…/u,
+    );
+  });
+
+  it("a translated reply uses one fixed lead, whatever the turn", () => {
+    for (const turnIndex of [0, 1, 2, 3]) {
+      const parts = acknowledgementParts({
+        results: [
+          { stepKey: "F1.stage", outcome: "COMMITTED", recorded: "Seed" },
+        ],
+        labelOf: () => "Stage",
+        next: { question: "Where are you based?", optional: false },
+        turnIndex,
+        fixedLead: true,
+      });
+      expect(parts?.lead).toBe(FIXED_LEAD);
+    }
+  });
+
+  it("research starting is a fixed line in the code reply, not a model round", () => {
+    const reply = quickAcknowledgement({
+      results: [
+        { stepKey: "F1.stage", outcome: "COMMITTED", recorded: "Seed" },
+      ],
+      labelOf: () => "Stage",
+      next: { question: "Where are you based?", optional: false },
+      turnIndex: 0,
+      aside: RESEARCH_STARTED_LINE,
+    });
+    expect(reply).toBe(
+      `Got it, saved: stage: Seed. ${RESEARCH_STARTED_LINE} Where are you based?`,
+    );
+  });
+});
+
+describe("live AH: a bare web address is the website, whatever was asked", () => {
+  const website = FOUNDER_DEFINITION_CURRENT.steps.find(
+    (s) => s.stepKey === "F1.website",
+  );
+  const problem = FOUNDER_DEFINITION_CURRENT.steps.find(
+    (s) => s.stepKey === "F9.problem",
+  );
+  it("reads 'tidewell.africa' as the website by code", () => {
+    const read = codeReading({
+      utterance: "tidewell.africa",
+      asked: problem,
+      pendingCount: 0,
+      openWebsite: website,
+    });
+    expect([...(read?.stated ?? [])]).toEqual(["F1.website"]);
+  });
+  it("not a sentence that mentions one", () => {
+    expect(
+      codeReading({
+        utterance: "we are on tidewell.africa now",
+        asked: problem,
+        pendingCount: 0,
+        openWebsite: website,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("live AH: figures their words give", () => {
+  it("one figure in a raise, several in a busy turn", () => {
+    expect(
+      moneyFiguresIn(
+        "actively raising about 750 thousand dollars on a SAFE",
+      ).map((f) => f.value),
+    ).toEqual([750_000]);
+    expect(moneyFiguresIn("raising $1.5m").map((f) => f.value)).toEqual([
+      1_500_000,
+    ]);
+    expect(
+      moneyFiguresIn("raising half a million").map((f) => f.value),
+    ).toEqual([500_000]);
+    expect(moneyFiguresIn("raising 750k and we burn 25k a month").length).toBe(
+      2,
+    );
+  });
+});
+
+describe("a chosen language warms the acknowledgement copy", () => {
+  it("covers the lead, labels, choices, questions and tail; hand copy is left out", () => {
+    const french = onboardingAcknowledgementCopy("founder", "fr");
+    expect(french).toContain(FIXED_LEAD);
+    expect(french).toContain(OPTIONAL_ACKNOWLEDGEMENT_TAIL);
+    expect(french).toContain("stage");
+    expect(french).toContain("US dollar");
+    expect(french.some((line) => /what stage/iu.test(line))).toBe(true);
+    const arabic = onboardingAcknowledgementCopy("founder", "ar");
+    expect(arabic.some((line) => /what stage/iu.test(line))).toBe(false);
+    expect(arabic).toContain("stage");
+  });
+
+  it("asks once per language, in bounded chunks, without waiting", async () => {
+    const calls: { language: string; size: number; cachedOnly: boolean }[] = [];
+    const warmup = createAcknowledgementWarmup({
+      localise: (_actor, language, texts, options) => {
+        calls.push({
+          language,
+          size: texts.length,
+          cachedOnly: options.cachedOnly,
+        });
+        return Promise.resolve([]);
+      },
+    });
+    const who = { tenantId: actor.tenantId, userId: actor.userId };
+    warmup.warm(who, "fr", ["founder"]);
+    warmup.warm(who, "fr", ["founder"]);
+    warmup.warm(who, "en", ["founder"]);
+    await Promise.resolve();
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((c) => c.language === "fr" && c.cachedOnly)).toBe(true);
+    expect(calls.every((c) => c.size <= 40)).toBe(true);
+    const total = calls.reduce((sum, c) => sum + c.size, 0);
+    expect(total).toBe(onboardingAcknowledgementCopy("founder", "fr").length);
+  });
+});

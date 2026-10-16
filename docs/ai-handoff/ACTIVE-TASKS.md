@@ -1,5 +1,13 @@
 # Active tasks — authoritative cross-model board
 
+## 16 October 2026 — open work (Claude lead)
+
+1. **Onboarding (top priority)** — lane ob1, branch `claude/ob1-oct16`. Goal: every stated fact saved, p50 ≤3.5 s English and <5 s in a chosen language. Next: warm onboarding copy translations on language choice, one fixed lead per language, fix "your what the company does" read-back; live re-run of checks 2–5 plus Arabic and French on AI.
+2. **Q Pitch v6** — spec `docs/specs/q-pitch/Q-PITCH-V6-OWNER-DIRECTION.md`. Natural-language trigger, step commands, section highlighting, preloaded zero-latency tour, investor and founder tracks, Q-to-Q GateQ interview and rehearsal (≤2 short Tavus sessions), instant Q&A bank. Branch `claude/qpitch-v6-oct16`.
+3. **Guide v3** — PDF + HTML from production, delivered in the conversation; scripts in `scripts/handoff/docs`.
+4. **Owner-only** — Google reconnect; Q Pitch scene 15 microphone; rotate seed password.
+5. **Not doing** — automatic-interest workforce rule (owner: example only); demo deck regeneration (owner cancelled on cost).
+
 ## Mandatory current milestone: H2 production acceptance
 
 PR99 is protectedgreen38617987342 and normally merged48c6f1e7. Founderdesktop realH2 checks PASS including selectedCSV/savedreload/security negatives. Complete investor/founder desktop/mobile and Q controls; verify q-api fourthservice (last BUILDING). Preserve98/97 and originalWIPs; do not mergefailing siblings. Media randomrequestId CI flake repaired with39testsPASS, PR101. STATE top is current authority; olderentries historical.

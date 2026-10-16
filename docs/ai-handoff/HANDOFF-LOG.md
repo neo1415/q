@@ -771,3 +771,7 @@ Lanes:
   3. Live check: choose French in Settings and watch `/v1/q/ui-text/fr` fill. Expect about USD 0.07, all of it in `ai_ops.model_usage` with task class `UI_TRANSLATION`.
   4. Switch fr → ar → es on Home.
   5. Choose Swahili, then open voice. Expect the 422 "type instead" message.
+
+## 2026-10-16 — Claude lead (long session)
+
+Fifteen releases (T through AI) went live; see STATE.md for the table. Owner directions recorded: any-language setting (generic, machine-translated, no per-language code); scores always present on every company from investor-visible material (ADR 0075); onboarding must save every stated fact without format demands ("Other" keeps their words); Overview follows the owner's 14-section template with a Diligence tab; Q Pitch v6 direction (see ACTIVE-TASKS). Demo-only deck confirmations were applied to 433 fictional companies (receipt in the lead's scratchpad, seed_reason demo-confirmation-2026-10-16). Next session: continue items 1–3 in ACTIVE-TASKS.

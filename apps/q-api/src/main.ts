@@ -231,6 +231,7 @@ import {
   createUiTextService,
   parseUiTranslationDailyCapUsd,
 } from "./composition/ui-text.js";
+import { createAcknowledgementWarmup } from "./voice/acknowledgement-warmup.js";
 import { createAnswerWords } from "./composition/answer-words.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
@@ -3894,7 +3895,18 @@ const qArtifacts = createQArtifacts({
 });
 // Q's standing with each person (founder direction 2026-09-30): their chosen
 // personality, which every Q surface speaks with, and Q's patience.
-const standingStore = createPostgresStandingStore(database.sql);
+const rawStandingStore = createPostgresStandingStore(database.sql);
+// A language chosen (Settings, or by telling Q) warms the onboarding
+// acknowledgement copy in it, so code-written replies need no model round.
+const standingStore: typeof rawStandingStore = {
+  ...rawStandingStore,
+  setLanguage: async (userId, tenantId, language) => {
+    await rawStandingStore.setLanguage(userId, tenantId, language);
+    if (language !== "AUTO") {
+      acknowledgementWarmup.warm({ tenantId, userId }, language);
+    }
+  },
+};
 
 /**
  * Any-language interface (owner 2026-10-16): the English UI catalogue in a
@@ -3941,6 +3953,16 @@ export const translateLines = createLineTranslator({
 // Q's code-written answers through lane lang's translateLines
 // (composition/answer-words.ts: skeletons in, data put back).
 const answerWords = createAnswerWords({ translateLines, logger });
+const acknowledgementWarmup = createAcknowledgementWarmup({
+  localise: (actor, language, texts, options) =>
+    answerWords.localise(
+      language,
+      texts,
+      { tenantId: actor.tenantId, userId: actor.userId },
+      options,
+    ),
+  logger,
+});
 // What this conversation already produced, read back from the owning
 // records as the person (CQ-QX-008): a document through the artifact
 // service (owner-scoped), an action through its approval record.
@@ -6049,6 +6071,11 @@ const reportPausedAccount = async (
   }
 };
 const interviewLoop = createInterviewAgent({
+  // Onboarding starting (or going on) in a chosen language warms its
+  // acknowledgement copy once per process.
+  warmAcknowledgements: (actor, language, journey) => {
+    acknowledgementWarmup.warm(actor, language, [journey]);
+  },
   // Any language: the questions code adds, through Q's shared translation
   // layer (Arabic's hand-written questions win).
   localiseWords: (actor, language, texts, options) =>

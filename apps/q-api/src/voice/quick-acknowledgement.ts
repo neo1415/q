@@ -21,8 +21,30 @@ const LEADS = [
   "Great, saved",
 ] as const;
 
-/** The longest a recorded value is read back; longer text is named, not quoted. */
+/** The longest a recorded value is read back whole; longer text by its opening. */
 const MAX_VALUE = 80;
+
+/** The lead used where the reply is translated: one line per language. */
+export const FIXED_LEAD = "Got it, saved";
+
+/** A long answer's opening words, cut at a word, marked as cut. */
+function openingWords(text: string): string {
+  const head = text.slice(0, 60);
+  const cut = head.lastIndexOf(" ");
+  const words = (cut > 20 ? head.slice(0, cut) : head)
+    .replace(/[,;:\s]+$/u, "")
+    .split(" ");
+  // Not on a small joining word ("in Accra and…").
+  while (
+    words.length > 3 &&
+    /^(?:and|or|but|in|on|at|for|the|a|an|of|to|with|by|from)$/iu.test(
+      words.at(-1) ?? "",
+    )
+  ) {
+    words.pop();
+  }
+  return `${words.join(" ").replace(/[,;:\s]+$/u, "")}…`;
+}
 
 type AcknowledgementInput = {
   readonly results: readonly OnboardingRecordResult[];
@@ -35,9 +57,13 @@ type AcknowledgementInput = {
   } | null;
   /** Varies the opening so no two turns sound alike. */
   readonly turnIndex: number;
+  /** The one fixed lead (a reply to be translated). */
+  readonly fixedLead?: boolean | undefined;
+  /** A fixed line said between the receipt and the question (research). */
+  readonly aside?: string | undefined;
 };
 
-/** One receipt line: a label with what was recorded, or a long answer named only. */
+/** One receipt line: a label with what was recorded (a long answer's opening words). */
 export type AcknowledgedItem =
   | {
       readonly kind: "VALUE";
@@ -45,7 +71,6 @@ export type AcknowledgedItem =
       readonly label: string;
       readonly value: string;
     }
-  | { readonly kind: "NAMED"; readonly stepKey: string; readonly label: string }
   /** A fact kept with their notes, read back as written ("revenue: first revenue only"). */
   | { readonly kind: "KEPT"; readonly text: string };
 
@@ -61,7 +86,16 @@ export type AcknowledgementParts = {
   /** The next question, ending in "?". */
   readonly question: string;
   readonly optional: boolean;
+  /** A fixed line of product copy before the question, if any. */
+  readonly aside?: string | undefined;
 };
+
+/** Said once when research on them starts (product copy, translated like the rest). */
+export const RESEARCH_STARTED_LINE =
+  "I'll look at your public sources and bring back what I find for you to confirm.";
+/** Said once when that research found nothing useful. */
+export const RESEARCH_NOTHING_LINE =
+  "Public sources had nothing useful on the company, so we'll carry on here.";
 
 export const OPTIONAL_ACKNOWLEDGEMENT_TAIL =
   "We can come back to this if you'd rather skip it.";
@@ -91,24 +125,35 @@ export function acknowledgementParts(
     const value = (result.recorded?.trim() ?? "").replace(/[.!?;:,\s]+$/u, "");
     if (label === undefined || value.length === 0) return null;
     // Each with its label, as a receipt ("stage: Seed"): a choice like
-    // "Yes, actively" means nothing on its own; long text is named only.
-    items.push(
-      value.length > MAX_VALUE
-        ? { kind: "NAMED", stepKey: result.stepKey, label }
-        : { kind: "VALUE", stepKey: result.stepKey, label, value },
-    );
+    // "Yes, actively" means nothing on its own. Long text is read back by
+    // its opening words (live AH 2026-10-16: "your what the company does").
+    items.push({
+      kind: "VALUE",
+      stepKey: result.stepKey,
+      label,
+      value: value.length > MAX_VALUE ? openingWords(value) : value,
+    });
   }
-  const lead = LEADS[Math.abs(input.turnIndex) % LEADS.length] ?? LEADS[0];
+  // One lead in a language other than English: one line to translate.
+  const lead =
+    input.fixedLead === true
+      ? FIXED_LEAD
+      : (LEADS[Math.abs(input.turnIndex) % LEADS.length] ?? LEADS[0]);
   const question = next.question.trim().endsWith("?")
     ? next.question.trim()
     : `${next.question.trim()}?`;
-  return { lead, items, question, optional: next.optional };
+  return {
+    lead,
+    items,
+    question,
+    optional: next.optional,
+    ...(input.aside === undefined ? {} : { aside: input.aside }),
+  };
 }
 
 /** The English receipt line for one item. */
 export function acknowledgedLine(item: AcknowledgedItem): string {
   if (item.kind === "KEPT") return item.text;
-  if (item.kind === "NAMED") return `your ${item.label.toLowerCase()}`;
   return `${item.label.toLowerCase()}: ${item.value}`;
 }
 
@@ -118,7 +163,8 @@ export function quickAcknowledgement(
   const parts = acknowledgementParts(input);
   if (parts === null) return null;
   const said = parts.items.map(acknowledgedLine).join("; ");
-  return `${parts.lead}: ${said}. ${parts.question}${parts.optional ? ` ${OPTIONAL_ACKNOWLEDGEMENT_TAIL}` : ""}`;
+  const aside = parts.aside === undefined ? "" : `${parts.aside} `;
+  return `${parts.lead}: ${said}. ${aside}${parts.question}${parts.optional ? ` ${OPTIONAL_ACKNOWLEDGEMENT_TAIL}` : ""}`;
 }
 
 /**
@@ -161,13 +207,12 @@ export function acknowledgementCopy(
       const kept = keptParts(item.text);
       if (kept === null) return null;
       lines.push(kept.label);
-    } else if (item.kind === "NAMED") {
-      lines.push(`your ${item.label.toLowerCase()}`);
     } else {
       lines.push(item.label.toLowerCase());
       lines.push(...(choicesOf(item.stepKey, item.value) ?? []));
     }
   }
+  if (parts.aside !== undefined) lines.push(parts.aside);
   if (hand.question === null) lines.push(parts.question);
   if (parts.optional && hand.tail === null)
     lines.push(OPTIONAL_ACKNOWLEDGEMENT_TAIL);
@@ -189,10 +234,6 @@ export function acknowledgementIn(
       const label = kept === null ? null : words(kept.label);
       if (kept === null || label === null) return null;
       said.push(`${label}: ${kept.words}`);
-    } else if (item.kind === "NAMED") {
-      const named = words(`your ${item.label.toLowerCase()}`);
-      if (named === null) return null;
-      said.push(named);
     } else {
       const label = words(item.label.toLowerCase());
       // A choice is product copy and is said in their language; their own
@@ -212,8 +253,10 @@ export function acknowledgementIn(
     ? (hand.tail ?? words(OPTIONAL_ACKNOWLEDGEMENT_TAIL))
     : "";
   if (lead === null || question === null || tail === null) return null;
+  const aside = parts.aside === undefined ? "" : words(parts.aside);
+  if (aside === null) return null;
   const opening = lead.replace(/[.!:;,\s]+$/u, "");
-  return `${opening}: ${said.join(separators.items)}. ${question}${tail === "" ? "" : ` ${tail}`}`;
+  return `${opening}: ${said.join(separators.items)}. ${aside === "" ? "" : `${aside} `}${question}${tail === "" ? "" : ` ${tail}`}`;
 }
 
 /** Latin-script words only: the code-written reply is English (lane ml owns others). */
