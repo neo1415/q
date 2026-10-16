@@ -173,6 +173,15 @@ export const CreateQVoiceSessionRequestSchema = z
       .object({
         sessionId: UuidSchema,
         journeyType: OnboardingJourneyTypeForVoiceSchema,
+        /**
+         * The profile section the person came to fill (?section=), so the
+         * spoken line opens on it as the typed one does (live AI: the voice
+         * opening asked the review instead). Data, never authority.
+         */
+        focus: z
+          .string()
+          .regex(/^[a-z][a-z_]{0,39}$/)
+          .optional(),
       })
       .strict()
       .optional(),

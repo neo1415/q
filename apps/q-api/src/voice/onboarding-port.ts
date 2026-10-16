@@ -47,6 +47,7 @@ import { quoteOccursIn } from "@capital-q/q-knowledge";
 import {
   figureCountIn,
   figureStatedIn,
+  scaleDroppedIn,
   textStatedIn,
 } from "./value-support.js";
 import type { UserId } from "@capital-q/security";
@@ -67,6 +68,7 @@ import {
   optionsOf,
   readRefusal,
   recordedCurrency,
+  SCALE_WORDS,
   spokenFiguresIn,
   toOpenStep,
   toResponseValue,
@@ -1275,6 +1277,13 @@ export function createOnboardingPort(input: {
       reason,
     });
     if (value.type === "RANGE") {
+      // "400 mille euros" is 400,000: a figure recorded without the scale
+      // its words carry is refused (live AJ 2026-10-16: saved as 400).
+      if (scaleDroppedIn(value.value, answer.quote)) {
+        return refuse(
+          "Their figure carries a scale word (thousand, million, mille, mil…) that this value leaves out, so nothing was recorded. Record the full figure.",
+        );
+      }
       const stated = figureStatedIn(value.value, answer.quote);
       if (stated === true) {
         // One stated figure answers one step: the same figure from the
@@ -3041,18 +3050,10 @@ export function optionNamedIn(
   return { optionKey: only[0], quote: only[1] };
 }
 
-/** The scale a figure's word or letter multiplies it by. */
+/** The scale a figure's word or letter multiplies it by, in any language spoken. */
 const FIGURE_SCALES: Readonly<Record<string, number>> = {
-  k: 1_000,
-  thousand: 1_000,
+  ...SCALE_WORDS,
   grand: 1_000,
-  m: 1_000_000,
-  mn: 1_000_000,
-  mil: 1_000_000,
-  million: 1_000_000,
-  bn: 1_000_000_000,
-  b: 1_000_000_000,
-  billion: 1_000_000_000,
 };
 
 /**
@@ -3066,8 +3067,7 @@ export function moneyFiguresIn(
 ): readonly { readonly value: number; readonly text: string }[] {
   const out: { value: number; text: string }[] = [];
   const digits = asciiDigits(text);
-  const pattern =
-    /(?:[$€£₦]\s*)?(\d+(?:[.,]\d+)*)(?:\s*(k|m|mn|mil|bn|b|thousand|grand|million|billion)\b)?/giu;
+  const pattern = /(?:[$€£₦]\s*)?(\d+(?:[.,]\d+)*)(?:\s*([\p{L}]+))?/giu;
   for (const match of digits.matchAll(pattern)) {
     const raw = match[1] ?? "";
     // "1,500,000" and "1.5": a comma before three digits groups thousands.
@@ -3077,8 +3077,16 @@ export function moneyFiguresIn(
         : raw.replace(/,/gu, "."),
     );
     if (!Number.isFinite(number)) continue;
-    const scale = FIGURE_SCALES[(match[2] ?? "").toLowerCase()] ?? 1;
-    out.push({ value: Math.round(number * scale), text: match[0].trim() });
+    const word = (match[2] ?? "").toLowerCase();
+    const scale = FIGURE_SCALES[word];
+    out.push({
+      value: Math.round(number * (scale ?? 1)),
+      // Only the figure and its scale: a following word is not part of it.
+      text: (scale === undefined
+        ? match[0].slice(0, match[0].length - word.length)
+        : match[0]
+      ).trim(),
+    });
   }
   if (out.length === 0) {
     for (const value of spokenFiguresIn(text)) {

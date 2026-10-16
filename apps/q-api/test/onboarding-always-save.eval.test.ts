@@ -54,6 +54,23 @@ const AG_INVESTOR =
   "Hey, so I'm a partner at Corvo Ventures, it's a small VC fund out of Lisbon. We're actively investing, cheques usually 150k to 400k euros, typical maybe 250k, mostly seed, sometimes pre-seed. We like climate, logistics and anything that makes ports less painful. Europe and North Africa. Honestly we also back a lot of second-time founders, and we never do gambling or tobacco.";
 
 export const ALWAYS_SAVE_CASES: readonly Case[] = [
+  // Logged misses (live AJ, 2026-10-16).
+  {
+    id: "aj-400-mille-euros",
+    journey: F,
+    said: "Oui, nous levons activement 400 mille euros, via un SAFE.",
+    stepKey: "F6.target_amount",
+    value: 400_000,
+    quote: "400 mille euros",
+  },
+  {
+    id: "aj-2-millones",
+    journey: F,
+    said: "Estamos levantando 2 millones de dólares.",
+    stepKey: "F6.target_amount",
+    value: 2_000_000,
+    quote: "2 millones de dólares",
+  },
   // Logged misses (live AI, 2026-10-16).
   {
     id: "ai-geography-new-investor",

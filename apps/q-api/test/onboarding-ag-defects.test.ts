@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { PermittedContextPlan } from "@capital-q/contracts";
+import {
+  CreateQVoiceSessionRequestSchema,
+  type PermittedContextPlan,
+} from "@capital-q/contracts";
 import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import { createLogger } from "@capital-q/observability";
@@ -26,6 +29,7 @@ import {
   RESEARCH_STARTED_LINE,
 } from "../src/voice/quick-acknowledgement.js";
 import { withoutUnbackedFieldClaims } from "../src/voice/onboarding-flow.js";
+import { scaleDroppedIn } from "../src/voice/value-support.js";
 import {
   createOnboardingPort,
   currencyNamedIn,
@@ -483,5 +487,64 @@ describe("live AI: a stated fact off their path is kept, by code", () => {
     const text = notes?.type === "TEXT" ? notes.text : "";
     expect(text).toContain("first revenue only");
     expect(text).not.toContain("cold-chain");
+  });
+});
+
+describe("live AI: the spoken opening of a section link opens on that section", () => {
+  it("the voice session carries the section, validated like the typed one", () => {
+    const base = {
+      onboarding: {
+        sessionId: "a0000000-0000-4000-8000-000000000001",
+        journeyType: "founder",
+      },
+    };
+    expect(
+      CreateQVoiceSessionRequestSchema.safeParse({
+        ...base,
+        onboarding: { ...base.onboarding, focus: "moats" },
+      }).success,
+    ).toBe(true);
+    expect(
+      CreateQVoiceSessionRequestSchema.safeParse({
+        ...base,
+        onboarding: { ...base.onboarding, focus: "Moats; drop table" },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("live AJ: a figure keeps its scale, in any language", () => {
+  it("'400 mille euros' is 400,000, and 400 is refused", () => {
+    expect(
+      moneyFiguresIn("nous levons 400 mille euros").map((f) => f.value),
+    ).toEqual([400_000]);
+    expect(scaleDroppedIn("400", "nous levons 400 mille euros")).toBe(true);
+    expect(scaleDroppedIn("400000", "nous levons 400 mille euros")).toBe(false);
+    expect(scaleDroppedIn("2", "2 millones de dólares")).toBe(true);
+    expect(scaleDroppedIn("11", "about 11 people")).toBe(false);
+    expect(scaleDroppedIn("150", "150 mil reais")).toBe(true);
+  });
+
+  it("the read-back has no English note and no doubled stops", () => {
+    const reply = quickAcknowledgement({
+      results: [
+        {
+          stepKey: "F1.country",
+          outcome: "COMMITTED",
+          recorded: "basés au Sénégal (in their words)",
+        },
+        {
+          stepKey: "F1.description",
+          outcome: "COMMITTED",
+          recorded:
+            "Nous proposons une plateforme de téléconsultation pour les pharmacies rurales au Sénégal.",
+        },
+      ],
+      labelOf: (key) =>
+        key === "F1.country" ? "Country" : "What the company does",
+      next: { question: "What stage is the company at?", optional: false },
+      turnIndex: 0,
+    });
+    expect(reply).not.toMatch(/in their words|\.\.|…\./u);
   });
 });
