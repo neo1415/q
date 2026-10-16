@@ -49,7 +49,7 @@ function ColumnHead({
 
 export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
   return (
-    <div className="overflow-x-auto" data-q-table>
+    <div className="relative overflow-x-auto" data-q-table>
       <table className="w-full border-collapse text-left">
         <thead>
           <tr>

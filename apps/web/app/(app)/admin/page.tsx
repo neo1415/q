@@ -204,7 +204,7 @@ export default async function AdminPage() {
                 Download CSV
               </a>
             </div>
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="cq-body-sm w-full min-w-[48rem] text-left">
                 <thead className="cq-caption text-(--cq-text-secondary)">
                   <tr>

@@ -729,7 +729,7 @@ export function DocumentLibrary({
         <div
           role="group"
           aria-label="Show"
-          className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1"
+          className="relative -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1"
         >
           {LIBRARY_FILTERS.map((option) => (
             <button

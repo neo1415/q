@@ -184,7 +184,7 @@ export function FitComparisonView({
   return (
     <div data-fit-comparison={n}>
       {/* Desktop: one table, rows aligned across columns. */}
-      <div className="hidden overflow-x-auto border border-(--cq-border-subtle) bg-(--cq-surface-raised) lg:block">
+      <div className="relative hidden overflow-x-auto border border-(--cq-border-subtle) bg-(--cq-surface-raised) lg:block">
         <div
           role="table"
           aria-label={`Top ${String(n)} side by side`}

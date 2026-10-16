@@ -508,7 +508,7 @@ export function ArtifactViewer({
               className={
                 fit === "page"
                   ? "flex justify-center"
-                  : "flex justify-center overflow-x-auto"
+                  : "relative flex justify-center overflow-x-auto"
               }
             >
               {/*

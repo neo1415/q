@@ -91,7 +91,7 @@ function ComparisonTable({
   );
   return (
     <div
-      className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+      className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
       tabIndex={0}
       role="region"
       aria-label="Application comparison table"

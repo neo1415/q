@@ -388,7 +388,7 @@ function ConnectedDataRoom({
         ) : null}
       </div>
       <div
-        className="flex gap-2 overflow-x-auto pb-1"
+        className="relative flex gap-2 overflow-x-auto pb-1"
         role="group"
         aria-label="Show"
       >

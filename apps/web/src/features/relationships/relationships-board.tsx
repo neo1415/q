@@ -265,7 +265,7 @@ export function RelationshipsBoard({
         ref={filterRef}
         role="group"
         aria-label="Show"
-        className="-mx-(--cq-page-gutter) flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-(--cq-page-gutter) [scrollbar-width:none]"
+        className="relative -mx-(--cq-page-gutter) flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-(--cq-page-gutter) [scrollbar-width:none]"
       >
         {tabs.map((key) => {
           const count = counts.get(key) ?? 0;
