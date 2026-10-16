@@ -177,14 +177,61 @@ export function withoutAnsweredQuestions(
   state: OnboardingState,
   spoken: Readonly<Record<string, string>>,
 ): string {
-  let out = reply;
+  const cores: string[] = [];
   for (const step of state.steps) {
     if (step.status !== "ANSWERED") continue;
     for (const wording of [spoken[step.stepKey], step.question]) {
-      if (wording === undefined || wording.length < 12) continue;
-      const at = out.indexOf(wording);
-      if (at >= 0) out = `${out.slice(0, at)}${out.slice(at + wording.length)}`;
+      const core = questionCore(wording);
+      if (core !== null) cores.push(core);
     }
   }
-  return out.replace(/\s{2,}/g, " ").trim();
+  if (cores.length === 0) return reply;
+  // Sentence by sentence: an asked sentence that carries an answered
+  // question's core is cut back to what comes before it ("Is that right —
+  // and, first, what does the company do?" keeps "Is that right?"), or
+  // dropped when nothing does (live 2026-10-16, after accepted findings).
+  const sentences = reply.match(/[^.?!]+[.?!]*/g) ?? [reply];
+  const kept: string[] = [];
+  for (const sentence of sentences) {
+    const lower = normalWords(sentence);
+    const hit = cores.find((core) => lower.includes(core));
+    if (hit === undefined || !sentence.includes("?")) {
+      kept.push(sentence);
+      continue;
+    }
+    const cut = sentence.search(/\s*(?:[—–;:]|,\s*and\b|\band\b,?\s*first\b)/u);
+    const before = cut > 0 ? sentence.slice(0, cut).trim() : "";
+    if (
+      before.length > 0 &&
+      !cores.some((core) => normalWords(before).includes(core))
+    ) {
+      kept.push(` ${before.replace(/[,\s]+$/u, "")}?`);
+    }
+  }
+  return kept
+    .join("")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Lower-case words only, single-spaced. */
+function normalWords(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * The part of a question that identifies it, without a lead-in: "In a
+ * sentence or two, what does the company do?" -> "what does the company
+ * do". Null when too short to be distinctive.
+ */
+function questionCore(wording: string | undefined): string | null {
+  if (wording === undefined) return null;
+  const clauses = wording.split(/[,;:—–]/u);
+  const last = normalWords(clauses.at(-1) ?? wording);
+  const core = last.split(" ").length >= 3 ? last : normalWords(wording);
+  return core.split(" ").length >= 3 ? core : null;
 }

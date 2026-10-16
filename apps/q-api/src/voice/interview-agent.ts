@@ -113,6 +113,9 @@ import { textStatedIn } from "./value-support.js";
  */
 
 const MAX_ROUNDS = 4;
+/** Words that point at something they uploaded, not the open web. */
+const ABOUT_THEIR_UPLOAD =
+  /\b(deck|decks|document|documents|upload|uploaded|file|files|pdf|attachment|slides)\b/iu;
 /** A record_answers result as the round saw it (the tool's own JSON body). */
 const RecordedResultsSchema = z
   .object({
@@ -1202,7 +1205,7 @@ export function createInterviewAgent(
           })),
       };
     };
-    const open = await journeyOpenings();
+    let open = await journeyOpenings();
     const ledger = conversationOf(input.onboardingSessionId);
     // Everything the turn takes from the independent reading of their
     // words, once that reading is in.
@@ -1227,8 +1230,11 @@ export function createInterviewAgent(
       // What else the turn asks, from the independent reading. A look-up
       // question goes on in the person's own words, never a model's; the
       // research ledger decides whether it may run.
+      // A question about their own upload is answered from what the deck
+      // gave (its proposals, on the record or on offer), never handed to a
+      // web look-up (live 2026-10-16: "what did you find in the deck?").
       const lookupWords =
-        authority.lookup === null
+        authority.lookup === null || ABOUT_THEIR_UPLOAD.test(utterance)
           ? null
           : textStatedIn(authority.lookup, utterance)
             ? authority.lookup
@@ -1251,15 +1257,19 @@ export function createInterviewAgent(
           ? authority.pronounce
           : null;
       const pausing = authority.pausing && !opening;
-      const turnNotes = turnNotesFor({
-        flow: pausing ? undefined : flowFor(state).note,
-        pausing,
-        lookup,
-        pronounce,
-        research: researchNote,
-        open,
-        held: heldNote,
-      });
+      // Rendered against the state of each round, never the state when the
+      // reading landed (live 2026-10-16: findings accepted by code this
+      // turn, and the round was still told to ask for the description).
+      const turnNotes = (now: typeof state) =>
+        turnNotesFor({
+          flow: pausing ? undefined : flowFor(now).note,
+          pausing,
+          lookup,
+          pronounce,
+          research: researchNote,
+          open,
+          held: heldNote,
+        });
       return {
         authority,
         delegated,
@@ -1335,7 +1345,7 @@ export function createInterviewAgent(
           delegated: current().delegated,
           approved: current().approved,
           declined: current().declined,
-          turnNotes: current().turnNotes,
+          turnNotes: current().turnNotes(state),
           personality: PERSONALITY_NOTES[personality],
           conduct: conductText.slice(0, 600),
           openings: openingsOf(thread).slice(0, 600),
@@ -1505,10 +1515,13 @@ export function createInterviewAgent(
         rounds += 1;
         const unread = reading === null;
         if (reading !== null) {
+          const before = actions.length;
           await recordApproved(
             (reading as ReturnType<typeof readingOf>).authority.approved,
           );
           state = await port.state();
+          // What code just accepted is no longer an opening to raise.
+          if (actions.length !== before) open = await journeyOpenings();
         }
         const response = await gateway.execute(
           {
@@ -1768,7 +1781,16 @@ export function createInterviewAgent(
           )
           .sort((a, b) => Number(b.required) - Number(a.required))
           .map((e) => steps.get(e.stepKey))
-          .find((step) => step !== undefined) ?? null)
+          // The journey settles its own platform steps (the mandate); never
+          // the question the conversation returns to.
+          .find(
+            (step) =>
+              step !== undefined &&
+              !(
+                step.configuration.stepType === "reference_select" &&
+                step.configuration.resourceType !== "TAXONOMY_NODE"
+              ),
+          ) ?? null)
       : null;
     if (handingOver) {
       remember(

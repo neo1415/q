@@ -251,6 +251,13 @@ export function QOnboardingWorkspace({
      */
     readonly sticky?: boolean;
   } | null>(null);
+  /**
+   * The steps Q's last turn asked about (its `askingAbout`), so the
+   * composer's hint follows Q's question, not the form's step cursor (live
+   * 2026-10-16: "example.com" under "what does the company do?"). Null
+   * until Q has spoken.
+   */
+  const [qAsking, setQAsking] = useState<readonly string[] | null>(null);
   const [reading, setReading] = useState(false);
   const [readingPolls, setReadingPolls] = useState(0);
   const [askingQ, setAskingQ] = useState(false);
@@ -603,7 +610,10 @@ export function QOnboardingWorkspace({
               text: turn.text.slice(0, 1500),
             })),
           )
-          .then((turn) => turn?.reply ?? null);
+          .then((turn) => {
+            if (turn !== null) setQAsking(turn.askingAbout ?? null);
+            return turn?.reply ?? null;
+          });
       })
       .then((reply) => {
         if (reply !== null) {
@@ -812,6 +822,7 @@ export function QOnboardingWorkspace({
       if (turn === null) {
         return;
       }
+      setQAsking(turn.askingAbout ?? null);
       // Q's own words, as Q wrote them. The reply carries both the
       // acknowledgement and the next question, so it also becomes the
       // live question under the composer until the step moves on.
@@ -1466,14 +1477,20 @@ export function QOnboardingWorkspace({
             chip.optionKey === undefined ||
             narrowedTo.includes(chip.optionKey),
         );
+  // Q asked about something other than the form's current step: the
+  // step's own hint ("example.com") would contradict Q's question.
+  const askingElsewhere =
+    prompt !== null && qAsking !== null && !qAsking.includes(prompt.stepKey);
   const composerPlaceholder =
     prompt === null
       ? undefined
-      : prompt.control === "chips" ||
-          prompt.control === "multi_chips" ||
-          prompt.control === "confirm"
-        ? "Or say it in your own words"
-        : prompt.placeholder;
+      : askingElsewhere
+        ? "Type your answer"
+        : prompt.control === "chips" ||
+            prompt.control === "multi_chips" ||
+            prompt.control === "confirm"
+          ? "Or say it in your own words"
+          : prompt.placeholder;
 
   return (
     <div
