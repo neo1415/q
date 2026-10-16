@@ -1,14 +1,17 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import {
   Q_LANGUAGE_PREFERENCES,
   type QLanguagePreference,
 } from "@capital-q/contracts";
 
-import { useT } from "@/features/i18n/language";
+import {
+  announceLanguage,
+  LANGUAGE_EVENT,
+  useT,
+} from "@/features/i18n/language";
 
 import { setLanguageAction } from "./language-actions";
 
@@ -40,8 +43,19 @@ export function LanguageSetting({
   readonly initial: QLanguagePreference;
 }) {
   const t = useT();
-  const router = useRouter();
   const [chosen, setChosen] = useState<QLanguagePreference>(initial);
+  // Told to Q while Settings is open: the choice shown follows it.
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (detail === "AUTO" || detail === "en" || detail === "ar")
+        setChosen(detail);
+    };
+    window.addEventListener(LANGUAGE_EVENT, onChange);
+    return () => {
+      window.removeEventListener(LANGUAGE_EVENT, onChange);
+    };
+  }, []);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -58,7 +72,8 @@ export function LanguageSetting({
         return;
       }
       setMessage(t("Saved. Q uses this from your next message or call."));
-      router.refresh();
+      // Every provider switches at once and the server words refresh.
+      announceLanguage(next);
     });
   };
 

@@ -82,6 +82,7 @@ const INTENT_ROUTES: Readonly<
       | "OPEN_WEBSITE"
       | "SET_Q_MOTION"
       | "SET_VOICE"
+      | "SET_LANGUAGE"
       | "SIGN_OUT"
       | "OPEN_RECORD_PAGE"
       | "OPEN_SETUP"
@@ -128,6 +129,7 @@ export function intentHref(intent: QUiIntent): string | null {
     intent.kind === "OPEN_WEBSITE" ||
     intent.kind === "SET_Q_MOTION" ||
     intent.kind === "SET_VOICE" ||
+    intent.kind === "SET_LANGUAGE" ||
     intent.kind === "SIGN_OUT" ||
     // Done on the page as the answer arrives; there is nowhere to link.
     intent.kind === "SCREEN_ACT" ||
@@ -213,6 +215,8 @@ function intentLabel(intent: QUiIntent): string {
       return "Q motion";
     case "SET_VOICE":
       return "Q's voice";
+    case "SET_LANGUAGE":
+      return "Language";
     case "SIGN_OUT":
       return "Sign out";
     case "OPEN_RECORD_PAGE":

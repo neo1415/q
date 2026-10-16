@@ -21,6 +21,7 @@ import {
 } from "./control/navigation-lifecycle";
 import { currentRoute } from "./control/route-state";
 import { performUiAct, requestMove } from "./ui-act-controller";
+import { announceLanguage } from "@/features/i18n/language";
 
 /**
  * What the browser does when Q's answer carries a client action (R20/R33;
@@ -36,6 +37,11 @@ export type ClientActionEffects = {
   readonly openTab: (url: string) => boolean;
   readonly setQMotion: (motion: "full" | "calm" | "off") => void;
   readonly setVoice: (voice: "FEMALE" | "MALE") => void;
+  /**
+   * Multilingual Q: the language they just chose by telling Q, already
+   * saved; the screen follows it at once. Absent: nothing to switch.
+   */
+  readonly setLanguage?: ((language: "AUTO" | "en" | "ar") => void) | undefined;
   readonly signOut: () => void;
   /** Goes to an in-app path built below from the fixed route map. */
   readonly goTo: (path: string) => void;
@@ -495,6 +501,9 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
   setVoice: (voice) => {
     storeVoicePreference(voice);
   },
+  setLanguage: (language) => {
+    announceLanguage(language);
+  },
   // The Sign out button's own steps: forget which chats were open on this
   // tab, then the server action that ends the session and redirects.
   goTo: (path) => {
@@ -578,6 +587,9 @@ function performChecked(
       return true;
     case "SET_VOICE":
       effects.setVoice(action.voice);
+      return true;
+    case "SET_LANGUAGE":
+      effects.setLanguage?.(action.language);
       return true;
     case "SIGN_OUT":
       effects.signOut();

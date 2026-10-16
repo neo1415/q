@@ -2860,6 +2860,11 @@ const qTools = createQTools({
       set: (actor, personality) =>
         standingStore.setPersonality(actor.userId, actor.tenantId, personality),
     },
+    // Multilingual Q: "switch to Arabic", in any language, as Settings does.
+    language: {
+      set: (actor, language) =>
+        standingStore.setLanguage(actor.userId, actor.tenantId, language),
+    },
     companies,
     capital,
     companyRaise,

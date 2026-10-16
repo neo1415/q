@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { QLanguagePreferenceSchema } from "./conduct.js";
 import { QUiActIntentSchema } from "./ui-act.js";
 import { UuidSchema } from "../common/ids.js";
 import { StageCodeSchema } from "../http/companies.js";
@@ -39,6 +40,7 @@ export const Q_UI_INTENT_KINDS = [
   "OPEN_WEBSITE",
   "SET_Q_MOTION",
   "SET_VOICE",
+  "SET_LANGUAGE",
   "SIGN_OUT",
   "OPEN_RECORD_PAGE",
   "OPEN_SETUP",
@@ -254,6 +256,20 @@ export const QSetQMotionIntentSchema = z
  * sets it. The same two values as `Q_VOICE_CHOICES` (voice.ts), restated
  * because voice.ts reads this module's schemas at load time.
  */
+/**
+ * Multilingual Q: the language the person just chose by telling Q, already
+ * saved by the server (set_q_language). The screen switches language and
+ * direction at once, without a reload; Settings and every later reply read
+ * the same saved choice.
+ */
+export const QSetLanguageIntentSchema = z
+  .object({
+    kind: z.literal("SET_LANGUAGE"),
+    language: QLanguagePreferenceSchema,
+  })
+  .strict();
+export type QSetLanguageIntent = z.infer<typeof QSetLanguageIntentSchema>;
+
 export const QSetVoiceIntentSchema = z
   .object({
     kind: z.literal("SET_VOICE"),
@@ -751,6 +767,7 @@ export const QClientActionIntentSchema = z.discriminatedUnion("kind", [
   QOpenWebsiteIntentSchema,
   QSetQMotionIntentSchema,
   QSetVoiceIntentSchema,
+  QSetLanguageIntentSchema,
   QSignOutIntentSchema,
   QOpenSetupIntentSchema,
   QOpenSettingsIntentSchema,
@@ -834,6 +851,7 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "dismiss_reminder",
   "set_notification_settings",
   "set_q_personality",
+  "set_q_language",
   // ADR 0050: their own speaking guide, versioned in Settings. (Removing it
   // deletes every version, so it is prepared for approval: RECOVERY-2026-10.)
   "set_my_speaking_guide",
@@ -879,6 +897,7 @@ export const QUiIntentSchema = z.discriminatedUnion("kind", [
   QOpenWebsiteIntentSchema,
   QSetQMotionIntentSchema,
   QSetVoiceIntentSchema,
+  QSetLanguageIntentSchema,
   QSignOutIntentSchema,
   QOpenRecordPageIntentSchema,
   QOpenSetupIntentSchema,

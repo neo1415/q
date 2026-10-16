@@ -561,6 +561,8 @@ export {
   QMotionChoiceSchema,
   QSetQMotionIntentSchema,
   QSetVoiceIntentSchema,
+  QSetLanguageIntentSchema,
+  type QSetLanguageIntent,
   QSignOutIntentSchema,
   Q_RECORD_PAGES,
   Q_ROOM_OBJECTS,

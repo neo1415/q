@@ -31,6 +31,7 @@ import type {
   VoiceTranscriptLine,
   VoiceTurnOutcome,
 } from "./session";
+import { LANGUAGE_EVENT } from "@/features/i18n/language";
 
 /**
  * Voice inside the interview (CQ-Q-VOICE-001 D §44, §51; E §67-§74).
@@ -141,6 +142,9 @@ const LINK_STATUS_LINGER_MS = 4_000;
 /** G-D21: this tab's line was replaced by the person's newer one. */
 export const VOICE_MOVED_NOTICE =
   "Voice moved to your other window. Start it here again whenever you like.";
+/** How long Q's confirmation of a new language may speak before the line reopens. */
+const LANGUAGE_REOPEN_DELAY_MS = 3_500;
+
 /** A vendor error this recent is what the reconnect shows. */
 const ERROR_KEPT_MS = 2_000;
 /** G-R3: voice turn outcomes kept for the rendered turns. */
@@ -875,6 +879,28 @@ export function useVoiceInterview(
     },
     [voice, active, talk],
   );
+
+  // Multilingual Q: a language chosen while the line is open (told to Q,
+  // or in Settings) reopens it, so the server opens the new line to hear
+  // and speak the new language. After a moment, so Q's confirmation is not
+  // cut off; the conversation itself is where it was.
+  useEffect(() => {
+    const onChange = () => {
+      const last = lastStart.current;
+      if (!active || last === null) return;
+      window.setTimeout(() => {
+        void talk({
+          thread: sameConversation(last.thread),
+          firstMessage: reopening(),
+          resume: true,
+        });
+      }, LANGUAGE_REOPEN_DELAY_MS);
+    };
+    window.addEventListener(LANGUAGE_EVENT, onChange);
+    return () => {
+      window.removeEventListener(LANGUAGE_EVENT, onChange);
+    };
+  }, [active, talk]);
 
   return {
     client,

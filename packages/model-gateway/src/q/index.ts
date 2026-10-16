@@ -28,6 +28,7 @@ import {
   MODEL_TOOL_RESULT_MAX_CHARS,
   QClientActionToolResultSchema,
   QShowCalendarConnectIntentSchema,
+  QSetLanguageIntentSchema,
   QDocumentToolResultSchema,
   QMessageIdSchema,
   type ModelBudget,
@@ -375,6 +376,14 @@ export {
 /** Q room R5: any tool result that carries the calendar connect card. */
 const CalendarConnectCarrierSchema = z
   .object({ clientAction: QShowCalendarConnectIntentSchema })
+  .passthrough();
+
+/**
+ * Multilingual Q: set_q_language's result, already saved; its intent
+ * switches the screen's language at once.
+ */
+const LanguageCarrierSchema = z
+  .object({ clientAction: QSetLanguageIntentSchema })
   .passthrough();
 
 /**
@@ -4069,11 +4078,17 @@ export function createModelGatewayQAnswer(
         const card = read.success
           ? null
           : CalendarConnectCarrierSchema.safeParse(outcome.result.data);
+        const language =
+          read.success || card?.success === true
+            ? null
+            : LanguageCarrierSchema.safeParse(outcome.result.data);
         const intent = read.success
           ? read.data.clientAction
           : card?.success === true
             ? card.data.clientAction
-            : null;
+            : language?.success === true
+              ? language.data.clientAction
+              : null;
         if (intent === null) return;
         const block: QResultBlock = { kind: "UI_INTENT", intent };
         if (

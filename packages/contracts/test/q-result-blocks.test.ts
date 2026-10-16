@@ -329,6 +329,7 @@ describe("QUiIntent", () => {
     OPEN_WEBSITE: { kind: "OPEN_WEBSITE", url: "https://zino.example" },
     SET_Q_MOTION: { kind: "SET_Q_MOTION", motion: "calm" },
     SET_VOICE: { kind: "SET_VOICE", voice: "FEMALE" },
+    SET_LANGUAGE: { kind: "SET_LANGUAGE", language: "ar" },
     SIGN_OUT: { kind: "SIGN_OUT" },
     OPEN_RECORD_PAGE: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: UUID },
     OPEN_SETUP: { kind: "OPEN_SETUP", journey: "investor" },

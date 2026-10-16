@@ -1,8 +1,19 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { LanguageProvider, useT } from "../src/features/i18n/language";
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh }),
+}));
+
+import {
+  announceLanguage,
+  LanguageProvider,
+  useT,
+} from "../src/features/i18n/language";
+import { performClientAction } from "../src/features/q/client-actions";
+import { loadWire } from "../src/features/q/wire";
 import {
   directionOf,
   translate,
@@ -119,5 +130,58 @@ describe("Settings says what is Arabic today", () => {
     for (const line of [ARABIC_NOW, STILL_ENGLISH, VIDEO_FALLBACK]) {
       expect(translate("ar", line)).not.toBe(line);
     }
+  });
+});
+
+describe("changing language by telling Q (live, no reload)", () => {
+  beforeAll(async () => {
+    await loadWire();
+  });
+
+  it("switches direction and words the moment the change is announced", () => {
+    refresh.mockClear();
+    const { container } = render(
+      <LanguageProvider language="en">
+        <Probe />
+      </LanguageProvider>,
+    );
+    const wrapper = () => container.querySelector("[data-ui-language]");
+    expect(wrapper()?.getAttribute("dir")).toBe("ltr");
+    act(() => {
+      announceLanguage("ar");
+    });
+    expect(wrapper()?.getAttribute("dir")).toBe("rtl");
+    expect(document.documentElement.dir).toBe("rtl");
+    expect(screen.getByText("الإعدادات")).toBeTruthy();
+    // Server-rendered words follow from a refresh, not a reload.
+    expect(refresh).toHaveBeenCalledTimes(1);
+    act(() => {
+      announceLanguage("en");
+    });
+    expect(wrapper()?.getAttribute("dir")).toBe("ltr");
+  });
+
+  it("Q's SET_LANGUAGE action is performed on the screen, checked against the contract", () => {
+    const seen: string[] = [];
+    const effects = {
+      setTheme: () => undefined,
+      reload: () => undefined,
+      openTab: () => true,
+      setQMotion: () => undefined,
+      setVoice: () => undefined,
+      setLanguage: (language: string) => seen.push(language),
+      signOut: () => undefined,
+      goTo: () => undefined,
+      setDiscoverFilters: () => undefined,
+      screen: () => undefined,
+      openMaterial: () => undefined,
+    };
+    expect(
+      performClientAction({ kind: "SET_LANGUAGE", language: "ar" }, effects),
+    ).toBe(true);
+    expect(
+      performClientAction({ kind: "SET_LANGUAGE", language: "fr" }, effects),
+    ).toBe(false);
+    expect(seen).toEqual(["ar"]);
   });
 });
