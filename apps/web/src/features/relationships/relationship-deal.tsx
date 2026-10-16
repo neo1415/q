@@ -777,7 +777,7 @@ export function RelationshipDeal({
                   href={`${base}/reports/${report.reportId}`}
                   download
                 >
-                  {t("PDF")}
+                  PDF
                 </a>
               </li>
             ))}

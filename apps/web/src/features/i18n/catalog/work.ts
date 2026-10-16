@@ -580,4 +580,6 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   "of 10": "من 10",
   "{n} more {things}": "{n} {things} أخرى",
   Others: "آخرون",
+  "spent this month": "أُنفق هذا الشهر",
+  "this month": "هذا الشهر",
 };

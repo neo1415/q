@@ -1093,4 +1093,11 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   ", the email you confirmed.": "، البريد الإلكتروني الذي أكدته.",
   "to decide.": "للحسم.",
   "{fund} gets:": "يحصل {fund} على:",
+  "Email ownership confirmed": "ملكية البريد مؤكدة",
+  "Email ownership not confirmed": "ملكية البريد غير مؤكدة",
+  Find: "بحث",
+  selected: "محددة",
+  "· Submitted": "· قُدِّم",
+  "· preferred": "· مفضّل",
+  "· required": "· مطلوب",
 };

@@ -301,8 +301,11 @@ export function ClaimView({
         <>
           <section className="gq-sect">
             <h2 className="cq-label gq-t2">
-              {list.length} {t("compan")}
-              {list.length === 1 ? "y matches" : "ies match"}
+              {t(
+                list.length === 1
+                  ? "1 company matches"
+                  : `${String(list.length)} companies match`,
+              )}
             </h2>
             <div>
               {list.map((company) => (

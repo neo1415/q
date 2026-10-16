@@ -150,7 +150,7 @@ function ModelCost({ usage }: { readonly usage: AdminUsageDto }) {
         <span className="cq-numeric text-4xl font-semibold tracking-tight text-(--cq-text-primary)">
           {t(usd(usage.totalUsd))}
         </span>
-        <span className="cq-body text-(--cq-text-secondary)">{t("USD")}</span>
+        <span className="cq-body text-(--cq-text-secondary)">USD</span>
       </p>
       <div className="grid gap-6 md:grid-cols-3">
         <CostList

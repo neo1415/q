@@ -117,7 +117,7 @@ export function SubmittedBrief({
           {t("Deterministic summary ·")} {t(dossier.application.reference)}{" "}
           {t("· Submitted")}{" "}
           <time dateTime={dossier.application.submittedAt}>
-            {t(dateWords(dossier.application.submittedAt))} {t("UTC")}
+            {t(dateWords(dossier.application.submittedAt))} UTC
           </time>
         </p>
         <p className="cq-body-sm gq-t2">
@@ -516,9 +516,7 @@ export function SubmittedTranscript({
               <p className="cq-caption gq-t2 mb-1">
                 {turn.role === "PERSON" ? t("Founder") : "Q"} {t("· Turn")}{" "}
                 {turn.seq} ·{" "}
-                <time dateTime={turn.at}>
-                  {t(dateWords(turn.at))} {t("UTC")}
-                </time>
+                <time dateTime={turn.at}>{t(dateWords(turn.at))} UTC</time>
               </p>
               <p className="cq-body-sm whitespace-pre-wrap break-words">
                 {turn.text}

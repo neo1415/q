@@ -686,4 +686,5 @@ export const RELATIONSHIPS_AR: Readonly<Record<string, string>> = {
   "pro-rata right": "حق المشاركة التناسبية",
   "no pro-rata right": "بلا حق المشاركة التناسبية",
   "no document attached": "لا مستند مرفق",
+  corrected: "مُصحَّح",
 };

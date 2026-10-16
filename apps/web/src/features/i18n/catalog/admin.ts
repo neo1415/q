@@ -635,4 +635,9 @@ export const ADMIN_AR: Readonly<Record<string, string>> = {
   USD: "USD",
   "sent ·": "أُرسل ·",
   "active members": "أعضاء نشطون",
+  ") from": ") من",
+  blocked: "حظر",
+  failed: "فشل",
+  "· confirmed": "· مؤكَّد",
+  "” · disputed": "» · متنازع عليه",
 };

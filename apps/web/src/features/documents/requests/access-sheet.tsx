@@ -426,8 +426,9 @@ function FolderAccess({
     <div className="flex flex-col gap-5" data-folder-access-sheet>
       {current === null ? (
         <p className="cq-caption text-(--cq-text-secondary)">
-          {t("Its documents are set differently. Choosing one below sets all")}{" "}
-          {access.documents.length}.
+          {t(
+            `Its documents are set differently. Choosing one below sets all ${String(access.documents.length)}.`,
+          )}
         </p>
       ) : null}
       <ScopeChoices
