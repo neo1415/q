@@ -254,7 +254,14 @@ describe("founder interview and review", () => {
     const go = screen.getByRole<HTMLButtonElement>("button", {
       name: "Continue by video",
     });
-    expect(go.disabled).toBe(true);
+    // Never greyed out: pressed before consent, it asks for it and starts
+    // nothing (live check 2026-10-16).
+    expect(go.disabled).toBe(false);
+    fireEvent.click(go);
+    expect(calls.videoStart).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Tick the box above to start the video interview."),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("checkbox", { name: /AI interviewer/ }));
     await press("Continue by video");
     expect(calls.videoStart).toHaveBeenCalledWith(token);
