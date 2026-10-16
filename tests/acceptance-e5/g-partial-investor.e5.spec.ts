@@ -35,8 +35,10 @@ test("an angel investor stops part way through onboarding", async ({
   test.setTimeout(900_000);
   const email = `e5-ans-angel-${Date.now().toString(36)}@capitalq.local`;
   await page.goto("/auth/sign-up");
+  // Registration chooses the journey (owner directive 2026-10-16).
+  await page.getByRole("radio", { name: /^Invest/ }).check();
   await page.getByLabel("Your name").fill("Zino Mario");
-  await page.getByLabel("Company or fund").fill("Zino Aviation");
+  await page.getByLabel("Fund or firm name").fill("Zino Aviation");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();

@@ -20,6 +20,8 @@ export type MaterialFileView = {
   readonly id: string;
   readonly filename: string;
   readonly kindLabel: string;
+  /** The stored document type, for screens that show only some kinds. */
+  readonly documentType?: string | undefined;
   readonly state: MaterialState;
   /** A plain sentence. Never a code, a queue id, a bucket or a stack trace. */
   readonly stateLabel: string;

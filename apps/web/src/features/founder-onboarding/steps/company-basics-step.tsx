@@ -6,6 +6,7 @@ import { Button } from "@capital-q/ui/button";
 import { Input } from "@capital-q/ui/input";
 import { Select } from "@capital-q/ui/select";
 
+import { useRegistrationDefaults } from "../../onboarding-kit/registration-defaults";
 import { StepHeading, type StepProps } from "./step-props";
 
 /** "https://www.acme.com/" read as "acme.com". */
@@ -23,7 +24,12 @@ export function CompanyBasicsStep({
   busy,
   actions,
 }: StepProps<"company_basics">) {
-  const [name, setName] = useState(step.response?.name ?? "");
+  // A saved answer wins; otherwise what they typed at sign-up, which they
+  // confirm by continuing (owner directive 2026-10-16: never re-asked).
+  const registered = useRegistrationDefaults().organisationName;
+  const fromRegistration =
+    step.response?.name === undefined && registered !== null;
+  const [name, setName] = useState(step.response?.name ?? registered ?? "");
   const [website, setWebsite] = useState(step.response?.website ?? "");
   const [countryCode, setCountryCode] = useState(
     step.response?.countryCode ?? "",
@@ -51,6 +57,11 @@ export function CompanyBasicsStep({
       <Input
         id="company-name"
         label="Company name"
+        description={
+          fromRegistration && name === registered
+            ? "From your sign-up. Change it if the company is called something else."
+            : undefined
+        }
         autoComplete="organization"
         autoFocus
         value={name}

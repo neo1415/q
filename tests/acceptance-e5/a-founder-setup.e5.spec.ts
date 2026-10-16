@@ -33,8 +33,10 @@ test("founder signs up, creates Kivu Freight and uploads the one-pager", async (
   mkdirSync(STATE_DIR, { recursive: true });
   const email = `e5-ans-founder-${Date.now().toString(36)}@capitalq.local`;
   await page.goto("/auth/sign-up");
+  // Registration chooses the journey (owner directive 2026-10-16).
+  await page.getByRole("radio", { name: /^Raise capital/ }).check();
   await page.getByLabel("Your name").fill("Wanjiru Kamau");
-  await page.getByLabel("Company or fund").fill("Kivu Freight");
+  await page.getByLabel("Company name").fill("Kivu Freight");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
