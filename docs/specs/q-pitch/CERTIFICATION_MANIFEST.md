@@ -297,3 +297,15 @@ Every other atlas feature currently has no certification entry and must not be p
   - **16, Capital Q's own profile:** `QP-SUBJECT` is CODE_VERIFIED. The scene completed in runs 3–7; promoting it needs a lead decision on its claims.
 - **Defect (cosmetic, not tour-specific):** the scene 6 answer showed a literal `\n\n` between paragraphs ("Apapa.\n\nThe fit…"). An escaped newline in the model's text reached the panel unrendered.
 - **Provider usage (estimate):** 4 Q text runs (top three, profile, comparison, live question), 1 short rehearsal, about 7 minutes of standard voice. Roughly $0.3–0.5.
+
+## Scene 16 (Capital Q's own profile): promoted, conditional on migration 20261228141700 (16 Oct, lead decision)
+
+- **Rule (lead):** Capital Q's profile may claim only what is on its record: pre-seed, bootstrapped, the USD 2M raise as a founder claim, and the product description. No verified traction, customers, revenue or investors; every claim labelled with its evidence status.
+- **Run 7 check (`scene-16.png` and the scene's narration):**
+  - Pre-seed; "$2M · Said in their pitch"; the product description; "Traction: Nothing stated in their pitch yet"; "Q's view · not verified".
+  - The narration calls the fundraising details the founders' own statements.
+  - No traction, customers, revenue or investors are claimed. Compliant, except one statement:
+- **The one breach:** the badge **"Demo verified (synthetic)"** under the name. Its source is data: Capital Q's organisation (`f95c3469…`) has a current `evidence.verification_claims` revision 2, VERIFIED by `SYNTHETIC_DEMO_ATTESTATION` (15 Oct 10:48 UTC, on a request from a synthetic-marked account).
+  - **Fix:** `supabase/migrations/20261228141700_capital_q_revoke_synthetic_attestation.sql` appends a REVOKED revision naming that row. It runs only while that attestation is current, updates and deletes nothing, and changes no grant or policy.
+  - **pgTAP:** `rls/972_capital_q_synthetic_revocation.test.sql`.
+- **Status:** `QP-SUBJECT` is **PRODUCTION_LIVE_VERIFIED once the migration is applied in production** and the profile shows no verification badge (a read-only check: the current revision is REVOKED). The ledger entry in `premiere.ts` stays CODE_VERIFIED until then, so no audience run shows the badge. With it, **16 of 17** scenes are certified; scene 15 waits on the human microphone test.
