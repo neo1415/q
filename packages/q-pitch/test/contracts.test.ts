@@ -39,6 +39,8 @@ describe("TourAction v1", () => {
         // on registered controls, and record pages by fixture key.
         "uiAct",
         "openRecord",
+        // v6 founder track: a fictional investor's page by fixture key.
+        "openInvestor",
       ].sort(),
     );
     // Consequential acts are never tour actions, and a uiAct is limited

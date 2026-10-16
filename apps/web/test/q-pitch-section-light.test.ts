@@ -42,4 +42,12 @@ describe("lightSection (v6: every section Q talks about is lit)", () => {
       false,
     );
   });
+
+  it("finds a shared element by any of its anchors, one per track", async () => {
+    document.body.innerHTML = `<section data-qp-anchor="inv.07.crm.hub fdr.05.crm.hub">CRM</section>`;
+    const signal = new AbortController().signal;
+    expect(await lightSection("fdr.05.crm.hub", {}, signal, 100)).toBe(true);
+    expect(await lightSection("inv.07.crm.hub", {}, signal, 100)).toBe(true);
+    expect(await lightSection("inv.07.crm", {}, signal, 100)).toBe(false);
+  });
 });

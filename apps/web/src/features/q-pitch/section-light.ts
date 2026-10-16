@@ -9,10 +9,14 @@
  * here is authority: it moves the viewer's own screen, as a scroll would.
  */
 
-/** An anchor's element, or null when the page does not have it (yet). */
+/**
+ * An anchor's element, or null when the page does not have it (yet). A
+ * shared element may carry several anchors, space-separated (one per
+ * track: `inv.07.crm.hub fdr.05.crm.hub`).
+ */
 export function anchorElement(anchor: string): HTMLElement | null {
-  const escaped = anchor.replace(/["\\]/gu, "");
-  return document.querySelector<HTMLElement>(`[data-qp-anchor="${escaped}"]`);
+  const escaped = anchor.replace(/["\\\s]/gu, "");
+  return document.querySelector<HTMLElement>(`[data-qp-anchor~="${escaped}"]`);
 }
 
 const LIT = "data-qp-lit";

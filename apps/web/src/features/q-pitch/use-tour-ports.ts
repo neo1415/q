@@ -13,6 +13,7 @@ import {
   type TourAction,
   type TourActor,
   demoApplication,
+  demoInvestor,
   type TourPorts,
   type TourScript,
 } from "@capital-q/q-pitch";
@@ -209,6 +210,21 @@ const UI_ACT_WAIT_MS = 6_000;
  * company (the record page, or its call-booking dialog, which the page
  * opens from its own hash). The pages authorise the viewer themselves.
  */
+/** v6 founder track: a fictional investor's page, by fixture key. */
+export function investorPath(
+  page: "PROFILE" | "RELATIONSHIP" | "REHEARSE",
+  key: string,
+): string | null {
+  const investor = demoInvestor(key);
+  if (investor === null) return null;
+  const id = encodeURIComponent(investor.investorOrganisationId);
+  return page === "PROFILE"
+    ? `/investors/${id}`
+    : page === "RELATIONSHIP"
+      ? `/relationships/investor/${id}`
+      : `/rehearsals/investor/${id}`;
+}
+
 export function recordPath(
   record: "GATEQ_APPLICATION" | "RELATIONSHIP" | "RELATIONSHIP_CALLS",
   key: string,
@@ -516,6 +532,12 @@ export function useTourPorts(
             ? outcome(false, "FIXTURE_UNRESOLVED")
             : navigate(path, signal);
         }
+        case "openInvestor": {
+          const path = investorPath(action.page, action.investor);
+          return path === null
+            ? outcome(false, "FIXTURE_UNRESOLVED")
+            : navigate(path, signal);
+        }
         case "askApprovedQuestion": {
           const text = questionText(action.question);
           if (text === null) return outcome(false, "FIXTURE_UNRESOLVED");
@@ -650,7 +672,9 @@ export function useTourPorts(
                     })()
                   : action.kind === "openRecord"
                     ? recordPath(action.record, action.key, companyOf)
-                    : null;
+                    : action.kind === "openInvestor"
+                      ? investorPath(action.page, action.investor)
+                      : null;
             if (path !== null) router.prefetch(path);
           }
         }

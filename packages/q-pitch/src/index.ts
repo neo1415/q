@@ -65,3 +65,4 @@ export {
 export * from "./step-commands.js";
 export * from "./step-graph.js";
 export * from "./qa-bank.js";
+export * from "./demo-investors.js";

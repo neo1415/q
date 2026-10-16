@@ -202,6 +202,20 @@ export const OpenRecordActionSchema = z
   })
   .strict();
 
+/**
+ * v6 founder track: open a fictional investor's page by fixture key
+ * (`demoInvestor`): its profile, the founder's relationship with it, or
+ * its rehearsal page. Never a URL or id in a script.
+ */
+export const OpenInvestorActionSchema = z
+  .object({
+    ...base,
+    kind: z.literal("openInvestor"),
+    investor: FixtureKeySchema,
+    page: z.enum(["PROFILE", "RELATIONSHIP", "REHEARSE"]),
+  })
+  .strict();
+
 export const TourActionSchema = z.discriminatedUnion("kind", [
   OpenRouteActionSchema,
   OpenCompanyActionSchema,
@@ -214,6 +228,7 @@ export const TourActionSchema = z.discriminatedUnion("kind", [
   RunShortRehearsalActionSchema,
   UiActActionSchema,
   OpenRecordActionSchema,
+  OpenInvestorActionSchema,
 ]);
 export type TourAction = z.infer<typeof TourActionSchema>;
 export type TourActionKind = TourAction["kind"];
@@ -230,6 +245,7 @@ export const TOUR_ACTION_KINDS = [
   "runShortRehearsal",
   "uiAct",
   "openRecord",
+  "openInvestor",
 ] as const satisfies readonly TourActionKind[];
 export const TourActionKindSchema = z.enum(TOUR_ACTION_KINDS);
 
