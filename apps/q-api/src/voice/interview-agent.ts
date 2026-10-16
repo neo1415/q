@@ -93,6 +93,7 @@ import {
   firstNameOf,
   onboardingFlowFor,
   withNextQuestion,
+  withoutUnbackedSaveClaims,
   withoutAnsweredQuestions,
 } from "./onboarding-flow.js";
 import type { InvestorResearch } from "./investor-research.js";
@@ -670,6 +671,8 @@ export function createInterviewAgent(
   // The step each session's last reply asked, for the independent reading
   // of the answer to it (DELEGATION_READER v4).
   const lastAsked = new Map<string, string>();
+  /** The step asked the turn before the last, per session (code reading). */
+  const askedBeforeLast = new Map<string, string>();
   // The steps each session's last replies asked, newest last ("" for a
   // reply that asked nothing), to rest a question pressed twice running.
   const recentAsks = new Map<string, string[]>();
@@ -878,11 +881,30 @@ export function createInterviewAgent(
       // just asked: code reads that, with no model call (owner 2026-10-16).
       const decided =
         dependencies.readingByCodeWhereExact === true
-          ? codeReading({
-              utterance,
-              asked: journeySteps.find((step) => step.stepKey === askedKey),
-              pendingCount: pending.length,
-            })
+          ? await (async () => {
+              const view = (await port.state().catch(() => null)) ?? null;
+              const open = new Set(
+                view?.steps
+                  .filter((row) => row.status === "OPEN")
+                  .map((row) => row.stepKey) ?? [],
+              );
+              const beforeKey =
+                askedBeforeLast.get(input.onboardingSessionId) ?? null;
+              return codeReading({
+                utterance,
+                asked: journeySteps.find((step) => step.stepKey === askedKey),
+                askedBefore:
+                  beforeKey !== null && open.has(beforeKey)
+                    ? journeySteps.find((step) => step.stepKey === beforeKey)
+                    : undefined,
+                openChoices: journeySteps.filter(
+                  (step) =>
+                    open.has(step.stepKey) &&
+                    step.configuration.stepType === "single_select",
+                ),
+                pendingCount: pending.length,
+              });
+            })()
           : null;
       delegationRead =
         decided !== null
@@ -1648,6 +1670,16 @@ export function createInterviewAgent(
       lastAsked.delete(input.onboardingSessionId);
     }
     if (result?.asking !== undefined && result.asking !== null) {
+      const previous = lastAsked.get(input.onboardingSessionId);
+      if (previous !== undefined && previous !== result.asking) {
+        askedBeforeLast.delete(input.onboardingSessionId);
+        askedBeforeLast.set(input.onboardingSessionId, previous);
+        while (askedBeforeLast.size > 2_000) {
+          const oldest = askedBeforeLast.keys().next().value;
+          if (oldest === undefined) break;
+          askedBeforeLast.delete(oldest);
+        }
+      }
       lastAsked.delete(input.onboardingSessionId);
       lastAsked.set(input.onboardingSessionId, result.asking);
       while (lastAsked.size > 2_000) {
@@ -1681,7 +1713,16 @@ export function createInterviewAgent(
         : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.");
     // Never the previous question word for word (QA 2026-10-03): what they
     // said is acknowledged first, and the question comes in other words.
-    let reply = notVerbatim(replyWritten, lastQTurn ?? null, {
+    // Never "saved" when nothing was (owner 2026-10-16): the claim is
+    // checked against what this turn actually committed.
+    const backedReply = withoutUnbackedSaveClaims(
+      replyWritten,
+      opening || recorded.length > 0 || (heldNote?.applied.length ?? 0) > 0,
+    );
+    if (backedReply !== replyWritten) {
+      logger.info({}, "interview reply claimed a save nothing backed; removed");
+    }
+    let reply = notVerbatim(backedReply, lastQTurn ?? null, {
       asking: result?.asking ?? null,
       alternate: (stepKey) => {
         const step = journeySteps.find((s) => s.stepKey === stepKey);
@@ -1698,7 +1739,7 @@ export function createInterviewAgent(
         );
       },
     });
-    if (reply !== replyWritten) {
+    if (reply !== backedReply) {
       logger.info(
         { asking: result?.asking ?? null },
         "interview reply repeated the last question verbatim; reworded",

@@ -12,6 +12,10 @@
     "./definition": {
       "types": "./dist/definition/index.d.ts",
       "default": "./dist/definition/index.js"
+    },
+    "./profile-sections": {
+      "types": "./dist/definition/profile-sections.d.ts",
+      "default": "./dist/definition/profile-sections.js"
     }
   },
   "main": "./dist/index.js",
