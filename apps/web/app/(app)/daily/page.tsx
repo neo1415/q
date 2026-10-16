@@ -51,8 +51,8 @@ export default async function DailyPage({
   if (home === null) {
     return (
       <PageContainer width="reading" className="flex flex-col gap-4">
-        <QSection id="daily" kind="DAILY" label="The Q Daily">
-          <PageHeader title="The Q Daily" />
+        <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
+          <PageHeader title={t("The Q Daily")} />
           <p
             className="cq-body text-(--cq-text-secondary)"
             data-state="unavailable"
@@ -73,9 +73,9 @@ export default async function DailyPage({
   if (before !== undefined) {
     return (
       <PageContainer width="reading" className="flex flex-col gap-6">
-        <QSection id="daily" kind="DAILY" label="The Q Daily">
+        <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
           <PageHeader
-            title="The Q Daily"
+            title={t("The Q Daily")}
             description={t("Earlier editions.")}
           />
           <DailyArchive items={home.archive} nextCursor={home.nextCursor} />
@@ -94,7 +94,7 @@ export default async function DailyPage({
   if (latest !== null) {
     return (
       <PageContainer width="content" className="flex flex-col gap-10">
-        <QSection id="daily" kind="DAILY" label="The Q Daily">
+        <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
           {home.preparing ? <PreparingNotice /> : null}
           <Newspaper edition={latest} />
           <DailyArchive
@@ -109,9 +109,9 @@ export default async function DailyPage({
   const preferences = home.preferences;
   return (
     <PageContainer width="reading" className="flex flex-col gap-5">
-      <QSection id="daily" kind="DAILY" label="The Q Daily">
+      <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
         <PageHeader
-          title="The Q Daily"
+          title={t("The Q Daily")}
           description={t("Your news, every story sourced.")}
         />
         {preferences.frequency === "OFF" ? (

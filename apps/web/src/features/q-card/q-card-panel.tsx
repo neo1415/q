@@ -17,6 +17,7 @@ import { Input } from "@capital-q/ui/input";
 import { useGlobalQ } from "@/components/app-shell/global-q";
 
 import { claimHandleAction, updateQCardAction } from "./q-card-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Q Card on the profile page (BIZ-004): choose or change the handle,
@@ -68,6 +69,7 @@ async function settle(
 const CARD_SAVED = "Saved. Your Q Card shows these fields now.";
 
 export function QCardPanel(props: QCardPanelProps) {
+  const t = useT();
   const { subjectType, subjectId, card } = props;
   const router = useRouter();
   const { askAbout } = useGlobalQ();
@@ -87,7 +89,7 @@ export function QCardPanel(props: QCardPanelProps) {
           <HandleForm
             subjectLabel={props.name}
             initial={props.suggestedHandle}
-            submitLabel="Create Q Card"
+            submitLabel={t("Create Q Card")}
             onSubmit={(handle) =>
               settle(async () => {
                 const result = await claimHandleAction(subject, handle);
@@ -108,7 +110,7 @@ export function QCardPanel(props: QCardPanelProps) {
                 askAbout(`Make a Q Card for ${props.name} with the handle `)
               }
             >
-              Ask Q to make it
+              {t("Ask Q to make it")}
             </button>
           </div>
         </div>
@@ -136,20 +138,22 @@ export function QCardPanel(props: QCardPanelProps) {
             data-q-card-customize
           >
             <summary className="cq-body-sm flex min-h-11 cursor-pointer items-center font-medium text-(--cq-text-primary)">
-              Customize card
+              {t("Customize card")}
             </summary>
             <section
               aria-labelledby={`${subjectId}-handle`}
               className="mt-2 flex flex-col gap-3"
             >
               <h3 id={`${subjectId}-handle`} className="cq-label">
-                Handle
+                {t("Handle")}
               </h3>
               <HandleForm
                 subjectLabel={props.name}
                 initial={card.handle ?? props.suggestedHandle}
-                submitLabel="Change handle"
-                hint="Your old handle keeps redirecting here for 90 days, and nobody else can take it meanwhile."
+                submitLabel={t("Change handle")}
+                hint={t(
+                  "Your old handle keeps redirecting here for 90 days, and nobody else can take it meanwhile.",
+                )}
                 onSubmit={(handle) =>
                   settle(async () => {
                     const result = await claimHandleAction(subject, handle);
@@ -256,6 +260,7 @@ function ShareRow({
   readonly qrHref: string;
   readonly onCopied: () => void;
 }) {
+  const t = useT();
   if (cardUrl === null || handle === null) return null;
   return (
     <div className="flex flex-wrap gap-2">
@@ -265,7 +270,7 @@ function ShareRow({
           void navigator.clipboard.writeText(cardUrl).then(onCopied);
         }}
       >
-        Copy link
+        {t("Copy link")}
       </Button>
       {/* The card to save or send: an image or a one-page PDF. */}
       <a
@@ -274,7 +279,7 @@ function ShareRow({
         className={buttonClassName("secondary")}
         data-card-download="png"
       >
-        Download image
+        {t("Download image")}
       </a>
       <a
         href={`/@${handle}.pdf`}
@@ -282,14 +287,14 @@ function ShareRow({
         className={buttonClassName("secondary")}
         data-card-download="pdf"
       >
-        Download PDF
+        {t("Download PDF")}
       </a>
       <a
         href={qrHref}
         download={`${handle}-qr.svg`}
         className={buttonClassName("quiet")}
       >
-        Download QR
+        {t("Download QR")}
       </a>
       <a
         href={`/@${handle}`}
@@ -297,7 +302,7 @@ function ShareRow({
         rel="noopener"
         className={buttonClassName("quiet")}
       >
-        Open public page
+        {t("Open public page")}
       </a>
     </div>
   );
@@ -333,6 +338,7 @@ function ScopeForm({
     readonly indexable: boolean;
   }) => Promise<string | null>;
 }) {
+  const t = useT();
   const id = useId();
   const [scopes, setScopes] = useState<QCardFieldScopes>(card.fieldScopes);
   const [indexable, setIndexable] = useState(card.indexable);
@@ -381,12 +387,12 @@ function ScopeForm({
     >
       <div className="flex flex-col gap-1">
         <h3 id={`${id}-heading`} className="cq-label">
-          What the card shows
+          {t("What the card shows")}
         </h3>
         <p className="cq-caption text-(--cq-text-secondary)">
-          The name is always shown. Choose who sees each field: nobody, people
-          signed in to Capital Q, or everyone with the link. Your raise and
-          financials stay private and can&apos;t go on a card.
+          {t(
+            "The name is always shown. Choose who sees each field: nobody, people signed in to Capital Q, or everyone with the link. Your raise and financials stay private and can't go on a card.",
+          )}
         </p>
       </div>
       <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
@@ -427,7 +433,7 @@ function ScopeForm({
                   className="cq-body-sm min-h-11 shrink-0 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                   data-card-audience={field.key}
                 >
-                  <option value="hidden">Nobody</option>
+                  <option value="hidden">{t("Nobody")}</option>
                   <option value="network_visible">
                     {AUDIENCE_WORDS.network_visible}
                   </option>
@@ -464,11 +470,12 @@ function ScopeForm({
         />
         <span className="flex flex-col gap-0.5">
           <span className="cq-body-sm">
-            Let search engines list the public page
+            {t("Let search engines list the public page")}
           </span>
           <span className="cq-caption text-(--cq-text-secondary)">
-            Off by default. Public fields are still visible to anyone with the
-            link either way.
+            {t(
+              "Off by default. Public fields are still visible to anyone with the link either way.",
+            )}
           </span>
         </span>
       </label>
@@ -483,7 +490,7 @@ function ScopeForm({
         </Button>
         {pending ? null : dirty ? (
           <span className="cq-caption text-(--cq-text-tertiary)">
-            Not saved yet.
+            {t("Not saved yet.")}
           </span>
         ) : (
           <SavedNote text={saved} />

@@ -226,6 +226,7 @@ import {
 import { createWorkPage } from "./composition/work/page.js";
 import {
   createGatewayUiTextTranslator,
+  createLineTranslator,
   createPostgresUiTextStore,
   createUiTextService,
   parseUiTranslationDailyCapUsd,
@@ -3901,25 +3902,39 @@ const standingStore = createPostgresStandingStore(database.sql);
  * unless CQ_UI_TRANSLATION_DAILY_CAP_USD says otherwise, counted from the
  * ledger rows of that class only.
  */
-const uiText = createUiTextService({
-  store: createPostgresUiTextStore(database.sql),
-  translate: createGatewayUiTextTranslator(
-    modelGateway,
-    budgetForTaskClass("UI_TRANSLATION"),
-  ),
-  cap: createDailySpendCap({
-    capUsd: parseUiTranslationDailyCapUsd(process.env),
-    readSpentSinceUsd: createPostgresDailySpendReader({
-      sql: database.sql,
-      taskClass: "UI_TRANSLATION",
-    }),
-    onReadFailure: (error) => {
-      logger.warn(
-        { err: error, spendCap: "UI_TRANSLATION" },
-        "ui translation cap could not read the ledger; using the last total",
-      );
-    },
+/** One UI_TRANSLATION ceiling for the interface and for Q's code-written lines. */
+const uiTranslationCap = createDailySpendCap({
+  capUsd: parseUiTranslationDailyCapUsd(process.env),
+  readSpentSinceUsd: createPostgresDailySpendReader({
+    sql: database.sql,
+    taskClass: "UI_TRANSLATION",
   }),
+  onReadFailure: (error) => {
+    logger.warn(
+      { err: error, spendCap: "UI_TRANSLATION" },
+      "ui translation cap could not read the ledger; using the last total",
+    );
+  },
+});
+const uiTextStore = createPostgresUiTextStore(database.sql);
+const uiTextTranslator = createGatewayUiTextTranslator(
+  modelGateway,
+  budgetForTaskClass("UI_TRANSLATION"),
+);
+const uiText = createUiTextService({
+  store: uiTextStore,
+  translate: uiTextTranslator,
+  cap: uiTranslationCap,
+  logger,
+});
+/**
+ * Q's code-written lines in any language (lane ml): English skeletons with
+ * names and figures lifted into {v1}…, cached under answer-words.v1.
+ */
+export const translateLines = createLineTranslator({
+  store: uiTextStore,
+  translate: uiTextTranslator,
+  cap: uiTranslationCap,
   logger,
 });
 // What this conversation already produced, read back from the owning

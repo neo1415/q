@@ -9,6 +9,7 @@ import {
 import { PitchVideoPage } from "@/features/pitch/pitch-video-page";
 import { resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Video" };
 
@@ -24,6 +25,7 @@ export default async function PitchVideoRoute({
 }: {
   readonly params: Promise<{ readonly mediaAssetId: string }>;
 }) {
+  const t = await serverT();
   const { mediaAssetId } = await params;
   if (!z.string().uuid().safeParse(mediaAssetId).success) notFound();
   const context = await resolveOwnContext();
@@ -40,9 +42,9 @@ export default async function PitchVideoRoute({
             : []),
         ]}
         total={1}
-        label="a pitch video"
+        label={t("a pitch video")}
       >
-        <PageHeader title="Video" />
+        <PageHeader title={t("Video")} />
         <PitchVideoPage
           companyId={context.companyId}
           mediaAssetId={mediaAssetId}

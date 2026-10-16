@@ -5,6 +5,7 @@ import type { InvestorGateFitDto } from "@capital-q/contracts";
 import { GateStandingBadge } from "@/features/assumptions/standing-badge";
 
 import { gateSummary } from "./gate-words";
+import { Words } from "@/features/i18n/language";
 
 /**
  * Q.05 on a founder's investor card: the investor's published gate, each
@@ -40,16 +41,21 @@ export function GateFit({
   return (
     <div className="flex flex-col gap-2" data-gate-fit={gate.publicId}>
       <span className="cq-label inline-flex w-fit items-center gap-1.5 border border-(--cq-accent) px-2 py-0.5 text-(--cq-accent)">
-        {gate.criteria.length === 0
-          ? "Has a gate · no published criteria yet"
-          : `Has a gate · ${String(gate.criteria.length)} ${gate.criteria.length === 1 ? "criterion" : "criteria"}`}
+        <Words>
+          {gate.criteria.length === 0
+            ? "Has a gate · no published criteria yet"
+            : `Has a gate · ${String(gate.criteria.length)} ${gate.criteria.length === 1 ? "criterion" : "criteria"}`}
+        </Words>
       </span>
       {compact && met > 0 ? (
         <p className="cq-caption text-(--cq-text-secondary)">
-          {met === gate.criteria.length
-            ? `All ${String(met)} met`
-            : `${String(met)} of ${String(gate.criteria.length)} met`}
-          {listed.length === 0 ? "" : "; the rest:"}
+          <Words>
+            {`${
+              met === gate.criteria.length
+                ? `All ${String(met)} met`
+                : `${String(met)} of ${String(gate.criteria.length)} met`
+            }${listed.length === 0 ? "." : "; the rest:"}`}
+          </Words>
         </p>
       ) : null}
       {shown.length === 0 ? null : (
@@ -72,12 +78,14 @@ export function GateFit({
               <GateStandingBadge standing={criterion.standing} />
               <span className="flex min-w-0 flex-col">
                 <span className="cq-body-sm text-(--cq-text-primary)">
-                  {criterion.label}
+                  <Words>{criterion.label}</Words>
                 </span>
                 <span className="cq-caption text-(--cq-text-tertiary)">
-                  {criterion.requiredness === "REQUIRED"
-                    ? "Required"
-                    : "Preferred"}
+                  <Words>
+                    {criterion.requiredness === "REQUIRED"
+                      ? "Required"
+                      : "Preferred"}
+                  </Words>
                 </span>
               </span>
             </li>
@@ -86,18 +94,18 @@ export function GateFit({
       )}
       {listed.length > shown.length ? (
         <p className="cq-caption text-(--cq-text-tertiary)">
-          {`${String(listed.length - shown.length)} more on their page`}
+          <Words>{`${String(listed.length - shown.length)} more on their page`}</Words>
         </p>
       ) : null}
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        {gateSummary(gate)}
+        <Words>{gateSummary(gate)}</Words>
       </p>
       {apply && gate.acceptingApplications ? (
         <Link
           href={`/g/${encodeURIComponent(gate.publicId)}`}
           className="cq-body-sm inline-flex min-h-11 w-fit items-center font-medium text-(--cq-accent) underline-offset-4 hover:underline"
         >
-          Check and apply
+          <Words>Check and apply</Words>
         </Link>
       ) : null}
     </div>

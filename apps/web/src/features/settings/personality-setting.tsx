@@ -80,13 +80,13 @@ export function PersonalitySetting({
                     : "cq-appearance-option"
                 }
               >
-                {LABELS[choice]}
+                {t(LABELS[choice])}
               </button>
             </Tooltip>
           ))}
         </div>
         <p className="cq-caption text-(--cq-text-secondary)">
-          {EXPLAINED[chosen]}
+          {t(EXPLAINED[chosen])}
         </p>
         {message === null ? null : (
           <p role="alert" className="cq-caption text-(--cq-text-secondary)">

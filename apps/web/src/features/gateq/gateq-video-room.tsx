@@ -65,10 +65,10 @@ export function GateqVideoRoom({
       unavailableNote={
         <>
           <p className="cq-body text-(--cq-stage-text)">
-            The video room isn’t available right now.
+            {t("The video room isn’t available right now.")}
           </p>
           <p className="cq-body-sm text-(--cq-stage-text-muted)">
-            Continue by typing; your interview carries on where it is.
+            {t("Continue by typing; your interview carries on where it is.")}
           </p>
         </>
       }

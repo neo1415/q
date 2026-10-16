@@ -150,6 +150,14 @@ function fromObject(object: string): NamedRecordRequest | null {
   return { name, facet: "PAGE", explicit: proper };
 }
 
+const LANGUAGE_NAME =
+  /^(?:the\s+)?(?:english|arabic|انجليزي(?:ة)?|إنجليزي(?:ة)?|الإنجليزي(?:ة)?|الانجليزي(?:ة)?|عربي(?:ة)?|العربي(?:ة)?)(?:\s+(?:language|please|now|instead|for\s+me))*$/iu;
+
+/** "English", "Arabic please", "the English language": a language. */
+function namesLanguage(object: string): boolean {
+  return LANGUAGE_NAME.test(object.trim().replace(/[.!?]+$/u, ""));
+}
+
 /**
  * The record a navigation request names, or null when the words are not
  * one (a page Capital Q has by name, a question, a pointing word). The last
@@ -170,6 +178,10 @@ export function namedRecordRequestOf(text: string): NamedRecordRequest | null {
     // Owner 2026-10-15: "show me a map of where Tensorgate is" was opened
     // as Tensorgate's profile. A drawing asked for names no record to open.
     if (isDrawingObject(object) || asksForDrawing(sentence)) continue;
+    // Live 2026-10-16: "switch to English" was looked up as a record ("I
+    // can't find English among your relationships"). A language named is
+    // a language change (set_q_language), never a record.
+    if (namesLanguage(object)) continue;
     const found = fromObject(object);
     if (found !== null) return found;
   }

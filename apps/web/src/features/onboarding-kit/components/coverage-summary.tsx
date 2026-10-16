@@ -66,22 +66,31 @@ export function useOnboardingCoverage(
   return coverage;
 }
 
-function fieldLine(field: OnboardingCoverageField): string {
+/**
+ * One field in words. Each part is put in the reader's language on its
+ * own (the label, the value as Capital Q displays it, where it came from),
+ * so a name or figure is kept exactly while the words around it change.
+ */
+function fieldLine(
+  field: OnboardingCoverageField,
+  t: (english: string) => string,
+): string {
+  const label = t(field.label);
   if (field.state === "SUPPLIED_UNCONFIRMED") {
     const offer = field.proposals[0];
     return offer === undefined
-      ? field.label
-      : `${field.label}: ${offer.display} (${SOURCE_WORDS[offer.source] ?? "offered"})`;
+      ? label
+      : `${label}: ${t(offer.display)} (${t(SOURCE_WORDS[offer.source] ?? "offered")})`;
   }
   if (field.state === "CONTRADICTORY") {
-    return `${field.label}: ${field.readings.join(" or ")}`;
+    return `${label}: ${field.readings.map(t).join(t(" or "))}`;
   }
   if (field.display !== null && field.state !== "MISSING") {
     const from =
-      field.source === null ? "" : ` (${SOURCE_WORDS[field.source] ?? ""})`;
-    return `${field.label}: ${field.display}${from}`;
+      field.source === null ? "" : ` (${t(SOURCE_WORDS[field.source] ?? "")})`;
+    return `${label}: ${t(field.display)}${from}`;
   }
-  return field.label;
+  return label;
 }
 
 export function CoverageSummary({
@@ -92,15 +101,17 @@ export function CoverageSummary({
   const t = useT();
   const { summary } = coverage;
   const parts = [
-    `Essentials ${String(summary.essentialSettled)} of ${String(summary.essentialTotal)}`,
+    t(
+      `Essentials ${String(summary.essentialSettled)} of ${String(summary.essentialTotal)}`,
+    ),
     ...(summary.unconfirmed > 0
-      ? [`${String(summary.unconfirmed)} to confirm`]
+      ? [t(`${String(summary.unconfirmed)} to confirm`)]
       : []),
     ...(summary.pendingSaves > 0
-      ? [`${String(summary.pendingSaves)} not saved yet`]
+      ? [t(`${String(summary.pendingSaves)} not saved yet`)]
       : []),
     ...(summary.minutesLeft > 0
-      ? [`about ${String(summary.minutesLeft)} min left`]
+      ? [t(`about ${String(summary.minutesLeft)} min left`)]
       : []),
   ];
   const applicable = coverage.fields.filter((f) => f.applicable);
@@ -134,14 +145,15 @@ export function CoverageSummary({
               </p>
               <ul className="flex flex-col gap-1">
                 {pending.map((f) => (
-                  <li key={f.fieldKey}>{f.label}</li>
+                  <li key={f.fieldKey}>{t(f.label)}</li>
                 ))}
               </ul>
             </section>
           )}
           <p>
-            How Q talks to you (concise or detailed, your language) is yours to
-            see and change in{" "}
+            {t(
+              "How Q talks to you (concise or detailed, your language) is yours to see and change in",
+            )}{" "}
             <Link href="/settings/memory" className={linkClassName()}>
               {t("What Q remembers")}
             </Link>
@@ -153,14 +165,14 @@ export function CoverageSummary({
             );
             if (fields.length === 0) return null;
             return (
-              <section key={group.title} aria-label={group.title}>
+              <section key={group.title} aria-label={t(group.title)}>
                 <h3 className="cq-label text-(--cq-text-primary)">
-                  {group.title}
+                  {t(group.title)}
                 </h3>
                 <ul className="flex flex-col gap-1">
                   {fields.map((f) => (
                     <li key={f.fieldKey} data-coverage-state={f.state}>
-                      {fieldLine(f)}
+                      {fieldLine(f, t)}
                     </li>
                   ))}
                 </ul>

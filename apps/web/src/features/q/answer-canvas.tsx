@@ -434,7 +434,7 @@ function AnswerCard({
                     <dt>{measure.label}</dt>
                     <dd>
                       <LevelShape level={measure.level} />
-                      {LEVEL_WORD[measure.level]}
+                      {t(LEVEL_WORD[measure.level])}
                     </dd>
                     {measure.value === null ? null : (
                       <dd className="val">{measure.value}</dd>
@@ -456,7 +456,7 @@ function AnswerCard({
               // the run's own reads; never a private mandate).
               <div className="flex flex-col gap-1" data-ac-fit-basis>
                 <p className="cq-caption m-0 text-(--cq-text-tertiary)">
-                  {BASIS_LABEL}
+                  {t(BASIS_LABEL)}
                 </p>
                 <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
                   {card.fitBasis.map((line) => (
@@ -698,7 +698,7 @@ function CompareTable({
                   >
                     <span className="v">
                       <LevelShape level={measure.level} />
-                      {LEVEL_WORD[measure.level]}
+                      {t(LEVEL_WORD[measure.level])}
                     </span>
                     {measure.value === null ? null : (
                       <span className="s">{measure.value}</span>

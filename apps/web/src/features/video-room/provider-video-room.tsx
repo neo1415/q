@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@capital-q/ui/button";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Capital Q's own video room shell (directive C3), shared by Rehearsals and
@@ -87,6 +88,7 @@ function remainingSeconds(
 }
 
 export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
+  const t = useT();
   const endsAt = Date.parse(props.endsAt);
   const held = props.clockStarted === false;
   const { maxSeconds } = props;
@@ -190,7 +192,7 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
           className="cq-label text-(--cq-text-primary) tabular-nums"
           aria-live="off"
         >
-          <span className="sr-only">Time left: </span>
+          <span className="sr-only">{t("Time left:")} </span>
           {minutes}:{seconds}
         </p>
       </div>

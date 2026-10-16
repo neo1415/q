@@ -57,7 +57,7 @@ export default async function WorkDetailPage({
                 href="/work"
                 className="cq-body-sm underline underline-offset-4"
               >
-                Open Q&rsquo;s work
+                {t("Open Q’s work")}
               </Link>
             }
           />

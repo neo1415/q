@@ -113,10 +113,100 @@ export function investorDiscoveryText(
   return parts.join(" ");
 }
 
+/** A region as said, in Arabic; null when it has no settled Arabic name. */
+const REGION_AR: Readonly<Record<string, string>> = {
+  gulf: "الخليج",
+  gcc: "دول مجلس التعاون الخليجي",
+  arab: "العالم العربي",
+  "middle east": "الشرق الأوسط",
+  mena: "الشرق الأوسط وشمال أفريقيا",
+  uae: "الإمارات",
+  emirates: "الإمارات",
+  saudi: "السعودية",
+  "saudi arabia": "السعودية",
+  ksa: "السعودية",
+  qatar: "قطر",
+  kuwait: "الكويت",
+  bahrain: "البحرين",
+  oman: "عُمان",
+  egypt: "مصر",
+  africa: "أفريقيا",
+  "east africa": "شرق أفريقيا",
+  "west africa": "غرب أفريقيا",
+  nigeria: "نيجيريا",
+  kenya: "كينيا",
+  europe: "أوروبا",
+};
+
+function arabicRegion(words: readonly string[]): string | null {
+  const first = words[0]?.replace(/\s+/gu, " ").trim();
+  if (first === undefined || first.length === 0) return null;
+  // Said in Arabic: kept as said.
+  if (/[\u0600-\u06FF]/u.test(first)) return first;
+  return REGION_AR[first.toLowerCase()] ?? null;
+}
+
+function arabicList(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join("، ")} و${items[items.length - 1] ?? ""}`;
+}
+
+/**
+ * The same answer in Arabic (multilingual Q, live 2026-10-16), from the
+ * same found investors and outcome: names kept as recorded, the count in
+ * Arabic agreement, and no claim that anyone is interested.
+ */
+export function arabicInvestorDiscoveryText(
+  found: readonly Found[],
+  context: {
+    readonly regionWords: readonly string[];
+    readonly asked: number;
+    readonly outcome: "FOUND" | "NONE" | "UNAVAILABLE";
+    readonly aboutMyCompany: boolean;
+  },
+): string {
+  const region = arabicRegion(context.regionWords);
+  const from = region === null ? "" : ` من ${region}`;
+  if (found.length === 0) {
+    return context.outcome === "UNAVAILABLE"
+      ? "البحث العام لا يستجيب الآن، لذا لا أستطيع الجزم بأي شيء. حاول مرة أخرى بعد قليل."
+      : `بحثت في المستثمرين الذين أعرفهم وفي بحث عام ولم أجد بعد مستثمرين${from} أستطيع تسميتهم. سيساعدني ذكر قطاع أو دولة على التضييق.`;
+  }
+  const investors = found.filter((one) => one.role === "INVESTOR");
+  const openers = found.filter((one) => one.role === "DOOR_OPENER");
+  const names = arabicList(
+    investors.map((one) => one.card.subject.displayName),
+  );
+  const fit = context.aboutMyCompany ? " قد يناسبون شركتك" : " قد يناسبون";
+  const n = investors.length;
+  const lead =
+    n === 0
+      ? "لم أجد مستثمراً لذلك، بل جهة يمكنها فتح الأبواب فقط."
+      : n === 1
+        ? `${n < context.asked ? "لم أجد إلا " : ""}مستثمراً واحداً${from}${context.aboutMyCompany ? " قد يناسب شركتك" : " قد يناسب"}: ${names}.`
+        : n === 2
+          ? `${n < context.asked ? "لم أجد إلا " : ""}مستثمرَين${from}${fit}: ${names}.`
+          : `${n < context.asked ? "لم أجد إلا " : ""}${String(n)} مستثمرين${from}${fit}: ${names}.`;
+  const parts = [lead];
+  for (const opener of openers) {
+    parts.push(
+      `${opener.card.subject.displayName} ليس صندوقاً، لكنه يستطيع فتح الأبواب.`,
+    );
+  }
+  if (found.some((one) => one.source === "WEB")) {
+    parts.push("بعضهم من بحث عام على الويب وغير مؤكَّد.");
+  }
+  parts.push(
+    "المطابقة مبنية على الموقع وعلى ما يصف به كلٌّ منهم نفسه؛ ولم يُبدِ أيٌّ منهم اهتماماً. يمكنني ترتيب تدريب مع أيٍّ منهم.",
+  );
+  return parts.join(" ");
+}
+
 /** One block of the cards, each with its fit reasons and a Rehearse action. */
 export function investorCardsBlock(
   found: readonly Found[],
   title: string,
+  language: "en" | "ar" = "en",
 ): QAnswerCardsBlock | null {
   const cards: QAnswerCard[] = [];
   found.forEach((one, at) => {
@@ -144,7 +234,7 @@ export function investorCardsBlock(
       .filter((one) => one.card.actions.includes("REHEARSE"))
       .slice(0, 3)
       .map((one) =>
-        `Rehearse with ${one.card.subject.displayName.split(/\s+/u)[0] ?? one.card.subject.displayName}`.slice(
+        `${language === "ar" ? "تدرّب مع" : "Rehearse with"} ${one.card.subject.displayName.split(/\s+/u)[0] ?? one.card.subject.displayName}`.slice(
           0,
           120,
         ),
@@ -158,8 +248,11 @@ export async function runInvestorDiscovery(input: {
   readonly tools: Pick<QToolPort, "execute">;
   readonly context: QToolExecutionContext;
   readonly available: ReadonlySet<string>;
+  /** Multilingual Q: the language they chose; English when unset. */
+  readonly language?: "en" | "ar" | undefined;
 }): Promise<InvestorDiscoveryAnswer | null> {
   const { ask, tools, context, available } = input;
+  const arabic = input.language === "ar";
   if (!available.has(DISCOVER_TOOL)) return null;
   const outcome = await tools
     .execute(
@@ -205,19 +298,28 @@ export async function runInvestorDiscovery(input: {
     : [];
   const asked = Math.min(5, Math.max(1, ask.count ?? 3));
   const label = regionLabel(regionWords);
-  const text = investorDiscoveryText(found, {
+  const facts: Parameters<typeof investorDiscoveryText>[1] = {
     regionWords,
     asked,
     outcome: status,
     aboutMyCompany: ask.aboutMyCompany,
-  });
+  };
+  const text = arabic
+    ? arabicInvestorDiscoveryText(found, facts)
+    : investorDiscoveryText(found, facts);
+  const region = arabic ? arabicRegion(regionWords) : null;
   return {
     text,
     block: investorCardsBlock(
       found,
-      label === null
-        ? "Investors who could fit"
-        : `${label} investors who could fit`,
+      arabic
+        ? region === null
+          ? "مستثمرون قد يناسبونك"
+          : `مستثمرون من ${region} قد يناسبونك`
+        : label === null
+          ? "Investors who could fit"
+          : `${label} investors who could fit`,
+      arabic ? "ar" : "en",
     ),
     shown: found.length,
     outcome: status,

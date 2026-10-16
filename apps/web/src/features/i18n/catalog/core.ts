@@ -92,8 +92,8 @@ export const CORE_AR: Readonly<Record<string, string>> = {
     "تعتمد التدريبات المرئية بالعربية على صوت الوجه المختار؛ إن لم يبدُ مناسباً فاستخدم التدريب الصوتي أو النصي.",
   "In Arabic: every page of Capital Q, your conversation with Q (typed and spoken), voice calls, rehearsals, video interviews, onboarding, notifications and emails.":
     "بالعربية: كل صفحات Capital Q، ومحادثتك مع Q (كتابةً وصوتاً)، والمكالمات الصوتية، والتدريبات، والمقابلات المرئية، والإعداد، والإشعارات، والرسائل البريدية.",
-  "Still in English: the one-line summary on a decision card and the stories in The Q Daily, which Q quotes as written. What people and companies wrote themselves stays in their own words.":
-    "ما زال بالإنجليزية: الملخص المختصر على بطاقة القرار وقصص The Q Daily، ويقتبسها Q كما كُتبت. وما كتبه الأشخاص والشركات بأنفسهم يبقى بكلماتهم.",
+  "Still in English: some of Q's ready-made answers (what needs you, a person or company looked up, fit and mandate summaries), the questions Q prepared about your company, the one-line summary on a decision card and stories in The Q Daily. What people and companies wrote themselves stays in their own words.":
+    "ما زال بالإنجليزية: بعض إجابات Q الجاهزة (ما يحتاج إليك، وشخص أو شركة بُحث عنها، وملخصات الملاءمة والتفويض)، والأسئلة التي أعدّها Q عن شركتك، والملخص المختصر على بطاقة القرار، وقصص The Q Daily. وما كتبه الأشخاص والشركات بأنفسهم يبقى بكلماتهم.",
   // Onboarding shell
   Back: "رجوع",
   "Save & leave": "احفظ وغادر",

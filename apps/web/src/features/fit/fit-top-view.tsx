@@ -14,6 +14,7 @@ import {
   WhyTheseSheet,
 } from "./fit-comparison";
 import { QViewMark, type QViewPort } from "./q-view-note";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Q, give me the top three" as a page (brief B2; match.html "top3"):
@@ -52,6 +53,7 @@ export function FitTopView({
   readonly qViewPort?: QViewPort | undefined;
   readonly retryHref?: string | undefined;
 }) {
+  const t = useT();
   const [why, setWhy] = useState(defaultWhyOpen);
   const comparison = state.kind === "READY" ? state.comparison : null;
   const n = comparison?.entries.length ?? 3;
@@ -85,7 +87,7 @@ export function FitTopView({
           )}
           <Link
             href={closeHref}
-            aria-label="Close"
+            aria-label={t("Close")}
             className={buttonClassName("quiet", "compact")}
           >
             <X size={ICON_SIZE.prominent} aria-hidden="true" />
@@ -101,38 +103,42 @@ export function FitTopView({
           >
             <QViewMark size={24} />
             <span className="cq-body-sm">
-              Ranking your companies against your mandate…
+              {t("Ranking your companies against your mandate…")}
             </span>
           </div>
           <Skeleton lines={8} />
         </>
       ) : state.kind === "ERROR" ? (
         <ErrorState
-          title="The comparison didn't load"
-          description="The connection dropped before it finished. Nothing you did was lost."
+          title={t("The comparison didn't load")}
+          description={t(
+            "The connection dropped before it finished. Nothing you did was lost.",
+          )}
           action={
             <Link href={retryHref} className={buttonClassName("secondary")}>
-              Try again
+              {t("Try again")}
             </Link>
           }
         />
       ) : state.kind === "NO_MANDATE" ? (
         <EmptyState
-          title="Set your mandate to see fit"
-          description="Q ranks companies against what you tell it: stage, sectors, countries and cheque size. It takes about two minutes, and you can skip anything."
+          title={t("Set your mandate to see fit")}
+          description={t(
+            "Q ranks companies against what you tell it: stage, sectors, countries and cheque size. It takes about two minutes, and you can skip anything.",
+          )}
           action={
             <Link href="/profile" className={buttonClassName("primary")}>
-              Set your mandate
+              {t("Set your mandate")}
             </Link>
           }
         />
       ) : state.comparison.entries.length === 0 ? (
         <EmptyState
-          title="No companies fit your mandate yet"
+          title={t("No companies fit your mandate yet")}
           description={`None of the ${String(state.comparison.considered)} companies of yours can be ranked yet: they sit outside your rules or have shared too little. Widen one rule, or look in Discover.`}
           action={
             <Link href="/discover" className={buttonClassName("primary")}>
-              Open Discover
+              {t("Open Discover")}
             </Link>
           }
         />

@@ -1,3 +1,5 @@
+import { listSeparator } from "@capital-q/q-core/language";
+
 /**
  * Sentences with a name, a figure or a date in them (multilingual Q).
  *
@@ -14,7 +16,21 @@ type Compiled = {
   readonly regex: RegExp;
   readonly names: readonly string[];
   readonly template: string;
+  /**
+   * Only placeholders and a joining word ("{a} and {b}"): such a key would
+   * match any English sentence with "and" in it, so it applies only when
+   * no captured part is English prose left untranslated.
+   */
+  readonly connective: boolean;
 };
+
+/**
+ * Lower-case words a sentence is made of and a name is not. Live
+ * 2026-10-16: "{a} and {b}" turned "What Capital Q knows about your
+ * company, and what investors would see." into "..., وwhat investors...".
+ */
+const PROSE =
+  /(?:^|[^\p{L}])(?:the|what|which|who|why|how|your|you|they|their|it|its|we|our|is|are|was|were|be|would|could|should|might|can|will|to|for|with|about|this|that|have|has|not|before|after|when|if|so|but)(?=$|[^\p{L}])/u;
 
 const PLACEHOLDER = /\{([A-Za-z][A-Za-z0-9]*)\}/g;
 // Not global: a global regex's `test` moves lastIndex, which `matchAll`
@@ -39,7 +55,13 @@ function compile(key: string, template: string): Compiled {
     last = match.index + match[0].length;
   }
   source += escape(key.slice(last));
-  return { regex: new RegExp(`^${source}$`, "s"), names, template };
+  const literal = key.replace(PLACEHOLDER, " ").match(/\p{L}+/gu) ?? [];
+  return {
+    regex: new RegExp(`^${source}$`, "s"),
+    names,
+    template,
+    connective: literal.length <= 1,
+  };
 }
 
 /** Bucketed by the pattern's first character, so a miss stays cheap. */
@@ -73,6 +95,23 @@ export function indexPatterns(
   return { byFirst, open };
 }
 
+/**
+ * "Founders named, Pitch deck" inside a sentence: translated only when
+ * every item has a translation, joined with the language's script comma;
+ * otherwise as written.
+ */
+function listOf(
+  catalogue: Readonly<Record<string, string>>,
+  value: string,
+  language: string,
+): string | undefined {
+  if (!value.includes(", ")) return undefined;
+  const items = value.split(", ").map((item) => catalogue[item]);
+  return items.every((item): item is string => item !== undefined)
+    ? items.join(listSeparator(language))
+    : undefined;
+}
+
 export function matchPattern(
   index: PatternIndex,
   catalogue: Readonly<Record<string, string>>,
@@ -95,18 +134,22 @@ export function matchPattern(
       continue;
     }
     const values = new Map<string, string>();
+    let prose = false;
     pattern.names.forEach((name, i) => {
       const value = match[i + 1] ?? "";
-      values.set(
-        name,
+      const translated =
         catalogue[value] ??
-          (value.length < english.length
-            ? matchPattern(index, catalogue, value, language)
-            : undefined) ??
-          localiseDate(value, language, catalogue) ??
-          value,
-      );
+        (value.length < english.length
+          ? matchPattern(index, catalogue, value, language)
+          : undefined) ??
+        localiseDate(value, language, catalogue) ??
+        listOf(catalogue, value, language);
+      if (translated === undefined && PROSE.test(value)) prose = true;
+      values.set(name, translated ?? value);
     });
+    // A joining pattern over English prose would graft Arabic onto an
+    // English sentence: the sentence stays as written instead.
+    if (pattern.connective && prose) continue;
     return pattern.template.replace(
       PLACEHOLDER,
       (whole, name: string) => values.get(name) ?? whole,

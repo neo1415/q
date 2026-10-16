@@ -107,10 +107,12 @@ export function LanguageSetting({
       const result = await setLanguageAction(next);
       if (!result.ok) {
         setChosen(before);
-        setMessage(t("Couldn't save that just now. Please try again."));
+        setMessage("Couldn't save that just now. Please try again.");
         return;
       }
-      setMessage(t("Saved. Q uses this from your next message or call."));
+      // Kept in English and said in the language at render: the choice
+      // just switched the language, so the words follow it.
+      setMessage("Saved. Q uses this from your next message or call.");
       // Every provider switches at once and the server words refresh.
       announceLanguage(result.language);
     });
@@ -198,7 +200,7 @@ export function LanguageSetting({
       )}
       {message === null ? null : (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>

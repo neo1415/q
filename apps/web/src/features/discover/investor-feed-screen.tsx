@@ -772,6 +772,7 @@ function InvestorFeed({
 }
 
 function Notes({ notes }: { readonly notes: readonly DiscoveryNoteDto[] }) {
+  const t = useT();
   if (notes.length === 0) return null;
   return (
     <div className="flex flex-col gap-1">
@@ -779,7 +780,7 @@ function Notes({ notes }: { readonly notes: readonly DiscoveryNoteDto[] }) {
         // A status line, not an error: none of these is a fault, and a
         // warning tone would tell the reader something untrue.
         <p key={note} className="cq-status-line">
-          {NOTE_TEXT[note]}
+          {t(NOTE_TEXT[note])}
         </p>
       ))}
     </div>

@@ -142,7 +142,7 @@ export default async function SettingsPage({
               hint={
                 organisation === null
                   ? t("Set up when Q onboards you")
-                  : `You are here as ${organisation.role.toLowerCase()}`
+                  : t(`You are here as ${organisation.role.toLowerCase()}`)
               }
             >
               <span className="cq-body-sm text-(--cq-text-secondary)">
@@ -173,8 +173,10 @@ export default async function SettingsPage({
             title={t("Team")}
             description={
               context.kind === "INVESTOR"
-                ? "Colleagues who work on your firm with you."
-                : "Co-founders and teammates who work on your company with you."
+                ? t("Colleagues who work on your firm with you.")
+                : t(
+                    "Co-founders and teammates who work on your company with you.",
+                  )
             }
           >
             <SettingRow
@@ -329,10 +331,10 @@ export default async function SettingsPage({
               term={t("Plan")}
               hint={
                 plan === null
-                  ? "Open Billing to see your plan"
+                  ? t("Open Billing to see your plan")
                   : plan.source === "LAUNCH_DEFAULT"
-                    ? `${plan.plan.name} · free while Capital Q launches`
-                    : plan.plan.name
+                    ? t(`${plan.plan.name} · free while Capital Q launches`)
+                    : t(plan.plan.name)
               }
             >
               <RowLink href="/settings/billing">{t("Billing")}</RowLink>

@@ -71,7 +71,7 @@ export function VoiceMenu({
                 />
               }
             >
-              {VOICE_LABELS[choice]}
+              {t(VOICE_LABELS[choice])}
             </MenuRadioItem>
           ))}
         </MenuRadioGroup>

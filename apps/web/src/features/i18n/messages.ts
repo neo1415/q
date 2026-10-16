@@ -17,6 +17,7 @@ import { Q_AR } from "./catalog/q";
 import { RELATIONSHIPS_AR } from "./catalog/relationships";
 import { SETUP_AR } from "./catalog/setup";
 import { SHELL_AR } from "./catalog/shell";
+import { SWEEP_AR } from "./catalog/sweep";
 import { TAXONOMY_AR } from "./catalog/taxonomy";
 import { WORK_AR } from "./catalog/work";
 import { indexPatterns, localiseDate, matchPattern } from "./patterns";
@@ -50,6 +51,9 @@ export type UiLanguage = string;
  * line here; the same English string means the same thing everywhere.
  */
 const ARABIC: Readonly<Record<string, string>> = {
+  // First: what the live check of 2026-10-16 found; an area's own entry
+  // for the same words wins.
+  ...SWEEP_AR,
   ...CORE_AR,
   ...RELATIONSHIPS_AR,
   ...DOCUMENTS_AR,

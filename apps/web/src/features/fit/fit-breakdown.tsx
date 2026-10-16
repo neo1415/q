@@ -17,6 +17,7 @@ import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { FitContextValues } from "./fit-context";
 import { FitGlyph, FitPips, glyphKindOf, outcomeWord } from "./fit-glyph";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The fit score and its breakdown (ADR 0052; mockups match.html and
@@ -50,6 +51,7 @@ export function FitScoreButton({
   readonly onOpen: () => void;
   readonly chevron?: boolean | undefined;
 }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -64,7 +66,7 @@ export function FitScoreButton({
         </span>
         <FitPips parameters={profile.parameters} />
         <span className="text-xs whitespace-nowrap text-(--cq-text-tertiary)">
-          {FIT_CONFIDENCE_LABELS[profile.confidence]}
+          {t(FIT_CONFIDENCE_LABELS[profile.confidence])}
         </span>
       </span>
       {chevron ? (
@@ -86,6 +88,7 @@ export function FitRows({
   readonly profile: FitProfileDto;
   readonly sources?: Readonly<Record<string, string>> | undefined;
 }) {
+  const t = useT();
   return (
     <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
       {profile.parameters.map((p) => {
@@ -99,7 +102,7 @@ export function FitRows({
           >
             <FitGlyph kind={kind} className="mt-0.5" />
             <span className="font-medium text-(--cq-text-primary)">
-              {FIT_PARAMETER_LABELS[p.parameter]}
+              {t(FIT_PARAMETER_LABELS[p.parameter])}
             </span>
             <span className="cq-body-sm text-(--cq-text-secondary)">
               {outcomeWord(kind)}
@@ -145,6 +148,7 @@ export function FitBreakdownSheet({
   readonly profile: FitProfileDto;
   readonly footer?: ReactNode | undefined;
 }) {
+  const t = useT();
   return (
     <SheetRoot open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -154,8 +158,9 @@ export function FitBreakdownSheet({
       >
         <div className="flex flex-col gap-3.5" data-fit-breakdown>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            Measured against your mandate, the same way for every company.
-            Unknown never counts against a company; it only lowers confidence.
+            {t(
+              "Measured against your mandate, the same way for every company. Unknown never counts against a company; it only lowers confidence.",
+            )}
           </p>
           {profile.hardRule === null ? null : (
             <p className="cq-body-sm bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)">
@@ -173,13 +178,13 @@ export function FitBreakdownSheet({
                 href={`/company/${companyId}`}
                 className={buttonClassName("secondary", "compact")}
               >
-                Open profile
+                {t("Open profile")}
               </Link>
               <Link
                 href="/profile"
                 className={buttonClassName("quiet", "compact")}
               >
-                Change your mandate
+                {t("Change your mandate")}
               </Link>
             </div>
           )}

@@ -11,6 +11,8 @@ import {
 } from "@capital-q/q-core/ui-text";
 
 import {
+  ANSWER_WORDS_VERSION,
+  createLineTranslator,
   createUiTextService,
   parseUiTranslationDailyCapUsd,
   type UiTextRow,
@@ -330,5 +332,86 @@ describe("the shipped catalogue and cap", () => {
     expect(() =>
       parseUiTranslationDailyCapUsd({ CQ_UI_TRANSLATION_DAILY_CAP_USD: "500" }),
     ).toThrow();
+  });
+});
+
+describe("translateLines (Q's code-written lines, lane ml)", () => {
+  const LINES = ["{v1} needs your answer by {v2}.", "Here's what's waiting."];
+
+  it("translates skeletons once, keeps placeholders, caches under its own version", async () => {
+    const memory = memoryStore();
+    const fake = fakeTranslator();
+    const translateLines = createLineTranslator({
+      store: memory.store,
+      translate: fake.translate,
+      cap: capOf(2),
+    });
+    const first = await translateLines("fr", LINES, actor);
+    expect(first.get("{v1} needs your answer by {v2}.")).toBe(
+      "[fr] {v1} needs your answer by {v2}.",
+    );
+    expect(
+      memory.rows.has(`fr|${ANSWER_WORDS_VERSION}|Here's what's waiting.`),
+    ).toBe(true);
+    expect(
+      memory.rows.has(`fr|${UI_TEXT_CATALOG_VERSION}|Here's what's waiting.`),
+    ).toBe(false);
+    await translateLines("fr", LINES, actor);
+    expect(fake.calls).toHaveLength(1);
+    // A new process reads the store, and asks nothing.
+    const again = createLineTranslator({
+      store: memory.store,
+      translate: fake.translate,
+      cap: capOf(2),
+    });
+    expect((await again("fr", LINES, actor)).size).toBe(2);
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it("returns nothing for English or an unofferable language, without a call", async () => {
+    const fake = fakeTranslator();
+    const translateLines = createLineTranslator({
+      store: memoryStore().store,
+      translate: fake.translate,
+      cap: capOf(2),
+    });
+    expect((await translateLines("en-GB", LINES, actor)).size).toBe(0);
+    expect((await translateLines("tlh", LINES, actor)).size).toBe(0);
+    expect(fake.calls).toEqual([]);
+  });
+
+  it("leaves out a line whose translation broke a placeholder, and waits no longer than it may", async () => {
+    const memory = memoryStore();
+    const broken = fakeTranslator({
+      breakOne: "{v1} needs your answer by {v2}.",
+    });
+    const translateLines = createLineTranslator({
+      store: memory.store,
+      translate: broken.translate,
+      cap: capOf(2),
+    });
+    const out = await translateLines("sw", LINES, actor);
+    expect(out.has("{v1} needs your answer by {v2}.")).toBe(false);
+    expect(out.get("Here's what's waiting.")).toBe(
+      "[sw] Here's what's waiting.",
+    );
+    const slow = createLineTranslator({
+      store: memoryStore().store,
+      translate: () => new Promise(() => undefined),
+      cap: capOf(2),
+      waitMs: 20,
+    });
+    expect((await slow("de", LINES, actor)).size).toBe(0);
+  });
+
+  it("stops at the shared daily cap", async () => {
+    const fake = fakeTranslator();
+    const translateLines = createLineTranslator({
+      store: memoryStore().store,
+      translate: fake.translate,
+      cap: capOf(0),
+    });
+    expect((await translateLines("es", LINES, actor)).size).toBe(0);
+    expect(fake.calls).toEqual([]);
   });
 });

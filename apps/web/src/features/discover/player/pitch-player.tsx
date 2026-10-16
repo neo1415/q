@@ -828,7 +828,7 @@ export function PitchPlayer({
         */}
         {cannotPlay ? (
           <p className="cq-caption text-(--cq-text-secondary)" role="status">
-            {CANNOT_PLAY}
+            {t(CANNOT_PLAY)}
           </p>
         ) : null}
         {explicitPlay && !playing && !cannotPlay ? (

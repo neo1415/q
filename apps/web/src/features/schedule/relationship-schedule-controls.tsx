@@ -20,6 +20,7 @@ import {
 import { JOINED_MESSAGE, JoinCallForm } from "./join-call-form";
 import { MeetingQ } from "./meeting-q";
 import { QSwarm } from "@/features/q-swarm/q-swarm";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The relationship page's calls and reminders (BIZ-008). The same things Q
@@ -101,6 +102,7 @@ export function RelationshipScheduleControls({
   readonly initialMeetings: readonly MeetingDto[];
   readonly initialReminders: readonly ReminderDto[];
 }) {
+  const t = useT();
   const [meetings, setMeetings] = useState(initialMeetings);
   const [reminders, setReminders] = useState(initialReminders);
   const [slots, setSlots] = useState<readonly MeetingSlot[] | null>(null);
@@ -247,7 +249,7 @@ export function RelationshipScheduleControls({
       data-relationship-schedule
     >
       <h2 id="relationship-schedule" className="sr-only">
-        Calls and reminders
+        {t("Calls and reminders")}
       </h2>
 
       {focus === "reminder" ? null : (
@@ -280,7 +282,7 @@ export function RelationshipScheduleControls({
                         rel="noopener noreferrer"
                         className={buttonClassName("secondary", "compact")}
                       >
-                        Join Google Meet
+                        {t("Join Google Meet")}
                       </a>
                     )}
                     {meeting.organisedByYou &&
@@ -291,7 +293,7 @@ export function RelationshipScheduleControls({
                         disabled={pending}
                         onClick={() => cancel(meeting.id)}
                       >
-                        Cancel call
+                        {t("Cancel call")}
                       </Button>
                     ) : null}
                   </div>
@@ -327,7 +329,7 @@ export function RelationshipScheduleControls({
               onClick={() => setJoining(true)}
               className="self-start"
             >
-              Have Q join a call
+              {t("Have Q join a call")}
             </Button>
           )}
 
@@ -340,7 +342,7 @@ export function RelationshipScheduleControls({
               <div className="flex items-center gap-3" role="status">
                 <QSwarm state="WORKING" pixels={40} />
                 <span className="cq-body-sm text-(--cq-text-secondary)">
-                  Looking at your calendar…
+                  {t("Looking at your calendar…")}
                 </span>
               </div>
             ) : (
@@ -350,7 +352,7 @@ export function RelationshipScheduleControls({
                 onClick={findTimes}
                 className="self-start"
               >
-                Find a time
+                {t("Find a time")}
               </Button>
             )
           ) : (
@@ -393,7 +395,7 @@ export function RelationshipScheduleControls({
                     <div className="pt-2">
                       <Input
                         id="meeting-purpose"
-                        label="What the call is for"
+                        label={t("What the call is for")}
                         value={purpose}
                         maxLength={500}
                         onChange={(event) => setPurpose(event.target.value)}
@@ -432,7 +434,7 @@ export function RelationshipScheduleControls({
                     disabled={pending}
                     onClick={() => dismiss(reminder.id)}
                   >
-                    Done
+                    {t("Done")}
                   </Button>
                 </li>
               ))}
@@ -441,7 +443,7 @@ export function RelationshipScheduleControls({
           <div className="flex flex-col gap-2" data-remind-form>
             <Input
               id="reminder-title"
-              label="Remind me to"
+              label={t("Remind me to")}
               placeholder={`Follow up with ${counterpart}`}
               value={reminderTitle}
               maxLength={200}
@@ -450,7 +452,7 @@ export function RelationshipScheduleControls({
             <div
               className="flex flex-wrap gap-2"
               role="group"
-              aria-label="When"
+              aria-label={t("When")}
             >
               {QUICK_WHEN.map((quick) => (
                 <Button
@@ -467,7 +469,7 @@ export function RelationshipScheduleControls({
             </div>
             <Input
               id="reminder-at"
-              label="Or pick a time"
+              label={t("Or pick a time")}
               type="datetime-local"
               value={reminderAt}
               onChange={(event) => setReminderAt(event.target.value)}
@@ -478,7 +480,7 @@ export function RelationshipScheduleControls({
                 checked={byEmail}
                 onChange={(event) => setByEmail(event.target.checked)}
               />
-              Email me too
+              {t("Email me too")}
             </label>
             <Button
               variant="secondary"
@@ -486,7 +488,7 @@ export function RelationshipScheduleControls({
               onClick={remind}
               className="self-start"
             >
-              Set reminder
+              {t("Set reminder")}
             </Button>
           </div>
         </div>

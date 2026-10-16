@@ -28,6 +28,7 @@ import {
   type RoundOption,
 } from "./round-terms-fields";
 import { STEP_EXPLAINED, STEP_WORDS } from "./round-words";
+import { useT } from "@/features/i18n/language";
 
 type Round = CapitalLedgerDto["rounds"][number];
 
@@ -89,6 +90,7 @@ export function RoundControls({
   readonly rounds: readonly Round[];
   readonly leads: readonly LeadOption[];
 }) {
+  const t = useT();
   const [open, setOpen] = useState<
     | { readonly kind: "STEP"; readonly step: CapitalRoundStep }
     | { readonly kind: "EDIT" }
@@ -111,7 +113,7 @@ export function RoundControls({
           size="compact"
           onClick={() => setOpen({ kind: "STEP", step })}
         >
-          {STEP_WORDS[step]}
+          {t(STEP_WORDS[step])}
         </Button>
       ))}
       <Button
@@ -119,7 +121,7 @@ export function RoundControls({
         size="compact"
         onClick={() => setOpen({ kind: "EDIT" })}
       >
-        Edit terms
+        {t("Edit terms")}
       </Button>
       <Button
         variant="quiet"
@@ -154,7 +156,9 @@ export function RoundControls({
           <SheetContent
             side="side"
             title={`Edit ${round.name}`}
-            description="Changes are kept in the round's history, with what they replaced."
+            description={t(
+              "Changes are kept in the round's history, with what they replaced.",
+            )}
           >
             <EditForm
               round={round}
@@ -167,7 +171,7 @@ export function RoundControls({
           <SheetContent
             side="side"
             title={`${round.name}: history`}
-            description="Every change to this round, newest first."
+            description={t("Every change to this round, newest first.")}
           >
             <History roundId={round.id} currency={round.target.currency} />
           </SheetContent>
@@ -188,6 +192,7 @@ function StepForm({
   readonly warning: string | null;
   readonly onDone: () => void;
 }) {
+  const t = useT();
   const id = useId();
   const router = useRouter();
   const [on, setOn] = useState(today);
@@ -241,7 +246,7 @@ function StepForm({
       <Input
         id={`${id}-on`}
         type="date"
-        label="When"
+        label={t("When")}
         value={on}
         onChange={(event) => setOn(event.target.value)}
       />
@@ -251,7 +256,7 @@ function StepForm({
           label={`Amount (${round.target.currency}), if you know it`}
           inputMode="decimal"
           autoComplete="off"
-          placeholder="Not said"
+          placeholder={t("Not said")}
           value={amount}
           onChange={(event) => setAmount(event.target.value)}
         />
@@ -281,10 +286,10 @@ function StepForm({
       )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" disabled={pending}>
-          {STEP_WORDS[step]}
+          {t(STEP_WORDS[step])}
         </Button>
         <Button variant="quiet" disabled={pending} onClick={onDone}>
-          Not now
+          {t("Not now")}
         </Button>
       </div>
     </form>
@@ -302,6 +307,7 @@ function EditForm({
   readonly leads: readonly LeadOption[];
   readonly onDone: () => void;
 }) {
+  const t = useT();
   const id = useId();
   const router = useRouter();
   const [name, setName] = useState(round.name);
@@ -367,7 +373,7 @@ function EditForm({
     >
       <Input
         id={`${id}-name`}
-        label="Name"
+        label={t("Name")}
         maxLength={80}
         value={name}
         onChange={(event) => setName(event.target.value)}
@@ -391,9 +397,9 @@ function EditForm({
       />
       <Input
         id={`${id}-note`}
-        label="Why the change (optional)"
+        label={t("Why the change (optional)")}
         maxLength={500}
-        placeholder="Corrected after the term sheet"
+        placeholder={t("Corrected after the term sheet")}
         value={note}
         onChange={(event) => setNote(event.target.value)}
       />
@@ -404,10 +410,10 @@ function EditForm({
       )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" disabled={pending}>
-          Save changes
+          {t("Save changes")}
         </Button>
         <Button variant="quiet" disabled={pending} onClick={onDone}>
-          Cancel
+          {t("Cancel")}
         </Button>
       </div>
     </form>
@@ -461,6 +467,7 @@ function History({
   readonly roundId: string;
   readonly currency: string;
 }) {
+  const t = useT();
   const [events, setEvents] = useState<
     readonly CapitalRoundEventDto[] | "loading" | "failed"
   >("loading");
@@ -476,14 +483,14 @@ function History({
   if (events === "loading") {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)" aria-busy="true">
-        Loading…
+        {t("Loading…")}
       </p>
     );
   }
   if (events === "failed") {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)">
-        The history couldn&apos;t load. Try again in a moment.
+        {t("The history couldn't load. Try again in a moment.")}
       </p>
     );
   }
@@ -496,7 +503,7 @@ function History({
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="cq-body-sm font-semibold text-(--cq-text-primary)">
-              {EVENT_WORDS[event.type]}
+              {t(EVENT_WORDS[event.type])}
               {event.amount === null
                 ? null
                 : `, ${money(event.amount, event.currencyCode ?? currency)}`}

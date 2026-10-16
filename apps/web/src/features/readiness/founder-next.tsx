@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FollowUpStack } from "./follow-up-stack";
 import { ownReadiness } from "./readiness-data";
 import { PrivateNote, ReadinessTally } from "./readiness-section";
+import { serverT } from "@/features/i18n/server";
 
 /**
  * Home's opening for a founder (Q.01/Q.04): the next question Q still
@@ -12,6 +13,7 @@ import { PrivateNote, ReadinessTally } from "./readiness-section";
  * Home stays Q first.
  */
 export async function FounderNext() {
+  const t = await serverT();
   const readiness = await ownReadiness();
   if (readiness === null) return null;
   const next = readiness.actions
@@ -45,7 +47,7 @@ export async function FounderNext() {
               href="/relationships?view=capital&tab=action-plan"
               className="cq-label text-(--cq-accent) underline-offset-2 hover:underline"
             >
-              Action plan
+              {t("Action plan")}
             </Link>
           </div>
           <ol className="overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
@@ -62,14 +64,14 @@ export async function FounderNext() {
                 </span>
                 <div className="flex flex-col gap-0.5">
                   <span className="cq-body font-semibold text-(--cq-text-primary)">
-                    {action.title}
+                    {t(action.title)}
                   </span>
                   <span className="cq-body-sm text-(--cq-text-secondary)">
-                    {action.why}
+                    {t(action.why)}
                   </span>
                 </div>
                 <span className="cq-caption col-start-2 text-(--cq-text-tertiary) sm:col-start-3">
-                  {action.ownerLabel}
+                  {t(action.ownerLabel)}
                 </span>
               </li>
             ))}
@@ -85,13 +87,13 @@ export async function FounderNext() {
             id="stop-raise-home"
             className="cq-title-sm text-(--cq-text-primary)"
           >
-            What could stop your raise
+            {t("What could stop your raise")}
           </h2>
           <Link
             href="/relationships?view=capital&tab=readiness"
             className="cq-label text-(--cq-accent) underline-offset-2 hover:underline"
           >
-            Readiness
+            {t("Readiness")}
           </Link>
         </div>
         <ReadinessTally readiness={readiness} />

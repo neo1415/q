@@ -94,3 +94,30 @@ Run as the fictional founder `babatunde.tunde-cargo` with `scratchpad/ml-live/li
   - Taxonomy sector names.
   - Labels in a few non-async server components.
 - **Browser check (local build of this branch against production APIs, Arabic injected by a read-only proxy):** screenshots at 390 and 1440 px under `scratchpad/ml-rtl/` — founder Home, Explore, Profile, Rehearsals and Settings; investor Home, Discover and Explore. No horizontal overflow on any of them.
+
+## Live Arabic check on release AA (f0d722b2), 2026-10-16
+
+Fresh fictional founder `ml.aa.founder.rimal@fictional.capitalq.local` (cq_seed `arabic-live-2026-10-16`, Rimal Freight). Live calls: about 9 Q runs (3 text turns, 2 language switches by talking to Q, 4 onboarding turns plus the opener), 1 TTS, 1 Nova-3 STT of about 8 s, 0 Tavus.
+
+| Check                                       | Result                                                                                                                                                                                                                                         |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Settings → Arabic: whole app RTL, no reload | PASS for direction and layout (no overflow at 390 or 1440). FAIL for coverage: many strings were still English (Home readiness and action plan, welcome, Settings options, Discover cards and gates, onboarding coverage list, Results counts) |
+| Switch language by talking to Q             | "غيّر اللغة إلى العربية" PASS (live, no reload, Arabic confirmation). "switch to English" FAIL: read as a record name ("I can't find English…")                                                                                                |
+| Arabic text conversation                    | PASS for 2 of 3 turns, figures exact (1.2m ÷ 95k = 12.6 months). FAIL for the code-switched turn: answered by the code-written investor list, in English, ignoring the question                                                                |
+| Arabic TTS / Nova-3 STT                     | PASS (200, 130 KB; production listen model nova-3, confidence 0.96)                                                                                                                                                                            |
+| Arrival greeting and summary                | Greeting and opener PASS. "Here's what's waiting." and the readiness question card were English                                                                                                                                                |
+| Onboarding scenario 14                      | FAIL: opener in English; English step questions appended after Arabic replies                                                                                                                                                                  |
+
+Fixed on `claude/ml-fix-oct16`:
+
+- the "{a} and {b}" pattern no longer grafts "و" onto English sentences;
+- about 400 strings wrapped or catalogued (`catalog/sweep.ts`), plus a `<Words>` helper for components that can't take a hook;
+- the language is named a language, not a record;
+- the Arabic investor-discovery composer;
+- onboarding: an Arabic note to the interviewer, Arabic step questions for code-added lines, and `؟` counted as a question.
+
+Still open, with other owners:
+
+- an onboarding monthly revenue or raise held as "not saved" (held writes);
+- the turn reader reading a question as investor discovery;
+- English in the other code-written Q answers and the stored readiness questions.

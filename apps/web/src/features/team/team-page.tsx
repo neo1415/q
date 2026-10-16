@@ -187,7 +187,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
               </span>
             </span>
             <span className="cq-caption text-(--cq-text-secondary)">
-              {ROLE_WORD[team.you.role]}
+              {t(ROLE_WORD[team.you.role])}
             </span>
           </span>
         </div>
@@ -235,7 +235,7 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
           <span>
             You&apos;re a{" "}
             <b className="font-medium text-(--cq-text-primary)">
-              {ROLE_WORD[team.you.role]}
+              {t(ROLE_WORD[team.you.role])}
             </b>
             . Admins invite people and change roles. <AskAnAdmin team={team} />
           </span>
@@ -667,7 +667,7 @@ function MemberRow({
             className="inline-flex min-h-11 items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) pe-2.5 ps-3 cq-body-sm whitespace-nowrap text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:min-h-10"
             onClick={onRole}
           >
-            {ROLE_WORD[member.role]}
+            {t(ROLE_WORD[member.role])}
             <ChevronDown
               aria-hidden="true"
               size={ICON_SIZE.compact}
@@ -676,7 +676,7 @@ function MemberRow({
           </button>
         ) : (
           <span className="px-1 cq-body-sm text-(--cq-text-secondary)">
-            {ROLE_WORD[member.role]}
+            {t(ROLE_WORD[member.role])}
           </span>
         )}
         {more ? (
@@ -972,7 +972,7 @@ function InviteSheet({
                     : "text-(--cq-text-secondary)",
                 )}
               >
-                {ROLE_WORD[option]}
+                {t(ROLE_WORD[option])}
               </button>
             ))}
           </div>
@@ -1057,7 +1057,7 @@ function RoleSheet({
               />
               <span className="flex flex-col">
                 <span className="cq-body font-medium text-(--cq-text-primary)">
-                  {ROLE_WORD[option]}
+                  {t(ROLE_WORD[option])}
                 </span>
                 <span className="cq-body-sm text-(--cq-text-secondary)">
                   {does}

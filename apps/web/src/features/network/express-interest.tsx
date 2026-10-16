@@ -10,6 +10,7 @@ import {
   type InterestActionResult,
 } from "./interest-actions";
 import { STATE_WORDS } from "../relationships/relationship-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Express Interest (CQ-NET-010; doc 17 §70, doc 19 §2.5).
@@ -89,6 +90,7 @@ export function ExpressInterest({
    */
   readonly relationshipState?: RelationshipStateV2 | null;
 }) {
+  const t = useT();
   const [phase, setPhase] = useState<Phase>(
     initialInterest === null
       ? { kind: startConfirming ? "CONFIRMING" : "IDLE" }
@@ -140,7 +142,7 @@ export function ExpressInterest({
           variant="secondary"
           onClick={() => setPhase({ kind: "CONFIRMING" })}
         >
-          Express interest
+          {t("Express interest")}
         </Button>
       );
 
@@ -158,10 +160,10 @@ export function ExpressInterest({
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="primary" onClick={() => void send()}>
-              Express interest
+              {t("Express interest")}
             </Button>
             <Button variant="quiet" onClick={() => setPhase({ kind: "IDLE" })}>
-              Cancel
+              {t("Cancel")}
             </Button>
           </div>
         </div>
@@ -170,7 +172,7 @@ export function ExpressInterest({
     case "SENDING":
       return (
         <Button variant="secondary" disabled aria-busy="true">
-          Sending interest…
+          {t("Sending interest…")}
         </Button>
       );
 
@@ -196,7 +198,7 @@ export function ExpressInterest({
           <p className="cq-status-line">{phase.message}</p>
           {phase.retryable ? (
             <Button variant="secondary" onClick={() => void send()}>
-              Try again
+              {t("Try again")}
             </Button>
           ) : null}
         </div>

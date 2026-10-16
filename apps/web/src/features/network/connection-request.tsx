@@ -18,6 +18,7 @@ import {
   requestConnectionAction,
   type ConnectionActionResult,
 } from "./connection-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * A founder's Connection Request to one investor (ADR 0023).
@@ -63,6 +64,7 @@ export function ConnectionRequest({
   readonly status: ConnectionStatusDto;
   readonly send?: RequestConnectionPort;
 }) {
+  const t = useT();
   const [request, setRequest] = useState<ConnectionRequestDto | null>(
     status.request,
   );
@@ -110,7 +112,7 @@ export function ConnectionRequest({
             href={`/relationships/investor/${investorOrganisationId}`}
             className={buttonClassName("primary")}
           >
-            Open the relationship
+            {t("Open the relationship")}
           </Link>
         </div>
       );
@@ -136,7 +138,7 @@ export function ConnectionRequest({
         className="cq-body-sm text-(--cq-text-secondary)"
         data-connection="NOT_ACCEPTED"
       >
-        {NOT_ACCEPTED[status.notAccepted]}
+        {t(NOT_ACCEPTED[status.notAccepted])}
       </p>
     );
   }
@@ -156,10 +158,10 @@ export function ConnectionRequest({
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="primary" onClick={() => void submit()}>
-            Send request
+            {t("Send request")}
           </Button>
           <Button variant="quiet" onClick={() => setPhase({ kind: "IDLE" })}>
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
       </div>
@@ -168,7 +170,7 @@ export function ConnectionRequest({
   if (phase.kind === "SENDING") {
     return (
       <Button variant="primary" disabled aria-busy="true">
-        Sending…
+        {t("Sending…")}
       </Button>
     );
   }

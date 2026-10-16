@@ -169,7 +169,7 @@ export function ProfileFindings({
               className="flex flex-col gap-1.5 py-3"
             >
               <p className="cq-caption text-(--cq-text-secondary)">
-                {FINDING_LABELS[finding.key]}
+                {t(FINDING_LABELS[finding.key])}
               </p>
               <p className="cq-body-sm text-(--cq-text-primary)">
                 {finding.statement}
@@ -177,7 +177,7 @@ export function ProfileFindings({
               <SourcesDisclosure count={finding.sources.length}>
                 <p className="cq-caption text-(--cq-text-tertiary)">
                   {TRUTH_WORDS[finding.truthClass]} ·{" "}
-                  {EVIDENCE_WORDS[finding.evidenceStatus]}
+                  {t(EVIDENCE_WORDS[finding.evidenceStatus])}
                   {finding.lifecycleStatus === "CURRENT"
                     ? ""
                     : ` · ${LIFECYCLE_WORDS[finding.lifecycleStatus]}`}
@@ -402,7 +402,7 @@ export function SignalsAndVerification({
                 className="flex flex-col gap-0.5 py-2"
               >
                 <dt className="cq-caption text-(--cq-text-secondary)">
-                  {CLAIM_WORDS[standing.claimType]}
+                  {t(CLAIM_WORDS[standing.claimType])}
                 </dt>
                 <dd className="cq-body-sm text-(--cq-text-primary)">
                   {standingLine(standing)}

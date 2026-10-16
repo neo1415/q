@@ -151,7 +151,7 @@ export function DeckReadSummary({
               >
                 <StatusMark status={section.status} />
                 <span className="min-w-0">
-                  {DECK_SECTION_LABELS[section.section]}
+                  {t(DECK_SECTION_LABELS[section.section])}
                 </span>
                 <span className="sr-only">
                   : {STATUS_WORDS[section.status]}
@@ -384,7 +384,7 @@ export function DeckCarousel({
                 : "border-(--cq-border) text-(--cq-text-primary)"
             }`}
           >
-            {DECK_SECTION_LABELS[section.section]}
+            {t(DECK_SECTION_LABELS[section.section])}
           </button>
         ))}
       </div>

@@ -1342,7 +1342,7 @@ export function ArrivalBriefing({
             <span className="font-semibold text-(--cq-text-primary)">
               {words.greeting}
             </span>{" "}
-            <span data-arrival-lowdown>{after}</span>
+            <span data-arrival-lowdown>{t(after)}</span>
           </p>
           {onClose === undefined ? null : (
             <Button
@@ -1373,7 +1373,7 @@ export function ArrivalBriefing({
                 {words.welcome}{" "}
               </span>
             )}
-            {after}
+            {t(after)}
           </p>
         </div>
       )}

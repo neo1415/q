@@ -15,6 +15,7 @@ import {
   listPitchMediaAction,
 } from "./pitch-actions";
 import { phaseOf } from "./pitch-library-state";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Pitch & media (ADR 0022): every live video the company has, newest
@@ -31,6 +32,7 @@ import { phaseOf } from "./pitch-library-state";
 const POSTER_BUDGET = 12;
 
 export function PitchGrid({ companyId }: { readonly companyId: string }) {
+  const t = useT();
   const [videos, setVideos] = useState<readonly MediaAssetDto[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [posters, setPosters] = useState<Readonly<Record<string, string>>>({});
@@ -78,7 +80,7 @@ export function PitchGrid({ companyId }: { readonly companyId: string }) {
 
   if (loadError !== null) {
     return (
-      <InlineNotice tone="warning" title="Your videos couldn't load">
+      <InlineNotice tone="warning" title={t("Your videos couldn't load")}>
         {loadError}
       </InlineNotice>
     );
@@ -99,7 +101,7 @@ export function PitchGrid({ companyId }: { readonly companyId: string }) {
           data-pitch-new
         >
           <Plus size={ICON_SIZE.regular} aria-hidden="true" />
-          New video
+          {t("New video")}
         </Link>
       </div>
       {videos.length === 0 ? null : (
