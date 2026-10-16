@@ -27,6 +27,7 @@ import {
 } from "../src/voice/quick-acknowledgement.js";
 import { withoutUnbackedFieldClaims } from "../src/voice/onboarding-flow.js";
 import {
+  createOnboardingPort,
   currencyNamedIn,
   fieldPartOf,
   moneyFiguresIn,
@@ -398,5 +399,89 @@ describe("a chosen language warms the acknowledgement copy", () => {
     expect(calls.every((c) => c.size <= 40)).toBe(true);
     const total = calls.reduce((sum, c) => sum + c.size, 0);
     expect(total).toBe(onboardingAcknowledgementCopy("founder", "fr").length);
+  });
+});
+
+describe("live AI: a new investor's categories in their first answer", () => {
+  it("are planned again once that answer set up their profile", async () => {
+    const said =
+      "We're a VC fund, we invest in Europe and North Africa, mostly climate.";
+    const world = investorSession({
+      currentStepKey: "I0.investor_type",
+      taxonomy: {
+        europe: "a0000000-0000-4000-8000-0000000000e1",
+        "north africa": "a0000000-0000-4000-8000-0000000000e2",
+        climate: "a0000000-0000-4000-8000-0000000000c1",
+      },
+      taxonomyUntil: "I0.investor_type",
+    });
+    const port = createOnboardingPort({
+      session: turn(world, said).session,
+      onboardingSessionId: turn(world, said).onboardingSessionId,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [said],
+      authority: () =>
+        Promise.resolve(
+          reading({
+            stated: ["I0.investor_type", "I3.geography", "I3.sectors"],
+          }),
+        ),
+    });
+    const results = await port.record([
+      {
+        stepKey: "I0.investor_type",
+        value: "vc",
+        quote: "a VC fund",
+        basis: "STATED",
+        ownWords: false,
+      },
+      {
+        stepKey: "I3.geography",
+        value: ["Europe", "North Africa"],
+        quote: "Europe and North Africa",
+        basis: "STATED",
+        ownWords: false,
+      },
+      {
+        stepKey: "I3.sectors",
+        value: ["climate"],
+        quote: "mostly climate",
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    expect(results.map((r) => r.outcome)).toEqual([
+      "COMMITTED",
+      "COMMITTED",
+      "COMMITTED",
+    ]);
+    expect(world.recordedValue("I3.geography")?.type).toBe(
+      "RESOURCE_REFERENCE",
+    );
+  });
+});
+
+describe("live AI: a stated fact off their path is kept, by code", () => {
+  it("revenue for a pre-seed company goes to their notes in its own words", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.description",
+      recorded: { "F0.intent": "raising_now", "F1.company_name": "Lakeline" },
+      ineligible: ["F5.revenue_status"],
+    });
+    const port = createOnboardingPort({
+      session: turn(world, AG_FOUNDER).session,
+      onboardingSessionId: turn(world, AG_FOUNDER).onboardingSessionId,
+      journeyType: "founder",
+      ownerUserId: actor.userId,
+      personTurns: [AG_FOUNDER],
+    });
+    const kept = await port.keepStated("F5.revenue_status", AG_FOUNDER);
+    expect(kept?.outcome).toBe("COMMITTED");
+    const notes = world.recordedValue("F7.follow_up");
+    const text = notes?.type === "TEXT" ? notes.text : "";
+    expect(text).toContain("first revenue only");
+    expect(text).not.toContain("cold-chain");
   });
 });

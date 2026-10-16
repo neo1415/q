@@ -232,6 +232,17 @@ export type BoundOnboardingPort = OnboardingToolPort &
      * name exactly one currency (owner 2026-10-16: never ask for a currency
      * already stated). Null when nothing was recorded.
      */
+    /**
+     * A step their latest words state that is not on their path (revenue
+     * for a pre-seed company): its part of their words kept with their
+     * notes, never lost (live AI 2026-10-16: "first revenue only, from two
+     * co-ops" was stated and nothing kept it). Null when no clause of their
+     * words carries the step's own words.
+     */
+    readonly keepStated: (
+      stepKey: string,
+      said: string,
+    ) => Promise<OnboardingRecordResult | null>;
     readonly recordStatedCurrency: (options?: {
       /** Only their earlier words: the latest are the acting model's first. */
       readonly earlierOnly?: boolean;
@@ -2512,10 +2523,15 @@ export function createOnboardingPort(input: {
         warmed.set(answer, resolving);
       }
       const plans: Planned[] = [];
-      for (const answer of answers) {
-        const plan = await planOne(answer).catch((error: unknown): Planned =>
-          done(refused(answer.stepKey, error)),
-        );
+      // Answers whose planning failed on a service call (a category lookup
+      // refused before this turn's first answers set up their profile).
+      const failedToPlan = new Set<number>();
+      const writtenBefore = written.length;
+      for (const [index, answer] of answers.entries()) {
+        const plan = await planOne(answer).catch((error: unknown): Planned => {
+          failedToPlan.add(index);
+          return done(refused(answer.stepKey, error));
+        });
         // A figure planned for one step is not also another's in the same
         // breath (one stated figure answers one step), as if each had
         // committed in turn.
@@ -2562,6 +2578,18 @@ export function createOnboardingPort(input: {
         // take as one: the single path, in the order they spoke.
         results.push(await safely(answer));
       }
+      // Live AI 2026-10-16: a new investor's first answer set up their
+      // profile in this batch, and the category look-ups planned before it
+      // were refused (no organisation context yet), so geography and
+      // sectors were lost. Once anything committed, they are planned again.
+      if (written.length > writtenBefore) {
+        for (const index of failedToPlan) {
+          const answer = answers[index];
+          if (answer !== undefined && results[index]?.outcome !== "COMMITTED") {
+            results[index] = await safely(answer);
+          }
+        }
+      }
       // A refused step whose prerequisite landed later in the batch gets
       // one more try, so the order they spoke in does not matter.
       for (const [index, result] of results.entries()) {
@@ -2581,6 +2609,30 @@ export function createOnboardingPort(input: {
     recorded: () => [...written],
     recordFromSignup: (stepKey, text) => recordPlatformHeld(stepKey, text),
     recordKnown: (stepKey, raw) => recordPlatformHeld(stepKey, raw),
+    keepStated: async (stepKey, said) => {
+      const step = steps.get(stepKey);
+      if (step === undefined || written.includes(stepKey)) return null;
+      const view = await current();
+      if (view.responses.some((r) => r.stepKey === stepKey)) return null;
+      const configuration: unknown = step.configuration;
+      const optionLabels =
+        typeof configuration === "object" &&
+        configuration !== null &&
+        "options" in configuration &&
+        Array.isArray(configuration.options)
+          ? (
+              configuration.options as readonly { readonly label?: unknown }[]
+            ).map((o) => (typeof o.label === "string" ? o.label : ""))
+          : [];
+      const about = [
+        coverageProfileFor(input.journeyType).fields[stepKey]?.label ?? "",
+        SPOKEN_QUESTIONS[stepKey] ?? step.configuration.prompt,
+        ...optionLabels,
+      ].join(" ");
+      const words = fieldClausesOf(said, about);
+      if (words === null) return null;
+      return keepOffPath(step, words);
+    },
     recordStatedCurrency: async (options) => {
       const stepKey =
         input.journeyType === "founder" ? "F6.currency" : "I2.currency";
