@@ -246,9 +246,11 @@ export {
   type RecordDocumentExtractionInput,
   type RecordDocumentExtractionResult,
   type BackfillDocumentPagesResult,
+  type ReadOwnDocumentTextQuery,
 } from "./application/extraction-use-cases.js";
 export {
   DOCUMENT_PAGE_MAX_CHARS,
+  documentTextFromBlocks,
   pagesFromBlocks,
   type DocumentPageText,
 } from "./domain/document-pages.js";
@@ -256,7 +258,10 @@ export {
   scanInstructionRisk,
   type InstructionRiskReport,
 } from "./domain/instruction-risk.js";
-export { createPostgresDocumentExtractionRepository } from "./infrastructure/postgres-extraction-repository.js";
+export {
+  createPostgresDocumentExtractionRepository,
+  createPostgresDocumentPageTextReader,
+} from "./infrastructure/postgres-extraction-repository.js";
 
 export const PACKAGE_NAME = "@capital-q/evidence" as const;
 export {

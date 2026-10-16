@@ -189,3 +189,49 @@ export function createPostgresDocumentExtractionRepository(): DocumentExtraction
     },
   };
 }
+
+const PageTextRow = z.object({ text: z.string() });
+
+/**
+ * An organisation's own document, read as its extracted text page by page
+ * (ob2 2026-10-16: an investor's fund deck for mandate proposals). Scoped by
+ * tenant, document, version AND owning organisation, on the pages and their
+ * extraction alike, so a caller that names another organisation's document
+ * reads nothing. The newest extraction of that version only, never a mix.
+ *
+ * Deliberately not the knowledge passages: those are cut only for a
+ * company's documents and feed retrieval; this is a direct read of the
+ * owner's own document and widens no retrieval scope.
+ */
+export function createPostgresDocumentPageTextReader() {
+  return {
+    listByVersion: async (
+      executor: DatabaseExecutor,
+      tenantId: string,
+      document: {
+        readonly documentId: string;
+        readonly documentVersionId: string;
+        readonly ownerOrganisationId: string;
+      },
+    ): Promise<readonly { readonly text: string }[]> => {
+      const rows = await executor`
+        with latest as (
+          select x.id
+            from evidence.document_extractions x
+           where x.tenant_id = ${tenantId}
+             and x.document_id = ${document.documentId}
+             and x.document_version_id = ${document.documentVersionId}
+             and x.owner_organisation_id = ${document.ownerOrganisationId}
+           order by x.created_at desc, x.id desc
+           limit 1)
+        select p.text
+          from evidence.document_pages p
+          join latest l on l.id = p.extraction_id
+         where p.tenant_id = ${tenantId}
+           and p.document_id = ${document.documentId}
+           and p.owner_organisation_id = ${document.ownerOrganisationId}
+         order by p.page_number`;
+      return rows.map((row) => PageTextRow.parse(row));
+    },
+  };
+}
