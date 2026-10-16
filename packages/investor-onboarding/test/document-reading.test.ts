@@ -23,9 +23,12 @@ function world(
     companyId: null,
     ownerOrganisationId: FIRM,
   },
+  /** False: an unpaged document (Word, plain text), with no page text. */
+  paged = true,
 ) {
   const narratives: string[] = [];
   const pageReads: unknown[] = [];
+  const extractionReads: unknown[] = [];
   const proposed: { stepKey: string; sourceRefs: unknown }[] = [];
   const reading: MandateSynthesis = {
     constraints: [],
@@ -88,13 +91,27 @@ function world(
     pages: {
       listByVersion: (_sql, tenantId, document) => {
         pageReads.push({ tenantId, ...document });
-        return Promise.resolve([
-          { text: "We write $250k seed cheques in USD across West Africa." },
-        ]);
+        return Promise.resolve(
+          paged
+            ? [
+                {
+                  text: "We write $250k seed cheques in USD across West Africa.",
+                },
+              ]
+            : [],
+        );
+      },
+    },
+    extractionText: {
+      read: (query) => {
+        extractionReads.push(query);
+        return Promise.resolve(
+          "Thesis: we write seed cheques in USD across East Africa.",
+        );
       },
     },
   });
-  return { review, narratives, proposed, pageReads };
+  return { review, narratives, proposed, pageReads, extractionReads };
 }
 
 const event = {
@@ -130,13 +147,48 @@ describe("investor document reading (ob1)", () => {
     ]);
   });
 
+  it("an unpaged thesis (Word, plain text) is read from its own extraction, same scope", async () => {
+    const { review, narratives, proposed, pageReads, extractionReads } = world(
+      "INVESTMENT_THESIS",
+      "CONFIDENTIAL",
+      { companyId: null, ownerOrganisationId: FIRM },
+      false,
+    );
+    const result = await review.onDocumentReady(event);
+    expect(result).toMatchObject({ kind: "PREPARED", suggestionsCreated: 1 });
+    expect(pageReads).toHaveLength(1);
+    expect(extractionReads).toEqual([
+      {
+        tenantId: TENANT,
+        documentId: event.documentId,
+        documentVersionId: event.documentVersionId,
+        ownerOrganisationId: FIRM,
+        maxChars: 12_000,
+      },
+    ]);
+    expect(narratives[0]).toContain("seed cheques in USD across East Africa");
+    expect(proposed.map((p) => p.stepKey)).toEqual(["I2.currency"]);
+  });
+
+  it("a paged deck never falls back to its extraction", async () => {
+    const { review, extractionReads } = world("FUND_DECK");
+    await review.onDocumentReady(event);
+    expect(extractionReads).toEqual([]);
+  });
+
   it("an LP letter yields no proposals and its pages are never read", async () => {
-    const { review, narratives, proposed, pageReads } = world("LP_LETTER");
+    const { review, narratives, proposed, pageReads, extractionReads } = world(
+      "LP_LETTER",
+      "CONFIDENTIAL",
+      undefined,
+      false,
+    );
     await expect(review.onDocumentReady(event)).resolves.toEqual({
       kind: "SKIPPED",
       reason: "NOT_FOR_ONBOARDING_READING",
     });
     expect(pageReads).toEqual([]);
+    expect(extractionReads).toEqual([]);
     expect(narratives).toEqual([]);
     expect(proposed).toEqual([]);
   });
@@ -154,16 +206,15 @@ describe("investor document reading (ob1)", () => {
   ])(
     "%s fund deck is never read into this firm's mandate",
     async (_label, owner) => {
-      const { review, narratives, proposed, pageReads } = world(
-        "FUND_DECK",
-        "CONFIDENTIAL",
-        owner,
-      );
+      // Unpaged, so the extraction would be the next thing read.
+      const { review, narratives, proposed, pageReads, extractionReads } =
+        world("FUND_DECK", "CONFIDENTIAL", owner, false);
       await expect(review.onDocumentReady(event)).resolves.toEqual({
         kind: "SKIPPED",
         reason: "NOT_FOR_ONBOARDING_READING",
       });
       expect(pageReads).toEqual([]);
+      expect(extractionReads).toEqual([]);
       expect(narratives).toEqual([]);
       expect(proposed).toEqual([]);
     },

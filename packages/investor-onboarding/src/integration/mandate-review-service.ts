@@ -212,6 +212,23 @@ export type MandateReviewServiceDependencies = {
         ) => Promise<readonly { readonly text: string }[]>;
       }
     | undefined;
+  /**
+   * The same document's text from its stored extraction, for a document
+   * with no pages (a Word or plain-text thesis). Asked only when the pages
+   * hold nothing, and only after the type, firm and session checks; scoped
+   * by the same tenant, document, version and owner.
+   */
+  readonly extractionText?:
+    | {
+        readonly read: (document: {
+          readonly tenantId: string;
+          readonly documentId: string;
+          readonly documentVersionId: string;
+          readonly ownerOrganisationId: string;
+          readonly maxChars: number;
+        }) => Promise<string>;
+      }
+    | undefined;
 };
 
 /** How much of an investor document is read: the first pages, bounded. */
@@ -938,11 +955,26 @@ export function createMandateReview(
         documentVersionId: event.documentVersionId,
         ownerOrganisationId: owner,
       });
-      const text = documentPages
+      let text = documentPages
         .slice(0, DOCUMENT_PAGES)
         .map((page) => page.text)
         .join("\n\n")
         .slice(0, DOCUMENT_CHARS);
+      if (
+        text.trim().length === 0 &&
+        dependencies.extractionText !== undefined
+      ) {
+        // No pages: an unpaged document's text lives only in its extraction.
+        text = (
+          await dependencies.extractionText.read({
+            tenantId: active.tenantId,
+            documentId: event.documentId,
+            documentVersionId: event.documentVersionId,
+            ownerOrganisationId: owner,
+            maxChars: DOCUMENT_CHARS,
+          })
+        ).slice(0, DOCUMENT_CHARS);
+      }
       if (text.trim().length === 0) {
         return { kind: "SKIPPED", reason: "NO_NARRATIVE" };
       }

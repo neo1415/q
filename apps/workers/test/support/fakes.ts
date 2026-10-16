@@ -263,6 +263,10 @@ export function createFakeEvidence(options: {
   const backfillDocumentPages: DocumentProcessingService["backfillDocumentPages"] =
     () => Promise.resolve({ examined: 0, pagesWritten: 0, failed: 0 });
 
+  // Nor does it read an unpaged document back for onboarding.
+  const readOwnDocumentText: DocumentProcessingService["readOwnDocumentText"] =
+    () => Promise.resolve("");
+
   return {
     service: {
       resolveProcessingTarget,
@@ -273,6 +277,7 @@ export function createFakeEvidence(options: {
       recordDocumentExtraction,
       findDocumentExtraction,
       backfillDocumentPages,
+      readOwnDocumentText,
     },
     calls,
     status: () => requireRun().status,

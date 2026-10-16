@@ -246,9 +246,11 @@ export {
   type RecordDocumentExtractionInput,
   type RecordDocumentExtractionResult,
   type BackfillDocumentPagesResult,
+  type ReadOwnDocumentTextQuery,
 } from "./application/extraction-use-cases.js";
 export {
   DOCUMENT_PAGE_MAX_CHARS,
+  documentTextFromBlocks,
   pagesFromBlocks,
   type DocumentPageText,
 } from "./domain/document-pages.js";

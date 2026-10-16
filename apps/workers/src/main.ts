@@ -409,6 +409,20 @@ const mandateReview =
         // has no company, so it is never cut into knowledge passages.
         documents: createPostgresEvidenceRepositories().documents,
         pages: createPostgresDocumentPageTextReader(),
+        // An unpaged deck or thesis (Word, plain text): its own extraction,
+        // read only when it has no pages. `storage` is resolved per call
+        // (it is composed further down); without it, nothing is read.
+        extractionText: {
+          read: (query) =>
+            storage === undefined
+              ? Promise.resolve("")
+              : createDocumentProcessingService({
+                  sql: database.sql,
+                  transactions: database.transactions,
+                  outbox: createOutboxWriter({ registry }),
+                  storage,
+                }).readOwnDocumentText(query),
+        },
         synthesis: createMandateSynthesis({
           gateway: {
             execute: (request, options) =>
