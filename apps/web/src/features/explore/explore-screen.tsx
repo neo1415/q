@@ -34,6 +34,7 @@ import {
   ExploreLimitedBanner,
   ExploreState,
 } from "./explore-state";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Explore (E1-E5, ADR 0055): search at the top, topic chips, the mosaic
@@ -151,6 +152,7 @@ export function ExploreScreen({
   /** Design review only: the opened feed shows posters, never a player. */
   readonly posterOnly?: boolean;
 }) {
+  const t = useT();
   const sectorLabels = useMemo(
     () => new Map(sectors.map((s) => [s.nodeId, s.label])),
     [sectors],
@@ -543,22 +545,23 @@ export function ExploreScreen({
       <ExploreSearchBar />
       <div
         role="group"
-        aria-label="Topics"
+        aria-label={t("Topics")}
         className="relative flex gap-2 overflow-x-auto py-0.5 [scrollbar-width:none]"
       >
-        {topics.map((t) => (
+        {topics.map((topic) => (
           <button
-            key={t.kind === "SECTOR" ? t.nodeId : t.kind}
+            key={topic.kind === "SECTOR" ? topic.nodeId : topic.kind}
             type="button"
-            aria-pressed={topicOn(t)}
-            onClick={() => choose(t)}
+            aria-pressed={topicOn(topic)}
+            onClick={() => choose(topic)}
             className={`inline-flex min-h-9 shrink-0 items-center border px-3.5 text-sm whitespace-nowrap ${
-              topicOn(t)
+              topicOn(topic)
                 ? "border-(--cq-text-primary) bg-(--cq-text-primary) text-(--cq-canvas)"
                 : "border-(--cq-border) bg-(--cq-surface-raised) text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
             }`}
           >
-            {t.label}
+            {/* Sectors by their taxonomy display name (catalog/taxonomy). */}
+            {t(topic.label)}
           </button>
         ))}
       </div>
@@ -608,7 +611,7 @@ export function ExploreScreen({
               role="status"
               className="cq-body-sm text-center text-(--cq-text-secondary)"
             >
-              Loading more pitches…
+              {t("Loading more pitches…")}
             </p>
           ) : null}
           {upToDate ? (

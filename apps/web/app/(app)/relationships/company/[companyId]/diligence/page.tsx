@@ -12,8 +12,13 @@ import {
 } from "@/features/relationships/relationship-diligence";
 import { messageCountOf } from "@/features/relationships/brief-lines";
 import { loadInvestorSideRelationship } from "@/features/relationships/relationship-page-data";
+import { serverUiLanguage } from "@/features/i18n/server";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Diligence" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Diligence") };
+}
 export const dynamic = "force-dynamic";
 
 /**
@@ -26,6 +31,9 @@ export default async function InvestorDiligencePage({
 }: {
   readonly params: Promise<{ readonly companyId: string }>;
 }) {
+  // The language for the server components below (serverTNow).
+  await serverUiLanguage();
+
   const { companyId } = await params;
   const basePath = `/relationships/company/${companyId}`;
   const loaded = await loadInvestorSideRelationship(companyId);

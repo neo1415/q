@@ -26,6 +26,7 @@ import {
 } from "../discover/feed/feed-position";
 import { countryLabel, stageLabel } from "./declared-labels";
 import { explainRecommendationAction } from "./explanation-action";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Evidence / Q deeper view of a company (CQ-WEB-024; doc 17 §74-§78,
@@ -146,6 +147,7 @@ export function CompanyDeeperView({
    */
   readonly connected?: boolean | undefined;
 }) {
+  const t = useT();
   return (
     <div className="mt-4 flex flex-col">
       {connected ? (
@@ -158,7 +160,7 @@ export function CompanyDeeperView({
             href={`/relationships/company/${companyId}`}
             className="underline underline-offset-2"
           >
-            See your relationship
+            {t("See your relationship")}
           </Link>
         </p>
       ) : (
@@ -206,7 +208,7 @@ function Disclosure({
         />
         <h2 className="cq-title-sm">{title}</h2>
       </summary>
-      <div className="flex flex-col gap-4 pb-6 pl-7">{children}</div>
+      <div className="flex flex-col gap-4 pb-6 ps-7">{children}</div>
     </details>
   );
 }
@@ -233,6 +235,7 @@ type Explanation =
  * the section is absent rather than empty.
  */
 function WhyInYourFeed({ companyId }: { readonly companyId: string }) {
+  const t = useT();
   const slateId = useSyncExternalStore(
     noSubscription,
     () => readStoredFeedSlateId(browserFeedPositionStore()),
@@ -260,18 +263,19 @@ function WhyInYourFeed({ companyId }: { readonly companyId: string }) {
 
   return (
     <Disclosure
-      title="Why it's in your feed"
+      title={t("Why it's in your feed")}
       onFirstOpen={load}
       data-deeper-view="why"
     >
       {explanation.status === "IDLE" || explanation.status === "LOADING" ? (
         <p className="cq-status-line" role="status">
-          Reading your recommendation…
+          {t("Reading your recommendation…")}
         </p>
       ) : explanation.status === "UNAVAILABLE" ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          There is no recommendation to explain for this company right now. It
-          may not be in your current feed.
+          {t(
+            "There is no recommendation to explain for this company right now. It may not be in your current feed.",
+          )}
         </p>
       ) : (
         <ExplanationBody explanation={explanation.value} />
@@ -285,6 +289,7 @@ function ExplanationBody({
 }: {
   readonly explanation: RecommendationExplanationDto;
 }) {
+  const t = useT();
   return (
     <>
       <div className="flex flex-col gap-1">
@@ -294,17 +299,22 @@ function ExplanationBody({
         {explanation.source === "Q_SYNTHESIZED" ? (
           // Who chose the words, so no reader thinks a model decided the order.
           <p className="cq-caption text-(--cq-text-tertiary)">
-            Worded by Q from the factors below. Q did not decide the order.
+            {t(
+              "Worded by Q from the factors below. Q did not decide the order.",
+            )}
           </p>
         ) : null}
       </div>
       <Factors
-        title="Matches your mandate"
+        title={t("Matches your mandate")}
         factors={explanation.matchedFactors}
       />
-      <Factors title="Doesn't match" factors={explanation.mismatchedFactors} />
       <Factors
-        title="Not known yet — not counted against it"
+        title={t("Doesn't match")}
+        factors={explanation.mismatchedFactors}
+      />
+      <Factors
+        title={t("Not known yet — not counted against it")}
         factors={explanation.uncertainties}
       />
     </>
@@ -347,10 +357,11 @@ function WhatIsKnown({
   readonly companyName: string;
   readonly facts: readonly CompanyNetworkFact[];
 }) {
+  const t = useT();
   const { askNow } = useGlobalQ();
   return (
     <Disclosure
-      title="What is known, and how well supported"
+      title={t("What is known, and how well supported")}
       defaultOpen
       data-deeper-view="evidence"
     >
@@ -379,6 +390,7 @@ function FactRow({
   readonly fact: CompanyNetworkFact;
   readonly onAsk: () => void;
 }) {
+  const t = useT();
   const { label } = FACT_LABELS[fact.key];
   const state =
     fact.statements.length === 0
@@ -403,13 +415,15 @@ function FactRow({
           onClick={onAsk}
           aria-label={`Ask Q about ${label.toLowerCase()}`}
         >
-          Ask Q about this
+          {t("Ask Q about this")}
         </Button>
       </div>
       {state === "unknown" ? (
         <div className="flex flex-col gap-0.5">
-          <p className="cq-body text-(--cq-text-primary)">Unknown</p>
-          <p className="cq-caption text-(--cq-text-tertiary)">Not stated.</p>
+          <p className="cq-body text-(--cq-text-primary)">{t("Unknown")}</p>
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            {t("Not stated.")}
+          </p>
         </div>
       ) : state === "stated" && fact.statements[0] !== undefined ? (
         <Statement factKey={fact.key} statement={fact.statements[0]} />
@@ -417,7 +431,7 @@ function FactRow({
         <div className="flex flex-col gap-2">
           <p className="flex items-center gap-1.5 cq-body-sm text-(--cq-text-primary)">
             <CircleAlert size={ICON_SIZE.compact} aria-hidden="true" />
-            These disagree. Neither has been chosen over the other.
+            {t("These disagree. Neither has been chosen over the other.")}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             {fact.statements.map((statement, index) => (

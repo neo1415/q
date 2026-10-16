@@ -162,7 +162,7 @@ export function CommitmentCard({
         {amount}
       </p>
       {item.quote === null || item.status !== "DETECTED" ? null : (
-        <blockquote className="cq-body-sm border-l-2 border-(--cq-border) pl-3 text-(--cq-text-secondary)">
+        <blockquote className="cq-body-sm border-s-2 border-(--cq-border) ps-3 text-(--cq-text-secondary)">
           “{item.quote}”
         </blockquote>
       )}

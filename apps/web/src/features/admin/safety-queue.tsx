@@ -18,6 +18,7 @@ import {
   reviewReportAction,
 } from "./console-actions";
 import { ReasonAction, ResultLine, useConsoleAction } from "./console-ui";
+import { useT } from "@/features/i18n/language";
 
 type Outcome = "NO_ACTION" | "WARNED" | "ACCOUNT_SUSPENDED" | "ESCALATED";
 
@@ -37,6 +38,8 @@ const OUTCOME_WORDS: Readonly<Record<Outcome, string>> = {
 };
 
 function ReviewReport({ report }: { readonly report: AdminSafetyReportDto }) {
+  const t = useT();
+
   const [open, setOpen] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>("NO_ACTION");
   const [note, setNote] = useState("");
@@ -50,13 +53,13 @@ function ReviewReport({ report }: { readonly report: AdminSafetyReportDto }) {
   return (
     <div className="flex flex-col items-start gap-1">
       <Button size="compact" disabled={pending} onClick={() => setOpen(true)}>
-        Review
+        {t("Review")}
       </Button>
       <ResultLine result={result} />
       <DialogRoot open={open} onOpenChange={setOpen}>
         <DialogContent
-          title="Review this report"
-          description="Your decision and note are kept in the audit log."
+          title={t("Review this report")}
+          description={t("Your decision and note are kept in the audit log.")}
           actions={
             <>
               <Button variant="quiet" onClick={() => setOpen(false)}>
@@ -85,24 +88,27 @@ function ReviewReport({ report }: { readonly report: AdminSafetyReportDto }) {
           <div className="flex flex-col gap-3">
             <Select
               id={outcomeId}
-              label="Decision"
+              label={t("Decision")}
               value={outcome}
-              options={OUTCOMES}
+              options={OUTCOMES.map((option) => ({
+                ...option,
+                label: t(option.label),
+              }))}
               onChange={(event) => setOutcome(event.target.value as Outcome)}
             />
             {needsMember ? (
               report.reportedMembers.length === 0 ? (
                 <p className="cq-caption text-(--cq-text-secondary)">
-                  The reported side has no active member to suspend.
+                  {t("The reported side has no active member to suspend.")}
                 </p>
               ) : (
                 <Select
                   id={memberId}
-                  label="Account to suspend"
+                  label={t("Account to suspend")}
                   value={member}
                   options={report.reportedMembers.map((m) => ({
                     value: m.userId,
-                    label: m.name ?? "Unnamed member",
+                    label: m.name ?? t("Unnamed member"),
                   }))}
                   onChange={(event) => setMember(event.target.value)}
                 />
@@ -110,8 +116,8 @@ function ReviewReport({ report }: { readonly report: AdminSafetyReportDto }) {
             ) : null}
             <Textarea
               id={noteId}
-              label="Note"
-              description="At least 3 characters."
+              label={t("Note")}
+              description={t("At least 3 characters.")}
               value={note}
               onChange={(event) => setNote(event.target.value)}
             />
@@ -131,22 +137,26 @@ export function SafetyReports({
   readonly canDecide: boolean;
   readonly canBreakGlass: boolean;
 }) {
+  const t = useT();
+
   return (
     <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
       {reports.map((report) => (
         <li key={report.reportId} className="flex flex-col gap-3 py-4">
           <div className="flex flex-col gap-1">
             <span className="cq-body font-medium text-(--cq-text-primary)">
-              {report.reasonLabel} · {report.companyName} ↔{" "}
+              {t(report.reasonLabel)} · {report.companyName} ↔{" "}
               {report.investorName}
             </span>
             <span className="cq-caption text-(--cq-text-secondary)">
-              Reported by {report.reporterName ?? "a member"} on the{" "}
-              {report.reporterSide === "COMPANY" ? "company" : "investor"} side
+              {t("Reported by")} {t(report.reporterName ?? "a member")}{" "}
+              {t("on the")}{" "}
+              {report.reporterSide === "COMPANY" ? "company" : "investor"}{" "}
+              {t("side")}
               {report.aboutMessage
-                ? " about a message"
-                : " about the conversation"}{" "}
-              · {new Date(report.createdAt).toLocaleDateString("en-GB")}
+                ? t(" about a message")
+                : t(" about the conversation")}{" "}
+              · {t(new Date(report.createdAt).toLocaleDateString("en-GB"))}
             </span>
             {report.note === null ? null : (
               <span className="cq-body-sm text-(--cq-text-primary)">
@@ -155,8 +165,9 @@ export function SafetyReports({
             )}
             {report.review === null ? null : (
               <span className="cq-caption text-(--cq-text-secondary)">
-                {OUTCOME_WORDS[report.review.outcome]} by{" "}
-                {report.review.reviewerName ?? "an admin"}: {report.review.note}
+                {t(OUTCOME_WORDS[report.review.outcome])} {t("by")}{" "}
+                {t(report.review.reviewerName ?? "an admin")}:{" "}
+                {report.review.note}
               </span>
             )}
           </div>
@@ -164,9 +175,11 @@ export function SafetyReports({
             {canDecide ? <ReviewReport report={report} /> : null}
             {canBreakGlass ? (
               <ReasonAction
-                label="Ask to read the chat"
-                title="Ask to read this conversation?"
-                description="Chats are private. A second admin must approve; access lasts 30 minutes and every read is logged."
+                label={t("Ask to read the chat")}
+                title={t("Ask to read this conversation?")}
+                description={t(
+                  "Chats are private. A second admin must approve; access lasts 30 minutes and every read is logged.",
+                )}
                 confirm="Send request"
                 minLength={20}
                 reasonLabel="Why you need to read it"
@@ -200,6 +213,8 @@ export function BreakGlassList({
   readonly rows: readonly AdminBreakGlassRowDto[];
   readonly viewerId: string | null;
 }) {
+  const t = useT();
+
   return (
     <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
       {rows.map((row) => {
@@ -209,35 +224,44 @@ export function BreakGlassList({
             <span className="cq-body text-(--cq-text-primary)">
               {row.targetLabel ??
                 (row.targetType === "Q_RUN"
-                  ? "A Q run"
-                  : "A conversation")}{" "}
-              · {STATUS_WORDS[row.status]}
+                  ? t("A Q run")
+                  : t("A conversation"))}{" "}
+              · {t(STATUS_WORDS[row.status])}
               {row.approvalKind === "SOLO"
-                ? " · Approved alone (no other admin)"
+                ? t(" · Approved alone (no other admin)")
                 : ""}
             </span>
             <span className="cq-caption text-(--cq-text-secondary)">
-              {row.requesterName ?? "An admin"}: &ldquo;{row.reason}&rdquo;
+              {row.requesterName ?? t("An admin")}: &ldquo;{t(row.reason)}
+              &rdquo;
               {row.decidedByName === null
                 ? ""
-                : ` · decided by ${row.decidedByName}`}
+                : t(` · decided by ${row.decidedByName}`)}
               {row.expiresAt === null || row.status !== "APPROVED"
                 ? ""
-                : ` · until ${new Date(row.expiresAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`}
-              {row.reads === 0 ? "" : ` · read ${String(row.reads)} times`}
+                : t(
+                    ` · until ${new Date(row.expiresAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
+                  )}
+              {row.reads === 0 ? "" : t(` · read ${String(row.reads)} times`)}
             </span>
             <div className="flex flex-wrap gap-2">
               {row.canDecide === null ? null : (
                 <>
                   <ReasonAction
                     label={
-                      row.canDecide === "SOLO" ? "Approve alone" : "Approve"
+                      row.canDecide === "SOLO"
+                        ? t("Approve alone")
+                        : t("Approve")
                     }
-                    title="Approve this request?"
+                    title={t("Approve this request?")}
                     description={
                       row.canDecide === "SOLO"
-                        ? "No other admin can approve, so this is recorded as a solo approval."
-                        : "They can read the content for 30 minutes. Every read is logged."
+                        ? t(
+                            "No other admin can approve, so this is recorded as a solo approval.",
+                          )
+                        : t(
+                            "They can read the content for 30 minutes. Every read is logged.",
+                          )
                     }
                     confirm="Approve"
                     variant="primary"
@@ -252,8 +276,8 @@ export function BreakGlassList({
                   />
                   {row.canDecide === "SECOND_PERSON" ? (
                     <ReasonAction
-                      label="Deny"
-                      title="Deny this request?"
+                      label={t("Deny")}
+                      title={t("Deny this request?")}
                       confirm="Deny"
                       reasonLabel="Note"
                       run={(note) =>
@@ -277,8 +301,8 @@ export function BreakGlassList({
                   }
                 >
                   {row.targetType === "Q_RUN"
-                    ? "Open the run"
-                    : "Read the conversation"}
+                    ? t("Open the run")
+                    : t("Read the conversation")}
                 </Link>
               ) : null}
             </div>

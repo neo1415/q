@@ -28,6 +28,7 @@ import {
   MODEL_TOOL_RESULT_MAX_CHARS,
   QClientActionToolResultSchema,
   QShowCalendarConnectIntentSchema,
+  QSetLanguageIntentSchema,
   QDocumentToolResultSchema,
   QMessageIdSchema,
   type ModelBudget,
@@ -375,6 +376,14 @@ export {
 /** Q room R5: any tool result that carries the calendar connect card. */
 const CalendarConnectCarrierSchema = z
   .object({ clientAction: QShowCalendarConnectIntentSchema })
+  .passthrough();
+
+/**
+ * Multilingual Q: set_q_language's result, already saved; its intent
+ * switches the screen's language at once.
+ */
+const LanguageCarrierSchema = z
+  .object({ clientAction: QSetLanguageIntentSchema })
   .passthrough();
 
 /**
@@ -1230,6 +1239,11 @@ export function environmentNoteParts(
      * personality they chose in Settings, or Auto. Trusted product copy.
      */
     readonly personality?: string | undefined;
+    /**
+     * Multilingual Q (2026-10-16): the language they chose for Q, as the
+     * words Q is told (q-core writtenLanguageNote). Trusted product copy.
+     */
+    readonly language?: string | undefined;
     /** Who is asking: their own company, from their record. */
     readonly asker?: string | undefined;
   } = {},
@@ -1286,6 +1300,7 @@ export function environmentNoteParts(
       : [
           `WHO YOU ARE WITH THIS PERSON: ${options.personality} Speak as that, as a person would: vary how you begin, laugh when something is funny, take a joke, and never begin two replies the same way.`,
         ]),
+    ...(options.language === undefined ? [] : [options.language]),
   ];
   const turnNotes = (researchNote: string | null, capabilities: boolean) => [
     // This turn's critical notes lead its part: a request for a document
@@ -1625,6 +1640,17 @@ export type ModelGatewayQAnswerDependencies = {
    * 2026-09-30), as the words Q is told. Null: Q's own default.
    */
   readonly personalityOf?:
+    | ((request: {
+        readonly tenantId: string;
+        readonly userId: string;
+      }) => Promise<string | null>)
+    | undefined;
+  /**
+   * Multilingual Q (2026-10-16): the language note for this person (their
+   * choice in Settings), or null when they chose none. Read beside the
+   * personality; a failed read is no note, never a failed answer.
+   */
+  readonly languageOf?:
     | ((request: {
         readonly tenantId: string;
         readonly userId: string;
@@ -3255,6 +3281,15 @@ export function createModelGatewayQAnswer(
                 userId: request.actorUserId,
               })
               .catch(() => null);
+      const languageRead =
+        dependencies.languageOf === undefined
+          ? Promise.resolve(null)
+          : dependencies
+              .languageOf({
+                tenantId: request.tenantId,
+                userId: request.actorUserId,
+              })
+              .catch(() => null);
       const askerRead =
         dependencies.askerOf === undefined
           ? Promise.resolve(null)
@@ -3610,6 +3645,7 @@ export function createModelGatewayQAnswer(
           turnNotes: "",
         };
         const personality = await personalityRead;
+        const language = await languageRead;
         const asker = await askerRead;
         let noteParts = environmentNoteParts(facts, offered, request.subjects, {
           // Only when the firewall actually granted it. The plan has
@@ -3628,6 +3664,7 @@ export function createModelGatewayQAnswer(
             : { questionSequence: request.questionSequence }),
           ...(onboardingNudge === null ? {} : { onboardingNudge }),
           ...(personality === null ? {} : { personality }),
+          ...(language === null ? {} : { language }),
           ...(asker === null ? {} : { asker }),
         });
         // S3a (live 2026-10-15, #107): the named company read ahead of the
@@ -4041,11 +4078,17 @@ export function createModelGatewayQAnswer(
         const card = read.success
           ? null
           : CalendarConnectCarrierSchema.safeParse(outcome.result.data);
+        const language =
+          read.success || card?.success === true
+            ? null
+            : LanguageCarrierSchema.safeParse(outcome.result.data);
         const intent = read.success
           ? read.data.clientAction
           : card?.success === true
             ? card.data.clientAction
-            : null;
+            : language?.success === true
+              ? language.data.clientAction
+              : null;
         if (intent === null) return;
         const block: QResultBlock = { kind: "UI_INTENT", intent };
         if (

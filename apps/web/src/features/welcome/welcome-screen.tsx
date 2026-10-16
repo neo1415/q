@@ -14,6 +14,7 @@ import { useVoiceInterview } from "../voice/use-voice-interview";
 import { VoiceHandover } from "../voice/voice-handover";
 import { VoiceStage } from "../voice/voice-stage";
 import { QAperture } from "../q-aperture";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The first minute with Q (QX-002 §A1-§A7).
@@ -106,6 +107,7 @@ export function WelcomeScreen({
    */
   readonly returning?: boolean | undefined;
 }) {
+  const t = useT();
   const voice = useVoiceInterview();
   const speech = useQSpeech();
   const router = useRouter();
@@ -293,7 +295,7 @@ export function WelcomeScreen({
               className="cq-stage-quiet"
               onClick={voice.clearNotice}
             >
-              Dismiss
+              {t("Dismiss")}
             </button>
           </div>
         ) : null}
@@ -313,7 +315,7 @@ export function WelcomeScreen({
               onClick={speech.play}
               data-q-speech-play
             >
-              Hear Q
+              {t("Hear Q")}
             </button>
           ) : null}
           {speech.status === "unavailable" ? null : (
@@ -335,7 +337,7 @@ export function WelcomeScreen({
           // uses, so the choice reads the same wherever it is offered.
           <div className="flex w-full flex-col gap-5" data-q-role-question>
             <p className="cq-body text-center text-(--cq-text-secondary)">
-              Are you here to raise capital, or to invest it?
+              {t("Are you here to raise capital, or to invest it?")}
             </p>
             <div className="border border-(--cq-border-subtle) bg-(--cq-surface) p-4">
               <PersonaCards
@@ -354,7 +356,7 @@ export function WelcomeScreen({
                 onClick={() => void begin()}
                 data-q-welcome-talk
               >
-                Talk with Q instead
+                {t("Talk with Q instead")}
               </button>
             </div>
           </div>
@@ -367,7 +369,7 @@ export function WelcomeScreen({
               disabled={connecting}
               data-q-welcome-begin
             >
-              Start
+              {t("Start")}
             </button>
             {/* The quiet other door: a two-way conversation needs the
                 microphone; reading and typing never do. */}
@@ -384,7 +386,7 @@ export function WelcomeScreen({
               }}
               data-q-welcome-type
             >
-              Prefer to type?
+              {t("Prefer to type?")}
             </button>
             {journey === null ? null : (
               // A correction, not a second question: the cards, for
@@ -412,7 +414,7 @@ export function WelcomeScreen({
               className="cq-stage-quiet"
               data-q-welcome-join
             >
-              Joining your team? Find your company
+              {t("Joining your team? Find your company")}
             </a>
           </div>
         )}

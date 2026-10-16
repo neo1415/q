@@ -24,6 +24,8 @@ import { loadMyOrganisations } from "@/features/team/load-organisations";
 import { PitchWarmup } from "@/features/discover/player/pitch-warmup-trigger";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
 import { QPitchEntrySlot } from "@/features/q-pitch/tour-entry-slot";
+import { LanguageProvider } from "@/features/i18n/language";
+import { uiLanguageOf } from "@/features/i18n/messages";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -90,7 +92,8 @@ export default async function ApplicationLayout({
   // to while they are not ready stays readable, nothing else is offered.
   // An account Q paused sees nothing but that it is paused, until a person
   // at Capital Q reinstates it.
-  if ((await standingRead)?.paused === true) {
+  const standing = await standingRead;
+  if (standing?.paused === true) {
     redirect("/paused");
   }
   const onboardingState = onboardingRead === null ? null : await onboardingRead;
@@ -117,46 +120,50 @@ export default async function ApplicationLayout({
     // G2: the switcher's list (shown only for two or more).
     loadMyOrganisations(),
   ]);
+  // Multilingual Q: the interface follows the language they chose.
+  const language = uiLanguageOf(standing?.language);
   return (
-    <AppShell
-      context={{ ...shell, admin, organisations, qPitch }}
-      subject={subject}
-      qConnected={qConnected}
-      onboarding={gate}
-      verifyNudge={verifyNudgeState}
-    >
-      <BrandStyle css={brandCss} />
-      {children}
-      <InstallPrompt />
-      {/* An investor's first pitches, cached before Discover opens (ADR 0064). */}
-      {context.kind === "INVESTOR" && unfinished === null ? (
-        <PitchWarmup />
-      ) : null}
-      <QSwarmPointer />
-      {/* Q Pitch rehearsal host (QP-F08): off unless the server enables it;
+    <LanguageProvider language={language}>
+      <AppShell
+        context={{ ...shell, admin, organisations, qPitch }}
+        subject={subject}
+        qConnected={qConnected}
+        onboarding={gate}
+        verifyNudge={verifyNudgeState}
+      >
+        <BrandStyle css={brandCss} />
+        {children}
+        <InstallPrompt />
+        {/* An investor's first pitches, cached before Discover opens (ADR 0064). */}
+        {context.kind === "INVESTOR" && unfinished === null ? (
+          <PitchWarmup />
+        ) : null}
+        <QSwarmPointer />
+        {/* Q Pitch rehearsal host (QP-F08): off unless the server enables it;
           the host itself admits only fictional demo accounts. Its subject
           read streams after the page and never holds the first byte. */}
-      {qPitch &&
-      unfinished === null &&
-      user.email !== null &&
-      (context.kind === "INVESTOR" || context.kind === "FOUNDER") ? (
-        <Suspense fallback={null}>
-          <QPitchEntrySlot account={user.email} role={context.kind} />
-        </Suspense>
-      ) : null}
-      {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
+        {qPitch &&
+        unfinished === null &&
+        user.email !== null &&
+        (context.kind === "INVESTOR" || context.kind === "FOUNDER") ? (
+          <Suspense fallback={null}>
+            <QPitchEntrySlot account={user.email} role={context.kind} />
+          </Suspense>
+        ) : null}
+        {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
           receipts to the Q API, and the notice when an act did not happen. */}
-      <Suspense fallback={null}>
-        <QControlRuntime
-          viewer={{
-            kind:
-              context.kind === "FOUNDER" || context.kind === "INVESTOR"
-                ? context.kind
-                : "NONE",
-            admin,
-          }}
-        />
-      </Suspense>
-    </AppShell>
+        <Suspense fallback={null}>
+          <QControlRuntime
+            viewer={{
+              kind:
+                context.kind === "FOUNDER" || context.kind === "INVESTOR"
+                  ? context.kind
+                  : "NONE",
+              admin,
+            }}
+          />
+        </Suspense>
+      </AppShell>
+    </LanguageProvider>
   );
 }

@@ -38,6 +38,7 @@ import {
   searchClaimableAction,
 } from "./gateq-actions";
 import { ErrorBlock, Skeleton, StateBlock } from "./gateq-chrome";
+import { useT } from "@/features/i18n/language";
 
 /**
  * A founder's GateQ (F2, F3; design a/gateq.html "Founder: GateQ page" and
@@ -74,6 +75,8 @@ export function FounderApplications({
   readonly applications: readonly FounderApplicationDto[];
   readonly limited?: boolean;
 }) {
+  const t = useT();
+
   if (state === "loading") {
     return (
       <div className="flex flex-col gap-3" aria-busy="true">
@@ -86,6 +89,7 @@ export function FounderApplications({
   if (state === "error")
     return (
       <ErrorBlock
+        t={t}
         what="Your applications"
         retryHref="/gateq?tab=applications"
       />
@@ -100,14 +104,16 @@ export function FounderApplications({
             aria-hidden
           />
         }
-        title="No applications yet"
-        body="Many investors have a gate: a short form that tells you at once if you fit what they look for. Open one from an investor's profile or a link they shared."
+        title={t("No applications yet")}
+        body={t(
+          "Many investors have a gate: a short form that tells you at once if you fit what they look for. Open one from an investor's profile or a link they shared.",
+        )}
       >
         <Link
           href="/discover?tab=investors"
           className={buttonClassName("primary")}
         >
-          Find investors
+          {t("Find investors")}
         </Link>
       </StateBlock>
     );
@@ -118,13 +124,14 @@ export function FounderApplications({
         <div className="gq-banner">
           <Lock {...icon} />
           <span>
-            You&apos;re a member of your company. Admins send applications; you
-            can see where each stands.
+            {t(
+              "You're a member of your company. Admins send applications; you can see where each stands.",
+            )}
           </span>
         </div>
       ) : null}
       <section className="gq-sect">
-        <h2 className="cq-title-sm">Your applications</h2>
+        <h2 className="cq-title-sm">{t("Your applications")}</h2>
         <ul className="gq-hair">
           {applications.map((application) => (
             <li
@@ -136,29 +143,30 @@ export function FounderApplications({
                 className="gq-logo"
                 style={{ width: 44, height: 44, borderRadius: "50%" }}
               >
-                {application.fund.slice(0, 1).toUpperCase()}
+                {t(application.fund.slice(0, 1).toUpperCase())}
               </span>
               <span className="min-w-0">
-                <b className="font-medium">{application.fund}</b>
+                <b className="font-medium">{t(application.fund)}</b>
                 <span className="cq-caption gq-t2 block">
-                  {sentWords(application.sentAt)}
+                  {t(sentWords(application.sentAt))}
                 </span>
               </span>
               <span className="gq-status">
                 {application.status === "PASSED" ? (
                   <>
                     <X {...icon} />
-                    Passed: {REASON_WORDS[application.reasonCode ?? "OTHER"]}
+                    {t("Passed:")}{" "}
+                    {REASON_WORDS[application.reasonCode ?? "OTHER"]}
                   </>
                 ) : application.status === "REPLIED" ? (
                   <>
                     <Check {...icon} />
-                    They replied
+                    {t("They replied")}
                   </>
                 ) : (
                   <>
                     <Clock {...icon} />
-                    Sent
+                    {t("Sent")}
                   </>
                 )}
               </span>
@@ -167,7 +175,7 @@ export function FounderApplications({
                   className="cq-body-sm gq-t2 col-start-2 col-end-4 mt-1.5"
                   style={{ maxWidth: "62ch" }}
                 >
-                  &ldquo;{application.message}&rdquo;
+                  &ldquo;{t(application.message)}&rdquo;
                 </p>
               )}
             </li>
@@ -189,6 +197,8 @@ export function ClaimView({
   readonly initialResults?: readonly ClaimableCompanyDto[];
   readonly demoSheet?: boolean;
 }) {
+  const t = useT();
+
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<readonly ClaimableCompanyDto[] | null>(
     initialQuery === "" ? null : initialResults,
@@ -220,10 +230,11 @@ export function ClaimView({
   const list = results ?? [];
   const head = (
     <div className="gq-card gq-findbox">
-      <h2 className="cq-title-sm">Find your company on Capital Q</h2>
+      <h2 className="cq-title-sm">{t("Find your company on Capital Q")}</h2>
       <p className="cq-body-sm gq-t2">
-        It may already be here: from a deck, a colleague, or public records.
-        Search by name or website.
+        {t(
+          "It may already be here: from a deck, a colleague, or public records. Search by name or website.",
+        )}
       </p>
       <form
         onSubmit={(event) => {
@@ -232,13 +243,13 @@ export function ClaimView({
         }}
       >
         <label className="gq-search">
-          <span className="sr-only">Company name or website</span>
+          <span className="sr-only">{t("Company name or website")}</span>
           <Search {...icon} size={18} />
           <input
             className="gq-input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Company name or website"
+            placeholder={t("Company name or website")}
           />
         </label>
       </form>
@@ -251,7 +262,7 @@ export function ClaimView({
       {notice === null ? null : (
         <div className="gq-banner" role="status">
           <Check {...icon} />
-          <span>{notice}</span>
+          <span>{t(notice)}</span>
         </div>
       )}
       {showLoading ? (
@@ -260,7 +271,7 @@ export function ClaimView({
           <Skeleton width="100%" height={64} />
         </div>
       ) : showError ? (
-        <ErrorBlock what="Search" retryHref="/gateq?tab=claim" />
+        <ErrorBlock t={t} what="Search" retryHref="/gateq?tab=claim" />
       ) : state === "empty" || (results !== null && list.length === 0) ? (
         <StateBlock
           icon={
@@ -270,56 +281,67 @@ export function ClaimView({
               aria-hidden
             />
           }
-          title="Not on Capital Q yet"
-          body="Add it now: upload your deck and Q fills in your profile. You check everything before anyone sees it."
+          title={t("Not on Capital Q yet")}
+          body={t(
+            "Add it now: upload your deck and Q fills in your profile. You check everything before anyone sees it.",
+          )}
         >
           <Link href="/onboarding" className={buttonClassName("primary")}>
             <Upload {...icon} />
-            Upload your deck
+            {t("Upload your deck")}
           </Link>
           <Link
             href="/onboarding?manual=1"
             className={buttonClassName("secondary")}
           >
-            Add it by hand
+            {t("Add it by hand")}
           </Link>
         </StateBlock>
       ) : results === null ? null : (
         <>
           <section className="gq-sect">
             <h2 className="cq-label gq-t2">
-              {list.length} compan
-              {list.length === 1 ? "y matches" : "ies match"}
+              {t(
+                list.length === 1
+                  ? "1 company matches"
+                  : `${String(list.length)} companies match`,
+              )}
             </h2>
             <div>
               {list.map((company) => (
                 <div key={company.companyId} className="gq-resrow">
                   <span className="gq-logo" style={{ width: 48, height: 48 }}>
-                    {company.name.slice(0, 1).toUpperCase()}
+                    {t(company.name.slice(0, 1).toUpperCase())}
                   </span>
                   <span className="min-w-0">
                     <b className="font-semibold">{company.name}</b>
                     <span className="cq-body-sm gq-t2 block">
-                      {[
-                        company.website
-                          ?.replace(/^https?:\/\/(www\.)?/, "")
-                          .replace(/\/$/, ""),
-                        company.city,
-                      ]
-                        .filter(
-                          (part) =>
-                            part !== null && part !== undefined && part !== "",
-                        )
-                        .join(" · ")}
+                      {t(
+                        [
+                          company.website
+                            ?.replace(/^https?:\/\/(www\.)?/, "")
+                            .replace(/\/$/, ""),
+                          company.city,
+                        ]
+                          .filter(
+                            (part) =>
+                              part !== null &&
+                              part !== undefined &&
+                              part !== "",
+                          )
+                          .join(" · "),
+                      )}
                     </span>
                     <span className="cq-caption gq-t3">
                       {company.yours
-                        ? "You're a member"
+                        ? t("You're a member")
                         : company.requested
-                          ? "Request sent"
+                          ? t("Request sent")
                           : company.members > 0
-                            ? `Already has ${company.members} member${company.members === 1 ? "" : "s"}`
-                            : "Not claimed yet"}
+                            ? t(
+                                `Already has ${company.members} member${company.members === 1 ? "" : "s"}`,
+                              )
+                            : t("Not claimed yet")}
                     </span>
                   </span>
                   {company.yours || company.requested ? (
@@ -328,7 +350,7 @@ export function ClaimView({
                     </span>
                   ) : company.members > 0 ? (
                     <Button size="compact" onClick={() => setClaiming(company)}>
-                      Ask to join
+                      {t("Ask to join")}
                     </Button>
                   ) : (
                     <Button
@@ -336,7 +358,7 @@ export function ClaimView({
                       size="compact"
                       onClick={() => setClaiming(company)}
                     >
-                      This is mine
+                      {t("This is mine")}
                     </Button>
                   )}
                 </div>
@@ -347,16 +369,16 @@ export function ClaimView({
             <div className="gq-banner">
               <Users {...icon} />
               <span>
-                A company that already has members on Capital Q lets you in when
-                an admin says yes. If you think someone claimed yours wrongly,
-                ask to join and say so: Capital Q reviews it.
+                {t(
+                  "A company that already has members on Capital Q lets you in when an admin says yes. If you think someone claimed yours wrongly, ask to join and say so: Capital Q reviews it.",
+                )}
               </span>
             </div>
           ) : null}
           <p className="cq-body-sm gq-t2">
-            Not listed?{" "}
+            {t("Not listed?")}{" "}
             <Link href="/onboarding" className="underline underline-offset-4">
-              Add your company
+              {t("Add your company")}
             </Link>
           </p>
         </>
@@ -391,6 +413,8 @@ function ClaimSheet({
   readonly onClose: () => void;
   readonly onDone: (message: string) => void;
 }) {
+  const t = useT();
+
   const hasMembers = (company?.members ?? 0) > 0;
   const domain =
     company?.website
@@ -452,15 +476,17 @@ function ClaimSheet({
     >
       {company === null ? null : (
         <SheetContent
-          title={hasMembers ? `Ask to join ${company.name}` : "Show it's yours"}
-          description="Pick one. It takes a minute."
+          title={
+            hasMembers ? t(`Ask to join ${company.name}`) : t("Show it's yours")
+          }
+          description={t("Pick one. It takes a minute.")}
           side="side"
         >
           <div className="flex flex-col gap-3.5">
             <ul
               className="gq-hair"
               role="radiogroup"
-              aria-label="How to show it's yours"
+              aria-label={t("How to show it's yours")}
             >
               {methods.map(([value, Icon, title, body]) => (
                 <li key={value}>
@@ -476,7 +502,7 @@ function ClaimSheet({
                     <span className="flex-1">
                       <b className="flex items-center gap-2 font-medium">
                         <Icon {...icon} />
-                        {title}
+                        {t(title)}
                       </b>
                       <span className="cq-body-sm gq-t2">{body}</span>
                     </span>
@@ -487,7 +513,7 @@ function ClaimSheet({
             {method === "WORK_EMAIL" ? (
               <div className="gq-field">
                 <label className="gq-label" htmlFor="gq-claim-email">
-                  Work email
+                  {t("Work email")}
                 </label>
                 <input
                   id="gq-claim-email"
@@ -495,7 +521,7 @@ function ClaimSheet({
                   type="email"
                   autoComplete="email"
                   value={email}
-                  placeholder={domain === null ? "" : `you@${domain}`}
+                  placeholder={domain === null ? "" : t(`you@${domain}`)}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
@@ -503,8 +529,9 @@ function ClaimSheet({
             {method === "REGISTRY_DOCUMENT" ? (
               <div className="gq-field">
                 <label className="gq-label" htmlFor="gq-claim-registry">
-                  Certificate of incorporation or registry extract (PDF, PNG or
-                  JPEG, up to 10 MB)
+                  {t(
+                    "Certificate of incorporation or registry extract (PDF, PNG or JPEG, up to 10 MB)",
+                  )}
                 </label>
                 <input
                   id="gq-claim-registry"
@@ -518,7 +545,7 @@ function ClaimSheet({
             {awaitingCode ? (
               <div className="gq-field" data-claim-code>
                 <label className="gq-label" htmlFor="gq-claim-code">
-                  The six-digit code we emailed to {email.trim()}
+                  {t("The six-digit code we emailed to")} {t(email.trim())}
                 </label>
                 <input
                   id="gq-claim-code"
@@ -552,21 +579,21 @@ function ClaimSheet({
                     });
                   }}
                 >
-                  Confirm code
+                  {t("Confirm code")}
                 </Button>
               </div>
             ) : null}
             {joinOrganisation !== null ? (
               <div className="gq-field">
                 <label className="gq-label" htmlFor="gq-join-note">
-                  A note for the admins (optional)
+                  {t("A note for the admins (optional)")}
                 </label>
                 <input
                   id="gq-join-note"
                   className="gq-input"
                   value={note}
                   maxLength={500}
-                  placeholder="I lead product, joined in May"
+                  placeholder={t("I lead product, joined in May")}
                   onChange={(e) => setNote(e.target.value)}
                 />
               </div>
@@ -574,7 +601,7 @@ function ClaimSheet({
             {problem === null ? null : (
               <div className="gq-banner gq-banner-err" role="alert">
                 <CircleAlert {...icon} />
-                <span>{problem}</span>
+                <span>{t(problem)}</span>
               </div>
             )}
             <Button
@@ -655,7 +682,7 @@ function ClaimSheet({
                 });
               }}
             >
-              {method === "ASK_MEMBERS" ? "Send request" : "Claim it"}
+              {method === "ASK_MEMBERS" ? t("Send request") : t("Claim it")}
             </Button>
           </div>
         </SheetContent>

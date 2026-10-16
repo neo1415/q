@@ -6,6 +6,7 @@ import { ChevronDown, ICON_SIZE } from "@capital-q/ui/icons";
 import { BrandKitPanel } from "./brand-kit-panel";
 import { DocumentLibrary } from "./document-library";
 import type { LibraryPage } from "./library-model";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Documents page (DOCS spec §3; P3): the library first, then the
@@ -28,6 +29,8 @@ export function DocumentsScreen({
    */
   readonly openOnArrival?: string | null;
 }) {
+  const t = useT();
+
   return (
     <>
       <DocumentLibrary
@@ -40,7 +43,7 @@ export function DocumentsScreen({
         data-brand-fold
       >
         <summary className="cq-title-sm flex min-h-12 cursor-pointer list-none items-center justify-between text-(--cq-text-primary) [&::-webkit-details-marker]:hidden">
-          Brand
+          {t("Brand")}
           <ChevronDown
             size={ICON_SIZE.regular}
             aria-hidden="true"

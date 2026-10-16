@@ -85,6 +85,8 @@ import { useQControl } from "@/features/q/control/q-control";
 
 import { loadArrival } from "./arrival-browser";
 import { setRoomFilled, useRoomSlots } from "./arrival-room";
+import { useUiLanguage } from "@/features/i18n/language";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q on arrival (Zino, 2026-10-08; designs docs/design/2026-10-08/briefing
@@ -363,11 +365,12 @@ function Editor({
   readonly onSubmit: (body: string) => void;
   readonly onCancel: () => void;
 }) {
+  const t = useT();
   const [text, setText] = useState(initial);
   return (
     <div className="flex flex-col gap-2">
       <label className="sr-only" htmlFor="arrival-edit">
-        Your message
+        {t("Your message")}
       </label>
       <textarea
         id="arrival-edit"
@@ -384,14 +387,14 @@ function Editor({
           disabled={text.trim().length === 0}
           onClick={() => onSubmit(text)}
         >
-          Review
+          {t("Review")}
         </Button>
         <Button
           variant="quiet"
           onClick={onCancel}
           className="text-(--cq-text-secondary)"
         >
-          Cancel
+          {t("Cancel")}
         </Button>
       </div>
     </div>
@@ -413,6 +416,7 @@ function FocusCard({
   readonly compact: boolean;
   readonly send: (event: SequenceEvent, source: "BUTTON" | "VOICE") => void;
 }) {
+  const t = useT();
   const busy = state.pending === card.key;
   const confirming =
     state.confirming?.key === card.key ? state.confirming : null;
@@ -446,9 +450,9 @@ function FocusCard({
         </div>
       </div>
       {card.theySaid === null ? null : (
-        <div className="border-l-2 border-(--cq-border) pl-2.5">
+        <div className="border-s-2 border-(--cq-border) ps-2.5">
           <p className="m-0 cq-caption text-(--cq-text-tertiary)">
-            What they said
+            {t("What they said")}
           </p>
           <p className="m-0 cq-body-sm text-(--cq-text-secondary)">
             {card.theySaid.length > 280
@@ -474,7 +478,7 @@ function FocusCard({
             className="m-0 bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)"
             data-arrival-confirm
           >
-            <span className="sr-only">What will be sent: </span>
+            <span className="sr-only">{t("What will be sent:")} </span>
             {confirming.body}
           </blockquote>
           <div className="flex flex-wrap items-center gap-1">
@@ -483,7 +487,7 @@ function FocusCard({
               disabled={busy}
               onClick={() => command("APPROVE")}
             >
-              Yes, send this
+              {t("Yes, send this")}
             </Button>
             <Button
               variant="secondary"
@@ -495,7 +499,7 @@ function FocusCard({
                 )
               }
             >
-              Keep editing
+              {t("Keep editing")}
             </Button>
             <Button
               variant="quiet"
@@ -503,11 +507,11 @@ function FocusCard({
               onClick={() => command("CANCEL")}
               className="text-(--cq-text-secondary)"
             >
-              Cancel edit
+              {t("Cancel edit")}
             </Button>
           </div>
           <p className="m-0 cq-caption text-(--cq-text-tertiary)">
-            Nothing is sent until you say yes.
+            {t("Nothing is sent until you say yes.")}
           </p>
         </>
       ) : (
@@ -560,7 +564,7 @@ function FocusCard({
                 onClick={() => command("APPROVE")}
                 data-arrival-send-as-is
               >
-                Send as is
+                {t("Send as is")}
               </Button>
             ) : null}
             {card.relationshipId !== null && card.message !== null ? (
@@ -574,7 +578,7 @@ function FocusCard({
                   )
                 }
               >
-                Edit &amp; send
+                {t("Edit & send")}
               </Button>
             ) : null}
             {card.kind === "HELD" && card.draftId !== null ? (
@@ -594,7 +598,7 @@ function FocusCard({
               onClick={() => command("DISMISS")}
               className="text-(--cq-text-secondary)"
             >
-              Dismiss
+              {t("Dismiss")}
             </Button>
             <Button
               variant="quiet"
@@ -602,18 +606,19 @@ function FocusCard({
               onClick={() => command("LATER")}
               className="text-(--cq-text-secondary)"
             >
-              Later
+              {t("Later")}
             </Button>
           </div>
           {card.kind === "APPROVAL" && !card.canDecide ? (
             <p className="m-0 cq-caption text-(--cq-text-secondary)">
-              Open it on Work to read it in full and decide.
+              {t("Open it on Work to read it in full and decide.")}
             </p>
           ) : null}
           {compact ? null : (
             <p className="m-0 cq-caption text-(--cq-text-tertiary)">
-              Or say “send it”, “change the second sentence to…”, “try again”,
-              “skip”, “not now”.
+              {t(
+                "Or say “send it”, “change the second sentence to…”, “try again”, “skip”, “not now”.",
+              )}
             </p>
           )}
         </>
@@ -640,7 +645,7 @@ function CardLine({
     <button
       type="button"
       onClick={onFocus}
-      className="flex min-h-13 w-full items-center gap-2.5 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-left transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+      className="flex min-h-13 w-full items-center gap-2.5 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-start transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
       data-arrival-line={card.key}
     >
       <Mark card={card} size={28} />
@@ -665,10 +670,11 @@ function CommandBar({
   readonly busy: boolean;
   readonly onWords: (words: string) => void;
 }) {
+  const t = useT();
   const [text, setText] = useState("");
   return (
     <form
-      className="flex w-full items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) py-1 pr-1 pl-4 focus-within:border-(--cq-border-strong)"
+      className="flex w-full items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) py-1 pe-1 ps-4 focus-within:border-(--cq-border-strong)"
       onSubmit={(event) => {
         event.preventDefault();
         const words = text.trim();
@@ -679,14 +685,14 @@ function CommandBar({
       data-arrival-command
     >
       <label className="sr-only" htmlFor="arrival-command">
-        Tell Q what to do with these
+        {t("Tell Q what to do with these")}
       </label>
       <input
         id="arrival-command"
         value={text}
         onChange={(event) => setText(event.target.value)}
         maxLength={700}
-        placeholder="Tell Q what to do with these"
+        placeholder={t("Tell Q what to do with these")}
         autoComplete="off"
         className="min-h-11 min-w-0 flex-1 bg-transparent cq-body-sm text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary)"
       />
@@ -735,6 +741,7 @@ export function Sequence({
   /** E1: the card Q just named (stage-focus.ts); null: none. */
   readonly focusKey?: string | null | undefined;
 }) {
+  const t = useT();
   const { state, status, reading, send, runWords } = useSequence(
     data.cards,
     decide,
@@ -882,7 +889,7 @@ export function Sequence({
     if (state.left) {
       return (
         <p className="m-0 cq-body-sm text-(--cq-text-secondary)" role="status">
-          Fine. Anything left is in Needs you on Work.
+          {t("Fine. Anything left is in Needs you on Work.")}
         </p>
       );
     }
@@ -907,7 +914,7 @@ export function Sequence({
         data-q-control="list.arrival-cards"
       >
         <span className="cq-body-sm font-semibold text-(--cq-text-primary)">
-          Needs you
+          {t("Needs you")}
         </span>
         <span className="min-w-0 flex-1 truncate cq-body-sm text-(--cq-text-secondary)">
           {state.cards.length > 1
@@ -917,7 +924,7 @@ export function Sequence({
         </span>
         {onExpand === undefined ? null : (
           <Button variant="quiet" onClick={onExpand} data-arrival-expand>
-            Show
+            {t("Show")}
           </Button>
         )}
       </div>
@@ -974,7 +981,7 @@ export function Sequence({
       ref={(node) => {
         listRef.current = node;
       }}
-      aria-label="Needs you"
+      aria-label={t("Needs you")}
       className={cx("flex w-full flex-col", compact ? "gap-2" : "gap-2.5")}
       data-arrival-sequence
       data-q-control="list.arrival-cards"
@@ -994,13 +1001,13 @@ export function Sequence({
         ) : null}
         <Button
           variant="quiet"
-          className="ml-auto text-(--cq-text-secondary)"
+          className="ms-auto text-(--cq-text-secondary)"
           onClick={() =>
             void send({ type: "COMMAND", command: { kind: "LEAVE" } }, "BUTTON")
           }
           data-arrival-leave
         >
-          Not now
+          {t("Not now")}
         </Button>
       </div>
       {compact ? (
@@ -1119,10 +1126,11 @@ export function OpenerChoices({
   readonly compact: boolean;
   readonly onChoose: (choice: OpenerChoice) => void;
 }) {
+  const t = useT();
   return (
     <div
       role="group"
-      aria-label="What would you like to do?"
+      aria-label={t("What would you like to do?")}
       className={cx(
         "flex flex-wrap gap-2",
         compact ? "justify-start" : "justify-center",
@@ -1135,7 +1143,7 @@ export function OpenerChoices({
         onClick={() => onChoose("SHOW")}
         data-arrival-opener-show
       >
-        {pending === 1 ? "Look at it" : "Look at them"}
+        {t(pending === 1 ? "Look at it" : "Look at them")}
       </Button>
       <Button
         variant="secondary"
@@ -1143,7 +1151,7 @@ export function OpenerChoices({
         onClick={() => onChoose("OTHER")}
         data-arrival-opener-other
       >
-        Something else
+        {t("Something else")}
       </Button>
     </div>
   );
@@ -1180,6 +1188,7 @@ export function ArrivalBriefing({
   /** The clock (the dev harness fixes it). */
   readonly now?: (() => Date) | undefined;
 }) {
+  const t = useT();
   const status = useArrival(load);
   useLaterCards(load, cards === "inline" && status.kind !== "PENDING");
   const loaded = status.kind === "READY" ? status : null;
@@ -1211,6 +1220,8 @@ export function ArrivalBriefing({
     };
   }, [loaded, greets]);
   const setupReminders = useArrivalSetupReminders();
+  // Multilingual Q: the opener in their chosen language.
+  const language = useUiLanguage();
   const words = useMemo(
     () =>
       ready === null
@@ -1219,8 +1230,9 @@ export function ArrivalBriefing({
             { ...ready.data, setupReminders },
             now?.() ?? new Date(),
             browserZone(),
+            language,
           ),
-    [ready, now, setupReminders],
+    [ready, now, setupReminders, language],
   );
   const opener = useOpener();
   useEffect(() => {
@@ -1293,10 +1305,10 @@ export function ArrivalBriefing({
             <Button
               variant="quiet"
               onClick={onClose}
-              className="-mt-2 -mr-2 text-(--cq-text-secondary)"
-              aria-label="Close Q's briefing"
+              className="-mt-2 -me-2 text-(--cq-text-secondary)"
+              aria-label={t("Close Q's briefing")}
             >
-              Close
+              {t("Close")}
             </Button>
           )}
         </div>

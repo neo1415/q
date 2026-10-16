@@ -6,6 +6,7 @@ import { ChoiceList } from "@capital-q/ui/choice-list";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * I1 mandate context. Most investors have exactly one open mandate: it is
@@ -18,6 +19,7 @@ export function MandateSelectStep({
   busy,
   actions,
 }: StepProps<"mandate_select">) {
+  const t = useT();
   const [mandateId, setMandateId] = useState<string | undefined>(
     step.response?.mandateId ?? step.suggestedMandateId ?? undefined,
   );
@@ -53,7 +55,9 @@ export function MandateSelectStep({
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
       {step.candidates.length === 0 ? (
         <InlineNotice tone="info">
-          There is no mandate to choose yet. Go back one step to create a draft.
+          {t(
+            "There is no mandate to choose yet. Go back one step to create a draft.",
+          )}
         </InlineNotice>
       ) : only !== undefined ? (
         <InlineNotice tone="info">

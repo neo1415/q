@@ -8,8 +8,12 @@ import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
 import { GrantRole, RevokeRole } from "@/features/admin/team-controls";
 import { ROLE_WORDS, when } from "@/features/admin/words";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Team · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Team · Admin") };
+}
 
 const ROLE_DOES: Readonly<Record<string, string>> = {
   platform_owner: "Everything, including the team and roles.",
@@ -20,6 +24,8 @@ const ROLE_DOES: Readonly<Record<string, string>> = {
 };
 
 export default async function AdminTeamPage() {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null) notFound();
   const team = await getAdminTeam(context.session)
@@ -28,11 +34,11 @@ export default async function AdminTeamPage() {
   const manage = context.can("roles.manage");
   return (
     <div className="flex flex-col gap-10">
-      <PageSection id="team" title="Console team">
+      <PageSection id="team" title={t("Console team")}>
         {team === null ? (
           <ErrorState
-            title="The team couldn't load"
-            description="Try again in a moment."
+            title={t("The team couldn't load")}
+            description={t("Try again in a moment.")}
           />
         ) : (
           <ul className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
@@ -43,15 +49,15 @@ export default async function AdminTeamPage() {
               >
                 <div className="flex min-w-0 flex-col">
                   <span className="cq-body text-(--cq-text-primary)">
-                    {member.name ?? "Unnamed member"} ·{" "}
-                    {ROLE_WORDS[member.role] ?? member.role}
+                    {member.name ?? t("Unnamed member")} ·{" "}
+                    {t(ROLE_WORDS[member.role] ?? member.role)}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    {member.email ?? "No email"} · since{" "}
-                    {when(member.grantedAt)}
+                    {member.email ?? t("No email")} {t("· since")}{" "}
+                    {t(when(member.grantedAt))}
                     {member.grantedByName === null
                       ? ""
-                      : ` · added by ${member.grantedByName}`}
+                      : t(` · added by ${member.grantedByName}`)}
                   </span>
                 </div>
                 {manage && member.userId !== context.me.userId ? (
@@ -65,20 +71,22 @@ export default async function AdminTeamPage() {
           </ul>
         )}
       </PageSection>
-      <PageSection id="roles" title="What each role can do">
+      <PageSection id="roles" title={t("What each role can do")}>
         <dl className="flex flex-col gap-2">
           {Object.entries(ROLE_DOES).map(([role, does]) => (
             <div key={role} className="flex flex-col sm:flex-row sm:gap-3">
               <dt className="cq-body-sm font-medium text-(--cq-text-primary) sm:w-48">
                 {ROLE_WORDS[role]}
               </dt>
-              <dd className="cq-body-sm text-(--cq-text-secondary)">{does}</dd>
+              <dd className="cq-body-sm text-(--cq-text-secondary)">
+                {t(does)}
+              </dd>
             </div>
           ))}
         </dl>
       </PageSection>
       {manage ? (
-        <PageSection id="grant" title="Add or change a role">
+        <PageSection id="grant" title={t("Add or change a role")}>
           <GrantRole />
         </PageSection>
       ) : null}

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { DialogContent, DialogRoot, DialogTrigger } from "@capital-q/ui/dialog";
 import { ICON_SIZE, Info } from "@capital-q/ui/icons";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The relationship's details behind one icon in the chat header, as a
@@ -17,19 +18,21 @@ export function InfoDialog({
   readonly title: string;
   readonly children: ReactNode;
 }) {
+  const t = useT();
+
   return (
     <DialogRoot>
       <DialogTrigger>
         <button
           type="button"
-          aria-label={title}
+          aria-label={t(title)}
           className="flex size-11 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
         >
           <Info size={ICON_SIZE.regular} aria-hidden="true" />
         </button>
       </DialogTrigger>
       <DialogContent
-        title={title}
+        title={t(title)}
         className="max-h-[85vh] max-w-md overflow-y-auto"
       >
         {children}

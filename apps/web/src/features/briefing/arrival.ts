@@ -33,6 +33,7 @@ import { attentionLines, unreadWords } from "./attention";
 import { greetingSeed, warmGreeting } from "./greeting";
 import { matchesWords, type ArrivalMatches } from "./matches";
 import { openerOf, type Opener } from "./opener";
+import { arabicArrivalWords } from "./arrival-ar";
 
 /**
  * The arrival briefing as the page shows and Q says it (Zino, 2026-10-08):
@@ -338,6 +339,26 @@ export function waitingWords(
 
 /** What Q says on arrival, from the data alone. */
 export function arrivalWords(
+  data: ArrivalData,
+  now: Date,
+  browserZone: string | null,
+  /** Multilingual Q: "ar" opens in Arabic; anything else in English. */
+  language: "en" | "ar" = "en",
+): ArrivalWords {
+  const english = englishArrivalWords(data, now, browserZone);
+  if (language !== "ar") return english;
+  const zone = zoneFor(data, browserZone);
+  return arabicArrivalWords(english, {
+    firstName: data.firstName,
+    now,
+    timeZone: zone,
+    hoursAway: data.hoursAway,
+    seed: greetingSeed(`${data.firstName ?? ""}:${now.toDateString()}`),
+    atLeast: (data.attention?.unread ?? []).length > 0,
+  });
+}
+
+function englishArrivalWords(
   data: ArrivalData,
   now: Date,
   browserZone: string | null,

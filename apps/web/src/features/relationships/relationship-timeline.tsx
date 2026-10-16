@@ -9,6 +9,7 @@ import {
   visibilityWords,
 } from "./relationship-words";
 import { timelineRuns, type TimelineRun } from "./timeline-runs";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /**
  * What happened, in order (CQ-WEB-030; doc 17 §84; spec §12.5).
@@ -65,6 +66,8 @@ export function RelationshipTimeline({
    */
   readonly now?: number | undefined;
 }) {
+  const t = serverTNow();
+
   const entries: Entry[] = [
     ...timelineRuns(milestones).map((run): Entry => ({
       kind: "RUN",
@@ -82,7 +85,7 @@ export function RelationshipTimeline({
 
   return (
     <ol
-      aria-label="What happened"
+      aria-label={t("What happened")}
       className="flex max-w-(--cq-layout-reading) flex-col"
     >
       {entries.map((entry, index) => (
@@ -113,13 +116,13 @@ export function RelationshipTimeline({
                 dateTime={entry.meeting.startsAt}
                 className="cq-caption cq-numeric text-(--cq-text-tertiary)"
               >
-                {formatRelationshipDate(entry.meeting.startsAt)}
+                {t(formatRelationshipDate(entry.meeting.startsAt))}
               </time>
               <span className="cq-body text-(--cq-text-primary)">
                 {meetingSentence(entry.meeting, counterpart, now)}
               </span>
               <span className="cq-caption text-(--cq-text-secondary)">
-                Shared with {counterpart}
+                {t(`Shared with ${counterpart}`)}
               </span>
             </span>
           ) : (
@@ -140,6 +143,8 @@ function RunText({
   readonly side: RelationshipSide;
   readonly counterpart: string;
 }) {
+  const t = serverTNow();
+
   const first = run.steps[0];
   if (first === undefined) return null;
   const last = run.steps[run.steps.length - 1] ?? first;
@@ -149,25 +154,27 @@ function RunText({
         dateTime={first.at}
         className="cq-caption cq-numeric text-(--cq-text-tertiary)"
       >
-        {formatRelationshipDate(first.at)}
+        {t(formatRelationshipDate(first.at))}
       </time>
       <span className="cq-body text-(--cq-text-primary)">
-        {milestoneSentence(first.state, side, counterpart)}
+        {t(milestoneSentence(first.state, side, counterpart))}
       </span>
       {run.steps.slice(1).map((step) => (
         <span key={step.state} className="cq-body text-(--cq-text-primary)">
-          Then: {milestoneSentence(step.state, side, counterpart)}
+          {t("Then:")} {t(milestoneSentence(step.state, side, counterpart))}
         </span>
       ))}
       {run.times > 1 ? (
         <span className="cq-caption cq-numeric text-(--cq-text-secondary)">
           {run.steps.length > 1
-            ? `This back-and-forth happened ${String(run.times)} times that day.`
-            : `Happened ${String(run.times)} times that day.`}
+            ? t(
+                `This back-and-forth happened ${String(run.times)} times that day.`,
+              )
+            : t(`Happened ${String(run.times)} times that day.`)}
         </span>
       ) : null}
       <span className="cq-caption text-(--cq-text-secondary)">
-        {visibilityWords(last.state, counterpart)}
+        {t(visibilityWords(last.state, counterpart))}
       </span>
     </span>
   );

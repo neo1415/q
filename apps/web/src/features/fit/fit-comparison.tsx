@@ -67,7 +67,7 @@ function Rank({ n }: { readonly n: number }) {
 
 function Best({ of }: { readonly of: number }) {
   return (
-    <span className="ml-auto inline-flex shrink-0 items-center gap-1 border border-(--cq-border) px-[7px] py-px text-[11.5px] whitespace-nowrap text-(--cq-text-secondary)">
+    <span className="ms-auto inline-flex shrink-0 items-center gap-1 border border-(--cq-border) px-[7px] py-px text-[11.5px] whitespace-nowrap text-(--cq-text-secondary)">
       <Check size={11} aria-hidden="true" />
       {of > 3 ? "Best" : `Best${of === 3 ? " of 3" : ""}`}
     </span>
@@ -195,7 +195,7 @@ export function FitComparisonView({
         >
           <div
             role="columnheader"
-            className="sticky left-0 bg-(--cq-surface-subtle)"
+            className="sticky start-0 bg-(--cq-surface-subtle)"
           />
           {entries.map((e, j) => (
             <div
@@ -241,14 +241,14 @@ export function FitComparisonView({
           ))}
           {comparison.parameters.map((parameter) => (
             <div key={parameter} role="row" className="contents">
-              <div role="rowheader" className={cx(label, "sticky left-0")}>
+              <div role="rowheader" className={cx(label, "sticky start-0")}>
                 {FIT_PARAMETER_LABELS[parameter]}
               </div>
               {row(parameter)}
             </div>
           ))}
           <div role="row" className="contents">
-            <div role="rowheader" className={cx(label, "sticky left-0")}>
+            <div role="rowheader" className={cx(label, "sticky start-0")}>
               Q&apos;s view
             </div>
             {entries.map((e, j) => (
@@ -262,7 +262,7 @@ export function FitComparisonView({
             ))}
           </div>
           <div role="row" className="contents">
-            <div className={cx(label, "sticky left-0")} />
+            <div className={cx(label, "sticky start-0")} />
             {entries.map((e, j) => (
               <div key={e.companyId} role="cell" className={cell(j)}>
                 <Actions entry={e} onSave={onSave} onPass={onPass} />
@@ -291,7 +291,7 @@ export function FitComparisonView({
                 type="button"
                 aria-expanded={isOpen}
                 onClick={() => setOpen(isOpen ? -1 : j)}
-                className="flex min-h-16 w-full items-center gap-3 px-4 py-3.5 text-left focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                className="flex min-h-16 w-full items-center gap-3 px-4 py-3.5 text-start focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
               >
                 <Rank n={e.position} />
                 <EntityAvatar
@@ -339,7 +339,7 @@ export function FitComparisonView({
                         <span className="text-(--cq-text-primary)">
                           {r.reason}
                           {e.bestOn.includes(r.parameter) ? (
-                            <span className="ml-1 inline-flex align-middle">
+                            <span className="ms-1 inline-flex align-middle">
                               <Best of={n} />
                             </span>
                           ) : null}

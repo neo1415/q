@@ -5,6 +5,7 @@ import { ICON_SIZE } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import type { OpenedFile } from "./material-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The reader's name over every page of a view-only file (A3/A4). It deters
@@ -40,6 +41,7 @@ export function FileViewer({
   readonly file: OpenedFile | null;
   readonly onClose: () => void;
 }) {
+  const t = useT();
   return (
     <SheetRoot
       open={file !== null}
@@ -80,7 +82,7 @@ export function FileViewer({
               ) : (
                 <>
                   <Lock size={ICON_SIZE.compact} aria-hidden="true" />
-                  View only. Your name is shown on every page.
+                  {t("View only. Your name is shown on every page.")}
                 </>
               )}
             </p>

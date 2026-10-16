@@ -9,6 +9,7 @@ import { Select } from "@capital-q/ui/select";
 import { grantRoleAction, revokeRoleAction } from "./console-actions";
 import { ReasonAction, ResultLine, useConsoleAction } from "./console-ui";
 import { ROLE_WORDS } from "./words";
+import { useT } from "@/features/i18n/language";
 
 const ROLE_OPTIONS = Object.entries(ROLE_WORDS).map(([value, label]) => ({
   value,
@@ -17,6 +18,8 @@ const ROLE_OPTIONS = Object.entries(ROLE_WORDS).map(([value, label]) => ({
 
 /** Give someone a console role, or change theirs (platform owner only). */
 export function GrantRole() {
+  const t = useT();
+
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("support");
   const [reason, setReason] = useState("");
@@ -40,22 +43,25 @@ export function GrantRole() {
     >
       <Input
         id={emailId}
-        label="Their Capital Q email"
+        label={t("Their Capital Q email")}
         type="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
       />
       <Select
         id={roleId}
-        label="Role"
+        label={t("Role")}
         value={role}
-        options={ROLE_OPTIONS}
+        options={ROLE_OPTIONS.map((option) => ({
+          ...option,
+          label: t(option.label),
+        }))}
         onChange={(e) => setRole(e.target.value)}
       />
       <Textarea
         id={reasonId}
-        label="Reason"
-        description="At least 3 characters."
+        label={t("Reason")}
+        description={t("At least 3 characters.")}
         value={reason}
         onChange={(e) => setReason(e.target.value)}
       />
@@ -65,7 +71,7 @@ export function GrantRole() {
           variant="primary"
           disabled={pending || email.length === 0 || reason.trim().length < 3}
         >
-          {pending ? "Saving…" : "Save role"}
+          {pending ? t("Saving…") : t("Save role")}
         </Button>
       </div>
       <ResultLine result={result} />
@@ -80,11 +86,13 @@ export function RevokeRole({
   readonly userId: string;
   readonly name: string;
 }) {
+  const t = useT();
+
   return (
     <ReasonAction
-      label="Remove"
-      title={`Remove ${name} from the console?`}
-      description="They lose console access at once."
+      label={t("Remove")}
+      title={t(`Remove ${name} from the console?`)}
+      description={t("They lose console access at once.")}
       confirm="Remove access"
       variant="danger"
       run={(reason) => revokeRoleAction({ userId, reason })}

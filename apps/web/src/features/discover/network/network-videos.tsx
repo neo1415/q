@@ -30,6 +30,7 @@ import { authorisePostersAction } from "../feed/playback-source";
 import { attachHlsOrNativeSource } from "../player/hls-source";
 import { PitchPlayer } from "../player/pitch-player";
 import { prefersReducedMotion } from "../player/use-pitch-playback";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Founders' videos (ADR 0021): what other founders opened to everyone on
@@ -78,6 +79,7 @@ export function NetworkVideos({
   /** Search: only videos whose company name or line matches (Search page). */
   readonly text?: string | undefined;
 } = {}) {
+  const t = useT();
   const [items, setItems] = useState<readonly NetworkPitchItemDto[] | null>(
     null,
   );
@@ -160,7 +162,7 @@ export function NetworkVideos({
 
   if (error !== null && items === null) {
     return (
-      <InlineNotice tone="warning" title="Founders' videos couldn't load">
+      <InlineNotice tone="warning" title={t("Founders' videos couldn't load")}>
         {error}
       </InlineNotice>
     );
@@ -176,11 +178,13 @@ export function NetworkVideos({
   if (items.length === 0) {
     return (
       <EmptyState
-        title="No founder has shared a video with everyone yet."
-        description="When founders open a video to everyone on Capital Q, it shows here. Yours can too: choose 'Everyone on Capital Q' on any of your videos."
+        title={t("No founder has shared a video with everyone yet.")}
+        description={t(
+          "When founders open a video to everyone on Capital Q, it shows here. Yours can too: choose 'Everyone on Capital Q' on any of your videos.",
+        )}
         action={
           <Link href="/pitch" className={buttonClassName("secondary")}>
-            Your videos
+            {t("Your videos")}
           </Link>
         }
       />
@@ -199,7 +203,7 @@ export function NetworkVideos({
                 type="button"
                 onClick={() => setWatching(at)}
                 aria-label={`Watch ${item.pitch.title ?? "the pitch"} from ${item.canonicalName}`}
-                className="group relative block aspect-9/16 w-full overflow-hidden bg-(--cq-stage-canvas) text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+                className="group relative block aspect-9/16 w-full overflow-hidden bg-(--cq-stage-canvas) text-start focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
                 data-network-tile={item.pitch.mediaAssetId}
               >
                 {poster !== null ? (
@@ -282,14 +286,14 @@ export function NetworkVideos({
                   href={`/company/${current.companyId}`}
                   className={buttonClassName("quiet")}
                 >
-                  Open company
+                  {t("Open company")}
                 </Link>
                 <Button
                   variant="secondary"
                   disabled={watching + 1 >= items.length}
                   onClick={() => setWatching(watching + 1)}
                 >
-                  Next video
+                  {t("Next video")}
                   <ChevronRight size={ICON_SIZE.regular} aria-hidden="true" />
                 </Button>
               </>

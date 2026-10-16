@@ -17,6 +17,7 @@ import {
 import { authoriseDownloadAction } from "../feed/playback-source";
 import { formatTime } from "./scrubber";
 import { PLAYBACK_RATES, rateLabel, type PlaybackRate } from "./playback-rate";
+import { useT } from "@/features/i18n/language";
 
 /**
  * A pitch's options (Discover v2): a long press on the pitch, or More on
@@ -46,7 +47,7 @@ function openDownload(url: string): void {
 }
 
 const optionRow =
-  "flex min-h-14 w-full items-center gap-3.5 px-2 text-left text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) active:scale-[0.99] disabled:cursor-default disabled:hover:bg-transparent";
+  "flex min-h-14 w-full items-center gap-3.5 px-2 text-start text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) active:scale-[0.99] disabled:cursor-default disabled:hover:bg-transparent";
 
 export function PitchOptionsSheet({
   open,
@@ -74,6 +75,7 @@ export function PitchOptionsSheet({
   /** Pass, under the words people use for it; absent where Pass is not a choice. */
   readonly onNotInterested?: (() => void) | undefined;
 }) {
+  const t = useT();
   const [download, setDownload] = useState<DownloadState>({ kind: "IDLE" });
   const captionsAvailable = pitch.captionState === "AVAILABLE";
   const allowed = pitch.downloadAllowed === true;
@@ -112,7 +114,7 @@ export function PitchOptionsSheet({
         {...(duration === null ? {} : { description: duration })}
         side="bottom"
         // A small panel beside the decisions on a desktop, a sheet on a phone.
-        className="lg:inset-x-auto lg:right-6 lg:bottom-6 lg:left-auto lg:w-[360px] lg:pb-0"
+        className="lg:inset-x-auto lg:end-6 lg:bottom-6 lg:start-auto lg:w-[360px] lg:pb-0"
       >
         <div
           className="flex flex-col gap-1"
@@ -130,7 +132,7 @@ export function PitchOptionsSheet({
             className="cq-label px-2 pt-1 pb-2 text-(--cq-text-secondary)"
             id="cq-pitch-speed"
           >
-            Playback speed
+            {t("Playback speed")}
           </p>
           <div
             role="radiogroup"
@@ -178,7 +180,7 @@ export function PitchOptionsSheet({
                       : "Download pitch"}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    Saves a copy to this device
+                    {t("Saves a copy to this device")}
                   </span>
                 </span>
               </button>
@@ -195,7 +197,7 @@ export function PitchOptionsSheet({
                 />
                 <span className="flex flex-col">
                   <span className="cq-body text-(--cq-text-secondary)">
-                    Download not allowed by the company
+                    {t("Download not allowed by the company")}
                   </span>
                   <span className="cq-caption text-(--cq-text-secondary)">
                     {companyName} has kept this pitch watch-only
@@ -231,10 +233,10 @@ export function PitchOptionsSheet({
                 className="shrink-0 text-(--cq-text-secondary)"
               />
               <span className="flex flex-1 flex-col">
-                <span className="cq-body">Captions</span>
+                <span className="cq-body">{t("Captions")}</span>
                 {captionsAvailable ? null : (
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    Not available for this pitch yet
+                    {t("Not available for this pitch yet")}
                   </span>
                 )}
               </span>
@@ -261,9 +263,9 @@ export function PitchOptionsSheet({
                 className="shrink-0 text-(--cq-text-secondary)"
               />
               <span className="flex flex-col">
-                <span className="cq-body">Clear display</span>
+                <span className="cq-body">{t("Clear display")}</span>
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  Hide everything over the video until you tap
+                  {t("Hide everything over the video until you tap")}
                 </span>
               </span>
             </button>
@@ -291,9 +293,9 @@ export function PitchOptionsSheet({
                   className="shrink-0 text-(--cq-text-secondary)"
                 />
                 <span className="flex flex-col">
-                  <span className="cq-body">Not interested</span>
+                  <span className="cq-body">{t("Not interested")}</span>
                   <span className="cq-caption text-(--cq-text-secondary)">
-                    Same as Pass: moves on and records your pass
+                    {t("Same as Pass: moves on and records your pass")}
                   </span>
                 </span>
               </button>

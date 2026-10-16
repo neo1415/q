@@ -220,7 +220,7 @@ function PresetButton({
       aria-pressed={on}
       onClick={onPick}
       data-brand-preset={preset.key}
-      className="grid min-h-14 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3 border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-left aria-pressed:border-2 aria-pressed:border-(--cq-accent)"
+      className="grid min-h-14 grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3 border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-start aria-pressed:border-2 aria-pressed:border-(--cq-accent)"
     >
       <span
         aria-hidden="true"
@@ -298,7 +298,7 @@ function ContrastPanel({
       ) : (
         modes.map(({ theme, rows }) => (
           <table key={theme} className="cq-body-sm w-full border-collapse">
-            <caption className="cq-caption pb-1 text-left text-(--cq-text-secondary)">
+            <caption className="cq-caption pb-1 text-start text-(--cq-text-secondary)">
               {theme === "light" ? "Light" : "Dark"}
             </caption>
             <thead className="sr-only">
@@ -314,7 +314,7 @@ function ContrastPanel({
                   key={row.name}
                   className="border-b border-(--cq-border-subtle)"
                 >
-                  <td className="py-1.5 pr-2 text-(--cq-text-primary)">
+                  <td className="py-1.5 pe-2 text-(--cq-text-primary)">
                     {row.name}
                   </td>
                   <td className="py-1.5">
@@ -331,7 +331,7 @@ function ContrastPanel({
                       Aa
                     </span>
                   </td>
-                  <td className="cq-numeric py-1.5 text-right whitespace-nowrap text-(--cq-text-secondary)">
+                  <td className="cq-numeric py-1.5 text-end whitespace-nowrap text-(--cq-text-secondary)">
                     {row.ratio.toFixed(1)}:1 · {row.passes ? "Passes" : "Below"}{" "}
                     {row.need}:1
                   </td>

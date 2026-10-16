@@ -21,6 +21,7 @@ import {
 } from "../src/contracts/index.js";
 import {
   createGateQInterviewer,
+  interviewLanguageOf,
   InterviewUnavailableError,
   InterviewTurnOutcomeSchema,
   type InterviewTurnInput,
@@ -684,5 +685,59 @@ describe("what the founder said, not what Q worked out (live 2026-10-15)", () =>
       turn({ utterance: "I'm Laura.", application: application([]) }),
     );
     expect(filled.facts.map((f) => f.dimension)).toEqual(["contact.name"]);
+  });
+});
+
+describe("the interview in Arabic (lane ml)", () => {
+  // The note's words as JSON-escaped in the captured request.
+  const asks = (prompt: string | undefined) =>
+    (prompt ?? "").includes("Ask every question and say every reply in Arabic");
+
+  it("asks an applicant who chose Arabic in Arabic, keeping the fund's name and figures as recorded", async () => {
+    const captured: { prompt?: string } = {};
+    const { service } = interviewer(RESULT, captured);
+    await service.turn(turn({ locale: "ar-AE", utterance: "We're in Lagos." }));
+    expect(asks(captured.prompt)).toBe(true);
+    expect(captured.prompt).toContain("Modern Standard Arabic");
+    expect(captured.prompt).toContain(
+      "the fund's name, the gateway's criteria as named, amounts and currencies stay exactly as recorded",
+    );
+    // The fund's record is unchanged in what the model is given.
+    expect(captured.prompt).toContain("Acme Ventures");
+  });
+
+  it("follows an applicant who answers in Arabic with no stated language", async () => {
+    const captured: { prompt?: string } = {};
+    const { service } = interviewer(RESULT, captured);
+    await service.turn(
+      turn({ utterance: "نحن في لاغوس ونجمع 1.5 مليون دولار." }),
+    );
+    expect(asks(captured.prompt)).toBe(true);
+  });
+
+  it("stays English for English, and a stated English wins over Arabic text", async () => {
+    const english: { prompt?: string } = {};
+    await interviewer(RESULT, english).service.turn(turn());
+    expect(asks(english.prompt)).toBe(false);
+    const stated: { prompt?: string } = {};
+    await interviewer(RESULT, stated).service.turn(
+      turn({ locale: "en", utterance: "نحن في لاغوس" }),
+    );
+    expect(asks(stated.prompt)).toBe(false);
+  });
+
+  it("reads the language of an opening from the stated locale alone", () => {
+    expect(
+      interviewLanguageOf({ locale: "ar", utterance: "", recentTurns: [] }),
+    ).toBe("ar");
+    expect(
+      interviewLanguageOf({
+        utterance: "",
+        recentTurns: [{ role: "person", text: "مرحباً، شركتنا في دبي" }],
+      }),
+    ).toBe("ar");
+    expect(interviewLanguageOf({ utterance: "Hello", recentTurns: [] })).toBe(
+      null,
+    );
   });
 });

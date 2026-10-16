@@ -6,6 +6,7 @@ import { ChoiceList, MultiChoiceList } from "@capital-q/ui/choice-list";
 import { Input } from "@capital-q/ui/input";
 
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 const digits = (value: string) => value.replace(/[^0-9]/g, "").slice(0, 9);
 
@@ -14,6 +15,7 @@ const digits = (value: string) => value.replace(/[^0-9]/g, "").slice(0, 9);
  * founder types, never bands turned into guesses. Functions are optional.
  */
 export function TeamStep({ step, formId, busy, actions }: StepProps<"team">) {
+  const t = useT();
   const saved = step.response;
   const [role, setRole] = useState<string | undefined>(saved?.role);
   const [founders, setFounders] = useState(saved?.founders ?? "");
@@ -71,7 +73,7 @@ export function TeamStep({ step, formId, busy, actions }: StepProps<"team">) {
       />
       <Input
         id="team-founders"
-        label="How many founders?"
+        label={t("How many founders?")}
         type="text"
         inputMode="numeric"
         autoComplete="off"
@@ -96,8 +98,8 @@ export function TeamStep({ step, formId, busy, actions }: StepProps<"team">) {
       />
       <Input
         id="team-size"
-        label="How many people work on the company today?"
-        description="Founders included."
+        label={t("How many people work on the company today?")}
+        description={t("Founders included.")}
         type="text"
         inputMode="numeric"
         autoComplete="off"
@@ -113,7 +115,7 @@ export function TeamStep({ step, formId, busy, actions }: StepProps<"team">) {
         id="team-functions"
         name="functions"
         legend="Which of these does the founding team cover?"
-        description="Optional. Choose any that apply."
+        description={t("Optional. Choose any that apply.")}
         options={step.functionOptions}
         values={functions}
         disabled={busy}

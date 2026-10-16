@@ -45,6 +45,7 @@ import {
   type CriterionLine,
   type FitVerdict,
 } from "./fit";
+import { useT } from "@/features/i18n/language";
 
 /**
  * "Do we fit? Ask Q" (P7; CQ-GATE-002): Q talks with a founder on an
@@ -70,12 +71,14 @@ export function ChatTranscript({
   readonly endRef?: RefObject<HTMLDivElement | null>;
   readonly label?: string;
 }) {
+  const t = useT();
+
   return (
     <ol
       className="flex flex-col gap-3"
       aria-live="polite"
       aria-busy={thinking}
-      aria-label={label}
+      aria-label={t(label)}
     >
       {lines.map((line, index) => (
         <li
@@ -89,7 +92,7 @@ export function ChatTranscript({
         >
           {line.from === "YOU" ? (
             <>
-              <span className="sr-only">You: </span>
+              <span className="sr-only">{t("You:")} </span>
               {line.text}
             </>
           ) : (
@@ -109,7 +112,7 @@ export function ChatTranscript({
         <li className="flex items-center gap-2.5 self-start" role="status">
           <QSwarm state="THINKING" pixels={32} />
           <span className="cq-caption text-(--cq-text-tertiary)">
-            Q is thinking
+            {t("Q is thinking")}
           </span>
         </li>
       ) : null}
@@ -136,6 +139,8 @@ export function ChatComposer({
   readonly label?: string;
   readonly placeholder?: string;
 }) {
+  const t = useT();
+
   return (
     <form
       className="flex items-end gap-2"
@@ -156,8 +161,8 @@ export function ChatComposer({
         }}
         rows={1}
         maxLength={2000}
-        aria-label={label}
-        placeholder={placeholder}
+        aria-label={t(label)}
+        placeholder={t(placeholder)}
         className="cq-body min-h-11 flex-1 resize-none border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
       />
       <Button
@@ -165,7 +170,7 @@ export function ChatComposer({
         variant="primary"
         disabled={pending || value.trim() === ""}
       >
-        Send
+        {t("Send")}
       </Button>
     </form>
   );
@@ -244,18 +249,22 @@ function Criteria({
   readonly lines: readonly CriterionLine[];
   readonly compact?: boolean;
 }) {
+  const t = useT();
+
   if (lines.length === 0) return null;
   if (compact) {
     return (
-      <ul className="flex flex-wrap gap-1.5" aria-label="Where you stand">
+      <ul className="flex flex-wrap gap-1.5" aria-label={t("Where you stand")}>
         {lines.map((line) => (
           <li
             key={line.label}
             className="cq-caption flex items-center gap-1 border border-(--cq-border-subtle) px-2.5 py-1 text-(--cq-text-secondary)"
           >
             <StandingIcon standing={line.standing} />
-            <span>{line.label}</span>
-            <span className="sr-only">: {STANDING_WORDS[line.standing]}</span>
+            <span>{t(line.label)}</span>
+            <span className="sr-only">
+              : {t(STANDING_WORDS[line.standing])}
+            </span>
           </li>
         ))}
       </ul>
@@ -267,13 +276,16 @@ function Criteria({
         <li key={line.label} className="flex items-center gap-3 py-2.5">
           <StandingIcon standing={line.standing} />
           <span className="cq-body-sm flex-1 text-(--cq-text-primary)">
-            {line.label}
+            {t(line.label)}
             {line.required ? null : (
-              <span className="text-(--cq-text-tertiary)"> · preferred</span>
+              <span className="text-(--cq-text-tertiary)">
+                {" "}
+                {t("· preferred")}
+              </span>
             )}
           </span>
           <span className="cq-caption text-(--cq-text-secondary)">
-            {STANDING_WORDS[line.standing]}
+            {t(STANDING_WORDS[line.standing])}
           </span>
         </li>
       ))}
@@ -321,6 +333,8 @@ export function ApplyExperience({
     { readonly ok: true } | { readonly ok: false; readonly message: string }
   >;
 }) {
+  const t = useT();
+
   const fund = gateway.organisationDisplayName;
   const [token, setToken] = useState<string | null>(
     initialSession?.token ?? null,
@@ -569,7 +583,7 @@ export function ApplyExperience({
     <header
       className={
         compact
-          ? "flex items-center gap-3 border-b border-(--cq-border-subtle) px-4 py-3 pr-14"
+          ? "flex items-center gap-3 border-b border-(--cq-border-subtle) px-4 py-3 pe-14"
           : "flex flex-col gap-3"
       }
     >
@@ -589,7 +603,7 @@ export function ApplyExperience({
             {fund}
           </span>
           <span className="cq-caption text-(--cq-text-tertiary)">
-            {interview ? "Founder interview with Q" : "Fit check with Q"}
+            {interview ? t("Founder interview with Q") : t("Fit check with Q")}
           </span>
         </div>
       </div>
@@ -601,18 +615,20 @@ export function ApplyExperience({
       <div className="flex flex-col gap-4">
         <QSwarm state="IDLE" pixels={compact ? 72 : 96} />
         <div className="flex flex-col gap-2">
-          <h1 className="cq-title-lg text-(--cq-text-primary)">Do we fit?</h1>
+          <h1 className="cq-title-lg text-(--cq-text-primary)">
+            {t("Do we fit?")}
+          </h1>
           <p className="cq-body text-(--cq-text-secondary)">
-            Q is {fund}&apos;s analyst. Answer a few questions, or share your
-            website, and Q tells you whether you fit {fund}&apos;s published
-            mandate. About two minutes.
+            {t(
+              `Q is ${fund}'s analyst. Answer a few questions, or share your website, and Q tells you whether you fit ${fund}'s published mandate. About two minutes.`,
+            )}
           </p>
         </div>
       </div>
       {gateway.criteria.length === 0 ? null : (
         <div className="flex flex-col gap-1">
           <span className="cq-caption text-(--cq-text-secondary)">
-            What {fund} looks at
+            {t(`What ${fund} looks at`)}
           </span>
           <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
             {gateway.criteria.map((criterion) => (
@@ -620,11 +636,11 @@ export function ApplyExperience({
                 key={criterion.label}
                 className="cq-body-sm flex items-center justify-between py-2.5 text-(--cq-text-primary)"
               >
-                {criterion.label}
+                {t(criterion.label)}
                 <span className="cq-caption text-(--cq-text-tertiary)">
                   {criterion.requiredness === "REQUIRED"
-                    ? "Required"
-                    : "Preferred"}
+                    ? t("Required")
+                    : t("Preferred")}
                 </span>
               </li>
             ))}
@@ -639,15 +655,17 @@ export function ApplyExperience({
             onClick={start}
             disabled={pending}
           >
-            {pending ? "Starting…" : "Start with Q"}
+            {pending ? t("Starting…") : t("Start with Q")}
           </Button>
           <p className="cq-caption text-(--cq-text-tertiary)">
-            Nothing is shared with {fund} unless you choose to at the end.
+            {t(
+              `Nothing is shared with ${fund} unless you choose to at the end.`,
+            )}
           </p>
         </div>
       ) : (
         <p className="cq-body text-(--cq-text-secondary)">
-          {fund} isn&apos;t taking new conversations right now.
+          {t(`${fund} isn't taking new conversations right now.`)}
         </p>
       )}
     </div>
@@ -658,7 +676,7 @@ export function ApplyExperience({
       className="flex flex-col gap-3"
       aria-live="polite"
       aria-busy={pending}
-      aria-label="Conversation with Q"
+      aria-label={t("Conversation with Q")}
     >
       {lines.map((line, index) => (
         <li
@@ -689,7 +707,7 @@ export function ApplyExperience({
         <li className="flex items-center gap-2.5 self-start" role="status">
           <QSwarm state="THINKING" pixels={32} />
           <span className="cq-caption text-(--cq-text-tertiary)">
-            Q is thinking
+            {t("Q is thinking")}
           </span>
         </li>
       ) : null}
@@ -718,8 +736,8 @@ export function ApplyExperience({
           }}
           rows={1}
           maxLength={2000}
-          aria-label="Your answer"
-          placeholder="Answer, or paste a link"
+          aria-label={t("Your answer")}
+          placeholder={t("Answer, or paste a link")}
           className="cq-body min-h-11 flex-1 resize-none border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         />
         <Button
@@ -727,7 +745,7 @@ export function ApplyExperience({
           variant="primary"
           disabled={pending || draft.trim() === "" || unconfirmedTurn}
         >
-          Send
+          {t("Send")}
         </Button>
       </form>
       {interview ? (
@@ -736,7 +754,7 @@ export function ApplyExperience({
           onClick={() => setStage("DECLINED")}
           disabled={pending}
         >
-          Pause interview
+          {t("Pause interview")}
         </Button>
       ) : null}
       {answered > 0 ? (
@@ -753,8 +771,8 @@ export function ApplyExperience({
           className="cq-caption min-h-11 self-start text-(--cq-text-secondary) underline-offset-4 hover:underline"
         >
           {interview
-            ? "Review my application"
-            : "That’s all I can share for now"}
+            ? t("Review my application")
+            : t("That’s all I can share for now")}
         </button>
       ) : null}
     </div>
@@ -769,14 +787,14 @@ export function ApplyExperience({
         onClick={consenting ? share : () => setConsenting(true)}
         disabled={pending}
       >
-        {pending && consenting ? "Sharing…" : `Share with ${fund}`}
+        {pending && consenting ? t("Sharing…") : t(`Share with ${fund}`)}
       </Button>
       <Button
         variant="quiet"
         onClick={() => setStage("DECLINED")}
         disabled={pending}
       >
-        Not now
+        {t("Not now")}
       </Button>
     </div>
   );
@@ -797,10 +815,10 @@ export function ApplyExperience({
               id="fit-verdict"
               className="cq-title-sm text-(--cq-text-primary)"
             >
-              {VERDICT_TITLE[verdict](fund)}
+              {t(VERDICT_TITLE[verdict](fund))}
             </h2>
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              {VERDICT_NOTE[verdict](fund)}
+              {t(VERDICT_NOTE[verdict](fund))}
             </p>
           </div>
         </div>
@@ -809,16 +827,16 @@ export function ApplyExperience({
           consenting ? (
             <div className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-4">
               <h3 className="cq-label text-(--cq-text-primary)">
-                Share with {fund}?
+                {t(`Share with ${fund}?`)}
               </h3>
               <p className="cq-body-sm text-(--cq-text-secondary)">
-                {fund} will see what you told Q, and nothing else:
+                {t(`${fund} will see what you told Q, and nothing else:`)}
               </p>
               {facts.length === 0 ? null : (
                 <ul className="cq-body-sm flex flex-col gap-1 text-(--cq-text-primary)">
                   {facts.slice(0, 8).map((fact) => (
                     <li key={`${fact.dimension}-${fact.summary}`}>
-                      {fact.summary}
+                      {t(fact.summary)}
                     </li>
                   ))}
                 </ul>
@@ -837,7 +855,9 @@ export function ApplyExperience({
                 if (verdict === "NOT_A_FIT") setRevising(true);
               }}
             >
-              {verdict === "PARTIAL" ? "Keep answering" : "Change an answer"}
+              {verdict === "PARTIAL"
+                ? t("Keep answering")
+                : t("Change an answer")}
             </Button>
           </div>
         )}
@@ -848,26 +868,30 @@ export function ApplyExperience({
     stage === "SHARED" ? (
       <section className="flex flex-col items-start gap-3" role="status">
         <QSwarm state="COMPLETE" pixels={72} />
-        <h2 className="cq-title-sm text-(--cq-text-primary)">Sent to {fund}</h2>
+        <h2 className="cq-title-sm text-(--cq-text-primary)">
+          {t(`Sent to ${fund}`)}
+        </h2>
         <p className="cq-body text-(--cq-text-secondary)">
-          {fund} has your answers
+          {t(`${fund} has your answers`)}
           {application === null || application.reference === ""
             ? ""
-            : ` (reference ${application.reference})`}
-          . The investment team may contact you through your confirmed email.
+            : t(` (reference ${application.reference})`)}
+          {t(
+            ". The investment team may contact you through your confirmed email.",
+          )}
         </p>
       </section>
     ) : stage === "DECLINED" ? (
       <section className="flex flex-col items-start gap-3" role="status">
         <QSwarm state="IDLE" pixels={72} />
         <h2 className="cq-title-sm text-(--cq-text-primary)">
-          Nothing was shared
+          {t("Nothing was shared")}
         </h2>
         <p className="cq-body text-(--cq-text-secondary)">
-          {fund} hasn&apos;t received anything. You can close this window.
+          {t(`${fund} hasn't received anything. You can close this window.`)}
         </p>
         <Button variant="secondary" onClick={() => setStage("TALKING")}>
-          Back to the conversation
+          {t("Back to the conversation")}
         </Button>
       </section>
     ) : null;
@@ -886,7 +910,7 @@ export function ApplyExperience({
         />
         <div className="flex flex-1 flex-col gap-2">
           <p className="cq-body-sm text-(--cq-text-primary)">
-            {problem.message}
+            {t(problem.message)}
           </p>
           {problem.rateLimited && !interview ? null : (
             <div>
@@ -896,7 +920,7 @@ export function ApplyExperience({
                   strokeWidth={ICON_STROKE}
                   aria-hidden="true"
                 />
-                Try again
+                {t("Try again")}
               </Button>
             </div>
           )}
@@ -939,10 +963,11 @@ export function ApplyExperience({
         });
       }}
     >
-      <h1 className="cq-title-lg">Confirm your contact details</h1>
+      <h1 className="cq-title-lg">{t("Confirm your contact details")}</h1>
       <p className="cq-body text-(--cq-text-secondary)">
-        Your application is for {fund}. Nothing is submitted until you review it
-        and press Submit.
+        {t(
+          `Your application is for ${fund}. Nothing is submitted until you review it and press Submit.`,
+        )}
       </p>
       {(
         [
@@ -953,7 +978,7 @@ export function ApplyExperience({
         ] as const
       ).map(([label, value, update]) => (
         <label key={label} className="cq-body-sm flex flex-col gap-1">
-          {label}
+          {t(label)}
           <input
             required
             type={label === "Email" ? "email" : "text"}
@@ -969,15 +994,15 @@ export function ApplyExperience({
       ))}
       <Button type="submit" disabled={pending}>
         {pending
-          ? "Sending…"
+          ? t("Sending…")
           : codeSent
-            ? "Send a new code"
-            : "Send confirmation code"}
+            ? t("Send a new code")
+            : t("Send confirmation code")}
       </Button>
       {codeSent ? (
         <>
           <label className="cq-body-sm flex flex-col gap-1">
-            Email confirmation code
+            {t("Email confirmation code")}
             <input
               value={code}
               onChange={(event) =>
@@ -1016,12 +1041,12 @@ export function ApplyExperience({
               });
             }}
           >
-            Confirm email
+            {t("Confirm email")}
           </Button>
         </>
       ) : null}
       <Button type="button" variant="quiet" onClick={onCorrectAnswers}>
-        Back to my answers
+        {t("Back to my answers")}
       </Button>
     </form>
   );
@@ -1037,28 +1062,29 @@ export function ApplyExperience({
     coverage === null ? null : (
       <section
         className="flex flex-col gap-4"
-        aria-label="Review your application"
+        aria-label={t("Review your application")}
       >
-        <h1 className="cq-title-lg">Review before submitting</h1>
+        <h1 className="cq-title-lg">{t("Review before submitting")}</h1>
         <p className="cq-body text-(--cq-text-secondary)">
-          {fund} will receive your confirmed contact details, form answers, the
-          interview transcript and the {coverage.documentCount} documents you
-          chose to share. Applicant claims remain unverified unless supporting
-          evidence is recorded.
+          {t(
+            `${fund} will receive your confirmed contact details, form answers, the interview transcript and the ${String(coverage.documentCount)} documents you chose to share. Applicant claims remain unverified unless supporting evidence is recorded.`,
+          )}
         </p>
         {reviewContact ? (
           <div>
-            <h2 className="cq-title-sm">Contact details to share</h2>
+            <h2 className="cq-title-sm">{t("Contact details to share")}</h2>
             <p className="cq-body-sm">
               {reviewContact.name} · {reviewContact.email}
               <br />
-              {reviewContact.role} · {reviewContact.companyName}
+              {t(reviewContact.role)} · {reviewContact.companyName}
             </p>
           </div>
         ) : null}
         {initialSession?.materialNames?.length ? (
           <div>
-            <h2 className="cq-title-sm">Documents selected for submission</h2>
+            <h2 className="cq-title-sm">
+              {t("Documents selected for submission")}
+            </h2>
             <ul className="cq-body-sm">
               {initialSession.materialNames.map((name) => (
                 <li key={name}>{name}</li>
@@ -1067,16 +1093,17 @@ export function ApplyExperience({
           </div>
         ) : (
           <p className="cq-body-sm">
-            {coverage.documentCount} documents attached to this application.
+            {coverage.documentCount}{" "}
+            {t("documents attached to this application.")}
           </p>
         )}
         <Criteria lines={criteria} />
-        <h2 className="cq-title-sm">Answered</h2>
+        <h2 className="cq-title-sm">{t("Answered")}</h2>
         <ul className="cq-body-sm flex flex-col gap-2">
           {coverage.coverage.answered.map((item) => (
             <li key={item.dimension}>
-              <b>{item.label}:</b> {item.summary} ·{" "}
-              {item.provenance.replaceAll("_", " ").toLowerCase()}
+              <b>{t(item.label)}:</b> {t(item.summary)} ·{" "}
+              {t(item.provenance.replaceAll("_", " ").toLowerCase())}
             </li>
           ))}
         </ul>
@@ -1089,10 +1116,10 @@ export function ApplyExperience({
         ).map(([label, items]) =>
           items.length === 0 ? null : (
             <div key={label}>
-              <h2 className="cq-title-sm">{label}</h2>
+              <h2 className="cq-title-sm">{t(label)}</h2>
               <ul className="cq-body-sm">
                 {items.map((item) => (
-                  <li key={item.dimension}>{item.label}</li>
+                  <li key={item.dimension}>{t(item.label)}</li>
                 ))}
               </ul>
             </div>
@@ -1100,21 +1127,25 @@ export function ApplyExperience({
         )}
         {coverage.coverage.contradictions.length === 0 ? null : (
           <div>
-            <h2 className="cq-title-sm">Answers that disagree</h2>
+            <h2 className="cq-title-sm">{t("Answers that disagree")}</h2>
             <ul>
               {coverage.coverage.contradictions.map((item) => (
-                <li key={item}>{item}</li>
+                <li key={item}>{t(item)}</li>
               ))}
             </ul>
           </div>
         )}
         {coverage.coverage.access !== "MAY_APPLY" ? (
           <p role="status">
-            Your application needs corrections before {fund} can receive it:{" "}
-            {[
-              ...coverage.coverage.unmet,
-              ...coverage.coverage.stillNeeded,
-            ].join(", ")}
+            {t(
+              `Your application needs corrections before ${fund} can receive it:`,
+            )}{" "}
+            {t(
+              [
+                ...coverage.coverage.unmet,
+                ...coverage.coverage.stillNeeded,
+              ].join(", "),
+            )}
           </p>
         ) : null}
         <div className="flex flex-wrap gap-2">
@@ -1127,30 +1158,31 @@ export function ApplyExperience({
               unconfirmedTurn
             }
           >
-            {pending ? "Submitting…" : `Submit to ${fund}`}
+            {pending ? t("Submitting…") : t(`Submit to ${fund}`)}
           </Button>
           <Button
             variant="secondary"
             onClick={() => setStage("TALKING")}
             disabled={pending}
           >
-            Keep answering
+            {t("Keep answering")}
           </Button>
           <Button
             variant="quiet"
             onClick={onCorrectAnswers}
             disabled={pending || submissionStarted}
           >
-            Correct form answers
+            {t("Correct form answers")}
           </Button>
         </div>
         <p className="cq-caption text-(--cq-text-tertiary)">
-          The investment team will review your application and may contact you
-          at your confirmed email address.
+          {t(
+            "The investment team will review your application and may contact you at your confirmed email address.",
+          )}
         </p>
         <details>
           <summary className="min-h-11 cursor-pointer">
-            Review full transcript
+            {t("Review full transcript")}
           </summary>
           {transcript}
         </details>
@@ -1159,7 +1191,7 @@ export function ApplyExperience({
 
   const body =
     interview && !loaded ? (
-      <p role="status">Restoring your application…</p>
+      <p role="status">{t("Restoring your application…")}</p>
     ) : interview && !confirmed && stage !== "SHARED" ? (
       contactPanel
     ) : interview && stage === "STOPPED" ? (
@@ -1175,11 +1207,13 @@ export function ApplyExperience({
         )}
         {interview && lines.length === 0 ? (
           <div className="flex flex-col gap-3">
-            <h1 className="cq-title-lg">Let’s understand your company</h1>
+            <h1 className="cq-title-lg">
+              {t("Let’s understand your company")}
+            </h1>
             <p className="cq-body text-(--cq-text-secondary)">
-              Q uses your answers and shared materials to ask focused
-              follow-ups. You can say “I don’t know” or decline any question,
-              and pause by closing this tab’s page.
+              {t(
+                "Q uses your answers and shared materials to ask focused follow-ups. You can say “I don’t know” or decline any question, and pause by closing this tab’s page.",
+              )}
             </p>
             <Button
               disabled={pending || unconfirmedTurn}
@@ -1194,7 +1228,7 @@ export function ApplyExperience({
                 sendText(turn.text, turn.id);
               }}
             >
-              Begin interview
+              {t("Begin interview")}
             </Button>
           </div>
         ) : null}
@@ -1233,7 +1267,7 @@ export function ApplyExperience({
     return (
       <section
         className="flex h-dvh w-full flex-col bg-(--cq-canvas)"
-        aria-label={`${fund}: fit check with Q`}
+        aria-label={t(`${fund}: fit check with Q`)}
       >
         {header}
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
@@ -1247,7 +1281,7 @@ export function ApplyExperience({
           </div>
         ) : null}
         <p className="cq-caption px-4 pt-1 pb-[max(0.75rem,var(--cq-safe-bottom))] text-center text-(--cq-text-tertiary)">
-          Powered by Capital Q
+          {t("Powered by Capital Q")}
         </p>
       </section>
     );
@@ -1256,7 +1290,7 @@ export function ApplyExperience({
   return (
     <section
       className="flex min-h-[32rem] flex-col gap-6"
-      aria-label={`${fund}: fit check with Q`}
+      aria-label={t(`${fund}: fit check with Q`)}
     >
       {header}
       {coveragePanel === null ? (

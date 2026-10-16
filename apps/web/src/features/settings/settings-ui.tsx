@@ -72,7 +72,7 @@ export function SettingRow({
 
 /** A secondary action that opens another page: 44 px on every screen. */
 export const rowLinkClassName =
-  "cq-body-sm inline-flex min-h-11 items-center justify-center gap-1 border border-(--cq-border) bg-(--cq-surface) pr-3 pl-4 font-medium text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)";
+  "cq-body-sm inline-flex min-h-11 items-center justify-center gap-1 border border-(--cq-border) bg-(--cq-surface) pe-3 ps-4 font-medium text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)";
 
 export function RowLink({
   href,

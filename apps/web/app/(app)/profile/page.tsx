@@ -49,6 +49,7 @@ import {
   resolveOwnContext,
 } from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Profile" };
 export const dynamic = "force-dynamic";
@@ -130,6 +131,7 @@ const pageAnswers = cache(async () => {
 });
 
 export default async function ProfilePage() {
+  const t = await serverT();
   const [user, session, context] = await Promise.all([
     getSessionUser(),
     apiSession(),
@@ -237,11 +239,11 @@ export default async function ProfilePage() {
             actions={
               <>
                 <a href="#you" className={buttonClassName("primary")}>
-                  Edit profile
+                  {t("Edit profile")}
                 </a>
                 {company !== null || investor !== null ? (
                   <a href="#q-card" className={buttonClassName("secondary")}>
-                    Share Q Card
+                    {t("Share Q Card")}
                   </a>
                 ) : null}
                 {journey === null ? null : (
@@ -249,7 +251,7 @@ export default async function ProfilePage() {
                     href="/company/visibility"
                     className={buttonClassName("quiet")}
                   >
-                    Visibility
+                    {t("Visibility")}
                   </Link>
                 )}
               </>
@@ -266,7 +268,7 @@ export default async function ProfilePage() {
             <>
               <EditableSection
                 id="about"
-                title="About"
+                title={t("About")}
                 profile={{
                   kind: "COMPANY",
                   subjectId: company.id,
@@ -281,7 +283,7 @@ export default async function ProfilePage() {
               />
               <EditableSection
                 id="company"
-                title="Company"
+                title={t("Company")}
                 profile={{
                   kind: "COMPANY",
                   subjectId: company.id,
@@ -315,7 +317,7 @@ export default async function ProfilePage() {
             <>
               <EditableSection
                 id="about"
-                title="About"
+                title={t("About")}
                 profile={{
                   kind: "INVESTOR_ORGANISATION",
                   subjectId: investor.id,
@@ -327,7 +329,7 @@ export default async function ProfilePage() {
               />
               <EditableSection
                 id="mandate"
-                title="Your organisation"
+                title={t("Your organisation")}
                 profile={{
                   kind: "INVESTOR_ORGANISATION",
                   subjectId: investor.id,
@@ -370,12 +372,14 @@ export default async function ProfilePage() {
           ) : context.kind === "NONE" && context.unavailable !== true ? (
             <ProfileSectionShell
               id="organisation"
-              title="Company or investor organisation"
-              description="You haven't set one up yet. Onboarding creates it, and it appears here to edit."
+              title={t("Company or investor organisation")}
+              description={t(
+                "You haven't set one up yet. Onboarding creates it, and it appears here to edit.",
+              )}
             >
               <div>
                 <Link href="/welcome" className={buttonClassName("secondary")}>
-                  Set up
+                  {t("Set up")}
                 </Link>
               </div>
             </ProfileSectionShell>
@@ -428,13 +432,13 @@ export default async function ProfilePage() {
           {journey === "founder" ? (
             <ProfileSectionShell
               id="traction"
-              title="Traction and raise"
+              title={t("Traction and raise")}
               action={
                 <Link
                   href="/relationships?view=capital"
                   className={buttonClassName("quiet", "regular", "shrink-0")}
                 >
-                  Open Capital
+                  {t("Open Capital")}
                 </Link>
               }
             >
@@ -449,7 +453,7 @@ export default async function ProfilePage() {
 
           {/* The shareable identity (BIZ-004). */}
           {company !== null || investor !== null ? (
-            <ProfileSectionShell id="q-card" title="Q Card">
+            <ProfileSectionShell id="q-card" title={t("Q Card")}>
               {company !== null ? (
                 <QCardSection
                   subjectType="COMPANY"
@@ -486,7 +490,7 @@ export default async function ProfilePage() {
         </div>
 
         <aside
-          aria-label="What else is known"
+          aria-label={t("What else is known")}
           className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start"
         >
           <SignalsSlot
@@ -589,7 +593,7 @@ function OrganisationImages({
             // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, browser to storage directly
             <img src={coverUrl} alt="" className="size-full object-cover" />
           )}
-          <div className="absolute top-1/2 right-2 -translate-y-1/2">
+          <div className="absolute top-1/2 end-2 -translate-y-1/2">
             <ProfileImageEditor
               subjectType={subjectType}
               subjectId={subjectId}
@@ -796,8 +800,10 @@ async function AnswersRead({
   readonly bare: boolean;
 }) {
   const state = await pageAnswers();
+  const t = await serverT();
   return (
     <ProfileAnswers
+      translate={t}
       journey={journey}
       state={state}
       include={include}

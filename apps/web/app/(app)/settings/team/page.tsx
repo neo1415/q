@@ -8,6 +8,7 @@ import { CompanyClaims } from "@/features/team/company-claims";
 import { SettingsNav, TeamError } from "@/features/team/settings-nav";
 import { TeamPage } from "@/features/team/team-page";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Team" };
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic";
  * answers for their ACTIVE organisation and decides what they may do.
  */
 export default async function TeamSettingsPage() {
+  const t = await serverT();
   const session = await apiSession();
   const context = await resolveOwnContext();
   const [team, claims] =
@@ -34,7 +36,7 @@ export default async function TeamSettingsPage() {
         ]);
   return (
     <PageContainer>
-      <QSection id="team" kind="TEAM" label="your team">
+      <QSection id="team" kind="TEAM" label={t("your team")}>
         <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
           <SettingsNav current="team" />
           <div className="max-w-[52rem] min-w-0">

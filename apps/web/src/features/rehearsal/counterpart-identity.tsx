@@ -82,7 +82,7 @@ export function SimulationDetails({
       <summary className="inline-flex min-h-11 cursor-pointer items-center underline-offset-2 hover:underline">
         Sources and details
       </summary>
-      <div className="mt-1 flex max-w-sm flex-col gap-2 text-left">
+      <div className="mt-1 flex max-w-sm flex-col gap-2 text-start">
         <p>{simulation.disclaimer}</p>
         {quotes.length > 0 ? (
           <ul className="flex flex-col gap-1">

@@ -8,6 +8,7 @@ import { useCardHidden } from "./cards/card-visibility";
 import type { QTurn, QTurnObjectBlock } from "./conversation";
 import { QResultBlocks } from "./q-result-blocks";
 import { Q_CONFIDENCE_LABELS } from "./wire-constants";
+import { useT } from "@/features/i18n/language";
 
 /**
  * What an answer rests on, behind one "Sources" disclosure (founder
@@ -109,6 +110,7 @@ export function QEvidence({
   readonly onAsk?: ((question: string) => void) | undefined;
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
 }) {
+  const t = useT();
   const summary = evidenceSummary(turn);
   // Founder P5: Sources the person cleared are not drawn (and take no space).
   const hidden = useCardHidden({
@@ -120,7 +122,7 @@ export function QEvidence({
   return (
     <details className="cq-q-evidence" data-q-evidence>
       <summary className="cq-q-evidence-summary">
-        Sources
+        {t("Sources")}
         <span className="cq-caption text-(--cq-text-tertiary)">
           {summary.label === "" ? "" : ` · ${summary.label}`}
         </span>
@@ -150,9 +152,10 @@ export function QEvidenceBody({
   readonly onOpenArtifact?: ((artifactId: string) => void) | undefined;
   readonly includeBlocks?: boolean | undefined;
 }) {
+  const t = useT();
   const evidence = includeBlocks ? splitBlocks(turn.blocks).evidence : [];
   return (
-    <div className="flex flex-col gap-4 pt-3 text-left">
+    <div className="flex flex-col gap-4 pt-3 text-start">
       {turn.findings.length > 0 ? (
         <dl className="cq-q-answer-findings flex flex-col">
           {turn.findings.map((finding) => (
@@ -180,7 +183,9 @@ export function QEvidenceBody({
       ) : null}
       {turn.uncertainties.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <span className="cq-label text-(--cq-text-tertiary)">Still open</span>
+          <span className="cq-label text-(--cq-text-tertiary)">
+            {t("Still open")}
+          </span>
           <ul className="flex flex-col gap-2">
             {turn.uncertainties.map((item) => (
               <li key={item.statement} className="flex flex-col gap-0.5">
@@ -200,7 +205,7 @@ export function QEvidenceBody({
       {turn.publicSources.length > 0 ? (
         <div className="flex flex-col gap-2" data-q-public-sources>
           <span className="cq-label text-(--cq-text-tertiary)">
-            Public sources, unverified
+            {t("Public sources, unverified")}
           </span>
           <ul className="flex flex-col gap-2">
             {turn.publicSources.map((source) => (

@@ -33,6 +33,7 @@ import {
   type SlidePicture,
 } from "./slide-pictures";
 import { slideSource } from "./slide-source";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Reading what Q composed (QX-003E).
@@ -167,6 +168,7 @@ export function ArtifactViewer({
   revision,
   onEditWithQ,
 }: ArtifactViewerProps) {
+  const t = useT();
   const [detail, setDetail] = useState<QArtifactDetail | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -374,7 +376,11 @@ export function ArtifactViewer({
             </p>
           )}
         </div>
-        <IconButton aria-label="Close" onClick={onClose} data-q-artifact-close>
+        <IconButton
+          aria-label={t("Close")}
+          onClick={onClose}
+          data-q-artifact-close
+        >
           <X
             aria-hidden="true"
             size={ICON_SIZE.regular}
@@ -387,7 +393,7 @@ export function ArtifactViewer({
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-(--cq-border-subtle) px-4 py-2 sm:px-6">
           {detail !== null && detail.history.length > 1 ? (
             <nav
-              aria-label="Versions"
+              aria-label={t("Versions")}
               className="flex flex-wrap items-center gap-1"
               data-q-artifact-versions
             >
@@ -416,7 +422,7 @@ export function ArtifactViewer({
             </nav>
           ) : null}
           <div
-            className="ml-auto flex flex-wrap items-center gap-2"
+            className="ms-auto flex flex-wrap items-center gap-2"
             data-q-artifact-export
           >
             {onEditWithQ === undefined || detail === null ? null : (
@@ -428,7 +434,7 @@ export function ArtifactViewer({
                 }}
                 data-q-artifact-edit
               >
-                Edit with Q
+                {t("Edit with Q")}
               </button>
             )}
             {version === null ? null : (
@@ -453,7 +459,7 @@ export function ArtifactViewer({
         {loading && detail === null ? (
           <div className="flex flex-col gap-4" data-q-artifact-loading>
             <span className="sr-only" role="status">
-              Opening the document…
+              {t("Opening the document…")}
             </span>
             <Skeleton lines={1} className="w-1/3" />
             <Skeleton lines={4} />
@@ -462,17 +468,18 @@ export function ArtifactViewer({
         ) : null}
 
         {notice !== null ? (
-          <InlineNotice tone="warning" title="That didn't open">
+          <InlineNotice tone="warning" title={t("That didn't open")}>
             <span className="block">{notice}</span>
             <span className="block">
-              Close this and open it again from the conversation, or ask Q for
-              it.
+              {t(
+                "Close this and open it again from the conversation, or ask Q for it.",
+              )}
             </span>
           </InlineNotice>
         ) : null}
 
         {newer ? (
-          <InlineNotice tone="info" title="A new version is ready">
+          <InlineNotice tone="info" title={t("A new version is ready")}>
             <button
               type="button"
               className={buttonClassName("secondary", "regular")}
@@ -483,7 +490,7 @@ export function ArtifactViewer({
               }}
               data-q-artifact-show-latest
             >
-              Show the latest
+              {t("Show the latest")}
             </button>
           </InlineNotice>
         ) : null}
@@ -499,7 +506,7 @@ export function ArtifactViewer({
         {slides === null || slides.length === 0 ? null : (
           <section
             aria-roledescription="slide viewer"
-            aria-label="Slides"
+            aria-label={t("Slides")}
             className="flex flex-col gap-3"
             data-q-artifact-slides
             data-fit={fit}
@@ -545,7 +552,7 @@ export function ArtifactViewer({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-1">
                 <IconButton
-                  aria-label="Previous slide"
+                  aria-label={t("Previous slide")}
                   variant="secondary"
                   className="aria-disabled:cursor-default aria-disabled:opacity-50"
                   // aria-disabled, not disabled: a disabled button drops
@@ -567,14 +574,14 @@ export function ArtifactViewer({
                   aria-live="polite"
                   data-q-artifact-page
                 >
-                  <span className="sr-only">Slide </span>
+                  <span className="sr-only">{t("Slide")} </span>
                   {String(page + 1)}
                   <span aria-hidden="true"> / </span>
-                  <span className="sr-only"> of </span>
+                  <span className="sr-only"> {t("of")} </span>
                   {String(pageCount)}
                 </span>
                 <IconButton
-                  aria-label="Next slide"
+                  aria-label={t("Next slide")}
                   variant="secondary"
                   className="aria-disabled:cursor-default aria-disabled:opacity-50"
                   aria-disabled={page >= pageCount - 1}
@@ -592,7 +599,7 @@ export function ArtifactViewer({
               </div>
               <div
                 role="group"
-                aria-label="Zoom"
+                aria-label={t("Zoom")}
                 className="flex items-center gap-1"
               >
                 {(["width", "page"] as const).map((option) => (
@@ -613,7 +620,7 @@ export function ArtifactViewer({
               </div>
             </div>
             <p className="cq-caption hidden text-(--cq-text-tertiary) sm:block">
-              Use the left and right arrow keys to turn slides.
+              {t("Use the left and right arrow keys to turn slides.")}
             </p>
           </section>
         )}
@@ -638,11 +645,11 @@ export function ArtifactViewer({
             {current.content.gaps.length === 0 ? null : (
               <section className="flex flex-col gap-2" data-q-artifact-gaps>
                 <h3 className="cq-title-sm text-(--cq-text-primary)">
-                  Evidence gaps
+                  {t("Evidence gaps")}
                 </h3>
                 {/* Unknown stays unknown, in the document itself, because
                     an investor should see the shape of the gap. */}
-                <ul className="flex list-disc flex-col gap-1 pl-5">
+                <ul className="flex list-disc flex-col gap-1 ps-5">
                   {current.content.gaps.map((gap) => (
                     <li
                       key={gap}
@@ -660,9 +667,9 @@ export function ArtifactViewer({
             )}
 
             <p className="cq-caption text-(--cq-text-tertiary)">
-              Q composed this from what Capital Q holds on record. It is a
-              private draft: it is not verified evidence, it does not change
-              your company record, and nothing here has been shared or sent.
+              {t(
+                "Q composed this from what Capital Q holds on record. It is a private draft: it is not verified evidence, it does not change your company record, and nothing here has been shared or sent.",
+              )}
             </p>
           </article>
         )}
@@ -695,7 +702,7 @@ function DocumentSection({
       </p>
       {section.findings.length === 0 ? null : (
         <SourcesDisclosure count={section.findings.length}>
-          <dl className="flex flex-col gap-1 border-l-2 border-(--cq-border-subtle) pl-3">
+          <dl className="flex flex-col gap-1 border-s-2 border-(--cq-border-subtle) ps-3">
             {section.findings.map((finding) => (
               <div key={finding.findingId} className="flex flex-col">
                 <dd className="cq-body-sm text-(--cq-text-secondary)">
@@ -734,10 +741,11 @@ const CHECK_NAMES: Readonly<Record<string, string>> = {
  * document; Q never fills a gap in itself.
  */
 function DocumentChecks({ audit }: { readonly audit: QDocumentAudit }) {
+  const t = useT();
   const failing = audit.checks.filter((check) => !check.ok);
   return (
     <section className="flex flex-col gap-2" data-q-artifact-checks>
-      <h3 className="cq-title-sm text-(--cq-text-primary)">Checks</h3>
+      <h3 className="cq-title-sm text-(--cq-text-primary)">{t("Checks")}</h3>
       {failing.length === 0 ? (
         <p className="cq-body-sm flex items-center gap-2 text-(--cq-text-secondary)">
           <Check
@@ -770,7 +778,7 @@ function DocumentChecks({ audit }: { readonly audit: QDocumentAudit }) {
         </ul>
       )}
       {audit.suggestions.length === 0 ? null : (
-        <ul className="flex list-disc flex-col gap-1 pl-5">
+        <ul className="flex list-disc flex-col gap-1 ps-5">
           {audit.suggestions.map((suggestion) => (
             <li
               key={suggestion}

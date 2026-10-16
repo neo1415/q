@@ -9,6 +9,7 @@ import { OwnerDataRoom } from "@/features/company/material/data-room";
 
 import { AccessSheet, type AccessTarget } from "./access-sheet";
 import { requestedMarks } from "./requests-model";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Data room tab on Documents (2026-10-08): the curated folders, with
@@ -26,13 +27,15 @@ export function DataRoomTab({
   readonly view: DataRoomOwnerView | null;
   readonly items: readonly RequestInboxItem[];
 }) {
+  const t = useT();
+
   const router = useRouter();
   const [target, setTarget] = useState<AccessTarget | null>(null);
   const marks = useMemo(() => requestedMarks(items), [items]);
   if (view === null) {
     return (
       <p className="cq-body text-(--cq-text-secondary)" role="status">
-        The data room couldn&apos;t load. Try again in a moment.
+        {t("The data room couldn't load. Try again in a moment.")}
       </p>
     );
   }

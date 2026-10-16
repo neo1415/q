@@ -50,10 +50,10 @@ function ColumnHead({
 export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
   return (
     <div className="relative overflow-x-auto" data-q-table>
-      <table className="w-full border-collapse text-left">
+      <table className="w-full border-collapse text-start">
         <thead>
           <tr>
-            <th className="px-0 py-2 pr-4">
+            <th className="px-0 py-2 pe-4">
               <span className="sr-only">Attribute</span>
             </th>
             {block.columns.map((column, index) => (
@@ -78,7 +78,7 @@ export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
             >
               <th
                 scope="row"
-                className="cq-body-sm px-0 py-2 pr-4 font-normal text-(--cq-text-secondary)"
+                className="cq-body-sm px-0 py-2 pe-4 font-normal text-(--cq-text-secondary)"
               >
                 {row.label}
               </th>
@@ -255,14 +255,14 @@ export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
       </figcaption>
       <details className="cq-caption text-(--cq-text-secondary)">
         <summary className="cursor-pointer">The figures</summary>
-        <table className="mt-1 border-collapse text-left" data-q-chart-table>
+        <table className="mt-1 border-collapse text-start" data-q-chart-table>
           <thead>
             <tr>
-              <th className="pr-3">
+              <th className="pe-3">
                 <span className="sr-only">Point</span>
               </th>
               {block.series.map((series) => (
-                <th key={series.label} scope="col" className="pr-3">
+                <th key={series.label} scope="col" className="pe-3">
                   {series.label}
                 </th>
               ))}
@@ -271,7 +271,7 @@ export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
           <tbody>
             {labels.map((label) => (
               <tr key={label}>
-                <th scope="row" className="pr-3 font-normal">
+                <th scope="row" className="pe-3 font-normal">
                   {label}
                 </th>
                 {block.series.map((series) => {
@@ -279,7 +279,7 @@ export function ChartBody({ block }: { readonly block: Block<"CHART"> }) {
                     (point) => point.label === label,
                   );
                   return (
-                    <td key={series.label} className="pr-3 cq-numeric">
+                    <td key={series.label} className="pe-3 cq-numeric">
                       {point === undefined
                         ? "Not known"
                         : formatValue(point.value, block.currency)}
@@ -432,7 +432,7 @@ export function MapBody({ map }: { readonly map: QMapSpec }) {
 export function TimelineBody({ block }: { readonly block: Block<"TIMELINE"> }) {
   return (
     <ol
-      className="m-0 flex list-none flex-col gap-3 border-l border-(--cq-border) p-0 pl-4"
+      className="m-0 flex list-none flex-col gap-3 border-s border-(--cq-border) p-0 ps-4"
       data-q-timeline
     >
       {block.events.map((event, index) => {

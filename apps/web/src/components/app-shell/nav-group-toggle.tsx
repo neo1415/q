@@ -58,7 +58,7 @@ export function NavGroupToggle({
         compact
           ? "w-11 justify-center"
           : cx(
-              "w-full gap-2 px-3 text-left font-medium",
+              "w-full gap-2 px-3 text-start font-medium",
               size === "large" ? "cq-label" : "cq-caption",
             ),
       )}
@@ -71,7 +71,7 @@ export function NavGroupToggle({
           aria-hidden="true"
           className={cx(
             "cq-caption cq-numeric font-semibold text-(--cq-accent)",
-            compact ? "absolute top-1 right-1" : null,
+            compact ? "absolute top-1 end-1" : null,
           )}
         >
           {count}

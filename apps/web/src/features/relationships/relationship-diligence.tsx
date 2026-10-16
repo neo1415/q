@@ -28,6 +28,7 @@ import {
 } from "./diligence-actions";
 import { NotScannedNote } from "../documents/not-scanned-note";
 import { since } from "./relationships-view";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Diligence tab (founder critique 2026-10-04: "they requested
@@ -137,20 +138,24 @@ function QuestionAnswers({
   readonly founder: boolean;
   readonly counterpart: string;
 }) {
+  const t = useT();
+
   return (
     <ol className="flex flex-col gap-3" data-request-questions>
       {questions.map((question) => (
         <li
           key={question.questionId}
-          className="flex flex-col gap-1 border-l-2 border-(--cq-border) pl-3"
+          className="flex flex-col gap-1 border-s-2 border-(--cq-border) ps-3"
           data-question-answered={question.answer === null ? "no" : "yes"}
         >
           <p className="cq-body-sm text-(--cq-text-primary)">
-            {question.question}
+            {t(question.question)}
           </p>
           {question.answer === null ? (
             <p className="cq-caption text-(--cq-text-tertiary)">
-              {founder ? "Not answered yet." : `Waiting on ${counterpart}.`}
+              {founder
+                ? t("Not answered yet.")
+                : t(`Waiting on ${counterpart}.`)}
             </p>
           ) : (
             <>
@@ -158,10 +163,10 @@ function QuestionAnswers({
                 {question.answer.text}
               </p>
               <p className="cq-caption text-(--cq-text-tertiary)">
-                {founder ? "Your answer" : `${counterpart}'s answer`} ·{" "}
+                {founder ? t("Your answer") : t(`${counterpart}'s answer`)} ·{" "}
                 {question.answer.evidenceStatus === "DOCUMENT_SUPPORTED"
                   ? "with a document"
-                  : "their own words, not verified"}
+                  : t("their own words, not verified")}
               </p>
             </>
           )}
@@ -170,7 +175,7 @@ function QuestionAnswers({
               href={`/company/${encodeURIComponent(companyId)}#assumptions`}
               className="cq-caption inline-flex min-h-11 items-center self-start text-(--cq-text-secondary) underline underline-offset-2 hover:text-(--cq-text-primary)"
             >
-              On the assumptions card: {question.assumptionLabel}
+              {t("On the assumptions card:")} {t(question.assumptionLabel)}
             </Link>
           )}
         </li>
@@ -228,6 +233,8 @@ export function RelationshipDiligence({
   readonly initial: DiligenceDto;
   readonly now: number;
 }) {
+  const t = useT();
+
   const [area, setArea] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -355,13 +362,13 @@ export function RelationshipDiligence({
         // Owner 2026-10-15: when an investor asks for something, the
         // founder's own data room and deck are one step away from here.
         <p className="cq-body-sm flex flex-wrap items-center justify-between gap-x-3 text-(--cq-text-secondary)">
-          <span>Shares come from your data room.</span>
+          <span>{t("Shares come from your data room.")}</span>
           <Link
             href="/company/data-room"
             className="inline-flex min-h-11 items-center text-(--cq-text-primary) underline underline-offset-2"
             data-own-data-room
           >
-            Edit data room & deck
+            {t("Edit data room & deck")}
           </Link>
         </p>
       ) : null}
@@ -385,45 +392,47 @@ export function RelationshipDiligence({
           role="alert"
           className="cq-body-sm border border-(--cq-border) bg-(--cq-surface-raised) px-3 py-2 text-(--cq-text-primary)"
         >
-          {error}
+          {t(error)}
         </p>
       )}
 
       {requests.length === 0 ? (
         <section className="flex flex-col items-start gap-2 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4">
           <h2 className="cq-title-sm text-(--cq-text-primary)">
-            {founder ? "No requests yet" : "Nothing asked yet"}
+            {founder ? t("No requests yet") : t("Nothing asked yet")}
           </h2>
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {founder
-              ? `When ${counterpart} asks for a document, it lands here.`
-              : `Ask for a deck, accounts or a cap table. ${counterpart} sees it straight away.`}
+              ? t(`When ${counterpart} asks for a document, it lands here.`)
+              : t(
+                  `Ask for a deck, accounts or a cap table. ${counterpart} sees it straight away.`,
+                )}
           </p>
         </section>
       ) : (
-        <ul aria-label="Requests" className="flex flex-col gap-3">
+        <ul aria-label={t("Requests")} className="flex flex-col gap-3">
           {requests.map((request) => {
             const status = requestStatus(request, area.shares);
             const mine = uploading?.requestId === request.requestId;
             return (
               <li key={request.requestId}>
                 <article
-                  aria-label={request.title}
+                  aria-label={t(request.title)}
                   className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-xs)"
                   data-request={status.words}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <h3 className="cq-body font-semibold text-(--cq-text-primary)">
-                        {request.title}
+                        {t(request.title)}
                       </h3>
                       <p className="cq-body-sm text-(--cq-text-secondary)">
                         {founder
-                          ? `${request.requestedByName ?? counterpart} asked`
-                          : "You asked"}{" "}
+                          ? t(`${request.requestedByName ?? counterpart} asked`)
+                          : t("You asked")}{" "}
                         ·{" "}
                         <time dateTime={request.requestedAt}>
-                          {since(request.requestedAt, now)}
+                          {t(since(request.requestedAt, now))}
                         </time>
                       </p>
                     </div>
@@ -433,11 +442,11 @@ export function RelationshipDiligence({
                         TONES[status.tone],
                       )}
                     >
-                      {status.words}
+                      {t(status.words)}
                     </span>
                   </div>
                   {request.note === null ? null : (
-                    <p className="cq-body-sm border-l-2 border-(--cq-border) pl-3 text-(--cq-text-secondary)">
+                    <p className="cq-body-sm border-s-2 border-(--cq-border) ps-3 text-(--cq-text-secondary)">
                       {request.note}
                     </p>
                   )}
@@ -446,10 +455,10 @@ export function RelationshipDiligence({
                       className="cq-body-sm text-(--cq-text-secondary)"
                       data-request-declined
                     >
-                      {founder ? "You declined" : "They declined"}
+                      {founder ? t("You declined") : t("They declined")}
                       {request.declineNote === null
                         ? "."
-                        : `: “${request.declineNote}”`}
+                        : t(`: “${request.declineNote}”`)}
                     </p>
                   ) : null}
                   {request.questions === null ||
@@ -475,7 +484,7 @@ export function RelationshipDiligence({
                       href={`/documents?tab=requested&item=${encodeURIComponent(request.requestId)}`}
                       className="cq-body-sm inline-flex min-h-11 items-center self-start text-(--cq-text-primary) underline underline-offset-2"
                     >
-                      Answer their questions
+                      {t("Answer their questions")}
                     </Link>
                   ) : null}
                   {founder &&
@@ -487,7 +496,7 @@ export function RelationshipDiligence({
                     <div className="grid grid-cols-2 gap-2 sm:flex">
                       <UploadButton
                         disabled={busy !== null || uploading !== null}
-                        label={`Upload & share ${request.title}`}
+                        label={t(`Upload & share ${request.title}`)}
                         onFile={(file) => void uploadAndShare(request, file)}
                       />
                       <Button
@@ -499,13 +508,13 @@ export function RelationshipDiligence({
                         }
                       >
                         <FileText size={ICON_SIZE.compact} aria-hidden="true" />
-                        Share existing
+                        {t("Share existing")}
                       </Button>
                     </div>
                   ) : null}
                   {!founder && status.answerable ? (
                     <p className="cq-body-sm text-(--cq-text-secondary)">
-                      Waiting on {counterpart}.
+                      {t(`Waiting on ${counterpart}.`)}
                     </p>
                   ) : null}
                 </article>
@@ -521,11 +530,11 @@ export function RelationshipDiligence({
           className="flex flex-col gap-2 pt-2"
         >
           <h2 id="also-shared" className="cq-title-sm text-(--cq-text-primary)">
-            {founder ? "Also shared" : "Also shared with you"}
+            {founder ? t("Also shared") : t("Also shared with you")}
           </h2>
           {extra.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              Only what you share here, and only with {counterpart}.
+              {t(`Only what you share here, and only with ${counterpart}.`)}
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -542,7 +551,7 @@ export function RelationshipDiligence({
               onClick={() => setPicking({ requestId: null })}
             >
               <FileText size={ICON_SIZE.compact} aria-hidden="true" />
-              Share a document
+              {t("Share a document")}
             </Button>
           ) : null}
         </section>
@@ -582,6 +591,8 @@ function FileRow({
   readonly onOpen: (view: boolean) => void;
   readonly onRevoke: () => void;
 }) {
+  const t = useT();
+
   return (
     <div
       className="grid grid-cols-[36px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 bg-(--cq-surface-subtle) p-3 sm:grid-cols-[36px_minmax(0,1fr)_auto]"
@@ -595,13 +606,13 @@ function FileRow({
       </span>
       <span className="flex min-w-0 flex-col">
         <span className="cq-body-sm truncate font-semibold text-(--cq-text-primary)">
-          {share.title}
+          {t(share.title)}
         </span>
         <span className="cq-caption text-(--cq-text-tertiary)">
-          Shared {since(share.sharedAt, now)}
+          {t("Shared")} {t(since(share.sharedAt, now))}
           {share.viewedAt === null
             ? ""
-            : ` · opened ${since(share.viewedAt, now)}`}
+            : t(` · opened ${since(share.viewedAt, now)}`)}
         </span>
         {share.scanned ? null : <NotScannedNote />}
       </span>
@@ -613,7 +624,7 @@ function FileRow({
             disabled={busy}
             onClick={onRevoke}
           >
-            Stop sharing
+            {t("Stop sharing")}
           </Button>
         ) : (
           <>
@@ -624,7 +635,7 @@ function FileRow({
               onClick={() => onOpen(true)}
             >
               <Eye size={ICON_SIZE.compact} aria-hidden="true" />
-              View
+              {t("View")}
             </Button>
             <Button
               variant="secondary"
@@ -633,7 +644,7 @@ function FileRow({
               onClick={() => onOpen(false)}
             >
               <Download size={ICON_SIZE.compact} aria-hidden="true" />
-              Download
+              {t("Download")}
             </Button>
           </>
         )}
@@ -649,9 +660,11 @@ function FileRow({
           />
           <span>
             <span className="font-semibold text-(--cq-text-primary)">
-              Q&apos;s summary
+              {t("Q's summary")}
             </span>{" "}
-            <span className="text-(--cq-text-secondary)">{share.qSummary}</span>
+            <span className="text-(--cq-text-secondary)">
+              {t(share.qSummary)}
+            </span>
           </span>
         </p>
       )}
@@ -668,6 +681,8 @@ function UploadButton({
   readonly label: string;
   readonly onFile: (file: File) => void;
 }) {
+  const t = useT();
+
   const input = useRef<HTMLInputElement>(null);
   return (
     <>
@@ -675,11 +690,11 @@ function UploadButton({
         variant="primary"
         className="min-w-0 px-2.5 sm:px-4"
         disabled={disabled}
-        aria-label={label}
+        aria-label={t(label)}
         onClick={() => input.current?.click()}
       >
         <Upload size={ICON_SIZE.compact} aria-hidden="true" />
-        Upload &amp; share
+        {t("Upload & share")}
       </Button>
       <input
         ref={input}
@@ -704,13 +719,15 @@ function UploadProgress({
   readonly name: string;
   readonly fraction: number;
 }) {
+  const t = useT();
+
   const percent = Math.round(fraction * 100);
   return (
     <div className="flex flex-col gap-1.5" role="status">
       <span className="cq-body-sm text-(--cq-text-secondary)">
         {percent >= 100
-          ? `Sharing ${name}…`
-          : `Uploading ${name} · ${String(percent)}%`}
+          ? t(`Sharing ${name}…`)
+          : t(`Uploading ${name} · ${String(percent)}%`)}
       </span>
       <span
         aria-hidden="true"
@@ -738,6 +755,8 @@ function SharePicker({
   readonly onClose: () => void;
   readonly onPick: (documentId: string) => void;
 }) {
+  const t = useT();
+
   const name = useId();
   const [documents, setDocuments] = useState<readonly Doc[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -760,15 +779,15 @@ function SharePicker({
         }
       }}
     >
-      <SheetContent title="Share existing" side="bottom">
+      <SheetContent title={t("Share existing")} side="bottom">
         <div className="flex flex-col gap-3 p-4">
           {failed ? (
             <div className="flex items-center justify-between gap-3">
               <p className="cq-body-sm text-(--cq-text-secondary)">
-                Your documents didn&apos;t load.
+                {t("Your documents didn't load.")}
               </p>
               <Button variant="secondary" onClick={load}>
-                Retry
+                {t("Retry")}
               </Button>
             </div>
           ) : documents === null ? (
@@ -782,11 +801,11 @@ function SharePicker({
             </ul>
           ) : documents.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              No documents yet. Use Upload &amp; share instead.
+              {t("No documents yet. Use Upload & share instead.")}
             </p>
           ) : (
             <fieldset className="flex max-h-[50vh] flex-col gap-1 overflow-y-auto">
-              <legend className="sr-only">Your documents</legend>
+              <legend className="sr-only">{t("Your documents")}</legend>
               {documents.map((document) => (
                 <label
                   key={document.id}
@@ -811,7 +830,7 @@ function SharePicker({
                     className="text-(--cq-text-tertiary)"
                   />
                   <span className="min-w-0 flex-1 truncate text-(--cq-text-primary)">
-                    {document.title}
+                    {t(document.title)}
                   </span>
                 </label>
               ))}
@@ -826,7 +845,7 @@ function SharePicker({
                 onClose();
               }}
             >
-              Cancel
+              {t("Cancel")}
             </button>
             <button
               type="button"
@@ -837,7 +856,7 @@ function SharePicker({
                 setChosen(null);
               }}
             >
-              Share
+              {t("Share")}
             </button>
           </div>
         </div>
@@ -853,6 +872,8 @@ function AskForm({
   readonly busy: boolean;
   readonly onSubmit: (title: string, note: string | null) => Promise<void>;
 }) {
+  const t = useT();
+
   const titleId = useId();
   const noteId = useId();
   const [title, setTitle] = useState("");
@@ -876,14 +897,14 @@ function AskForm({
     >
       <div className="flex gap-2">
         <label htmlFor={titleId} className="sr-only">
-          Ask for a document
+          {t("Ask for a document")}
         </label>
         <input
           id={titleId}
           value={title}
           maxLength={200}
           onChange={(event) => setTitle(event.target.value)}
-          placeholder="Ask for a document"
+          placeholder={t("Ask for a document")}
           className="cq-body min-h-11 min-w-0 flex-1 border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)"
         />
         <Button
@@ -891,13 +912,13 @@ function AskForm({
           type="submit"
           disabled={busy || title.trim().length === 0}
         >
-          Ask
+          {t("Ask")}
         </Button>
       </div>
       {withNote ? (
         <>
           <label htmlFor={noteId} className="sr-only">
-            Note
+            {t("Note")}
           </label>
           <textarea
             id={noteId}
@@ -905,7 +926,7 @@ function AskForm({
             maxLength={1000}
             rows={2}
             onChange={(event) => setNote(event.target.value)}
-            placeholder="A note for them"
+            placeholder={t("A note for them")}
             className="cq-body min-h-11 w-full resize-y border border-(--cq-border) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)"
           />
         </>
@@ -915,7 +936,7 @@ function AskForm({
           onClick={() => setWithNote(true)}
           className="cq-body-sm inline-flex min-h-11 items-center self-start text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
         >
-          Add a note
+          {t("Add a note")}
         </button>
       )}
     </form>
@@ -924,6 +945,8 @@ function AskForm({
 
 /** The tab could not be read: say so, and one way to try again. */
 export function DiligenceUnavailable({ href }: { readonly href: string }) {
+  const t = useT();
+
   return (
     <section
       role="alert"
@@ -932,14 +955,14 @@ export function DiligenceUnavailable({ href }: { readonly href: string }) {
     >
       <span className="flex flex-col gap-0.5">
         <span className="cq-body-sm font-semibold text-(--cq-text-primary)">
-          Diligence didn&apos;t load
+          {t("Diligence didn't load")}
         </span>
         <span className="cq-body-sm text-(--cq-text-secondary)">
-          Nothing changed. Try again in a moment.
+          {t("Nothing changed. Try again in a moment.")}
         </span>
       </span>
       <a href={href} className={buttonClassName("secondary")}>
-        Retry
+        {t("Retry")}
       </a>
     </section>
   );

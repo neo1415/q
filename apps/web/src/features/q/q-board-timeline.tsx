@@ -22,6 +22,7 @@ import {
 } from "./board-timeline";
 import type { QTurn } from "./conversation";
 import { useBoardMarks } from "./q-board";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The Board (C7; mockup board.html): a timeline of what Q showed, with
@@ -221,6 +222,7 @@ export function QBoardTimeline({
   readonly suggestions?: readonly string[] | undefined;
   readonly now?: Date | undefined;
 }) {
+  const t = useT();
   const marks = useBoardMarks(conversationId);
   const [tab, setTab] = useState<Tab>("timeline");
   const entries = boardTimeline(turns).filter(
@@ -234,12 +236,12 @@ export function QBoardTimeline({
   return (
     <div className="cq-board" data-q-board-timeline>
       <div className="cq-board-head">
-        <h1>Board</h1>
+        <h1>{t("Board")}</h1>
         {onClose === undefined ? null : (
           <button
             type="button"
             className="cq-ac-x"
-            aria-label="Close the Board"
+            aria-label={t("Close the Board")}
             onClick={onClose}
           >
             <X
@@ -251,7 +253,7 @@ export function QBoardTimeline({
         )}
       </div>
       {empty ? null : (
-        <div className="cq-board-tabs" role="tablist" aria-label="Board">
+        <div className="cq-board-tabs" role="tablist" aria-label={t("Board")}>
           {(
             [
               ["timeline", "Timeline"],
@@ -275,10 +277,11 @@ export function QBoardTimeline({
         <div className="cq-board-timeline">
           {empty ? (
             <div className="cq-board-empty">
-              <h2>Nothing on the Board yet</h2>
+              <h2>{t("Nothing on the Board yet")}</h2>
               <p>
-                What Q shows you lands here, so you can find it again. Pin what
-                matters; files Q makes for you sit alongside.
+                {t(
+                  "What Q shows you lands here, so you can find it again. Pin what matters; files Q makes for you sit alongside.",
+                )}
               </p>
               {onAsk === undefined || suggestions.length === 0 ? null : (
                 <div className="flex flex-wrap justify-center gap-2">
@@ -322,12 +325,14 @@ export function QBoardTimeline({
         </div>
         {empty ? null : (
           <aside className="cq-board-rail">
-            <section className="pins" aria-label="Pinned">
+            <section className="pins" aria-label={t("Pinned")}>
               <h2>
-                Pinned <span>{pinned.length}</span>
+                {t("Pinned")} <span>{pinned.length}</span>
               </h2>
               {pinned.length === 0 ? (
-                <p className="cq-board-note">Pin an answer to keep it here.</p>
+                <p className="cq-board-note">
+                  {t("Pin an answer to keep it here.")}
+                </p>
               ) : (
                 pinned.map((entry) => (
                   <div
@@ -358,13 +363,13 @@ export function QBoardTimeline({
                 ))
               )}
             </section>
-            <section className="files" aria-label="Files">
+            <section className="files" aria-label={t("Files")}>
               <h2>
-                Files <span>{files.length}</span>
+                {t("Files")} <span>{files.length}</span>
               </h2>
               {files.length === 0 ? (
                 <p className="cq-board-note">
-                  Files Q makes when you ask for one sit here.
+                  {t("Files Q makes when you ask for one sit here.")}
                 </p>
               ) : (
                 files.map((file) => (

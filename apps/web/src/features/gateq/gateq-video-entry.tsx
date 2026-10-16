@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 
 import type {
   ApplicationCoverageDto,
@@ -21,6 +28,8 @@ import {
 } from "@/features/video-room/video-allowance";
 
 import { GateqVideoRoom } from "./gateq-video-room";
+import { deviceLocale } from "@/features/voice/device-locale";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The way into the GateQ video interview (C3). It appears only when the
@@ -36,6 +45,9 @@ import { GateqVideoRoom } from "./gateq-video-room";
  * typing instead (not offered, refused, cap reached, or the person's
  * choice) through `onUnavailable` / `onTypeInstead`.
  */
+/** The device language does not change while the page is open. */
+const noLanguageChanges = () => () => undefined;
+
 export function GateqVideoEntry({
   token,
   fund,
@@ -61,6 +73,8 @@ export function GateqVideoEntry({
   /** The room opened (true) or closed (false). */
   readonly onRoomChange?: ((open: boolean) => void) | undefined;
 }) {
+  const t = useT();
+
   const primary = variant === "primary";
   const [checked, setChecked] = useState(false);
   const [available, setAvailable] = useState(false);
@@ -69,6 +83,13 @@ export function GateqVideoEntry({
   const [message, setMessage] = useState<string | null>(null);
   const [why, setWhy] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
+  // Lane ml: an Arabic device is told how an Arabic video room behaves.
+  // Read after mount: the server has no device language.
+  const arabic = useSyncExternalStore(
+    noLanguageChanges,
+    () => /^ar\b/iu.test(deviceLocale().locale ?? ""),
+    () => false,
+  );
   // Pressed Start before ticking consent: ask for it, beside the box.
   const [askConsent, setAskConsent] = useState(false);
   const consentRef = useRef<HTMLInputElement>(null);
@@ -175,7 +196,7 @@ export function GateqVideoEntry({
         : null);
     return said === null ? null : (
       <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-        {said}
+        {t(said)}
       </p>
     );
   }
@@ -190,13 +211,15 @@ export function GateqVideoEntry({
       data-gateq-video-entry={variant}
     >
       <p className="cq-label text-(--cq-text-primary)">
-        {primary ? "Talk it through with Q" : "Prefer to talk it through?"}
+        {primary
+          ? t("Talk it through with Q")
+          : t("Prefer to talk it through?")}
       </p>
       {primary ? (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          A short video conversation, the way you would pitch {fund} in person.
-          Q asks, you answer out loud; every answer is written into this
-          application for you to review.
+          {t(
+            `A short video conversation, the way you would pitch ${fund} in person. Q asks, you answer out loud; every answer is written into this application for you to review.`,
+          )}
         </p>
       ) : null}
       {videoAllowanceLine(allowance) === null ? null : (
@@ -218,11 +241,21 @@ export function GateqVideoEntry({
           className="mt-1 size-4 accent-(--cq-accent)"
         />
         <span>
-          I understand Q is an AI interviewer, my camera and microphone are used
-          only while the video room is open, and what I say is transcribed into
-          this application. Nothing reaches {fund} until I review and submit.
+          {t(
+            `I understand Q is an AI interviewer, my camera and microphone are used only while the video room is open, and what I say is transcribed into this application. Nothing reaches ${fund} until I review and submit.`,
+          )}
         </span>
       </label>
+      {arabic ? (
+        <p
+          lang="ar"
+          dir="rtl"
+          className="cq-body-sm text-(--cq-text-secondary)"
+        >
+          تجري المقابلة المرئية بالعربية، ويعتمد وضوحها على صوت الوجه المختار؛
+          إن لم يبدُ مناسباً فيمكنك المتابعة بالكتابة.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant={primary ? "primary" : "secondary"}
@@ -238,7 +271,10 @@ export function GateqVideoEntry({
             }
             startTransition(async () => {
               setMessage(null);
-              const result = await startVideoAction(token);
+              const result = await startVideoAction(
+                token,
+                deviceLocale().locale,
+              );
               if (!result.ok) {
                 setMessage(result.message);
                 setAvailable(false);
@@ -260,18 +296,18 @@ export function GateqVideoEntry({
           }}
         >
           {pending
-            ? "Opening the video room…"
+            ? t("Opening the video room…")
             : primary
-              ? "Start the video interview"
-              : "Continue by video"}
+              ? t("Start the video interview")
+              : t("Continue by video")}
         </Button>
         {primary && onTypeInstead !== undefined ? (
           <Button variant="quiet" disabled={pending} onClick={onTypeInstead}>
-            Type my answers instead
+            {t("Type my answers instead")}
           </Button>
         ) : (
           <span className="cq-caption text-(--cq-text-tertiary)">
-            Short sessions; typing stays available.
+            {t("Short sessions; typing stays available.")}
           </span>
         )}
       </div>
@@ -281,12 +317,12 @@ export function GateqVideoEntry({
           role="status"
           className="cq-body-sm text-(--cq-text-primary)"
         >
-          Tick the box above to start the video interview.
+          {t("Tick the box above to start the video interview.")}
         </p>
       ) : null}
       {message === null ? null : (
         <p role="status" className="cq-body-sm text-(--cq-text-secondary)">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>

@@ -11,6 +11,7 @@ import {
   workingLabel,
 } from "@/features/q/conversation";
 import { useQConversation } from "@/features/q/use-q-conversation";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F8's first Company Intelligence, through the ordinary Q boundary
@@ -34,6 +35,7 @@ export function CompanyIntelligencePanel({
   readonly companyId: string;
   readonly companyName: string;
 }) {
+  const t = useT();
   const q = useQConversation({ companyId });
   const asked = useRef(false);
   const { ask } = q;
@@ -54,7 +56,7 @@ export function CompanyIntelligencePanel({
   return (
     <section className="flex flex-col gap-3" aria-labelledby="q-first-reading">
       <h2 id="q-first-reading" className="cq-title-md text-(--cq-text-primary)">
-        What Q makes of it so far
+        {t("What Q makes of it so far")}
       </h2>
 
       {/*
@@ -87,13 +89,13 @@ export function CompanyIntelligencePanel({
       ) : null}
 
       {q.state.failure !== null ? (
-        <InlineNotice tone="info" title="Q couldn't finish that reading">
+        <InlineNotice tone="info" title={t("Q couldn't finish that reading")}>
           {failureMessage(q.state.failure)}
         </InlineNotice>
       ) : null}
 
       {q.notice !== null ? (
-        <InlineNotice tone="info" title="Q couldn't finish that reading">
+        <InlineNotice tone="info" title={t("Q couldn't finish that reading")}>
           {q.notice}
         </InlineNotice>
       ) : null}
@@ -104,8 +106,9 @@ export function CompanyIntelligencePanel({
         anything (§20).
       */}
       <p className="cq-status-line">
-        Based on what you&apos;ve told Capital Q and the material you shared.
-        Nothing here has been independently verified.
+        {t(
+          "Based on what you've told Capital Q and the material you shared. Nothing here has been independently verified.",
+        )}
       </p>
       {/* The company this reading is about; never rendered, never guessed. */}
       <span hidden data-company-id={companyId} />

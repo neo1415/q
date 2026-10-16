@@ -8,6 +8,8 @@ import {
   type OnboardingCoverageSource,
 } from "@capital-q/contracts";
 
+import { ARABIC_ONBOARDING_COPY } from "./confirmation-ar.js";
+
 /**
  * Grouped confirmations and their copy, parameterised by language (lane ob1;
  * lane ml plugs other languages in by adding a catalog, never by editing
@@ -76,10 +78,10 @@ export const ENGLISH_ONBOARDING_COPY: OnboardingCopyCatalog = {
     `I found a public description ${where}: ${label}: ${display}. Is that still accurate?`,
 };
 
-/** Catalogs by primary language subtag. Lane ml adds "ar" here. */
+/** Catalogs by primary language subtag. Arabic: lane ml (confirmation-ar.ts). */
 export const ONBOARDING_COPY_CATALOGS: Readonly<
   Record<string, OnboardingCopyCatalog>
-> = { en: ENGLISH_ONBOARDING_COPY };
+> = { en: ENGLISH_ONBOARDING_COPY, ar: ARABIC_ONBOARDING_COPY };
 
 /** The catalog for a BCP 47 tag, falling back to English. */
 export function onboardingCopyFor(

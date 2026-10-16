@@ -8,14 +8,20 @@ import { EmptyState, ErrorState } from "@capital-q/ui/states";
 import { PageSection } from "@/components/app-shell/page-container";
 import { adminContext } from "@/features/admin/admin-context";
 import { BreakGlassList, SafetyReports } from "@/features/admin/safety-queue";
+import { serverT } from "@/features/i18n/server";
 
-export const metadata: Metadata = { title: "Safety · Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Safety · Admin") };
+}
 
 export default async function AdminSafetyPage({
   searchParams,
 }: {
   readonly searchParams: Promise<{ readonly all?: string | undefined }>;
 }) {
+  const t = await serverT();
+
   const context = await adminContext();
   if (context === null || !context.can("safety.read")) notFound();
   const all = (await searchParams).all === "1";
@@ -29,26 +35,30 @@ export default async function AdminSafetyPage({
     <div className="flex flex-col gap-10">
       <PageSection
         id="reports"
-        title="Reports from chat"
-        description="What people reported, and why. Conversations stay private unless a second admin approves a request to read one."
+        title={t("Reports from chat")}
+        description={t(
+          "What people reported, and why. Conversations stay private unless a second admin approves a request to read one.",
+        )}
       >
         <div className="flex flex-col gap-3">
           <Link
             href={all ? "/admin/safety" : "/admin/safety?all=1"}
             className="cq-body-sm inline-flex min-h-11 items-center self-start underline underline-offset-4"
           >
-            {all ? "Show only reports to review" : "Show reviewed reports too"}
+            {all
+              ? t("Show only reports to review")
+              : t("Show reviewed reports too")}
           </Link>
           {safety === null ? (
             <ErrorState
-              title="Reports couldn't load"
-              description="Try again in a moment."
+              title={t("Reports couldn't load")}
+              description={t("Try again in a moment.")}
             />
           ) : safety.reports.length === 0 ? (
             <EmptyState
               compact
-              title="Nothing to review"
-              description="New reports from chat appear here."
+              title={t("Nothing to review")}
+              description={t("New reports from chat appear here.")}
             />
           ) : (
             <SafetyReports
@@ -60,26 +70,31 @@ export default async function AdminSafetyPage({
         </div>
       </PageSection>
 
-      <PageSection id="break-glass" title="Requests to read private content">
+      <PageSection
+        id="break-glass"
+        title={t("Requests to read private content")}
+      >
         {glass === null ? (
           <ErrorState
-            title="Requests couldn't load"
-            description="Try again in a moment."
+            title={t("Requests couldn't load")}
+            description={t("Try again in a moment.")}
           />
         ) : glass.length === 0 ? (
           <EmptyState
             compact
-            title="No requests"
-            description="Requests to read a chat or a Q run's words appear here for a second admin to decide."
+            title={t("No requests")}
+            description={t(
+              "Requests to read a chat or a Q run's words appear here for a second admin to decide.",
+            )}
           />
         ) : (
           <BreakGlassList rows={glass} viewerId={context.me.userId} />
         )}
       </PageSection>
 
-      <PageSection id="blocks" title="Active blocks">
+      <PageSection id="blocks" title={t("Active blocks")}>
         {safety === null ? null : safety.blocks.length === 0 ? (
-          <EmptyState compact title="No active blocks" />
+          <EmptyState compact title={t("No active blocks")} />
         ) : (
           <ul className="flex flex-col gap-2">
             {safety.blocks.map((block) => (
@@ -90,11 +105,11 @@ export default async function AdminSafetyPage({
                 {block.blockerSide === "COMPANY"
                   ? block.companyName
                   : block.investorName}{" "}
-                blocked{" "}
+                {t("blocked")}{" "}
                 {block.blockerSide === "COMPANY"
                   ? block.investorName
                   : block.companyName}{" "}
-                · {new Date(block.createdAt).toLocaleDateString("en-GB")}
+                · {t(new Date(block.createdAt).toLocaleDateString("en-GB"))}
               </li>
             ))}
           </ul>

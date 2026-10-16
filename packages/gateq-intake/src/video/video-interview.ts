@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { supportedLanguageOf } from "@capital-q/q-core";
 
 import type {
   ApplicantTurnResult,
@@ -217,6 +218,12 @@ export type GateqVideoProvider = {
     readonly joinGraceSeconds: number;
     /** Where the provider reports room events; the token is the proof. */
     readonly events: { readonly path: string; readonly token: string };
+    /**
+     * Lane ml: the applicant's language when Capital Q speaks it beyond
+     * English (Arabic); null is English. The adapter runs the room in it
+     * and discloses in it; Q's lines come from the interview.
+     */
+    readonly language?: "ar" | null | undefined;
   }) => Promise<{
     readonly conversationId: string;
     readonly joinUrl: string | null;
@@ -407,6 +414,8 @@ export function createGateqVideoInterview(deps: {
     start: async (input: {
       readonly token: string;
       readonly correlationId: string;
+      /** The applicant's language (BCP 47), a presentation hint only. */
+      readonly locale?: string | undefined;
     }): Promise<GateqVideoSessionView> => {
       if (!deps.config.enabled || deps.provider === null)
         throw new GateqVideoRefusedError("DISABLED");
@@ -447,6 +456,7 @@ export function createGateqVideoInterview(deps: {
           token: input.token,
           channel: "voice",
           correlationId: input.correlationId,
+          ...(input.locale === undefined ? {} : { locale: input.locale }),
         });
         const fund =
           deps.fundFor === undefined
@@ -463,6 +473,7 @@ export function createGateqVideoInterview(deps: {
           bridge: { path: deps.bridgePath, bearer },
           joinGraceSeconds: GATEQ_VIDEO_JOIN_GRACE_SECONDS,
           events: { path: deps.eventsPath, token: eventsToken },
+          language: supportedLanguageOf(input.locale) === "ar" ? "ar" : null,
         });
         createdConversationId = room.conversationId;
         const joinUrlSealed =

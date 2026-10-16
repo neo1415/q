@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Keyboard review for an admin queue (design-48; Linear triage): J and K
@@ -18,6 +19,8 @@ export function QueueKeys({
   readonly hint: string;
   readonly children: ReactNode;
 }) {
+  const t = useT();
+
   const root = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(0);
   const currentRef = useRef(0);
@@ -81,7 +84,7 @@ export function QueueKeys({
   return (
     <div ref={root} className="flex flex-col gap-3" data-queue-keys>
       <p className="cq-caption text-(--cq-text-tertiary) max-lg:hidden">
-        {hint}
+        {t(hint)}
       </p>
       {children}
     </div>
@@ -109,5 +112,5 @@ export const QUEUE_ITEM = {
   "data-queue-item": "",
   tabIndex: -1,
   className:
-    "outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--cq-focus-ring) aria-[current=true]:lg:border-l-2 aria-[current=true]:lg:border-(--cq-accent) aria-[current=true]:lg:pl-3",
+    "outline-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--cq-focus-ring) aria-[current=true]:lg:border-s-2 aria-[current=true]:lg:border-(--cq-accent) aria-[current=true]:lg:ps-3",
 } as const;

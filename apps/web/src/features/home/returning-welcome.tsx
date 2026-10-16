@@ -22,6 +22,7 @@ import { QBriefing } from "./q-briefing";
 import type { ReturningCard, ReturningGreeting } from "./returning";
 import { remindSetupLaterAction } from "./setup-nudge-actions";
 import { useClaimWhenSeen } from "./use-claim-when-seen";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Q welcoming somebody back (CQ-WEB-030; acceptance A and K).
@@ -40,22 +41,23 @@ import { useClaimWhenSeen } from "./use-claim-when-seen";
  */
 
 const CARD_CLASS = [
-  "group flex min-h-11 w-full items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-left",
+  "group flex min-h-11 w-full items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-3.5 py-2.5 text-start",
   "transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:bg-(--cq-surface-subtle)",
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
   "disabled:cursor-progress disabled:opacity-70",
 ].join(" ");
 
 function CardBody({ card }: { readonly card: ReturningCard }) {
+  const t = useT();
   return (
     <>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="cq-body-sm font-medium text-(--cq-text-primary)">
-          {card.title}
+          {t(card.title)}
         </span>
         {/* The title says where it goes; the line under it is for
             assistive technology only (minimal Home, 2026-09-29). */}
-        <span className="sr-only">{card.description}</span>
+        <span className="sr-only">{t(card.description)}</span>
       </span>
       <ChevronRight
         aria-hidden="true"
@@ -83,6 +85,7 @@ export function ReturningWelcome({
   /** Today's setup reminder, as `setupRemindersWaiting` counts it. */
   readonly setupReminders?: 0 | 1 | undefined;
 }) {
+  const t = useT();
   const router = useRouter();
   const tools = useQSurfaceTools();
   const arrival = useArrivalStatus();
@@ -170,11 +173,11 @@ export function ReturningWelcome({
         // Q's own last question, as Q asked it: where they left off is
         // shown, not paraphrased.
         <figure
-          className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 border-l-2 border-(--cq-border-strong) pl-3"
+          className="flex w-full max-w-(--cq-layout-narrow) flex-col gap-1 border-s-2 border-(--cq-border-strong) ps-3"
           data-q-left-off
         >
           <figcaption className="cq-caption text-(--cq-text-tertiary)">
-            Where we left off
+            {t("Where we left off")}
           </figcaption>
           <blockquote className="cq-body text-(--cq-text-primary)">
             {greeting.leftOff}
@@ -194,7 +197,7 @@ export function ReturningWelcome({
       {shownCards.length > 0 ? (
         <ul
           ref={cardsRef}
-          aria-label="Where to start"
+          aria-label={t("Where to start")}
           className="grid w-full gap-2 sm:grid-cols-2"
           data-q-returning-cards
         >
@@ -254,7 +257,7 @@ export function ReturningWelcome({
           className="inline-flex min-h-11 items-center px-3 cq-body-sm text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           data-setup-reminder-later
         >
-          Remind me next week
+          {t("Remind me next week")}
         </button>
       ) : null}
 

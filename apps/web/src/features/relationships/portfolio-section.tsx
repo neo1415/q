@@ -12,6 +12,7 @@ import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { dealDay } from "./deal-stage-strip";
 import { commitmentLine, PORTFOLIO_READ_LIMIT } from "./portfolio";
 import { relationshipHref } from "./relationship-words";
+import { serverTNow } from "@/features/i18n/server-now";
 
 /** Rows per page: a portfolio longer than a screen pages by cursor. */
 export const PORTFOLIO_PAGE = 8;
@@ -44,14 +45,16 @@ export function PortfolioSection({
     RelationshipCommitmentsDto | undefined
   >;
 }) {
+  const t = serverTNow();
+
   return (
     <Panel
       id="portfolio"
-      title="Portfolio"
+      title={t("Portfolio")}
       count={
         items === undefined || items.length === 0 ? undefined : items.length
       }
-      description="Companies you have invested in, newest first."
+      description={t("Companies you have invested in, newest first.")}
       flush
       data-portfolio
     >
@@ -60,7 +63,7 @@ export function PortfolioSection({
           className="cq-body-sm px-4 py-4 text-(--cq-text-secondary) sm:px-5"
           data-state="unavailable"
         >
-          Your portfolio couldn&apos;t be read just now. Nothing is lost.
+          {t("Your portfolio couldn't be read just now. Nothing is lost.")}
         </p>
       ) : items.length === 0 ? (
         <div
@@ -68,22 +71,25 @@ export function PortfolioSection({
           data-state="empty"
         >
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            No investments recorded yet. A company joins your portfolio when its
-            money is marked received.
+            {t(
+              "No investments recorded yet. A company joins your portfolio when its money is marked received.",
+            )}
           </p>
           {agreed === undefined || agreed.count === 0 ? null : (
             <p className="cq-body-sm cq-numeric text-(--cq-text-primary)">
               {agreed.count === 1
                 ? "1 commitment is confirmed and not yet received"
-                : `${String(agreed.count)} commitments are confirmed and not yet received`}
+                : t(
+                    `${String(agreed.count)} commitments are confirmed and not yet received`,
+                  )}
               {agreed.amounts.length === 0
                 ? ". "
-                : ` (${agreed.amounts.join(", ")}). `}
+                : t(` (${agreed.amounts.join(", ")}). `)}
               <Link
                 href="/relationships?view=capital#commitments"
                 className="font-medium text-(--cq-accent) underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
               >
-                Open Capital
+                {t("Open Capital")}
               </Link>
             </p>
           )}
@@ -108,13 +114,13 @@ export function PortfolioSection({
                 <span className="cq-body-sm min-w-0 truncate font-semibold text-(--cq-text-primary)">
                   {item.counterpart.name}
                 </span>
-                <span className="cq-caption cq-numeric col-start-2 text-(--cq-text-secondary) sm:col-start-3 sm:text-right">
+                <span className="cq-caption cq-numeric col-start-2 text-(--cq-text-secondary) sm:col-start-3 sm:text-end">
                   {index < PORTFOLIO_READ_LIMIT
                     ? commitmentLine(commitments.get(item.relationshipId))
                     : "Open for the commitment"}
                   {" · since "}
                   <time dateTime={item.stateSince}>
-                    {dealDay(item.stateSince)}
+                    {t(dealDay(item.stateSince))}
                   </time>
                 </span>
               </Link>

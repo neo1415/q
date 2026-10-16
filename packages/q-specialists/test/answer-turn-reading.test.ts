@@ -4526,13 +4526,14 @@ describe("work handed over in general (QA 2026-10-03, runs 18eb8420, 5c6dcabe)",
 });
 
 describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)", () => {
-  const advice = (aboutNamedOther = false) =>
+  const advice = (aboutNamedOther = false, nextSteps = true) =>
     ({
       kind: "QUESTION_TO_Q",
       confidence: "HIGH",
       transcript: "CLEAR",
       question: { kind: "ADVICE", text: "what should I do next" },
       aboutNamedOther,
+      nextSteps,
       tool: null,
       handOver: null,
     }) as unknown as TurnReaderResult;
@@ -4570,6 +4571,22 @@ describe("what should I do next about themselves (lead 2026-10-03, run 2cba241a)
     });
     await ready.answer.answer(request());
     expect(ready.leads).toEqual([undefined]);
+  });
+  it("not on advice that does not ask for next steps (live 2026-10-16: explain a SAFE)", async () => {
+    let asked = 0;
+    const safe = seam({
+      said: "اشرح لي باختصار ما هو SAFE",
+      reading: advice(false, false),
+      outcomes: [],
+      readinessLead: () => {
+        asked += 1;
+        return Promise.resolve(LEAD);
+      },
+    });
+    await safe.answer.answer(request());
+    expect(safe.leads).toEqual([undefined]);
+    // The readiness record is not even read for such a turn.
+    expect(asked).toBe(0);
   });
 });
 
