@@ -22,7 +22,11 @@ export type InvestabilityService = {
   readonly sweep: (options?: {
     readonly limit?: number | undefined;
     readonly pauseMs?: number | undefined;
-  }) => Promise<{ readonly recorded: number; readonly unchanged: number; readonly failed: number }>;
+  }) => Promise<{
+    readonly recorded: number;
+    readonly unchanged: number;
+    readonly failed: number;
+  }>;
 };
 
 export function createInvestabilityService(dependencies: {

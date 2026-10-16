@@ -101,7 +101,8 @@ export function discoverOrderValue(
   const suitability = fitScoreOutOf10 * 10;
   if (investability === null) return suitability;
   return (
-    (weights.suitability * suitability + weights.investability * investability) /
+    (weights.suitability * suitability +
+      weights.investability * investability) /
     (weights.suitability + weights.investability)
   );
 }
@@ -227,14 +228,11 @@ export function createFitOrdering(dependencies: {
    * investor-eligible projection. Absent or failing: none is known.
    */
   readonly investability?:
-    | ((
-        companyIds: readonly string[],
-      ) => Promise<ReadonlyMap<string, number>>)
+    | ((companyIds: readonly string[]) => Promise<ReadonlyMap<string, number>>)
     | undefined;
   /** The Suitability each candidate was ordered with (investor-private projection). */
   readonly recordSuitability?:
-    | ((rows: readonly SuitabilityRecord[]) => Promise<void>)
-    | undefined;
+    ((rows: readonly SuitabilityRecord[]) => Promise<void>) | undefined;
   readonly config?: FitConfig | undefined;
   readonly clock?: (() => Date) | undefined;
 }): FitOrdering {

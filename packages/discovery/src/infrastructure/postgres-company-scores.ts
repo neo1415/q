@@ -52,7 +52,7 @@ export function createPostgresSuitabilityRecorder(options: {
         values (${row.tenantId}::uuid, ${row.investorOrganisationId}::uuid,
                 ${row.organisationId}::uuid, ${row.mandateId}::uuid, ${row.companyId}::uuid,
                 ${s.configVersion}, ${s.status}, ${s.score}, ${s.coverage.known},
-                ${s.coverage.applicable}, ${sql.json(s as never)}, ${row.computedAt}::timestamptz)
+                ${s.coverage.applicable}, ${sql.json(s)}, ${row.computedAt}::timestamptz)
         on conflict (investor_organisation_id, mandate_id, company_id) do update
           set fit_config_version = excluded.fit_config_version,
               status = excluded.status,

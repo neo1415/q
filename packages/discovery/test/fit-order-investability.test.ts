@@ -27,7 +27,10 @@ function key(fit: number | null, investability: number | null): FitOrderKey {
 }
 
 const base = (n: number) =>
-  Array.from({ length: n }, (_v, i) => ({ companyId: ID(i + 1), baseRank: i + 1 }));
+  Array.from({ length: n }, (_v, i) => ({
+    companyId: ID(i + 1),
+    baseRank: i + 1,
+  }));
 
 describe("discover order with Investability (fit-order.v2)", () => {
   it("is the current, versioned policy with explicit weights", () => {

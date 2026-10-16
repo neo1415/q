@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { DeckFact, DeckSection, DeckSectionCode } from "@capital-q/contracts";
+import type {
+  DeckFact,
+  DeckSection,
+  DeckSectionCode,
+} from "@capital-q/contracts";
 import { DECK_SECTIONS } from "@capital-q/contracts";
 
 import {
@@ -47,8 +51,11 @@ function section(
   };
 }
 
-const figure = (label: string, value: string, asOf: string | null = "Sep 2026") =>
-  fact(label, value, { kind: "FIGURE", asOf });
+const figure = (
+  label: string,
+  value: string,
+  asOf: string | null = "Sep 2026",
+) => fact(label, value, { kind: "FIGURE", asOf });
 
 function fullDeck(
   overrides: Partial<Record<DeckSectionCode, DeckSection | null>> = {},
@@ -138,9 +145,7 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
       claim("c1", "traction", "network_visible"),
       claim("c2", "market", "network_visible"),
     ];
-    expect(
-      assessInvestability(inputs({ claims }), AS_OF).basisHash,
-    ).toBe(
+    expect(assessInvestability(inputs({ claims }), AS_OF).basisHash).toBe(
       assessInvestability(inputs({ claims: [...claims].reverse() }), AS_OF)
         .basisHash,
     );
@@ -209,7 +214,10 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
     expect(thin.band).toBeNull();
     expect(thin.missing.length).toBeGreaterThan(0);
     // Unknown stage: never defaulted to seed.
-    const noStage = assessInvestability(inputs({ stageCode: null }), AS_OF).view;
+    const noStage = assessInvestability(
+      inputs({ stageCode: null }),
+      AS_OF,
+    ).view;
     expect(noStage.status).toBe("INSUFFICIENT_EVIDENCE");
     expect(noStage.missing[0]).toMatch(/Stage/u);
   });
@@ -238,7 +246,9 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
   it("more recorded information never dilutes a strength", () => {
     const strong = assessInvestability(
       inputs({
-        founders: [founder("f1", "Co-founded Paystack-like startup, exited 2021")],
+        founders: [
+          founder("f1", "Co-founded Paystack-like startup, exited 2021"),
+        ],
       }),
       AS_OF,
     );
@@ -301,7 +311,9 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
       const b = assessInvestability(withPrivate, AS_OF);
       expect(b.basisHash).toBe(a.basisHash);
       expect(b.view).toEqual(a.view);
-      expect(JSON.stringify(b.observations)).not.toMatch(/statement p[1-6]|sold two/u);
+      expect(JSON.stringify(b.observations)).not.toMatch(
+        /statement p[1-6]|sold two/u,
+      );
     });
 
     it("an unlisted company is not assessed for investors at all", () => {

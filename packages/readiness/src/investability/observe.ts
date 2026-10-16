@@ -80,7 +80,8 @@ export const INVESTABILITY_INPUT_RULES = {
     "A contradictory deck fact withholds its criterion until reconciled.",
   "founder.prior_delivery":
     "A network-visible background line naming a prior company founded or an exit.",
-  "founder.background": "A network-visible founder background line is on record.",
+  "founder.background":
+    "A network-visible founder background line is on record.",
   "profile.description": "The listed profile describes the product.",
   "profile.business_model": "The listed profile declares its business model.",
   "verification.organisation":
@@ -118,8 +119,10 @@ const CLAIM_CRITERION: Readonly<Record<string, string>> = {
 };
 
 const PRE_REVENUE = /\bpre[- ]?revenue\b|\bno revenue\b/iu;
-const CUSTOMER = /\b(customers?|clients?|users?|merchants?|subscribers?|accounts?|schools?|farmers?|patients?|pilots?)\b/iu;
-const PROJECTION = /\b(forecast|projection|projected|plan(?:ned)?|target|budget)\b/iu;
+const CUSTOMER =
+  /\b(customers?|clients?|users?|merchants?|subscribers?|accounts?|schools?|farmers?|patients?|pilots?)\b/iu;
+const PROJECTION =
+  /\b(forecast|projection|projected|plan(?:ned)?|target|budget)\b/iu;
 const CASH = /\b(burn|runway|cash)\b/iu;
 const PRICING = /\b(pric\w*|fee|subscription|commission|take rate|margin)\b/iu;
 const USE_OF_FUNDS = /\b(use of funds|allocation|spend|hire|hiring)\b/iu;
@@ -205,9 +208,15 @@ function deckSignals(
   const summary = section.summary ?? section.section.toLowerCase();
 
   if (contradictory && primary !== undefined) {
-    add(primary, "RECORDED", "deck.contradiction", `Contradictory: ${summary}`, {
-      lifecycleStatus: "CONTRADICTORY",
-    });
+    add(
+      primary,
+      "RECORDED",
+      "deck.contradiction",
+      `Contradictory: ${summary}`,
+      {
+        lifecycleStatus: "CONTRADICTORY",
+      },
+    );
   }
 
   switch (section.section) {
@@ -239,7 +248,9 @@ function deckSignals(
         add(
           "cp.customer_base",
           figure && early(stage) ? "SUPPORTS_STRENGTH" : "RECORDED",
-          figure && early(stage) ? "deck.customers.early_figure" : "deck.section",
+          figure && early(stage)
+            ? "deck.customers.early_figure"
+            : "deck.section",
           `Customers: ${customers.map(factText).join("; ")}`,
           {
             evidenceStatus: strongest(customers.map((f) => f.evidenceStatus)),
@@ -304,7 +315,12 @@ function deckSignals(
     case "THE_ASK": {
       const ask = deckAskTerms([section]);
       if (ask.amount !== undefined) {
-        add("cs.raise_amount", "RECORDED", "deck.section", `Raise: ${ask.amount}`);
+        add(
+          "cs.raise_amount",
+          "RECORDED",
+          "deck.section",
+          `Raise: ${ask.amount}`,
+        );
       }
       if (ask.instrument !== undefined) {
         add(
@@ -338,7 +354,9 @@ function deckSignals(
       add(
         "fl.leadership_depth",
         facts.length >= 3 && early(stage) ? "SUPPORTS_STRENGTH" : "RECORDED",
-        facts.length >= 3 && early(stage) ? "deck.team.early_depth" : "deck.section",
+        facts.length >= 3 && early(stage)
+          ? "deck.team.early_depth"
+          : "deck.section",
         summary,
       );
       return out;
@@ -356,8 +374,16 @@ function deckSignals(
       }
       return out;
     }
-    default: {
-      if (primary !== undefined) add(primary, "RECORDED", "deck.section", summary);
+    case "MARKET":
+    case "PROBLEM":
+    case "SOLUTION":
+    case "VALUE_PROPOSITION":
+    case "GO_TO_MARKET":
+    case "COMPETITION":
+    case "FOUNDERS": {
+      if (primary !== undefined) {
+        add(primary, "RECORDED", "deck.section", summary);
+      }
       return out;
     }
   }
@@ -493,8 +519,7 @@ function mergeSignals(signals: readonly Signal[]): InvestIQObservation[] {
     const draft = toObservation(s, "x");
     const w = observationWeight(draft).toFixed(4);
     const conflictClass =
-      s.lifecycleStatus === "CONTRADICTORY" ||
-      s.lifecycleStatus === "DISPUTED"
+      s.lifecycleStatus === "CONTRADICTORY" || s.lifecycleStatus === "DISPUTED"
         ? "conflict"
         : s.reading === "INDICATES_WEAKNESS"
           ? "weak"
@@ -514,8 +539,7 @@ function mergeSignals(signals: readonly Signal[]): InvestIQObservation[] {
     );
     const strength = sorted.filter((s) => s.reading === "SUPPORTS_STRENGTH");
     const weakness = sorted.filter((s) => s.reading === "INDICATES_WEAKNESS");
-    const chosen =
-      weakness[0] ?? strength[0] ?? sorted[0];
+    const chosen = weakness[0] ?? strength[0] ?? sorted[0];
     if (chosen === undefined) continue;
     const latest = sorted
       .map((s) => s.observedAt)

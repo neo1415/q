@@ -683,9 +683,10 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
               scored.push([...ids]);
               return Promise.resolve(
                 new Map(
-                  [...(options.investability ?? new Map())].filter(([id]) =>
-                    ids.includes(id),
-                  ),
+                  [
+                    ...(options.investability ??
+                      new Map<string, InvestabilityDto>()),
+                  ].filter(([id]) => ids.includes(id)),
                 ),
               );
             },

@@ -20,7 +20,10 @@ import {
   type ReadinessBand,
 } from "../investiq/method-v1.js";
 import type { InvestabilityInputs } from "./inputs.js";
-import { INVESTABILITY_INPUTS_VERSION, observeInvestability } from "./observe.js";
+import {
+  INVESTABILITY_INPUTS_VERSION,
+  observeInvestability,
+} from "./observe.js";
 
 /**
  * Investability: FDN InvestIQ v1, investor-facing (owner 2026-10-16).
@@ -64,8 +67,10 @@ export const DIMENSION_LABELS: Readonly<Record<GradedDimension, string>> = {
 };
 
 const DIMENSION_ASKS: Readonly<Record<GradedDimension, string>> = {
-  MANAGEMENT_AND_TEAM: "founder backgrounds and the team, shared with investors",
-  BUSINESS_FUNDAMENTALS: "market, product and business model in a confirmed deck",
+  MANAGEMENT_AND_TEAM:
+    "founder backgrounds and the team, shared with investors",
+  BUSINESS_FUNDAMENTALS:
+    "market, product and business model in a confirmed deck",
   COMMERCIAL_STRENGTH: "dated traction and customer figures",
   FINANCIAL_READINESS: "historical financials, forecasts or runway",
   GOVERNANCE: "board and reporting arrangements",
@@ -172,9 +177,8 @@ function viewOf(
           ? ""
           : ` · ${EVIDENCE_WORDS[c.strongestEvidenceStatus] ?? ""}`;
       const statement =
-        c.observationIds
-          .map((id) => byId.get(id))
-          .find((o) => o !== undefined)?.statement ?? c.label;
+        c.observationIds.map((id) => byId.get(id)).find((o) => o !== undefined)
+          ?.statement ?? c.label;
       if (c.state === "CONFLICTED") {
         withheld.push({
           label: c.label,

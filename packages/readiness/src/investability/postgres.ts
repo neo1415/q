@@ -50,7 +50,10 @@ export type InvestabilityStore = {
   readonly latest: (
     companyId: string,
     methodVersion: string,
-  ) => Promise<{ readonly revision: number; readonly basisHash: string } | null>;
+  ) => Promise<{
+    readonly revision: number;
+    readonly basisHash: string;
+  } | null>;
   readonly record: (input: {
     readonly subject: InvestabilitySubject;
     readonly methodVersion: string;
@@ -65,12 +68,12 @@ export type InvestabilityStore = {
   ) => Promise<ReadonlyMap<string, InvestabilityDto>>;
 };
 
-const iso = (value: unknown): string | null =>
+const iso = (value: Date | string | null | undefined): string | null =>
   value === null || value === undefined
     ? null
     : value instanceof Date
       ? value.toISOString()
-      : new Date(String(value)).toISOString();
+      : new Date(value).toISOString();
 
 export function createPostgresInvestabilityStore(options: {
   readonly sql: DatabaseExecutor;
@@ -199,28 +202,24 @@ export function createPostgresInvestabilityStore(options: {
             domain: false,
             decidedAt: null,
           },
-          founders: founders.map(
-            (row): InvestabilityFounderLine => ({
-              id: row.id,
-              title: row.title,
-              detail: row.detail,
-              documentSupported: row.supported,
-              visibilityScope: row.visibility_scope,
-            }),
-          ),
-          claims: claims.map(
-            (row): InvestabilityClaimInput => ({
-              id: row.id,
-              claimType: row.claim_type,
-              claimKey: row.claim_key,
-              statement: row.statement,
-              truthClass: row.truth_class,
-              evidenceStatus: row.evidence_status,
-              lifecycleStatus: row.lifecycle_status,
-              visibilityScope: row.visibility_scope,
-              assertedAt: iso(row.asserted_at) ?? new Date(0).toISOString(),
-            }),
-          ),
+          founders: founders.map((row): InvestabilityFounderLine => ({
+            id: row.id,
+            title: row.title,
+            detail: row.detail,
+            documentSupported: row.supported,
+            visibilityScope: row.visibility_scope,
+          })),
+          claims: claims.map((row): InvestabilityClaimInput => ({
+            id: row.id,
+            claimType: row.claim_type,
+            claimKey: row.claim_key,
+            statement: row.statement,
+            truthClass: row.truth_class,
+            evidenceStatus: row.evidence_status,
+            lifecycleStatus: row.lifecycle_status,
+            visibilityScope: row.visibility_scope,
+            assertedAt: iso(row.asserted_at) ?? new Date(0).toISOString(),
+          })),
         },
       };
     },
@@ -263,7 +262,7 @@ export function createPostgresInvestabilityStore(options: {
                ${view.status}, ${view.score}, ${view.band}, ${view.confidence},
                ${view.coverage.areasScored}, ${view.coverage.areasTotal},
                ${view.coverage.criteriaScored}, ${view.coverage.criteriaApplicable},
-               ${sql.json(view as never)}, ${sql.json(input.assessment as never)}
+               ${sql.json(view)}, ${sql.json(input.assessment as never)}
           from core.company_investability_assessments a
          where a.company_id = ${input.subject.companyId}::uuid
            and a.method_version = ${input.methodVersion}

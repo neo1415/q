@@ -298,8 +298,7 @@ export function createFitService(
         : await dependencies
             .investability(items.map((i) => i.assessment.profile.companyId))
             .catch(() => new Map<string, InvestabilityDto>());
-    const method =
-      dependencies.investabilityMethodVersion ?? "investiq/v1";
+    const method = dependencies.investabilityMethodVersion ?? "investiq/v1";
     return {
       kind: "OK",
       items: items.map((item) => {

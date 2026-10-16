@@ -72,10 +72,14 @@ function decided(claimId: string): QueueMessage {
 
 describe("investability recompute on events", () => {
   it("resolves companies from the database, not the message", async () => {
-    const ids = await companiesOfEvent(fakeSql(), "verification.claim.decided", {
-      claimId: randomUUID(),
-      organisationId: undefined,
-    });
+    const ids = await companiesOfEvent(
+      fakeSql(),
+      "verification.claim.decided",
+      {
+        claimId: randomUUID(),
+        organisationId: undefined,
+      },
+    );
     expect(ids).toEqual([COMPANY]);
     expect(
       await companiesOfEvent(fakeSql(), "core.company.updated", {

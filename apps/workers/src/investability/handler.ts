@@ -147,8 +147,7 @@ export async function runInvestabilitySweepTicker(options: {
   readonly logger: RunnerLogger;
   readonly intervalMs?: number | undefined;
   readonly sleep?:
-    | ((ms: number, signal: AbortSignal) => Promise<void>)
-    | undefined;
+    ((ms: number, signal: AbortSignal) => Promise<void>) | undefined;
 }): Promise<void> {
   const sleep = options.sleep ?? abortableSleep;
   await sleep(FIRST_SWEEP_DELAY_MS, options.signal);

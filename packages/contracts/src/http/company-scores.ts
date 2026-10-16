@@ -220,7 +220,8 @@ export function investabilityLine(dto: InvestabilityDto): string {
 
 /** "Suitability 80 · 6 of 7 known", or the honest words. */
 export function suitabilityLine(dto: SuitabilityDto): string {
-  if (dto.status === "OUTSIDE_MANDATE") return "Suitability: outside your mandate";
+  if (dto.status === "OUTSIDE_MANDATE")
+    return "Suitability: outside your mandate";
   const known = `${dto.coverage.known} of ${dto.coverage.applicable} known`;
   if (dto.status === "NOT_ENOUGH_INFORMATION" || dto.score === null) {
     return `Suitability: not enough known yet · ${known}`;
