@@ -471,6 +471,20 @@ describe("grid previews: one muted player, chosen by one controller", () => {
     expect((await c).playbackUrl).toContain("/c.m3u8");
   });
 
+  it("asks once when the warm-up and the preview want the same pitch", async () => {
+    const authorize = vi.fn((_c: string, id: string) =>
+      Promise.resolve({
+        playbackUrl: `https://cdn.example.invalid/${id}.m3u8`,
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      }),
+    );
+    const grants = createPreviewGrants(authorize);
+    const warm = grants("c", "m");
+    const preview = grants("c", "m");
+    expect(await preview).toBe(await warm);
+    expect(authorize).toHaveBeenCalledTimes(1);
+  });
+
   it("shows posters only under reduced motion", () => {
     const { showAll } = mockBrowser(true);
     const { container, authorize } = renderGrid();
