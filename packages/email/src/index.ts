@@ -314,6 +314,7 @@ export {
   localiseEmail,
   translateEmailText,
   EMAIL_HAND_CATALOGUES,
+  EMAIL_HAND_LOCALES,
   EMAIL_SOURCE_STRINGS,
   type EmailLanguage,
   type EmailLocale,

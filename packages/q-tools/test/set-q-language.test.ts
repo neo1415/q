@@ -8,6 +8,7 @@ import {
   createQToolRegistry,
   createSetQLanguageTool,
   LANGUAGE_CONFIRMATIONS,
+  SetQLanguageOutputSchema,
 } from "../src/index.js";
 import { actorA, actorB, contextFor, planFor } from "./support.js";
 
@@ -135,9 +136,10 @@ describe("set_q_language", () => {
         clientAction: { kind: "SET_LANGUAGE", language: "fr" },
       });
       // No hand-written French line: Q is told to say it in French.
-      expect(outcome.result.ok && outcome.result.data.confirm).toMatch(
-        /^Say this in French \(français\)/u,
-      );
+      const said = outcome.result.ok
+        ? SetQLanguageOutputSchema.parse(outcome.result.data).confirm
+        : "";
+      expect(said).toMatch(/^Say this in French \(français\)/u);
     }
     expect(saved.map((s) => s.language)).toEqual(["fr", "fr", "fr"]);
   });
@@ -165,9 +167,10 @@ describe("set_q_language", () => {
       done: false,
       clientAction: null,
     });
-    expect(outcome.result.ok && outcome.result.data.confirm).toMatch(
-      /^I can't do Klingon yet.*for example French/u,
-    );
+    const said = outcome.result.ok
+      ? SetQLanguageOutputSchema.parse(outcome.result.data).confirm
+      : "";
+    expect(said).toMatch(/^I can't do Klingon yet.*for example French/u);
     expect(saved).toEqual([]);
   });
 });
