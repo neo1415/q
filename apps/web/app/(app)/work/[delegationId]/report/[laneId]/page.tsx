@@ -13,6 +13,7 @@ import {
 } from "@/components/app-shell/page-container";
 import { qApiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "First-stage report" };
 
@@ -33,6 +34,8 @@ export default async function WorkReportPage({
 }: {
   readonly params: Promise<{ delegationId: string; laneId: string }>;
 }) {
+  const t = await serverT();
+
   const { delegationId, laneId } = await params;
   const session = await qApiSession();
   let report: QWorkReportDto | null = null;
@@ -49,12 +52,12 @@ export default async function WorkReportPage({
           kind="WORK_LIST"
           refs={[{ kind: "Q_WORK", id: delegationId }]}
           total={1}
-          label="a report on Q's work"
+          label={t("a report on Q's work")}
         >
-          <PageHeader title="First-stage report" />
+          <PageHeader title={t("First-stage report")} />
           <ErrorState
-            title="This report isn't available"
-            description="It may not be written yet, or it isn't yours."
+            title={t("This report isn't available")}
+            description={t("It may not be written yet, or it isn't yours.")}
             action={
               <Link
                 href="/work"
@@ -77,46 +80,46 @@ export default async function WorkReportPage({
         kind="WORK_LIST"
         refs={[{ kind: "Q_WORK", id: delegationId }]}
         total={1}
-        label="a report on Q's work"
+        label={t("a report on Q's work")}
       >
         <PageHeader
           title={report.counterpartName}
-          description={report.headline}
+          description={t(report.headline)}
         >
           <a
             href={`/api/q-work-report/${delegationId}/${laneId}`}
             className={buttonClassName("secondary", "compact")}
           >
-            Download PDF
+            {t("Download PDF")}
           </a>
         </PageHeader>
         <div className="flex flex-col gap-10">
-          <PageSection id="verdict" title={VERDICT[report.recommendation]}>
-            <p className="cq-body text-(--cq-text-primary)">{report.why}</p>
+          <PageSection id="verdict" title={t(VERDICT[report.recommendation])}>
+            <p className="cq-body text-(--cq-text-primary)">{t(report.why)}</p>
           </PageSection>
-          <PageSection id="how" title="How it went">
+          <PageSection id="how" title={t("How it went")}>
             <p className="cq-body text-(--cq-text-primary)">
-              {report.howItWent}
+              {t(report.howItWent)}
             </p>
           </PageSection>
           {[
             { id: "strengths", title: "Strengths", items: report.strengths },
             { id: "concerns", title: "Concerns", items: report.concerns },
           ].map((group) => (
-            <PageSection key={group.id} id={group.id} title={group.title}>
+            <PageSection key={group.id} id={group.id} title={t(group.title)}>
               {group.items.length === 0 ? (
                 <p className="cq-body-sm text-(--cq-text-secondary)">
-                  None stated.
+                  {t("None stated.")}
                 </p>
               ) : (
                 <ul className="flex flex-col gap-2">
                   {group.items.map((item) => (
                     <li key={item.point} className="flex flex-col gap-0.5">
                       <span className="cq-body text-(--cq-text-primary)">
-                        {item.point}
+                        {t(item.point)}
                       </span>
                       <span className="cq-caption text-(--cq-text-secondary)">
-                        {basis(item.basis)}
+                        {t(basis(item.basis))}
                       </span>
                     </li>
                   ))}
@@ -125,32 +128,33 @@ export default async function WorkReportPage({
             </PageSection>
           ))}
           {report.openQuestions.length === 0 ? null : (
-            <PageSection id="open" title="Ask next">
+            <PageSection id="open" title={t("Ask next")}>
               <ul className="flex list-disc flex-col gap-1 ps-5">
                 {report.openQuestions.map((question) => (
                   <li
                     key={question}
                     className="cq-body text-(--cq-text-primary)"
                   >
-                    {question}
+                    {t(question)}
                   </li>
                 ))}
               </ul>
             </PageSection>
           )}
-          <PageSection id="interview" title="The interview">
+          <PageSection id="interview" title={t("The interview")}>
             <dl className="flex flex-col gap-4">
               {report.interview.map((item) => (
                 <div key={item.question} className="flex flex-col gap-1">
                   <dt className="cq-body-sm font-medium text-(--cq-text-primary)">
-                    {item.question}
+                    {t(item.question)}
                   </dt>
                   <dd className="cq-body whitespace-pre-line text-(--cq-text-secondary)">
-                    {item.answer}
+                    {t(item.answer)}
                     {item.byQ ? (
                       <span className="cq-caption block text-(--cq-text-tertiary)">
-                        Answered by their Q, standing in from their approved
-                        brief
+                        {t(
+                          "Answered by their Q, standing in from their approved brief",
+                        )}
                       </span>
                     ) : null}
                   </dd>
@@ -159,15 +163,15 @@ export default async function WorkReportPage({
             </dl>
           </PageSection>
           <p className="cq-caption text-(--cq-text-tertiary)">
-            Written by Q from a chat interview it ran for you. What the founder
-            said is their own claim; nothing here is verified, and it is not
-            investment advice.
+            {t(
+              "Written by Q from a chat interview it ran for you. What the founder said is their own claim; nothing here is verified, and it is not investment advice.",
+            )}
           </p>
           <Link
             href="/work"
             className="cq-body-sm inline-flex min-h-11 items-center underline underline-offset-4"
           >
-            Back to Q&rsquo;s work
+            {t("Back to Q’s work")}
           </Link>
         </div>
       </QSection>

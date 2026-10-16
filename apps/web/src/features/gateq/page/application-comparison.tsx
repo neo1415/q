@@ -59,7 +59,7 @@ function Fact({
         {t(summaryWords(fact.summary))}
       </p>
       <p className="cq-caption gq-t2">
-        {t("Origin:")} {t(origin)} {t("· Truth:")} {t(truth)} {t("· Evidence:")}{" "}
+        {t(`Origin: ${origin} · Truth:`)} {t(truth)} {t("· Evidence:")}{" "}
         {t(evidence)}
       </p>
       {fact.derivation === undefined ? null : (

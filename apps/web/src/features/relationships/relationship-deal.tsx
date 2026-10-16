@@ -519,7 +519,7 @@ export function RelationshipDeal({
           </p>
           {side === "INVESTOR" ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              {counterpart} {t("is in your portfolio: it counts in")}{" "}
+              {t(`${counterpart} is in your portfolio: it counts in`)}{" "}
               <a
                 className="underline underline-offset-2"
                 href="/relationships?view=overview"
@@ -585,7 +585,7 @@ export function RelationshipDeal({
       {view.terms === null || editingTerms ? null : (
         <div className="flex flex-col gap-1" data-deal-terms>
           <span className="cq-caption text-(--cq-text-tertiary)">
-            {t("Terms · version")} {view.terms.version} {t("· recorded by")}{" "}
+            {t(`Terms · version ${String(view.terms.version)} · recorded by`)}{" "}
             {t(
               view.terms.recordedBy ??
                 (view.terms.recordedBySide === side

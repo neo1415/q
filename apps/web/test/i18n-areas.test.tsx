@@ -12,10 +12,14 @@ vi.mock("../src/features/gateq/gateway-actions", () => ({
   openGatewayAction: vi.fn(),
 }));
 
+import { WorkforceOverviewDtoSchema } from "@capital-q/contracts";
+
 import { dealFixture } from "../app/dev/deal-close/fixtures";
 import { DOCUMENTS_AR } from "../src/features/i18n/catalog/documents";
 import { GATEQ_AR } from "../src/features/i18n/catalog/gateq";
 import { RELATIONSHIPS_AR } from "../src/features/i18n/catalog/relationships";
+import { WORK_AR } from "../src/features/i18n/catalog/work";
+import { WorkforceCost } from "../src/features/work/workforce-cost";
 import { LanguageProvider } from "../src/features/i18n/language";
 import { translate } from "../src/features/i18n/messages";
 import { localiseDate } from "../src/features/i18n/patterns";
@@ -50,6 +54,7 @@ const AREAS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   relationships: RELATIONSHIPS_AR,
   documents: DOCUMENTS_AR,
   gateq: GATEQ_AR,
+  work: WORK_AR,
 };
 
 describe("the area catalogues", () => {
@@ -229,5 +234,43 @@ describe("GateQ in Arabic", () => {
     expect(translate("ar", "Replies within 10 working days")).toBe(
       "يردّ خلال 10 أيام عمل",
     );
+  });
+});
+
+describe("Q Work and notifications in Arabic", () => {
+  it("renders the cost of Q's work in Arabic, figures as written", () => {
+    const overview = WorkforceOverviewDtoSchema.parse({
+      month: "2026-10",
+      spentUsd: "4.2",
+      limitUsd: "25",
+      paused: false,
+      byRole: [{ role: "WRITER", usd: "1.5" }],
+      team: [],
+      jobs: { open: 1, needsYou: 0 },
+    });
+    render(
+      <LanguageProvider language="ar">
+        <WorkforceCost overview={overview} jobs={[]} />
+      </LanguageProvider>,
+    );
+    expect(screen.getByRole("heading", { name: "هذا الشهر" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "حسب المتخصص" })).toBeTruthy();
+    expect(
+      screen.getByRole("meter", { name: "المُنفق من حدك الشهري" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/يوقف Q العمل الجديد ويسألك عند \$25/u),
+    ).toBeTruthy();
+  });
+
+  it("says jobs, drafts and times in Arabic, keeping names and figures", () => {
+    expect(translate("ar", "Waiting for Ada Obi to reply")).toBe(
+      "بانتظار رد Ada Obi",
+    );
+    expect(translate("ar", "Next run Thu 09:03.")).toBe(
+      "التنفيذ التالي الخميس 09:03.",
+    );
+    expect(translate("ar", "Show 3 more")).toBe("عرض 3 أخرى");
+    expect(translate("ar", "Notifications, 4 new")).toBe("الإشعارات، 4 جديدة");
   });
 });

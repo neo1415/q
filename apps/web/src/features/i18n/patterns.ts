@@ -162,10 +162,11 @@ const MONTH = Object.keys(MONTHS_AR).join("|");
 const DAY = Object.keys(DAYS_AR).join("|");
 /**
  * A date as the app writes it in English (en-GB: "18 Sept", "27 Sept 2026",
- * "Tue 18 Sept, 14:00"), and nothing else.
+ * "Tue 18 Sept, 14:00", "Thu 09:03"), and nothing else.
  */
+const TIME = "\\d{1,2}:\\d{2}(?: ?[ap]m)?";
 const DATE_ONLY = new RegExp(
-  `^(?:(?:${DAY}),? )?\\d{1,2} (?:${MONTH})(?:,? \\d{4})?(?:,? (?:at )?\\d{1,2}:\\d{2}(?: ?[ap]m)?)?$`,
+  `^(?:(?:${DAY}),? )?(?:\\d{1,2} (?:${MONTH})(?:,? \\d{4})?(?:,? (?:at )?${TIME})?|${TIME})$`,
   "i",
 );
 const WORD = new RegExp(`\\b(${MONTH}|${DAY}|at|am|pm)\\b`, "g");

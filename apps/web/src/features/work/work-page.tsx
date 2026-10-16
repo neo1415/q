@@ -97,6 +97,7 @@ import {
   stopJobAction,
   type Prepared,
 } from "./work-page-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Work, Q's work page (WORK-58, founder-approved mockups 2026-10-04).
@@ -157,6 +158,8 @@ export function WorkPage({
   initialView,
   liveReads = true,
 }: Props) {
+  const t = useT();
+
   const running = (work ?? []).filter((item) => item.status === "ACTIVE");
   const timeLanes = running.flatMap((item) =>
     item.lanes
@@ -226,7 +229,7 @@ export function WorkPage({
       {hasTeam ? (
         <nav
           ref={viewsRef}
-          aria-label="More about Q’s work"
+          aria-label={t("More about Q’s work")}
           className="-mt-2 -mb-4 flex items-center gap-1"
           data-work-views
         >
@@ -237,7 +240,7 @@ export function WorkPage({
               onClick={() => setView("work")}
               className="inline-flex min-h-11 items-center px-2 cq-label text-(--cq-text-primary) hover:underline"
             >
-              ← Back to Work
+              {t("← Back to Work")}
             </button>
           )}
           <span className="ms-auto" />
@@ -265,7 +268,7 @@ export function WorkPage({
                   : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
               )}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </nav>
@@ -308,8 +311,9 @@ export function WorkPage({
               className="-mt-4 cq-body-sm text-(--cq-text-secondary)"
               role="status"
             >
-              What waits for your yes couldn’t load. Nothing is sent without it;
-              try again in a moment.
+              {t(
+                "What waits for your yes couldn’t load. Nothing is sent without it; try again in a moment.",
+              )}
             </p>
           ) : null}
           <Suggestions
@@ -389,6 +393,8 @@ function InProgress({
   /** The page's clock (render stays pure). */
   readonly now: number;
 }) {
+  const t = useT();
+
   // Recovery D6: the durable work state -- running, waiting, or stopped
   // this week with why -- read from the same fields Q reads.
   const tasks = jobsInProgress(jobs, now);
@@ -406,20 +412,21 @@ function InProgress({
         id="work-running"
         className="flex items-baseline gap-2 cq-title-sm text-(--cq-text-primary)"
       >
-        In progress
+        {t("In progress")}
         <span className="cq-body font-normal cq-numeric text-(--cq-text-tertiary)">
           {running}
-          {stopped === 0 ? null : ` · ${String(stopped)} stopped`}
+          {stopped === 0 ? null : t(` · ${String(stopped)} stopped`)}
         </span>
       </h2>
       {failed ? (
         <p className="mt-2 cq-body-sm text-(--cq-text-secondary)" role="status">
-          Q&rsquo;s work couldn&rsquo;t load. Try again in a moment.
+          {t("Q’s work couldn’t load. Try again in a moment.")}
         </p>
       ) : items.length + tasks.length === 0 ? (
         <p className="mt-2 cq-body-sm text-(--cq-text-secondary)">
-          Nothing running. Give Q a task above, or ask it to look after
-          something for you, and it shows here as one line.
+          {t(
+            "Nothing running. Give Q a task above, or ask it to look after something for you, and it shows here as one line.",
+          )}
         </p>
       ) : (
         <div className="mt-3">
@@ -439,6 +446,8 @@ function InProgress({
 
 /** One job: its real state, why it stopped, and "Stop this job". */
 function JobRow({ job }: { readonly job: WorkforceJobSummaryDto }) {
+  const t = useT();
+
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [said, setSaid] = useState<string | null>(null);
@@ -461,17 +470,19 @@ function JobRow({ job }: { readonly job: WorkforceJobSummaryDto }) {
     >
       <div className="min-w-0 flex-1">
         <p className="m-0 truncate cq-body-sm font-medium text-(--cq-text-primary)">
-          {job.goal}
+          {t(job.goal)}
         </p>
         <p className="m-0 cq-label font-normal text-(--cq-text-tertiary)">
-          {line.state}
+          {t(line.state)}
           {job.drafts > 0
-            ? ` · ${String(job.drafts)} ${job.drafts === 1 ? "draft" : "drafts"}`
+            ? t(
+                ` · ${String(job.drafts)} ${job.drafts === 1 ? "draft" : "drafts"}`,
+              )
             : ""}
         </p>
         {line.why === null ? null : (
           <p className="m-0 cq-body-sm text-(--cq-text-secondary)">
-            {line.why}
+            {t(line.why)}
           </p>
         )}
         {said === null ? null : (
@@ -479,7 +490,7 @@ function JobRow({ job }: { readonly job: WorkforceJobSummaryDto }) {
             className="m-0 cq-body-sm text-(--cq-text-secondary)"
             role="status"
           >
-            {said}
+            {t(said)}
           </p>
         )}
       </div>
@@ -488,9 +499,9 @@ function JobRow({ job }: { readonly job: WorkforceJobSummaryDto }) {
           variant="secondary"
           onClick={stop}
           disabled={pending}
-          aria-label={`Stop this job: ${job.goal.slice(0, 80)}`}
+          aria-label={t(`Stop this job: ${job.goal.slice(0, 80)}`)}
         >
-          {pending ? "Stopping…" : "Stop"}
+          {pending ? t("Stopping…") : t("Stop")}
         </Button>
       ) : null}
     </li>
@@ -498,13 +509,15 @@ function JobRow({ job }: { readonly job: WorkforceJobSummaryDto }) {
 }
 
 function TeamUnavailable({ onRetry }: { readonly onRetry: () => void }) {
+  const t = useT();
+
   return (
     <div className="flex flex-wrap items-center gap-3">
       <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
-        Q’s team couldn’t load. It keeps working; this view catches up.
+        {t("Q’s team couldn’t load. It keeps working; this view catches up.")}
       </p>
       <Button variant="secondary" onClick={onRetry}>
-        Try again
+        {t("Try again")}
       </Button>
     </div>
   );
@@ -520,6 +533,8 @@ function ShowMore({
   readonly hidden: number;
   readonly onShow: () => void;
 }) {
+  const t = useT();
+
   if (hidden <= 0) return null;
   return (
     <button
@@ -527,7 +542,7 @@ function ShowMore({
       onClick={onShow}
       className="mt-1 inline-flex min-h-11 items-center gap-1 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
     >
-      Show {hidden} more
+      {t(`Show ${hidden} more`)}
       <ChevronDown
         aria-hidden="true"
         size={ICON_SIZE.compact}
@@ -542,6 +557,8 @@ function ShowMore({
 // ---------------------------------------------------------------------------
 
 function TaskComposer() {
+  const t = useT();
+
   const session = useQSessionOptional();
   const [text, setText] = useState("");
   const [asked, setAsked] = useState<Asked | null>(null);
@@ -575,13 +592,13 @@ function TaskComposer() {
         data-work-composer
       >
         <label htmlFor="work-task" className="sr-only">
-          Give Q a task
+          {t("Give Q a task")}
         </label>
         <input
           id="work-task"
           value={text}
           onChange={(event) => setText(event.target.value)}
-          placeholder="Give Q a task…"
+          placeholder={t("Give Q a task…")}
           autoComplete="off"
           maxLength={2000}
           className="min-w-0 flex-1 bg-transparent cq-body-lg text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) lg:text-lg"
@@ -589,7 +606,7 @@ function TaskComposer() {
         {text.trim().length > 0 ? (
           <button
             type="submit"
-            aria-label="Give Q this task"
+            aria-label={t("Give Q this task")}
             disabled={busy}
             className="flex size-11 shrink-0 items-center justify-center bg-(--cq-accent) text-(--cq-text-inverse) motion-safe:transition-transform motion-safe:duration-(--cq-motion-fast) active:scale-[0.97] disabled:opacity-50 lg:size-12"
           >
@@ -598,7 +615,7 @@ function TaskComposer() {
         ) : (
           <button
             type="button"
-            aria-label="Talk to Q"
+            aria-label={t("Talk to Q")}
             disabled={session === null}
             onClick={() => void session?.talk()}
             className="flex size-11 shrink-0 items-center justify-center bg-(--cq-accent) text-(--cq-text-inverse) motion-safe:transition-transform motion-safe:duration-(--cq-motion-fast) active:scale-[0.97] disabled:opacity-50 lg:size-12"
@@ -610,7 +627,7 @@ function TaskComposer() {
       </form>
       {notice === null ? null : (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          {notice}
+          {t(notice)}
         </p>
       )}
       {asked === null ? null : (
@@ -678,6 +695,8 @@ function PreparedPlan({
   readonly closeLabel: string;
   readonly onDecided?: ((approved: boolean) => void) | undefined;
 }) {
+  const t = useT();
+
   const prepared = usePrepared(asked.runId);
   const qPage =
     asked.conversationId === null
@@ -688,7 +707,7 @@ function PreparedPlan({
     return (
       <div className="flex flex-col gap-2" role="status">
         <span className="cq-body-sm text-(--cq-text-secondary)">
-          Q is preparing it…
+          {t("Q is preparing it…")}
         </span>
         <Skeleton lines={2} />
       </div>
@@ -698,13 +717,13 @@ function PreparedPlan({
     return (
       <div className="flex flex-wrap items-center gap-3" role="status">
         <span className="cq-body-sm text-(--cq-text-secondary)">
-          Q couldn&rsquo;t prepare that. Nothing was done.
+          {t("Q couldn’t prepare that. Nothing was done.")}
         </span>
         <Link
           href={qPage}
           className="cq-body-sm font-medium text-(--cq-accent) underline-offset-4 hover:underline"
         >
-          Ask Q
+          {t("Ask Q")}
         </Link>
       </div>
     );
@@ -720,10 +739,10 @@ function PreparedPlan({
             href={qPage}
             className="inline-flex min-h-11 items-center px-3 cq-body-sm font-medium text-(--cq-accent) hover:bg-(--cq-surface-subtle) lg:min-h-10"
           >
-            Continue with Q
+            {t("Continue with Q")}
           </Link>
           <Button variant="quiet" size="compact" onClick={onClose}>
-            {closeLabel}
+            {t(closeLabel)}
           </Button>
         </div>
       </div>
@@ -767,6 +786,8 @@ function ApprovalPlan({
   /** In the decision queue, Dismiss sits beside it instead. */
   readonly hideNotNow?: boolean | undefined;
 }) {
+  const t = useT();
+
   const [view, setView] = useState<QApprovalView | null>(initialView ?? null);
   const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -806,7 +827,9 @@ function ApprovalPlan({
   if (failed) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-        This couldn&rsquo;t load. Nothing was sent; it still waits for your yes.
+        {t(
+          "This couldn’t load. Nothing was sent; it still waits for your yes.",
+        )}
       </p>
     );
   }
@@ -817,10 +840,12 @@ function ApprovalPlan({
 
   return (
     <div className="flex flex-col gap-3" data-approval-plan>
-      <p className="cq-body text-(--cq-text-primary)">{view.action.summary}</p>
+      <p className="cq-body text-(--cq-text-primary)">
+        {t(view.action.summary)}
+      </p>
       {plan.quote === null ? null : (
         <blockquote className="bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-secondary)">
-          <span className="sr-only">What Q will send: </span>
+          <span className="sr-only">{t("What Q will send:")} </span>
           {plan.quote}
         </blockquote>
       )}
@@ -828,14 +853,14 @@ function ApprovalPlan({
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 cq-body-sm">
           {plan.alone === null ? null : (
             <>
-              <dt className="text-(--cq-text-tertiary)">On its own</dt>
-              <dd className="text-(--cq-text-primary)">{plan.alone}</dd>
+              <dt className="text-(--cq-text-tertiary)">{t("On its own")}</dt>
+              <dd className="text-(--cq-text-primary)">{t(plan.alone)}</dd>
             </>
           )}
           {plan.asks === null ? null : (
             <>
-              <dt className="text-(--cq-text-tertiary)">Asks first</dt>
-              <dd className="text-(--cq-text-primary)">{plan.asks}</dd>
+              <dt className="text-(--cq-text-tertiary)">{t("Asks first")}</dt>
+              <dd className="text-(--cq-text-primary)">{t(plan.asks)}</dd>
             </>
           )}
         </dl>
@@ -848,7 +873,7 @@ function ApprovalPlan({
             onClick={() => setFull((now) => !now)}
             className="inline-flex min-h-11 items-center gap-1 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary) lg:min-h-8"
           >
-            Full plan
+            {t("Full plan")}
             <ChevronDown
               aria-hidden="true"
               size={ICON_SIZE.compact}
@@ -861,7 +886,7 @@ function ApprovalPlan({
           </button>
           {full ? (
             <p className="mt-1 cq-body-sm whitespace-pre-wrap text-(--cq-text-secondary)">
-              {plan.rest}
+              {t(plan.rest)}
             </p>
           ) : null}
         </div>
@@ -875,7 +900,7 @@ function ApprovalPlan({
       ) : null}
       {canDecide ? null : (
         <p className="cq-body-sm text-(--cq-text-secondary)">
-          Already decided or expired.
+          {t("Already decided or expired.")}
         </p>
       )}
       <div className="flex flex-wrap items-center gap-1">
@@ -885,14 +910,14 @@ function ApprovalPlan({
           onClick={approve}
           className="motion-safe:transition-transform active:scale-[0.97]"
         >
-          Approve
+          {t("Approve")}
         </Button>
         {editHref === undefined ? null : (
           <Link
             href={editHref}
             className="inline-flex min-h-11 items-center px-4 cq-body-sm font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-10"
           >
-            Edit
+            {t("Edit")}
           </Link>
         )}
         {hideNotNow ? null : (
@@ -902,13 +927,13 @@ function ApprovalPlan({
             onClick={onNotNow}
             className="text-(--cq-text-secondary)"
           >
-            {notNowLabel}
+            {t(notNowLabel)}
           </Button>
         )}
       </div>
       {message === null ? null : (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>
@@ -932,10 +957,12 @@ function SectionHead({
   readonly count?: number | undefined;
   readonly aside?: string | undefined;
 }) {
+  const t = useT();
+
   return (
     <div className="mb-2.5 flex items-baseline gap-2">
       <h2 id={id} className="cq-title-sm text-(--cq-text-primary)">
-        {title}
+        {t(title)}
         {count === undefined ? null : (
           <span className="sr-only">, {count}</span>
         )}
@@ -950,7 +977,7 @@ function SectionHead({
       )}
       {aside === undefined ? null : (
         <span className="ms-auto cq-label cq-numeric font-normal text-(--cq-text-tertiary)">
-          {aside}
+          {t(aside)}
         </span>
       )}
     </div>
@@ -969,14 +996,16 @@ function Suggestions({
   readonly failed: boolean;
   readonly onGone: (key: string) => void;
 }) {
+  const t = useT();
+
   const [open, setOpen] = useState<string | null>(prepared?.key ?? null);
   if (items.length === 0 && !failed) return null;
   return (
     <section aria-labelledby="work-suggests" data-work-suggests>
-      <SectionHead id="work-suggests" title="Q suggests" />
+      <SectionHead id="work-suggests" title={t("Q suggests")} />
       {failed ? (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          Suggestions couldn&rsquo;t load.
+          {t("Suggestions couldn’t load.")}
         </p>
       ) : (
         <ul className="overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
@@ -1025,6 +1054,8 @@ function SuggestionCard({
   readonly onToggle: () => void;
   readonly onGone: () => void;
 }) {
+  const t = useT();
+
   // Q prepares on the first tap only: one model call, never ahead of time.
   const [asked, setAsked] = useState<Asked | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1080,21 +1111,21 @@ function SuggestionCard({
             {item.lead}
           </span>
           <span className="mt-1 text-[11px] leading-none text-(--cq-text-tertiary)">
-            {item.unit}
+            {t(item.unit)}
           </span>
         </span>
         <span className="min-w-0">
           <span className="flex min-w-0 items-center gap-2">
             <NamedMark named={item.named} size={20} />
             <span className="block truncate cq-body font-medium text-(--cq-text-primary)">
-              {item.subject}
+              {t(item.subject)}
             </span>
           </span>
           <span className="block truncate cq-body-sm text-(--cq-text-secondary)">
-            {item.question}
+            {t(item.question)}
           </span>
           <span className="sr-only">
-            {`, ${String(item.lead)} ${item.unit}`}
+            {t(`, ${String(item.lead)} ${item.unit}`)}
           </span>
         </span>
         <ChevronDown
@@ -1123,12 +1154,12 @@ function SuggestionCard({
             />
           ) : notice !== null ? (
             <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-              {notice}
+              {t(notice)}
             </p>
           ) : asked === null ? (
             <div role="status" className="flex flex-col gap-2">
               <span className="cq-body-sm text-(--cq-text-secondary)">
-                Q is preparing it…
+                {t("Q is preparing it…")}
               </span>
               <Skeleton lines={2} />
             </div>
@@ -1245,6 +1276,8 @@ function NeedsYou({
   /** Inside the decision queue: rows only, under its heading. */
   readonly embedded?: boolean | undefined;
 }) {
+  const t = useT();
+
   const [open, setOpen] = useState<string | null>(null);
   const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set());
   const [all, setAll] = useState(false);
@@ -1263,11 +1296,11 @@ function NeedsYou({
   return (
     <section
       aria-labelledby={embedded ? undefined : "work-needs-you"}
-      aria-label={embedded ? "Other things waiting on you" : undefined}
+      aria-label={embedded ? t("Other things waiting on you") : undefined}
       data-work-needs-you={embedded ? undefined : true}
     >
       {embedded ? null : (
-        <SectionHead id="work-needs-you" title="Needs you" count={count} />
+        <SectionHead id="work-needs-you" title={t("Needs you")} count={count} />
       )}
       <ul className="border-t border-(--cq-border-subtle)">
         {shownLanes.map(({ work, lane }) => (
@@ -1276,7 +1309,7 @@ function NeedsYou({
               Icon={CalendarDays}
               named={lane.counterpart}
               namedName={lane.counterpartName}
-              title={`Pick a time with ${lane.counterpartName}`}
+              title={t(`Pick a time with ${lane.counterpartName}`)}
               meta={`${String(lane.offered.length)} ${lane.offered.length === 1 ? "time" : "times"} offered`}
               open={open === lane.id}
               onReview={() =>
@@ -1303,7 +1336,7 @@ function NeedsYou({
             <NeedRow
               Icon={MessageSquare}
               named={item.named}
-              title={item.summary}
+              title={t(item.summary)}
               meta={`Asked ${shortAge(item.requestedAt)}`}
               open={open === item.approvalId}
               onReview={() =>
@@ -1349,6 +1382,8 @@ function NeedsYou({
  * with it, so it is read and leaves (the same rule as the bell's "Needs you").
  */
 function NoticeRow({ group }: { readonly group: NoticeGroup }) {
+  const t = useT();
+
   const { notice } = group;
   const done = () => {
     void markReadAction(group.ids.slice(0, 50)).then((result) => {
@@ -1368,15 +1403,15 @@ function NoticeRow({ group }: { readonly group: NoticeGroup }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate cq-body-sm font-medium text-(--cq-text-primary)">
-          {notice.title}
+          {t(notice.title)}
         </p>
         <p className="truncate cq-label font-normal text-(--cq-text-tertiary)">
-          {meta}
+          {t(meta)}
         </p>
       </div>
       {notice.linkPath === null ? (
         <Button variant="secondary" size="compact" onClick={done}>
-          Got it
+          {t("Got it")}
         </Button>
       ) : (
         <Link
@@ -1384,7 +1419,7 @@ function NoticeRow({ group }: { readonly group: NoticeGroup }) {
           onClick={done}
           className="inline-flex min-h-11 items-center border border-(--cq-border-strong) px-3 cq-body-sm font-medium text-(--cq-text-primary) hover:bg-(--cq-surface-subtle) pointer-fine:min-h-9"
         >
-          Open
+          {t("Open")}
         </Link>
       )}
     </div>
@@ -1413,6 +1448,8 @@ function NeedRow({
   readonly open: boolean;
   readonly onReview: () => void;
 }) {
+  const t = useT();
+
   return (
     <div className="flex min-h-16 items-center gap-3 py-2.5">
       {namedMarkShown(named, namedName) ? (
@@ -1424,10 +1461,10 @@ function NeedRow({
       )}
       <div className="min-w-0 flex-1">
         <p className="truncate cq-body-sm font-medium text-(--cq-text-primary)">
-          {title}
+          {t(title)}
         </p>
         <p className="truncate cq-label font-normal text-(--cq-text-tertiary)">
-          {meta}
+          {t(meta)}
         </p>
       </div>
       <Button
@@ -1437,7 +1474,7 @@ function NeedRow({
         onClick={onReview}
         className="motion-safe:transition-transform active:scale-[0.97]"
       >
-        {open ? "Close" : "Review"}
+        {open ? t("Close") : t("Review")}
       </Button>
     </div>
   );
@@ -1450,6 +1487,8 @@ function DeclineLink({
   readonly approvalId: string;
   readonly onDeclined: () => void;
 }) {
+  const t = useT();
+
   const [pending, startTransition] = useTransition();
   return (
     <Button
@@ -1466,7 +1505,7 @@ function DeclineLink({
         })
       }
     >
-      Decline
+      {t("Decline")}
     </Button>
   );
 }
@@ -1480,6 +1519,8 @@ function TimePicker({
   readonly lane: QWorkDto["lanes"][number];
   readonly onAnswered: () => void;
 }) {
+  const t = useT();
+
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const answer = (
@@ -1508,7 +1549,7 @@ function TimePicker({
             disabled={pending}
             onClick={() => answer({ kind: "BOOK_AT", at: slot.start })}
           >
-            {slot.label}
+            {t(slot.label)}
           </Button>
         ))}
         <Button
@@ -1518,12 +1559,12 @@ function TimePicker({
           className="text-(--cq-text-secondary)"
           onClick={() => answer({ kind: "PASS" })}
         >
-          Pass
+          {t("Pass")}
         </Button>
       </div>
       {message === null ? null : (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>
@@ -1560,12 +1601,14 @@ function Running({
   /** Rows only, under the In progress heading. */
   readonly bare?: boolean | undefined;
 }) {
+  const t = useT();
+
   const [rows, setRows] = useState(items);
   const [all, setAll] = useState(false);
   if (failed) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-        Q&rsquo;s work couldn&rsquo;t load. Try again in a moment.
+        {t("Q’s work couldn’t load. Try again in a moment.")}
       </p>
     );
   }
@@ -1579,18 +1622,18 @@ function Running({
   return (
     <section
       aria-labelledby={bare ? undefined : "work-running-list"}
-      aria-label={bare ? "Running" : undefined}
+      aria-label={bare ? t("Running") : undefined}
     >
       {bare ? (
         anySpend ? (
           <p className="mb-1 text-end cq-label font-normal cq-numeric text-(--cq-text-tertiary)">
-            {dollars(month)} this month
+            {t(dollars(month))} {t("this month")}
           </p>
         ) : null
       ) : (
         <SectionHead
           id="work-running-list"
-          title="Running"
+          title={t("Running")}
           count={rows.length}
           aside={anySpend ? `${dollars(month)} this month` : undefined}
         />
@@ -1633,6 +1676,8 @@ function RunningRow({
   /** The row as it now stands; null once stopped. */
   readonly onChanged: (next: QWorkDto | null) => void;
 }) {
+  const t = useT();
+
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -1678,7 +1723,7 @@ function RunningRow({
       <div className="flex min-h-12 items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate cq-body-sm font-medium text-(--cq-text-primary)">
-            {goal}
+            {t(goal)}
           </p>
           <p className="flex min-w-0 items-center gap-1.5 cq-label font-normal text-(--cq-text-tertiary)">
             <StateMark state={state} />
@@ -1686,9 +1731,9 @@ function RunningRow({
             <span className="truncate">
               {item.lastStep === null
                 ? state === "PAUSED" && !pausedByYou
-                  ? "Waiting for your yes"
-                  : "Nothing done yet"
-                : `${item.lastStep.words} · ${shortAge(item.lastStep.at)}`}
+                  ? t("Waiting for your yes")
+                  : t("Nothing done yet")
+                : t(`${item.lastStep.words} · ${shortAge(item.lastStep.at)}`)}
             </span>
           </p>
         </div>
@@ -1696,10 +1741,10 @@ function RunningRow({
           <div className="w-24 shrink-0 text-end">
             <p className="cq-label font-normal cq-numeric whitespace-nowrap text-(--cq-text-secondary)">
               <span className="font-medium text-(--cq-text-primary)">
-                {dollars(spent)}
+                {t(dollars(spent))}
               </span>{" "}
-              / {dollars(budget).replace(/\.00$/u, "")}
-              <span className="sr-only"> spent this month</span>
+              / {t(dollars(budget).replace(/\.00$/u, ""))}
+              <span className="sr-only"> {t("spent this month")}</span>
             </p>
             <div
               aria-hidden="true"
@@ -1720,7 +1765,7 @@ function RunningRow({
         <MenuRoot>
           <MenuTrigger>
             <IconButton
-              aria-label={`Options for ${goal}`}
+              aria-label={t(`Options for ${goal}`)}
               size="compact"
               className="-me-2 text-(--cq-text-tertiary)"
               disabled={pending}
@@ -1734,21 +1779,23 @@ function RunningRow({
           </MenuTrigger>
           <MenuContent align="end">
             {instruction && state !== "PAUSED" ? (
-              <MenuItem onClick={() => setPaused(true)}>Pause</MenuItem>
+              <MenuItem onClick={() => setPaused(true)}>{t("Pause")}</MenuItem>
             ) : null}
             {instruction && pausedByYou ? (
-              <MenuItem onClick={() => setPaused(false)}>Resume</MenuItem>
+              <MenuItem onClick={() => setPaused(false)}>
+                {t("Resume")}
+              </MenuItem>
             ) : null}
             <MenuItem
               onClick={() => {
                 router.push(`/work/${item.id}`);
               }}
             >
-              What Q did
+              {t("What Q did")}
             </MenuItem>
             <MenuSeparator />
             <MenuItem tone="danger" onClick={() => setConfirming(true)}>
-              Stop
+              {t("Stop")}
             </MenuItem>
           </MenuContent>
         </MenuRoot>
@@ -1771,7 +1818,7 @@ function RunningRow({
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <span className="cq-body-sm text-(--cq-text-secondary)">
-            Stop this for good?
+            {t("Stop this for good?")}
           </span>
           <Button
             variant="danger"
@@ -1779,7 +1826,7 @@ function RunningRow({
             disabled={pending}
             onClick={stop}
           >
-            Stop
+            {t("Stop")}
           </Button>
           <Button
             variant="quiet"
@@ -1787,13 +1834,13 @@ function RunningRow({
             disabled={pending}
             onClick={() => setConfirming(false)}
           >
-            Keep it
+            {t("Keep it")}
           </Button>
         </div>
       ) : null}
       {message === null ? null : (
         <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          {message}
+          {t(message)}
         </p>
       )}
     </div>
@@ -1814,6 +1861,8 @@ function DelegationSwitch({
   readonly delegation: NonNullable<QWorkDto["delegation"]>;
   readonly onChanged: (enabled: boolean) => void;
 }) {
+  const t = useT();
+
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const on = delegation.enabled;
@@ -1834,13 +1883,13 @@ function DelegationSwitch({
         id={labelId}
         className="min-w-0 flex-1 cq-label font-normal text-(--cq-text-secondary)"
       >
-        {delegation.words}.{" "}
+        {t(delegation.words)}.{" "}
         <span className="font-medium text-(--cq-text-primary)">
-          {on ? "On" : "Off"}
+          {on ? t("On") : t("Off")}
         </span>
         {message === null ? null : (
           <span className="block" role="status">
-            {message}
+            {t(message)}
           </span>
         )}
       </p>
@@ -1882,6 +1931,8 @@ function StateMark({
 }: {
   readonly state: "WORKING" | "WAITING" | "PAUSED";
 }) {
+  const t = useT();
+
   return (
     <span
       className={cx(
@@ -1901,7 +1952,7 @@ function StateMark({
           state === "PAUSED" && "h-2 w-[7px] border-x-2 border-current",
         )}
       />
-      {STATE_WORDS[state]}
+      {t(STATE_WORDS[state])}
     </span>
   );
 }

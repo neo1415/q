@@ -19,6 +19,7 @@ import {
 import { QSection } from "@/features/q/q-section";
 import { WorkPage } from "@/features/work/work-page";
 import { loadWorkforceAction } from "@/features/work/workforce-actions";
+import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Work" };
 
@@ -60,6 +61,8 @@ async function WorkLists({
 }: {
   readonly view?: WorkViewParam | undefined;
 }) {
+  const t = await serverT();
+
   const [suggestions, approvals, work, done, workforce] = await Promise.all([
     listSuggestionsAction().catch(() => null),
     pendingQApprovalsAction().catch(() => null),
@@ -94,7 +97,7 @@ async function WorkLists({
           id: item.id,
         }))}
         total={items.length}
-        label={`${String(items.length)} work items`}
+        label={t(`${String(items.length)} work items`)}
       />
       {waiting === null ? null : (
         <QSection
@@ -127,10 +130,12 @@ export default async function WorkRoute({
 }: {
   readonly searchParams: Promise<{ readonly view?: string | string[] }>;
 }) {
+  const t = await serverT();
+
   const view = workViewOf((await searchParams).view);
   return (
     <PageContainer>
-      <PageHeader title="Work" />
+      <PageHeader title={t("Work")} />
       <Suspense fallback={<Skeleton lines={6} />}>
         <WorkLists view={view} />
       </Suspense>

@@ -1363,9 +1363,7 @@ function FolderControl({
       : `item:${document.checklistItemCode}`;
   return (
     <label className="cq-caption flex items-center gap-1 text-(--cq-text-secondary)">
-      <span className="sr-only">
-        {t("File")} {t(document.title)} {t("in")}
-      </span>
+      <span className="sr-only">{t(`File ${document.title} in`)}</span>
       <select
         value={value}
         disabled={disabled}
