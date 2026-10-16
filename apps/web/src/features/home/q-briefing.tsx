@@ -85,8 +85,11 @@ function SetupNudgeCard({
 
 export function QBriefing({
   briefing,
+  onlyReminder = false,
 }: {
   readonly briefing: Promise<Briefing | null>;
+  /** Only today's setup reminder card, without the line (the arrival's). */
+  readonly onlyReminder?: boolean | undefined;
 }) {
   const [shown, setShown] = useState<Briefing | null>(null);
   const [putOff, setPutOff] = useState<ReadonlySet<string>>(new Set());
@@ -105,7 +108,9 @@ export function QBriefing({
   }, [briefing]);
 
   if (shown === null) return null;
-  const items = shown.items.filter((item) => !putOff.has(item.id));
+  const items = shown.items.filter(
+    (item) => !putOff.has(item.id) && (!onlyReminder || item.later === true),
+  );
   if (items.length === 0) return null;
   const later = (id: string) => {
     setPutOff((before) => new Set([...before, id]));
@@ -113,13 +118,17 @@ export function QBriefing({
   };
   return (
     <section
-      aria-labelledby="q-briefing-line"
+      {...(onlyReminder
+        ? { "aria-label": "Your setup" }
+        : { "aria-labelledby": "q-briefing-line" })}
       className="flex w-full flex-col gap-2"
       data-q-briefing
     >
-      <p id="q-briefing-line" className="cq-body text-(--cq-text-primary)">
-        {shown.line}
-      </p>
+      {onlyReminder ? null : (
+        <p id="q-briefing-line" className="cq-body text-(--cq-text-primary)">
+          {shown.line}
+        </p>
+      )}
       <ul className="grid w-full gap-2 sm:grid-cols-2">
         {items.map((item) => (
           <li key={item.id} className="flex">

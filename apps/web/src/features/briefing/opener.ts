@@ -50,7 +50,9 @@ export function pendingCount(data: ArrivalData): number {
   const matches =
     data.matches?.label === "SINCE_LAST_VISIT" ? data.matches.items.length : 0;
   const questions = data.questions?.length ?? 0;
-  return decisions + lines + matches + questions;
+  // The continue-setup card, shown with the rest once they choose to look.
+  const setup = Math.max(0, Math.min(1, data.setupReminders ?? 0));
+  return decisions + lines + matches + questions + setup;
 }
 
 export const SOMETHING_ELSE_QUESTION = "What would you like to know?";

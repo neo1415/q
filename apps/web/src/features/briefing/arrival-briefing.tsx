@@ -75,6 +75,7 @@ import {
   setOpenerOffered,
   takeCarriedStatus,
   useArrival,
+  useArrivalSetupReminders,
   useOpener,
   type ArrivalLoader,
 } from "./arrival-store";
@@ -1209,12 +1210,17 @@ export function ArrivalBriefing({
       data: { ...loaded.data, cards },
     };
   }, [loaded, greets]);
+  const setupReminders = useArrivalSetupReminders();
   const words = useMemo(
     () =>
       ready === null
         ? null
-        : arrivalWords(ready.data, now?.() ?? new Date(), browserZone()),
-    [ready, now],
+        : arrivalWords(
+            { ...ready.data, setupReminders },
+            now?.() ?? new Date(),
+            browserZone(),
+          ),
+    [ready, now, setupReminders],
   );
   const opener = useOpener();
   useEffect(() => {

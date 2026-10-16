@@ -355,8 +355,35 @@ export function answerOpener(words: string): OpenerReply | null {
   return reply;
 }
 
+// Today's setup reminder, which Home's server render knows and the arrival
+// read does not: counted with what waits, shown with the cards.
+let setupReminders = 0;
+const setupSubscribers = new Set<() => void>();
+
+/** Home says how many setup reminders wait today (0 or 1). */
+export function setArrivalSetupReminders(n: number): void {
+  const next = Math.max(0, Math.min(1, Math.trunc(n)));
+  if (next === setupReminders) return;
+  setupReminders = next;
+  for (const notify of setupSubscribers) notify();
+}
+
+export function useArrivalSetupReminders(): number {
+  return useSyncExternalStore(
+    (notify) => {
+      setupSubscribers.add(notify);
+      return () => {
+        setupSubscribers.delete(notify);
+      };
+    },
+    () => setupReminders,
+    () => 0,
+  );
+}
+
 /** For the dev harness and tests: start over. */
 export function resetArrival(): void {
+  setupReminders = 0;
   opener = { choice: null, offered: false };
   notifyOpener();
   briefingWords = null;

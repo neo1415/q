@@ -102,6 +102,11 @@ export type ArrivalData = {
    * place; null: not read; absent: not a founder.
    */
   readonly questions?: readonly ReadinessFollowUp[] | null | undefined;
+  /**
+   * Today's setup reminder (Home's continue-setup card), as Home's own
+   * `setupRemindersWaiting` counts it: 0 or 1; absent: none.
+   */
+  readonly setupReminders?: number | undefined;
 };
 
 /**

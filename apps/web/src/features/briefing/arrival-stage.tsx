@@ -39,6 +39,7 @@ import {
   refreshArrival,
   setOpenerOffered,
   useArrival,
+  useArrivalSetupReminders,
   useOpener,
   type ArrivalLoader,
 } from "./arrival-store";
@@ -472,12 +473,17 @@ export function ArrivalStage({
   });
 
   // Words for the late-landing case below; the same words the head says.
+  const setupReminders = useArrivalSetupReminders();
   const words = useMemo(
     () =>
       rawData === null
         ? null
-        : arrivalWords(rawData, now?.() ?? new Date(), browserZone()),
-    [rawData, now],
+        : arrivalWords(
+            { ...rawData, setupReminders },
+            now?.() ?? new Date(),
+            browserZone(),
+          ),
+    [rawData, now, setupReminders],
   );
 
   // The opener's question is open whether or not the welcome is still on
