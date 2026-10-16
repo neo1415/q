@@ -581,6 +581,10 @@ export function ExploreScreen({
             posters={posters}
             sectorLabels={sectorLabels}
             onOpen={(index) => open(shown, index)}
+            preview={{
+              authorize: source.authorize,
+              suspended: opened !== null,
+            }}
             onIntent={(index) => {
               const tile = shown[index];
               if (tile !== undefined)

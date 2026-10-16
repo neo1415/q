@@ -21,6 +21,11 @@ import {
   fixtureSearch,
 } from "../src/features/explore/explore-fixtures";
 import { ExploreGrid } from "../src/features/explore/explore-grid";
+import {
+  chooseActivePreview,
+  linkIsConstrained,
+  type PreviewInput,
+} from "../src/features/explore/grid-preview";
 import { ExploreSearchResults } from "../src/features/explore/explore-search-results";
 import {
   parseSearch,
@@ -195,6 +200,183 @@ describe("the grid", () => {
     expect(container.querySelector(".cq-explore-initial")?.textContent).toBe(
       FIXTURE_TILES[0]?.canonicalName.slice(0, 1).toUpperCase(),
     );
+  });
+});
+
+describe("grid previews: one muted player, chosen by one controller", () => {
+  const order = ["a", "b", "c", "d"];
+  const base: PreviewInput = {
+    order,
+    visible: new Map([
+      ["a", 1],
+      ["b", 1],
+      ["c", 0.5],
+    ]),
+    hovered: null,
+    canHover: true,
+    reducedMotion: false,
+    constrained: false,
+    suspended: false,
+  };
+
+  it("plays the first tile while it is in view, and nothing once it scrolls away", () => {
+    expect(chooseActivePreview(base)).toBe("a");
+    expect(
+      chooseActivePreview({ ...base, visible: new Map([["b", 1]]) }),
+    ).toBeNull();
+  });
+
+  it("switches to the hovered tile, which keeps playing after the pointer leaves", () => {
+    expect(chooseActivePreview({ ...base, hovered: "c" })).toBe("c");
+    // The pointer left c and hovered nothing else: c is still the one.
+    expect(chooseActivePreview({ ...base, hovered: "c" })).toBe("c");
+    expect(chooseActivePreview({ ...base, hovered: "b" })).toBe("b");
+  });
+
+  it("never plays with reduced motion, Save-Data or 2g, a hidden tab or an open pitch", () => {
+    expect(chooseActivePreview({ ...base, reducedMotion: true })).toBeNull();
+    expect(chooseActivePreview({ ...base, constrained: true })).toBeNull();
+    expect(chooseActivePreview({ ...base, suspended: true })).toBeNull();
+    expect(
+      chooseActivePreview({ ...base, hovered: "b", reducedMotion: true }),
+    ).toBeNull();
+    expect(linkIsConstrained({ saveData: true })).toBe(true);
+    expect(linkIsConstrained({ effectiveType: "2g" })).toBe(true);
+    expect(linkIsConstrained({ effectiveType: "slow-2g" })).toBe(true);
+    expect(linkIsConstrained({ effectiveType: "4g" })).toBe(false);
+    expect(linkIsConstrained(undefined)).toBe(false);
+  });
+
+  it("on touch plays the most visible tile, the higher rank on a tie", () => {
+    const touch = { ...base, canHover: false };
+    expect(
+      chooseActivePreview({
+        ...touch,
+        visible: new Map([
+          ["a", 0.3],
+          ["b", 0.6],
+          ["c", 0.9],
+        ]),
+      }),
+    ).toBe("c");
+    expect(chooseActivePreview(touch)).toBe("a");
+    expect(
+      chooseActivePreview({ ...touch, visible: new Map([["d", 0.2]]) }),
+    ).toBeNull();
+  });
+
+  function mockBrowser(reducedMotion: boolean) {
+    let observerCallback: IntersectionObserverCallback = () => undefined;
+    const observed: Element[] = [];
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          observerCallback = callback;
+        }
+        observe(element: Element) {
+          observed.push(element);
+        }
+        disconnect() {}
+        unobserve() {}
+        takeRecords() {
+          return [];
+        }
+      },
+    );
+    vi.stubGlobal(
+      "matchMedia",
+      (query: string) =>
+        ({
+          matches: query.includes("reduced-motion")
+            ? reducedMotion
+            : query.includes("hover"),
+          media: query,
+          onchange: null,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+          addListener: () => undefined,
+          removeListener: () => undefined,
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(
+      () => undefined,
+    );
+    vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(
+      () => undefined,
+    );
+    const showAll = () =>
+      act(() => {
+        observerCallback(
+          observed.map(
+            (target) =>
+              ({
+                target,
+                isIntersecting: true,
+                intersectionRatio: 1,
+              }) as unknown as IntersectionObserverEntry,
+          ),
+          {} as IntersectionObserver,
+        );
+      });
+    return { showAll };
+  }
+
+  const renderGrid = () => {
+    const authorize = vi.fn(() => new Promise<never>(() => undefined));
+    const view = render(
+      <ExploreGrid
+        tiles={FIXTURE_TILES.slice(0, 6)}
+        posters={FIXTURE_POSTERS}
+        sectorLabels={labels}
+        onOpen={() => undefined}
+        preview={{ authorize, suspended: false }}
+      />,
+    );
+    return { ...view, authorize };
+  };
+
+  it("renders exactly one muted, inline, looping player, and hover moves it", () => {
+    const { showAll } = mockBrowser(false);
+    const { container, authorize } = renderGrid();
+    showAll();
+    const videos = () => [...container.querySelectorAll("video")];
+    expect(videos()).toHaveLength(1);
+    const first = videos()[0];
+    expect(
+      first?.closest("[data-explore-tile]")?.getAttribute("data-rank"),
+    ).toBe("0");
+    expect(first?.muted).toBe(true);
+    expect(first?.hasAttribute("playsinline")).toBe(true);
+    expect(first?.loop).toBe(true);
+    expect(first?.getAttribute("preload")).toBe("none");
+    // The source is attached only from a signed grant, never up front.
+    expect(first?.getAttribute("src")).toBeNull();
+    expect(authorize).toHaveBeenCalledTimes(1);
+
+    const third = container.querySelector('[data-rank="2"]');
+    if (third === null) throw new Error("no third tile");
+    fireEvent.pointerEnter(third, { pointerType: "mouse" });
+    expect(videos()).toHaveLength(1);
+    expect(
+      videos()[0]?.closest("[data-explore-tile]")?.getAttribute("data-rank"),
+    ).toBe("2");
+    // Leaving keeps it playing until another tile is hovered.
+    fireEvent.pointerLeave(third, { pointerType: "mouse" });
+    expect(
+      videos()[0]?.closest("[data-explore-tile]")?.getAttribute("data-rank"),
+    ).toBe("2");
+    vi.unstubAllGlobals();
+  });
+
+  it("shows posters only under reduced motion", () => {
+    const { showAll } = mockBrowser(true);
+    const { container, authorize } = renderGrid();
+    showAll();
+    expect(container.querySelector("video")).toBeNull();
+    expect(authorize).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 

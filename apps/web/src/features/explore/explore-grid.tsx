@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { ExploreTileDto } from "@capital-q/contracts";
 import { Play } from "@capital-q/ui/icons";
@@ -13,13 +13,18 @@ import {
   tileHook,
   tileMeta,
 } from "./explore-words";
+import {
+  GridPreviewVideo,
+  useGridPreview,
+  type AuthorizePreview,
+} from "./grid-preview-player";
 import { mosaicCellStyle, mosaicLayouts } from "./mosaic";
 
 /**
  * Explore's grid (E2; owner 2026-10-16, "the Instagram Explore feel"): one
  * dense mosaic of full-bleed posters with a 2px gutter, no cards, no
- * captions, no stage labels. Posters only, never autoplay: the one player
- * is the opened pitch's (doc 20). Each box is reserved from the tile's
+ * captions, no stage labels. Posters, and at most one muted preview at a
+ * time, chosen by the grid's controller (grid-preview.ts). Each box is reserved from the tile's
  * rank before its poster arrives, and the DOM order is the rank order.
  * Why a tile is shown is still said on every tile: in its accessible
  * name, and on hover or keyboard focus.
@@ -93,6 +98,7 @@ export function ExploreTile({
   onIntent,
   style,
   index,
+  preview = null,
 }: {
   readonly tile: ExploreTileDto;
   readonly poster: string | null;
@@ -105,6 +111,15 @@ export function ExploreTile({
   readonly onIntent?: (() => void) | undefined;
   readonly style?: React.CSSProperties | undefined;
   readonly index: number;
+  /**
+   * The grid's preview controller: `playing` when this is the one tile it
+   * chose, `onHover` to tell it a mouse is over this tile.
+   */
+  readonly preview?: {
+    readonly playing: boolean;
+    readonly authorize: AuthorizePreview;
+    readonly onHover: () => void;
+  } | null;
 }) {
   const meta = tileMeta(tile, sectorLabels);
   const reason = REASON_WORDS[tile.reason];
@@ -124,6 +139,13 @@ export function ExploreTile({
       style={style}
       data-explore-tile={tile.pitch.mediaAssetId}
       data-rank={index}
+      {...(preview === null
+        ? {}
+        : {
+            onPointerEnter: (event: React.PointerEvent) => {
+              if (event.pointerType === "mouse") preview.onHover();
+            },
+          })}
     >
       <button
         type="button"
@@ -149,6 +171,13 @@ export function ExploreTile({
             className="cq-explore-img"
           />
         )}
+        {preview?.playing === true ? (
+          <GridPreviewVideo
+            companyId={tile.companyId}
+            mediaAssetId={tile.pitch.mediaAssetId}
+            authorize={preview.authorize}
+          />
+        ) : null}
         <Play className="cq-explore-play" aria-hidden="true" />
         <span className="cq-explore-name" aria-hidden="true">
           {tile.canonicalName}
@@ -168,6 +197,7 @@ export function ExploreGrid({
   onOpen,
   onIntent,
   label = "Pitches",
+  preview = null,
 }: {
   readonly tiles: readonly ExploreTileDto[];
   readonly posters: Readonly<Record<string, string>>;
@@ -175,11 +205,27 @@ export function ExploreGrid({
   readonly onOpen: (index: number) => void;
   readonly onIntent?: ((index: number) => void) | undefined;
   readonly label?: string;
+  /**
+   * Muted in-grid previews (owner 2026-10-16): one tile at a time, chosen
+   * by the controller. Null keeps the grid posters only.
+   */
+  readonly preview?: {
+    readonly authorize: AuthorizePreview;
+    /** A pitch is open over the grid: nothing previews. */
+    readonly suspended: boolean;
+  } | null;
 }) {
   const layouts = mosaicLayouts(tiles.length);
+  const host = useRef<HTMLUListElement | null>(null);
+  const order = tiles.map((tile) => tile.pitch.mediaAssetId);
+  const controller = useGridPreview(
+    host,
+    preview === null ? [] : order,
+    preview?.suspended ?? true,
+  );
   return (
     <div className="cq-explore-mosaic-host">
-      <ul className="cq-explore-mosaic" aria-label={label}>
+      <ul ref={host} className="cq-explore-mosaic" aria-label={label}>
         {tiles.map((tile, index) => (
           <ExploreTile
             key={tile.pitch.mediaAssetId}
@@ -190,6 +236,15 @@ export function ExploreGrid({
             onOpen={() => onOpen(index)}
             onIntent={onIntent && (() => onIntent(index))}
             style={mosaicCellStyle(layouts, index)}
+            preview={
+              preview === null
+                ? null
+                : {
+                    playing: controller.active === tile.pitch.mediaAssetId,
+                    authorize: preview.authorize,
+                    onHover: () => controller.hover(tile.pitch.mediaAssetId),
+                  }
+            }
           />
         ))}
       </ul>

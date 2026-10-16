@@ -3392,6 +3392,26 @@
     height: 100%;
     object-fit: cover;
   }
+  /* The grid's one muted preview: transparent over the poster until it is
+     actually playing, then a short fade, so there is no flash or shift. */
+  .cq-explore-preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-explore-preview[data-ready="true"] {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-explore-preview {
+      display: none;
+    }
+  }
   /* No poster (yet): the company's initial on the stage canvas, under the
      company photo when there is one; never an empty box. */
   .cq-explore-initial {
