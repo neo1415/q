@@ -456,6 +456,7 @@ export function createGateqVideoInterview(deps: {
           token: input.token,
           channel: "voice",
           correlationId: input.correlationId,
+          ...(input.locale === undefined ? {} : { locale: input.locale }),
         });
         const fund =
           deps.fundFor === undefined
