@@ -309,3 +309,13 @@ Every other atlas feature currently has no certification entry and must not be p
   - **Fix:** `supabase/migrations/20261228141700_capital_q_revoke_synthetic_attestation.sql` appends a REVOKED revision naming that row. It runs only while that attestation is current, updates and deletes nothing, and changes no grant or policy.
   - **pgTAP:** `rls/972_capital_q_synthetic_revocation.test.sql`.
 - **Status:** `QP-SUBJECT` is **PRODUCTION_LIVE_VERIFIED once the migration is applied in production** and the profile shows no verification badge (a read-only check: the current revision is REVOKED). The ledger entry in `premiere.ts` stays CODE_VERIFIED until then, so no audience run shows the badge. With it, **16 of 17** scenes are certified; scene 15 waits on the human microphone test.
+
+## Scene 16 (Capital Q's own profile): PRODUCTION_LIVE_VERIFIED, production `6d7b521d` (release Y), 16 Oct 2026 about 13:10 UTC
+
+- **Hosted read:** Capital Q's organisation (`f95c3469…`) shows revision 3 REVOKED (`c3c9a446…`, 12:59 UTC, migration 20261228141700), ending the synthetic attestation (revision 2). Revisions 1 and 2 are kept unchanged.
+- **Browser, as savanna-seed (GET only on the profile; the tour in captions only):**
+  - `/company/ee75a7d8…` shows no "Demo verified (synthetic)" and no verification badge.
+  - Q Pitch reached scene 16 ("Capital Q, on its own platform · Scene 16 of 17 · Done on screen") on the same page, also without a badge.
+  - Receipts: scratchpad `v5-acc/badge/capital-q-profile.png` and `capital-q-scene16.png`.
+- **Ledger:** `QP-SUBJECT` promoted in `premiere.ts`. The forbidden list now names verified traction, customers, revenue and investors.
+- **Certified scenes: 16 of 17.** Scene 15 (Q-to-Q rehearsal) waits on the human microphone "skip" test.
