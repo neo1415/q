@@ -12,6 +12,7 @@ import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 import {
   createCreateQRun,
   RUN_SCREEN_MAX_CHARS,
+  screenCompanyFirst,
 } from "../src/application/create-run.js";
 import type { QRuntimeDependencies } from "../src/application/dependencies.js";
 
@@ -37,7 +38,11 @@ const person = ActorContextSchema.parse({
   actorType: "HUMAN",
 });
 
-function harness(resolves: (ref: QSubjectRef) => boolean | "throws") {
+function harness(
+  resolves: (ref: QSubjectRef) => boolean | "throws",
+  carried: readonly QSubjectRef[] = [],
+) {
+  const conversationId = randomUUID();
   const runs: {
     subjects: readonly QSubjectRef[];
     screen?: QScreenContext | null;
@@ -73,6 +78,19 @@ function harness(resolves: (ref: QSubjectRef) => boolean | "throws") {
           return Promise.resolve({ id: randomUUID(), ...input });
         },
         setSubjects: () => Promise.resolve(),
+        // An earlier page's conversation, whose subjects carry forward.
+        findForOwner: () =>
+          Promise.resolve({
+            id: conversationId,
+            tenantId: TENANT,
+            userId: person.userId,
+            organisationId: person.organisationId,
+            contextType: "GENERAL",
+            subjects: carried,
+            title: null,
+            summary: null,
+            archivedAt: null,
+          }),
       },
       runs: {
         insert: (
@@ -109,6 +127,7 @@ function harness(resolves: (ref: QSubjectRef) => boolean | "throws") {
         capability: "ANSWER",
         message: { text: "what do you make of this?" },
         modality: "TEXT",
+        ...(carried.length === 0 ? {} : { conversationId }),
         ...(screen === undefined ? {} : { screen }),
       },
       idempotencyKey: randomUUID(),
@@ -310,5 +329,48 @@ describe("a busy page's manifest on the run (G-D8)", () => {
     const stored = JSON.stringify(h.runs[0]?.screen);
     expect(stored.length).toBeGreaterThan(512);
     expect(stored.length).toBeLessThanOrEqual(RUN_SCREEN_MAX_CHARS);
+  });
+});
+
+describe("the company on screen is the run's first subject (run 5, 16 Oct)", () => {
+  const EARLIER = "c0000000-0000-4000-8000-000000000002";
+  const earlier: QSubjectRef = { kind: "COMPANY", companyId: EARLIER };
+
+  it("leads over a company the conversation carried from an earlier page", async () => {
+    const h = harness(() => true, [earlier]);
+    // The profile is still loading: the screen names the company, no focus yet.
+    await h.ask({ route: "COMPANY", companyId: COMPANY });
+    expect(h.runs[0]?.subjects.slice(0, 2)).toEqual([company, earlier]);
+  });
+
+  it("keeps the order when the screen names two companies (it asks, never guesses)", () => {
+    const refs = [earlier, company];
+    expect(
+      screenCompanyFirst(refs, {
+        route: "COMPANY",
+        companyId: COMPANY,
+        manifest: {
+          v: 2,
+          seq: 1,
+          inView: [],
+          dialogs: [],
+          sections: [],
+          focus: { kind: "COMPANY", id: EARLIER },
+        },
+      }),
+    ).toBe(refs);
+    expect(screenCompanyFirst(refs, { route: "COMPANY" })).toBe(refs);
+    expect(screenCompanyFirst(refs, undefined)).toBe(refs);
+  });
+
+  it("never chooses a company the person may not see", async () => {
+    const h = harness(
+      (ref) => ref.kind !== "COMPANY" || ref.companyId !== COMPANY,
+      [earlier],
+    );
+    await h.ask({ route: "COMPANY", companyId: COMPANY });
+    const subjects = h.runs[0]?.subjects ?? [];
+    expect(subjects[0]).toEqual(earlier);
+    expect(subjects).not.toContainEqual(company);
   });
 });
