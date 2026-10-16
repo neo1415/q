@@ -123,6 +123,8 @@ export function createOnboardingQRecommendations(options: {
 
   const isQ = (refs: readonly { readonly sourceType: string }[]) =>
     refs.some((ref) => ref.sourceType === Q_RECOMMENDATION_SOURCE);
+  const fromDocument = (refs: readonly { readonly sourceType: string }[]) =>
+    refs.some((ref) => ref.sourceType === "EVIDENCE_DOCUMENT");
   const publicOf = (
     refs: readonly OnboardingSourceRef[],
   ): readonly OnboardingSourceRef[] =>
@@ -225,13 +227,19 @@ export function createOnboardingQRecommendations(options: {
         if (session === null) {
           throw new OnboardingSessionNotFoundError();
         }
+        // Lane ob1 (live acceptance 2026-10-16): what their own document
+        // says is held the same way, for Q to put to them and their
+        // approval to accept: a deck read mid-conversation could be
+        // neither said nor confirmed in the conversation.
         return (await suggestions.listPending(tx.sql, sessionId))
-          .filter((s) => isQ(s.sourceRefs))
+          .filter((s) => isQ(s.sourceRefs) || fromDocument(s.sourceRefs))
           .map((s) => ({
             id: s.id,
             stepKey: s.stepKey,
             value: s.suggestedValue,
-            rationale: s.rationale ?? null,
+            rationale:
+              s.rationale ??
+              (fromDocument(s.sourceRefs) ? "found in their uploaded document" : null),
             payloadSha256: payloadSha256(s.suggestedValue),
             sources: publicOf(s.sourceRefs),
           }));

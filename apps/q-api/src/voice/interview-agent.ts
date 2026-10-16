@@ -85,6 +85,7 @@ import {
   firstNameOf,
   onboardingFlowFor,
   withNextQuestion,
+  withoutAnsweredQuestions,
 } from "./onboarding-flow.js";
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
@@ -1534,7 +1535,10 @@ export function createInterviewAgent(
     const replyWritten =
       result?.reply ??
       (recorded.length > 0
-        ? "That's on your record. I lost my train of thought for a second — say that last part again?"
+        ? // Live acceptance 2026-10-16: eleven answers saved, then "say
+          // that last part again?". What was saved stays saved; the
+          // backstop below adds the next question.
+          "That's all on your record."
         : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.");
     // Never the previous question word for word (QA 2026-10-03): what they
     // said is acknowledged first, and the question comes in other words.
@@ -1663,14 +1667,14 @@ export function createInterviewAgent(
     // without the next most valuable question, from coverage. Not while a
     // look-up takes over the line, they are pausing, or the model failed.
     if (
-      result !== undefined &&
+      (result !== undefined || recorded.length > 0) &&
       !handingOver &&
       !pausing &&
       stateAfter !== null &&
       !stateAfter.completed
     ) {
       const backed = withNextQuestion(
-        reply,
+        withoutAnsweredQuestions(reply, stateAfter, SPOKEN_QUESTIONS),
         onboardingFlowFor({
           journey: input.journeyType,
           opening: false,

@@ -71,6 +71,14 @@ export type InvestorResearchIdentity = {
 
 export type InvestorResearchDependencies = {
   /**
+   * Lane ob1 (live acceptance 2026-10-16): a fictional account has no
+   * public presence; the open web can only return real namesakes, and each
+   * search is a paid provider call. True: nothing is read or offered.
+   */
+  readonly isFictionalAccount?:
+    | ((userId: string) => Promise<boolean>)
+    | undefined;
+  /**
    * Whose journey this engine reads for. The same engine reads a
    * founder's company; its log said "investor research" for a founder
    * (founder report 2026-10-05). Default: investor.
@@ -397,6 +405,12 @@ type SessionResearch = {
   unsaid: Set<string>;
   noticeSaid: boolean;
   nothingSaid: boolean;
+  /**
+   * A provider read has actually been sent (lane ob1, live 2026-10-16: Q
+   * said it was searching public sources when nothing had been queued).
+   * Q may say research is under way only once this is true.
+   */
+  begun?: boolean;
 };
 
 function identityKeyOf(identity: InvestorResearchIdentity): string {
@@ -451,7 +465,20 @@ export function createInvestorResearch(
   ): Promise<void> => {
     const correlationId = CorrelationIdSchema.parse(`cor_${randomUUID()}`);
     const { actor, identity } = input;
+    if (
+      dependencies.isFictionalAccount !== undefined &&
+      (await dependencies.isFictionalAccount(actor.userId).catch(() => false))
+    ) {
+      // Nothing to say about it either: no "found nothing" for a subject
+      // that was never looked up.
+      research.status = "NOTHING_FOUND";
+      research.noticeSaid = true;
+      research.nothingSaid = true;
+      logger?.info({}, "research skipped: fictional account");
+      return;
+    }
     const registries = dependencies.registries ?? [];
+    research.begun = true;
     const [web, ...fromRegistries] = await Promise.allSettled([
       dependencies.read({ actor, correlationId, identity }),
       ...registries.map((registry) => registry.lookup(identity.firmName)),
@@ -577,7 +604,7 @@ export function createInvestorResearch(
     takeNote: (onboardingSessionId) => {
       const research = bySession.get(onboardingSessionId);
       if (research === undefined) return null;
-      if (!research.noticeSaid) {
+      if (!research.noticeSaid && research.begun === true) {
         research.noticeSaid = true;
         return "STARTED";
       }

@@ -109,7 +109,7 @@ describe("proactive onboarding (owner 2026-10-16)", () => {
     // The question named is the top coverage field's own.
     const question = SPOKEN_QUESTIONS[top?.stepKey ?? ""];
     expect(told).toMatch(
-      /Then ask exactly one question, the most valuable one now: "/,
+      /Then ask exactly one question, the most valuable one still open after your writes/,
     );
     if (question !== undefined) expect(told).toContain(question.slice(0, 40));
     // The company typed at sign-up is never the question.
