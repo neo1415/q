@@ -8,15 +8,8 @@ import { Textarea } from "@capital-q/ui/input";
 import { Select } from "@capital-q/ui/select";
 
 import { requestReviewAction, type FormResult } from "./review-actions";
+import { SUBJECT_OPTIONS } from "./review-subjects";
 import { useT } from "@/features/i18n/language";
-
-export const SUBJECT_OPTIONS = [
-  { value: "VERIFICATION_DECISION", label: "A verification decision" },
-  { value: "READINESS_ASSESSMENT", label: "My readiness reading" },
-  { value: "ACCOUNT_ACTION", label: "An action on my account" },
-  { value: "Q_ASSESSMENT", label: "An assessment Q made" },
-  { value: "OTHER", label: "Something else" },
-] as const;
 
 /**
  * Asking a person at Capital Q to look again (appeals Stage 4). The reason
