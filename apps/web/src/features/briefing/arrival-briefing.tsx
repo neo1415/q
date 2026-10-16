@@ -196,6 +196,12 @@ async function run(
 }
 
 /** The sequence and its one way to change: the same for buttons and voice. */
+/** The standard line's lead after a card settles, in Arabic. */
+function arabicOutcome(ok: boolean | null): string | null {
+  if (ok === null) return null;
+  return ok ? "تمّ." : "لم يتمّ ذلك، ولم يُرسَل شيء.";
+}
+
 function useSequence(
   cards: readonly ArrivalCard[],
   decide: ArrivalDecide,
@@ -224,6 +230,7 @@ function useSequence(
   );
   const [status, setStatus] = useState<string | null>(takeCarriedStatus);
   const [reading, setReading] = useState(false);
+  const language = useUiLanguage();
   const ref = useRef(state);
   const commit = useCallback((next: SequenceState) => {
     ref.current = next;
@@ -235,6 +242,7 @@ function useSequence(
       const step = stepSequence(ref.current, event);
       commit(step.state);
       let done: string | null = null;
+      let settled: boolean | null = null;
       if (step.effect !== null) {
         const effect = step.effect;
         const card = cards.find((one) => one.key === effect.key);
@@ -245,6 +253,7 @@ function useSequence(
             message: "That didn't go through. Nothing was sent.",
           }),
         );
+        settled = result.ok;
         commit(
           stepSequence(ref.current, {
             type: "SETTLED",
@@ -273,7 +282,14 @@ function useSequence(
             `${note}${done === null ? "" : ` Just now: ${done.replace(/\.$/u, "")}.`} Put this card to them briefly, then stop.`,
             true,
             // The standard line says this as it is (E-03).
-            focusSay(cards, ref.current, done) ?? undefined,
+            // In Arabic the outcome is said in Arabic; the server's English
+            // message stays on the page's status line.
+            focusSay(
+              cards,
+              ref.current,
+              language === "ar" ? arabicOutcome(settled) : done,
+              language,
+            ) ?? undefined,
           );
         }
       }
@@ -284,7 +300,7 @@ function useSequence(
         done,
       });
     },
-    [cards, commit, decide, reload],
+    [cards, commit, decide, reload, language],
   );
   const runWords = useCallback(
     async (raw: string, source: "BUTTON" | "VOICE") => {
@@ -742,6 +758,7 @@ export function Sequence({
   readonly focusKey?: string | null | undefined;
 }) {
   const t = useT();
+  const language = useUiLanguage();
   const { state, status, reading, send, runWords } = useSequence(
     data.cards,
     decide,
@@ -880,10 +897,17 @@ export function Sequence({
       noteToLine(
         `${note} This just came in from Q's work. At a natural pause, mention it once, gently, in a sentence; don't interrupt them.`,
         true,
-        focusSay(data.cards, state, "Something new just came in.") ?? undefined,
+        focusSay(
+          data.cards,
+          state,
+          language === "ar"
+            ? "وصل للتوّ أمر جديد."
+            : "Something new just came in.",
+          language,
+        ) ?? undefined,
       );
     }
-  }, [nudge, active, data.cards, state]);
+  }, [nudge, active, data.cards, state, language]);
 
   if (!active) {
     if (state.left) {

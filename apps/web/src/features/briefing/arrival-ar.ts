@@ -1,54 +1,32 @@
-import type { ArrivalWords } from "./arrival";
+import {
+  ARABIC_CARDS_CLOSE,
+  ARABIC_QUIET_PREFIX,
+  arabicArrivalGreeting,
+  arabicCardLine,
+  arabicJobsDoneWords,
+  arabicLowdownOf,
+  arabicMatchesWords,
+  arabicQuestionsWords,
+  arabicQuietDayNewsWords,
+  arabicSummaryOfCards,
+  arabicUnreadWords,
+  arabicWaitingWords,
+  partOfDay,
+  welcomeStories,
+} from "@capital-q/q-core/speech";
+
+import type { ArrivalData, ArrivalWords } from "./arrival";
+import { decisionFactsOf, WAITING_NAME } from "./arrival";
+import { attentionLines } from "./attention";
+import { bestFit } from "./matches";
 import type { Opener } from "./opener";
 
 /**
- * Q's first words on arrival, in Arabic (multilingual Q). The same facts
- * as the English (how many things wait, whether to look now), composed by
- * code in Modern Standard Arabic: the greeting, the warm half and the
- * opener. The fuller lowdown is still composed in English and is said
- * only once the person chooses to look.
+ * Q's arrival in Arabic (multilingual Q): every line composed in Arabic by
+ * q-core from the same data the English is built from (`arrival-ar.ts` in
+ * q-core), never by translating English sentences. Names, figures, the
+ * cards' own summaries and what people wrote stay as recorded.
  */
-
-function partOfDay(
-  now: Date,
-  zone: string | null,
-): "MORNING" | "AFTERNOON" | "EVENING" | "LATE" {
-  let hour = now.getHours();
-  try {
-    const formatted = new Intl.DateTimeFormat("en-GB", {
-      hour: "numeric",
-      hourCycle: "h23",
-      ...(zone === null ? {} : { timeZone: zone }),
-    }).format(now);
-    hour = Number.parseInt(formatted, 10);
-  } catch {
-    // An unknown zone: the device's clock.
-  }
-  if (hour >= 5 && hour < 12) return "MORNING";
-  if (hour >= 12 && hour < 17) return "AFTERNOON";
-  if (hour >= 17 && hour < 22) return "EVENING";
-  return "LATE";
-}
-
-export function arabicGreeting(input: {
-  readonly firstName: string | null;
-  readonly now: Date;
-  readonly timeZone: string | null;
-}): string {
-  const name = input.firstName?.trim().split(/\s+/u)[0] ?? "";
-  const to = name.length > 0 ? `، ${name}` : "";
-  switch (partOfDay(input.now, input.timeZone)) {
-    case "MORNING":
-      return `صباح الخير${to}.`;
-    case "AFTERNOON":
-    case "EVENING":
-      return `مساء الخير${to}.`;
-    case "LATE":
-      return name.length > 0
-        ? `مرحباً ${name}، ما زلت مستيقظاً.`
-        : "مرحباً، ما زلت مستيقظاً.";
-  }
-}
 
 const WARM = [
   "سعيد برؤيتك.",
@@ -88,9 +66,25 @@ export function arabicOpener(opener: Opener, atLeast: boolean): Opener {
   return { ...opener, count, question, line: `${count} ${question}` };
 }
 
-/** The arrival's opening words in Arabic; the rest as composed. */
+/** The names of notices still waiting on them; other notices are counted. */
+function waitingOf(titles: readonly string[]): {
+  readonly names: readonly string[];
+  readonly others: number;
+} {
+  const names: string[] = [];
+  let others = 0;
+  for (const title of titles) {
+    const name = WAITING_NAME.exec(title.trim())?.[1]?.trim();
+    if (name === undefined) others += 1;
+    else names.push(name);
+  }
+  return { names, others };
+}
+
+/** The arrival in Arabic, from the data; the English supplies only flags. */
 export function arabicArrivalWords(
-  words: ArrivalWords,
+  english: ArrivalWords,
+  data: ArrivalData,
   input: {
     readonly firstName: string | null;
     readonly now: Date;
@@ -100,19 +94,87 @@ export function arabicArrivalWords(
     readonly atLeast: boolean;
   },
 ): ArrivalWords {
-  const greeting = arabicGreeting(input);
+  const greeting = arabicArrivalGreeting(input);
   const late = partOfDay(input.now, input.timeZone) === "LATE";
   const away = input.hoursAway !== null && input.hoursAway >= 72;
   const options = away ? AWAY : WARM;
   const welcome = late ? null : (options[input.seed % options.length] ?? null);
-  const opener = arabicOpener(words.opener, input.atLeast);
+  const opener = arabicOpener(english.opener, input.atLeast);
+
+  const cards = data.cards.map(decisionFactsOf);
+  const read = arabicLowdownOf({
+    activity: data.activity ?? {},
+    decisions: data.cards.length,
+    hoursAway: data.hoursAway,
+  });
+  const waiting = waitingOf(data.waiting ?? []);
+  const waitingLine = [
+    arabicWaitingWords(waiting.names),
+    waiting.others > 0 ? "وهناك إشعارات أخرى في مركز الإشعارات." : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" ");
+  const unreadLine = arabicUnreadWords(data.attention?.unread ?? []);
+  const told = [
+    read.quiet ? null : read.text,
+    arabicJobsDoneWords(data.jobsDone),
+    waitingLine.length === 0 ? null : waitingLine,
+    unreadLine,
+  ].filter((part): part is string => part !== null);
+  const lowdown =
+    told.length === 0
+      ? read.text
+      : read.quiet && unreadLine !== null && told.length === 1
+        ? `${ARABIC_QUIET_PREFIX} ${unreadLine}`
+        : told.join(" ");
+
+  const matches = data.matches ?? null;
+  const best = matches === null ? null : bestFit(matches);
+  const matchesLine =
+    matches === null
+      ? null
+      : arabicMatchesWords({
+          total: matches.total,
+          sinceLastVisit: matches.label === "SINCE_LAST_VISIT",
+          names: matches.items.map((item) => item.name),
+          best: best?.name ?? null,
+        });
+  const quietDay =
+    read.quiet &&
+    told.length === 0 &&
+    matchesLine === null &&
+    data.cards.length === 0 &&
+    (data.attention === null || data.attention === undefined
+      ? true
+      : attentionLines(data.attention).length === 0);
+  const dailyLine = quietDay
+    ? arabicQuietDayNewsWords(welcomeStories(data.snapshot?.daily ?? []))
+    : null;
+  const first = cards[0];
+  const firstCard =
+    first === undefined ? null : arabicCardLine(first, 1, cards.length);
+  const summary = cards.length < 2 ? null : arabicSummaryOfCards(cards);
+  const questions = arabicQuestionsWords(data.questions?.length ?? 0);
+
   return {
-    ...words,
+    ...english,
     greeting,
     welcome,
     opener,
+    lowdown: dailyLine ?? lowdown,
+    firstCard,
+    summary,
+    matches: matchesLine,
     spoken: [greeting, welcome, opener.line]
       .filter((part): part is string => part !== null)
+      .join(" "),
+    briefing: [
+      dailyLine ?? lowdown,
+      ...(summary === null ? [firstCard] : [summary, ARABIC_CARDS_CLOSE]),
+      matchesLine,
+      questions,
+    ]
+      .filter((part): part is string => part !== null && part.length > 0)
       .join(" "),
   };
 }
