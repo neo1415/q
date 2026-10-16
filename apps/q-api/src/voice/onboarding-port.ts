@@ -858,6 +858,15 @@ export function createOnboardingPort(input: {
           value: { type: "TEXT", text: ownWordsFor(unnamed.join(", ")) },
         };
       }
+      // "Other" with nothing beside it would lose what they said (live
+      // 2026-10-16: "Based in Uganda" saved as a bare "Somewhere else").
+      if (
+        catchAll !== undefined &&
+        keys.includes(catchAll) &&
+        otherWords === undefined
+      ) {
+        otherWords = ownWordsFor(phrases.join(", ")).slice(0, 200);
+      }
       const [only] = keys;
       value =
         only === undefined
@@ -2448,8 +2457,22 @@ export function createOnboardingPort(input: {
       const writes = plans.flatMap((plan, index) =>
         plan.kind === "WRITE" ? [{ plan, index }] : [],
       );
+      // At most ONBOARDING_RESPONSES_BATCH_MAX a transaction; a longer
+      // answer is saved in consecutive batches, in order.
       const committedBatch =
-        writes.length > 1 ? await writeMany(writes.map((w) => w.plan)) : null;
+        writes.length > 1
+          ? await (async () => {
+              const all: OnboardingRecordResult[] = [];
+              for (let at = 0; at < writes.length; at += BATCH_MAX) {
+                const chunk = await writeMany(
+                  writes.slice(at, at + BATCH_MAX).map((w) => w.plan),
+                );
+                if (chunk === null) return null;
+                all.push(...chunk);
+              }
+              return all;
+            })()
+          : null;
       for (const [index, plan] of plans.entries()) {
         const answer = answers[index];
         if (answer === undefined) continue;
@@ -2614,6 +2637,9 @@ export function shortWordIn(quote: string, said: string): boolean {
 /** A sentence that asks rather than states: by its mark or how it opens. */
 const ASKING =
   /[?؟]\s*$|^(?:what|which|who|whom|whose|when|where|why|how|is|are|do|does|did|can|could|should|would|will|shall|tell me|curious|i wonder|any idea|هل|ما|ماذا|كيف|لماذا|متى|أين|من)\b/iu;
+
+/** The most answers one transactional save carries (the API's own bound). */
+const BATCH_MAX = 24;
 
 /** A figure no answer can have (a negative count or amount). */
 export function impossibleFigure(raw: unknown): boolean {
