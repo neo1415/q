@@ -64,6 +64,9 @@ describe("Company requests (B4 rename)", () => {
       join(ROOT, "apps/web/app/(app)/investors/page.tsx"),
       "utf8",
     );
-    expect(page).toContain('title="Company requests"');
+    // Lane ml: the title is the catalogue key, so Arabic readers get it too.
+    expect(page).toMatch(
+      /title=(?:"Company requests"|\{t\("Company requests"\)\})/u,
+    );
   });
 });
