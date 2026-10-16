@@ -805,6 +805,10 @@ export {
 export {
   FIT_ORDER_CURRENT,
   FIT_ORDER_V1,
+  FIT_ORDER_V2,
+  discoverOrderValue,
+  type FitOrderWeights,
+  type SuitabilityRecord,
   compareFitOrder,
   createFitOrdering,
   fitOrderScore,
@@ -893,3 +897,7 @@ export {
   composeCompanyRaiseReader,
   type CompanyRaiseContextPorts,
 } from "./company-raise/compose.js";
+export {
+  createPostgresInvestabilityScores,
+  createPostgresSuitabilityRecorder,
+} from "./infrastructure/postgres-company-scores.js";
