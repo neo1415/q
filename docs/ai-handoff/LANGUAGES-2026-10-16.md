@@ -33,7 +33,7 @@ Provider pages below were read on 2026-10-16 and treated as data. Where a page i
   - Product names and a lone Q must survive.
   - A result that is empty or too long is refused.
   - A refused string is stored as `REJECTED` with its reason code. It shows in English and is never paid for again under the same version.
-- **Cache:** `q_runtime.ui_translations` is keyed by (language, `catalog_version` `ui-text.v1`, SHA-256 of the English, computed by the database). It is non-tenant, server-only, RLS on with no policies, and anon and authenticated are revoked. pgTAP suite 973 covers it.
+- **Cache:** `q_runtime.ui_translations` is keyed by (language, `catalog_version` `ui-text.v1`, SHA-256 of the English, computed by the database). It is non-tenant, server-only, RLS on with no policies, and anon and authenticated are revoked. pgTAP suite 974 covers it.
 - **Serving:** `GET /v1/q/ui-text/:language`.
   - The route needs an authenticated actor.
   - It returns what is cached and starts one single-flight background fill per language (2 batches in flight, 60 strings each).
@@ -81,4 +81,4 @@ Provider pages below were read on 2026-10-16 and treated as data. Where a page i
 | Video                 | `apps/api/test/gateq-video-provider.test.ts`, `packages/gateq-intake/test/{interviewer,video-interview}.test.ts`                                                                                                                                                                                                               |
 | Email                 | `packages/platform-admin/test/email-language.test.ts`: fr ltr, ur rtl, sw not yet translated → English.                                                                                                                                                                                                                        |
 | Web                   | `apps/web/test/i18n-any-language.test.tsx`: Urdu and Hebrew right to left; machine strings with placeholders; English fallback; Arabic hand catalogue wins; never shrinks; fr → ar → es live without a reload; picker search, save and coverage.<br>`i18n-catalogue-coverage` extended: source current, every literal covered. |
-| Database              | pgTAP `973_ui_translations`. `320_ai_ops`, `590` and `130_schema_guard` were updated for the new policy and table.                                                                                                                                                                                                             |
+| Database              | pgTAP `974_ui_translations`. `320_ai_ops`, `590` and `130_schema_guard` were updated for the new policy and table.                                                                                                                                                                                                             |

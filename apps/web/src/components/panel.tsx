@@ -1,6 +1,9 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useId, useState, type ReactNode } from "react";
 
 import { cx } from "@capital-q/ui";
+import { ChevronDown, ICON_SIZE } from "@capital-q/ui/icons";
 
 /**
  * One bordered, square surface for one question on a workspace page
@@ -19,6 +22,8 @@ export function Panel({
   action,
   lead = false,
   flush = false,
+  collapsible = false,
+  defaultOpen = true,
   className,
   children,
   ...rest
@@ -33,10 +38,30 @@ export function Panel({
   readonly lead?: boolean;
   /** Rows run edge to edge; the body adds no padding of its own. */
   readonly flush?: boolean;
+  /**
+   * The title becomes a toggle with a caret (owner 2026-10-16: "Needs you"
+   * shows only its name and count until opened). The header action shows
+   * only while open.
+   */
+  readonly collapsible?: boolean;
+  /** With `collapsible`: whether it starts open. */
+  readonly defaultOpen?: boolean;
   readonly className?: string | undefined;
   readonly children: ReactNode;
 } & { readonly [data: `data-${string}`]: string | boolean | undefined }) {
   const Heading = headingLevel === 3 ? "h3" : "h2";
+  const [open, setOpen] = useState(!collapsible || defaultOpen);
+  const bodyId = useId();
+  const titleText = (
+    <>
+      {title}
+      {count === undefined ? null : (
+        <span className="cq-numeric ms-2 font-normal text-(--cq-text-tertiary)">
+          {count}
+        </span>
+      )}
+    </>
+  );
   return (
     <section
       id={id}
@@ -48,7 +73,12 @@ export function Panel({
       )}
       {...rest}
     >
-      <header className="flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-(--cq-border-subtle) px-4 py-2 sm:px-5">
+      <header
+        className={cx(
+          "flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2 sm:px-5",
+          open && "border-b border-(--cq-border-subtle)",
+        )}
+      >
         <div className="flex min-w-0 flex-col gap-0.5">
           <Heading
             id={`${id}-title`}
@@ -57,11 +87,26 @@ export function Panel({
               "text-(--cq-text-primary)",
             )}
           >
-            {title}
-            {count === undefined ? null : (
-              <span className="cq-numeric ms-2 font-normal text-(--cq-text-tertiary)">
-                {count}
-              </span>
+            {collapsible ? (
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={bodyId}
+                onClick={() => setOpen((current) => !current)}
+                className="inline-flex min-h-11 items-center gap-2 text-start focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+              >
+                <span>{titleText}</span>
+                <ChevronDown
+                  size={ICON_SIZE.compact}
+                  aria-hidden="true"
+                  className={cx(
+                    "text-(--cq-text-secondary) transition-transform motion-reduce:transition-none",
+                    open && "rotate-180",
+                  )}
+                />
+              </button>
+            ) : (
+              titleText
             )}
           </Heading>
           {description === undefined ? null : (
@@ -70,12 +115,14 @@ export function Panel({
             </p>
           )}
         </div>
-        {action ?? null}
+        {open ? (action ?? null) : null}
       </header>
       <div
+        id={bodyId}
+        hidden={!open}
         className={flush ? "flex flex-col" : "flex flex-col gap-4 p-4 sm:p-5"}
       >
-        {children}
+        {open ? children : null}
       </div>
     </section>
   );

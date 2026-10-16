@@ -401,7 +401,8 @@ type Draft = {
  * The names in a list as the investor wrote it ("Kenya, Nigeria and
  * Ghana", "East Africa: Kenya, Tanzania, Uganda"), one per entry. A label
  * before a colon introduces the list and is not itself an entry; a
- * leading "in"/"across" phrase is the sentence, not the name. Nothing is
+ * leading "in"/"across"/"sell to"/"for" phrase is the sentence, not the
+ * name ("companies that sell to SMEs" is "SMEs"). Nothing is
  * guessed: each entry is still resolved on its own, and what does not
  * resolve is reported, never dropped.
  */
@@ -423,7 +424,7 @@ export function splitNameList(
     const name = (
       stripLeadIn
         ? raw
-            .replace(/^.*\b(?:in|across|throughout|from)\s+/i, "")
+            .replace(/^.*\b(?:in|across|throughout|from|to|for)\s+/i, "")
             .replace(/^(?:the|also|only)\s+/i, "")
         : raw
     )
@@ -442,6 +443,61 @@ export function splitNameList(
     names.push(name);
   }
   return names;
+}
+
+/**
+ * What a document says about matters no structured field an upload may
+ * fill holds: founders, the team, traction, regulation. Offered as custom
+ * criteria in the document's words, never as a founder preference.
+ */
+const DOCUMENT_CRITERIA_DIMENSIONS: ReadonlySet<MandateDimension> = new Set([
+  "custom_criteria",
+  "founder_preferences",
+  "green_flags",
+  "revenue_state",
+  "capital_intensity",
+  "regulatory_appetite",
+]);
+
+/** Lowercase, single-spaced, straight quotes: for "is this verbatim?". */
+function normaliseWords(text: string): string {
+  return text
+    .normalize("NFKC")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+const UNMATCHED_SUBJECT: Readonly<Record<string, string>> = {
+  [INVESTOR_STEPS.geography]: "the places you invest in",
+  [INVESTOR_STEPS.businessModels]: "the business models you back",
+  [INVESTOR_STEPS.customerTypes]: "the customers you back",
+};
+
+/** A list nothing in Capital Q's list matched, put to the person in their words. */
+function unmatchedQuestion(
+  stepKey: string,
+  unmatched: readonly string[],
+  sourceRefs: readonly { sourceType: string; sourceId: string }[],
+): Question {
+  const words = unmatched.map((name) => `"${name}"`).join(", ");
+  const subject = UNMATCHED_SUBJECT[stepKey] ?? "this";
+  return {
+    stepKey,
+    factKey: `unmatched.${stepKey.toLowerCase().replace(/[^a-z0-9_.]/g, "_")}`,
+    question:
+      `For ${subject} I read ${words}, which didn't match Capital Q's list, so I haven't filled anything in. Which of the options fit?`.slice(
+        0,
+        500,
+      ),
+    why: "Not matched to Capital Q's list, so not included.",
+    reason: "MATERIAL_GAP",
+    readings: unmatched.slice(0, 8).map((name) => name.slice(0, 200)),
+    options: [],
+    sourceRefs: [...sourceRefs],
+  };
 }
 
 /** "Not matched: Atlantis, Narnia." for a proposal; undefined when all matched. */
@@ -696,11 +752,40 @@ export function createMandateReview(
       }
     };
     const criteria: string[] = [];
+    let unquoted = 0;
+    // Criteria are kept in the document's own words: the reading's quote
+    // when the document says it verbatim, else its value when that is
+    // verbatim. A paraphrase the document does not contain is not offered.
+    const documentText = normaliseWords(narrative);
+    const quoted = (item: ProposedConstraint): string | null => {
+      for (const candidate of [item.quote, item.value]) {
+        const words = candidate?.trim() ?? "";
+        if (words.length > 0 && documentText.includes(normaliseWords(words))) {
+          return words;
+        }
+      }
+      return null;
+    };
     const seen = (item: ProposedConstraint): boolean => {
       const stepKey = STEP_FOR_DIMENSION[item.dimension];
       return stepKey !== undefined && open(stepKey);
     };
     for (const item of reading.constraints) {
+      // A document's criteria about founders, the team or other matters it
+      // cannot fill a structured field with become custom criteria, quoted
+      // (ob2 2026-10-16): never a founder preference or a filter.
+      if (
+        allowedSteps !== undefined &&
+        DOCUMENT_CRITERIA_DIMENSIONS.has(item.dimension)
+      ) {
+        const words = quoted(item);
+        if (words === null) {
+          unquoted += 1;
+        } else if (!criteria.includes(words)) {
+          criteria.push(words);
+        }
+        continue;
+      }
       if (!seen(item)) {
         continue;
       }
@@ -998,19 +1083,22 @@ export function createMandateReview(
       [INVESTOR_STEPS.businessModels]: "mandate.business_models",
       [INVESTOR_STEPS.customerTypes]: "mandate.customer_types",
     };
+    const unmatchedQuestions: Question[] = [];
     for (const [stepKey, entry] of listed) {
       const targetField = LISTED_TARGETS[stepKey];
       if (targetField === undefined || entry.ids.size === 0 || !open(stepKey)) {
-        // Nothing matched at all: there is no value to propose. The
-        // unmatched names stay in the investor's own words, unchanged.
-        if (entry.unmatched.length > 0) {
-          logger?.info(
-            {
-              sessionId: session.id,
-              stepKey,
-              unmatched: entry.unmatched.length,
-            },
-            "mandate reading list matched nothing; not proposed",
+        // Nothing matched at all: there is no value to propose. The words
+        // are put to the person instead, as a question on that step naming
+        // them, so nothing read is silently dropped (ob2 2026-10-16).
+        if (
+          targetField !== undefined &&
+          entry.ids.size === 0 &&
+          entry.unmatched.length > 0 &&
+          open(stepKey) &&
+          (allowedSteps === undefined || allowedSteps.has(stepKey))
+        ) {
+          unmatchedQuestions.push(
+            unmatchedQuestion(stepKey, entry.unmatched, sourceRefs),
           );
         }
         continue;
@@ -1072,8 +1160,16 @@ export function createMandateReview(
     let recorded = 0;
     if (allowedSteps !== undefined) {
       // A document's reading proposes; it never raises exclusion or
-      // ambiguity questions of its own.
+      // ambiguity questions of its own. It does say what it could not
+      // match (below).
       questions.length = 0;
+    }
+    questions.push(...unmatchedQuestions);
+    if (unquoted > 0) {
+      logger?.info(
+        { sessionId: session.id, unquoted },
+        "mandate reading criteria not found verbatim in the document; not offered",
+      );
     }
     if (questions.length > 0) {
       try {

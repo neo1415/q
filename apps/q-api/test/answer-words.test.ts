@@ -2,15 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { createDailySpendCap } from "@capital-q/model-gateway";
 
+import { createAnswerWords as createWords } from "../src/composition/answer-words.js";
 import {
   ANSWER_WORDS_VERSION,
-  createAnswerWords as createWords,
-  createCachedLineTranslator,
-} from "../src/composition/answer-words.js";
-import type {
-  UiTextRow,
-  UiTextStore,
-  UiTextTranslator,
+  createLineTranslator,
+  type UiTextRow,
+  type UiTextStore,
+  type UiTextTranslator,
 } from "../src/composition/ui-text.js";
 
 /**
@@ -61,16 +59,13 @@ function translator(ok = true) {
 }
 
 /** The answer path over the interim cached line translator. */
-const createAnswerWords = (
-  deps: Parameters<typeof createCachedLineTranslator>[0],
-) => createWords({ translateLines: createCachedLineTranslator(deps) });
+const createAnswerWords = (deps: Parameters<typeof createLineTranslator>[0]) =>
+  createWords({ translateLines: createLineTranslator(deps) });
 const cap = (capUsd = 2) =>
   createDailySpendCap({ capUsd, readSpentSinceUsd: () => Promise.resolve(0) });
 const who = {
   tenantId: "00000000-0000-4000-8000-000000000001",
   userId: "00000000-0000-4000-8000-000000000002",
-  correlationId: "answer-words:test",
-  purpose: "OTHER" as const,
 };
 const ANSWER =
   "Here is one investor who could fit: AlRayan Investment LLC. Rimal Freight raised USD 1.5m.";

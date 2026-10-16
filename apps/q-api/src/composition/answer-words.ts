@@ -8,14 +8,8 @@ import {
   QWordsRequestSchema,
   type ModelAttribution,
 } from "@capital-q/contracts";
-import type { ModelSpendCap } from "@capital-q/model-gateway";
 import { languageInfo } from "@capital-q/q-core/language";
-import {
-  acceptUiTranslations,
-  answerSkeletons,
-  localisedAnswer,
-  uiTextBatches,
-} from "@capital-q/q-core/ui-text";
+import { answerSkeletons, localisedAnswer } from "@capital-q/q-core/ui-text";
 
 import {
   getActorContext,
@@ -25,15 +19,15 @@ import {
 } from "../security/actor-context.js";
 import type { QVoiceRoutesDependencies } from "../voice/routes.js";
 
-import type { UiTextRow, UiTextStore, UiTextTranslator } from "./ui-text.js";
+import type { TranslateLines } from "./ui-text.js";
 
 /**
  * Words Q writes by code, in the person's language (owner directive
  * 2026-10-16: any language, no per-language hand work). The answers Q
  * composes without a model (what needs them, a person or company looked
  * up, fit, their mandate, investors who could fit) and the questions Q
- * stored for them go through lane lang's translation layer: the same
- * UI_TRANSLATION gateway class, store and daily cap as the interface.
+ * stored for them go through lane lang's `translateLines` (ui-text.ts): the
+ * same UI_TRANSLATION gateway class, store and daily cap as the interface.
  *
  * Only a sentence's skeleton is ever translated: q-core lifts every name,
  * figure, currency code, quote and address out first, so no person's data
@@ -44,8 +38,6 @@ import type { UiTextRow, UiTextStore, UiTextTranslator } from "./ui-text.js";
  * language, never a guess.
  */
 
-/** The store's namespace for answer sentences, apart from the catalogue's. */
-export const ANSWER_WORDS_VERSION = "answer-words.v1";
 /** Bounds per call: what one answer or one screen can need. */
 const MAX_TEXTS = 40;
 const MAX_SKELETON_CHARS = 600;
@@ -63,144 +55,9 @@ export type AnswerWords = {
   readonly localise: (
     language: string,
     texts: readonly string[],
-    attribution: ModelAttribution,
+    attribution: Omit<ModelAttribution, "correlationId" | "purpose">,
   ) => Promise<readonly (string | null)[]>;
 };
-
-/**
- * Lines of English with `{placeholders}` (product copy, no person's data)
- * in a language: the accepted, validated translation of each line that is
- * ready in time; a line absent from the map has none yet. The shape agreed
- * with lane lang (`translateLines`): its UI_TRANSLATION cache can stand in
- * for this one without the answer path changing.
- */
-export type TranslateLines = (
-  language: string,
-  lines: readonly string[],
-  attribution: ModelAttribution,
-) => Promise<ReadonlyMap<string, string>>;
-
-/**
- * Until lane lang's translateLines lands: lines through its store,
- * translator and daily cap, under this namespace. A first-seen line waits
- * up to `deadlineMs`; past that it is ready for the next answer.
- */
-export function createCachedLineTranslator(dependencies: {
-  readonly store: UiTextStore;
-  readonly translate: UiTextTranslator;
-  readonly cap: ModelSpendCap;
-  readonly logger?: Logger | undefined;
-  readonly deadlineMs?: number | undefined;
-  readonly now?: (() => number) | undefined;
-  readonly cacheMs?: number | undefined;
-}): TranslateLines {
-  const now = dependencies.now ?? Date.now;
-  const deadlineMs = dependencies.deadlineMs ?? 6_000;
-  const cacheMs = dependencies.cacheMs ?? 60_000;
-  const cache = new Map<
-    string,
-    { at: number; accepted: Map<string, string>; settled: Set<string> }
-  >();
-  /** Lines being translated now, so two answers never pay twice. */
-  const inFlight = new Map<string, Promise<void>>();
-
-  async function read(tag: string) {
-    const hit = cache.get(tag);
-    if (hit !== undefined && now() - hit.at < cacheMs) return hit;
-    const rows = await dependencies.store.read(tag, ANSWER_WORDS_VERSION);
-    const fresh = {
-      at: now(),
-      accepted: new Map(rows.accepted),
-      settled: new Set(rows.settled),
-    };
-    cache.set(tag, fresh);
-    return fresh;
-  }
-
-  async function translateMissing(
-    tag: string,
-    missing: readonly string[],
-    attribution: ModelAttribution,
-  ): Promise<void> {
-    const info = languageInfo(tag);
-    if (info === null) return;
-    for (const batch of uiTextBatches(missing)) {
-      const verdict = await dependencies.cap.check();
-      if (!verdict.allowed) {
-        dependencies.logger?.warn(
-          { language: tag },
-          "answer words stay English: the day's translation budget is spent",
-        );
-        return;
-      }
-      const outcome = await dependencies.translate(info, batch, attribution);
-      if (!outcome.ok) {
-        dependencies.logger?.warn(
-          { language: tag, reason: outcome.reason },
-          "answer words stay English: translation unavailable",
-        );
-        return;
-      }
-      dependencies.cap.note(outcome.costUsd);
-      const { accepted, rejected } = acceptUiTranslations(
-        batch,
-        outcome.result,
-      );
-      const rows: UiTextRow[] = [
-        ...[...accepted].map(([source, text]): UiTextRow => ({
-          source,
-          status: "ACCEPTED",
-          text,
-          modelCode: outcome.modelCode,
-        })),
-        ...[...rejected].map(([source, why]): UiTextRow => ({
-          source,
-          status: "REJECTED",
-          reason: why.ok ? "UNKNOWN" : why.reason,
-          modelCode: outcome.modelCode,
-        })),
-      ];
-      await dependencies.store.write(tag, ANSWER_WORDS_VERSION, rows);
-      const cached = cache.get(tag);
-      if (cached !== undefined) {
-        for (const row of rows) {
-          cached.settled.add(row.source);
-          if (row.status === "ACCEPTED")
-            cached.accepted.set(row.source, row.text);
-        }
-      }
-    }
-  }
-
-  return async (language, lines, attribution) => {
-    const info = languageInfo(language);
-    if (info === null || info.primary === "en") return new Map();
-    const cached = await read(info.tag);
-    const missing = [...new Set(lines)].filter(
-      (line) => !cached.settled.has(line),
-    );
-    if (missing.length > 0) {
-      const key = `${info.tag}\u0000${missing.join("\u0001")}`;
-      const pass =
-        inFlight.get(key) ??
-        translateMissing(info.tag, missing, attribution).finally(() => {
-          inFlight.delete(key);
-        });
-      inFlight.set(key, pass);
-      await Promise.race([
-        pass.catch(() => undefined),
-        new Promise((resolve) => setTimeout(resolve, deadlineMs)),
-      ]);
-    }
-    const accepted = (cache.get(info.tag) ?? cached).accepted;
-    return new Map(
-      lines.flatMap((line) => {
-        const text = accepted.get(line);
-        return text === undefined ? [] : [[line, text] as const];
-      }),
-    );
-  };
-}
 
 /**
  * The answer path: each text's sentences lifted to skeletons (q-core),
@@ -285,8 +142,6 @@ export function registerAnswerWordsRoutes(
         : await dependencies.answerWords.localise(language, parsed.data.texts, {
             tenantId: actor.tenantId,
             userId: actor.userId,
-            correlationId: `answer-words:${request.id}`,
-            purpose: "OTHER",
           });
     void reply.header("Cache-Control", "no-store");
     return QWordsDtoSchema.parse({ language, texts });

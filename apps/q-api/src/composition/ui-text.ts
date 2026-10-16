@@ -464,3 +464,180 @@ export function registerUiTextRoutes(
     },
   );
 }
+
+/** The catalogue version code-written answer lines are cached under, apart from the UI's. */
+export const ANSWER_WORDS_VERSION = "answer-words.v1" as const;
+
+/**
+ * Q's code-written lines in any language (lane ml's answers: attention,
+ * person search, fit, mandate; arrival and welcome lines). The caller
+ * passes English SKELETONS: every name, figure, currency code, quote and
+ * link already lifted out into `{v1}`, `{v2}`…, so only product copy is
+ * ever sent (PUBLIC). The same translator, store, checks and daily cap as
+ * the interface, under its own catalogue version.
+ *
+ * Returns the accepted translation per line that is ready in time; a
+ * missing key means none yet (the caller says that line in English). A
+ * line never seen waits up to `waitMs` for the model, then is ready for
+ * the next caller. English, or a language the registry cannot offer,
+ * returns an empty map without any model call.
+ */
+export type TranslateLines = (
+  language: string,
+  lines: readonly string[],
+  attribution: Omit<ModelAttribution, "correlationId" | "purpose">,
+) => Promise<ReadonlyMap<string, string>>;
+
+export function createLineTranslator(dependencies: {
+  readonly store: UiTextStore;
+  readonly translate: UiTextTranslator;
+  /** Shared with the interface's service: one UI_TRANSLATION ceiling. */
+  readonly cap: ModelSpendCap;
+  readonly logger?: Logger | undefined;
+  readonly version?: string | undefined;
+  /** How long a caller waits for lines nobody has asked for before. */
+  readonly waitMs?: number | undefined;
+  /** At most this many lines per call reach the model. */
+  readonly maxLines?: number | undefined;
+}): TranslateLines {
+  const version = dependencies.version ?? ANSWER_WORDS_VERSION;
+  const waitMs = dependencies.waitMs ?? 6_000;
+  const maxLines = dependencies.maxLines ?? 200;
+  // Settled lines per language (accepted text, or null when refused), so a
+  // line is read from the store once per process and asked for once.
+  const known = new Map<string, Map<string, string | null>>();
+  const loaded = new Map<string, Promise<void>>();
+  const inFlight = new Map<string, Promise<void>>();
+
+  const memory = (tag: string): Map<string, string | null> => {
+    let lines = known.get(tag);
+    if (lines === undefined) {
+      lines = new Map();
+      known.set(tag, lines);
+    }
+    return lines;
+  };
+
+  const load = (tag: string): Promise<void> => {
+    let pending = loaded.get(tag);
+    if (pending === undefined) {
+      pending = dependencies.store
+        .read(tag, version)
+        .then(({ accepted, settled }) => {
+          const lines = memory(tag);
+          for (const line of settled)
+            lines.set(line, accepted.get(line) ?? null);
+        })
+        .catch((error: unknown) => {
+          loaded.delete(tag);
+          dependencies.logger?.warn(
+            { err: error, language: tag },
+            "answer words could not be read",
+          );
+        });
+      loaded.set(tag, pending);
+    }
+    return pending;
+  };
+
+  const ask = async (
+    info: LanguageInfo,
+    missing: readonly string[],
+    attribution: ModelAttribution,
+  ): Promise<void> => {
+    const lines = memory(info.tag);
+    for (const batch of uiTextBatches(missing)) {
+      const verdict = await dependencies.cap.check();
+      if (!verdict.allowed) {
+        dependencies.logger?.warn(
+          {
+            language: info.tag,
+            capUsd: verdict.capUsd,
+            spentUsd: verdict.spentUsd,
+          },
+          "answer words paused: the day's translation budget is spent",
+        );
+        return;
+      }
+      const outcome = await dependencies.translate(info, batch, attribution);
+      if (!outcome.ok) return;
+      dependencies.cap.note(outcome.costUsd);
+      const { accepted, rejected } = acceptUiTranslations(
+        batch,
+        outcome.result,
+      );
+      const rows: UiTextRow[] = [
+        ...[...accepted].map(([text, translated]): UiTextRow => ({
+          source: text,
+          status: "ACCEPTED",
+          text: translated,
+          modelCode: outcome.modelCode,
+        })),
+        ...[...rejected].map(([text, why]): UiTextRow => ({
+          source: text,
+          status: "REJECTED",
+          reason: why.ok ? "UNKNOWN" : why.reason,
+          modelCode: outcome.modelCode,
+        })),
+      ];
+      for (const row of rows) {
+        lines.set(row.source, row.status === "ACCEPTED" ? row.text : null);
+      }
+      await dependencies.store.write(info.tag, version, rows);
+    }
+  };
+
+  return async (language, requested, attribution) => {
+    const info = languageInfo(language);
+    const result = new Map<string, string>();
+    if (info === null || info.primary === "en") return result;
+    await load(info.tag);
+    const lines = memory(info.tag);
+    const unique = [...new Set(requested)].filter(
+      (line) => line.trim().length > 0 && line.length <= 4_000,
+    );
+    const missing = unique
+      .filter(
+        (line) => !lines.has(line) && !inFlight.has(`${info.tag}|${line}`),
+      )
+      .slice(0, maxLines);
+    const waits = unique
+      .map((line) => inFlight.get(`${info.tag}|${line}`))
+      .filter((wait): wait is Promise<void> => wait !== undefined);
+    if (missing.length > 0) {
+      const pass = ask(info, missing, {
+        ...attribution,
+        correlationId: `answer-words:${info.tag}`,
+        purpose: "OTHER",
+      })
+        .catch((error: unknown) => {
+          dependencies.logger?.warn(
+            { err: error, language: info.tag },
+            "answer words translation failed",
+          );
+        })
+        .finally(() => {
+          for (const line of missing) inFlight.delete(`${info.tag}|${line}`);
+        });
+      for (const line of missing) inFlight.set(`${info.tag}|${line}`, pass);
+      waits.push(pass);
+    }
+    if (waits.length > 0) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        Promise.all(waits),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, waitMs);
+        }),
+      ]);
+      if (timer !== undefined) clearTimeout(timer);
+    }
+    for (const line of unique) {
+      const translated = lines.get(line);
+      if (translated !== undefined && translated !== null) {
+        result.set(line, translated);
+      }
+    }
+    return result;
+  };
+}

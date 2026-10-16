@@ -99,14 +99,14 @@ Run as the fictional founder `babatunde.tunde-cargo` with `scratchpad/ml-live/li
 
 Fresh fictional founder `ml.aa.founder.rimal@fictional.capitalq.local` (cq_seed `arabic-live-2026-10-16`, Rimal Freight). Live calls: about 9 Q runs (3 text turns, 2 language switches by talking to Q, 4 onboarding turns plus the opener), 1 TTS, 1 Nova-3 STT of about 8 s, 0 Tavus.
 
-| Check | Result |
-| --- | --- |
+| Check                                       | Result                                                                                                                                                                                                                                         |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Settings → Arabic: whole app RTL, no reload | PASS for direction and layout (no overflow at 390 or 1440). FAIL for coverage: many strings were still English (Home readiness and action plan, welcome, Settings options, Discover cards and gates, onboarding coverage list, Results counts) |
-| Switch language by talking to Q | "غيّر اللغة إلى العربية" PASS (live, no reload, Arabic confirmation). "switch to English" FAIL: read as a record name ("I can't find English…") |
-| Arabic text conversation | PASS for 2 of 3 turns, figures exact (1.2m ÷ 95k = 12.6 months). FAIL for the code-switched turn: answered by the code-written investor list, in English, ignoring the question |
-| Arabic TTS / Nova-3 STT | PASS (200, 130 KB; production listen model nova-3, confidence 0.96) |
-| Arrival greeting and summary | Greeting and opener PASS. "Here's what's waiting." and the readiness question card were English |
-| Onboarding scenario 14 | FAIL: opener in English; English step questions appended after Arabic replies |
+| Switch language by talking to Q             | "غيّر اللغة إلى العربية" PASS (live, no reload, Arabic confirmation). "switch to English" FAIL: read as a record name ("I can't find English…")                                                                                                |
+| Arabic text conversation                    | PASS for 2 of 3 turns, figures exact (1.2m ÷ 95k = 12.6 months). FAIL for the code-switched turn: answered by the code-written investor list, in English, ignoring the question                                                                |
+| Arabic TTS / Nova-3 STT                     | PASS (200, 130 KB; production listen model nova-3, confidence 0.96)                                                                                                                                                                            |
+| Arrival greeting and summary                | Greeting and opener PASS. "Here's what's waiting." and the readiness question card were English                                                                                                                                                |
+| Onboarding scenario 14                      | FAIL: opener in English; English step questions appended after Arabic replies                                                                                                                                                                  |
 
 Fixed on `claude/ml-fix-oct16`:
 

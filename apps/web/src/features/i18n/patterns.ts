@@ -1,3 +1,5 @@
+import { listSeparator } from "@capital-q/q-core/language";
+
 /**
  * Sentences with a name, a figure or a date in them (multilingual Q).
  *
@@ -94,17 +96,19 @@ export function indexPatterns(
 }
 
 /**
- * "Founders named, Pitch deck" inside a sentence: Arabic only when every
- * item has Arabic, joined with the Arabic comma; otherwise as written.
+ * "Founders named, Pitch deck" inside a sentence: translated only when
+ * every item has a translation, joined with the language's script comma;
+ * otherwise as written.
  */
 function listOf(
   catalogue: Readonly<Record<string, string>>,
   value: string,
+  language: string,
 ): string | undefined {
   if (!value.includes(", ")) return undefined;
   const items = value.split(", ").map((item) => catalogue[item]);
   return items.every((item): item is string => item !== undefined)
-    ? items.join("، ")
+    ? items.join(listSeparator(language))
     : undefined;
 }
 
@@ -139,7 +143,7 @@ export function matchPattern(
           ? matchPattern(index, catalogue, value, language)
           : undefined) ??
         localiseDate(value, language, catalogue) ??
-        listOf(catalogue, value);
+        listOf(catalogue, value, language);
       if (translated === undefined && PROSE.test(value)) prose = true;
       values.set(name, translated ?? value);
     });

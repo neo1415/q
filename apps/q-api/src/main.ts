@@ -226,14 +226,12 @@ import {
 import { createWorkPage } from "./composition/work/page.js";
 import {
   createGatewayUiTextTranslator,
+  createLineTranslator,
   createPostgresUiTextStore,
   createUiTextService,
   parseUiTranslationDailyCapUsd,
 } from "./composition/ui-text.js";
-import {
-  createAnswerWords,
-  createCachedLineTranslator,
-} from "./composition/answer-words.js";
+import { createAnswerWords } from "./composition/answer-words.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
 import {
@@ -3905,6 +3903,7 @@ const standingStore = createPostgresStandingStore(database.sql);
  * unless CQ_UI_TRANSLATION_DAILY_CAP_USD says otherwise, counted from the
  * ledger rows of that class only.
  */
+/** One UI_TRANSLATION ceiling for the interface and for Q's code-written lines. */
 const uiTranslationCap = createDailySpendCap({
   capUsd: parseUiTranslationDailyCapUsd(process.env),
   readSpentSinceUsd: createPostgresDailySpendReader({
@@ -3918,30 +3917,30 @@ const uiTranslationCap = createDailySpendCap({
     );
   },
 });
+const uiTextStore = createPostgresUiTextStore(database.sql);
+const uiTextTranslator = createGatewayUiTextTranslator(
+  modelGateway,
+  budgetForTaskClass("UI_TRANSLATION"),
+);
 const uiText = createUiTextService({
-  store: createPostgresUiTextStore(database.sql),
-  translate: createGatewayUiTextTranslator(
-    modelGateway,
-    budgetForTaskClass("UI_TRANSLATION"),
-  ),
-  // One daily ceiling for the class, shared with Q's code-written words.
+  store: uiTextStore,
+  translate: uiTextTranslator,
   cap: uiTranslationCap,
   logger,
 });
-// Q's code-written words in any language: lane lang's store, translator
-// and daily cap, under their own namespace (composition/answer-words.ts).
-const answerWords = createAnswerWords({
-  translateLines: createCachedLineTranslator({
-    store: createPostgresUiTextStore(database.sql),
-    translate: createGatewayUiTextTranslator(
-      modelGateway,
-      budgetForTaskClass("UI_TRANSLATION"),
-    ),
-    cap: uiTranslationCap,
-    logger,
-  }),
+/**
+ * Q's code-written lines in any language (lane ml): English skeletons with
+ * names and figures lifted into {v1}…, cached under answer-words.v1.
+ */
+export const translateLines = createLineTranslator({
+  store: uiTextStore,
+  translate: uiTextTranslator,
+  cap: uiTranslationCap,
   logger,
 });
+// Q's code-written answers through lane lang's translateLines
+// (composition/answer-words.ts: skeletons in, data put back).
+const answerWords = createAnswerWords({ translateLines, logger });
 // What this conversation already produced, read back from the owning
 // records as the person (CQ-QX-008): a document through the artifact
 // service (owner-scoped), an action through its approval record.
@@ -4072,14 +4071,12 @@ const qIntelligence = composeQIntelligence({
       ),
   // Any language: what Q writes by code, through the shared translation
   // layer (names and figures lifted out first; English when not ready).
-  localiseWords: async ({ tenantId, userId, runId }, texts) => {
+  localiseWords: async ({ tenantId, userId }, texts) => {
     const standing = await standingStore.read(userId, tenantId, new Date());
     if (standing.language === "AUTO") return texts.map(() => null);
     return answerWords.localise(standing.language, texts, {
       tenantId,
       userId,
-      correlationId: `answer-words:${runId}`,
-      purpose: "OTHER",
     });
   },
   // Multilingual Q: the language they chose, as the words Q is told.
@@ -6058,8 +6055,6 @@ const interviewLoop = createInterviewAgent({
     answerWords.localise(language, texts, {
       tenantId: actor.tenantId,
       userId: actor.userId,
-      correlationId: "answer-words:onboarding",
-      purpose: "OTHER",
     }),
   // Lane ob1 (2026-10-16): after a round that only saved answers, all
   // committed, with nothing else to judge, code writes the reply (what was
