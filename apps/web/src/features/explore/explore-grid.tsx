@@ -241,7 +241,10 @@ export function ExploreGrid({
   // One batched read for every tile (investors only; others get none).
   const scores = useCompanyScores(tiles.map((tile) => tile.companyId));
   return (
-    <div className="cq-explore-mosaic-host">
+    <div
+      className="cq-explore-mosaic-host"
+      data-qp-anchor="fdr.05.explore.mosaic"
+    >
       <ul ref={host} className="cq-explore-mosaic" aria-label={label}>
         {tiles.map((tile, index) => (
           <ExploreTile

@@ -23,8 +23,12 @@ import { Words } from "@/features/i18n/language";
 export function InvestorCards({
   items,
   footer,
+  anchorOf,
 }: {
   readonly items: readonly DiscoveredInvestorDto[];
+  /** Q Pitch v6: a card's tour anchor, when the tour talks about it. */
+  readonly anchorOf?:
+    ((item: DiscoveredInvestorDto) => string | undefined) | undefined;
   /** Under each card's text: Discover's "why shown" reasons. */
   readonly footer?: ((item: DiscoveredInvestorDto) => ReactNode) | undefined;
 }) {
@@ -34,7 +38,11 @@ export function InvestorCards({
       data-investor-cards
     >
       {items.map((item) => (
-        <li key={item.investorOrganisationId} data-q-item>
+        <li
+          key={item.investorOrganisationId}
+          data-q-item
+          data-qp-anchor={anchorOf?.(item)}
+        >
           <InvestorCard item={item} footer={footer?.(item)} />
         </li>
       ))}

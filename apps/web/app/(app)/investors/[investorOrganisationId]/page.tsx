@@ -183,70 +183,75 @@ export default async function InvestorPage({
             <ChevronLeft size={ICON_SIZE.compact} aria-hidden="true" />
             {t("Investors")}
           </Link>
-          <ProfileHero
-            name={investor.displayName}
-            headline={investorTypeLabel(investor.investorType)}
-            location={where}
-            square
-            facts={deployment === null ? [] : [deployment]}
-            images={{
-              subjectType: "INVESTOR_ORGANISATION",
-              subjectId: id,
-              avatarUrl: investor.photoUrl ?? null,
-              coverUrl: investor.coverUrl ?? null,
-              editable: false,
-              avatarLabel: "logo",
-            }}
-            actions={
-              <QControl id="section.investor-actions" kind="SECTION">
-                <div
-                  className="flex flex-wrap items-center gap-2"
-                  data-investor-actions
-                >
-                  {/* In touch already: the record leads; else the application. */}
-                  {cta.kind === "OPEN" || cta.kind === "ANSWER" ? (
-                    <Link
-                      href={recordHref}
-                      className={buttonClassName("primary")}
-                    >
-                      {cta.kind === "ANSWER"
-                        ? "Answer their interest"
-                        : "Open in CRM"}
-                    </Link>
-                  ) : null}
-                  <a
-                    href="#apply"
-                    className={buttonClassName(
-                      cta.kind === "OPEN" || cta.kind === "ANSWER"
-                        ? "secondary"
-                        : "primary",
-                    )}
+          <div data-qp-anchor="fdr.04.investor.hero">
+            <ProfileHero
+              name={investor.displayName}
+              headline={investorTypeLabel(investor.investorType)}
+              location={where}
+              square
+              facts={deployment === null ? [] : [deployment]}
+              images={{
+                subjectType: "INVESTOR_ORGANISATION",
+                subjectId: id,
+                avatarUrl: investor.photoUrl ?? null,
+                coverUrl: investor.coverUrl ?? null,
+                editable: false,
+                avatarLabel: "logo",
+              }}
+              actions={
+                <QControl id="section.investor-actions" kind="SECTION">
+                  <div
+                    className="flex flex-wrap items-center gap-2"
+                    data-investor-actions
                   >
-                    {t("Apply via GateQ")}
-                  </a>
-                  {cta.kind === "REQUEST" ? (
-                    <a href="#connect" className={buttonClassName("secondary")}>
-                      {REQUEST_WORDS}
+                    {/* In touch already: the record leads; else the application. */}
+                    {cta.kind === "OPEN" || cta.kind === "ANSWER" ? (
+                      <Link
+                        href={recordHref}
+                        className={buttonClassName("primary")}
+                      >
+                        {cta.kind === "ANSWER"
+                          ? "Answer their interest"
+                          : "Open in CRM"}
+                      </Link>
+                    ) : null}
+                    <a
+                      href="#apply"
+                      className={buttonClassName(
+                        cta.kind === "OPEN" || cta.kind === "ANSWER"
+                          ? "secondary"
+                          : "primary",
+                      )}
+                    >
+                      {t("Apply via GateQ")}
                     </a>
-                  ) : null}
-                  <Link
-                    href={`/rehearsals/investor/${encodeURIComponent(id)}`}
-                    className={buttonClassName("secondary")}
-                  >
-                    {t("Rehearse")}
-                  </Link>
-                  {cta.kind === "ENDED" ? (
+                    {cta.kind === "REQUEST" ? (
+                      <a
+                        href="#connect"
+                        className={buttonClassName("secondary")}
+                      >
+                        {REQUEST_WORDS}
+                      </a>
+                    ) : null}
                     <Link
-                      href={recordHref}
-                      className={buttonClassName("quiet")}
+                      href={`/rehearsals/investor/${encodeURIComponent(id)}`}
+                      className={buttonClassName("secondary")}
                     >
-                      {t("Open in CRM")}
+                      {t("Rehearse")}
                     </Link>
-                  ) : null}
-                </div>
-              </QControl>
-            }
-          />
+                    {cta.kind === "ENDED" ? (
+                      <Link
+                        href={recordHref}
+                        className={buttonClassName("quiet")}
+                      >
+                        {t("Open in CRM")}
+                      </Link>
+                    ) : null}
+                  </div>
+                </QControl>
+              }
+            />
+          </div>
           <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
             <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
               {investor.publicDescription === null ? null : (
@@ -271,60 +276,67 @@ export default async function InvestorPage({
             </div>
             <aside className="flex min-w-0 flex-col gap-4 sm:gap-6 lg:sticky lg:top-4">
               <QControl id="section.connect" kind="SECTION">
-                <ProfileSectionShell
-                  id="connect"
-                  title={t("Connect")}
-                  description={
-                    cta.kind !== "REQUEST"
-                      ? undefined
-                      : inbound === null
-                        ? "A Connection Request shows them your company; they accept or decline."
-                        : `${inbound}. A Connection Request shows them your company; they accept or decline.`
-                  }
-                >
-                  {cta.kind === "OPEN" || cta.kind === "ENDED" ? (
-                    <p className="cq-status-line" data-connection={cta.state}>
-                      {cta.kind === "OPEN"
-                        ? `${STATE_WORDS[cta.state]}. You are already in touch; everything with ${investor.displayName} is in your CRM.`
-                        : `${STATE_WORDS[cta.state]}. The record stays in your CRM.`}
-                    </p>
-                  ) : cta.kind === "ANSWER" ? (
-                    <p className="cq-status-line" data-connection="ANSWER">
-                      {investor.displayName} expressed interest in your company.
-                      Answer it from the record.
-                    </p>
-                  ) : status === null ? (
-                    <p className="cq-body-sm text-(--cq-text-secondary)">
-                      {t(
-                        "Whether you can send a request couldn't be checked just now. Reload to try again.",
-                      )}
-                    </p>
-                  ) : (
-                    <ConnectionRequest
-                      investorOrganisationId={id}
-                      investorName={investor.displayName}
-                      status={status}
-                    />
-                  )}
-                </ProfileSectionShell>
+                <div data-qp-anchor="fdr.04.investor.connect">
+                  <ProfileSectionShell
+                    id="connect"
+                    title={t("Connect")}
+                    description={
+                      cta.kind !== "REQUEST"
+                        ? undefined
+                        : inbound === null
+                          ? "A Connection Request shows them your company; they accept or decline."
+                          : `${inbound}. A Connection Request shows them your company; they accept or decline.`
+                    }
+                  >
+                    {cta.kind === "OPEN" || cta.kind === "ENDED" ? (
+                      <p className="cq-status-line" data-connection={cta.state}>
+                        {cta.kind === "OPEN"
+                          ? `${STATE_WORDS[cta.state]}. You are already in touch; everything with ${investor.displayName} is in your CRM.`
+                          : `${STATE_WORDS[cta.state]}. The record stays in your CRM.`}
+                      </p>
+                    ) : cta.kind === "ANSWER" ? (
+                      <p className="cq-status-line" data-connection="ANSWER">
+                        {investor.displayName} expressed interest in your
+                        company. Answer it from the record.
+                      </p>
+                    ) : status === null ? (
+                      <p className="cq-body-sm text-(--cq-text-secondary)">
+                        {t(
+                          "Whether you can send a request couldn't be checked just now. Reload to try again.",
+                        )}
+                      </p>
+                    ) : (
+                      <ConnectionRequest
+                        investorOrganisationId={id}
+                        investorName={investor.displayName}
+                        status={status}
+                      />
+                    )}
+                  </ProfileSectionShell>
+                </div>
               </QControl>
-              <ProfileSectionShell id="investor-facts" title={t("At a glance")}>
-                <dl className="cq-body-sm flex flex-col divide-y divide-(--cq-border-subtle)">
-                  {facts.map((fact) => (
-                    <div
-                      key={fact.label}
-                      className="flex min-h-10 items-baseline justify-between gap-3 py-2"
-                    >
-                      <dt className="text-(--cq-text-tertiary)">
-                        {fact.label}
-                      </dt>
-                      <dd className="min-w-0 text-end text-(--cq-text-primary)">
-                        {fact.value}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </ProfileSectionShell>
+              <div data-qp-anchor="fdr.04.investor.facts">
+                <ProfileSectionShell
+                  id="investor-facts"
+                  title={t("At a glance")}
+                >
+                  <dl className="cq-body-sm flex flex-col divide-y divide-(--cq-border-subtle)">
+                    {facts.map((fact) => (
+                      <div
+                        key={fact.label}
+                        className="flex min-h-10 items-baseline justify-between gap-3 py-2"
+                      >
+                        <dt className="text-(--cq-text-tertiary)">
+                          {fact.label}
+                        </dt>
+                        <dd className="min-w-0 text-end text-(--cq-text-primary)">
+                          {fact.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </ProfileSectionShell>
+              </div>
             </aside>
           </div>
         </div>

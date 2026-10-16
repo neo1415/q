@@ -295,7 +295,7 @@ const STEPS: readonly Built[] = [
       {
         text: "Each investor here chose to be found. Where they publish a gate, I check your company against each of its criteria: met, not met, or not known yet. Their private mandates never shape this list.",
         claim: true,
-        anchor: "fdr.03.discover.note",
+        anchor: "fdr.03.discover.list",
       },
       {
         text: "This is the closest match on what they publish: the criteria you meet are marked, and so is anything still unknown.",

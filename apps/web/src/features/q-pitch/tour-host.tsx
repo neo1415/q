@@ -11,6 +11,8 @@ import {
 } from "react";
 
 import {
+  FOUNDER_V6_LEDGER,
+  FOUNDER_V6_SCRIPT,
   PILOT_CERTIFICATION_LEDGER,
   PILOT_SCRIPT,
   PREMIERE_CERTIFICATION_LEDGER,
@@ -96,7 +98,8 @@ function actionWords(snapshot: TourSnapshot): string | null {
   }
 }
 
-export type TourChoice = "pilot" | "premiere" | "short" | "atlas";
+export type TourChoice =
+  "pilot" | "premiere" | "short" | "atlas" | "founder-v6";
 
 /**
  * Which script, and what the gate may admit. The premiere opts into
@@ -122,6 +125,13 @@ const TOURS = {
     accepted: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
     label:
       "Internal rehearsal · Feature Atlas · includes code-verified scenes without a browser receipt · demonstration data",
+  },
+  // Q Pitch v6, founder track (Lane qpf): Capital Q presented to founders.
+  "founder-v6": {
+    script: FOUNDER_V6_SCRIPT,
+    ledger: FOUNDER_V6_LEDGER,
+    accepted: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
+    label: "Q Pitch · founder track · demonstration data",
   },
   premiere: {
     script: PREMIERE_SCRIPT,

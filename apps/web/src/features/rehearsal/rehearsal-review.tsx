@@ -96,7 +96,10 @@ export function RehearsalReview({
               <ReviewRefresh />
             </p>
           ) : null}
-          <section className="flex flex-col gap-3 md:flex-row md:items-start md:gap-8">
+          <section
+            className="flex flex-col gap-3 md:flex-row md:items-start md:gap-8"
+            data-qp-anchor="fdr.12.rehearsal.score"
+          >
             {review.score === null ? null : (
               <div className="flex shrink-0 flex-col">
                 <span className="cq-display text-(--cq-text-primary)">
@@ -181,7 +184,10 @@ export function RehearsalReview({
           </section>
 
           {review.wentRight.length === 0 ? null : (
-            <section className="flex flex-col gap-3">
+            <section
+              className="flex flex-col gap-3"
+              data-qp-anchor="fdr.12.rehearsal.right"
+            >
               <h2 className="cq-title-sm text-(--cq-text-primary)">
                 What went right
               </h2>
@@ -201,7 +207,10 @@ export function RehearsalReview({
           )}
 
           {review.wentWrong.length === 0 ? null : (
-            <section className="flex flex-col gap-3">
+            <section
+              className="flex flex-col gap-3"
+              data-qp-anchor="fdr.12.rehearsal.improve"
+            >
               <h2 className="cq-title-sm text-(--cq-text-primary)">
                 What to improve
               </h2>
@@ -303,7 +312,10 @@ export function RehearsalReview({
         A plain section, not <details>: a flex <details> rendered its items
         empty for the founder (live 2026-10-01, 21 blank lines).
       */}
-      <section className="flex flex-col gap-2">
+      <section
+        className="flex flex-col gap-2"
+        data-qp-anchor="fdr.12.rehearsal.transcript"
+      >
         <h2 className="cq-title-sm text-(--cq-text-primary)">
           Transcript ({rehearsal.turns.length} lines)
         </h2>

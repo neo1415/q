@@ -947,19 +947,29 @@ function FounderDashboard(
         <Tile {...responseTile("You answer in", results.responseTime)} />
       </div>
 
-      <RaisePanel results={results} />
+      {/* fdr.06.*: the founder track lights these while Q explains them. */}
+      <div data-qp-anchor="fdr.06.crm.raise">
+        <RaisePanel results={results} />
+      </div>
 
-      <Activity activity={results.activity} first="Interest received" />
+      <div data-qp-anchor="fdr.06.crm.activity">
+        <Activity activity={results.activity} first="Interest received" />
+      </div>
 
       <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
-        <Pipeline
-          props={props}
-          side="FOUNDER"
-          byState={results.pipeline.byState}
-          rows={rows}
-          unlisted={[]}
-        />
-        <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+        <div className="min-w-0" data-qp-anchor="fdr.06.crm.pipeline">
+          <Pipeline
+            props={props}
+            side="FOUNDER"
+            byState={results.pipeline.byState}
+            rows={rows}
+            unlisted={[]}
+          />
+        </div>
+        <div
+          className="flex min-w-0 flex-col gap-4 sm:gap-5"
+          data-qp-anchor="fdr.06.crm.seen"
+        >
           <Panel
             id="rehearsals"
             title={tr("Rehearsals")}
