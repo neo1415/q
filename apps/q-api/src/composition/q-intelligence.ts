@@ -214,6 +214,8 @@ export type QIntelligenceDependencies = {
         readonly userId: string;
       }) => Promise<string | null>)
     | undefined;
+  /** Multilingual Q: the language note for each person, or null. */
+  readonly languageOf?: ModelGatewayQAnswerDependencies["languageOf"];
   /** Who is asking: their own name and company (founder live 2026-09-30). */
   /** Their own rehearsals and saved zone, for the own-day read. */
   readonly ownDay?: ModelGatewayQAnswerDependencies["ownDay"];
@@ -405,6 +407,9 @@ export function composeQIntelligence(
     ...(dependencies.personalityOf === undefined
       ? {}
       : { personalityOf: dependencies.personalityOf }),
+    ...(dependencies.languageOf === undefined
+      ? {}
+      : { languageOf: dependencies.languageOf }),
     ...(dependencies.askerOf === undefined
       ? {}
       : { askerOf: dependencies.askerOf }),

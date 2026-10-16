@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   EXTERNAL_REHEARSAL_DISCLAIMER,
   REHEARSAL_VIDEO_MAX_SECONDS,
+  type QLanguagePreference,
   type QRehearsalDto,
   type RehearsalInterviewerDto,
   type RehearsalInterviewersDto,
@@ -622,6 +623,14 @@ export function createRehearsalVideoService(dependencies: {
   /** Where the provider reports room events for a session. */
   readonly eventsPath: (sessionId: string) => string;
   readonly enabledInterviewers: ReadonlySet<string>;
+  /**
+   * Multilingual Q: the founder's chosen language for Q. Arabic runs the
+   * room in Arabic first (Tavus `languages`), with the spoken disclosure in
+   * Arabic; the lines themselves come from Q, already in their language.
+   */
+  readonly languageOf?:
+    | ((actor: ActorContext) => Promise<QLanguagePreference>)
+    | undefined;
   /** Tavus test_mode: the room is created but no face joins (no minutes). */
   readonly testMode?: boolean | undefined;
   /** Canonical profile admission for test and paid rooms; empty fails closed. */
@@ -1073,6 +1082,10 @@ export function createRehearsalVideoService(dependencies: {
       }
       const row = claimed.row;
       const greeting = latestThemLine(rehearsal)?.text ?? null;
+      const arabic =
+        (await (
+          dependencies.languageOf?.(actor) ?? Promise.resolve("AUTO")
+        ).catch(() => "AUTO")) === "ar";
       const publicBase = dependencies.publicBaseUrl.replace(/\/+$/u, "");
       const bridgeUrl = `${publicBase}${dependencies.bridgePath(row.id)}`;
       const eventsUrl = `${publicBase}${dependencies.eventsPath(row.id)}/${encodeURIComponent(eventsToken)}`;
@@ -1092,7 +1105,9 @@ export function createRehearsalVideoService(dependencies: {
                 "You are the face and voice of a practice meeting run by Capital Q. Speak exactly the lines you are given, naturally, and nothing else.",
               faceId: interviewer.faceId,
               disclosure: {
-                spoken: `Just so you know, this is an AI rehearsal, not the real ${rehearsal.counterpart.name.slice(0, 80)}.`,
+                spoken: arabic
+                  ? `للعلم، هذا تدريب بالذكاء الاصطناعي، وليس ${rehearsal.counterpart.name.slice(0, 80)} الحقيقي.`
+                  : `Just so you know, this is an AI rehearsal, not the real ${rehearsal.counterpart.name.slice(0, 80)}.`,
                 shown: disclosure.slice(0, 200),
               },
               layers: {
@@ -1144,6 +1159,8 @@ export function createRehearsalVideoService(dependencies: {
                 joinGraceSeconds: REHEARSAL_VIDEO_JOIN_GRACE_SECONDS,
                 testMode: dependencies.testMode === true,
                 requireAuth: true,
+                // Arabic first, English understood: a Gulf founder mixes both.
+                ...(arabic ? { languages: ["ar", "en"] } : {}),
               });
               return { palId, conversation };
             } catch (error: unknown) {

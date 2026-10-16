@@ -5,7 +5,12 @@ import type {
   onRequestHookHandler,
 } from "fastify";
 
-import { parseContract, Q_VOICE_LIVE_TRIAL_SPENT } from "@capital-q/contracts";
+import {
+  parseContract,
+  Q_VOICE_LIVE_TRIAL_SPENT,
+  type QLanguagePreference,
+} from "@capital-q/contracts";
+import { effectiveLocale } from "@capital-q/q-core";
 
 import { getActorContext } from "../../security/actor-context.js";
 import type { VoiceSessionBinding } from "../bindings.js";
@@ -77,6 +82,13 @@ export function registerLiveVoiceRoutes(
      */
     readonly names?:
       ((request: FastifyRequest) => Promise<readonly string[]>) | undefined;
+    /**
+     * Multilingual Q: the language this person chose for Q, which wins over
+     * the device's locale. A failed read keeps the device's.
+     */
+    readonly languageOf?:
+      | ((request: FastifyRequest) => Promise<QLanguagePreference>)
+      | undefined;
     /** Developer preview gate (LiveConfig.preview). */
     readonly preview: {
       readonly enabled: boolean;
@@ -128,7 +140,12 @@ export function registerLiveVoiceRoutes(
         briefingOpening: body.briefingOpening,
         firstName: body.firstName,
         role: body.role,
-        locale: body.locale,
+        locale: effectiveLocale(
+          await (
+            dependencies.languageOf?.(request) ?? Promise.resolve(null)
+          ).catch(() => null),
+          body.locale,
+        ),
         names: await (
           dependencies.names?.(request) ?? Promise.resolve([])
         ).catch(() => []),

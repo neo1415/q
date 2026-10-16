@@ -6,6 +6,8 @@ import { resolveQStanding } from "@/features/q/context";
 import { PublicBrandStyle } from "@/features/brand-theme/public-brand-style";
 import { FictionalNames } from "@/components/app-shell/fictional-names";
 import { QControlRuntime } from "@/features/q/control/q-control-runtime";
+import { LanguageProvider } from "@/features/i18n/language";
+import { uiLanguageOf } from "@/features/i18n/messages";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -26,11 +28,14 @@ export default async function OnboardingLayout({
   children: ReactNode;
 }): Promise<ReactNode> {
   await requireSessionUser();
-  if ((await resolveQStanding())?.paused === true) {
+  const standing = await resolveQStanding();
+  if (standing?.paused === true) {
     redirect("/paused");
   }
   // Outside the app shell: the same "fictional" names rule as inside it.
+  // Multilingual Q: onboarding speaks their chosen language too.
   return (
+    <LanguageProvider language={uiLanguageOf(standing?.language)}>
     <div data-fictional-scope>
       <PublicBrandStyle />
       {children}
@@ -41,5 +46,6 @@ export default async function OnboardingLayout({
         <QControlRuntime />
       </Suspense>
     </div>
+    </LanguageProvider>
   );
 }

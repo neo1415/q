@@ -216,7 +216,12 @@ import {
   createPostgresWorkforceStore,
   createStaleHoldsReader,
 } from "./composition/workforce/store.js";
-import { houseEtiquetteOf, stanceDeclines } from "@capital-q/q-core";
+import {
+  houseEtiquetteOf,
+  spokenLanguageNote,
+  stanceDeclines,
+  writtenLanguageNote,
+} from "@capital-q/q-core";
 import { createWorkPage } from "./composition/work/page.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
@@ -3967,6 +3972,15 @@ const qIntelligence = composeQIntelligence({
     standingStore
       .read(userId, tenantId, new Date())
       .then((standing) => PERSONALITY_NOTES[standing.personality]),
+  // Multilingual Q: the language they chose, as the words Q is told.
+  languageOf: ({ tenantId, userId }) =>
+    standingStore
+      .read(userId, tenantId, new Date())
+      .then((standing) =>
+        standing.language === "AUTO"
+          ? null
+          : writtenLanguageNote(standing.language),
+      ),
   // Their own name and company, from their own record in their own
   // tenant: what they would be annoyed to be asked.
   // Their day (founder demo 2026-10-02): their own finished rehearsals and
@@ -5589,6 +5603,15 @@ const rehearsals = createRehearsalService({
   composer: createRehearsalComposer({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
+    // Multilingual Q: the founder's chosen language for the played line.
+    languageOf: (actor) =>
+      standingStore
+        .read(actor.userId, actor.tenantId, new Date())
+        .then((standing) =>
+          standing.language === "AUTO"
+            ? null
+            : spokenLanguageNote(standing.language),
+        ),
     logger,
   }),
   logger,
@@ -6074,6 +6097,11 @@ const rehearsalVideoActorResolver = createPostgresActorContextResolver({
 });
 const rehearsalVideo = createRehearsalVideoService({
   store: createPostgresRehearsalVideoStore(database.sql),
+  // Multilingual Q: an Arabic founder's practice room runs in Arabic.
+  languageOf: (actor) =>
+    standingStore
+      .read(actor.userId, actor.tenantId, new Date())
+      .then((standing) => standing.language),
   stillAllowed: async (actor) => {
     if (actor.organisationId === undefined || actor.membershipId === undefined)
       return false;
@@ -6586,6 +6614,11 @@ const { app, logger: appLogger } = createApp(
               quota: speechQuotaFrom(process.env),
             }),
             bindings: voiceBindings,
+            // Multilingual Q: their chosen language, on every voice line.
+            languageOf: (actor: ActorContext) =>
+              standingStore
+                .read(actor.userId, actor.tenantId, new Date())
+                .then((standing) => standing.language),
             interviewAgent,
             interviewPresence: presenceTrigger,
             apiBaseUrl: config.voice.apiBaseUrl,

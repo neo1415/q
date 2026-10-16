@@ -97,6 +97,31 @@ If the backend says their words did not reach it clearly, say back briefly what 
 Delegate before giving any answer that depends on backend work, and do not guess the result while waiting. Do not announce fetching ("hang on", "let me pull that up"). If the backend is slow you will be told; then say once, in a few specific words, what you are getting ("pulling your best mandate fits now"), and keep the conversation going. Never say you didn't get it in time: a slow result still arrives, and you deliver it when it does. When results arrive, speak them as an analyst would: the point first, then what separates the options. Keep every fact's meaning exact: "known" is not "matched", a tie stays a tie, an estimate stays an estimate, and a fit score is about their mandate, not the company's quality. If a result arrives while you are speaking, finish your sentence and bring it in naturally. If a result for an earlier request arrives after they asked something new, say it briefly if it still helps them, then go on with the new one.`;
 }
 
+/**
+ * Multilingual Q (2026-10-16): a person who chose Arabic (Settings, or an
+ * Arabic device with nothing chosen) is spoken to in Arabic. GPT-Live has
+ * no language parameter; OpenAI's live-prompting guide sets the language
+ * by instruction ("Speak [language] unless the user asks to switch"). The
+ * same words as q-core's spokenLanguageNote; inlined because this file
+ * stays dependency-free for the recording harness.
+ */
+const ENGLISH_LANGUAGE_RULE = "\nLanguage: always speak natural, standard English,";
+const ARABIC_LANGUAGE_RULE =
+  "Language: this person chose Arabic. Speak natural, clear Modern Standard Arabic, the register a Gulf professional uses at work, and understand Gulf and other Arabic dialects and Arabic-English code-switching. If they speak to you in English, or ask you to switch, follow them. Keep names, company names and investment terms as they say them (ARR, SAFE, term sheet). Say amounts as spoken Arabic with the currency named (USD, dirhams, riyals); never convert a currency. Never mimic a dialect they did not use, and never comment on how they speak.";
+
+/** The speaking style for this person's language. */
+export function styleFor(locale: string | undefined): string {
+  if (locale?.split("-")[0]?.toLowerCase() !== "ar") return STYLE;
+  const at = STYLE.indexOf(ENGLISH_LANGUAGE_RULE);
+  if (at < 0) return STYLE;
+  const end = STYLE.indexOf("\n", at + 1);
+  return `${STYLE.slice(0, at)}\n${ARABIC_LANGUAGE_RULE}${end < 0 ? "" : STYLE.slice(end)}`
+    .replace(
+      "Use plain, natural phrasing a fluent English-speaking analyst would use",
+      "Use plain, natural phrasing a fluent analyst would use in their language",
+    );
+}
+
 export function livePrompt(input: LivePromptInput = {}): string {
   const who =
     input.firstName === undefined || input.firstName.trim().length === 0
@@ -120,7 +145,7 @@ export function livePrompt(input: LivePromptInput = {}): string {
         ];
   return [
     `${IDENTITY}${who}`,
-    `${STYLE}${language}`,
+    `${styleFor(input.locale)}${language}`,
     ...known,
     ...(input.briefingOpening === true ? [OPENING] : []),
     ...(input.guided === true ? [GUIDED] : []),

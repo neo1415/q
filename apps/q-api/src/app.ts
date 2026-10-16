@@ -317,6 +317,7 @@ export type QApiModules = {
         | "ownNames"
         | "openerFacts"
         | "rehearsals"
+        | "languageOf"
       >)
     | undefined;
 };
@@ -803,6 +804,7 @@ export function createApp(
       rehearsals: modules.voice.rehearsals,
       duplex: modules.voice.duplex,
       live: modules.voice.live,
+      languageOf: modules.voice.languageOf,
     });
     /**
      * One Q, whatever the input was (QX-004 core gate).

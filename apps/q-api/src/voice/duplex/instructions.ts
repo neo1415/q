@@ -1,5 +1,10 @@
 import type { ModelToolDefinition } from "@capital-q/contracts";
-import { Q_SYSTEM_VOICE_V3, SPEAK_FROM_FACTS_V1 } from "@capital-q/q-core";
+import {
+  Q_SYSTEM_VOICE_V3,
+  SPEAK_FROM_FACTS_V1,
+  spokenLanguageNote,
+  supportedLanguageOf,
+} from "@capital-q/q-core";
 
 /**
  * What the full-duplex model is told (DUPLEX).
@@ -202,7 +207,12 @@ export function duplexInstructions(input: {
     ...(input.guided === true ? [GUIDED_CONDUCT] : []),
     "THIS LINE",
   ];
-  if (input.locale !== undefined && !/^en\b/i.test(input.locale)) {
+  // Multilingual Q: a person who chose Arabic hears Arabic from the first
+  // word, not only once they speak it.
+  const arabic = spokenLanguageNote(supportedLanguageOf(input.locale));
+  if (arabic !== null) {
+    parts.push(arabic);
+  } else if (input.locale !== undefined && !/^en\b/i.test(input.locale)) {
     parts.push(
       `The person's device language is ${input.locale}; answer in the language they speak.`,
     );

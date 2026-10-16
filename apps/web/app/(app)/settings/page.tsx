@@ -28,6 +28,8 @@ import {
   resolveQStanding,
 } from "@/features/q/context";
 import { PersonalitySetting } from "@/features/settings/personality-setting";
+import { LanguageSetting } from "@/features/settings/language-setting";
+import { translate, uiLanguageOf } from "@/features/i18n/messages";
 import {
   RowLink,
   SettingRow,
@@ -100,6 +102,8 @@ export default async function SettingsPage({
       loadMyOrganisations(),
     ]);
   const acting = mine.find((organisation) => organisation.active) ?? null;
+  // Multilingual Q: this page in their chosen language.
+  const t = (english: string) => translate(uiLanguageOf(standing?.language), english);
   const organisation =
     context.kind === "NONE"
       ? null
@@ -110,37 +114,42 @@ export default async function SettingsPage({
   const canBrand = admin?.can("flags.write") === true;
   return (
     <PageContainer>
-      <PageHeader title="Settings" />
+      <PageHeader title={t("Settings")} />
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
-        <SettingsIndex sections={SECTIONS} />
+        <SettingsIndex
+          sections={SECTIONS.map((section) => ({
+            ...section,
+            label: t(section.label),
+          }))}
+        />
         <div className="flex max-w-(--cq-layout-reading) min-w-0 flex-col gap-4">
           {/* Q room R1: Q knows it is on Settings; nothing here is read. */}
           <QSection id="settings" kind="SETTINGS" label="settings" />
-          <SettingsCard id="account" title="Account">
-            <SettingRow term="Profile" hint="What investors and founders see">
-              <RowLink href="/profile">Edit profile</RowLink>
+          <SettingsCard id="account" title={t("Account")}>
+            <SettingRow term={t("Profile")} hint={t("What investors and founders see")}>
+              <RowLink href="/profile">{t("Edit profile")}</RowLink>
             </SettingRow>
             <SettingRow
-              term={context.kind === "INVESTOR" ? "Firm" : "Company"}
+              term={t(context.kind === "INVESTOR" ? "Firm" : "Company")}
               hint={
                 organisation === null
-                  ? "Set up when Q onboards you"
+                  ? t("Set up when Q onboards you")
                   : `You are here as ${organisation.role.toLowerCase()}`
               }
             >
               <span className="cq-body-sm text-(--cq-text-secondary)">
-                {organisation?.name ?? "Not set yet"}
+                {organisation?.name ?? t("Not set yet")}
               </span>
             </SettingRow>
-            <SettingRow term="Email">
+            <SettingRow term={t("Email")}>
               <span className="cq-body-sm break-all text-(--cq-text-secondary)">
-                {user?.email ?? "Not available"}
+                {user?.email ?? t("Not available")}
               </span>
             </SettingRow>
-            <SettingRow term="Password">
-              <RowLink href="/auth/update-password">Change</RowLink>
+            <SettingRow term={t("Password")}>
+              <RowLink href="/auth/update-password">{t("Change")}</RowLink>
             </SettingRow>
-            <SettingRow term="This device" hint="Signs you out on this device">
+            <SettingRow term={t("This device")} hint={t("Signs you out on this device")}>
               <SignOutButton />
             </SettingRow>
           </SettingsCard>
@@ -150,7 +159,7 @@ export default async function SettingsPage({
               invite the rest. */}
           <SettingsCard
             id="team"
-            title="Team"
+            title={t("Team")}
             description={
               context.kind === "INVESTOR"
                 ? "Colleagues who work on your firm with you."
@@ -158,35 +167,35 @@ export default async function SettingsPage({
             }
           >
             <SettingRow
-              term={acting?.name ?? "Your team"}
+              term={acting?.name ?? t("Your team")}
               hint={
                 acting === null
-                  ? "Set up when Q onboards you"
+                  ? t("Set up when Q onboards you")
                   : acting.memberCount <= 1
-                    ? "Just you, for now"
+                    ? t("Just you, for now")
                     : `${String(acting.memberCount)} people`
               }
             >
               <RowLink href="/settings/team">
                 {acting !== null && acting.memberCount <= 1
-                  ? "Invite your team"
-                  : "Open"}
+                  ? t("Invite your team")
+                  : t("Open")}
               </RowLink>
             </SettingRow>
           </SettingsCard>
 
           <SettingsCard
             id="appearance"
-            title="Appearance"
-            description="How Capital Q looks on this device."
+            title={t("Appearance")}
+            description={t("How Capital Q looks on this device.")}
           >
-            <SettingRow term="Theme">
+            <SettingRow term={t("Theme")}>
               <ThemeToggle />
             </SettingRow>
-            <SettingRow term="Q motion" hint="How much Q's light moves">
+            <SettingRow term={t("Q motion")} hint={t("How much Q's light moves")}>
               <QMotionToggle size="touch" />
             </SettingRow>
-            <SettingRow term="Sounds" hint="Q's small sounds on this device">
+            <SettingRow term={t("Sounds")} hint={t("Q's small sounds on this device")}>
               <SoundSetting />
             </SettingRow>
             {canBrand ? (
@@ -202,7 +211,7 @@ export default async function SettingsPage({
                 term="How Q conducts business"
                 hint="The house guide for everyone · admins only"
               >
-                <RowLink href="/admin/etiquette">Open</RowLink>
+                <RowLink href="/admin/etiquette">{t("Open")}</RowLink>
               </SettingRow>
             ) : null}
           </SettingsCard>
@@ -210,21 +219,27 @@ export default async function SettingsPage({
           <SettingsCard
             id="q"
             title="Q"
-            description="How Q sounds and works with you."
+            description={t("How Q sounds and works with you.")}
           >
-            <SettingRow term="Voice">
+            <SettingRow
+              term={t("Language")}
+              hint={t("For Q's replies, voice and these screens")}
+            >
+              <LanguageSetting initial={standing?.language ?? "AUTO"} />
+            </SettingRow>
+            <SettingRow term={t("Voice")}>
               <VoiceSetting />
             </SettingRow>
-            <SettingRow term="Listening sounds">
+            <SettingRow term={t("Listening sounds")}>
               <ListeningSetting />
             </SettingRow>
-            <SettingRow term="Wake word" hint="On this device only">
+            <SettingRow term={t("Wake word")} hint={t("On this device only")}>
               <WakeSetting />
             </SettingRow>
-            <SettingRow term="Personality">
+            <SettingRow term={t("Personality")}>
               <PersonalitySetting initial={standing?.personality ?? "AUTO"} />
             </SettingRow>
-            <SettingRow term="The Q Daily" hint="Your morning newspaper">
+            <SettingRow term="The Q Daily" hint={t("Your morning newspaper")}>
               {daily === null ? (
                 <p className="cq-body-sm text-(--cq-text-secondary)">
                   These choices couldn&apos;t load. Reload in a moment.
@@ -234,17 +249,17 @@ export default async function SettingsPage({
               )}
             </SettingRow>
             <SettingRow
-              term="Outreach and stand-in"
-              hint="What Q may do on your behalf"
+              term={t("Outreach and stand-in")}
+              hint={t("What Q may do on your behalf")}
             >
-              <RowLink href="/work">Open</RowLink>
+              <RowLink href="/work">{t("Open")}</RowLink>
             </SettingRow>
           </SettingsCard>
 
           {/* ETIQUETTE block (ADR 0050) */}
           <SettingsCard
             id="speaking"
-            title="How Q speaks for you"
+            title={t("How Q speaks for you")}
             description="Your guide to how Q writes and talks to investors and founders for you."
           >
             {speaking === null ? (
@@ -260,8 +275,8 @@ export default async function SettingsPage({
 
           <SettingsCard
             id="notifications"
-            title="Notifications"
-            description="In-app notices always show."
+            title={t("Notifications")}
+            description={t("In-app notices always show.")}
           >
             {/* A definition list holds only term/description groups (axe
                 definition-list, 2026-10-08): the setting is its description. */}
@@ -274,22 +289,22 @@ export default async function SettingsPage({
           </SettingsCard>
 
           {/* meetfix-57: "Settings → Connections", where Q's reconnect link lands. */}
-          <SettingsCard id="connections" title="Connections">
-            <SettingRow term="Google" hint="Gmail, Calendar and Meet">
+          <SettingsCard id="connections" title={t("Connections")}>
+            <SettingRow term="Google" hint={t("Gmail, Calendar and Meet")}>
               <GmailConnection
                 outcome={typeof google === "string" ? google : undefined}
                 reconnect={params["reconnect"] === "google"}
               />
             </SettingRow>
-            <SettingRow term="Your Q email address">
+            <SettingRow term={t("Your Q email address")}>
               <QEmailAddress />
             </SettingRow>
           </SettingsCard>
 
           {/* BILLING block (ADR 0034) */}
-          <SettingsCard id="billing" title="Plan and billing">
+          <SettingsCard id="billing" title={t("Plan and billing")}>
             <SettingRow
-              term="Plan"
+              term={t("Plan")}
               hint={
                 plan === null
                   ? "Open Billing to see your plan"
@@ -298,23 +313,23 @@ export default async function SettingsPage({
                     : plan.plan.name
               }
             >
-              <RowLink href="/settings/billing">Billing</RowLink>
+              <RowLink href="/settings/billing">{t("Billing")}</RowLink>
             </SettingRow>
-            <SettingRow term="Allowances" hint="What your plan includes">
-              <RowLink href="/settings/plan">Open</RowLink>
+            <SettingRow term={t("Allowances")} hint={t("What your plan includes")}>
+              <RowLink href="/settings/plan">{t("Open")}</RowLink>
             </SettingRow>
-            <SettingRow term="Usage" hint="What Q used for you this month">
-              <RowLink href="/settings/usage">Usage</RowLink>
+            <SettingRow term={t("Usage")} hint={t("What Q used for you this month")}>
+              <RowLink href="/settings/usage">{t("Usage")}</RowLink>
             </SettingRow>
           </SettingsCard>
           {/* end BILLING block */}
 
-          <SettingsCard id="privacy" title="Privacy">
+          <SettingsCard id="privacy" title={t("Privacy")}>
             <SettingRow
-              term="What Q remembers"
-              hint="See, correct or forget it"
+              term={t("What Q remembers")}
+              hint={t("See, correct or forget it")}
             >
-              <RowLink href="/settings/memory">Review</RowLink>
+              <RowLink href="/settings/memory">{t("Review")}</RowLink>
             </SettingRow>
           </SettingsCard>
         </div>

@@ -3,9 +3,11 @@ import type { FastifyInstance } from "fastify";
 import {
   createProblemDetails,
   PROBLEM_CONTENT_TYPE,
+  Q_STANDING_LANGUAGE_PATH,
   Q_STANDING_PATH,
   Q_STANDING_PERSONALITY_PATH,
   QStandingDtoSchema,
+  SetQLanguageRequestSchema,
   SetQPersonalityRequestSchema,
 } from "@capital-q/contracts";
 
@@ -54,6 +56,7 @@ export function registerStandingRoutes(
       void reply.header("Cache-Control", "no-store");
       return QStandingDtoSchema.parse({
         personality: mine.personality,
+        language: mine.language,
         paused: mine.conduct.suspended,
       });
     },
@@ -89,6 +92,45 @@ export function registerStandingRoutes(
       void reply.header("Cache-Control", "no-store");
       return QStandingDtoSchema.parse({
         personality: mine.personality,
+        language: mine.language,
+        paused: mine.conduct.suspended,
+      });
+    },
+  );
+
+  // Multilingual Q (2026-10-16): the language Q uses with them, everywhere
+  // (text, voice, rehearsals, onboarding). Their own row only.
+  app.put(
+    Q_STANDING_LANGUAGE_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const body = SetQLanguageRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        const problem = createProblemDetails({
+          code: "INVALID_REQUEST",
+          requestId: request.id,
+          detail: "Choose one of the languages Q speaks.",
+        });
+        return reply
+          .status(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(problem);
+      }
+      const actor = getActorContext(request);
+      await standing.setLanguage(
+        actor.userId,
+        actor.tenantId,
+        body.data.language,
+      );
+      const mine = await standing.read(
+        actor.userId,
+        actor.tenantId,
+        new Date(),
+      );
+      void reply.header("Cache-Control", "no-store");
+      return QStandingDtoSchema.parse({
+        personality: mine.personality,
+        language: mine.language,
         paused: mine.conduct.suspended,
       });
     },

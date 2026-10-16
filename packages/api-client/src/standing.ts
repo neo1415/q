@@ -1,7 +1,9 @@
 import {
+  Q_STANDING_LANGUAGE_PATH,
   Q_STANDING_PATH,
   Q_STANDING_PERSONALITY_PATH,
   QStandingDtoSchema,
+  type QLanguagePreference,
   type QPersonality,
 } from "@capital-q/contracts";
 
@@ -19,5 +21,15 @@ export function setQPersonality(
 ) {
   return call(session, "PUT", Q_STANDING_PERSONALITY_PATH, QStandingDtoSchema, {
     body: { personality },
+  });
+}
+
+/** The person chooses the language Q uses with them (multilingual Q). */
+export function setQLanguage(
+  session: ApiSession,
+  language: QLanguagePreference,
+) {
+  return call(session, "PUT", Q_STANDING_LANGUAGE_PATH, QStandingDtoSchema, {
+    body: { language },
   });
 }

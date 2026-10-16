@@ -37,6 +37,7 @@ import {
 } from "./navigation";
 import { useNavGroups } from "./nav-group-state";
 import { NavGroupToggle } from "./nav-group-toggle";
+import { useT } from "@/features/i18n/language";
 
 const TAB_CLASS =
   "relative flex h-full min-h-11 w-full flex-col items-center justify-center gap-1 px-0.5 text-[11px] leading-tight tracking-tight transition-colors duration-(--cq-motion-fast)";
@@ -68,9 +69,10 @@ export function MobileNavigation({
   const pathname = usePathname();
   // Home is the conversation this tab was in, not a new chat each visit.
   const home = useHomeHref();
+  const t = useT();
 
   return (
-    <nav aria-label="Primary" className="cq-bottom-nav">
+    <nav aria-label={t("Primary")} className="cq-bottom-nav">
       <ul className="grid h-full grid-cols-5">
         {MOBILE_NAVIGATION.map((item) => {
           const active = isActiveRoute(pathname, item.href);
@@ -115,7 +117,7 @@ export function MobileNavigation({
                     strokeWidth={active ? 2 : ICON_STROKE}
                   />
                 )}
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">{t(item.label)}</span>
               </IntentLink>
             </li>
           );
@@ -166,6 +168,7 @@ function MoreSheet({
   ).length;
   // The same remembered groups as the desktop sidebar, closed by default.
   const disclosure = useNavGroups(groups, pathname);
+  const t = useT();
   const close = () => {
     setOpen(false);
   };
@@ -197,16 +200,16 @@ function MoreSheet({
             size={ICON_SIZE.prominent + 2}
             strokeWidth={inside ? 2 : ICON_STROKE}
           />
-          <span className="truncate">More</span>
+          <span className="truncate">{t("More")}</span>
         </button>
       </SheetTrigger>
-      <SheetContent title="More">
+      <SheetContent title={t("More")}>
         {/* G2: who they act for, first, when they have two or more. */}
         <MoreOrganisationSwitcher
           organisations={organisations}
           onPicked={close}
         />
-        <nav aria-label="More sections">
+        <nav aria-label={t("More sections")}>
           {/* Profile heads the sheet (WORK-58); search lives in Explore. */}
           <Link
             href={PROFILE_NAVIGATION.href}
@@ -221,13 +224,13 @@ function MoreSheet({
               className="text-(--cq-text-secondary)"
             />
             <span className="min-w-0 flex-1 truncate cq-body font-medium text-(--cq-text-primary)">
-              {PROFILE_NAVIGATION.label}
+              {t(PROFILE_NAVIGATION.label)}
             </span>
             <ChevronRight
               aria-hidden="true"
               size={ICON_SIZE.regular}
               strokeWidth={ICON_STROKE}
-              className="text-(--cq-text-tertiary)"
+              className="text-(--cq-text-tertiary) rtl:-scale-x-100"
             />
           </Link>
           {groups.map((group) => {
@@ -244,12 +247,12 @@ function MoreSheet({
               <div
                 key={label ?? "main"}
                 role="group"
-                aria-label={label ?? "Sections"}
+                aria-label={label === null ? "Sections" : t(label)}
                 className="mt-3"
               >
                 {label === null || listId === undefined ? null : (
                   <NavGroupToggle
-                    label={label}
+                    label={t(label)}
                     open={open}
                     controls={listId}
                     waiting={waiting}
@@ -318,6 +321,7 @@ function MoreLink({
 }) {
   const Icon = item.icon;
   const waiting = count !== undefined && count > 0 ? count : null;
+  const t = useT();
   return (
     <IntentLink
       href={item.href}
@@ -325,7 +329,7 @@ function MoreLink({
       aria-label={
         waiting === null
           ? undefined
-          : `${item.label}, ${String(waiting)} waiting for you`
+          : `${t(item.label)}, ${String(waiting)} waiting for you`
       }
       onClick={onNavigate}
       className={cx(
@@ -341,7 +345,7 @@ function MoreLink({
         strokeWidth={active ? 2 : ICON_STROKE}
         className={active ? "text-(--cq-accent)" : "text-(--cq-text-secondary)"}
       />
-      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      <span className="min-w-0 flex-1 truncate">{t(item.label)}</span>
       {waiting === null ? null : (
         <span
           aria-hidden="true"
@@ -351,7 +355,9 @@ function MoreLink({
         </span>
       )}
       {active ? (
-        <span className="cq-caption text-(--cq-text-secondary)">Current</span>
+        <span className="cq-caption text-(--cq-text-secondary)">
+          {t("Current")}
+        </span>
       ) : null}
     </IntentLink>
   );

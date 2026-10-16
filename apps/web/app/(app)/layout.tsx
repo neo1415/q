@@ -23,6 +23,8 @@ import { loadMyOrganisations } from "@/features/team/load-organisations";
 import { PitchWarmup } from "@/features/discover/player/pitch-warmup-trigger";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
 import { QPitchEntrySlot } from "@/features/q-pitch/tour-entry-slot";
+import { LanguageProvider } from "@/features/i18n/language";
+import { uiLanguageOf } from "@/features/i18n/messages";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -89,9 +91,12 @@ export default async function ApplicationLayout({
   // to while they are not ready stays readable, nothing else is offered.
   // An account Q paused sees nothing but that it is paused, until a person
   // at Capital Q reinstates it.
-  if ((await standingRead)?.paused === true) {
+  const standing = await standingRead;
+  if (standing?.paused === true) {
     redirect("/paused");
   }
+  // Multilingual Q: the interface follows the language they chose.
+  const language = uiLanguageOf(standing?.language);
   const unfinished =
     onboardingRead === null ? null : onboardingPath(await onboardingRead);
   // ADMIN-4 block: "Verify you and <organisation>" stays in the shell until
@@ -110,6 +115,7 @@ export default async function ApplicationLayout({
     loadMyOrganisations(),
   ]);
   return (
+    <LanguageProvider language={language}>
     <AppShell
       context={{ ...shell, admin, organisations, qPitch }}
       subject={subject}
@@ -150,5 +156,6 @@ export default async function ApplicationLayout({
         />
       </Suspense>
     </AppShell>
+    </LanguageProvider>
   );
 }

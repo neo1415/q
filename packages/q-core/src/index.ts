@@ -81,6 +81,12 @@ export {
   type QPersonality,
   type QPersonalityCode,
 } from "./personality.js";
+export {
+  effectiveLocale,
+  spokenLanguageNote,
+  supportedLanguageOf,
+  writtenLanguageNote,
+} from "./language.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
 export { GATEQ_INTERVIEWER_V1 } from "./prompts/tasks/gateq-interviewer.v1.js";
 export {
