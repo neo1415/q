@@ -321,3 +321,23 @@ export {
   onboardingCopyFor,
   type OnboardingCopyCatalog,
 } from "./application/confirmation.js";
+export {
+  drainPendingWrites,
+  failureCode,
+  isTransientOnboardingFailure,
+  pendingReplayKey,
+  sameResponseValue,
+  type DrainPorts,
+  type DrainResult,
+  type PendingWrite,
+  type PendingWriteOrigin,
+  type PendingWriteRepository,
+  type ReplayFailure,
+} from "./application/pending-writes.js";
+export { createPostgresPendingWriteRepository } from "./infrastructure/postgres-pending-write-repository.js";
+export {
+  classifyOnboardingUpload,
+  ONBOARDING_READABLE_DOCUMENT_TYPES,
+  onboardingDocumentTreatment,
+  type OnboardingDocumentTreatment,
+} from "./application/documents.js";

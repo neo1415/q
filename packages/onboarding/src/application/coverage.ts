@@ -322,6 +322,14 @@ export function deriveOnboardingCoverage(
         (fieldProfile.deferrable ?? fieldProfile.priority !== "ESSENTIAL");
       const response = responses.get(step.stepKey);
       const seed = known.get(step.stepKey);
+      // A held fact describes the answer only while the answer still says
+      // it; a correction makes the answer theirs, not registration's.
+      const seedMatches =
+        seed !== undefined &&
+        response !== undefined &&
+        displayOnboardingValue(step, response.value, input.labelFor)
+          .trim()
+          .toLowerCase() === seed.display.trim().toLowerCase();
       const proposals = (proposalsByStep.get(step.stepKey) ?? []).slice(0, 8);
       const readings = [...new Set(readingsByStep.get(step.stepKey) ?? [])]
         .slice(0, 6)
@@ -335,7 +343,9 @@ export function deriveOnboardingCoverage(
 
       if (response !== undefined) {
         display = displayOnboardingValue(step, response.value, input.labelFor);
-        source = seed?.source ?? sourceOfModality(response.sourceModality);
+        source = seedMatches
+          ? (seed?.source ?? sourceOfModality(response.sourceModality))
+          : sourceOfModality(response.sourceModality);
       } else if (seed !== undefined) {
         display = seed.display.slice(0, 600);
         source = seed.source;
@@ -352,7 +362,7 @@ export function deriveOnboardingCoverage(
           state = "EVIDENCE_NEEDED";
           evidenceWanted = [...wanted].slice(0, 8);
         } else {
-          state = seed !== undefined ? "KNOWN" : "CONFIRMED_SAVED";
+          state = seedMatches ? "KNOWN" : "CONFIRMED_SAVED";
         }
       } else if (declined) {
         state = "DEFERRABLE";

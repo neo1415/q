@@ -448,6 +448,19 @@ export function createPostgresOnboardingSuggestionRepository(): OnboardingSugges
         returning g.id`;
       return rows.length === 1;
     },
+    listRejectedValues: async (executor, sessionId, stepKey) => {
+      const rows = await executor`
+        select g.suggested_value
+          from onboarding.suggestions g
+         where g.session_id = ${sessionId}
+           and g.step_key = ${stepKey}
+           and g.status = 'REJECTED'
+         limit 50`;
+      return rows.map(
+        (row) =>
+          z.object({ suggested_value: z.unknown() }).parse(row).suggested_value,
+      );
+    },
   };
 }
 

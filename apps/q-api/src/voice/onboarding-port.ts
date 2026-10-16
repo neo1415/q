@@ -12,21 +12,33 @@ import {
   withdrawOnboardingResponse,
   type ApiSession,
 } from "@capital-q/api-client";
-import type {
-  OnboardingResponseValue,
-  OnboardingSessionView,
-  TaxonomyCandidateResponse,
+import {
+  OnboardingResponseValueSchema,
+  type OnboardingResponseValue,
+  type OnboardingSessionView,
+  type TaxonomyCandidateResponse,
 } from "@capital-q/contracts";
-import { FOUNDER_UTTERANCE_ALIASES } from "@capital-q/founder-onboarding";
+import {
+  FOUNDER_COVERAGE_PROFILE,
+  FOUNDER_UTTERANCE_ALIASES,
+} from "@capital-q/founder-onboarding";
 import {
   INVESTOR_CONCEPT_FAMILIES,
+  INVESTOR_COVERAGE_PROFILE,
   INVESTOR_UTTERANCE_ALIASES,
   investorPlausibility,
 } from "@capital-q/investor-onboarding";
-import type {
-  OnboardingQRecommendations,
-  OnboardingStepManifest,
-  QRecommendationPublicSourceType,
+import {
+  deriveOnboardingCoverage,
+  isTransientOnboardingFailure,
+  pendingReplayKey,
+  type DrainResult,
+  type PendingWrite,
+  type OnboardingCoverageProfile,
+  type OnboardingKnownFact,
+  type OnboardingQRecommendations,
+  type OnboardingStepManifest,
+  type QRecommendationPublicSourceType,
 } from "@capital-q/onboarding";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
 
@@ -82,6 +94,33 @@ export const UPLOAD_ONLY_REASON =
  * immutable. Composed from packages/onboarding in production; a fake in
  * tests.
  */
+/** The durable hold for confirmed changes a temporary failure kept from saving. */
+export type HeldOnboardingWrites = {
+  readonly hold: (
+    stepKey: string,
+    response: {
+      readonly value: OnboardingResponseValue;
+      readonly note?: string;
+    },
+  ) => Promise<void>;
+  /** Step keys with a held change, not yet saved. */
+  readonly pendingSteps: () => Promise<ReadonlySet<string>>;
+  readonly drain?:
+    | ((ports: {
+        readonly currentValue: (stepKey: string) => Promise<unknown>;
+        readonly submit: (write: PendingWrite) => Promise<void>;
+      }) => Promise<DrainResult>)
+    | undefined;
+};
+
+export function coverageProfileFor(
+  journeyType: "investor" | "founder",
+): OnboardingCoverageProfile {
+  return journeyType === "founder"
+    ? FOUNDER_COVERAGE_PROFILE
+    : INVESTOR_COVERAGE_PROFILE;
+}
+
 export type RecommendationStore = Pick<
   OnboardingQRecommendations,
   "recommend" | "pending"
@@ -183,6 +222,11 @@ export type BoundOnboardingPort = OnboardingToolPort &
      * person's own token; nothing when the step already has an answer.
      */
     readonly recordKnown: (stepKey: string, raw: string) => Promise<boolean>;
+    /**
+     * Replays held changes (lane ob1) through the ordinary submit, before
+     * the turn reads its state. Null when nothing can be held here.
+     */
+    readonly replayHeld: () => Promise<DrainResult | null>;
     /** Q's recommendations still waiting on the person, as Q would say them. */
     readonly pendingRecommendations: () => Promise<
       readonly {
@@ -283,6 +327,15 @@ export function createOnboardingPort(input: {
    */
   readonly statedEarlier?:
     ((stepKey: string, quote: string) => boolean) | undefined;
+  /**
+   * Held changes (lane ob1): where a confirmed write fails because the
+   * onboarding service is temporarily down, it is held durably here and
+   * retried, never dropped and never claimed as saved. Absent: such a
+   * failure is reported as not accepted, as before.
+   */
+  readonly held?: HeldOnboardingWrites | undefined;
+  /** Facts the platform holds already (registration): never asked again. */
+  readonly knownFacts?: readonly OnboardingKnownFact[] | undefined;
 }): BoundOnboardingPort {
   const steps = new Map(
     definitionFor(input.journeyType).steps.map(
@@ -409,6 +462,25 @@ export function createOnboardingPort(input: {
   const state = async (): Promise<OnboardingState> => {
     const view = await fresh();
     const pendingList = await pendingNow().catch(() => []);
+    const heldSteps =
+      input.held === undefined
+        ? new Set<string>()
+        : await input.held.pendingSteps().catch(() => new Set<string>());
+    // The canonical coverage picture (lane ob1): the same projection the
+    // form reads, so Q never re-asks what is known, saved or held.
+    const coverage = deriveOnboardingCoverage({
+      profile: coverageProfileFor(input.journeyType),
+      definition: definitionFor(input.journeyType),
+      view,
+      known: input.knownFacts,
+      checks: openChecks(view).map((check) => ({
+        stepKeys: [...check.stepKeys],
+        fact: check.fact,
+      })),
+      pendingSaves: [...heldSteps],
+      now: new Date(),
+    });
+    const coverageOf = new Map(coverage.fields.map((f) => [f.fieldKey, f]));
     const rows: OnboardingStepState[] = [];
     for (const eligible of view.progress.eligibleSteps) {
       const step = steps.get(eligible.stepKey);
@@ -465,6 +537,27 @@ export function createOnboardingPort(input: {
         ...(open?.maxChoices === undefined
           ? {}
           : { maxChoices: open.maxChoices }),
+        ...(() => {
+          const field = coverageOf.get(step.stepKey);
+          if (field === undefined) return {};
+          const offer = field.proposals.find(
+            (p) => p.source === "DOCUMENT" || p.source === "PUBLIC_RESEARCH",
+          );
+          return {
+            coverage: field.state,
+            priority: field.priority,
+            ...(field.savePending ? { savePending: true } : {}),
+            ...(offer === undefined
+              ? {}
+              : {
+                  offered: `${offer.display} (${
+                    offer.source === "DOCUMENT"
+                      ? "from their document"
+                      : "from a public page, not verified"
+                  })`.slice(0, 600),
+                }),
+          };
+        })(),
         ...(await (async () => {
           const held = pendingList.find((r) => r.stepKey === step.stepKey);
           if (held === undefined) return {};
@@ -493,6 +586,11 @@ export function createOnboardingPort(input: {
           stepKeys: [...check.stepKeys].slice(0, 4),
           raised: input.raisedChecks?.has(check.id) === true,
         })),
+      next: coverage.next.map((n) => ({
+        stepKey: n.fieldKey,
+        reason: n.reason,
+      })),
+      minutesLeft: coverage.summary.minutesLeft,
     };
   };
 
@@ -943,6 +1041,25 @@ export function createOnboardingPort(input: {
           : { movedFrom: prepared.movedFrom }),
       };
     } catch (error: unknown) {
+      if (input.held !== undefined && isTransientOnboardingFailure(error)) {
+        try {
+          await input.held.hold(step.stepKey, {
+            value,
+            ...(note === undefined ? {} : { note }),
+          });
+          return {
+            stepKey: step.stepKey,
+            outcome: "HELD_FOR_RETRY",
+            question: (
+              SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+            ).slice(0, 400),
+            reason:
+              "Not saved yet: the service is briefly unavailable. Their answer is held and will be saved automatically; nothing is lost. Tell them plainly it is not saved yet, do not ask it again, and carry on.",
+          };
+        } catch {
+          // The hold itself failed: report the original failure honestly.
+        }
+      }
       return refused(step.stepKey, error);
     }
   };
@@ -1892,6 +2009,44 @@ export function createOnboardingPort(input: {
     recorded: () => [...written],
     recordFromSignup: (stepKey, text) => recordPlatformHeld(stepKey, text),
     recordKnown: (stepKey, raw) => recordPlatformHeld(stepKey, raw),
+    replayHeld: async () => {
+      const drain = input.held?.drain;
+      if (drain === undefined) return null;
+      return drain({
+        currentValue: async (stepKey) => {
+          const view = await fresh();
+          return (
+            view.responses.find((r) => r.stepKey === stepKey)?.value ?? null
+          );
+        },
+        submit: async (write) => {
+          const view = await current();
+          // Validated again: the held row is data, not a trusted value.
+          const value = OnboardingResponseValueSchema.parse(
+            write.response.value,
+          );
+          const response =
+            write.response.note === undefined
+              ? { value }
+              : { value, note: write.response.note };
+          latest = await settle(
+            await submitOnboardingResponse(
+              input.session,
+              input.onboardingSessionId,
+              {
+                stepKey: write.stepKey,
+                response,
+                expectedSessionVersion: view.session.version,
+              },
+              // Derived from the held row and the version it targets: a
+              // retried replay of the same version replays, not repeats.
+              pendingReplayKey(write.id, view.session.version),
+            ),
+          );
+          written.push(write.stepKey);
+        },
+      });
+    },
     pendingRecommendations: async () => {
       const view = await current();
       const list = await pendingNow().catch(() => []);

@@ -23,6 +23,7 @@ import {
   type QTurnAuthority,
 } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
+import { knownFactsFromRegistration } from "@capital-q/onboarding";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
@@ -71,9 +72,11 @@ import {
   type StandingStore,
 } from "./standing.js";
 import {
+  coverageProfileFor,
   createOnboardingPort,
   type RecommendationStore,
 } from "./onboarding-port.js";
+import type { HeldWritesStore } from "./held-writes.js";
 import { createReplySentenceStream } from "./reply-stream.js";
 import type { InvestorResearch } from "./investor-research.js";
 import { createResearchPublicLinksTool } from "./investor-research-tool.js";
@@ -290,6 +293,11 @@ export type InterviewAgentDependencies = {
   readonly now?: (() => number) | undefined;
   /** The whole turn's deadline; tests shorten it. */
   readonly turnDeadlineMs?: number | undefined;
+  /**
+   * Durable hold for confirmed answers a temporary failure kept from
+   * saving (lane ob1). Absent: such a failure is reported, not held.
+   */
+  readonly heldWrites?: HeldWritesStore | undefined;
 };
 
 export type RaisedChecks = {
@@ -417,8 +425,39 @@ export function turnNotesFor(input: {
    * the website, description and pitch deck never asked).
    */
   readonly open?: JourneyOpenings | undefined;
+  /**
+   * Held changes replayed before this turn (lane ob1), by question: now
+   * saved, refused on replay, or still held because a service is down.
+   */
+  readonly held?:
+    | {
+        readonly applied: readonly string[];
+        readonly refused: readonly string[];
+        readonly stillPending: readonly string[];
+      }
+    | undefined;
 }): string {
   const notes: string[] = [];
+  const held = input.held;
+  if (held !== undefined) {
+    const list = (items: readonly string[]) =>
+      items.map((q) => `"${q.slice(0, 80)}"`).join(", ");
+    if (held.applied.length > 0) {
+      notes.push(
+        `What they confirmed earlier that could not be saved at the time is now saved: ${list(held.applied)}. Say so in one short sentence.`,
+      );
+    }
+    if (held.refused.length > 0) {
+      notes.push(
+        `What they confirmed earlier could not be saved after all, because it was not accepted: ${list(held.refused)}. Say so plainly and ask for it again.`,
+      );
+    }
+    if (held.stillPending.length > 0) {
+      notes.push(
+        `Still held and NOT saved yet (a service is briefly unavailable): ${list(held.stillPending)}. Never say these are saved, and do not ask them again.`,
+      );
+    }
+  }
   if (input.pausing) {
     notes.push(
       "They want to pause and come back later: acknowledge it in one short sentence, say their answers are kept, and ask nothing.",
@@ -744,6 +783,14 @@ export function createInterviewAgent(
         ? dependencies.investorResearch
         : dependencies.founderResearch
       )?.unsaid(input.onboardingSessionId),
+      held: dependencies.heldWrites?.bind({
+        userId: actor.userId,
+        sessionId: input.onboardingSessionId,
+      }),
+      knownFacts: knownFactsFromRegistration(
+        coverageProfileFor(input.journeyType),
+        input.signup ?? null,
+      ),
     });
     // The newest turns verbatim, the older ones as a bounded summary
     // (P0-5): the whole conversation, within a fixed budget.
@@ -905,6 +952,26 @@ export function createInterviewAgent(
     // No stuck steps: what the platform already holds (the journey they
     // chose answers F0.intent) is on the record before any model reads the
     // turn. Every turn, so a session already stuck on one is repaired.
+    // Held changes first (lane ob1): what they confirmed while a service
+    // was down is saved now, through the ordinary submit, before anything
+    // reads the record; never twice, never claimed early.
+    const replay = await port.replayHeld().catch(() => null);
+    const questionOf = (stepKey: string): string =>
+      SPOKEN_QUESTIONS[stepKey] ??
+      journeySteps.find((s) => s.stepKey === stepKey)?.configuration.prompt ??
+      stepKey;
+    const heldNote =
+      replay === null ||
+      replay.applied.length +
+        replay.refused.length +
+        replay.stillPending.length ===
+        0
+        ? undefined
+        : {
+            applied: replay.applied.map(questionOf),
+            refused: replay.refused.map((r) => questionOf(r.stepKey)),
+            stillPending: replay.stillPending.map(questionOf),
+          };
     await settleKnownAnswers(port, input.journeyType);
     await prefillFromSignup();
     let state = await port.state();
@@ -1104,6 +1171,7 @@ export function createInterviewAgent(
         pronounce,
         research: researchNote,
         open,
+        held: heldNote,
       });
       return {
         authority,
