@@ -1,8 +1,15 @@
+import { randomUUID } from "node:crypto";
+
+import { CorrelationIdSchema } from "@capital-q/contracts";
 import {
   decodeJsonbString,
   jsonbParam,
   type DatabaseExecutor,
+  type TransactionManager,
 } from "@capital-q/database";
+import type { OutboxWriter } from "@capital-q/eventing";
+import { MediaOwnerTypeSchema, MediaPurposeSchema } from "@capital-q/media";
+import { mediaPitchSectionsReadEvent } from "@capital-q/media/events";
 import {
   FOUNDER_PROFILE_SECTIONS,
   FOUNDER_PROFILE_SECTIONS_VERSION,
@@ -47,6 +54,17 @@ export type PitchSectionReadingOptions = {
   readonly sql: DatabaseExecutor;
   readonly reader: PitchSectionReader;
   readonly logger: RunnerLogger;
+  /**
+   * Lane ob1: the stored reading is announced (media.pitch_sections.read)
+   * in the same transaction, so founder onboarding proposes its sections.
+   * Absent: stored only, as before.
+   */
+  readonly publish?:
+    | {
+        readonly transactions: TransactionManager;
+        readonly outbox: OutboxWriter;
+      }
+    | undefined;
 };
 
 export type PitchSectionReadingOutcome =
@@ -159,7 +177,8 @@ export async function readPitchSections(
     );
     return { kind: "EMPTY" };
   }
-  const inserted = await options.sql<{ id: string }[]>`
+  const store = async (sql: DatabaseExecutor) =>
+    sql<{ id: string }[]>`
     insert into media.pitch_section_readings
       (tenant_id, media_asset_id, language, prompt_version, sections_version, sections)
     values (${target.tenantId}, ${target.mediaAssetId}, ${row.language},
@@ -167,6 +186,52 @@ export async function readPitchSections(
             ${jsonbParam(options.sql, reading)})
     on conflict (media_asset_id, language, prompt_version, sections_version) do nothing
     returning id`;
+  const publish = options.publish;
+  const inserted =
+    publish === undefined
+      ? await store(options.sql)
+      : await publish.transactions.run(async (tx) => {
+          const rows = await store(tx.sql);
+          const readingId = rows[0]?.id;
+          if (readingId === undefined) return rows;
+          // The asset's owner, read in the same unit: identifiers only.
+          const owner = (
+            await tx.sql<
+              {
+                owner_type: string;
+                owner_id: string;
+                owner_organisation_id: string;
+                purpose: string;
+              }[]
+            >`
+              select owner_type, owner_id, owner_organisation_id, purpose
+                from media.media_assets
+               where tenant_id = ${target.tenantId} and id = ${target.mediaAssetId}`
+          )[0];
+          if (owner !== undefined) {
+            await publish.outbox.enqueue(
+              tx,
+              mediaPitchSectionsReadEvent(
+                {
+                  tenantId: target.tenantId,
+                  organisationId: owner.owner_organisation_id,
+                  correlationId: CorrelationIdSchema.safeParse(correlationId)
+                    .success
+                    ? CorrelationIdSchema.parse(correlationId)
+                    : CorrelationIdSchema.parse(`cor_${randomUUID()}`),
+                },
+                {
+                  mediaAssetId: target.mediaAssetId,
+                  ownerType: MediaOwnerTypeSchema.parse(owner.owner_type),
+                  ownerId: owner.owner_id,
+                  purpose: MediaPurposeSchema.parse(owner.purpose),
+                  readingId,
+                },
+              ),
+            );
+          }
+          return rows;
+        });
   const facts = reading.reduce((sum, section) => sum + section.facts.length, 0);
   options.logger.info(
     {

@@ -46,6 +46,8 @@ const READY_EVENT = "evidence.document.ready";
 /** An investor's narrative answer → Q's reading of the mandate (CQ-PRE-REC-001 §6). */
 const RESPONSE_COMMITTED_EVENT = "onboarding.response.committed";
 const MEDIA_STATUS_CHANGED_EVENT = "media.asset.status_changed";
+/** Lane ov stored a pitch reading: its sections become founder proposals. */
+const PITCH_SECTIONS_READ_EVENT = "media.pitch_sections.read";
 /**
  * A free-text turn of the conversational interview that no deterministic
  * rule could place (CQ-PRE-REC-001 §20): the journey's own reading turns it
@@ -93,6 +95,13 @@ export type DocumentProcessingHandlerOptions = {
         }) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
         readonly onResponseCommitted: ResponseReader;
         readonly onUtterance: UtteranceReader;
+        readonly onPitchSectionsRead?:
+          | ((event: {
+              readonly tenantId: TenantId;
+              readonly companyId: string;
+              readonly readingId: string;
+            }) => Promise<{ readonly kind: string }>)
+          | undefined;
       }
     | undefined;
   /**
@@ -262,6 +271,42 @@ export function createDomainEventHandler(
           "recommendation slate refresh failed; retrying",
         );
         return { kind: "RETRY", errorCode: "RECOMMENDATION_REFRESH_FAILED" };
+      }
+    }
+    if (event.type === PITCH_SECTIONS_READ_EVENT) {
+      const read = event.data as {
+        readonly ownerType?: unknown;
+        readonly ownerId?: unknown;
+        readonly readingId?: unknown;
+      };
+      const tenantId = TenantIdSchema.safeParse(event.tenantId);
+      const propose = founderReview?.onPitchSectionsRead;
+      if (
+        propose === undefined ||
+        !tenantId.success ||
+        read.ownerType !== "COMPANY" ||
+        typeof read.ownerId !== "string" ||
+        typeof read.readingId !== "string"
+      ) {
+        return { kind: "ARCHIVE" };
+      }
+      try {
+        const outcome = await propose({
+          tenantId: tenantId.data,
+          companyId: read.ownerId,
+          readingId: read.readingId,
+        });
+        logger.info(
+          { msgId: message.msgId, eventId: event.id, outcome: outcome.kind },
+          "pitch sections proposed to founder onboarding",
+        );
+        return { kind: "ARCHIVE" };
+      } catch (error: unknown) {
+        logger.warn(
+          { err: error, msgId: message.msgId, eventId: event.id },
+          "pitch section proposals failed; retrying",
+        );
+        return { kind: "RETRY", errorCode: "PITCH_SECTION_PROPOSALS_FAILED" };
       }
     }
     if (event.type === MEDIA_STATUS_CHANGED_EVENT) {

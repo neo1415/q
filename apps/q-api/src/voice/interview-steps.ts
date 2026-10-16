@@ -55,6 +55,11 @@ export type InterviewTurnInput = {
   /** Empty for the opening line. */
   readonly utterance: string;
   /**
+   * The founder profile section they came to fill (profile-sections key):
+   * Q asks that section's question first. Unknown keys change nothing.
+   */
+  readonly focus?: string | undefined;
+  /**
    * What they typed when they created the account (QX-004 core gate §2).
    *
    * Captured at sign-up and then, until now, never used: Q asked "what is
@@ -607,7 +612,28 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
   eighty: 80,
   ninety: 90,
 };
+/**
+ * Digits in any script the platform hears as ASCII digits, with the Arabic
+ * decimal and grouping marks as "." and "," (owner 2026-10-16: "١٫٥ مليون"
+ * was a figure nobody could read, so the raise was refused).
+ */
+export function asciiDigits(text: string): string {
+  return text
+    .replace(/[\u0660-\u0669]/gu, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06f0-\u06f9]/gu, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/\u066b/gu, ".")
+    .replace(/\u066c/gu, ",");
+}
+
 const SCALE_WORDS: Readonly<Record<string, number>> = {
+  // Arabic scale words ("ألف", "مليون", "مليار") and their plurals.
+  ألف: 1e3,
+  الف: 1e3,
+  آلاف: 1e3,
+  الاف: 1e3,
+  مليون: 1e6,
+  ملايين: 1e6,
+  مليار: 1e9,
   hundred: 100,
   thousand: 1e3,
   k: 1e3,
@@ -625,8 +651,10 @@ const SCALE_WORDS: Readonly<Record<string, number>> = {
  * a word that is none of these ends the reading.
  */
 function spokenNumber(text: string): number | null {
-  const tokens = text
+  const tokens = asciiDigits(text)
     .toLowerCase()
+    // A currency code or sign fastened to the figure ("USD1.5m", "AED180k").
+    .replace(/\b([a-z]{3})(?=\d)/g, "$1 ")
     .replace(/[,$€£₦]/g, "")
     .replace(/-/g, " ")
     .split(/\s+/)
@@ -635,6 +663,7 @@ function spokenNumber(text: string): number | null {
   let current = 0;
   let sawNumber = false;
   let previous = "";
+  let lastScale = 0;
   for (const token of tokens) {
     const before = previous;
     previous = token;
@@ -661,7 +690,9 @@ function spokenNumber(text: string): number | null {
     // "four and a half million" (live 2026-09-30): a half of the unit
     // being counted, before its scale.
     if (token === "half" && sawNumber) {
-      current += 0.5;
+      // "a million and a half": half of the scale just counted.
+      if (current === 0 && lastScale > 0) total += lastScale / 2;
+      else current += 0.5;
       continue;
     }
     const scale = SCALE_WORDS[token];
@@ -676,6 +707,7 @@ function spokenNumber(text: string): number | null {
       } else {
         total += (current === 0 ? 1 : current) * scale;
         current = 0;
+        lastScale = scale;
       }
       continue;
     }
@@ -706,7 +738,7 @@ function spokenNumber(text: string): number | null {
  * meaning.
  */
 export function spokenFiguresIn(text: string): readonly number[] {
-  const tokens = text
+  const tokens = asciiDigits(text)
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s-]/gu, " ")
     .split(/\s+/)

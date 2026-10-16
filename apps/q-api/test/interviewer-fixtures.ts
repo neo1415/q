@@ -79,6 +79,11 @@ export type WorldOptions = {
   /** Each vocabulary's top-level categories, by display name -> node id. */
   readonly taxonomyRoots?: Readonly<Record<string, string>> | undefined;
   /** The mandate candidate context the view carries on the I1 step. */
+  /**
+   * Steps off this person's path: the fake refuses them the way the
+   * service does (409 STEP_NOT_ELIGIBLE), as revenue for a pre-seed company.
+   */
+  readonly ineligible?: readonly string[] | undefined;
   readonly mandates?:
     | {
         readonly candidates: readonly string[];
@@ -440,6 +445,25 @@ export function investorSession(options: WorldOptions): InvestorWorld {
       response: { value: OnboardingResponseValue; note?: string };
     }): Promise<Response> => {
       tried.push(body.stepKey);
+      if (options.ineligible?.includes(body.stepKey) === true) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              type: "urn:capitalq:problem:resource-conflict",
+              title: "The request conflicts with the current state.",
+              status: 409,
+              code: "RESOURCE_CONFLICT",
+              requestId: "req_test",
+              detail:
+                "The onboarding session does not allow this action right now. (STEP_NOT_ELIGIBLE)",
+            }),
+            {
+              status: 409,
+              headers: { "content-type": "application/problem+json" },
+            },
+          ),
+        );
+      }
       const needs = options.refuseUntil?.[body.stepKey];
       if (needs !== undefined && !held.has(needs)) {
         return Promise.resolve(refusal(needs.split(".").at(-1) ?? needs));

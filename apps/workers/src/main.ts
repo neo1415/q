@@ -172,6 +172,7 @@ import {
   withDeckReadings,
 } from "./evidence/deck-reading-handler.js";
 import { runDeckReadingHeal } from "./evidence/deck-reading-backfill.js";
+import { createPitchSectionsPort } from "./media/pitch-section-proposals.js";
 import { runPitchSectionSweep } from "./media/pitch-section-readings.js";
 import { createOutboxPublisherRunner } from "./outbox-runner.js";
 import { runRetentionTicker } from "./retention/retention.js";
@@ -353,6 +354,8 @@ const founderReview =
           onboarding.internal.createSuggestion(command as never),
         recordQuestions: (command) =>
           onboarding.internal.recordInterviewQuestions(command as never),
+        // Lane ob1: lane ov's pitch readings, proposed as the sections.
+        pitchSections: createPitchSectionsPort(database.sql),
         extraction: createFounderExtraction({
           // The extraction declares the narrow slice of the gateway it uses
           // — one task class, one output shape — which is deliberately not
@@ -1480,6 +1483,12 @@ await Promise.all([
             sql: database.sql,
             reader: pitchSectionReader,
             logger,
+            // Lane ob1: each stored reading is announced, so founder
+            // onboarding proposes its sections for the founder to confirm.
+            publish: {
+              transactions: database.transactions,
+              outbox: createOutboxWriter({ registry }),
+            },
           },
           intervalMs: 5 * 60 * 1000,
           perSweep: 5,

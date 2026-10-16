@@ -22,6 +22,9 @@ import { createRecordingLogger, TENANT_A } from "./support/fakes.js";
  */
 
 const PITCH = "a0000000-0000-4000-8000-000000000021";
+const READING_ID = "a0000000-0000-4000-8000-000000000022";
+const COMPANY_ID = "a0000000-0000-4000-8000-000000000023";
+const ORGANISATION_ID = "a0000000-0000-4000-8000-000000000024";
 const CUES = [{ startMs: 2_000, endMs: 4_000, text: "Ports lose a day." }];
 
 function harness(options: {
@@ -39,7 +42,7 @@ function harness(options: {
       queries.push(text);
       if (text.includes("insert into media.pitch_section_readings")) {
         inserted.push(values);
-        return Promise.resolve([{ id: "r1" }]);
+        return Promise.resolve([{ id: READING_ID }]);
       }
       if (text.includes("select distinct on (t.media_asset_id)")) {
         return Promise.resolve(
@@ -54,6 +57,16 @@ function harness(options: {
             ? [{ language: "en", cues: CUES, duration_seconds: 90 }]
             : [],
         );
+      }
+      if (text.includes("select owner_type, owner_id")) {
+        return Promise.resolve([
+          {
+            owner_type: "COMPANY",
+            owner_id: COMPANY_ID,
+            owner_organisation_id: ORGANISATION_ID,
+            purpose: "FOUNDER_PITCH",
+          },
+        ]);
       }
       if (text.includes("from ai_ops.model_usage")) {
         return Promise.resolve([{ usd: String(options.spentUsd ?? 0) }]);
@@ -218,5 +231,47 @@ describe("the backfill", () => {
       runId: "t3",
     });
     expect(result.outcomes).toEqual([{ mediaAssetId: PITCH, outcome: "READ" }]);
+  });
+});
+
+describe("a stored reading is announced to founder onboarding (lane ob1)", () => {
+  it("enqueues media.pitch_sections.read in the same unit, identifiers only", async () => {
+    const h = harness({ eligible: true });
+    const events: { type: string; data: unknown }[] = [];
+    let units = 0;
+    const outcome = await readPitchSections(
+      {
+        ...h.reading,
+        publish: {
+          transactions: {
+            run: (work) => {
+              units += 1;
+              return work({ sql: h.reading.sql } as never);
+            },
+          },
+          outbox: {
+            enqueue: (_tx: unknown, event: { type: string; data: unknown }) => {
+              events.push(event);
+              return Promise.resolve();
+            },
+          } as never,
+        },
+      },
+      { tenantId: TENANT_A, mediaAssetId: PITCH },
+      "cor_test",
+    );
+    expect(outcome).toMatchObject({ kind: "READ", stored: true });
+    expect(units).toBe(1);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.type).toBe("media.pitch_sections.read");
+    expect(events[0]?.data).toEqual({
+      mediaAssetId: PITCH,
+      ownerType: "COMPANY",
+      ownerId: COMPANY_ID,
+      purpose: "FOUNDER_PITCH",
+      readingId: READING_ID,
+    });
+    // Identifiers only: never a fact or a quote.
+    expect(JSON.stringify(events[0])).not.toContain("a day");
   });
 });

@@ -33,11 +33,11 @@ const countryOptions = (definition: typeof FOUNDER_DEFINITION_V5) => {
 };
 
 describe("founder definition v5", () => {
-  it("is valid, and current", () => {
+  it("is valid, and superseded only by v6", () => {
     expect(() =>
       validateOnboardingManifest(FOUNDER_DEFINITION_V5),
     ).not.toThrow();
-    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(5);
+    expect(FOUNDER_DEFINITION_CURRENT.version).toBe(6);
   });
 
   it("adds Qatar and the other missing GCC countries before 'somewhere else'", () => {

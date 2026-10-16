@@ -235,6 +235,7 @@ export function registerOnboardingRoutes(
           utterance: input.text,
           channel: "text",
           recentTurns: input.recentTurns,
+          ...(input.focus === undefined ? {} : { focus: input.focus }),
         },
       });
 

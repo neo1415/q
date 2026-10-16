@@ -34,6 +34,13 @@ export default async function FounderOnboardingPage({
   // Q has already welcomed them, and the screen does not do it twice.
   const greeted = startTalking || params["from"] === "home";
   const openReview = params["review"] === "1";
+  // Lane ov's Overview links a gap here ("?talk=1&section=<key>"): Q opens
+  // on that section. A profile-sections key, checked by the API too.
+  const rawSection = params["section"];
+  const focusSection =
+    typeof rawSection === "string" && /^[a-z][a-z_]{0,39}$/.test(rawSection)
+      ? rawSection
+      : undefined;
   const rawSeed = params["fixture"];
   const seed =
     config.founderOnboardingAdapter === "fixture" && typeof rawSeed === "string"
@@ -52,6 +59,7 @@ export default async function FounderOnboardingPage({
         startTalking={startTalking}
         greeted={greeted}
         openReview={openReview}
+        focusSection={focusSection}
       />
     </RegistrationDefaultsProvider>
   );

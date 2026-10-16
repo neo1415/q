@@ -6,7 +6,6 @@ import {
   skipOnboardingStep,
   getOnboardingSession,
   getTaxonomyNode,
-  listTaxonomyNodes,
   resolveOnboardingSuggestion,
   submitOnboardingResponse,
   submitOnboardingResponses,
@@ -32,6 +31,8 @@ import {
 import {
   deriveOnboardingCoverage,
   isTransientOnboardingFailure,
+  clausesOf,
+  negatedMention,
   pendingReplayKey,
   type DrainResult,
   type PendingWrite,
@@ -370,7 +371,9 @@ export function createOnboardingPort(input: {
     .catch(() => []);
   /** The person's own words carry this write, or it does not happen. */
   const said = (quote: string): boolean =>
-    input.personTurns.some((turn) => quoteOccursIn(quote, turn));
+    input.personTurns.some(
+      (turn) => quoteOccursIn(quote, turn) || shortWordIn(quote, turn),
+    );
   const unsaid = (stepKey: string): OnboardingRecordResult => ({
     stepKey: stepKey.slice(0, 80),
     outcome: "REJECTED",
@@ -628,28 +631,54 @@ export function createOnboardingPort(input: {
     };
   };
 
+  /**
+   * The session moved under this turn (a document reading or the form
+   * added a proposal, which bumps its version): the write is made again
+   * against the fresh version at once, never held as a "temporary fault"
+   * (live 2026-10-16: "monthly revenue 180k AED" held three times).
+   */
+  const onFreshVersion = async <T>(
+    attempt: (version: number) => Promise<T>,
+  ): Promise<T> => {
+    const view = await current();
+    try {
+      return await attempt(view.session.version);
+    } catch (error: unknown) {
+      const failed = error as {
+        readonly status?: unknown;
+        readonly code?: unknown;
+      };
+      if (failed.status !== 409 || failed.code !== "VERSION_CONFLICT") {
+        throw error;
+      }
+      const again = await fresh();
+      return attempt(again.session.version);
+    }
+  };
+
   const submit = async (
     stepKey: string,
     value: OnboardingResponseValue,
     note?: string,
   ): Promise<void> => {
-    const view = await current();
     trusted = false;
     latest = await settle(
-      await submitOnboardingResponse(
-        input.session,
-        input.onboardingSessionId,
-        {
-          stepKey,
-          response: {
-            value,
-            ...(note === undefined ? {} : { note }),
-            // Given in the conversation with Q, not the form (lane ob1).
-            channel: "CONVERSATION",
+      await onFreshVersion((version) =>
+        submitOnboardingResponse(
+          input.session,
+          input.onboardingSessionId,
+          {
+            stepKey,
+            response: {
+              value,
+              ...(note === undefined ? {} : { note }),
+              // Given in the conversation with Q, not the form (lane ob1).
+              channel: "CONVERSATION",
+            },
+            expectedSessionVersion: version,
           },
-          expectedSessionVersion: view.session.version,
-        },
-        randomUUID(),
+          randomUUID(),
+        ),
       ),
     );
     trusted = true;
@@ -676,37 +705,13 @@ export function createOnboardingPort(input: {
       }
     | { readonly ok: false; readonly result: OnboardingRecordResult };
 
-  /**
-   * The categories a taxonomy step records, by name: each vocabulary's
-   * top level. A category that cannot be read is left out, never guessed.
-   */
-  const categoriesOf = async (
-    vocabularyCodes: readonly string[],
-  ): Promise<string[]> => {
-    const names: string[] = [];
-    for (const code of vocabularyCodes.slice(0, 6)) {
-      try {
-        const page = await listTaxonomyNodes(input.session, code, {
-          roots: true,
-          limit: 40,
-        });
-        for (const node of page.items) {
-          if (!names.includes(node.displayName)) {
-            names.push(node.displayName.slice(0, 160));
-          }
-        }
-      } catch {
-        // A vocabulary that cannot be listed offers nothing.
-      }
-    }
-    return names.slice(0, 40);
-  };
-
   /** What the words resolve to for this step, validated; nothing written. */
   const resolve = async (answer: {
     readonly stepKey: string;
     readonly value: string | readonly string[] | number | boolean;
     readonly ownWords?: boolean | undefined;
+    /** Their own words for it, kept when no option or number holds them. */
+    readonly quote?: string | undefined;
   }): Promise<Resolved> => {
     const refuse = (result: OnboardingRecordResult): Resolved => ({
       ok: false,
@@ -722,6 +727,14 @@ export function createOnboardingPort(input: {
     }
     let value: OnboardingResponseValue | null;
     let otherWords: string | undefined;
+    // Their own words where they hold the answer; the model's reading of
+    // them otherwise. Bounded as the runtime keeps them.
+    const ownWordsFor = (reading: string): string => {
+      const quote = answer.quote?.trim() ?? "";
+      const words =
+        quote.length > 0 && quote.length <= 300 ? quote : reading.trim();
+      return words.slice(0, 500);
+    };
     const c = step.configuration;
     if (
       c.stepType === "reference_select" &&
@@ -750,69 +763,25 @@ export function createOnboardingPort(input: {
           // Their own words, kept beside the categories that did match,
           // when Q marks them so (live 2026-09-30: "AI infrastructure"
           // came back as ambiguous three times running).
-          if (answer.ownWords === true) {
-            unmatched.push(phrase);
-            continue;
-          }
-          return refuse({
-            stepKey: step.stepKey,
-            outcome: "AMBIGUOUS",
-            reason: `"${phrase.slice(0, 80)}" could be more than one category.`,
-            candidates: found.candidates
-              .slice(0, 6)
-              .map((candidate) => candidate.displayName.slice(0, 160)),
-          });
+          // More than one category could be meant: their words are kept
+          // as they said them, never dropped and never forced into one
+          // (owner 2026-10-16).
+          unmatched.push(phrase);
+          continue;
         }
         if (!ids.includes(best.nodeId)) ids.push(best.nodeId);
       }
-      if (unmatched.length > 0 && answer.ownWords === true && ids.length > 0) {
+      if (unmatched.length > 0 && ids.length > 0) {
+        // The categories that matched, with their other words beside them.
         otherWords = unmatched.join(", ").slice(0, 200);
       } else if (unmatched.length > 0) {
-        // Their words name no category: the categories Capital Q records
-        // go back to the model, which reads which one means what they
-        // said (ADR 0011). Nothing is recorded until it chooses one.
-        // A sibling of the same concept whose own options hold the words
-        // ("crypto tokens" → hard exclusions' "Speculative crypto"; bench
-        // 2026-09-30). The model's words against the journey's labels.
-        const families =
-          input.journeyType === "investor" ? INVESTOR_CONCEPT_FAMILIES : [];
-        const wordsOf = (text: string) =>
-          text
-            .toLowerCase()
-            .split(/[^a-z0-9]+/)
-            .filter((w) => w.length >= 4);
-        const wanted = new Set(unmatched.flatMap(wordsOf));
-        const sibling = families
-          .filter((family) => family.stepKeys.includes(step.stepKey))
-          .flatMap((family) => family.stepKeys)
-          .filter((key) => key !== step.stepKey)
-          .flatMap((key) => {
-            const other = steps.get(key);
-            if (other === undefined) return [];
-            return optionsOf(other)
-              .filter((o) => wordsOf(o.label).some((w) => wanted.has(w)))
-              .map((o) => `${key} as "${o.label}"`);
-          })[0];
-        if (sibling !== undefined) {
-          return refuse({
-            stepKey: step.stepKey,
-            outcome: "UNMATCHED",
-            reason: `No category here holds that, but ${sibling} does: record it there instead.`,
-          });
-        }
-        return refuse({
-          stepKey: step.stepKey,
-          outcome: "UNMATCHED",
-          reason: `No category is named in ${unmatched
-            .map((p) => `"${p.slice(0, 80)}"`)
-            .join(
-              ", ",
-            )}. Choose the category below that means what they said and record it by its name; say which you chose. If none fits, ask them.`.slice(
-            0,
-            400,
-          ),
-          candidates: await categoriesOf([...c.vocabularyCodes]),
-        });
+        // No category holds their words: kept as they said them, like
+        // ticking "Other" and typing (owner 2026-10-16).
+        return {
+          ok: true,
+          step,
+          value: { type: "TEXT", text: ownWordsFor(unmatched.join(", ")) },
+        };
       }
       value = {
         type: "RESOURCE_REFERENCE",
@@ -839,11 +808,14 @@ export function createOnboardingPort(input: {
         // live 2026-09-30): the one option whose label holds all its
         // words. Only when exactly one does; this reads the model's value
         // against the journey's own labels, never the person's words.
+        // Singular and plural are the same word ("US dollars" names "US
+        // dollar"; live 2026-10-16).
         const words = (s: string) =>
           s
             .toLowerCase()
             .split(/[^a-z0-9]+/)
-            .filter((w) => w.length > 0);
+            .filter((w) => w.length > 0)
+            .map((w) => (w.length > 3 ? w.replace(/(?:es|s)$/u, "") : w));
         const value = words(wanted);
         if (value.length === 0) return undefined;
         const holding = options.filter((o) => {
@@ -868,17 +840,26 @@ export function createOnboardingPort(input: {
       // catch-all, never lost or forced into a near option. Only where the
       // step has one; the words are checked as theirs before writing.
       const catchAll = options.find((o) => o.key === "other")?.key;
-      if (
-        answer.ownWords === true &&
-        unnamed.length > 0 &&
-        catchAll !== undefined
-      ) {
+      if (unnamed.length > 0 && catchAll !== undefined) {
         keys.push(catchAll);
         otherWords = unnamed.join(", ").slice(0, 200);
+      } else if (
+        unnamed.length > 0 &&
+        keys.length > 0 &&
+        c.stepType === "multi_select"
+      ) {
+        // The options they named, with their other words beside them.
+        otherWords = unnamed.join(", ").slice(0, 200);
+      } else if (unnamed.length > 0 && keys.length === 0) {
+        // None of the options: their words are the answer ("Other: ...").
+        return {
+          ok: true,
+          step,
+          value: { type: "TEXT", text: ownWordsFor(unnamed.join(", ")) },
+        };
       }
       const [only] = keys;
       value =
-        (keys.length !== phrases.length && otherWords === undefined) ||
         only === undefined
           ? null
           : c.stepType === "single_select"
@@ -890,6 +871,32 @@ export function createOnboardingPort(input: {
       const raw =
         typeof answer.value === "number" ? String(answer.value) : answer.value;
       value = toResponseValue(step, raw);
+      // A number question answered in words no figure can be read from
+      // ("a dozen or so", "about half the team"): kept as they said it,
+      // unless the figure is impossible, which is asked about instead.
+      if (value === null && c.stepType === "range" && !impossibleFigure(raw)) {
+        return {
+          ok: true,
+          step,
+          value: { type: "TEXT", text: ownWordsFor(String(raw)) },
+        };
+      }
+    }
+    if (
+      value === null &&
+      (c.stepType === "single_select" || c.stepType === "multi_select")
+    ) {
+      // More than one option named for a one-choice question: their words,
+      // as said, rather than a guess between them.
+      const said =
+        typeof answer.value === "object"
+          ? answer.value.join(", ")
+          : String(answer.value);
+      return {
+        ok: true,
+        step,
+        value: { type: "TEXT", text: ownWordsFor(said) },
+      };
     }
     if (value === null) {
       const options = optionsOf(step);
@@ -1064,10 +1071,63 @@ export function createOnboardingPort(input: {
   };
 
   /** Write a resolved value: one concept in one exclusion list, then submit. */
+  /**
+   * A fact for a question not on their path (revenue for a pre-seed
+   * company): never refused, kept in their words with the journey's own
+   * notes, under the question's label (owner 2026-10-16).
+   */
+  const OFF_PATH_NOTES =
+    input.journeyType === "founder" ? "F7.follow_up" : "I11.additional_context";
+  const keepOffPath = async (
+    step: OnboardingStepManifest,
+    words: string,
+  ): Promise<OnboardingRecordResult | null> => {
+    const notes = steps.get(OFF_PATH_NOTES);
+    if (notes === undefined || step.stepKey === OFF_PATH_NOTES) return null;
+    const label =
+      coverageProfileFor(input.journeyType).fields[step.stepKey]?.label ??
+      (SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt).replace(
+        /\?$/u,
+        "",
+      );
+    const line = `${label}: ${words.trim()}`.slice(0, 600);
+    const view = await current();
+    const before = view.responses.find((r) => r.stepKey === OFF_PATH_NOTES);
+    const existing =
+      before?.value.type === "TEXT" ? before.value.text.trim() : "";
+    if (existing.includes(line)) {
+      return { stepKey: OFF_PATH_NOTES, outcome: "SAME_AS_ANSWER" } as never;
+    }
+    const text = (existing.length > 0 ? `${existing}\n${line}` : line).slice(
+      -2000,
+    );
+    try {
+      await submit(OFF_PATH_NOTES, { type: "TEXT", text });
+      written.push(OFF_PATH_NOTES);
+      return {
+        stepKey: OFF_PATH_NOTES,
+        outcome: "COMMITTED",
+        question: (
+          SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+        ).slice(0, 400),
+        recorded:
+          `${line} (kept with their notes: that question is not on their path)`.slice(
+            0,
+            600,
+          ),
+      };
+    } catch {
+      return null;
+    }
+  };
+  const offPath = (error: unknown): boolean =>
+    readRefusal(error).because?.includes("(STEP_NOT_ELIGIBLE)") === true;
+
   const write = async (
     step: OnboardingStepManifest,
     resolvedValue: OnboardingResponseValue,
     note?: string,
+    words?: string,
   ): Promise<OnboardingRecordResult> => {
     const prepared = await prepareSiblings(step, resolvedValue);
     if (!prepared.ok) return prepared.result;
@@ -1091,6 +1151,13 @@ export function createOnboardingPort(input: {
           : { movedFrom: prepared.movedFrom }),
       };
     } catch (error: unknown) {
+      if (offPath(error)) {
+        const kept = await keepOffPath(
+          step,
+          words ?? note ?? (await spoken(step, value, await current())),
+        );
+        if (kept !== null) return kept;
+      }
       if (input.held !== undefined && isTransientOnboardingFailure(error)) {
         try {
           await input.held.hold(step.stepKey, {
@@ -1229,6 +1296,38 @@ export function createOnboardingPort(input: {
     );
   };
 
+  /**
+   * Whether their latest words assert this quote: it is in what they just
+   * said, in a sentence that is not a question, and not something they
+   * said they are not ("we are not raising"). Code, not a reading.
+   */
+  const assertedNow = (quote: string): boolean => {
+    const latest = input.personTurns[0];
+    if (
+      latest === undefined ||
+      !(quoteOccursIn(quote, latest) || shortWordIn(quote, latest))
+    ) {
+      return false;
+    }
+    const sentences = latest.match(/[^.?!]+[.?!]*/gu) ?? [latest];
+    const words = quote.trim().toLowerCase();
+    const holding = sentences.filter((sentence) =>
+      sentence.toLowerCase().includes(words.slice(0, 40)),
+    );
+    // A question, however it is punctuated ("what are angels backing these
+    // days", "tell me about...", "هل ..."), asks; it states nothing.
+    if (
+      holding.length > 0 &&
+      holding.every((sentence) => ASKING.test(sentence.trim()))
+    ) {
+      return false;
+    }
+    // What they said they are not ("not raising"), judged on the quote's
+    // own opening clause: a later "no outside money" does not negate
+    // "bootstrapped so far".
+    const opening = clausesOf(quote)[0] ?? quote;
+    return !negatedMention(latest, opening);
+  };
   const notStated = async (
     stepKey: string,
     quote?: string,
@@ -1239,6 +1338,10 @@ export function createOnboardingPort(input: {
     if (quote !== undefined && input.statedEarlier?.(stepKey, quote) === true) {
       return null;
     }
+    // Their own words, now, asserting it: saved whether or not the
+    // reading noticed (owner 2026-10-16: "US dollars.", "Partner.",
+    // "1200000" were refused because a model missed them).
+    if (quote !== undefined && assertedNow(quote)) return null;
     return {
       stepKey: stepKey.slice(0, 80),
       outcome: "REJECTED",
@@ -1388,7 +1491,7 @@ export function createOnboardingPort(input: {
     const plan = await planOne(answer);
     if (plan.kind === "DONE") return plan.result;
     if (plan.kind === "CONFIRM") return confirmStep(plan.step, plan.value);
-    const result = await write(plan.step, plan.value, plan.note);
+    const result = await write(plan.step, plan.value, plan.note, plan.quote);
     if (result.outcome === "COMMITTED") {
       noteFigure(plan.step, plan.value, plan.quote);
     }
@@ -1465,6 +1568,7 @@ export function createOnboardingPort(input: {
     const reading = (await input.authority?.()) ?? null;
     const latestStated =
       verbatimMatch ||
+      assertedNow(answer.quote) ||
       (reading !== null && statedIn(reading.stated, resolved.step.stepKey));
     const readerStated =
       latestStated ||
@@ -1599,57 +1703,67 @@ export function createOnboardingPort(input: {
       );
     const settled: OnboardingRecordResult[] = [];
     if (ready.length > 0) {
-      const view = await current();
       trusted = false;
       try {
-        const out = await submitOnboardingResponses(
-          input.session,
-          input.onboardingSessionId,
-          {
-            responses: ready.map((item) => ({
-              stepKey: item.plan.step.stepKey,
-              response: {
-                value: item.value,
-                ...(item.plan.note === undefined
-                  ? {}
-                  : { note: item.plan.note }),
-                channel: "CONVERSATION" as const,
-              },
-            })),
-            expectedSessionVersion: view.session.version,
-          },
-          randomUUID(),
+        const out = await onFreshVersion((version) =>
+          submitOnboardingResponses(
+            input.session,
+            input.onboardingSessionId,
+            {
+              responses: ready.map((item) => ({
+                stepKey: item.plan.step.stepKey,
+                response: {
+                  value: item.value,
+                  ...(item.plan.note === undefined
+                    ? {}
+                    : { note: item.plan.note }),
+                  channel: "CONVERSATION" as const,
+                },
+              })),
+              expectedSessionVersion: version,
+            },
+            randomUUID(),
+          ),
         );
         latest = await settle(out.view);
         trusted = true;
         const after = latest;
-        settled.push(
-          ...(await Promise.all(
-            ready.map(async (item, index): Promise<OnboardingRecordResult> => {
-              const outcome = out.results[index];
-              const stepKey = item.plan.step.stepKey;
-              if (outcome?.outcome !== "COMMITTED") {
-                return refused(stepKey, {
-                  problem: outcome?.refusal ?? { detail: null, errors: [] },
-                });
-              }
-              written.push(stepKey);
-              noteFigure(item.plan.step, item.value, item.plan.quote);
-              return {
-                stepKey,
-                outcome: "COMMITTED",
-                question: questionOf(item.plan.step),
-                recorded: (item.plan.note === undefined
-                  ? await spoken(item.plan.step, item.value, after)
-                  : `${item.plan.note} (in their words)`
-                ).slice(0, 600),
-                ...(item.movedFrom === undefined
-                  ? {}
-                  : { movedFrom: item.movedFrom }),
-              };
-            }),
-          )),
-        );
+        // In order: a fact kept with their notes appends to one answer.
+        const settleOne = async (
+          item: (typeof ready)[number],
+          index: number,
+        ): Promise<OnboardingRecordResult> => {
+          const outcome = out.results[index];
+          const stepKey = item.plan.step.stepKey;
+          if (outcome?.outcome !== "COMMITTED") {
+            const problem = outcome?.refusal ?? {
+              detail: null,
+              errors: [],
+            };
+            if (offPath({ problem })) {
+              const kept = await keepOffPath(item.plan.step, item.plan.quote);
+              if (kept !== null) return kept;
+            }
+            return refused(stepKey, { problem });
+          }
+          written.push(stepKey);
+          noteFigure(item.plan.step, item.value, item.plan.quote);
+          return {
+            stepKey,
+            outcome: "COMMITTED",
+            question: questionOf(item.plan.step),
+            recorded: (item.plan.note === undefined
+              ? await spoken(item.plan.step, item.value, after)
+              : `${item.plan.note} (in their words)`
+            ).slice(0, 600),
+            ...(item.movedFrom === undefined
+              ? {}
+              : { movedFrom: item.movedFrom }),
+          };
+        };
+        for (const [index, item] of ready.entries()) {
+          settled.push(await settleOne(item, index));
+        }
       } catch (error: unknown) {
         const status = (error as { readonly status?: unknown }).status;
         if (status === 404 || status === 405) return null;
@@ -1837,7 +1951,15 @@ export function createOnboardingPort(input: {
             };
           }
         }
-        if (!resolved.ok) {
+        // A finding is offered only as a value the step holds: page words
+        // are not the person's own words (those are kept only when they
+        // say them).
+        if (
+          !resolved.ok ||
+          (resolved.value.type === "TEXT" &&
+            step.configuration.stepType !== "short_text" &&
+            step.configuration.stepType !== "long_text")
+        ) {
           results.push({ stepKey: step.stepKey, outcome: "UNRESOLVED" });
           continue;
         }
@@ -2377,7 +2499,6 @@ export function createOnboardingPort(input: {
           );
         },
         submit: async (write) => {
-          const view = await current();
           // Validated again: the held row is data, not a trusted value.
           const value = OnboardingResponseValueSchema.parse(
             write.response.value,
@@ -2391,17 +2512,19 @@ export function createOnboardingPort(input: {
           };
           trusted = false;
           latest = await settle(
-            await submitOnboardingResponse(
-              input.session,
-              input.onboardingSessionId,
-              {
-                stepKey: write.stepKey,
-                response,
-                expectedSessionVersion: view.session.version,
-              },
-              // Derived from the held row and the version it targets: a
-              // retried replay of the same version replays, not repeats.
-              pendingReplayKey(write.id, view.session.version),
+            await onFreshVersion((version) =>
+              submitOnboardingResponse(
+                input.session,
+                input.onboardingSessionId,
+                {
+                  stepKey: write.stepKey,
+                  response,
+                  expectedSessionVersion: version,
+                },
+                // Derived from the held row and the version it targets: a
+                // retried replay of the same version replays, not repeats.
+                pendingReplayKey(write.id, version),
+              ),
             ),
           );
           written.push(write.stepKey);
@@ -2471,6 +2594,31 @@ export function proposalPrerequisites(input: {
     }
   }
   return out;
+}
+
+/**
+ * A one- or two-character answer ("GP", "UK", "5") as a whole word of what
+ * they said: too short for the quote check's minimum, still their words.
+ */
+export function shortWordIn(quote: string, said: string): boolean {
+  const word = quote.trim().toLowerCase();
+  if (word.length === 0 || word.length > 2 || !/^[\p{L}\p{N}]+$/u.test(word)) {
+    return false;
+  }
+  return said
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .includes(word);
+}
+
+/** A sentence that asks rather than states: by its mark or how it opens. */
+const ASKING =
+  /[?؟]\s*$|^(?:what|which|who|whom|whose|when|where|why|how|is|are|do|does|did|can|could|should|would|will|shall|tell me|curious|i wonder|any idea|هل|ما|ماذا|كيف|لماذا|متى|أين|من)\b/iu;
+
+/** A figure no answer can have (a negative count or amount). */
+export function impossibleFigure(raw: unknown): boolean {
+  const text = String(raw).replace(/[,\s]/gu, "");
+  return /^-\d/u.test(text);
 }
 
 /** Every step a branching expression reads, in order, once each. */
