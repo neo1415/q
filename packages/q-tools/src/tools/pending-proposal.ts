@@ -98,6 +98,16 @@ export const APPROVE_PENDING_OUTCOMES = [
   "NOT_FOUND",
   /** The named id is not the change waiting; `pending` lists the one that is. */
   "NOT_THE_PENDING_ONE",
+  /**
+   * A kind that keeps its card's own Approve (money, terms, sharing a
+   * private document): nothing approved; ask them to tap Approve on it.
+   */
+  "CARD_ONLY",
+  /**
+   * Nothing they said since the card was shown is their approval (no
+   * reply yet, a no, or a change asked for): nothing approved.
+   */
+  "NOT_APPROVED_BY_THEM",
 ] as const;
 
 export const ApprovePendingProposalOutputSchema = z
@@ -165,7 +175,7 @@ export function createApprovePendingProposalTool(
     status: "ACTIVE",
     providerName: "approve_pending_proposal",
     description:
-      "Approves the one change you prepared earlier in this conversation that is still waiting for the person's decision, when they have now clearly approved it themselves (by voice or text). Pass that change's id, or the approvalId of an item list_pending_approvals returned when they clearly mean that item. Do not call it when they want the change altered first (prepare the altered version instead: it needs its own approval), when they are only asking about it, or on your own initiative. The result's outcome is the only basis for saying whether the change is saved: SAVED, SAVING, NOT_SAVED, CHANGED or EXPIRED after an approval; ALREADY_DECIDED with its current status; NONE_PENDING; SEVERAL_PENDING (ask which, from the list); NOT_THE_PENDING_ONE.",
+      "Approves the one change you prepared earlier in this conversation that is still waiting for the person's decision, when they have now clearly approved it themselves (by voice or text). Pass that change's id, or the approvalId of an item list_pending_approvals returned when they clearly mean that item. Do not call it when they want the change altered first (prepare the altered version instead: it needs its own approval), when they are only asking about it, or on your own initiative. The result's outcome is the only basis for saying whether the change is saved: SAVED, SAVING, NOT_SAVED, CHANGED or EXPIRED after an approval; ALREADY_DECIDED with its current status; NONE_PENDING; SEVERAL_PENDING (ask which, from the list); NOT_THE_PENDING_ONE; CARD_ONLY (this kind keeps its card: ask them to tap Approve on it); NOT_APPROVED_BY_THEM (nothing they said since the card was shown approves it: approve nothing, ask).",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     // The approver's authority is the Approval Engine's to check
@@ -213,6 +223,16 @@ export function createApprovePendingProposalTool(
           };
         }
         const approved = await port.approve(at, item.proposalId);
+        if (approved.status === "CARD_ONLY" || approved.status === "PENDING") {
+          return {
+            outcome:
+              approved.status === "CARD_ONLY"
+                ? "CARD_ONLY"
+                : "NOT_APPROVED_BY_THEM",
+            proposal: view(item),
+            pending: [],
+          };
+        }
         return {
           outcome:
             approved.status === "CHANGED" ||
@@ -261,6 +281,16 @@ export function createApprovePendingProposalTool(
         };
       }
       const approved = await port.approve(at, only.proposalId);
+      if (approved.status === "CARD_ONLY" || approved.status === "PENDING") {
+        return {
+          outcome:
+            approved.status === "CARD_ONLY"
+              ? "CARD_ONLY"
+              : "NOT_APPROVED_BY_THEM",
+          proposal: view(only),
+          pending: [],
+        };
+      }
       const status =
         approved.status === "CHANGED" ? "PENDING" : approved.status;
       return {

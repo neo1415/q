@@ -154,6 +154,13 @@ export {
   type ProfileAnswerField,
 } from "./ports.js";
 export {
+  explicitlyApproves,
+  mayStandAsApproval,
+  readApprovalWords,
+  type ApprovalScope,
+  type ApprovalWords,
+} from "./approval-words.js";
+export {
   APPROVE_PENDING_OUTCOMES,
   APPROVE_PENDING_PROPOSAL,
   ApprovePendingProposalInputSchema,

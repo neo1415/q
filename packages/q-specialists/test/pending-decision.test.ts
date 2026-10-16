@@ -527,8 +527,9 @@ describe("a yes in a new conversation to a change asked for elsewhere (live 2026
       remainder: null,
     });
     const outcome = await decidePending(value, turn("yes, go ahead"));
-    // Read by meaning (J7): a clear approval of the only change waiting.
-    expect(asked).toHaveLength(1);
+    // A clear approval in plain words is read by code (owner 2026-10-16):
+    // no model reading is asked for, and the only change waiting is it.
+    expect(asked).toHaveLength(0);
     expect(calls.approve).toEqual(["b23ff5cc"]);
     expect(outcome).toEqual({
       kind: "REPLY",
@@ -712,7 +713,8 @@ describe("the founder's lines, live 2026-10-02 (Zino)", () => {
       value,
       turn("Okay. I give the approval. Go ahead."),
     );
-    expect(calls.read).toBe(1);
+    // Plain approval words: read by code, no model reading (2026-10-16).
+    expect(calls.read).toBe(0);
     expect(calls.approve).toEqual(["e1"]);
     expect(outcome).toEqual({
       kind: "REPLY",
@@ -723,10 +725,19 @@ describe("the founder's lines, live 2026-10-02 (Zino)", () => {
   it("when the words cannot be read, nothing is approved or declined (the safe fallback)", async () => {
     const { value, calls } = port({ proposals: [ERRAND], reading: null });
     expect(
-      await decidePending(value, turn("Okay. I give the approval. Go ahead.")),
+      await decidePending(value, turn("that works for me, thanks")),
     ).toEqual({ kind: "NONE" });
     expect(calls.approve).toEqual([]);
     expect(calls.decline).toEqual([]);
+  });
+
+  it("plain approval words still approve when the model reading is down (owner 2026-10-16)", async () => {
+    const { value, calls } = port({ proposals: [ERRAND], reading: null });
+    expect(
+      await decidePending(value, turn("Okay. I give the approval. Go ahead.")),
+    ).toEqual({ kind: "REPLY", line: "Done: Q looks after Nixo for you." });
+    expect(calls.read).toBe(0);
+    expect(calls.approve).toEqual(["e1"]);
   });
 
   it('with two waiting, "approve the Nixon one" picks Nixo by the same name matcher', async () => {
