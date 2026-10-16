@@ -116,46 +116,46 @@ export default async function ApplicationLayout({
   ]);
   return (
     <LanguageProvider language={language}>
-    <AppShell
-      context={{ ...shell, admin, organisations, qPitch }}
-      subject={subject}
-      qConnected={qConnected}
-      onboarding={unfinished}
-      verifyNudge={verifyNudgeState}
-    >
-      <BrandStyle css={brandCss} />
-      {children}
-      <InstallPrompt />
-      {/* An investor's first pitches, cached before Discover opens (ADR 0064). */}
-      {context.kind === "INVESTOR" && unfinished === null ? (
-        <PitchWarmup />
-      ) : null}
-      <QSwarmPointer />
-      {/* Q Pitch rehearsal host (QP-F08): off unless the server enables it;
+      <AppShell
+        context={{ ...shell, admin, organisations, qPitch }}
+        subject={subject}
+        qConnected={qConnected}
+        onboarding={unfinished}
+        verifyNudge={verifyNudgeState}
+      >
+        <BrandStyle css={brandCss} />
+        {children}
+        <InstallPrompt />
+        {/* An investor's first pitches, cached before Discover opens (ADR 0064). */}
+        {context.kind === "INVESTOR" && unfinished === null ? (
+          <PitchWarmup />
+        ) : null}
+        <QSwarmPointer />
+        {/* Q Pitch rehearsal host (QP-F08): off unless the server enables it;
           the host itself admits only fictional demo accounts. Its subject
           read streams after the page and never holds the first byte. */}
-      {qPitch &&
-      unfinished === null &&
-      user.email !== null &&
-      (context.kind === "INVESTOR" || context.kind === "FOUNDER") ? (
-        <Suspense fallback={null}>
-          <QPitchEntrySlot account={user.email} role={context.kind} />
-        </Suspense>
-      ) : null}
-      {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
+        {qPitch &&
+        unfinished === null &&
+        user.email !== null &&
+        (context.kind === "INVESTOR" || context.kind === "FOUNDER") ? (
+          <Suspense fallback={null}>
+            <QPitchEntrySlot account={user.email} role={context.kind} />
+          </Suspense>
+        ) : null}
+        {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
           receipts to the Q API, and the notice when an act did not happen. */}
-      <Suspense fallback={null}>
-        <QControlRuntime
-          viewer={{
-            kind:
-              context.kind === "FOUNDER" || context.kind === "INVESTOR"
-                ? context.kind
-                : "NONE",
-            admin,
-          }}
-        />
-      </Suspense>
-    </AppShell>
+        <Suspense fallback={null}>
+          <QControlRuntime
+            viewer={{
+              kind:
+                context.kind === "FOUNDER" || context.kind === "INVESTOR"
+                  ? context.kind
+                  : "NONE",
+              admin,
+            }}
+          />
+        </Suspense>
+      </AppShell>
     </LanguageProvider>
   );
 }

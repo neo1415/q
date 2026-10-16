@@ -4,13 +4,13 @@ Lane `ml`, branch `claude/ml-oct16`. What each provider in the current voice and
 
 ## The stack as configured (code, not docs)
 
-| Path | Where | Listening | Speaking |
-| --- | --- | --- | --- |
-| Standard voice line | `apps/q-api/src/voice/providers/deepgram.ts` (Deepgram Voice Agent) | Flux: `flux-general-en`, or `flux-general-multi` for any non-English device locale | Deepgram Aura (English voices) or ElevenLabs `eleven_turbo_v2_5` |
-| Q speaking a reply (TTS) | `voice/providers/elevenlabs-speak.ts` | — | ElevenLabs `eleven_v3_conversational`, fallback `eleven_turbo_v2_5` |
-| Duplex line (`CQ_VOICE_REALTIME`, off by default) | `packages/model-gateway/src/realtime/openai.ts` | `gpt-4o-transcribe` input transcription with a `language` hint | `gpt-realtime-mini`, voices marin and cedar |
-| GPT-Live line (`CQ_VOICE_LIVE`, trial cohort) | `voice/providers/gpt-live.ts` | the model itself (no separate transcription endpoint) | `gpt-live-1`, voices marin and cedar |
-| Rehearsal video, GateQ video | `packages/integrations/src/tavus/client.ts` via `composition/rehearsal-video.ts`, `meeting-face.ts` | Tavus STT (`tavus-auto`) | Tavus TTS (Cartesia or ElevenLabs); the face's default voice; lines come from Q over the LLM bridge |
+| Path                                              | Where                                                                                               | Listening                                                                          | Speaking                                                                                            |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Standard voice line                               | `apps/q-api/src/voice/providers/deepgram.ts` (Deepgram Voice Agent)                                 | Flux: `flux-general-en`, or `flux-general-multi` for any non-English device locale | Deepgram Aura (English voices) or ElevenLabs `eleven_turbo_v2_5`                                    |
+| Q speaking a reply (TTS)                          | `voice/providers/elevenlabs-speak.ts`                                                               | —                                                                                  | ElevenLabs `eleven_v3_conversational`, fallback `eleven_turbo_v2_5`                                 |
+| Duplex line (`CQ_VOICE_REALTIME`, off by default) | `packages/model-gateway/src/realtime/openai.ts`                                                     | `gpt-4o-transcribe` input transcription with a `language` hint                     | `gpt-realtime-mini`, voices marin and cedar                                                         |
+| GPT-Live line (`CQ_VOICE_LIVE`, trial cohort)     | `voice/providers/gpt-live.ts`                                                                       | the model itself (no separate transcription endpoint)                              | `gpt-live-1`, voices marin and cedar                                                                |
+| Rehearsal video, GateQ video                      | `packages/integrations/src/tavus/client.ts` via `composition/rehearsal-video.ts`, `meeting-face.ts` | Tavus STT (`tavus-auto`)                                                           | Tavus TTS (Cartesia or ElevenLabs); the face's default voice; lines come from Q over the LLM bridge |
 
 Before this lane, the persisted language was nowhere: every path used the browser's `navigator.language` as a hint, the GPT-Live prompt said "always speak natural, standard English", and text Q ignored the run's `locale`.
 
@@ -45,14 +45,14 @@ Before this lane, the persisted language was nowhere: every path used the browse
 
 ## Implications
 
-| Surface | Arabic plan | Status after this lane |
-| --- | --- | --- |
-| Text Q | A language note in the gateway's per-person notes: reply in MSA, follow the person if they switch, keep names, figures, currency codes and terms verbatim | Planned (this lane) |
-| Standard voice | `nova-3` + `ar` listen, ElevenLabs speak with `language: ar` | Planned (this lane) |
-| Duplex | Transcription hint `ar`; instructions in Arabic | Planned (this lane) |
-| GPT-Live | Prompt: speak Arabic (MSA) unless asked to switch | Planned (this lane) |
-| Rehearsals (voice) | The played investor speaks Arabic when the founder chose Arabic | Planned (this lane) |
-| Rehearsals / GateQ video (Tavus) | `properties.languages: ["ar","en"]`; Arabic spoken disclosure | Planned (this lane) |
-| Voice onboarding | The onboarding prompts (lane ob1) receive the effective language through an exposed parameter | Planned (this lane) |
+| Surface                          | Arabic plan                                                                                                                                               | Status after this lane |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| Text Q                           | A language note in the gateway's per-person notes: reply in MSA, follow the person if they switch, keep names, figures, currency codes and terms verbatim | Planned (this lane)    |
+| Standard voice                   | `nova-3` + `ar` listen, ElevenLabs speak with `language: ar`                                                                                              | Planned (this lane)    |
+| Duplex                           | Transcription hint `ar`; instructions in Arabic                                                                                                           | Planned (this lane)    |
+| GPT-Live                         | Prompt: speak Arabic (MSA) unless asked to switch                                                                                                         | Planned (this lane)    |
+| Rehearsals (voice)               | The played investor speaks Arabic when the founder chose Arabic                                                                                           | Planned (this lane)    |
+| Rehearsals / GateQ video (Tavus) | `properties.languages: ["ar","en"]`; Arabic spoken disclosure                                                                                             | Planned (this lane)    |
+| Voice onboarding                 | The onboarding prompts (lane ob1) receive the effective language through an exposed parameter                                                             | Planned (this lane)    |
 
 **Only a human can verify:** naturalness of Arabic speech per voice (marin, cedar, the ElevenLabs voices, Tavus faces), Gulf-dialect comprehension in real speech, code-switching mid-sentence in live audio, and lip-sync quality in Arabic.

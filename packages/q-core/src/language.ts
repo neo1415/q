@@ -1,7 +1,4 @@
-import type {
-  QLanguageCode,
-  QLanguagePreference,
-} from "@capital-q/contracts";
+import type { QLanguageCode, QLanguagePreference } from "@capital-q/contracts";
 
 /**
  * The language Q uses with a person (owner directive 2026-10-16, Arabic

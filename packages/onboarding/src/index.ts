@@ -321,3 +321,4 @@ export {
   onboardingCopyFor,
   type OnboardingCopyCatalog,
 } from "./application/confirmation.js";
+export { ARABIC_ONBOARDING_COPY } from "./application/confirmation-ar.js";

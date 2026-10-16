@@ -124,8 +124,7 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
    * overrides the device's locale on every voice line. Absent: the device's.
    */
   readonly languageOf?:
-    | ((actor: ActorContext) => Promise<QLanguagePreference>)
-    | undefined;
+    ((actor: ActorContext) => Promise<QLanguagePreference>) | undefined;
   /** The ElevenLabs transport, when composed. */
   readonly provider?: RealtimeVoiceProvider | undefined;
   /** The Deepgram transport, when composed; preferred when both exist. */
@@ -662,9 +661,10 @@ export function registerQVoiceRoutes(
         dependencies.languageOf === undefined
           ? null
           : await dependencies.languageOf(actor).catch(() => null);
-      const locale = effectiveLocale(chosen, requested.locale);
-      const { locale: _device, ...rest } = requested;
-      const input = locale === undefined ? rest : { ...rest, locale };
+      const input = {
+        ...requested,
+        locale: effectiveLocale(chosen, requested.locale),
+      };
       const header = request.headers.authorization;
       const accessToken = extractBearerToken(
         typeof header === "string" ? header : undefined,

@@ -629,8 +629,7 @@ export function createRehearsalVideoService(dependencies: {
    * Arabic; the lines themselves come from Q, already in their language.
    */
   readonly languageOf?:
-    | ((actor: ActorContext) => Promise<QLanguagePreference>)
-    | undefined;
+    ((actor: ActorContext) => Promise<QLanguagePreference>) | undefined;
   /** Tavus test_mode: the room is created but no face joins (no minutes). */
   readonly testMode?: boolean | undefined;
   /** Canonical profile admission for test and paid rooms; empty fails closed. */

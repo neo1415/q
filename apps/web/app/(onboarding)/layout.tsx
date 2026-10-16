@@ -36,16 +36,16 @@ export default async function OnboardingLayout({
   // Multilingual Q: onboarding speaks their chosen language too.
   return (
     <LanguageProvider language={uiLanguageOf(standing?.language)}>
-    <div data-fictional-scope>
-      <PublicBrandStyle />
-      {children}
-      <FictionalNames />
-      {/* R3: Q's moves from onboarding go through the client router and
+      <div data-fictional-scope>
+        <PublicBrandStyle />
+        {children}
+        <FictionalNames />
+        {/* R3: Q's moves from onboarding go through the client router and
           are verified like everywhere else. */}
-      <Suspense fallback={null}>
-        <QControlRuntime />
-      </Suspense>
-    </div>
+        <Suspense fallback={null}>
+          <QControlRuntime />
+        </Suspense>
+      </div>
     </LanguageProvider>
   );
 }

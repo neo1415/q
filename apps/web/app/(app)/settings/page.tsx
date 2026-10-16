@@ -103,7 +103,8 @@ export default async function SettingsPage({
     ]);
   const acting = mine.find((organisation) => organisation.active) ?? null;
   // Multilingual Q: this page in their chosen language.
-  const t = (english: string) => translate(uiLanguageOf(standing?.language), english);
+  const t = (english: string) =>
+    translate(uiLanguageOf(standing?.language), english);
   const organisation =
     context.kind === "NONE"
       ? null
@@ -126,7 +127,10 @@ export default async function SettingsPage({
           {/* Q room R1: Q knows it is on Settings; nothing here is read. */}
           <QSection id="settings" kind="SETTINGS" label="settings" />
           <SettingsCard id="account" title={t("Account")}>
-            <SettingRow term={t("Profile")} hint={t("What investors and founders see")}>
+            <SettingRow
+              term={t("Profile")}
+              hint={t("What investors and founders see")}
+            >
               <RowLink href="/profile">{t("Edit profile")}</RowLink>
             </SettingRow>
             <SettingRow
@@ -149,7 +153,10 @@ export default async function SettingsPage({
             <SettingRow term={t("Password")}>
               <RowLink href="/auth/update-password">{t("Change")}</RowLink>
             </SettingRow>
-            <SettingRow term={t("This device")} hint={t("Signs you out on this device")}>
+            <SettingRow
+              term={t("This device")}
+              hint={t("Signs you out on this device")}
+            >
               <SignOutButton />
             </SettingRow>
           </SettingsCard>
@@ -192,10 +199,16 @@ export default async function SettingsPage({
             <SettingRow term={t("Theme")}>
               <ThemeToggle />
             </SettingRow>
-            <SettingRow term={t("Q motion")} hint={t("How much Q's light moves")}>
+            <SettingRow
+              term={t("Q motion")}
+              hint={t("How much Q's light moves")}
+            >
               <QMotionToggle size="touch" />
             </SettingRow>
-            <SettingRow term={t("Sounds")} hint={t("Q's small sounds on this device")}>
+            <SettingRow
+              term={t("Sounds")}
+              hint={t("Q's small sounds on this device")}
+            >
               <SoundSetting />
             </SettingRow>
             {canBrand ? (
@@ -315,10 +328,16 @@ export default async function SettingsPage({
             >
               <RowLink href="/settings/billing">{t("Billing")}</RowLink>
             </SettingRow>
-            <SettingRow term={t("Allowances")} hint={t("What your plan includes")}>
+            <SettingRow
+              term={t("Allowances")}
+              hint={t("What your plan includes")}
+            >
               <RowLink href="/settings/plan">{t("Open")}</RowLink>
             </SettingRow>
-            <SettingRow term={t("Usage")} hint={t("What Q used for you this month")}>
+            <SettingRow
+              term={t("Usage")}
+              hint={t("What Q used for you this month")}
+            >
               <RowLink href="/settings/usage">{t("Usage")}</RowLink>
             </SettingRow>
           </SettingsCard>

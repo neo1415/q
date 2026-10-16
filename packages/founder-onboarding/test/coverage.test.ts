@@ -231,7 +231,11 @@ describe("deriveOnboardingCoverage (founder)", () => {
   });
 
   it("copy falls back to English for an unknown language and keeps the lane-ml seam", () => {
-    expect(onboardingCopyFor("ar-SA").saved(["Stage"])).toBe("Saved: Stage.");
+    expect(onboardingCopyFor("fr-FR").saved(["Stage"])).toBe("Saved: Stage.");
+    // Lane ml filled the seam: Arabic is a real catalog now.
+    expect(onboardingCopyFor("ar-SA").saved(["Stage"])).toBe(
+      "تم الحفظ: Stage.",
+    );
     const custom = onboardingCopyFor("ar", {
       ar: { ...onboardingCopyFor("en"), saved: () => "تم الحفظ" },
     });

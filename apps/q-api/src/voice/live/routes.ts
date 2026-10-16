@@ -87,8 +87,7 @@ export function registerLiveVoiceRoutes(
      * the device's locale. A failed read keeps the device's.
      */
     readonly languageOf?:
-      | ((request: FastifyRequest) => Promise<QLanguagePreference>)
-      | undefined;
+      ((request: FastifyRequest) => Promise<QLanguagePreference>) | undefined;
     /** Developer preview gate (LiveConfig.preview). */
     readonly preview: {
       readonly enabled: boolean;

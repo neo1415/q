@@ -105,7 +105,8 @@ Delegate before giving any answer that depends on backend work, and do not guess
  * same words as q-core's spokenLanguageNote; inlined because this file
  * stays dependency-free for the recording harness.
  */
-const ENGLISH_LANGUAGE_RULE = "\nLanguage: always speak natural, standard English,";
+const ENGLISH_LANGUAGE_RULE =
+  "\nLanguage: always speak natural, standard English,";
 const ARABIC_LANGUAGE_RULE =
   "Language: this person chose Arabic. Speak natural, clear Modern Standard Arabic, the register a Gulf professional uses at work, and understand Gulf and other Arabic dialects and Arabic-English code-switching. If they speak to you in English, or ask you to switch, follow them. Keep names, company names and investment terms as they say them (ARR, SAFE, term sheet). Say amounts as spoken Arabic with the currency named (USD, dirhams, riyals); never convert a currency. Never mimic a dialect they did not use, and never comment on how they speak.";
 
@@ -115,11 +116,10 @@ export function styleFor(locale: string | undefined): string {
   const at = STYLE.indexOf(ENGLISH_LANGUAGE_RULE);
   if (at < 0) return STYLE;
   const end = STYLE.indexOf("\n", at + 1);
-  return `${STYLE.slice(0, at)}\n${ARABIC_LANGUAGE_RULE}${end < 0 ? "" : STYLE.slice(end)}`
-    .replace(
-      "Use plain, natural phrasing a fluent English-speaking analyst would use",
-      "Use plain, natural phrasing a fluent analyst would use in their language",
-    );
+  return `${STYLE.slice(0, at)}\n${ARABIC_LANGUAGE_RULE}${end < 0 ? "" : STYLE.slice(end)}`.replace(
+    "Use plain, natural phrasing a fluent English-speaking analyst would use",
+    "Use plain, natural phrasing a fluent analyst would use in their language",
+  );
 }
 
 export function livePrompt(input: LivePromptInput = {}): string {

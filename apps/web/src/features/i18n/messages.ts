@@ -81,8 +81,7 @@ const AR: Readonly<Record<string, string>> = {
   "Q's small sounds on this device": "أصوات Q الصغيرة على هذا الجهاز",
   "How Q sounds and works with you.": "كيف يبدو Q وكيف يعمل معك.",
   Language: "اللغة",
-  "For Q's replies, voice and these screens":
-    "لردود Q وصوته وهذه الشاشات",
+  "For Q's replies, voice and these screens": "لردود Q وصوته وهذه الشاشات",
   Voice: "الصوت",
   "Listening sounds": "أصوات الإصغاء",
   "Wake word": "كلمة التنبيه",
@@ -119,8 +118,9 @@ const AR: Readonly<Record<string, string>> = {
   Continue: "متابعة",
 };
 
-const CATALOGUE: Readonly<Record<UiLanguage, Readonly<Record<string, string>>>> =
-  { en: {}, ar: AR };
+const CATALOGUE: Readonly<
+  Record<UiLanguage, Readonly<Record<string, string>>>
+> = { en: {}, ar: AR };
 
 /** The text in this language; the English source when there is none. */
 export function translate(language: UiLanguage, english: string): string {

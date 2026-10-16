@@ -2972,8 +2972,7 @@ export function createRehearsalComposer(dependencies: {
    * review then use it; a failed read is English, never a lost turn.
    */
   readonly languageOf?:
-    | ((actor: ActorContext) => Promise<string | null>)
-    | undefined;
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
   readonly dataPosture?: ModelDataPosture | undefined;
   readonly logger?: Logger | undefined;
 }): RehearsalComposer {
