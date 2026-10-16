@@ -117,6 +117,9 @@ function fakeRuntime(overrides: Partial<Runtime> = {}) {
     getCurrentSession: record("getCurrentSession", () => Promise.resolve(VIEW)),
     getSession: record("getSession", () => Promise.resolve(VIEW)),
     reviseResponse: record("reviseResponse", () => Promise.resolve(VIEW)),
+    submitResponses: record("submitResponses", () =>
+      Promise.resolve({ view: VIEW, results: [] }),
+    ),
     submitResponse: record("submitResponse", () =>
       Promise.resolve({
         ...VIEW,

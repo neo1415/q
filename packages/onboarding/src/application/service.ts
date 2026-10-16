@@ -59,6 +59,7 @@ export type OnboardingService = {
     | "getCurrentSession"
     | "getSession"
     | "submitResponse"
+    | "submitResponses"
     | "reviseResponse"
     | "skipStep"
     | "withdrawResponse"
@@ -182,6 +183,7 @@ export function createOnboardingService(
       getCurrentSession: useCases.getCurrentSession,
       getSession: useCases.getSession,
       submitResponse: useCases.submitResponse,
+      submitResponses: useCases.submitResponses,
       reviseResponse: useCases.reviseResponse,
       skipStep: useCases.skipStep,
       withdrawResponse: useCases.withdrawResponse,

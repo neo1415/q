@@ -299,6 +299,66 @@ export type SubmitOnboardingResponseCommand = SessionScopedQuery & {
   readonly correlationId: CorrelationId;
 };
 
+/**
+ * Several answers given in one breath (lane ob1, 2026-10-16), committed in
+ * one transaction instead of one round trip each.
+ */
+export type SubmitOnboardingResponsesCommand = SessionScopedQuery & {
+  readonly responses: readonly {
+    readonly stepKey: string;
+    /** Validated here against the pinned step, as a single submission is. */
+    readonly response: unknown;
+  }[];
+  readonly expectedSessionVersion: number;
+  readonly idempotencyKey: string;
+  readonly correlationId: CorrelationId;
+};
+
+/** One answer's outcome in a batch; a refusal in a single submission's terms. */
+export type OnboardingBatchOutcome =
+  | { readonly stepKey: string; readonly outcome: "COMMITTED" }
+  | {
+      readonly stepKey: string;
+      readonly outcome: "REFUSED";
+      readonly refusal: {
+        readonly detail: string | null;
+        readonly errors: readonly {
+          readonly path: string;
+          readonly code: string;
+          readonly message: string;
+        }[];
+      };
+    };
+
+/**
+ * What the journey says about one answer it will not take: its own refusal
+ * (a validation issue, a step not open), in the shape a single
+ * submission's problem details carry. Anything else is not a refusal of
+ * that answer but a failure of the unit, and it is rethrown so nothing in
+ * the batch commits.
+ */
+function batchRefusalOf(
+  error: unknown,
+): Extract<OnboardingBatchOutcome, { outcome: "REFUSED" }>["refusal"] | null {
+  if (error instanceof ContractValidationError) {
+    return {
+      detail: error.message.slice(0, 400),
+      errors: error.issues.slice(0, 10).map((issue) => ({
+        path: issue.path.slice(0, 200),
+        code: issue.code.slice(0, 120),
+        message: issue.message.slice(0, 400),
+      })),
+    };
+  }
+  if (error instanceof OnboardingSessionStateError) {
+    return {
+      detail: `${error.message} (${error.reason})`.slice(0, 400),
+      errors: [],
+    };
+  }
+  return null;
+}
+
 /** ADR 0024: revise one answer of a completed session. */
 export type ReviseOnboardingResponseCommand = SubmitOnboardingResponseCommand;
 
@@ -1099,6 +1159,177 @@ export function createOnboardingUseCases(
         stepKey: step.stepKey,
       });
       return view(tx.sql, actor, committed.session, committed.changes);
+    });
+  };
+
+  /**
+   * Several answers in one transaction (lane ob1, 2026-10-16). Each is
+   * validated and committed exactly as `submitResponse` would, in its own
+   * savepoint, against the session as the answers before it left it: an
+   * answer the journey refuses (not valid, not open yet) releases only its
+   * savepoint and is reported; the others commit together. One refused
+   * because another in the batch had to land first is tried again once
+   * that one has, so the order they were said in does not matter. A
+   * failure that is not the journey's refusal rolls the whole batch back.
+   * One idempotency record for the batch; each committed answer emits its
+   * own RESPONSE_COMMITTED event, as a single submission does.
+   */
+  const submitResponses = async (
+    raw: SubmitOnboardingResponsesCommand,
+  ): Promise<{
+    readonly view: OnboardingSessionView;
+    readonly results: readonly OnboardingBatchOutcome[];
+  }> => {
+    const command = z
+      .object({
+        actor: ActorSchema,
+        sessionId: OnboardingSessionIdSchema,
+        responses: z
+          .array(
+            z
+              .object({
+                stepKey: OnboardingStepKeySchema,
+                response: z.unknown(),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(24),
+        expectedSessionVersion: VersionSchema,
+        idempotencyKey: IdempotencyKeySchema,
+        correlationId: CorrelationIdSchema,
+      })
+      .strict()
+      .parse(raw);
+    const { actor } = command;
+    return transactions.run(async (tx) => {
+      const locked = await sessions.lockForUpdate(
+        tx,
+        command.sessionId,
+        actor.userId,
+      );
+      if (locked === null) {
+        throw new OnboardingSessionNotFoundError();
+      }
+      // Namespaced with single submissions: the same key on a different
+      // request (a single answer, another batch) is a conflict, never a
+      // replay of the wrong thing.
+      const idem = await replayOrRecordable(
+        runtime,
+        tx,
+        locked,
+        "submit",
+        command.idempotencyKey,
+        {
+          batch: command.responses,
+          expectedSessionVersion: command.expectedSessionVersion,
+        },
+      );
+      if (idem.replay) {
+        const replayed = await view(tx.sql, actor, locked);
+        const answered = new Set(replayed.responses.map((r) => r.stepKey));
+        return {
+          view: replayed,
+          results: command.responses.map((item): OnboardingBatchOutcome =>
+            answered.has(item.stepKey)
+              ? { stepKey: item.stepKey, outcome: "COMMITTED" }
+              : {
+                  stepKey: item.stepKey,
+                  outcome: "REFUSED",
+                  refusal: { detail: null, errors: [] },
+                },
+          ),
+        };
+      }
+      let session = await lockedActiveSession(
+        runtime,
+        tx,
+        actor,
+        command.sessionId,
+        command.expectedSessionVersion,
+      );
+      const results = new Map<number, OnboardingBatchOutcome>();
+      let changes: OnboardingPathChanges | undefined;
+      let open = command.responses.map((_, index) => index);
+      // Each pass commits what it can; another pass only after progress,
+      // so a batch ends after at most as many passes as it has answers.
+      for (let pass = 0; open.length > 0; pass += 1) {
+        const refusedThisPass: number[] = [];
+        for (const index of open) {
+          const item = command.responses[index];
+          if (item === undefined) continue;
+          try {
+            const before = session;
+            const committed = await tx.sql.savepoint(async (inner) => {
+              const unit: TransactionContext = { sql: inner };
+              const aggregate = await aggregateOf(runtime, inner, before);
+              const step = eligibleStep(aggregate, item.stepKey);
+              const validated = validateOnboardingResponse(step, item.response);
+              const done = await commitResponse(
+                runtime,
+                unit,
+                actor,
+                aggregate,
+                step,
+                validated,
+                command.correlationId,
+              );
+              await outbox.enqueue(
+                unit,
+                responseCommittedEvent({
+                  session: done.session,
+                  correlationId: command.correlationId,
+                  stepKey: step.stepKey,
+                  responseId: done.response.id,
+                }),
+              );
+              getOnboardingMetrics().responsesCommitted.add(1, {
+                journeyType: before.journeyType,
+                stepType: step.stepType,
+              });
+              return done;
+            });
+            session = committed.session;
+            changes = committed.changes;
+            results.set(index, { stepKey: item.stepKey, outcome: "COMMITTED" });
+          } catch (error: unknown) {
+            const refusal = batchRefusalOf(error);
+            if (refusal === null) throw error;
+            results.set(index, {
+              stepKey: item.stepKey,
+              outcome: "REFUSED",
+              refusal,
+            });
+            refusedThisPass.push(index);
+          }
+        }
+        const progressed = refusedThisPass.length < open.length;
+        if (!progressed || pass >= command.responses.length) break;
+        open = refusedThisPass;
+      }
+      await idempotency.recordMutation(tx, {
+        sessionId: session.id,
+        keyHash: idem.keyHash,
+        operation: "submit",
+        requestHash: idem.requestHash,
+        resultVersion: session.version,
+      });
+      safeLog(runtime, "responses.committed", session, {
+        committed: [...results.values()].filter(
+          (r) => r.outcome === "COMMITTED",
+        ).length,
+      });
+      return {
+        view: await view(tx.sql, actor, session, changes),
+        results: command.responses.map(
+          (item, index): OnboardingBatchOutcome =>
+            results.get(index) ?? {
+              stepKey: item.stepKey,
+              outcome: "REFUSED",
+              refusal: { detail: null, errors: [] },
+            },
+        ),
+      };
     });
   };
 
@@ -3008,6 +3239,7 @@ export function createOnboardingUseCases(
     getSession,
     bindSessionContext,
     submitResponse,
+    submitResponses,
     reviseResponse,
     skipStep,
     withdrawResponse,

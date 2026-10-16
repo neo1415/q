@@ -21,6 +21,17 @@ import { QSentenceGesturesSchema } from "../q/presence.js";
 export const ONBOARDING_PATH = "/v1/onboarding";
 export const ONBOARDING_SESSIONS_SEGMENT = "/sessions";
 export const ONBOARDING_RESPONSES_SEGMENT = "/responses";
+/**
+ * `POST /v1/onboarding/sessions/:sessionId/responses/batch` -- several
+ * answers given in one breath, committed in ONE transaction (lane ob1,
+ * 2026-10-16: eleven sequential round trips made a typed turn 6-18 s).
+ * Each answer is validated as a single submission would be; one the
+ * journey refuses is reported with its reason and the rest still commit.
+ * An infrastructure failure commits none. Idempotency-Key required.
+ */
+export const ONBOARDING_RESPONSES_BATCH_SEGMENT = "/responses/batch";
+/** The most answers one batch carries. */
+export const ONBOARDING_RESPONSES_BATCH_MAX = 24;
 export const ONBOARDING_STEPS_SEGMENT = "/steps";
 export const ONBOARDING_SKIP_SEGMENT = "/skip";
 /** Take a step's answer back without replacing it; its history is kept. */
@@ -320,6 +331,71 @@ export const SubmitOnboardingResponseRequestSchema = z
   .strict();
 export type SubmitOnboardingResponseRequest = z.infer<
   typeof SubmitOnboardingResponseRequestSchema
+>;
+
+/** `POST .../responses/batch`: answers in the order they were given. */
+export const SubmitOnboardingResponsesRequestSchema = z
+  .object({
+    responses: z
+      .array(
+        z
+          .object({
+            stepKey: OnboardingStepKeySchema,
+            response: OnboardingResponseInputSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(ONBOARDING_RESPONSES_BATCH_MAX),
+    expectedSessionVersion: SessionVersionSchema,
+  })
+  .strict();
+export type SubmitOnboardingResponsesRequest = z.infer<
+  typeof SubmitOnboardingResponsesRequestSchema
+>;
+
+/**
+ * Why the journey refused one answer of a batch, in the problem-details
+ * shape a single submission's refusal has (its detail and violations), so a
+ * caller reads both the same way. Never a stack, never another person's data.
+ */
+export const OnboardingBatchRefusalSchema = z
+  .object({
+    detail: z.string().max(400).nullable(),
+    errors: z
+      .array(
+        z
+          .object({
+            path: z.string().max(200),
+            code: z.string().max(120),
+            message: z.string().max(400),
+          })
+          .strict(),
+      )
+      .max(10),
+  })
+  .strict();
+export type OnboardingBatchRefusal = z.infer<
+  typeof OnboardingBatchRefusalSchema
+>;
+
+export const OnboardingBatchItemResultSchema = z.discriminatedUnion("outcome", [
+  z
+    .object({
+      stepKey: OnboardingStepKeySchema,
+      outcome: z.literal("COMMITTED"),
+    })
+    .strict(),
+  z
+    .object({
+      stepKey: OnboardingStepKeySchema,
+      outcome: z.literal("REFUSED"),
+      refusal: OnboardingBatchRefusalSchema,
+    })
+    .strict(),
+]);
+export type OnboardingBatchItemResult = z.infer<
+  typeof OnboardingBatchItemResultSchema
 >;
 
 /** `POST .../steps/:stepKey/withdraw` — the answer is taken back, never deleted. */
@@ -1057,3 +1133,16 @@ export type OnboardingNudgeChoiceRequest = z.infer<
 export const OnboardingNudgeChoiceResponseSchema = z
   .object({ recorded: OnboardingNudgeChoiceSchema })
   .strict();
+
+/** The session after the commit, and each answer's outcome in request order. */
+export const SubmitOnboardingResponsesResultSchema = z
+  .object({
+    view: OnboardingSessionViewSchema,
+    results: z
+      .array(OnboardingBatchItemResultSchema)
+      .max(ONBOARDING_RESPONSES_BATCH_MAX),
+  })
+  .strict();
+export type SubmitOnboardingResponsesResult = z.infer<
+  typeof SubmitOnboardingResponsesResultSchema
+>;
