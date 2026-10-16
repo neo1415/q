@@ -7,56 +7,52 @@ import { cityForAskedAction } from "../src/answer.js";
  * time zone should I use for Friday at 10:00?" itself, and "Lagos." was
  * answered as small talk. The city continues the request it was asked for.
  */
-const history = [
-  {
-    id: "u1",
-    role: "USER",
-    content:
-      "Set me a reminder for Friday at 10am to review the cash forecast.",
-  },
-  {
-    id: "q1",
-    role: "Q",
-    content:
-      "Which city or time zone should I use for Friday at 10:00? I can also save it to your profile so I won't need to ask again.",
-  },
-  { id: "u2", role: "USER", content: "Lagos." },
-];
+type Line = { id: string; role: string; content: string };
+
+const REQUEST: Line = {
+  id: "u1",
+  role: "USER",
+  content: "Set me a reminder for Friday at 10am to review the cash forecast.",
+};
+const ASKED: Line = {
+  id: "q1",
+  role: "Q",
+  content:
+    "Which city or time zone should I use for Friday at 10:00? I can also save it to your profile so I won't need to ask again.",
+};
+const LAGOS: Line = { id: "u2", role: "USER", content: "Lagos." };
 
 describe("cityForAskedAction", () => {
   it("binds the city to the reminder Q asked it for", () => {
-    expect(cityForAskedAction(history, history[2]!)).toEqual({
+    expect(cityForAskedAction([REQUEST, ASKED, LAGOS], LAGOS)).toEqual({
       tool: "propose_reminder",
-      utterance:
-        "Set me a reminder for Friday at 10am to review the cash forecast.",
+      utterance: REQUEST.content,
       zone: "Africa/Lagos",
     });
   });
 
   it("a call to book is bound to the meeting tool", () => {
-    const call = [
+    const reply: Line = { id: "u2", role: "USER", content: "I'm in Abuja" };
+    const call: Line[] = [
       {
         id: "u1",
         role: "USER",
         content: "Book a call with Nixo on Tuesday at 2pm",
       },
       { id: "q1", role: "Q", content: "What time zone are you in?" },
-      { id: "u2", role: "USER", content: "I'm in Abuja" },
+      reply,
     ];
-    expect(cityForAskedAction(call, call[2]!)?.tool).toBe("propose_meeting");
+    expect(cityForAskedAction(call, reply)?.tool).toBe("propose_meeting");
   });
 
   it("nothing when Q did not ask for a city, or the reply names no place", () => {
-    const notAsked = [
-      history[0]!,
-      { id: "q1", role: "Q", content: "Done. I'll remind you." },
-      history[2]!,
-    ];
-    expect(cityForAskedAction(notAsked, notAsked[2]!)).toBeNull();
-    const noPlace = [
-      ...history.slice(0, 2),
-      { id: "u2", role: "USER", content: "thanks" },
-    ];
-    expect(cityForAskedAction(noPlace, noPlace[2]!)).toBeNull();
+    const done: Line = {
+      id: "q1",
+      role: "Q",
+      content: "Done. I'll remind you.",
+    };
+    expect(cityForAskedAction([REQUEST, done, LAGOS], LAGOS)).toBeNull();
+    const thanks: Line = { id: "u2", role: "USER", content: "thanks" };
+    expect(cityForAskedAction([REQUEST, ASKED, thanks], thanks)).toBeNull();
   });
 });
