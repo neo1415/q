@@ -47,6 +47,7 @@ import { useFollowNewest } from "@/features/q/follow-newest";
 import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 
 import { VoiceRecorder } from "./voice-recorder";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The 1:1 chat on one relationship (R34; ADR 0019).
@@ -122,6 +123,7 @@ export function RelationshipChat({
   /** The page's own header actions (call, info). */
   readonly headerEnd?: ReactNode | undefined;
 }) {
+  const t = useT();
   const [attachOpen, setAttachOpen] = useState(false);
   const { askNow } = useGlobalQ();
   const [messages, setMessages] = useState<ChatMessageDto[]>(
@@ -415,7 +417,7 @@ export function RelationshipChat({
         <button
           type="button"
           onClick={() => invokeQ(draft.replace(Q_PREFIX, "").trim())}
-          aria-label="Ask Q"
+          aria-label={t("Ask Q")}
           className="flex size-11 items-center justify-center hover:bg-(--cq-surface-subtle)"
         >
           <QAperture state="IDLE" size="chrome" />
@@ -547,12 +549,14 @@ export function RelationshipChat({
                 {message.viaQ ? (
                   <span>Sent by Q for {message.senderName}</span>
                 ) : null}
-                {message.edited && !message.unsent ? <span>Edited</span> : null}
+                {message.edited && !message.unsent ? (
+                  <span>{t("Edited")}</span>
+                ) : null}
                 <time dateTime={message.sentAt} className="cq-numeric">
                   {formatRelationshipDate(message.sentAt)}
                 </time>
                 {index === lastMineIndex && seenIndex >= lastMineIndex ? (
-                  <span aria-label="Seen">✓✓</span>
+                  <span aria-label={t("Seen")}>✓✓</span>
                 ) : null}
               </span>
             </div>
@@ -566,7 +570,7 @@ export function RelationshipChat({
                   className="min-h-8"
                   onClick={() => void unsend(message.messageId)}
                 >
-                  Unsend
+                  {t("Unsend")}
                 </Button>
               ) : null}
               {!message.mine && !message.unsent && message.side !== ownSide ? (
@@ -582,7 +586,7 @@ export function RelationshipChat({
                     })
                   }
                 >
-                  Report
+                  {t("Report")}
                 </Button>
               ) : null}
             </span>
@@ -611,12 +615,12 @@ export function RelationshipChat({
         >
           {documents === null ? null : documents.length === 0 ? (
             <p className="cq-body-sm px-2 text-(--cq-text-secondary)">
-              No documents yet.
+              {t("No documents yet.")}
             </p>
           ) : (
             <ul
               className="flex max-h-48 flex-col gap-1 overflow-y-auto"
-              aria-label="Your documents"
+              aria-label={t("Your documents")}
             >
               {documents.map((document) => (
                 <li key={document.id}>
@@ -631,7 +635,7 @@ export function RelationshipChat({
                     <span className="truncate">{document.name}</span>
                     {document.ready ? null : (
                       <span className="cq-caption text-(--cq-text-tertiary)">
-                        Still being checked
+                        {t("Still being checked")}
                       </span>
                     )}
                   </Button>
@@ -640,7 +644,11 @@ export function RelationshipChat({
             </ul>
           )}
           {attachOpen ? (
-            <div className="flex gap-2 px-1" role="group" aria-label="Attach">
+            <div
+              className="flex gap-2 px-1"
+              role="group"
+              aria-label={t("Attach")}
+            >
               <Button
                 type="button"
                 variant="secondary"
@@ -652,7 +660,7 @@ export function RelationshipChat({
                 }}
               >
                 <Upload size={ICON_SIZE.compact} aria-hidden="true" />
-                File
+                {t("File")}
               </Button>
               <Button
                 type="button"
@@ -666,14 +674,14 @@ export function RelationshipChat({
                 aria-expanded={documents !== null}
               >
                 <FileText size={ICON_SIZE.compact} aria-hidden="true" />
-                Document
+                {t("Document")}
               </Button>
             </div>
           ) : null}
           <div className="flex items-end gap-2">
             <button
               type="button"
-              aria-label="Attach"
+              aria-label={t("Attach")}
               aria-expanded={attachOpen}
               onClick={() => setAttachOpen((open) => !open)}
               className="flex size-11 shrink-0 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
@@ -690,14 +698,14 @@ export function RelationshipChat({
               rows={1}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Message"
+              placeholder={t("Message")}
               className="cq-body field-sizing-content max-h-40 min-h-11 flex-1 resize-none border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary)"
             />
             {hasDraft ? (
               <button
                 type="submit"
                 disabled={busy}
-                aria-label="Send"
+                aria-label={t("Send")}
                 className="flex size-11 shrink-0 items-center justify-center bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover) disabled:opacity-50"
               >
                 <ArrowUp size={ICON_SIZE.regular} aria-hidden="true" />

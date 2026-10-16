@@ -1035,7 +1035,7 @@ export function QConversationPanel({
                           : "cq-stage-quiet"
                       }
                     >
-                      {option === "presence" ? "Q" : "Chat"}
+                      {option === "presence" ? "Q" : t("Chat")}
                     </button>
                   ))}
                 </div>
@@ -1152,7 +1152,7 @@ export function QConversationPanel({
                               data-q-turn-role="USER"
                               data-q-disposition={rowDisposition(line)}
                             >
-                              You: {line.text}
+                              {t("You:")} {line.text}
                             </li>
                           ) : (
                             <li

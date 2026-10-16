@@ -31,6 +31,7 @@ import {
   STATE_WORDS,
 } from "./relationship-words";
 import { serverTNow } from "@/features/i18n/server-now";
+import { serverT } from "@/features/i18n/server";
 
 /**
  * The conversation with a counterpart (founder design 2026-09-28,
@@ -55,6 +56,7 @@ export async function RelationshipConversation({
   readonly thread: ChatThreadDto | null;
   readonly basePath: string;
 }) {
+  const t = await serverT();
   // The match outlives CONNECTED (relationship-state.v2).
   const connected = isMatchedRelationshipState(relationship.state);
   const session = await apiSession();
@@ -110,7 +112,7 @@ export async function RelationshipConversation({
                 {counterpart}
               </span>
               <span className="cq-caption truncate text-(--cq-text-secondary)">
-                {STATE_WORDS[relationship.state]}
+                {t(STATE_WORDS[relationship.state])}
               </span>
             </span>
           </>
@@ -120,7 +122,7 @@ export async function RelationshipConversation({
             {connected ? (
               <Link
                 href={`${basePath}#calls`}
-                aria-label="Book a call"
+                aria-label={t("Book a call")}
                 className="flex size-11 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) max-sm:hidden"
               >
                 <CalendarDays size={ICON_SIZE.regular} aria-hidden="true" />
@@ -130,20 +132,20 @@ export async function RelationshipConversation({
               <div className="flex flex-col gap-5">
                 <dl className="flex flex-col gap-3">
                   <RailFact
-                    label="Status"
+                    label={t("Status")}
                     value={STATE_WORDS[relationship.state]}
                   />
                   <RailFact
-                    label="Since"
+                    label={t("Since")}
                     value={formatRelationshipDate(relationship.stateSince)}
                   />
                   <RailFact
-                    label="Next step"
+                    label={t("Next step")}
                     value={NEXT_STEP_WORDS[relationship.nextStep]}
                   />
                   {nextReminder === undefined ? null : (
                     <RailFact
-                      label="Reminder"
+                      label={t("Reminder")}
                       value={`${formatRelationshipDate(nextReminder.dueAt)} · ${nextReminder.title}`}
                     />
                   )}
@@ -154,7 +156,7 @@ export async function RelationshipConversation({
                       href={profile.profileHref}
                       className={buttonClassName("secondary", "compact")}
                     >
-                      Profile
+                      {t("Profile")}
                       <ArrowUpRight
                         size={ICON_SIZE.compact}
                         aria-hidden="true"
@@ -170,7 +172,7 @@ export async function RelationshipConversation({
                         size={ICON_SIZE.compact}
                         aria-hidden="true"
                       />
-                      Book a call
+                      {t("Book a call")}
                     </Link>
                   ) : null}
                   <Link
@@ -178,7 +180,7 @@ export async function RelationshipConversation({
                     className={buttonClassName("secondary", "compact")}
                   >
                     <Bell size={ICON_SIZE.compact} aria-hidden="true" />
-                    Reminder
+                    {t("Reminder")}
                   </Link>
                 </div>
                 {relationship.milestones.length === 0 ? null : (

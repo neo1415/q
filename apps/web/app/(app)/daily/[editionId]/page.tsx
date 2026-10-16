@@ -49,8 +49,8 @@ export default async function DailyEditionPage({
   if (edition === null) {
     return (
       <PageContainer width="reading" className="flex flex-col gap-4">
-        <QSection id="daily" kind="DAILY" label="The Q Daily">
-          <PageHeader title="The Q Daily" />
+        <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
+          <PageHeader title={t("The Q Daily")} />
           <p
             className="cq-body text-(--cq-text-secondary)"
             data-state="unavailable"
@@ -63,7 +63,7 @@ export default async function DailyEditionPage({
   }
   return (
     <PageContainer width="content" className="flex flex-col gap-8">
-      <QSection id="daily" kind="DAILY" label="The Q Daily">
+      <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
         <Link
           href="/daily"
           className={buttonClassName("quiet", "compact", "self-start")}

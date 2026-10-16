@@ -19,6 +19,7 @@ import { FictionalNames } from "./fictional-names";
 import { GlobalQProvider } from "./global-q";
 import { MobileNavigation } from "./mobile-navigation";
 import { NetworkStatus } from "./network-status";
+import { Words } from "@/features/i18n/language";
 
 /**
  * The workspace cue the shell shows: which organisation context this person
@@ -102,7 +103,7 @@ export function AppShell({
           href="#main"
           className="sr-only z-(--cq-z-toast) bg-(--cq-surface-raised) px-4 py-3 cq-body-sm font-medium text-(--cq-text-primary) shadow-(--cq-shadow-overlay) focus:not-sr-only focus:fixed focus:top-3 focus:start-3"
         >
-          Skip to content
+          <Words>Skip to content</Words>
         </a>
         <DesktopSidebar context={context} />
         <div className="cq-shell-body">

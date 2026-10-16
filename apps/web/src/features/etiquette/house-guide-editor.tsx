@@ -15,6 +15,7 @@ import {
   recordHouseGuideAction,
 } from "./etiquette-actions";
 import { EMPTY_DRAFT, GuideInput, type GuideDraft } from "./guide-input";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The console's house guide (ADR 0050): what Q follows for everyone when it
@@ -39,6 +40,7 @@ export function HouseGuideEditor({
 }: {
   readonly guide: AdminEtiquetteGuideDto;
 }) {
+  const t = useT();
   const titleId = useId();
   const [title, setTitle] = useState("");
   const [draft, setDraft] = useState<GuideDraft>(EMPTY_DRAFT);
@@ -61,7 +63,9 @@ export function HouseGuideEditor({
   return (
     <div className="flex flex-col gap-4">
       <section className="cq-panel flex flex-col gap-3 p-5">
-        <h2 className="cq-title-sm text-(--cq-text-primary)">In force now</h2>
+        <h2 className="cq-title-sm text-(--cq-text-primary)">
+          {t("In force now")}
+        </h2>
         <p className="cq-body-sm text-(--cq-text-secondary)">
           {builtInActive
             ? "Capital Q's built-in guide."
@@ -73,7 +77,7 @@ export function HouseGuideEditor({
         </p>
         <details className="group">
           <summary className="cq-body-sm min-h-11 cursor-pointer content-center font-medium text-(--cq-text-primary)">
-            Read it
+            {t("Read it")}
           </summary>
           <div className="cq-body-sm mt-2 max-h-96 overflow-y-auto border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3 whitespace-pre-wrap text-(--cq-text-primary)">
             {guide.activeText}
@@ -83,14 +87,14 @@ export function HouseGuideEditor({
 
       <section className="cq-panel flex flex-col gap-3 p-5">
         <h2 className="cq-title-sm text-(--cq-text-primary)">
-          Upload a new version
+          {t("Upload a new version")}
         </h2>
         <div className="flex flex-col gap-2">
           <label
             htmlFor={titleId}
             className="cq-body-sm text-(--cq-text-secondary)"
           >
-            Title
+            {t("Title")}
           </label>
           <input
             id={titleId}
@@ -98,13 +102,13 @@ export function HouseGuideEditor({
             onChange={(event) => setTitle(event.target.value)}
             maxLength={120}
             disabled={pending}
-            placeholder="How we talk to investors and founders"
+            placeholder={t("How we talk to investors and founders")}
             className="cq-body min-h-11 w-full border border-(--cq-border-subtle) bg-(--cq-surface) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           />
         </div>
         <GuideInput
-          label="The guide"
-          placeholder="Paste the guide, or upload a PDF or Word file."
+          label={t("The guide")}
+          placeholder={t("Paste the guide, or upload a PDF or Word file.")}
           maxCharacters={PLATFORM_ETIQUETTE_TEXT_MAX}
           draft={draft}
           onChange={setDraft}
@@ -127,7 +131,9 @@ export function HouseGuideEditor({
       </section>
 
       <section className="cq-panel flex flex-col gap-3 p-5">
-        <h2 className="cq-title-sm text-(--cq-text-primary)">Versions</h2>
+        <h2 className="cq-title-sm text-(--cq-text-primary)">
+          {t("Versions")}
+        </h2>
         <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
           <li className="flex flex-wrap items-center justify-between gap-3 py-3">
             <div className="flex min-w-0 flex-col">
@@ -140,7 +146,7 @@ export function HouseGuideEditor({
             </div>
             {builtInActive ? (
               <span className="cq-caption text-(--cq-text-secondary)">
-                In force
+                {t("In force")}
               </span>
             ) : (
               <Button
@@ -148,7 +154,7 @@ export function HouseGuideEditor({
                 disabled={pending}
                 onClick={() => perform(() => activateHouseGuideAction(null))}
               >
-                Use this
+                {t("Use this")}
               </Button>
             )}
           </li>
@@ -170,7 +176,7 @@ export function HouseGuideEditor({
               </div>
               {version.id === guide.activeVersionId ? (
                 <span className="cq-caption text-(--cq-text-secondary)">
-                  In force
+                  {t("In force")}
                 </span>
               ) : (
                 <Button
@@ -180,7 +186,7 @@ export function HouseGuideEditor({
                     perform(() => activateHouseGuideAction(version.id))
                   }
                 >
-                  Use this
+                  {t("Use this")}
                 </Button>
               )}
             </li>

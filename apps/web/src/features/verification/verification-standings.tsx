@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
 
@@ -13,6 +15,7 @@ import {
   requestVerificationAction,
   type VerificationNotice,
 } from "./verification-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The founder's two verification standings (CQ-VERIFY-001), rendered on
@@ -70,6 +73,7 @@ export function VerificationStandings({
   readonly verification: CompanyVerificationDto;
   readonly notice: VerificationNotice | null;
 }) {
+  const t = useT();
   const waiting = verification.standings.some((s) => s.status === "PENDING");
   return (
     <div className="flex flex-col gap-6">
@@ -101,7 +105,7 @@ export function VerificationStandings({
               data-status={standing.status}
             >
               <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-40">
-                {CLAIM_LABEL[standing.claimType]}
+                {t(CLAIM_LABEL[standing.claimType])}
               </dt>
               <dd className="flex flex-col items-start gap-1.5">
                 {/* The status in words; tone is never the only signal. */}

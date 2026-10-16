@@ -18,6 +18,7 @@ import {
 import { formatDay } from "@/components/date-format";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { STATE_WORDS } from "@/features/relationships/relationship-words";
+import { useT } from "@/features/i18n/language";
 
 /**
  * The founder's inbox of investor interest (CQ-NET-011; doc 17 §83-§86).
@@ -78,6 +79,7 @@ function Row({
   /** Where the relationship stands now, when known. */
   readonly currentState?: RelationshipStateV2 | undefined;
 }) {
+  const t = useT();
   const [current, setCurrent] = useState(item);
   const [phase, setPhase] = useState<RowPhase>({ kind: "IDLE" });
   // One key per intended answer, reused across retries of it.
@@ -173,7 +175,7 @@ function Row({
             {phase.decision === "ACCEPTED" ? "Accept" : "Decline"}
           </Button>
           <Button variant="quiet" onClick={() => setPhase({ kind: "IDLE" })}>
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
       </div>
@@ -198,7 +200,7 @@ function Row({
               variant="secondary"
               onClick={() => void send(phase.decision)}
             >
-              Try again
+              {t("Try again")}
             </Button>
           ) : (
             <>
@@ -208,7 +210,7 @@ function Row({
                   setPhase({ kind: "CONFIRMING", decision: "ACCEPTED" })
                 }
               >
-                Accept
+                {t("Accept")}
               </Button>
               {/* Declining is neutral: quiet, never danger, never red. */}
               <Button
@@ -217,7 +219,7 @@ function Row({
                   setPhase({ kind: "CONFIRMING", decision: "DECLINED" })
                 }
               >
-                Decline
+                {t("Decline")}
               </Button>
             </>
           )}
@@ -272,17 +274,20 @@ export function IncomingInterest({
   /** Called once the server has recorded an answer (CQ-WEB-030). */
   readonly onAnswered?: (() => void) | undefined;
 }) {
+  const t = useT();
   if (items.length === 0) {
     return (
       <EmptyState
-        title="No investor interest yet."
-        description="When an investor expresses interest in your company, it appears here for you to accept or decline."
+        title={t("No investor interest yet.")}
+        description={t(
+          "When an investor expresses interest in your company, it appears here for you to accept or decline.",
+        )}
       />
     );
   }
   return (
     <ul
-      aria-label="Investor interest in your company"
+      aria-label={t("Investor interest in your company")}
       className="cq-panel-rows flex flex-col"
     >
       {items.map((item) => (

@@ -268,7 +268,7 @@ export function ArtifactDownloads({
                 }}
               >
                 <span data-q-artifact-download={format}>
-                  {MENU_LABELS[format]}
+                  {t(MENU_LABELS[format])}
                 </span>
               </MenuItem>
             ))}

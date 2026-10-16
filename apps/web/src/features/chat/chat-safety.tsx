@@ -21,6 +21,7 @@ import {
   reportChatAction,
   unblockChatAction,
 } from "./chat-actions";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Block and report on a relationship chat (R34 safety; doc 10).
@@ -54,13 +55,14 @@ export function ChatSafetyMenu({
   readonly blockedByYourSide: boolean;
   readonly onChoose: (dialog: ChatSafetyDialog) => void;
 }) {
+  const t = useT();
   return (
     <MenuRoot>
       <MenuTrigger>
         <Button
           variant="quiet"
           className="min-h-11 min-w-11"
-          aria-label="Chat options"
+          aria-label={t("Chat options")}
         >
           <MoreHorizontal size={ICON_SIZE.regular} aria-hidden="true" />
         </Button>
@@ -68,15 +70,15 @@ export function ChatSafetyMenu({
       <MenuContent align="end">
         {blockedByYourSide ? (
           <MenuItem onClick={() => onChoose({ kind: "UNBLOCK" })}>
-            Unblock messages
+            {t("Unblock messages")}
           </MenuItem>
         ) : (
           <MenuItem onClick={() => onChoose({ kind: "BLOCK" })}>
-            Block messages
+            {t("Block messages")}
           </MenuItem>
         )}
         <MenuItem onClick={() => onChoose({ kind: "REPORT", messageId: null })}>
-          Report conversation
+          {t("Report conversation")}
         </MenuItem>
       </MenuContent>
     </MenuRoot>
@@ -98,6 +100,7 @@ export function ChatSafetyDialogs({
   /** A plain one-line result for the panel, after the server confirmed. */
   readonly onDone: (notice: string) => void;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState<string | null>(null);
@@ -142,7 +145,7 @@ export function ChatSafetyDialogs({
     >
       {dialog?.kind === "BLOCK" ? (
         <DialogContent
-          title="Block messages?"
+          title={t("Block messages?")}
           description={`Neither of you can send messages until you unblock. Messages so far stay. ${counterpart} isn't told who blocked.`}
           actions={
             <>
@@ -152,7 +155,7 @@ export function ChatSafetyDialogs({
                 onClick={close}
                 disabled={busy}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 variant="primary"
@@ -174,7 +177,7 @@ export function ChatSafetyDialogs({
         </DialogContent>
       ) : dialog?.kind === "UNBLOCK" ? (
         <DialogContent
-          title="Unblock messages?"
+          title={t("Unblock messages?")}
           description={`You and ${counterpart} can send messages again.`}
           actions={
             <>
@@ -184,7 +187,7 @@ export function ChatSafetyDialogs({
                 onClick={close}
                 disabled={busy}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 variant="primary"
@@ -220,7 +223,7 @@ export function ChatSafetyDialogs({
                 onClick={close}
                 disabled={busy}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 variant="primary"
@@ -253,7 +256,7 @@ export function ChatSafetyDialogs({
         >
           <fieldset className="flex flex-col gap-1">
             <legend className="cq-body-sm mb-1 text-(--cq-text-secondary)">
-              Why are you reporting this?
+              {t("Why are you reporting this?")}
             </legend>
             {CHAT_REPORT_REASONS.map((option) => (
               <label

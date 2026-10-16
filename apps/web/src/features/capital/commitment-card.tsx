@@ -19,6 +19,7 @@ import {
   type CapitalResult,
 } from "./capital-actions";
 import { money } from "./money";
+import { useT } from "@/features/i18n/language";
 
 /**
  * One commitment, as a card (2026-10-04): who, how much, where it stands,
@@ -92,6 +93,7 @@ export function CommitmentCard({
   readonly currentRoundId: string | null;
   readonly roundName: string | null;
 }) {
+  const t = useT();
   const router = useRouter();
   const id = useId();
   const [pending, start] = useTransition();
@@ -192,7 +194,7 @@ export function CommitmentCard({
               )
             }
           >
-            Confirm amount
+            {t("Confirm amount")}
           </Button>
           {item.status === "DETECTED" ? (
             <Button
@@ -200,7 +202,7 @@ export function CommitmentCard({
               disabled={pending}
               onClick={() => act(() => notRightAction(item.id))}
             >
-              Not right
+              {t("Not right")}
             </Button>
           ) : null}
         </div>
@@ -228,13 +230,13 @@ export function CommitmentCard({
               disabled={pending}
               onClick={() => setAsking(false)}
             >
-              Not yet
+              {t("Not yet")}
             </Button>
           </div>
         ) : (
           <div>
             <Button variant="primary" onClick={() => setAsking(true)}>
-              Confirm received
+              {t("Confirm received")}
             </Button>
           </div>
         )
@@ -245,7 +247,7 @@ export function CommitmentCard({
           <div className="flex flex-col gap-3">
             <Input
               id={`${id}-reference`}
-              label="Transfer reference (optional)"
+              label={t("Transfer reference (optional)")}
               value={reference}
               maxLength={120}
               onChange={(event) => setReference(event.target.value)}
@@ -263,14 +265,14 @@ export function CommitmentCard({
                 disabled={pending}
                 onClick={() => setAsking(false)}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
             </div>
           </div>
         ) : (
           <div>
             <Button variant="primary" onClick={() => setAsking(true)}>
-              Mark as sent
+              {t("Mark as sent")}
             </Button>
           </div>
         )

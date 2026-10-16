@@ -474,7 +474,7 @@ export function DeckCoach({
                   {" "}
                   To reach the minimum,{" "}
                   <strong className="text-(--cq-text-primary)">
-                    {DECK_SECTION_LABELS[first.section]}
+                    {t(DECK_SECTION_LABELS[first.section])}
                   </strong>{" "}
                   needs to be Clear.
                 </>
@@ -572,7 +572,7 @@ export function DeckCoach({
                       </span>
                       <span className="cq-caption inline-flex items-center gap-2 text-(--cq-text-secondary)">
                         <Dots score={section.score} />{" "}
-                        {LEVEL_WORDS[section.level]}
+                        {t(LEVEL_WORDS[section.level])}
                       </span>
                       <ChevronDown
                         size={ICON_SIZE.compact}

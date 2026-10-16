@@ -176,7 +176,7 @@ export default async function RelationshipsPage({
                 className={buttonClassName("secondary")}
                 href="/relationships?view=pipeline"
               >
-                Start again
+                {t("Start again")}
               </Link>
             }
           />
@@ -308,7 +308,7 @@ export default async function RelationshipsPage({
             )}
             action={
               <Link className={buttonClassName("primary")} href="/welcome">
-                Set up
+                {t("Set up")}
               </Link>
             }
           />
@@ -354,7 +354,7 @@ export default async function RelationshipsPage({
                 className={buttonClassName("secondary")}
                 href="/relationships?view=overview"
               >
-                Try again
+                {t("Try again")}
               </Link>
             }
           />
@@ -423,7 +423,7 @@ export default async function RelationshipsPage({
                   className={buttonClassName("quiet", "compact")}
                   data-company-requests-link
                 >
-                  Company requests
+                  {t("Company requests")}
                 </Link>
               ) : null}
               {/* A relationship starts where its first step is taken:
@@ -434,7 +434,7 @@ export default async function RelationshipsPage({
                 data-add-relationship
               >
                 <Plus size={ICON_SIZE.compact} aria-hidden="true" />
-                Add
+                {t("Add")}
               </Link>
             </>
           )

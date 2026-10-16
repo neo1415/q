@@ -20,6 +20,8 @@ import {
   type LooksForRow,
   type LooksForStanding,
 } from "./looks-for";
+import { serverT } from "@/features/i18n/server";
+import { Words } from "@/features/i18n/language";
 
 /**
  * "What this investor looks for" and "Draft my application" on the
@@ -76,7 +78,7 @@ export function StandingBadge({
           />
         )}
       </svg>
-      {STANDING_WORDS[standing]}
+      <Words>{STANDING_WORDS[standing]}</Words>
     </span>
   );
 }
@@ -146,6 +148,7 @@ export async function LooksForSection({
   readonly investorOrganisationId: string;
   readonly investorName: string;
 }) {
+  const t = await serverT();
   const [gate, reasons, form] = await Promise.all([
     readGate(session, investorOrganisationId),
     readProfileReasons(session, investorOrganisationId),
@@ -170,10 +173,12 @@ export async function LooksForSection({
             id="investor-looks-for"
             className="cq-title-md text-(--cq-text-primary)"
           >
-            What this investor looks for
+            {t("What this investor looks for")}
           </h2>
           <p className="cq-body-sm text-(--cq-text-secondary)">
-            From their public profile and their published GateQ criteria only.
+            {t(
+              "From their public profile and their published GateQ criteria only.",
+            )}
           </p>
         </div>
         {criteria.length === 0 && profile.length === 0 ? (
@@ -194,7 +199,7 @@ export async function LooksForSection({
             {profile.length === 0 ? null : (
               <>
                 <h3 className="cq-title-sm pt-2 text-(--cq-text-primary)">
-                  Where their public profile matches you
+                  {t("Where their public profile matches you")}
                 </h3>
                 <Rows rows={profile} />
               </>
@@ -202,8 +207,9 @@ export async function LooksForSection({
           </>
         )}
         <p className="cq-body-sm text-(--cq-text-tertiary)">
-          This is their published bar, not their private thesis. Meeting it is
-          not a promise of interest.
+          {t(
+            "This is their published bar, not their private thesis. Meeting it is not a promise of interest.",
+          )}
         </p>
       </section>
       {href === null ? (
@@ -216,7 +222,7 @@ export async function LooksForSection({
             id="investor-draft"
             className="cq-title-md text-(--cq-text-primary)"
           >
-            Apply via GateQ
+            {t("Apply via GateQ")}
           </h2>
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {investorName} has no open GateQ form yet. A Connection Request is
@@ -234,31 +240,33 @@ export async function LooksForSection({
               id="investor-draft"
               className="cq-title-md text-(--cq-text-primary)"
             >
-              Draft my application
+              {t("Draft my application")}
             </h2>
             <span className="cq-body-sm text-(--cq-text-tertiary)">
-              Q prepares · you approve · nothing is sent until you press Send
+              {t(
+                "Q prepares · you approve · nothing is sent until you press Send",
+              )}
             </span>
           </div>
           {prefill === null ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
-              Q starts the form from your company profile.
+              {t("Q starts the form from your company profile.")}
             </p>
           ) : (
             <dl className="cq-body-sm grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[10rem_1fr]">
-              <dt className="text-(--cq-text-tertiary)">Company</dt>
+              <dt className="text-(--cq-text-tertiary)">{t("Company")}</dt>
               <dd className="text-(--cq-text-primary)">
                 {prefill.companyName}
               </dd>
-              <dt className="text-(--cq-text-tertiary)">One line</dt>
+              <dt className="text-(--cq-text-tertiary)">{t("One line")}</dt>
               <dd className="text-(--cq-text-primary)">
                 {prefill.oneLiner ?? "Not on your profile yet"}
               </dd>
-              <dt className="text-(--cq-text-tertiary)">Stage</dt>
+              <dt className="text-(--cq-text-tertiary)">{t("Stage")}</dt>
               <dd className="text-(--cq-text-primary)">
                 {stageLabel(prefill.stageCode) ?? "Not on your profile yet"}
               </dd>
-              <dt className="text-(--cq-text-tertiary)">Country</dt>
+              <dt className="text-(--cq-text-tertiary)">{t("Country")}</dt>
               <dd className="text-(--cq-text-primary)">
                 {countryLabel(prefill.country) ?? "Not on your profile yet"}
               </dd>
@@ -266,7 +274,7 @@ export async function LooksForSection({
           )}
           <div className="flex flex-wrap gap-2">
             <Link href={href} className={buttonClassName("primary")}>
-              Review and send
+              {t("Review and send")}
             </Link>
           </div>
         </section>

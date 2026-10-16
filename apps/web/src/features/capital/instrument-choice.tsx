@@ -3,6 +3,7 @@
 import type { CapitalRoundInstrument } from "@capital-q/contracts";
 
 import { INSTRUMENT_LABELS } from "./round-labels";
+import { useT } from "@/features/i18n/language";
 
 const INSTRUMENTS: readonly CapitalRoundInstrument[] = [
   "SAFE",
@@ -26,6 +27,7 @@ export function InstrumentChoice({
   readonly value: CapitalRoundInstrument | null | undefined;
   readonly onChange: (value: CapitalRoundInstrument | null) => void;
 }) {
+  const t = useT();
   const options: readonly {
     readonly value: CapitalRoundInstrument | null;
     readonly label: string;
@@ -39,7 +41,7 @@ export function InstrumentChoice({
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="cq-label mb-2 text-(--cq-text-primary)">
-        Instrument
+        {t("Instrument")}
       </legend>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => (

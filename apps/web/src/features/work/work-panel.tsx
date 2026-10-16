@@ -449,7 +449,7 @@ export function WorkPanel({
               void load();
             }}
           >
-            Try again
+            {t("Try again")}
           </Button>
         }
         compact
@@ -466,7 +466,7 @@ export function WorkPanel({
             size="compact"
             onClick={() => askAbout("Q, handle it for me: ")}
           >
-            Ask Q to handle something
+            {t("Ask Q to handle something")}
           </Button>
         }
       />
