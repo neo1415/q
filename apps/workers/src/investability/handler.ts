@@ -34,6 +34,12 @@ export const INVESTABILITY_EVENT_TYPES: ReadonlySet<string> = new Set([
   "evidence.document.details_changed",
   "evidence.document.download_audience_changed",
   "verification.claim.decided",
+  // ADR 0075: the pitch investors may play is an input.
+  "media.asset.status_changed",
+  "media.asset.moderated",
+  "media.asset.playback_policy_changed",
+  "media.asset.replaced",
+  "media.asset.deleted",
 ]);
 
 const MAX_COMPANIES_PER_EVENT = 20;
@@ -46,6 +52,8 @@ const Subjects = z
     organisationId: z.string().uuid().optional(),
     claimId: z.string().uuid().optional(),
     userId: z.string().uuid().optional(),
+    ownerType: z.string().optional(),
+    ownerId: z.string().uuid().optional(),
   })
   .passthrough();
 
@@ -60,6 +68,9 @@ export async function companiesOfEvent(
   if (d.companyId !== undefined) return [d.companyId];
   if (d.subjectType === "COMPANY" && d.subjectId !== undefined) {
     return [d.subjectId];
+  }
+  if (d.ownerType === "COMPANY" && d.ownerId !== undefined) {
+    return [d.ownerId];
   }
   let organisationId = d.organisationId;
   if (

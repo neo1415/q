@@ -478,7 +478,22 @@ void _confidenceAgree;
 export function suitabilityFromFit(profile: FitProfileDto): SuitabilityDto {
   const applicable = profile.parameters.filter((p) => p.applicable);
   const known = applicable.filter((p) => p.outcome !== "UNKNOWN");
-  const shown = fitScoreOutOf10(profile);
+  // ADR 0075: a number whenever anything is known, labelled with its
+  // coverage; the fit's own x/10 (3+ known) is used when it shows one, so
+  // the two agree wherever both are shown.
+  const points = known
+    .map((p) => FIT_SCORE_POINTS[p.outcome])
+    .filter((n): n is number => n !== null);
+  const shownFit = fitScoreOutOf10(profile);
+  const shown =
+    shownFit ??
+    (points.length === 0
+      ? null
+      : String(
+          Math.round(
+            (points.reduce((sum, n) => sum + n, 0) / points.length) * 10,
+          ) / 10,
+        ));
   const status: SuitabilityStatus =
     profile.band === "OUTSIDE_MANDATE"
       ? "OUTSIDE_MANDATE"

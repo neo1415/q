@@ -32,7 +32,8 @@ create table core.company_investability_assessments (
   method_version       text not null check (method_version ~ '^[a-z][a-z0-9-]*/v[0-9]+(\+[a-z][a-z0-9.-]*)?$' and length(method_version) <= 80),
   revision             integer not null check (revision >= 1),
   basis_hash           text not null check (basis_hash ~ '^[0-9a-f]{64}$'),
-  status               text not null check (status in ('SCORED', 'INSUFFICIENT_EVIDENCE')),
+  -- NO_MATERIAL (ADR 0075): nothing investor-visible to read yet.
+  status               text not null check (status in ('SCORED', 'INSUFFICIENT_EVIDENCE', 'NO_MATERIAL')),
   -- 0-100 integer (InvestIQ 0-4 × 25); only when scored. Never a default.
   score                smallint check (score between 0 and 100),
   band                 text check (band in ('STRONG', 'INVESTABLE', 'DEVELOPING', 'EARLY')),

@@ -9,6 +9,8 @@ import {
 
 import {
   assessInvestIQV1,
+  bandOf,
+  observationWeight,
   type InvestIQV1Assessment,
 } from "../investiq/assess-v1.js";
 import type { InvestIQObservation } from "../investiq/contracts.js";
@@ -19,10 +21,15 @@ import {
   type GradedDimension,
   type ReadinessBand,
 } from "../investiq/method-v1.js";
-import type { InvestabilityInputs } from "./inputs.js";
+import {
+  INVESTOR_ELIGIBLE_SCOPES,
+  type InvestabilityInputs,
+} from "./inputs.js";
 import {
   INVESTABILITY_INPUTS_VERSION,
   observeInvestability,
+  PITCH_REF,
+  UNCONFIRMED_DECK_REF,
 } from "./observe.js";
 
 /**
@@ -145,16 +152,70 @@ export function assessInvestability(
     )
     .digest("hex");
   return {
-    view: viewOf(assessment, observations),
+    view: viewOf(assessment, observations, hasMaterial(inputs)),
     assessment,
     observations,
     basisHash,
   };
 }
 
+/** Is there anything investor-visible to read beyond the bare profile? */
+function hasMaterial(inputs: InvestabilityInputs): boolean {
+  const readable = (sections: readonly { readonly status: string }[]) =>
+    sections.some((s) => s.status !== "NOT_IN_DECK" && s.status !== "UNCLEAR");
+  const deck =
+    inputs.deck !== null &&
+    (readable(inputs.deck.sections) || readable(inputs.deck.unconfirmed ?? []));
+  const pitch = inputs.pitch !== null && inputs.pitch !== undefined;
+  const claims = inputs.claims.some((c) =>
+    (INVESTOR_ELIGIBLE_SCOPES as readonly string[]).includes(c.visibilityScope),
+  );
+  return deck || pitch || claims;
+}
+
+/**
+ * ADR 0075: the score shown when InvestIQ's full gates are not met. The
+ * same criterion scores, each weighted by its dimension's stage weight
+ * shared over that dimension's applicable criteria, averaged over the
+ * criteria with evidence. Unknown criteria stay out (never zero). Stage
+ * unknown: equal dimension weights, and no stage-specific readings.
+ */
+function provisionalScore(a: InvestIQV1Assessment): number | null {
+  const weights = a.stageBand === null ? null : STAGE_WEIGHTS[a.stageBand];
+  let total = 0;
+  let sum = 0;
+  for (const d of a.dimensions) {
+    if (d.applicableGradedCriteria === 0) continue;
+    const dimensionWeight = weights === null ? 1 : weights[d.dimension];
+    const each = dimensionWeight / d.applicableGradedCriteria;
+    for (const c of d.criteria) {
+      if (!c.graded || c.state !== "SCORED" || c.score === null) continue;
+      total += each;
+      sum += each * c.score;
+    }
+  }
+  return total === 0 ? null : sum / total;
+}
+
+/** What a factor line may say: confirmed facts are quoted, the rest named only. */
+function factorDetail(
+  top: InvestIQObservation | undefined,
+  fallback: string,
+): string {
+  const ref = top?.provenance.sourceRef ?? "";
+  if (ref.startsWith(UNCONFIRMED_DECK_REF)) {
+    return "From their own deck, not yet confirmed";
+  }
+  if (ref.startsWith(PITCH_REF)) return "Stated in their pitch video";
+  const evidence =
+    top === undefined ? "" : ` · ${EVIDENCE_WORDS[top.evidenceStatus] ?? ""}`;
+  return `${top?.statement ?? fallback}${evidence}`.slice(0, 200);
+}
+
 function viewOf(
   a: InvestIQV1Assessment,
   observations: readonly InvestIQObservation[],
+  material: boolean,
 ): Omit<InvestabilityDto, "assessedAt"> {
   const byId = new Map(observations.map((o) => [o.id, o] as const));
   const weights = a.stageBand === null ? null : STAGE_WEIGHTS[a.stageBand];
@@ -169,29 +230,29 @@ function viewOf(
   };
   const rows: Row[] = [];
   const withheld: ScoreFactor[] = [];
+  let unconfirmedOnly = 0;
   for (const d of a.dimensions) {
     for (const c of d.criteria) {
       if (!c.graded) continue;
-      const evidence =
-        c.strongestEvidenceStatus === null
-          ? ""
-          : ` · ${EVIDENCE_WORDS[c.strongestEvidenceStatus] ?? ""}`;
-      const statement =
-        c.observationIds.map((id) => byId.get(id)).find((o) => o !== undefined)
-          ?.statement ?? c.label;
+      // The observation that decided the criterion: the highest weight.
+      const top = c.observationIds
+        .map((id) => byId.get(id))
+        .filter((o): o is InvestIQObservation => o !== undefined)
+        .sort((x, y) => observationWeight(y) - observationWeight(x))[0];
       if (c.state === "CONFLICTED") {
         withheld.push({
           label: c.label,
           detail: "Contradictory evidence: withheld until reconciled",
         });
       } else if (c.state === "SCORED" && c.score !== null) {
+        const ref = top?.provenance.sourceRef ?? "";
+        if (ref.startsWith(UNCONFIRMED_DECK_REF) || ref.startsWith(PITCH_REF)) {
+          unconfirmedOnly += 1;
+        }
         rows.push({
           score: c.score,
           weight: weightOf(d.dimension),
-          factor: {
-            label: c.label,
-            detail: `${statement}${evidence}`.slice(0, 200),
-          },
+          factor: { label: c.label, detail: factorDetail(top, c.label) },
         });
       }
     }
@@ -215,6 +276,11 @@ function viewOf(
 
   const missing: string[] = [];
   if (a.stageBand === null) missing.push("Stage: not stated on the profile");
+  if (unconfirmedOnly > 0) {
+    missing.push(
+      "The founder confirming Q's reading of their deck would raise confidence",
+    );
+  }
   const thin = applicable
     .filter((d) => d.status === "INSUFFICIENT_EVIDENCE")
     .sort(
@@ -238,33 +304,76 @@ function viewOf(
     );
   }
 
-  const scored =
-    overall.status === "BANDED" &&
-    overall.score !== null &&
-    overall.band !== null;
-  return InvestabilityDtoSchema.omit({ assessedAt: true }).parse({
-    status: scored ? "SCORED" : "INSUFFICIENT_EVIDENCE",
-    score:
-      scored && overall.score !== null
-        ? Math.round(overall.score * INVESTABILITY_SCALE)
-        : null,
-    band: scored && overall.band !== null ? BAND_WORDS[overall.band] : null,
-    confidence: scored ? overall.confidence : null,
-    cappedByConfidence: overall.cappedByConfidence,
-    coverage: {
-      areasScored: scoredAreas.length,
-      areasTotal: applicable.length,
-      criteriaScored: applicable.reduce((s, d) => s + d.scoredCriteria, 0),
-      criteriaApplicable: applicable.reduce(
-        (s, d) => s + d.applicableGradedCriteria,
-        0,
-      ),
-    },
+  const coverage = {
+    areasScored: scoredAreas.length,
+    areasTotal: applicable.length,
+    criteriaScored: applicable.reduce((s, d) => s + d.scoredCriteria, 0),
+    criteriaApplicable: applicable.reduce(
+      (s, d) => s + d.applicableGradedCriteria,
+      0,
+    ),
+  };
+  const common = {
+    coverage,
     stage: a.stageBand === null ? null : (STAGE_WORDS[a.stageBand] ?? null),
     up,
     down,
     missing: missing.slice(0, 4),
     methodVersion: INVESTABILITY_METHOD_VERSION,
+  };
+  const viewSchema = InvestabilityDtoSchema.omit({ assessedAt: true });
+  const parse = (value: unknown) => viewSchema.parse(value);
+
+  if (!material) {
+    return parse({
+      ...common,
+      status: "NO_MATERIAL",
+      score: null,
+      band: null,
+      confidence: null,
+      cappedByConfidence: false,
+      provisional: false,
+    });
+  }
+  if (
+    overall.status === "BANDED" &&
+    overall.score !== null &&
+    overall.band !== null
+  ) {
+    return parse({
+      ...common,
+      status: "SCORED",
+      score: Math.round(overall.score * INVESTABILITY_SCALE),
+      band: BAND_WORDS[overall.band],
+      confidence: overall.confidence,
+      cappedByConfidence: overall.cappedByConfidence,
+      provisional: false,
+    });
+  }
+  // ADR 0075: always a number when there is material; a thin basis is
+  // Low confidence and the band is held at Developing at most.
+  const provisional = provisionalScore(a);
+  if (provisional === null) {
+    return parse({
+      ...common,
+      status: "INSUFFICIENT_EVIDENCE",
+      score: null,
+      band: null,
+      confidence: null,
+      cappedByConfidence: false,
+      provisional: false,
+    });
+  }
+  const raw = bandOf(provisional);
+  const capped = raw === "READY" || raw === "STRONG";
+  return parse({
+    ...common,
+    status: "SCORED",
+    score: Math.round(provisional * INVESTABILITY_SCALE),
+    band: BAND_WORDS[capped ? "DEVELOPING" : raw],
+    confidence: "LOW",
+    cappedByConfidence: capped,
+    provisional: true,
   });
 }
 

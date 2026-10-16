@@ -17,6 +17,12 @@
 
 They are separate (CLAUDE.md: Readiness ≠ Business Quality ≠ Fit ≠ Interest ≠ Match). Neither is shown as a blend. The only place they meet is the Discover ordering key, below, which is never displayed.
 
+## ADR 0075 amendment (owner, 2026-10-16): always present, unconfirmed material counted
+
+Scores read Q's **unconfirmed** reading of decks open to all investors, and the pitch investors may play together with its transcript topics. Both count as Q_INFERENCE · SELF_REPORTED at weight 0.25, below a confirmed founder claim (0.5) and verified evidence (1.0). They are never quoted: the why says "From their own deck, not yet confirmed" or "Stated in their pitch video".
+
+A number is shown whenever any investor-visible material exists. Below InvestIQ's full gates it is a **provisional** score: criterion scores weighted by stage weight per criterion, unknown left out, Low confidence, at most Developing, labelled "early read". Coverage is shown as "based on N of M factors". With no deck, no pitch and no shared claim the investor sees "No pitch or deck shared yet". Inputs version: `investability-inputs.v2`. Production offline count after the amendment: 461 of 461 listed companies scored, 190 of them provisional, all 50–54, Developing, Low confidence.
+
 ## Investability: the InvestIQ v1 method
 
 ### Dimensions and stage weights

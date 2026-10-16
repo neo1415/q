@@ -44,7 +44,8 @@ import {
  * penalised). Contradictory deck facts are CONTRADICTORY: withheld.
  */
 
-export const INVESTABILITY_INPUTS_VERSION = "investability-inputs.v1";
+/** v2 (ADR 0075): unconfirmed reads of open decks and investor-visible pitches. */
+export const INVESTABILITY_INPUTS_VERSION = "investability-inputs.v2";
 
 type Reading = InvestIQObservation["reading"];
 type SourceKind = InvestIQObservation["provenance"]["sourceKind"];
@@ -87,6 +88,12 @@ export const INVESTABILITY_INPUT_RULES = {
   "verification.organisation":
     "The organisation is verified by Capital Q (platform verified).",
   "claim.network": "A network-visible evidence claim is on record.",
+  "deck.unconfirmed":
+    "ADR 0075: Q's reading of an unreviewed section of a deck open to all investors (Q inference, self-reported; never quoted).",
+  "pitch.presented":
+    "ADR 0075: the founder presents the product in a pitch investors may play.",
+  "pitch.transcript":
+    "ADR 0075: the pitch's generated transcript speaks to the topic (fixed patterns; never quoted).",
 } as const;
 export type InvestabilityInputRule = keyof typeof INVESTABILITY_INPUT_RULES;
 
@@ -389,6 +396,111 @@ function deckSignals(
   }
 }
 
+/** Observation source prefixes the "why" reads to decide what it may quote. */
+export const UNCONFIRMED_DECK_REF = "deck-unconfirmed:";
+export const PITCH_REF = "pitch:";
+
+const PITCH_RULES: readonly {
+  readonly criterion: string;
+  readonly pattern: RegExp;
+  /** The words must come with a figure (a digit) to count. */
+  readonly figure: boolean;
+}[] = [
+  {
+    criterion: "cp.traction",
+    pattern: /\b(revenue|arr|mrr|sales|gmv|growing|growth)\b/iu,
+    figure: true,
+  },
+  {
+    criterion: "cp.customer_base",
+    pattern: /\b(customers?|clients?|users?|merchants?|subscribers?)\b/iu,
+    figure: true,
+  },
+  {
+    criterion: "fl.founder_quality",
+    pattern:
+      /\b(co-?founders?|founded|years of experience|previously|ceo|cto)\b/iu,
+    figure: false,
+  },
+  {
+    criterion: "fl.leadership_depth",
+    pattern: /\b(our team|engineers|hired|head of)\b/iu,
+    figure: false,
+  },
+  {
+    criterion: "mo.market_size",
+    pattern: /\b(market|tam|billion)\b/iu,
+    figure: false,
+  },
+  {
+    criterion: "pt.competitive_advantage",
+    pattern: /\b(compet\w*|alternatives?|unlike)\b/iu,
+    figure: false,
+  },
+  {
+    criterion: "cp.revenue_model",
+    pattern: /\b(pric\w*|subscription|commission|fee|per month)\b/iu,
+    figure: false,
+  },
+  {
+    criterion: "cp.distribution",
+    pattern: /\b(distribution|channels?|partners?|sell to|go-to-market)\b/iu,
+    figure: false,
+  },
+  {
+    criterion: "cs.raise_amount",
+    pattern: /\b(raising|raise)\b/iu,
+    figure: true,
+  },
+];
+
+/**
+ * ADR 0075: the pitch investors may play. Its existence records that the
+ * founder presented the product; its generated transcript, read by fixed
+ * patterns (never a model), records which topics they spoke to. Each is Q's
+ * inference of what was said: self-reported at the most, never quoted,
+ * never a strength or a weakness on its own.
+ */
+function pitchSignals(
+  pitch: NonNullable<InvestabilityInputs["pitch"]>,
+): Signal[] {
+  const base = {
+    reading: "RECORDED" as const,
+    truthClass: "Q_INFERENCE" as const,
+    evidenceStatus: "SELF_REPORTED" as const,
+    lifecycleStatus: "CURRENT" as const,
+    sourceKind: "Q_EXTRACTION" as const,
+    sourceRef: `${PITCH_REF}${pitch.mediaAssetId}`,
+    observedAt: iso(pitch.readyAt),
+  };
+  const out: Signal[] = [
+    {
+      ...base,
+      criterion: "pt.product_definition",
+      statement: "The founder presents the product in their pitch video.",
+      rule: "pitch.presented",
+    },
+  ];
+  const text = (pitch.transcript ?? "").slice(0, 20_000);
+  if (text.trim() === "") return out;
+  const sentences = text.split(/(?<=[.!?])\s+/u);
+  for (const rule of PITCH_RULES) {
+    const said = sentences.some(
+      (sentence) =>
+        rule.pattern.test(sentence) && (!rule.figure || /\d/u.test(sentence)),
+    );
+    if (said) {
+      out.push({
+        ...base,
+        criterion: rule.criterion,
+        statement: "Stated in their pitch video.",
+        rule: "pitch.transcript",
+      });
+    }
+  }
+  return out;
+}
+
 /** The single rule that turns the inputs into observations. */
 export function observeInvestability(
   inputs: InvestabilityInputs,
@@ -502,6 +614,33 @@ export function observeInvestability(
     for (const section of inputs.deck.sections) {
       signals.push(...deckSignals(section, stage, inputs.deck));
     }
+    // ADR 0075: Q's reading of sections the founder has not reviewed yet,
+    // as Q's inference of what their own deck says: self-reported at the
+    // most, never document-supported, never quoted. Q's own uncertainty
+    // (a "contradictory" read) is not evidence of a contradiction here.
+    const shown = new Set(
+      inputs.deck.sections
+        .filter((s) => s.status !== "UNCLEAR" && s.status !== "NOT_IN_DECK")
+        .map((s) => s.section),
+    );
+    for (const section of inputs.deck.unconfirmed ?? []) {
+      if (shown.has(section.section)) continue;
+      for (const signal of deckSignals(section, stage, inputs.deck)) {
+        if (signal.lifecycleStatus !== "CURRENT") continue;
+        signals.push({
+          ...signal,
+          truthClass: "Q_INFERENCE",
+          evidenceStatus: "SELF_REPORTED",
+          sourceKind: "Q_EXTRACTION",
+          sourceRef: `${UNCONFIRMED_DECK_REF}${inputs.deck.extractionId}:${section.section}`,
+          rule: "deck.unconfirmed",
+        });
+      }
+    }
+  }
+
+  if (inputs.pitch !== null && inputs.pitch !== undefined) {
+    signals.push(...pitchSignals(inputs.pitch));
   }
 
   return mergeSignals(signals);

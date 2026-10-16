@@ -14,9 +14,12 @@ import type {
  *   verification  the badges shown to the network (organisation, domain)
  *   founders      background lines the founder made network_visible
  *   claims        evidence claims scoped network_visible / public_external
- *   deck          the confirmed or founder-corrected sections of a deck
- *                 offered to all investors (data room PUBLIC, or download
- *                 open to investors); never a relationship grant
+ *   deck          a deck offered to all investors (data room PUBLIC, or
+ *                 download open to investors): its confirmed or corrected
+ *                 sections, and (ADR 0075) Q's unconfirmed reading of the
+ *                 sections not yet reviewed; never a dismissed section,
+ *                 never a deck shared only through a relationship grant
+ *   pitch         (ADR 0075) the pitch investors may play and its transcript
  *
  * Not read, by design: the capital objective (founder_private until
  * shared), team facts (not investor-visible), the founder's readiness
@@ -72,11 +75,31 @@ export type InvestabilityInputs = {
   };
   readonly founders: readonly InvestabilityFounderLine[];
   readonly claims: readonly InvestabilityClaimInput[];
-  /** Null: no deck offered to all investors, or no confirmed reading. */
+  /** Null: no deck offered to all investors, or no reading of it. */
   readonly deck: {
     readonly extractionId: string;
     readonly readAt: string;
     /** Investor-shown sections only (confirmed or corrected); others UNCLEAR. */
     readonly sections: readonly DeckSection[];
+    /**
+     * ADR 0075: Q's reading of sections the founder has NOT reviewed yet,
+     * of this same deck (open to all investors). Never a dismissed section.
+     * Scored as Q's inference of what the deck says (reduced weight) and
+     * never quoted to investors.
+     */
+    readonly unconfirmed?: readonly DeckSection[] | undefined;
   } | null;
+  /**
+   * ADR 0075: the current founder pitch that investors may play (READY,
+   * moderation ALLOWED, AUTHORISED playback, not superseded), with its
+   * generated transcript text when there is one. Never quoted.
+   */
+  readonly pitch?:
+    | {
+        readonly mediaAssetId: string;
+        readonly readyAt: string | null;
+        readonly transcript: string | null;
+      }
+    | null
+    | undefined;
 };

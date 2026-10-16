@@ -24,13 +24,20 @@ import {
  * (`@capital-q/permissions` company-deck). A deck shared only with one
  * relationship never reaches a score every investor sees. No model call.
  */
+export type InvestabilityDeckRoom = Pick<
+  ReturnType<typeof createPostgresDataRoom>,
+  "currentDeck" | "extractionFor"
+>;
+
 export function createInvestabilityDeckPort(
   sql: DatabaseExecutor,
+  room: InvestabilityDeckRoom = createPostgresDataRoom(),
 ): InvestabilityDeckPort {
-  const room = createPostgresDataRoom();
   return async (companyId) => {
     const deck = await room.currentDeck(sql, companyId);
     if (deck === null) return null;
+    // Only a deck offered to ALL investors; a relationship grant never
+    // reaches a score every investor sees.
     const offeredToAll =
       deck.level === "PUBLIC" || deck.downloadAudience === "INVESTORS";
     if (!offeredToAll) return null;
@@ -41,20 +48,33 @@ export function createInvestabilityDeckPort(
       reading.reviews ?? [],
       reading.confirmed,
     );
-    const shown = new Set(
-      reviewed.states
-        .filter((s) => s.state === "CONFIRMED" || s.state === "CORRECTED")
-        .map((s) => s.section),
-    );
-    if (shown.size === 0) return null;
+    const stateOf = new Map(reviewed.states.map((s) => [s.section, s.state]));
+    const shown = (state: string | undefined) =>
+      state === "CONFIRMED" || state === "CORRECTED";
     const sections: DeckSection[] = orderDeckSections(
       reviewed.sections.map((section) =>
-        shown.has(section.section)
+        shown(stateOf.get(section.section))
           ? deckSectionForReaders(section)
           : unknownDeckSection(section.section, "UNCLEAR"),
       ),
     );
-    return { extractionId: reading.id, readAt: reading.createdAt, sections };
+    // ADR 0075: sections not reviewed yet, as Q read them. A section the
+    // founder marked as wrong (DISMISSED) is never among them.
+    const unconfirmed: DeckSection[] = reviewed.sections
+      .filter((section) => stateOf.get(section.section) === "PENDING")
+      .map((section) => deckSectionForReaders(section));
+    if (
+      !sections.some((s) => s.status !== "UNCLEAR") &&
+      unconfirmed.length === 0
+    ) {
+      return null;
+    }
+    return {
+      extractionId: reading.id,
+      readAt: reading.createdAt,
+      sections,
+      unconfirmed,
+    };
   };
 }
 

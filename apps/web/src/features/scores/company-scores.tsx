@@ -43,9 +43,12 @@ function investabilityWords(dto: InvestabilityDto): string {
   if (dto.status !== "SCORED" || dto.band === null || dto.confidence === null) {
     return dto.status === "NOT_ASSESSED"
       ? "Not assessed yet"
-      : "Not enough shared evidence yet";
+      : dto.status === "NO_MATERIAL"
+        ? "No pitch or deck shared yet"
+        : "Not enough shared evidence yet";
   }
-  return `${INVESTABILITY_BAND_LABELS[dto.band]} · ${SCORE_CONFIDENCE_LABELS[dto.confidence]}`;
+  // ADR 0075: a screening signal on a thin basis says so.
+  return `${INVESTABILITY_BAND_LABELS[dto.band]} · ${SCORE_CONFIDENCE_LABELS[dto.confidence]}${dto.provisional === true ? " · early read" : ""}`;
 }
 
 function suitabilityWords(dto: SuitabilityDto): string {
@@ -244,7 +247,7 @@ export function CompanyScores({
         coverage={
           inv.status === "NOT_ASSESSED"
             ? "Assessed once the company is listed"
-            : `Based on ${inv.coverage.areasScored} of ${inv.coverage.areasTotal} areas · ${inv.coverage.criteriaScored} of ${inv.coverage.criteriaApplicable} criteria`
+            : `Based on ${inv.coverage.criteriaScored} of ${inv.coverage.criteriaApplicable} factors · ${inv.coverage.areasScored} of ${inv.coverage.areasTotal} areas`
         }
       >
         <Why

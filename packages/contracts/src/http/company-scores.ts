@@ -101,6 +101,11 @@ export const INVESTABILITY_STATUSES = [
   "INSUFFICIENT_EVIDENCE",
   /** Not assessed yet (new, or not listed to the network). */
   "NOT_ASSESSED",
+  /**
+   * ADR 0075: nothing investor-visible to read (no deck, no pitch, no
+   * shared claims). The only state that shows no number once assessed.
+   */
+  "NO_MATERIAL",
 ] as const;
 export const InvestabilityStatusSchema = z.enum(INVESTABILITY_STATUSES);
 export type InvestabilityStatus = z.infer<typeof InvestabilityStatusSchema>;
@@ -114,6 +119,11 @@ export const InvestabilityDtoSchema = z
     confidence: ScoreConfidenceSchema.nullable(),
     /** The band was held at DEVELOPING because confidence is low. */
     cappedByConfidence: z.boolean(),
+    /**
+     * ADR 0075: shown on a basis thinner than InvestIQ's full coverage gates
+     * (a screening signal); confidence is then Low. Absent: false.
+     */
+    provisional: z.boolean().optional(),
     coverage: z
       .object({
         /** InvestIQ dimensions with enough evidence to score. */
@@ -211,11 +221,12 @@ export type CompanyScoresDto = z.infer<typeof CompanyScoresDtoSchema>;
 /** "Investability 72 · based on 5 of 8 areas", or the honest words. */
 export function investabilityLine(dto: InvestabilityDto): string {
   if (dto.status === "NOT_ASSESSED") return "Investability not assessed yet";
-  const areas = `based on ${dto.coverage.areasScored} of ${dto.coverage.areasTotal} areas`;
+  if (dto.status === "NO_MATERIAL") return "No pitch or deck shared yet";
+  const factors = `based on ${dto.coverage.criteriaScored} of ${dto.coverage.criteriaApplicable} factors`;
   if (dto.status === "INSUFFICIENT_EVIDENCE" || dto.score === null) {
-    return `Investability: not enough shared evidence yet · ${areas}`;
+    return `Investability: not enough shared evidence yet · ${factors}`;
   }
-  return `Investability ${dto.score} · ${areas}`;
+  return `Investability ${dto.score} · ${factors}`;
 }
 
 /** "Suitability 80 · 6 of 7 known", or the honest words. */

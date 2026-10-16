@@ -148,7 +148,7 @@ export function createPostgresInvestabilityStore(options: {
           },
         };
       }
-      const [founders, claims] = await Promise.all([
+      const [founders, claims, pitches] = await Promise.all([
         sql<
           {
             id: string;
@@ -192,7 +192,35 @@ export function createPostgresInvestabilityStore(options: {
              and lifecycle_status <> 'SUPERSEDED'
            order by claim_key, id
            limit 200`,
+        // ADR 0075: the current pitch investors may play (READY, moderation
+        // ALLOWED, AUTHORISED or PUBLIC playback, not superseded or
+        // deleted), with its generated transcript text when there is one.
+        sql<
+          {
+            id: string;
+            ready_at: Date | null;
+            transcript: string | null;
+          }[]
+        >`
+          select m.id, m.ready_at,
+                 (select string_agg(cue->>'text', ' ')
+                    from jsonb_array_elements(t.cues) cue) as transcript
+            from media.media_assets m
+            left join lateral (
+              select cues from media.pitch_transcripts pt
+               where pt.media_asset_id = m.id
+               order by (pt.language like 'en%') desc, pt.created_at desc
+               limit 1) t on true
+           where m.owner_type = 'COMPANY' and m.owner_id = ${companyId}::uuid
+             and m.tenant_id = ${company.tenant_id}::uuid
+             and m.purpose = 'FOUNDER_PITCH' and m.status = 'READY'
+             and m.moderation_status = 'ALLOWED'
+             and m.playback_policy in ('AUTHORISED', 'PUBLIC')
+             and m.deleted_at is null and m.superseded_at is null
+           order by m.created_at desc
+           limit 1`,
       ]);
+      const pitch = pitches[0];
       return {
         subject,
         inputs: {
@@ -211,6 +239,17 @@ export function createPostgresInvestabilityStore(options: {
             domain: false,
             decidedAt: null,
           },
+          pitch:
+            pitch === undefined
+              ? null
+              : {
+                  mediaAssetId: pitch.id,
+                  readyAt: iso(pitch.ready_at),
+                  transcript:
+                    pitch.transcript === null
+                      ? null
+                      : pitch.transcript.slice(0, 20_000),
+                },
           founders: founders.map((row): InvestabilityFounderLine => ({
             id: row.id,
             title: row.title,
@@ -272,6 +311,17 @@ export function createPostgresInvestabilityStore(options: {
           select c.subject_id, r.created_at
             from evidence.claim_revisions r
             join evidence.claims c on c.id = r.claim_id
+          union all
+          select m.owner_id,
+                 greatest(m.created_at, coalesce(m.ready_at, m.created_at),
+                          coalesce(m.deleted_at, m.created_at), coalesce(m.superseded_at, m.created_at))
+            from media.media_assets m
+           where m.owner_type = 'COMPANY' and m.purpose = 'FOUNDER_PITCH'
+          union all
+          select m.owner_id, t.created_at
+            from media.pitch_transcripts t
+            join media.media_assets m on m.id = t.media_asset_id
+           where m.owner_type = 'COMPANY'
           union all
           select m.company_id, b.created_at
             from core.founder_background_entries b

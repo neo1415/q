@@ -75,7 +75,9 @@ describe("CompanyScores", () => {
     const inv = document.querySelector('[data-score="investability"]');
     const suit = document.querySelector('[data-score="suitability"]');
     expect(inv?.textContent).toContain("58");
-    expect(inv?.textContent).toContain("Based on 5 of 8 areas");
+    expect(inv?.textContent).toContain(
+      "Based on 15 of 46 factors · 5 of 8 areas",
+    );
     expect(inv?.textContent).toContain("Developing · Low confidence");
     expect(suit?.textContent).toContain("80");
     expect(suit?.textContent).toContain("6 of 7 of your criteria known");
@@ -102,7 +104,7 @@ describe("CompanyScores", () => {
     render(<CompanyScores scores={thin} variant="compact" />);
     const line = document.querySelector('[data-company-scores="compact"]');
     expect(line?.textContent).toContain(
-      "Investability: not enough shared evidence yet · based on 5 of 8 areas",
+      "Investability: not enough shared evidence yet · based on 15 of 46 factors",
     );
     expect(line?.textContent).toContain("Suitability 80 · 6 of 7 known");
     expect(line?.getAttribute("aria-label")).toBe(companyScoresLabel(thin));
@@ -112,7 +114,7 @@ describe("CompanyScores", () => {
     render(<CompanyScores scores={scored} variant="minimal" />);
     const tile = document.querySelector('[data-company-scores="minimal"]');
     expect(tile?.getAttribute("aria-label")).toContain(
-      "Investability 58 · based on 5 of 8 areas",
+      "Investability 58 · based on 15 of 46 factors",
     );
     expect(tile?.textContent).toContain("58");
     expect(tile?.textContent).toContain("80");

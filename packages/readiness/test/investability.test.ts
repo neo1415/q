@@ -128,6 +128,81 @@ function inputs(
   };
 }
 
+describe("ADR 0075: unconfirmed investor-visible material", () => {
+  const thinDeck = (): DeckSection[] =>
+    DECK_SECTIONS.map((code) =>
+      section(code, [], { status: "NOT_IN_DECK", summary: null }),
+    );
+
+  it("counts Q's unconfirmed reading at reduced weight, Low confidence, never quoted", () => {
+    const r = assessInvestability(inputs({}, null), AS_OF);
+    expect(r.view.status).toBe("NO_MATERIAL");
+    const unconfirmed = assessInvestability(
+      {
+        ...inputs({}, null),
+        deck: {
+          extractionId: "ext-2",
+          readAt: READ_AT,
+          sections: thinDeck(),
+          unconfirmed: fullDeck(),
+        },
+      },
+      AS_OF,
+    );
+    expect(unconfirmed.view.status).toBe("SCORED");
+    expect(unconfirmed.view.confidence).toBe("LOW");
+    expect(unconfirmed.view.score).not.toBeNull();
+    const factors = [...unconfirmed.view.up, ...unconfirmed.view.down];
+    expect(factors.length).toBeGreaterThan(0);
+    for (const f of factors) {
+      expect(f.detail).toBe("From their own deck, not yet confirmed");
+    }
+    // Nothing the founder has not confirmed is ever shown in words.
+    expect(JSON.stringify(unconfirmed.view)).not.toMatch(/\$40k|summary|Ada/u);
+    // Confirmed evidence counts more than the same reading unconfirmed.
+    const confirmed = assessInvestability(inputs(), AS_OF);
+    const traction = (x: typeof confirmed) =>
+      x.assessment.dimensions
+        .flatMap((d) => d.criteria)
+        .find((c) => c.criterion === "cp.traction")?.score ?? 0;
+    expect(traction(confirmed)).toBeGreaterThan(traction(unconfirmed));
+  });
+
+  it("a pitch investors may play counts, its transcript by topic only", () => {
+    const r = assessInvestability(
+      {
+        ...inputs({}, null),
+        pitch: {
+          mediaAssetId: "m1",
+          readyAt: READ_AT,
+          transcript:
+            "We have 120 paying customers. Our co-founder previously built payments at a bank. We are raising $2M.",
+        },
+      },
+      AS_OF,
+    );
+    expect(r.view.status).toBe("SCORED");
+    expect(r.view.confidence).toBe("LOW");
+    const criteria = r.observations.map((o) => o.criterion);
+    expect(criteria).toEqual(
+      expect.arrayContaining([
+        "cp.customer_base",
+        "fl.founder_quality",
+        "cs.raise_amount",
+        "pt.product_definition",
+      ]),
+    );
+    expect(JSON.stringify(r.view)).not.toMatch(/120|bank|\$2M/u);
+    expect(
+      r.observations.every(
+        (o) =>
+          o.truthClass !== "USER_CLAIM" ||
+          o.provenance.sourceKind !== "Q_EXTRACTION",
+      ),
+    ).toBe(true);
+  });
+});
+
 describe("investability (InvestIQ v1, investor-facing)", () => {
   it("is deterministic and reproducible from its inputs", () => {
     const a = assessInvestability(inputs(), AS_OF);
@@ -207,18 +282,20 @@ describe("investability (InvestIQ v1, investor-facing)", () => {
     // A missing criterion leaves the mean; it is never scored as zero.
     expect(less.score ?? 0).toBeGreaterThanOrEqual(full.score ?? 0);
     expect(less.confidence).toBe(full.confidence);
-    // Too little shared: no number at all, and what is missing is named.
-    const thin = assessInvestability(inputs({}, null), AS_OF).view;
-    expect(thin.status).toBe("INSUFFICIENT_EVIDENCE");
-    expect(thin.score).toBeNull();
-    expect(thin.band).toBeNull();
-    expect(thin.missing.length).toBeGreaterThan(0);
-    // Unknown stage: never defaulted to seed.
+    // ADR 0075: nothing investor-visible at all (no deck, pitch or shared
+    // claim): no number, said in words.
+    const none = assessInvestability(inputs({}, null), AS_OF).view;
+    expect(none.status).toBe("NO_MATERIAL");
+    expect(none.score).toBeNull();
+    // Unknown stage: never defaulted to seed; still a number, provisional,
+    // Low confidence, and the stage named as missing.
     const noStage = assessInvestability(
       inputs({ stageCode: null }),
       AS_OF,
     ).view;
-    expect(noStage.status).toBe("INSUFFICIENT_EVIDENCE");
+    expect(noStage.status).toBe("SCORED");
+    expect(noStage.provisional).toBe(true);
+    expect(noStage.confidence).toBe("LOW");
     expect(noStage.missing[0]).toMatch(/Stage/u);
   });
 
