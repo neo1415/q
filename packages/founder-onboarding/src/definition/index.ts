@@ -84,3 +84,13 @@ export {
 
 export { FOUNDER_UTTERANCE_ALIASES } from "./utterance-aliases.js";
 export { FOUNDER_COVERAGE_PROFILE } from "./coverage.js";
+
+export {
+  FOUNDER_PROFILE_SECTION_SOURCES,
+  FOUNDER_PROFILE_SECTIONS,
+  FOUNDER_PROFILE_SECTIONS_VERSION,
+  FOUNDER_PROFILE_STEPS,
+  founderProfileSectionOf,
+  type FounderProfileSection,
+  type FounderProfileSectionSource,
+} from "./profile-sections.js";
