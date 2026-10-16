@@ -129,20 +129,23 @@ export type ReturningGreeting = {
 
 export function returningGreeting(
   facts: ReturningFacts,
-  /** Multilingual Q: "ar" welcomes in Arabic; anything else in English. */
-  language: "en" | "ar" = "en",
+  /**
+   * Any language: a language with a hand-composed welcome (Arabic) welcomes
+   * in it; any other in English.
+   */
+  language: string = "en",
 ): ReturningGreeting {
   const name = firstName(facts.name);
+  const hand =
+    HAND_WELCOMES[(language.split("-")[0] ?? language).toLowerCase()];
   const headline =
-    language === "ar"
-      ? name === null
-        ? "أهلاً بعودتك."
-        : `أهلاً بعودتك، ${name}.`
+    hand !== undefined
+      ? hand.headline(name)
       : name === null
         ? "Welcome back."
         : `Welcome back, ${name}.`;
   const question =
-    language === "ar" ? arabicQuestionFor(facts) : questionFor(facts);
+    hand !== undefined ? hand.question(facts) : questionFor(facts);
   const leftOff = welcomeReminds(facts) ? (facts.setup?.pending ?? null) : null;
   return { headline, question, leftOff, spoken: `${headline} ${question}` };
 }
@@ -186,6 +189,23 @@ function questionFor(facts: ReturningFacts): string {
     ? "What would you like to work on today?"
     : "What would you like to do today?";
 }
+
+/** Hand-composed welcomes by primary subtag. */
+const HAND_WELCOMES: Readonly<
+  Record<
+    string,
+    {
+      readonly headline: (name: string | null) => string;
+      readonly question: (facts: ReturningFacts) => string;
+    }
+  >
+> = {
+  ar: {
+    headline: (name) =>
+      name === null ? "أهلاً بعودتك." : `أهلاً بعودتك، ${name}.`,
+    question: (facts) => arabicQuestionFor(facts),
+  },
+};
 
 /** questionFor, in Arabic: the same choice of what is most worth saying. */
 function arabicQuestionFor(facts: ReturningFacts): string {

@@ -66,8 +66,8 @@ select is(
   (select input_per_million from ai_ops.model_prices where id = 'a3000000-0000-4000-8000-000000000003'),
   1.50::numeric(12,6),
   'the announced 2027 price is a separate row, not an edit');
-select is((select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE'), 7,
-  'seven active v1 routing policies, one per text task class');
+select is((select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE'), 8,
+  'eight active v1 routing policies, one per text task class (UI_TRANSLATION joined in 20261228150500)');
 select is((select count(*)::int from ai_ops.routing_policies where task_class in ('EMBEDDING', 'REALTIME_VOICE', 'GUARDRAIL')), 0,
   'no policy routes embedding, voice or guardrail to a model');
 

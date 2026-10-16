@@ -156,6 +156,9 @@ export const StartRehearsalVideoResponseSchema = z.discriminatedUnion("mode", [
         "PROVIDER_UNAVAILABLE",
         "ALLOWANCE_EXHAUSTED",
         "CONCURRENCY_LIMIT",
+        // Any language: the video provider does not list the founder's
+        // chosen language, so no face room is opened pretending it does.
+        "LANGUAGE_UNAVAILABLE",
       ]),
     })
     .strict(),

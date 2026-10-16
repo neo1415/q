@@ -14,6 +14,8 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   personalityOf,
   renderPrompt,
+  isEnglish,
+  languageInfo,
   supportedLanguageOf,
   writtenLanguageNote,
   GateQInterviewerResultSchema,
@@ -247,39 +249,114 @@ function renderPublicGateway(gateway: PublicGateway): string {
     .join("\n");
 }
 
-/** Share of an utterance's letters that are Arabic script. */
-function arabicShare(text: string): number {
+/**
+ * Scripts an answer is read from when no language is stated: each maps to
+ * the language CLDR says it most likely writes (`und-Arab` -> ar, `und-Cyrl`
+ * -> ru, `und-Deva` -> hi). Data about scripts, not per-language code;
+ * Latin is left out because it cannot tell English from French.
+ */
+const SCRIPTS = [
+  "Arabic",
+  "Hebrew",
+  "Cyrillic",
+  "Greek",
+  "Devanagari",
+  "Bengali",
+  "Tamil",
+  "Telugu",
+  "Gujarati",
+  "Gurmukhi",
+  "Kannada",
+  "Malayalam",
+  "Thai",
+  "Hangul",
+  "Hiragana",
+  "Katakana",
+  "Han",
+  "Ethiopic",
+  "Georgian",
+  "Armenian",
+  "Khmer",
+  "Lao",
+  "Myanmar",
+  "Sinhala",
+] as const;
+const SCRIPT_CODES: Readonly<Record<(typeof SCRIPTS)[number], string>> = {
+  Arabic: "Arab",
+  Hebrew: "Hebr",
+  Cyrillic: "Cyrl",
+  Greek: "Grek",
+  Devanagari: "Deva",
+  Bengali: "Beng",
+  Tamil: "Taml",
+  Telugu: "Telu",
+  Gujarati: "Gujr",
+  Gurmukhi: "Guru",
+  Kannada: "Knda",
+  Malayalam: "Mlym",
+  Thai: "Thai",
+  Hangul: "Kore",
+  Hiragana: "Jpan",
+  Katakana: "Jpan",
+  Han: "Hani",
+  Ethiopic: "Ethi",
+  Georgian: "Geor",
+  Armenian: "Armn",
+  Khmer: "Khmr",
+  Lao: "Laoo",
+  Myanmar: "Mymr",
+  Sinhala: "Sinh",
+};
+
+/** The language most of an utterance's letters are written in, from its script, or null. */
+function languageOfScript(text: string): string | null {
   const letters = text.match(/\p{L}/gu)?.length ?? 0;
-  if (letters === 0) return 0;
-  return (text.match(/[\u0600-\u06FF\u0750-\u077F]/gu)?.length ?? 0) / letters;
+  if (letters === 0) return null;
+  for (const script of SCRIPTS) {
+    const count =
+      text.match(new RegExp(`\\p{Script=${script}}`, "gu"))?.length ?? 0;
+    if (count / letters > 0.5) {
+      try {
+        return new Intl.Locale(`und-${SCRIPT_CODES[script]}`).maximize()
+          .language;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
 }
 
 /**
- * Lane ml: the language Q asks in. The applicant's stated language wins;
- * otherwise what they last wrote or said, read from its script by code
- * (an Arabic answer is asked in Arabic, an English one in English). Fund
- * names, figures and terms stay as recorded in either.
+ * The language Q asks in. The applicant's stated language wins (any the
+ * registry offers; English is null); otherwise what they last wrote or
+ * said, read from its script by code (an Arabic answer is asked in Arabic,
+ * a Russian one in Russian). Fund names, figures and terms stay as
+ * recorded in any.
  */
 export function interviewLanguageOf(
   input: Pick<InterviewTurnInput, "locale" | "utterance" | "recentTurns">,
-): "ar" | null {
+): string | null {
   const stated = supportedLanguageOf(input.locale);
-  if (stated !== null) return stated === "ar" ? "ar" : null;
+  if (stated !== null) return isEnglish(stated) ? null : stated;
   const lastSaid =
     input.utterance.trim().length > 0
       ? input.utterance
       : ([...input.recentTurns].reverse().find((t) => t.role === "person")
           ?.text ?? "");
-  return arabicShare(lastSaid) > 0.5 ? "ar" : null;
+  const read = languageOfScript(lastSaid);
+  return read === null || isEnglish(read) ? null : read;
 }
 
 function interviewLanguageNote(
   input: Pick<InterviewTurnInput, "locale" | "utterance" | "recentTurns">,
 ): string {
-  const note = writtenLanguageNote(interviewLanguageOf(input));
-  return note === null
+  const language = interviewLanguageOf(input);
+  const note = writtenLanguageNote(language);
+  const name = languageInfo(language)?.englishName;
+  return note === null || name === undefined
     ? ""
-    : ` ${note} Ask every question and say every reply in Arabic; the fund's name, the gateway's criteria as named, amounts and currencies stay exactly as recorded.`;
+    : ` ${note} Ask every question and say every reply in ${name}; the fund's name, the gateway's criteria as named, amounts and currencies stay exactly as recorded.`;
 }
 
 export function createGateQInterviewer(

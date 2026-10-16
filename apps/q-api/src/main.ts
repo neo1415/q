@@ -218,11 +218,19 @@ import {
 } from "./composition/workforce/store.js";
 import {
   houseEtiquetteOf,
+  resolveLanguage,
   spokenLanguageNote,
   stanceDeclines,
   writtenLanguageNote,
 } from "@capital-q/q-core";
 import { createWorkPage } from "./composition/work/page.js";
+import {
+  createGatewayUiTextTranslator,
+  createLineTranslator,
+  createPostgresUiTextStore,
+  createUiTextService,
+  parseUiTranslationDailyCapUsd,
+} from "./composition/ui-text.js";
 import { createInstructionActions } from "./composition/instructions/actions.js";
 import { createPostgresInstructionStore } from "./composition/instructions/store.js";
 import {
@@ -399,6 +407,7 @@ import {
 } from "@capital-q/model-gateway";
 import { withTestRouting } from "@capital-q/model-gateway";
 import {
+  budgetForTaskClass,
   createQDelegationReader,
   createWordsReaders,
   CLEAR_QUESTION,
@@ -2874,10 +2883,15 @@ const qTools = createQTools({
       set: (actor, personality) =>
         standingStore.setPersonality(actor.userId, actor.tenantId, personality),
     },
-    // Multilingual Q: "switch to Arabic", in any language, as Settings does.
+    // Any language: "switch to French", in any language, as Settings does.
+    // The registry (Intl data) resolves the name; nothing lists languages.
     language: {
       set: (actor, language) =>
         standingStore.setLanguage(actor.userId, actor.tenantId, language),
+      resolve: (asked) => {
+        const resolved = resolveLanguage(asked);
+        return resolved.ok ? resolved.info : null;
+      },
     },
     companies,
     capital,
@@ -3880,6 +3894,49 @@ const qArtifacts = createQArtifacts({
 // Q's standing with each person (founder direction 2026-09-30): their chosen
 // personality, which every Q surface speaks with, and Q's patience.
 const standingStore = createPostgresStandingStore(database.sql);
+
+/**
+ * Any-language interface (owner 2026-10-16): the English UI catalogue in a
+ * person's chosen language, machine-translated once per language through
+ * the gateway (UI_TRANSLATION) and shared. Its own daily ceiling, USD 2
+ * unless CQ_UI_TRANSLATION_DAILY_CAP_USD says otherwise, counted from the
+ * ledger rows of that class only.
+ */
+/** One UI_TRANSLATION ceiling for the interface and for Q's code-written lines. */
+const uiTranslationCap = createDailySpendCap({
+  capUsd: parseUiTranslationDailyCapUsd(process.env),
+  readSpentSinceUsd: createPostgresDailySpendReader({
+    sql: database.sql,
+    taskClass: "UI_TRANSLATION",
+  }),
+  onReadFailure: (error) => {
+    logger.warn(
+      { err: error, spendCap: "UI_TRANSLATION" },
+      "ui translation cap could not read the ledger; using the last total",
+    );
+  },
+});
+const uiTextStore = createPostgresUiTextStore(database.sql);
+const uiTextTranslator = createGatewayUiTextTranslator(
+  modelGateway,
+  budgetForTaskClass("UI_TRANSLATION"),
+);
+const uiText = createUiTextService({
+  store: uiTextStore,
+  translate: uiTextTranslator,
+  cap: uiTranslationCap,
+  logger,
+});
+/**
+ * Q's code-written lines in any language (lane ml): English skeletons with
+ * names and figures lifted into {v1}…, cached under answer-words.v1.
+ */
+export const translateLines = createLineTranslator({
+  store: uiTextStore,
+  translate: uiTextTranslator,
+  cap: uiTranslationCap,
+  logger,
+});
 // What this conversation already produced, read back from the owning
 // records as the person (CQ-QX-008): a document through the artifact
 // service (owner-scoped), an action through its approval record.
@@ -6621,6 +6678,7 @@ const { app, logger: appLogger } = createApp(
     readinessBlueprints: readinessService,
     // end BILLING-2 block
     standing: standingStore,
+    uiText,
     // RECOVERY B1: the reader Q's what_needs_me tool uses, for the pages.
     attention: qTools.attention,
     arrivalSnapshots,

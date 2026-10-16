@@ -124,10 +124,38 @@ const ARABIC: ReadinessLeadCopy = {
   },
 };
 
+/** Hand-written copies by primary subtag (trusted product copy). */
+const COPIES: Readonly<Record<string, ReadinessLeadCopy>> = {
+  en: ENGLISH,
+  ar: ARABIC,
+};
+
+const primaryOf = (language: QLanguageCode | null | undefined): string =>
+  language === null || language === undefined
+    ? "en"
+    : (language.split("-")[0] ?? "").toLowerCase();
+
+/**
+ * The copy for a language; English when nothing is chosen or no hand copy
+ * exists (callers that would prepend English to an answer in another
+ * language ask `hasReadinessLeadCopy` first and leave the lead out).
+ */
 export function readinessLeadCopy(
   language: QLanguageCode | null | undefined,
 ): ReadinessLeadCopy {
-  return language === "ar" ? ARABIC : ENGLISH;
+  return COPIES[primaryOf(language)] ?? ENGLISH;
+}
+
+/**
+ * Whether code may lead an answer with this copy: English, or a language
+ * with a hand-written copy. Any other language gets no code-written lead,
+ * so an answer in French never opens with an English list (lane ml's live
+ * defect, generalised); Q's own answer carries the steps in their language.
+ */
+export function hasReadinessLeadCopy(
+  language: QLanguageCode | null | undefined,
+): boolean {
+  return COPIES[primaryOf(language)] !== undefined;
 }
 
 /**

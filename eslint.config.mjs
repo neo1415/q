@@ -588,6 +588,13 @@ export default tseslint.config(
     files: ["**/*.mjs", "**/*.js"],
     extends: [tseslint.configs.disableTypeChecked],
   },
+  // Repo scripts written as .mts (run with Node's type stripping) live
+  // outside every TypeScript project, like the .mjs scripts beside them.
+  {
+    files: ["scripts/**/*.mts"],
+    ignores: ["scripts/**/*.d.mts"],
+    extends: [tseslint.configs.disableTypeChecked],
+  },
 
   // 7. Prettier last: turns off every rule that would fight the formatter.
   prettier,

@@ -29,6 +29,7 @@ import {
 } from "@/features/q/context";
 import { PersonalitySetting } from "@/features/settings/personality-setting";
 import { LanguageSetting } from "@/features/settings/language-setting";
+import { machineUiText } from "@/features/i18n/machine";
 import { translate, uiLanguageOf } from "@/features/i18n/messages";
 import {
   RowLink,
@@ -102,9 +103,12 @@ export default async function SettingsPage({
       loadMyOrganisations(),
     ]);
   const acting = mine.find((organisation) => organisation.active) ?? null;
-  // Multilingual Q: this page in their chosen language.
-  const t = (english: string) =>
-    translate(uiLanguageOf(standing?.language), english);
+  // Any language: this page in their chosen language (Q's machine
+  // translations registered before the first word, where there is no hand
+  // catalogue).
+  const pageLanguage = uiLanguageOf(standing?.language);
+  await machineUiText(pageLanguage);
+  const t = (english: string) => translate(pageLanguage, english);
   const organisation =
     context.kind === "NONE"
       ? null

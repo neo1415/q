@@ -1,3 +1,4 @@
+import { languageInfo } from "@capital-q/q-core/language";
 import {
   EXTERNAL_REHEARSAL_DISCLAIMER,
   EXTERNAL_REHEARSAL_LABEL,
@@ -472,8 +473,15 @@ export function externalLiveInstructions(input: {
 }): string {
   const { subject, built, founder } = input;
   const who = plain(subject.displayName, 120);
-  // Multilingual Q: a founder who chose Arabic rehearses in Arabic.
-  const arabic = input.locale?.split("-")[0]?.toLowerCase() === "ar";
+  // Any language: a founder rehearses in the language they chose, named
+  // from the registry (no per-language branch).
+  const language = languageInfo(input.locale);
+  const spoken =
+    language === null || language.primary === "en"
+      ? null
+      : language.nativeName === language.englishName
+        ? language.englishName
+        : `${language.englishName} (${language.nativeName})`;
   const role = plain(
     [subject.role, subject.organization].filter(Boolean).join(", ") ||
       "their role",
@@ -489,7 +497,7 @@ export function externalLiveInstructions(input: {
         ? "Public evidence is thin. Play a neutral, professional counterpart for the role only. Invent no personality, history, opinions or past deals."
         : "Shape your questions around the sourced themes below. Themes marked Reportedly are publicly reported but unconfirmed: if you refer to one, say it is reported or that you understand it to be a focus, never as established fact. Do not state any of them as things the real person said, and never quote anyone; you only ask about the themes. Add no personal history, opinions or past deals that are not listed."
     }`,
-    `Voice and manner: ${arabic ? "natural, clear Modern Standard Arabic, because the founder chose Arabic (follow them if they switch to English; keep names, figures, currencies and investment terms such as ARR or SAFE as they say them)" : "natural, standard English"}, measured pace, short sentences, contractions. Use the same neutral professional manner whatever the name, nationality or location suggests: never put on an accent, dialect or mannerism. One question at a time.`,
+    `Voice and manner: ${spoken !== null ? `natural, clear ${spoken} in the standard register professionals use at work, because the founder chose it (follow them if they switch to English; keep names, figures, currencies and investment terms such as ARR or SAFE as they say them)` : "natural, standard English"}, measured pace, short sentences, contractions. Use the same neutral professional manner whatever the name, nationality or location suggests: never put on an accent, dialect or mannerism. One question at a time.`,
     `Opening: after that sentence, open on ${scenario.openingThemes.map((t) => JSON.stringify(t)).join(", then, if it is covered, ")}. Do not read a list of questions. Weave the angles below into a natural conversation, one at a time, in your own words, reacting to what the founder actually says.`,
     `Angles to probe (not a script; ask them naturally, skip any the founder has already covered well):\n${quote(scenario.directions.map((d) => `${d.label}: press on ${d.pressure}`))}`,
     ...(scenario.quirk === undefined
