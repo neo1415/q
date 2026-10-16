@@ -14,7 +14,10 @@ import {
   claimActivePlayer,
   releaseActivePlayer,
 } from "../discover/player/active-player";
-import { attachHlsOrNativeSource } from "../discover/player/hls-source";
+import {
+  attachHlsOrNativeSource,
+  restartPitch,
+} from "../discover/player/hls-source";
 import { isPlaybackUsable } from "../discover/player/pitch-playback";
 import { useReducedMotionPreference } from "../discover/player/use-pitch-playback";
 
@@ -191,9 +194,14 @@ export function GridPreviewVideo({
     };
     const onPlay = () => claimActivePlayer(video);
     const onPlaying = () => setReady(true);
+    // A streamed source turns the element's own `loop` off (an MSE loop
+    // seeks to exactly 0; see loopStart), so the end restarts it, as the
+    // pitch player does.
+    const onEnded = () => restartPitch(video);
     video.addEventListener("canplay", start);
     video.addEventListener("play", onPlay);
     video.addEventListener("playing", onPlaying);
+    video.addEventListener("ended", onEnded);
     authorize(companyId, mediaAssetId).then(
       (grant) => {
         if (cancelled || !isPlaybackUsable(grant, Date.now())) return;
@@ -211,6 +219,7 @@ export function GridPreviewVideo({
       video.removeEventListener("canplay", start);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("ended", onEnded);
       video.pause();
       detach?.();
       releaseActivePlayer(video);
