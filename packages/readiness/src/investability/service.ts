@@ -22,6 +22,8 @@ export type InvestabilityService = {
   readonly sweep: (options?: {
     readonly limit?: number | undefined;
     readonly pauseMs?: number | undefined;
+    /** Only companies with an input touched since their last assessment. */
+    readonly changedOnly?: boolean | undefined;
   }) => Promise<{
     readonly recorded: number;
     readonly unchanged: number;
@@ -76,9 +78,14 @@ export function createInvestabilityService(dependencies: {
   return {
     recompute,
     sweep: async (options = {}) => {
-      const ids = await dependencies.store.listedCompanyIds(
-        options.limit ?? 2000,
-      );
+      const limit = options.limit ?? 2000;
+      const ids =
+        options.changedOnly === true
+          ? await dependencies.store.changedCompanyIds(
+              INVESTABILITY_METHOD_VERSION,
+              limit,
+            )
+          : await dependencies.store.listedCompanyIds(limit);
       let recorded = 0;
       let unchanged = 0;
       let failed = 0;

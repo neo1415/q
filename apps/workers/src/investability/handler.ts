@@ -140,6 +140,8 @@ export function withInvestabilityRecompute(
 /** Every 30 minutes, paced: deck confirmations and anything an event missed. */
 export const INVESTABILITY_SWEEP_INTERVAL_MS = 30 * 60 * 1000;
 const FIRST_SWEEP_DELAY_MS = 2 * 60 * 1000;
+/** 48 × 30 minutes: one full sweep a day. */
+const FULL_SWEEP_EVERY_TICKS = 48;
 
 export async function runInvestabilitySweepTicker(options: {
   readonly service: Pick<InvestabilityService, "sweep">;
@@ -151,11 +153,16 @@ export async function runInvestabilitySweepTicker(options: {
 }): Promise<void> {
   const sleep = options.sleep ?? abortableSleep;
   await sleep(FIRST_SWEEP_DELAY_MS, options.signal);
+  let tick = 1;
   while (!options.signal.aborted) {
     try {
-      const result = await options.service.sweep({ pauseMs: 250 });
+      // Changed companies every tick (one read when nothing changed); every
+      // company once a day, as a repair.
+      const changedOnly = tick % FULL_SWEEP_EVERY_TICKS !== 0;
+      tick += 1;
+      const result = await options.service.sweep({ pauseMs: 250, changedOnly });
       options.logger.info(
-        { event: "investability.sweep", ...result },
+        { event: "investability.sweep", changedOnly, ...result },
         "investability sweep",
       );
     } catch {

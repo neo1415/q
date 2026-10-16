@@ -47,6 +47,15 @@ export type InvestabilityStore = {
   } | null>;
   /** Companies listed to the network now, for the sweep and the backfill. */
   readonly listedCompanyIds: (limit: number) => Promise<readonly string[]>;
+  /**
+   * Listed companies never assessed under this method, or with an input
+   * touched since their latest assessment: one query, so a periodic sweep
+   * costs one read when nothing changed (the database is small and shared).
+   */
+  readonly changedCompanyIds: (
+    methodVersion: string,
+    limit: number,
+  ) => Promise<readonly string[]>;
   readonly latest: (
     companyId: string,
     methodVersion: string,
@@ -229,6 +238,53 @@ export function createPostgresInvestabilityStore(options: {
         select company_id from knowledge.company_profiles
          where listed
          order by company_id
+         limit ${limit}`;
+      return rows.map((row) => row.company_id);
+    },
+
+    changedCompanyIds: async (methodVersion, limit) => {
+      const rows = await sql<{ company_id: string }[]>`
+        with listed as (
+          select company_id, updated_at from knowledge.company_profiles where listed
+        ), last as (
+          select company_id, max(assessed_at) as at
+            from core.company_investability_assessments
+           where method_version = ${methodVersion}
+           group by company_id
+        ), touched as (
+          select company_id, updated_at as t from listed
+          union all
+          select d.company_id, greatest(d.updated_at, coalesce(e.updated_at, d.updated_at))
+            from evidence.documents d
+            left join evidence.data_room_entries e on e.document_id = d.id
+           where d.document_type = 'PITCH_DECK'
+          union all
+          select x.company_id, x.created_at from evidence.deck_extractions x
+          union all
+          select x.company_id, c.created_at
+            from evidence.deck_extraction_confirmations c
+            join evidence.deck_extractions x on x.id = c.extraction_id
+          union all
+          select x.company_id, r.created_at
+            from evidence.deck_section_reviews r
+            join evidence.deck_extractions x on x.id = r.extraction_id
+          union all
+          select c.subject_id, r.created_at
+            from evidence.claim_revisions r
+            join evidence.claims c on c.id = r.claim_id
+          union all
+          select m.company_id, b.created_at
+            from core.founder_background_entries b
+            join core.company_members m
+              on m.user_id = b.user_id and m.tenant_id = b.tenant_id
+        )
+        select l.company_id
+          from listed l
+          left join last on last.company_id = l.company_id
+         where last.at is null
+            or exists (select 1 from touched t
+                        where t.company_id = l.company_id and t.t > last.at)
+         order by l.company_id
          limit ${limit}`;
       return rows.map((row) => row.company_id);
     },

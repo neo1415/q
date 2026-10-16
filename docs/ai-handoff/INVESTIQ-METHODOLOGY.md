@@ -100,8 +100,20 @@ The weights live in `FIT_ORDER_V2` (`packages/discovery/src/fit/order.ts`). The 
 
 - `core.company_investability_assessments` holds append-only revisions: a new row only when the basis hash (method, input rules, context, observations; never the clock) changes. RLS lets the company's members read it, and any active participant read it while the company is listed. pgTAP suite 976.
 - `core.investor_company_suitability` holds the Suitability each candidate was ordered with, per investor organisation and mandate. Only that investor organisation's members can read it. The slate build writes it.
-- Recompute: the worker recomputes on `core.company.*`, `core.founder_profile.updated`, `evidence.claim.changed`, `evidence.document.*` (audience, version, ready) and `verification.claim.decided`. It also sweeps every listed company every 30 minutes, which covers deck confirmations (they have no outbox event). It is idempotent and makes no model call.
+- Recompute: the worker recomputes on `core.company.*`, `core.founder_profile.updated`, `evidence.claim.changed`, `evidence.document.*` (audience, version, ready) and `verification.claim.decided`. Every 30 minutes it also sweeps the companies whose inputs changed since their last assessment, which covers deck confirmations and section reviews (they have no outbox event). That sweep costs one query when nothing changed. Once a day it sweeps every listed company. It is idempotent and makes no model call.
 - Backfill: `node apps/workers/dist/backfill-investability.js --apply`, paced at 250 ms per company. A dry run prints only counts.
+
+## First reading of real data (2026-10-16, read-only, offline)
+
+`assessInvestability` was run over production's investor-eligible inputs, read-only through the hosted SQL API, without writing anything. Only aggregates are recorded here.
+
+- 461 companies are listed.
+- 16 get a score: 50 to 54, all Developing with low confidence, from self-reported deck sections.
+- 445 show "not enough shared evidence yet" (444 of them with 0 of 8 areas scored).
+- The cause is the Write Gate. 449 listed companies have a deck offered to all investors that Q has read, but only about 17 founders have confirmed that reading. Unconfirmed Q readings are never investor-eligible.
+- No company has a network-visible founder background line, and 10 have network-visible claims.
+
+The lever is founders confirming their deck reading and sharing evidence with investors. The method must not lower its gates to reach a number.
 
 ## Known limits
 
