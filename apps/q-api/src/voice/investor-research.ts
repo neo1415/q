@@ -76,8 +76,7 @@ export type InvestorResearchDependencies = {
    * search is a paid provider call. True: nothing is read or offered.
    */
   readonly isFictionalAccount?:
-    | ((userId: string) => Promise<boolean>)
-    | undefined;
+    ((userId: string) => Promise<boolean>) | undefined;
   /**
    * Whose journey this engine reads for. The same engine reads a
    * founder's company; its log said "investor research" for a founder

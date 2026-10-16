@@ -239,7 +239,9 @@ export function createOnboardingQRecommendations(options: {
             value: s.suggestedValue,
             rationale:
               s.rationale ??
-              (fromDocument(s.sourceRefs) ? "found in their uploaded document" : null),
+              (fromDocument(s.sourceRefs)
+                ? "found in their uploaded document"
+                : null),
             payloadSha256: payloadSha256(s.suggestedValue),
             sources: publicOf(s.sourceRefs),
           }));
