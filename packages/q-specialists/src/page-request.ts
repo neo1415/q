@@ -509,16 +509,39 @@ export function wordsNamePage(text: string, target: PageTarget): boolean {
 
 // Q Pitch v6 (live 2026-10-17: "Can you pitch Capital Q to me?" was read as
 // Q_PITCH by TURN_READER v53 but this gate held it, since the tour has no
-// page name in those words). A sentence that asks Q to pitch, present,
-// explain or walk through Capital Q (or "this platform") names the tour by
-// meaning. Negations and "I'm on..." still do not move.
-const PITCH_ASK =
-  /\b(?:pitch|present|demo|introduce|explain|walk\s+(?:me|us)\s+through|take\s+(?:me|us)\s+through|show\s+(?:me|us)\s+around|give\s+(?:me|us)\s+(?:a\s+)?(?:tour|pitch|demo|walkthrough|walk-through|overview)\s+of|tell\s+(?:me|us)\s+about|what(?:'s|\s+is))\b[^.!?]{0,40}\b(?:capital\s*q|this\s+(?:platform|product|app))\b/iu;
+// page name in those words). v53 reads the tour from meaning in any
+// language, so the gate does too: a sentence that asks Q to pitch,
+// present, explain or walk through Capital Q (or "this platform"), or asks
+// what Q can do, in English, French, Spanish, Portuguese, German, Italian
+// or Swahili. Negations and "I'm on..." still do not move.
+const L = "(?<!\\p{L})";
+const PITCH_VERB = new RegExp(
+  `${L}(?:pitch|present|demo|introduc|explain|walk\\s+(?:me|us)\\s+through|take\\s+(?:me|us)\\s+through|show\\s+(?:me|us)\\s+around|tour|overview|tell\\s+(?:me|us)\\s+about|what(?:'s|\\s+is)|présent|expliqu|montre|visite|c'est\\s+quoi|qu'est-ce\\s+que|expl[ií]ca|muestra|enseña|qué\\s+es|apresent|mostra|o\\s+que\\s+é|präsentier|vorstell|stell\\S*\\s.*vor|erklär|zeig|was\\s+ist|spieg|cos(?:'|a\\s+)è|che\\s+cos|(?:ni|tu|m)?elez|(?:ni|tu)?tambulish|(?:ni|tu)?onyesh|ni\\s+nini)`,
+  "iu",
+);
+const NAMES_CAPITAL_Q = new RegExp(
+  `${L}(?:capital\\s*q|q\\s+pitch|this\\s+(?:platform|product|app)|cette\\s+plateforme|esta\\s+plataforma|diese\\s+plattform|questa\\s+piattaforma|jukwaa\\s+hili)(?!\\p{L})`,
+  "iu",
+);
+const WHAT_CAN_YOU_DO = new RegExp(
+  `${L}(?:what\\s+(?:can|do)\\s+you\\s+do|que\\s+(?:peux|sais)-tu\\s+faire|qu'est-ce\\s+que\\s+tu\\s+(?:peux|sais)\\s+faire|qué\\s+puedes\\s+hacer|o\\s+que\\s+(?:você\\s+pode|podes|consegues)\\s+fazer|was\\s+kannst\\s+du|cosa\\s+(?:puoi|sai)\\s+fare|unaweza\\s+kufanya\\s+nini)`,
+  "iu",
+);
+const NOT_A_PITCH = new RegExp(
+  `${L}(?:pas|nicht|kein\\p{L}*|não|nao|non|usi|sitaki)(?!\\p{L})`,
+  "iu",
+);
 
 function asksForPitch(text: string): boolean {
   return selfCorrected(text)
     .split(/(?<=[.!?])\s+/u)
-    .some((sentence) => PITCH_ASK.test(sentence) && !NOT_A_MOVE.test(sentence));
+    .some(
+      (sentence) =>
+        ((PITCH_VERB.test(sentence) && NAMES_CAPITAL_Q.test(sentence)) ||
+          WHAT_CAN_YOU_DO.test(sentence)) &&
+        !NOT_A_MOVE.test(sentence) &&
+        !NOT_A_PITCH.test(sentence),
+    );
 }
 
 /** What Q says for a page Capital Q does not have. */
