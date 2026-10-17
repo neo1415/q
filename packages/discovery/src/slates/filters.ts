@@ -23,7 +23,8 @@ import type { ActorContext } from "@capital-q/security";
  * except for the raise when the reader asked for disclosed raises only.
  * "Verified only" and "has pitch" ask for a positive fact, so only a
  * company that has it passes; that is the filter's meaning, not a verdict
- * on the rest.
+ * on the rest. An explicit premium Unicorn Potential minimum likewise needs
+ * an eligible precomputed score; unknown scores are not a positive match.
  */
 
 /** An exact money amount as shared with the reader; never a float. */
@@ -39,6 +40,16 @@ export type FilterMoney = {
  * and verification or a pitch cannot be shown to exist (not passed).
  */
 export type DiscoverFilterFactsPort = {
+  /** Recheck current premium access before any slate or score read. */
+  readonly assertUnicornAccess?:
+    ((actor: ActorContext) => Promise<void>) | undefined;
+  /** Precomputed scores only for the already guarded candidate IDs. */
+  readonly unicornScores?:
+    | ((input: {
+        readonly actor: ActorContext;
+        readonly companyIds: readonly string[];
+      }) => Promise<ReadonlyMap<string, number>>)
+    | undefined;
   /** Declared sector nodes of each company, with their ancestors. */
   readonly sectors?:
     | ((
@@ -74,6 +85,7 @@ export type CompanyFilterFacts = {
   readonly raise: FilterMoney | null;
   readonly verified: boolean;
   readonly hasPitch: boolean;
+  readonly unicornScore?: number | null | undefined;
 };
 
 export type FilterVerdict = {
@@ -154,6 +166,13 @@ export function evaluateDiscoverFilters(
   }
   if (filters.verifiedOnly && !facts.verified) pass = false;
   if (filters.hasPitch && !facts.hasPitch) pass = false;
+  if (
+    filters.unicornMinimum !== null &&
+    (facts.unicornScore === null ||
+      facts.unicornScore === undefined ||
+      facts.unicornScore < filters.unicornMinimum)
+  )
+    pass = false;
   return { pass, unknown: pass ? unknown : [] };
 }
 

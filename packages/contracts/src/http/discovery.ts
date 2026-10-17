@@ -134,7 +134,8 @@ export const MandateRuleCodeDtoSchema = z
 // country is not stated, or whose raise is not shared with this reader,
 // stays and is marked (`filterUnknown`), unless the reader asked for
 // disclosed raises only. "Verified only" and "has pitch" ask for a
-// positive fact, so only a company that has it passes.
+// positive fact, so only a company that has it passes. An explicit premium
+// Unicorn Potential minimum also requires a scored, authorized assessment.
 // ---------------------------------------------------------------------------
 
 export const DISCOVER_FILTER_DIMENSIONS = [
@@ -188,6 +189,8 @@ export const DiscoverFiltersSchema = z
     raiseDisclosedOnly: z.boolean().default(false),
     verifiedOnly: z.boolean().default(false),
     hasPitch: z.boolean().default(false),
+    /** Explicit premium narrowing only; never a ranking input. */
+    unicornMinimum: z.number().int().min(0).max(100).nullable().default(null),
   })
   .strict();
 export type DiscoverFilters = z.infer<typeof DiscoverFiltersSchema>;
@@ -200,6 +203,7 @@ export const NO_DISCOVER_FILTERS: DiscoverFilters = Object.freeze({
   raiseDisclosedOnly: false,
   verifiedOnly: false,
   hasPitch: false,
+  unicornMinimum: null,
 });
 
 /** True when nothing narrows the slate. */
@@ -212,7 +216,8 @@ export function isEmptyDiscoverFilters(filters: DiscoverFilters): boolean {
       (filters.raise.min === undefined && filters.raise.max === undefined)) &&
     !filters.raiseDisclosedOnly &&
     !filters.verifiedOnly &&
-    !filters.hasPitch
+    !filters.hasPitch &&
+    filters.unicornMinimum === null
   );
 }
 
@@ -227,6 +232,7 @@ export function activeDiscoverFilterCount(filters: DiscoverFilters): number {
       filters.raiseDisclosedOnly,
     filters.verifiedOnly,
     filters.hasPitch,
+    filters.unicornMinimum !== null,
   ].filter(Boolean).length;
 }
 
@@ -257,6 +263,7 @@ export function canonicalDiscoverFilters(
     raiseDisclosedOnly: filters.raiseDisclosedOnly,
     verifiedOnly: filters.verifiedOnly,
     hasPitch: filters.hasPitch,
+    unicornMinimum: filters.unicornMinimum ?? null,
   };
 }
 
@@ -271,6 +278,7 @@ export const DISCOVER_FILTER_QUERY_KEYS = [
   "raiseDisclosedOnly",
   "verifiedOnly",
   "hasPitch",
+  "unicornMinimum",
 ] as const;
 
 const list = (value: unknown): string[] =>
@@ -298,6 +306,10 @@ export const DiscoverFiltersQuerySchema = z
     raiseDisclosedOnly: flag,
     verifiedOnly: flag,
     hasPitch: flag,
+    unicornMinimum: z
+      .string()
+      .regex(/^(?:0|[1-9]\d?|100)$/)
+      .optional(),
   })
   .refine(
     (q) =>
@@ -322,6 +334,8 @@ export const DiscoverFiltersQuerySchema = z
       raiseDisclosedOnly: q.raiseDisclosedOnly === "true",
       verifiedOnly: q.verifiedOnly === "true",
       hasPitch: q.hasPitch === "true",
+      unicornMinimum:
+        q.unicornMinimum === undefined ? null : Number(q.unicornMinimum),
     });
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
@@ -353,6 +367,7 @@ export function discoverFiltersToQuery(
   if (f.raiseDisclosedOnly) out.raiseDisclosedOnly = "true";
   if (f.verifiedOnly) out.verifiedOnly = "true";
   if (f.hasPitch) out.hasPitch = "true";
+  if (f.unicornMinimum !== null) out.unicornMinimum = String(f.unicornMinimum);
   return out;
 }
 

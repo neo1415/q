@@ -96,6 +96,16 @@ function facts(options: { readonly verified?: readonly string[] } = {}) {
 }
 
 describe("Discover filter facts (ux/discover-filters)", () => {
+  it("fails closed when premium read composition is unavailable", async () => {
+    const { port, asked } = facts();
+    await expect(port.assertUnicornAccess?.(actor)).rejects.toThrow(
+      "permission",
+    );
+    await expect(
+      port.unicornScores?.({ actor, companyIds: [SHARED] }),
+    ).rejects.toThrow("permission");
+    expect(asked).toEqual([]);
+  });
   it("a raise is a fact only where disclosure lets this reader view it", async () => {
     const { port, asked } = facts();
     const raises = await port.disclosedRaises?.({

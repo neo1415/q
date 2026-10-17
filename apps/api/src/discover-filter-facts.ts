@@ -1,3 +1,8 @@
+import {
+  AuthorizationDeniedError,
+  type ActorContext,
+} from "@capital-q/security";
+
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import type { CompanyQueryPort } from "@capital-q/companies";
 import { CompanyIdSchema } from "@capital-q/companies";
@@ -31,6 +36,15 @@ import {
  */
 export function createDiscoverFilterFacts(ports: {
   readonly companies: Pick<CompanyQueryPort, "findCanonicalCompany">;
+  readonly unicorn?:
+    | {
+        readonly assertAccess: (actor: ActorContext) => Promise<void>;
+        readonly scores: (input: {
+          readonly actor: ActorContext;
+          readonly companyIds: readonly string[];
+        }) => Promise<ReadonlyMap<string, number>>;
+      }
+    | undefined;
   readonly capital: Pick<CapitalObjectiveQueryPort, "getCurrentForCompany">;
   readonly disclosure: Pick<DisclosureAccessService, "evaluateMany">;
   readonly verification: () => {
@@ -57,6 +71,20 @@ export function createDiscoverFilterFacts(ports: {
     ).filter((company) => company !== null);
 
   return {
+    assertUnicornAccess: async (actor: ActorContext) => {
+      if (ports.unicorn === undefined)
+        throw new AuthorizationDeniedError("NO_MATCHING_GRANT");
+      await ports.unicorn.assertAccess(actor);
+    },
+    unicornScores: async (input: {
+      readonly actor: ActorContext;
+      readonly companyIds: readonly string[];
+    }) => {
+      if (ports.unicorn === undefined)
+        throw new AuthorizationDeniedError("NO_MATCHING_GRANT");
+      await ports.unicorn.assertAccess(input.actor);
+      return ports.unicorn.scores(input);
+    },
     disclosedRaises: async ({ actor, companyIds }) => {
       const out = new Map<string, FilterMoney>();
       const objectives = (

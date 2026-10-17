@@ -4,7 +4,10 @@ import {
   type DiscoverFilters,
 } from "@capital-q/contracts";
 import { getMeter, type Logger } from "@capital-q/observability";
-import type { ActorContext } from "@capital-q/security";
+import {
+  AuthorizationDeniedError,
+  type ActorContext,
+} from "@capital-q/security";
 
 import {
   ELIGIBILITY_BATCH_MAX,
@@ -453,20 +456,25 @@ export function createSlateReadService(
     const out = new Map<string, SlatePageItem>();
     if (ids.length === 0) return out;
     const none = <T>(): Promise<T | null> => Promise.resolve(null);
-    const [sectors, raises, verified, pitched] = await Promise.all([
-      filters.sectorNodeIds.length > 0 && filterFacts.sectors !== undefined
-        ? filterFacts.sectors(ids)
-        : none<ReadonlyMap<string, readonly string[]>>(),
-      raiseFilterActive(filters) && filterFacts.disclosedRaises !== undefined
-        ? filterFacts.disclosedRaises({ actor, companyIds: ids })
-        : none<ReadonlyMap<string, { amount: string; currency: string }>>(),
-      filters.verifiedOnly && filterFacts.verified !== undefined
-        ? filterFacts.verified(ids)
-        : none<ReadonlySet<string>>(),
-      filters.hasPitch && filterFacts.withPitch !== undefined
-        ? filterFacts.withPitch(ids)
-        : none<ReadonlySet<string>>(),
-    ]);
+    const [sectors, raises, verified, pitched, unicornScores] =
+      await Promise.all([
+        filters.sectorNodeIds.length > 0 && filterFacts.sectors !== undefined
+          ? filterFacts.sectors(ids)
+          : none<ReadonlyMap<string, readonly string[]>>(),
+        raiseFilterActive(filters) && filterFacts.disclosedRaises !== undefined
+          ? filterFacts.disclosedRaises({ actor, companyIds: ids })
+          : none<ReadonlyMap<string, { amount: string; currency: string }>>(),
+        filters.verifiedOnly && filterFacts.verified !== undefined
+          ? filterFacts.verified(ids)
+          : none<ReadonlySet<string>>(),
+        filters.hasPitch && filterFacts.withPitch !== undefined
+          ? filterFacts.withPitch(ids)
+          : none<ReadonlySet<string>>(),
+        filters.unicornMinimum !== null &&
+        filterFacts.unicornScores !== undefined
+          ? filterFacts.unicornScores({ actor, companyIds: ids })
+          : none<ReadonlyMap<string, number>>(),
+      ]);
     for (const { rank: _rank, ...item } of input.items) {
       const verdict = evaluateDiscoverFilters(filters, {
         stageCode: item.currentStageCode,
@@ -476,6 +484,7 @@ export function createSlateReadService(
         raise: raises?.get(item.companyId) ?? null,
         verified: verified?.has(item.companyId) ?? false,
         hasPitch: pitched?.has(item.companyId) ?? false,
+        unicornScore: unicornScores?.get(item.companyId) ?? null,
       });
       if (verdict.pass) {
         out.set(item.companyId, { ...item, filterUnknown: verdict.unknown });
@@ -617,6 +626,14 @@ export function createSlateReadService(
 
   return {
     pageCompanies: async (query) => {
+      if (
+        query.filters?.unicornMinimum !== null &&
+        query.filters?.unicornMinimum !== undefined
+      ) {
+        if (filterFacts.assertUnicornAccess === undefined)
+          throw new AuthorizationDeniedError("NO_MATCHING_GRANT");
+        await filterFacts.assertUnicornAccess(query.actor);
+      }
       const now = clock();
       const limit = Math.max(
         1,

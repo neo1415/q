@@ -38,7 +38,10 @@ import {
   type NetworkPitchQueryPort,
 } from "@capital-q/media";
 import { namedImageKey, type NamedImages } from "@capital-q/public-identity";
-import type { ActorContext } from "@capital-q/security";
+import {
+  AuthorizationDeniedError,
+  type ActorContext,
+} from "@capital-q/security";
 
 import {
   getActorContext,
@@ -73,6 +76,9 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
   readonly discovery: DiscoveryService;
   /** Persisted recommendation slates (CQ-REC-006): the companies feed. */
   readonly slates: SlateReadService;
+  /** Current premium access, checked before any filter-side read. */
+  readonly assertUnicornAccess?:
+    ((actor: ActorContext) => Promise<void>) | undefined;
   /**
    * The Media context's feed read (CQ-MEDIA-012): which of a page's
    * companies have a publishable pitch. Absent, every item's pitch is null
@@ -238,6 +244,11 @@ export function registerDiscoveryRoutes(
     async (request, reply) => {
       const page = pageOf(request);
       const filters = filtersOf(request);
+      if (filters.unicornMinimum !== null) {
+        if (dependencies.assertUnicornAccess === undefined)
+          throw new AuthorizationDeniedError("NO_MATCHING_GRANT");
+        await dependencies.assertUnicornAccess(getActorContext(request));
+      }
       const served = await slates.pageCompanies({
         actor: getActorContext(request),
         limit: page.limit,

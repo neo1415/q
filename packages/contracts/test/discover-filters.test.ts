@@ -43,6 +43,7 @@ describe("Discover filter query parameters", () => {
       raiseDisclosedOnly: false,
       verifiedOnly: true,
       hasPitch: true,
+      unicornMinimum: null,
     });
     expect(activeDiscoverFilterCount(parsed)).toBe(6);
   });
@@ -124,5 +125,23 @@ describe("the page and the Q intent carry filters", () => {
         sectorCodes: ["Fin Tech"],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("Unicorn Potential filter query", () => {
+  it("round trips explicit thresholds including zero and excludes malformed values", () => {
+    for (const value of ["0", "60", "80", "100"]) {
+      const parsed = DiscoverFiltersQuerySchema.parse({
+        unicornMinimum: value,
+      });
+      expect(parsed.unicornMinimum).toBe(Number(value));
+      expect(discoverFiltersToQuery(parsed)).toEqual({ unicornMinimum: value });
+      expect(activeDiscoverFilterCount(parsed)).toBe(1);
+      expect(isEmptyDiscoverFilters(parsed)).toBe(false);
+    }
+    for (const value of ["-1", "101", "60.5", "", "1e2", "060"])
+      expect(
+        DiscoverFiltersQuerySchema.safeParse({ unicornMinimum: value }).success,
+      ).toBe(false);
   });
 });

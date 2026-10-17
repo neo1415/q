@@ -231,6 +231,12 @@ export function activeFilterChips(
     COUNTRY_FILTER_OPTIONS.map((o) => [o.value, o.label] as const),
   );
   const chips: ActiveFilterChip[] = [];
+  if (filters.unicornMinimum !== null)
+    chips.push({
+      key: "unicorn",
+      label: `Unicorn Potential ${String(filters.unicornMinimum)}+`,
+      without: { ...filters, unicornMinimum: null },
+    });
   for (const id of filters.sectorNodeIds) {
     chips.push({
       key: `sector:${id}`,

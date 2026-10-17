@@ -247,6 +247,8 @@ export type ApiModules = {
   readonly investors?: InvestorRoutesDependencies["investors"] | undefined;
   readonly discovery?:
     | (Pick<DiscoveryRoutesDependencies, "discovery" | "slates"> & {
+        readonly assertUnicornAccess?:
+          DiscoveryRoutesDependencies["assertUnicornAccess"] | undefined;
         /** CQ-REC-008. Absent: the feed reads, and nothing records. */
         readonly interactions?:
           | RecommendationInteractionRoutesDependencies["interactions"]
@@ -560,6 +562,7 @@ export function createApp(
       resolver: security.resolver,
       discovery: modules.discovery.discovery,
       slates: modules.discovery.slates,
+      assertUnicornAccess: modules.discovery.assertUnicornAccess,
       pitches: modules.discovery.pitches,
       feedSummaries: modules.discovery.feedSummaries,
       interactions: modules.discovery.interactions,

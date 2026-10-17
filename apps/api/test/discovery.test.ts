@@ -66,6 +66,8 @@ const discovery: DiscoveryService = {
 function buildApp(options: {
   readonly principal: AuthenticatedPrincipal | null;
   readonly page: SlatePage | Error;
+  readonly assertUnicornAccess?:
+    ((actor: ActorContext) => Promise<void>) | undefined;
   readonly pitches?: DiscoverablePitchQueryPort | undefined;
   readonly saved?: readonly string[] | Error | undefined;
   readonly network?:
@@ -101,6 +103,9 @@ function buildApp(options: {
     discovery: {
       discovery,
       slates,
+      ...(options.assertUnicornAccess === undefined
+        ? {}
+        : { assertUnicornAccess: options.assertUnicornAccess }),
       ...(options.pitches === undefined ? {} : { pitches: options.pitches }),
       ...(options.saved === undefined
         ? {}
@@ -306,6 +311,7 @@ describe("GET /v1/discovery/companies — Discover filters (ux/discover-filters)
       raiseDisclosedOnly: false,
       verifiedOnly: true,
       hasPitch: true,
+      unicornMinimum: null,
     });
     expect(queries[0]?.cursor).toBe("abc");
     await app.close();
@@ -922,5 +928,60 @@ describe("GET /v1/discovery/your-companies (founder decisions 2026-10-02, 2026-1
     });
     expect(response.json()).toEqual({ items: [], nextCursor: null });
     await app.close();
+  });
+});
+
+describe("premium Discover narrowing", () => {
+  it("rejects direct threshold requests before invoking the slate service", async () => {
+    const h = buildApp({
+      principal: PRINCIPAL,
+      page: {
+        slateId: null,
+        rankingVersion: "test",
+        items: [],
+        notes: [],
+        nextCursor: null,
+        unverifiableExclusions: [],
+        excludingRules: [],
+        discoverableCount: null,
+      },
+    });
+    const response = await h.app.inject({
+      method: "GET",
+      url: `${DISCOVERY_COMPANIES_PATH}?unicornMinimum=60`,
+    });
+    expect(response.statusCode).toBe(403);
+    expect(h.queries).toHaveLength(0);
+    expect(response.body).not.toContain("overallScore");
+    await h.app.close();
+  });
+  it("forwards the entitled threshold without exposing assessment fields", async () => {
+    const checked: ActorContext[] = [];
+    const h = buildApp({
+      principal: PRINCIPAL,
+      page: {
+        slateId: null,
+        rankingVersion: "test",
+        items: [],
+        notes: [],
+        nextCursor: null,
+        unverifiableExclusions: [],
+        excludingRules: [],
+        discoverableCount: null,
+      },
+      assertUnicornAccess: (actor) => {
+        checked.push(actor);
+        return Promise.resolve();
+      },
+    });
+    const response = await h.app.inject({
+      method: "GET",
+      url: `${DISCOVERY_COMPANIES_PATH}?unicornMinimum=80`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(checked).toEqual([CONTEXT]);
+    expect(h.queries[0]?.filters?.unicornMinimum).toBe(80);
+    expect(response.body).not.toContain("overallScore");
+    await h.app.close();
   });
 });

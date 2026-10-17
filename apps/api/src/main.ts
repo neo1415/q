@@ -105,6 +105,8 @@ import {
 import { createResultsReader } from "@capital-q/results";
 import {
   createPostgresReadinessStore,
+  createPostgresUnicornPotentialStore,
+  UNICORN_POTENTIAL_METHOD_VERSION,
   createReadinessService,
   readinessDataRoomFrom,
   readinessDeckFrom,
@@ -233,6 +235,8 @@ import {
   createIntakeTaxonomyPort,
 } from "./gateq/intake-ports.js";
 import {
+  AuthorizationDeniedError,
+  type ActorContext,
   CapabilitySchema,
   createAuthorizationService,
   OrganisationIdSchema,
@@ -247,6 +251,7 @@ import {
   createWebhookApplier,
   billingAccountOf,
   FEATURE_GATEWAYS,
+  FEATURE_UNICORN_POTENTIAL,
   stripeConfigFromEnv,
   VALUE_RECOMMENDATION_VOLUME,
 } from "@capital-q/billing";
@@ -1231,7 +1236,35 @@ const companyTeamProjection = createPostgresCompanyTeamProjection({
 // One composition of the filter facts: Discover's filters read them, and a
 // company's profile reads the same raise and verification answers, so the
 // two can never disagree about what this reader may know.
+const unicornPotentialStore = createPostgresUnicornPotentialStore({
+  sql: database.sql,
+  transactions: database.transactions,
+});
+const assertUnicornAccess = async (actor: ActorContext): Promise<void> => {
+  const decision = await recommendationVolume.check(
+    billingAccountOf(actor),
+    FEATURE_UNICORN_POTENTIAL,
+  );
+  if (!decision.allowed)
+    throw new AuthorizationDeniedError("NO_MATCHING_GRANT");
+};
 const discoverFilterFacts = createDiscoverFilterFacts({
+  unicorn: {
+    assertAccess: assertUnicornAccess,
+    scores: async ({ companyIds }) => {
+      const assessments = await unicornPotentialStore.current(
+        companyIds,
+        UNICORN_POTENTIAL_METHOD_VERSION,
+      );
+      return new Map(
+        [...assessments].flatMap(([companyId, assessment]) =>
+          assessment.status === "SCORED" && assessment.overallScore !== null
+            ? [[companyId, assessment.overallScore] as const]
+            : [],
+        ),
+      );
+    },
+  },
   companies: disclosurePorts.companies,
   capital: disclosurePorts.capital,
   disclosure,
@@ -2305,6 +2338,7 @@ const { app, logger } = createApp(config, security, {
   discovery: {
     discovery,
     slates: slates.reader,
+    assertUnicornAccess,
     interactions,
     // The feed's one batched pitch read per page (CQ-MEDIA-012), through
     // the Media context's port: discovery never touches media tables.

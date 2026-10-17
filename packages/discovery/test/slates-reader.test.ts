@@ -917,7 +917,90 @@ describe("Discover filters narrow the served slate (ux/discover-filters)", () =>
     raiseDisclosedOnly: false,
     verifiedOnly: false,
     hasPitch: false,
+    unicornMinimum: null,
   };
+
+  it("denies premium probing before any candidate lookup, even with no mandate", async () => {
+    const h = harness({ mandate: "NONE" });
+    await expect(
+      h.reader.pageCompanies({
+        actor,
+        filters: { ...none, unicornMinimum: 60 },
+      }),
+    ).rejects.toThrow("permission");
+    expect(h.evaluated).toHaveLength(0);
+  });
+
+  it("filters only authorized candidates on precomputed scores without changing mandate order", async () => {
+    const reads: string[][] = [];
+    let allowed = true;
+    let checks = 0;
+    const h = harness({
+      ineligible: [id(2)],
+      passed: [id(3)],
+      filterFacts: {
+        assertUnicornAccess: () => {
+          checks++;
+          return allowed
+            ? Promise.resolve()
+            : Promise.reject(new Error("denied"));
+        },
+        unicornScores: ({ companyIds }) => {
+          reads.push([...companyIds]);
+          return Promise.resolve(
+            new Map([
+              [id(1), 60],
+              [id(2), 100],
+              [id(3), 100],
+              [id(4), 90],
+              [id(6), 59],
+            ]),
+          );
+        },
+      },
+    });
+    await publish(h.store, KEY, 6);
+    const unfiltered = await h.reader.pageCompanies({ actor, limit: 10 });
+    expect(reads).toHaveLength(0);
+    const filtered = await h.reader.pageCompanies({
+      actor,
+      limit: 1,
+      filters: { ...none, unicornMinimum: 60 },
+    });
+    expect(filtered.items.map((i) => i.companyId)).toEqual([id(1)]);
+    expect(reads.flat()).not.toContain(id(2));
+    expect(reads.flat()).not.toContain(id(3));
+    const second = await h.reader.pageCompanies({
+      actor,
+      cursor: filtered.nextCursor,
+      limit: 10,
+      filters: { ...none, unicornMinimum: 60 },
+    });
+    expect(second.items.map((i) => i.companyId)).toEqual([id(4)]);
+    expect([id(1), id(4)]).toEqual(
+      unfiltered.items
+        .filter((i) => [id(1), id(4)].includes(i.companyId))
+        .map((i) => i.companyId),
+    );
+    const restarted = await h.reader.pageCompanies({
+      actor,
+      cursor: filtered.nextCursor,
+      filters: { ...none, unicornMinimum: 80 },
+    });
+    expect(restarted.notes).toContain("SLATE_RESTARTED");
+    expect(restarted.items.map((i) => i.companyId)).toEqual([id(4)]);
+    allowed = false;
+    const before = reads.length;
+    await expect(
+      h.reader.pageCompanies({
+        actor,
+        cursor: filtered.nextCursor,
+        filters: { ...none, unicornMinimum: 60 },
+      }),
+    ).rejects.toThrow("denied");
+    expect(reads).toHaveLength(before);
+    expect(checks).toBe(4);
+  });
 
   it("keeps slate order, drops non-matches, and keeps unknown countries marked", async () => {
     const h = harness({
@@ -1147,6 +1230,7 @@ describe("plan recommendation volume (BILLING-2, ADR 0036): volume only, never p
         raiseDisclosedOnly: false,
         verifiedOnly: false,
         hasPitch: false,
+        unicornMinimum: null,
       },
     });
     expect(page.items.map((i) => i.companyId)).toEqual([id(1), id(2), id(3)]);

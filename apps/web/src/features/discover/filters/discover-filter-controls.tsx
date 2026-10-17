@@ -69,7 +69,9 @@ export function DiscoverFilterSheet({
   onChange,
   open,
   onOpenChange,
+  canUnicorn = false,
 }: ControlsProps & {
+  readonly canUnicorn?: boolean | undefined;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
@@ -80,6 +82,7 @@ export function DiscoverFilterSheet({
           // A fresh draft each time it opens.
           filters={filters}
           sectors={sectors}
+          canUnicorn={canUnicorn}
           onApply={(next) => {
             onChange(next);
             onOpenChange(false);
@@ -94,7 +97,9 @@ function FilterSheetBody({
   filters,
   sectors,
   onApply,
+  canUnicorn,
 }: {
+  readonly canUnicorn: boolean;
   readonly filters: DiscoverFilters;
   readonly sectors: readonly SectorOption[];
   readonly onApply: (next: DiscoverFilters) => void;
@@ -298,6 +303,39 @@ function FilterSheetBody({
               {t("Has pitch video")}
             </ChoiceChip>
           </div>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="cq-label text-(--cq-text-primary)">
+            {t("Unicorn Potential · Premium")}
+          </legend>
+          <Select
+            id="discover-unicorn-minimum"
+            label={t("Minimum indicator score")}
+            options={[
+              { value: "", label: t("Any score") },
+              { value: "60", label: t("Strong signals · 60+") },
+              { value: "80", label: t("Exceptional signals · 80+") },
+            ]}
+            disabled={!canUnicorn}
+            value={
+              draft.unicornMinimum === null ? "" : String(draft.unicornMinimum)
+            }
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                unicornMinimum:
+                  event.target.value === "" ? null : Number(event.target.value),
+              })
+            }
+          />
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            {t(
+              canUnicorn
+                ? "Only scored companies match. Your mandate-based order stays unchanged."
+                : "Available with premium investor intelligence.",
+            )}
+          </p>
         </fieldset>
 
         <div className="sticky bottom-0 flex items-center justify-between gap-3 bg-(--cq-surface-raised) py-3">
