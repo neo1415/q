@@ -787,3 +787,21 @@ Releases AK to AR were each CI-green, released to `recovery/2026-09-12` and Rail
   - pause language work ("as long as english is good");
   - stop asking for permission. The user settings allow list was widened; cloud session mode itself can't be changed from chat.
 - **Next:** see `ACTIVE-TASKS.md` under 17 October.
+
+## 2026-10-17 midday — Claude lead, Q conversation fixes
+
+The owner reported five problems live:
+
+- wrong cards;
+- no conversational memory;
+- slow or failed tab opens;
+- unreliable moves between pages that aren't Home;
+- robotic Q Pitch narration, deferred.
+
+Release AT (`9a25c149`) shipped the cards, memory and move fixes, and they were live-verified. Batch AU (PR #200) adds three more:
+
+- fetched tool results stored per conversation (migration `20261228190000`);
+- turn reader v55 page controls;
+- the dialog-state fix.
+
+Open items and every SHA: `docs/ai-handoff/Q-CONVERSATION-FIXES-2026-10-17.md`.
