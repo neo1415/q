@@ -66,3 +66,9 @@ export {
   UNICORN_POTENTIAL_METHOD_VERSION,
   UNICORN_POTENTIAL_INPUT_RULES_VERSION,
 } from "./unicorn-potential/method-v1.js";
+
+export {
+  createPostgresUnicornPotentialStore,
+  type UnicornPotentialStore,
+} from "./unicorn-potential/postgres.js";
+export { createUnicornPotentialService } from "./unicorn-potential/service.js";
