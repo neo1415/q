@@ -1,3 +1,4 @@
+import { coreCompanyScores } from "./fit.js";
 import { z } from "zod";
 
 import {
@@ -245,7 +246,15 @@ export function createFitCompareTool(ports: QToolPorts): AnyQToolDefinition {
       }
       return {
         status: "OK",
-        comparison: result.comparison,
+        comparison: {
+          ...result.comparison,
+          entries: result.comparison.entries.map((entry) => ({
+            ...entry,
+            ...(entry.scores === undefined
+              ? {}
+              : { scores: coreCompanyScores(entry.scores) }),
+          })),
+        },
         text: fitComparisonText(result.comparison),
       };
     },

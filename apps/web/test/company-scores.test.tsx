@@ -203,14 +203,16 @@ describe("CompanyScores", () => {
 
 describe("score read authorization lifetime", () => {
   it("reauthorizes a company after remount instead of reusing a prior reader's result", async () => {
-    const port = vi.fn(async (ids: readonly string[]) =>
-      ids.map((companyId) => ({
-        companyId,
-        name: "Co",
-        line: null,
-        profile: {} as never,
-        scores: { ...scored, companyId },
-      })),
+    const port = vi.fn((ids: readonly string[]) =>
+      Promise.resolve(
+        ids.map((companyId) => ({
+          companyId,
+          name: "Co",
+          line: null,
+          profile: {} as never,
+          scores: { ...scored, companyId },
+        })),
+      ),
     );
     function Card() {
       const scores = useCompanyScores([COMPANY], { port });
@@ -235,7 +237,7 @@ describe("score read authorization lifetime", () => {
           finish = resolve;
         }),
     );
-    const later = vi.fn(async () => []);
+    const later = vi.fn(() => Promise.resolve([]));
     function Card({
       port,
     }: {

@@ -150,6 +150,10 @@ export function withKeptToolResults(
         outcome.status !== "SUCCEEDED" ||
         outcome.classification !== "READ_ONLY" ||
         outcome.toolName === null ||
+        // Advanced entitlement may be revoked. Re-read through its gated
+        // tool instead of persisting an answer that can bypass that gate.
+        outcome.toolName === "intelligence.unicorn_potential" ||
+        outcome.toolName === "unicorn_potential" ||
         outcome.sensitivity === null ||
         !outcome.result.ok ||
         Q_SENSITIVITY_RANK[outcome.sensitivity] > Q_SENSITIVITY_RANK[KEPT_UP_TO]

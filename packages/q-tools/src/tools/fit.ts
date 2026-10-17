@@ -184,6 +184,15 @@ const SHARED = {
   visibleStage: "COMPARING_OPPORTUNITIES",
 } as const;
 
+/** Premium data uses its own reader so generic retained fit results cannot replay it. */
+export function coreCompanyScores(scores: CompanyScoresDto): CompanyScoresDto {
+  return {
+    companyId: scores.companyId,
+    investability: scores.investability,
+    suitability: scores.suitability,
+  };
+}
+
 export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
   return defineQTool<FitProfileInput, FitProfileOutput, null>({
     ...SHARED,
@@ -219,9 +228,14 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
         raise: item.raise ?? null,
         ...(raiseView === undefined ? {} : { raiseView }),
         profile: item.assessment.profile,
-        ...(item.scores === undefined ? {} : { scores: item.scores }),
+        ...(item.scores === undefined
+          ? {}
+          : { scores: coreCompanyScores(item.scores) }),
         text: fitProfileText(item.name, item.assessment.profile, {
-          scores: item.scores,
+          scores:
+            item.scores === undefined
+              ? undefined
+              : coreCompanyScores(item.scores),
         }),
         guidance: GUIDANCE,
       };
@@ -236,7 +250,7 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
  */
 function compactScores(scores: CompanyScoresDto): CompanyScoresDto {
   return {
-    ...scores,
+    companyId: scores.companyId,
     investability: { ...scores.investability, up: [], down: [], missing: [] },
     suitability:
       scores.suitability === null

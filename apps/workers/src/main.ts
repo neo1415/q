@@ -231,6 +231,7 @@ import {
 } from "./recommendations/embeddings.js";
 import { runDocumentJobTicker } from "./documents/document-jobs.js";
 import { composeInvestability } from "./investability/composition.js";
+import { composeUnicornPotential } from "./unicorn-potential/composition.js";
 import {
   runInvestabilitySweepTicker,
   withInvestabilityRecompute,
@@ -897,6 +898,10 @@ const withDocumentReadings = (
 // Investability (owner 2026-10-16): InvestIQ over investor-eligible inputs,
 // recomputed on the events that change them, and swept for the rest.
 const investability = composeInvestability(database.sql);
+const unicornPotential = composeUnicornPotential(
+  database.sql,
+  database.transactions,
+);
 const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,
@@ -1053,6 +1058,9 @@ const documentEvents = createQueueRunner({
       registry,
       sql: database.sql,
       service: investability.service,
+      alsoRecompute: async (companyId) => {
+        await unicornPotential.service.recompute(companyId);
+      },
       // fit-order.v2: a new Investability revision reorders the slates
       // that serve the company.
       onRecorded: async (companyId) => {
@@ -1472,6 +1480,9 @@ await Promise.all([
   }),
   runInvestabilitySweepTicker({
     service: investability.service,
+    alsoSweep: async () => {
+      await unicornPotential.service.sweep({ limit: 100, pauseMs: 250 });
+    },
     // Every current slate once, after a sweep that changed scores (and
     // after the first sweep of a deploy): Discover's order follows them.
     onScoresChanged: async () => {

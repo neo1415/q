@@ -188,7 +188,8 @@ export type QApiModules = {
   readonly recommendationExplanations?:
     RecommendationExplanationRoutesDependencies["explanations"] | undefined;
   /** MATCH block (ADR 0052): fit with the reader's own mandate, and Q's view. */
-  readonly fit?: Pick<FitRoutesDependencies, "fit" | "qViews"> | undefined;
+  readonly fit?:
+    Pick<FitRoutesDependencies, "fit" | "qViews" | "unicornAccess"> | undefined;
   /** Investor promises (2026-10-07): compare picked companies; thesis reading. */
   readonly thesis?: InvestorPromiseRoutesDependencies["thesis"] | undefined;
   /** What Q remembers about the person, for them to read and correct. */
@@ -538,6 +539,7 @@ export function createApp(
       resolver: security.resolver,
       fit: modules.fit.fit,
       qViews: modules.fit.qViews,
+      unicornAccess: modules.fit.unicornAccess,
     });
     // Q.10 / Q.02: the same reads as fit_compare and thesis_reading.
     if (modules.thesis !== undefined) {

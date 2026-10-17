@@ -207,3 +207,17 @@ describe("the Postgres store", () => {
     ]);
   });
 });
+
+it("never retains premium assessment results for later ungated replay", async () => {
+  for (const toolName of [
+    "intelligence.unicorn_potential",
+    "unicorn_potential",
+  ]) {
+    const { s, kept } = store();
+    const result = outcome({ toolName });
+    expect(
+      await withKeptToolResults(port(result), s).execute(proposal, context),
+    ).toBe(result);
+    expect(kept).toEqual([]);
+  }
+});

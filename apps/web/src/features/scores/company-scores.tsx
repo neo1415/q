@@ -12,7 +12,6 @@ import {
   type InvestabilityDto,
   type ScoreFactor,
   type SuitabilityDto,
-  type UnicornPotentialDto,
 } from "@capital-q/contracts";
 import type { ReactNode } from "react";
 
@@ -22,10 +21,6 @@ import { useT } from "@/features/i18n/language";
 
 import { useCompanyScores } from "./use-company-scores";
 import { UnicornPotential, unicornPotentialLine } from "./unicorn-potential";
-
-type ScoresWithUnicorn = CompanyScoresDto & {
-  readonly unicornPotential?: UnicornPotentialDto | undefined;
-};
 
 /**
  * Investability and Suitability, side by side and never blended (owner
@@ -63,7 +58,7 @@ function suitabilityWords(dto: SuitabilityDto): string {
 }
 
 /** Accessible descriptions of the assessments actually authorized. */
-export function companyScoresLabel(scores: ScoresWithUnicorn): string {
+export function companyScoresLabel(scores: CompanyScoresDto): string {
   return [
     `${investabilityLine(scores.investability)}, ${investabilityWords(scores.investability).toLowerCase()}`,
     scores.suitability === null
@@ -191,7 +186,7 @@ export function CompanyScores({
   variant = "full",
   className,
 }: {
-  readonly scores: ScoresWithUnicorn;
+  readonly scores: CompanyScoresDto;
   readonly variant?: CompanyScoresVariant | undefined;
   readonly className?: string | undefined;
 }) {

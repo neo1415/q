@@ -8,6 +8,7 @@ import {
   discoverCompanies,
   discoverInvestors,
   getInvestorGates,
+  getMyPlan,
   listTaxonomyNodes,
   listYourCompanies,
 } from "@capital-q/api-client";
@@ -121,7 +122,7 @@ export default async function DiscoverPage({
       (CQ-WEB-020/021). Either read failing just means the client loads as
       before; neither is fatal to the page.
     */
-    const [slate, sectors, yours] = await Promise.all([
+    const [slate, sectors, yours, plan] = await Promise.all([
       discoverCompanies(session, {}).catch(() => null),
       // The sector filter's options: the industry vocabulary, reference
       // data. Failing leaves the filter without sectors, nothing more.
@@ -140,6 +141,7 @@ export default async function DiscoverPage({
       initialTab === "YOURS"
         ? listYourCompanies(session, { limit: 10 }).catch(() => null)
         : Promise.resolve(null),
+      getMyPlan(session).catch(() => null),
     ]);
     /*
      * The cards the preload window can reach first (spec §9.5: active, the
@@ -208,6 +210,13 @@ export default async function DiscoverPage({
             <InvestorFeedScreen
               initial={slate === null ? null : { slate, authorization, warm }}
               sectors={sectors}
+              canUnicorn={
+                plan?.features.some(
+                  (feature) =>
+                    feature.key === "intelligence.unicorn_potential" &&
+                    feature.included,
+                ) ?? false
+              }
             />
           }
         />

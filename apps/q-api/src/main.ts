@@ -21,6 +21,7 @@ import { createWorkforceDocuments } from "./composition/workforce/documents.js";
 import { createDemoRehearsalAccess } from "./composition/demo-rehearsal-access.js";
 import { createInvestorLink } from "./composition/investor-link.js";
 import { createFitComposition } from "./composition/fit.js";
+import { createUnicornPotentialComposition } from "./composition/unicorn-potential.js";
 import {
   createPreparedEntities,
   preparedEntityMatcher,
@@ -2389,7 +2390,14 @@ const investorFeed = createInvestorFeedPort({
 // MATCH block (B1-B3; ADR 0052): fit with the investor's own mandate,
 // for Q's tools and the /v1/fit routes alike -- one fit service, so the
 // card, the profile and Q's answer say the same thing.
+const unicornPotential = createUnicornPotentialComposition({
+  sql: database.sql,
+  transactions: database.transactions,
+  entitlements,
+});
 const fitComposition = createFitComposition({
+  unicornPotential: unicornPotential.read,
+  unicornAccess: unicornPotential.access,
   sql: database.sql,
   eligibilityPorts: slateRead.eligibilityPorts,
   eligibility: slateRead.eligibility,

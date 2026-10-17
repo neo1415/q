@@ -1,3 +1,6 @@
+import type { EntitlementDecision } from "@capital-q/billing";
+import type { ActorContext } from "@capital-q/security";
+import { sendEntitlementRequired } from "./entitlement-problem.js";
 import type { FastifyInstance } from "fastify";
 
 import {
@@ -13,6 +16,7 @@ import {
   FitTopQuerySchema,
   QViewDtoSchema,
   UuidSchema,
+  UnicornPotentialDtoSchema,
   type FitComparisonDto,
 } from "@capital-q/contracts";
 import { FIT_CONFIG_CURRENT, type FitService } from "@capital-q/discovery";
@@ -40,6 +44,8 @@ import {
 
 export type FitRoutesDependencies = ActorContextDependencies & {
   readonly fit: FitService;
+  readonly unicornAccess?:
+    ((actor: ActorContext) => Promise<EntitlementDecision>) | undefined;
   readonly qViews: FitQViews;
 };
 
@@ -60,6 +66,31 @@ export function registerFitRoutes(
   dependencies: FitRoutesDependencies,
 ): void {
   const withContext = requireActorContextHook(dependencies);
+  if (dependencies.unicornAccess !== undefined)
+    app.get<{ Params: { companyId: string } }>(
+      "/v1/intelligence/companies/:companyId/unicorn-potential",
+      { onRequest: withContext },
+      async (request, reply) => {
+        void reply.header("Cache-Control", "no-store");
+        const actor = getActorContext(request);
+        const access = await dependencies.unicornAccess?.(actor);
+        if (access === undefined) return reply.callNotFound();
+        if (!access.allowed)
+          return sendEntitlementRequired(request, reply, access.refusal);
+        const id = UuidSchema.safeParse(request.params.companyId);
+        if (!id.success) return reply.callNotFound();
+        const result = await dependencies.fit.profiles(actor, [id.data]);
+        const assessment =
+          result.kind === "OK"
+            ? result.items.find(
+                (i) => i.assessment.profile.companyId === id.data,
+              )?.scores?.unicornPotential
+            : undefined;
+        return assessment === undefined
+          ? reply.callNotFound()
+          : UnicornPotentialDtoSchema.parse(assessment);
+      },
+    );
 
   app.get(
     FIT_COMPANIES_PATH,

@@ -143,10 +143,12 @@ function noSubscription(): () => void {
 export function InvestorFeedScreen({
   initial = null,
   sectors = [],
+  canUnicorn = false,
 }: {
   readonly initial?: InvestorFeedInitial | null;
   /** The industry vocabulary, for the sector filter. */
   readonly sectors?: readonly SectorOption[];
+  readonly canUnicorn?: boolean | undefined;
 } = {}) {
   const discoverFilters = useDiscoverFilters(sectors);
   const sectorLabels = useMemo(
@@ -182,6 +184,7 @@ export function InvestorFeedScreen({
         sectorLabels={sectorLabels}
       />
       <DiscoverFilterSheet
+        canUnicorn={canUnicorn}
         filters={filters}
         sectors={sectors}
         onChange={setFilters}

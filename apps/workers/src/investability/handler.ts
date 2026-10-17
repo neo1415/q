@@ -106,6 +106,8 @@ export function withInvestabilityRecompute(
     readonly registry: EventRegistry;
     readonly sql: DatabaseExecutor;
     readonly service: Pick<InvestabilityService, "recompute">;
+    /** Optional separate indicator, same evidence events; never changes fit order. */
+    readonly alsoRecompute?: ((companyId: string) => Promise<void>) | undefined;
     /**
      * A new revision changes the Discover order (fit-order.v2): refresh the
      * slates that serve this company. Never fails the event.
@@ -125,6 +127,17 @@ export function withInvestabilityRecompute(
       const companies = await companiesOfEvent(sql, event.type, event.data);
       for (const companyId of companies) {
         const outcome = await service.recompute(companyId);
+        await options
+          .alsoRecompute?.(companyId)
+          .catch((error: unknown) =>
+            logger.warn(
+              {
+                event: "unicorn_potential.recompute_failed",
+                errorName: error instanceof Error ? error.name : "unknown",
+              },
+              "Optional assessment will be retried by the paced sweep",
+            ),
+          );
         if (outcome.kind === "RECORDED") {
           await options.onRecorded?.(companyId).catch(() => undefined);
           logger.info(
@@ -170,6 +183,7 @@ export async function runInvestabilitySweepTicker(options: {
    * slates to expire.
    */
   readonly onScoresChanged?: (() => Promise<void>) | undefined;
+  readonly alsoSweep?: (() => Promise<void>) | undefined;
   readonly signal: AbortSignal;
   readonly logger: RunnerLogger;
   readonly intervalMs?: number | undefined;
@@ -194,6 +208,14 @@ export async function runInvestabilitySweepTicker(options: {
       if (result.recorded > 0 || first) {
         await options.onScoresChanged?.().catch(() => undefined);
       }
+      await options
+        .alsoSweep?.()
+        .catch(() =>
+          options.logger.warn(
+            { event: "unicorn_potential.sweep_failed" },
+            "Optional assessment sweep failed",
+          ),
+        );
       first = false;
     } catch {
       options.logger.warn(

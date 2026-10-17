@@ -1,8 +1,13 @@
 import { createHash } from "node:crypto";
 
+import type { EntitlementDecision } from "@capital-q/billing";
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import { CompanyIdSchema, type CompanyQueryPort } from "@capital-q/companies";
-import type { CompanyDeckView, QViewDto } from "@capital-q/contracts";
+import type {
+  CompanyDeckView,
+  QViewDto,
+  UnicornPotentialDto,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import {
   createFitInputSource,
@@ -50,6 +55,14 @@ export type FitQViews = {
 };
 
 export type FitCompositionDependencies = {
+  readonly unicornPotential?:
+    | ((
+        actor: ActorContext,
+        ids: readonly string[],
+      ) => Promise<ReadonlyMap<string, UnicornPotentialDto>>)
+    | undefined;
+  readonly unicornAccess?:
+    ((actor: ActorContext) => Promise<EntitlementDecision>) | undefined;
   readonly sql: DatabaseExecutor;
   readonly eligibilityPorts: EligibilityPorts;
   readonly eligibility: Pick<EligibilityService, "evaluate">;
@@ -82,6 +95,7 @@ const Q_VIEW_CACHE_MAX = 500;
 export function createFitComposition(
   dependencies: FitCompositionDependencies,
 ): {
+  readonly unicornAccess: FitCompositionDependencies["unicornAccess"];
   readonly fit: FitService;
   readonly qViews: FitQViews;
 } {
@@ -216,6 +230,7 @@ export function createFitComposition(
     sql: dependencies.sql,
   });
   const fit = createFitService({
+    unicornPotential: dependencies.unicornPotential,
     investability: (companyIds) =>
       investabilityStore.current(companyIds, INVESTABILITY_METHOD_VERSION),
     investabilityMethodVersion: INVESTABILITY_METHOD_VERSION,
@@ -308,5 +323,5 @@ export function createFitComposition(
     },
   };
 
-  return { fit, qViews };
+  return { fit, qViews, unicornAccess: dependencies.unicornAccess };
 }
