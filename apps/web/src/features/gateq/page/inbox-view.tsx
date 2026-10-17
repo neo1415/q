@@ -1452,7 +1452,7 @@ function Detail({
             />
           ) : null}
 
-          <section className="gq-sect">
+          <section className="gq-sect" data-gateq-shared>
             <h3 className="cq-title-sm">{t("What they shared")}</h3>
             {detail.shared.length === 0 ? (
               <p className="cq-body-sm gq-t2">

@@ -25,6 +25,7 @@ import { QAperture } from "@/features/q-aperture";
 import { Q_FEED_EVENT } from "@/features/q/client-actions";
 import { useQSessionOptional } from "@/features/q/q-session";
 import { QPageState } from "@/features/q/q-section";
+import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
 import { QPageSubject } from "@/features/q/q-subject";
 
 import { FeedCard } from "./feed-card";
@@ -134,6 +135,11 @@ export type InvestorFeedInitial = {
  * filter set continued under another. The server's first page is the
  * unfiltered one, so it seeds only an unfiltered feed.
  */
+/** The pitch-mode flag changes only with a page load or the tour's start. */
+function noSubscription(): () => void {
+  return () => undefined;
+}
+
 export function InvestorFeedScreen({
   initial = null,
   sectors = [],
@@ -329,7 +335,14 @@ function InvestorFeed({
   // for the whole open line, added after the microphone heard a pitch on
   // 2026-09-30, kept them silent all session once voice was always on; a
   // headset keeps the pitch out of the microphone.)
-  const effectiveMuted = muted || qSpeaking;
+  // Q Pitch v6 (owner 16 Oct): "Discover in pitch mode is muted" -- the
+  // tour never plays a pitch's sound. Read after hydration only.
+  const pitchMode = useSyncExternalStore(
+    noSubscription,
+    qPitchHoldsVoice,
+    () => false,
+  );
+  const effectiveMuted = muted || qSpeaking || pitchMode;
 
   // Q's moves on the feed (founder report 2026-09-30: "say next and it
   // goes to the next one... pass should go straight to the next video"):

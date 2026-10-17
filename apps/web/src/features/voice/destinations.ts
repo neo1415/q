@@ -58,6 +58,9 @@ const ROUTES: Readonly<Record<QVoiceDestination, string | null>> = {
   CAPITAL_INVESTORS: "/relationships?view=capital&tab=investors",
   // Lane ov 2026-10-16: the CRM's Pipeline tab.
   CRM_PIPELINE: "/relationships?view=pipeline",
+  // Q Pitch v6: the entry picks the track by the person's side and starts
+  // it (a full load into the layout-mounted host).
+  Q_PITCH: "/q-pitch?start=1",
   INTERVIEW: null,
   INTERVIEW_FOUNDER: "/onboarding/founder?talk=1",
   INTERVIEW_INVESTOR: "/onboarding/investor?talk=1",

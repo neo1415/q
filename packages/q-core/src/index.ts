@@ -1608,6 +1608,10 @@ export {
   TURN_READER_V52,
   V52_NEXT_STEPS,
 } from "./prompts/tasks/turn-reader.v52.js";
+export {
+  TURN_READER_V53,
+  V53_Q_PITCH,
+} from "./prompts/tasks/turn-reader.v53.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 
 export {

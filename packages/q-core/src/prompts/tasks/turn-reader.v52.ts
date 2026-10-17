@@ -28,7 +28,7 @@ export const TURN_READER_V52: PromptDefinition<
 > = {
   ...TURN_READER_V51,
   version: 52,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Lane ml live 2026-10-16: nextSteps, read from meaning, so code's readiness list opens only answers that ask what to do next or how ready they are, not every ADVICE question. v51's rules unchanged.",
   effectiveFrom: "2026-10-16",

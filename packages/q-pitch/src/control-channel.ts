@@ -72,6 +72,8 @@ export const TOUR_CONTROL_KINDS = [
   "SKIP",
   "REPEAT",
   "JUMP",
+  /** Q Pitch v6: go to a numbered step (1-based), absolute. */
+  "STEP",
   /** The person asked a question or spoke over the tour. */
   "INTERRUPT",
 ] as const;
@@ -91,6 +93,8 @@ export const TourControlIntentSchema = z
     kind: TourControlKindSchema,
     /** JUMP only. */
     chapterId: ChapterIdSchema.optional(),
+    /** STEP only: the step to go to, 1-based. */
+    step: z.number().int().min(1).max(200).optional(),
     /** VOICE only: the segment the intent was classified from. */
     segmentId: OpaqueIdSchema.optional(),
   })
@@ -98,6 +102,10 @@ export const TourControlIntentSchema = z
   .refine((i) => (i.kind === "JUMP") === (i.chapterId !== undefined), {
     message: "a JUMP names its chapter, and only a JUMP does",
     path: ["chapterId"],
+  })
+  .refine((i) => (i.kind === "STEP") === (i.step !== undefined), {
+    message: "a STEP names its step, and only a STEP does",
+    path: ["step"],
   })
   .refine((i) => i.modality !== "VOICE" || i.segmentId !== undefined, {
     message: "a spoken intent names the segment it came from",
@@ -215,6 +223,10 @@ export function eventOf(intent: TourControlIntent): GuideEvent | null {
       return intent.chapterId === undefined
         ? null
         : { type: "JUMP_TO_CHAPTER", chapterId: intent.chapterId };
+    case "STEP":
+      return intent.step === undefined
+        ? null
+        : { type: "GO_TO_STEP", index: intent.step - 1 };
     case "RESUME":
       return null;
   }

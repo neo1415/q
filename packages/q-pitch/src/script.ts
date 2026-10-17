@@ -38,6 +38,17 @@ export const LineTimingSchema = z.enum(LINE_TIMINGS);
 
 const DIGIT = /[0-9]/u;
 
+/**
+ * Q Pitch v6: a section of a page, by stable id: track, step number, page,
+ * part ("inv.07.profile.overview.moats"). Resolved in the browser by
+ * `[data-qp-anchor]` (or a mapped existing marker); never a selector or
+ * URL in a script.
+ */
+export const AnchorIdSchema = z
+  .string()
+  .regex(/^(?:inv|fdr)\.\d{2}(?:\.[a-z0-9][a-z0-9-]{0,40}){1,5}$/u);
+export type AnchorId = z.infer<typeof AnchorIdSchema>;
+
 export const SceneLineSchema = z
   .object({
     lineId: LineIdSchema,
@@ -47,8 +58,25 @@ export const SceneLineSchema = z
     timing: LineTimingSchema,
     /** Where the wording comes from: a blueprint section or manifest entry. */
     source: z.string().trim().min(1).max(120),
+    /**
+     * v6: the section this line talks about. The host scrolls to it, opens
+     * it when `open` says so, and lights it before the line is spoken, and
+     * the light moves with the narration: every section Q talks about is
+     * highlighted (owner, 16 Oct). AFTER_ACK lines only: the page is there.
+     */
+    anchor: AnchorIdSchema.optional(),
+    /** v6: open (true) or close (false) the anchored section first. */
+    open: z.boolean().optional(),
   })
   .strict()
+  .refine((l) => l.anchor === undefined || l.timing === "AFTER_ACK", {
+    message: "a line about a section is spoken once the page is there",
+    path: ["anchor"],
+  })
+  .refine((l) => l.open === undefined || l.anchor !== undefined, {
+    message: "only a line about a section opens or closes one",
+    path: ["open"],
+  })
   .refine((l) => l.kind !== "CLAIM" || l.claimIds.length > 0, {
     message: "a CLAIM line names the certified claims it states",
     path: ["claimIds"],

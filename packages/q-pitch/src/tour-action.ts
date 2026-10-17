@@ -197,8 +197,42 @@ export const OpenRecordActionSchema = z
   .object({
     ...base,
     kind: z.literal("openRecord"),
-    record: z.enum(["GATEQ_APPLICATION", "RELATIONSHIP", "RELATIONSHIP_CALLS"]),
+    record: z.enum([
+      "GATEQ_APPLICATION",
+      "RELATIONSHIP",
+      "RELATIONSHIP_CALLS",
+      // v6: the relationship's own tabs.
+      "RELATIONSHIP_MESSAGES",
+      "RELATIONSHIP_SCHEDULE",
+    ]),
     key: FixtureKeySchema,
+  })
+  .strict();
+
+/**
+ * v6 founder track: open a fictional investor's page by fixture key
+ * (`demoInvestor`): its profile, the founder's relationship with it, or
+ * its rehearsal page. Never a URL or id in a script.
+ */
+export const OpenInvestorActionSchema = z
+  .object({
+    ...base,
+    kind: z.literal("openInvestor"),
+    investor: FixtureKeySchema,
+    page: z.enum(["PROFILE", "RELATIONSHIP", "REHEARSE"]),
+  })
+  .strict();
+
+/**
+ * v6: a page that exists for the tour itself, by name (never a URL in a
+ * script): the founder track's Capital Q pitch page.
+ */
+export const TOUR_PAGES = { CAPITAL_Q_PITCH: "/q-pitch/capital-q" } as const;
+export const OpenTourPageActionSchema = z
+  .object({
+    ...base,
+    kind: z.literal("openTourPage"),
+    page: z.enum(["CAPITAL_Q_PITCH"]),
   })
   .strict();
 
@@ -214,6 +248,8 @@ export const TourActionSchema = z.discriminatedUnion("kind", [
   RunShortRehearsalActionSchema,
   UiActActionSchema,
   OpenRecordActionSchema,
+  OpenInvestorActionSchema,
+  OpenTourPageActionSchema,
 ]);
 export type TourAction = z.infer<typeof TourActionSchema>;
 export type TourActionKind = TourAction["kind"];
@@ -230,6 +266,8 @@ export const TOUR_ACTION_KINDS = [
   "runShortRehearsal",
   "uiAct",
   "openRecord",
+  "openInvestor",
+  "openTourPage",
 ] as const satisfies readonly TourActionKind[];
 export const TourActionKindSchema = z.enum(TOUR_ACTION_KINDS);
 

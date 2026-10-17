@@ -43,6 +43,8 @@ const TABLE: readonly (readonly [string, string])[] = [
   ["open relationship hub", "RELATIONSHIPS"],
   ["open the hub", "RELATIONSHIPS"],
   ["open my pipeline", "CRM_PIPELINE"],
+  ["open Q Pitch", "Q_PITCH"],
+  ["take me to the capital q tour", "Q_PITCH"],
   // Lane ov 2026-10-16: the CRM by its name and its tabs.
   ["open the CRM", "RELATIONSHIPS"],
   ["take me to the crm overview", "RELATIONSHIPS"],

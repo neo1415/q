@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { closestMatches } from "@/features/q-pitch/founder/matches";
+import "@/features/q-pitch/founder/founder-tour.css";
 import { InvestorCards } from "@/features/investors/investor-cards";
 
 import { GateFit } from "./gate-fit";
@@ -189,8 +191,14 @@ export function DiscoverInvestors({
   /** Q.05: published gates checked for the founder's own company. */
   readonly gates?: ReadonlyMap<string, InvestorGateFitDto>;
 }) {
+  // Q Pitch v6 (founder track): the three closest matches on what each
+  // investor publishes, marked so the tour can light them in turn.
+  const matches = closestMatches(
+    items.map((item) => item.investorOrganisationId),
+    gates,
+  );
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6" data-qp-anchor="fdr.03.discover.list">
       <Notes notes={notes} t={translate} />
       {items.length === 0 ? (
         <EmptyState
@@ -207,6 +215,7 @@ export function DiscoverInvestors({
         // is sent. Order is the server's; the reasons say why each is here.
         <InvestorCards
           items={items}
+          anchorOf={(item) => matches.get(item.investorOrganisationId)}
           footer={(item) => {
             const gate = gates.get(item.investorOrganisationId);
             return (

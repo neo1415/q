@@ -941,6 +941,18 @@ function ProfileChips({ profile }: { readonly profile: CounterpartProfile }) {
   );
 }
 
+/**
+ * Q Pitch v6: the record's sections a tour talks about, by card id. Inert
+ * markers (`data-qp-anchor`, space-separated per track); the tour lights
+ * the one Q is speaking about. fdr.10.*: the founder track's record step.
+ */
+const QP_CARD_ANCHORS: Readonly<Record<string, string>> = {
+  deal: "fdr.10.relationship.deal",
+  history: "fdr.10.relationship.history",
+  notes: "fdr.10.relationship.notes",
+  next: "fdr.10.relationship.next",
+};
+
 function Card({
   title,
   id,
@@ -985,6 +997,7 @@ function Card({
         aria-labelledby={`relationship-${id}`}
         className={`group scroll-mt-24 border-t border-(--cq-border-subtle) pt-2 lg:pt-5 lg:[&::details-content]:[content-visibility:visible] ${className ?? ""}`}
         data-collapsible={id}
+        data-qp-anchor={QP_CARD_ANCHORS[id]}
       >
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 lg:pointer-events-none lg:min-h-0 [&::-webkit-details-marker]:hidden">
           {heading}
@@ -1005,6 +1018,7 @@ function Card({
     <section
       aria-labelledby={`relationship-${id}`}
       className={`flex scroll-mt-24 flex-col gap-4 border-t border-(--cq-border-subtle) pt-5 ${className ?? ""}`}
+      data-qp-anchor={QP_CARD_ANCHORS[id]}
     >
       <div className="flex items-center justify-between gap-3">
         {heading}

@@ -319,3 +319,23 @@ Every other atlas feature currently has no certification entry and must not be p
   - Receipts: scratchpad `v5-acc/badge/capital-q-profile.png` and `capital-q-scene16.png`.
 - **Ledger:** `QP-SUBJECT` promoted in `premiere.ts`. The forbidden list now names verified traction, customers, revenue and investors.
 - **Certified scenes: 16 of 17.** Scene 15 (Q-to-Q rehearsal) waits on the human microphone "skip" test.
+
+## Founder track v6 (`tour.founder-v6`): local browser runs, 16–17 Oct 2026 (Lane qpf)
+
+- **Setup:**
+  - Web: `claude/qpf-oct16` run locally (merged with `claude/qpitch-v6-oct16@723c023d`).
+  - Services: production api, q-api and Supabase.
+  - Account: fictional founder `babatunde.tunde-cargo@fictional.capitalq.local`.
+  - Mode: captions only.
+  - Driver: scratchpad `qpf/frun.mjs`. Logs are in `qpf/run2` (steps 1–5), `run4` (6–11), `run5` (12–16) and `run6` (3–8, a screenshot per lit section).
+- **Result:**
+  - All 16 steps completed and every anchored section was lit.
+  - Page moves took under 1 s, except the pipeline at about 2.4 s.
+  - The ledger stays `CODE_VERIFIED`: this was not the production web, so no entry is promoted until a run on the deployed SHA.
+- **Testing residue:**
+  - Rehearsal `04b2ac3c-0858-4533-8dc8-1e491bb33732` on babatunde, with Savanna Seed Partners, came from testing. It was a live runShortRehearsal from an earlier draft of step 12.
+  - It is finished, private to the fictional account, and sent nothing.
+  - There is no delete endpoint, so it remains.
+  - No GateQ application was created.
+- **Step 12 change:** a live persona rehearses the signed-in founder's own company. On babatunde it questioned Harbourline Cargo while Q presented Capital Q. Step 12 is now a prepared exchange, labelled aloud as one, on the rehearsal lobby. It uses no paid session and no Tavus.
+- **Known blocker:** `/relationships?view=capital` throws a server error for founders on production (digest 2735418325). The track mentions Capital on the CRM overview instead of opening it.

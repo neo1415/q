@@ -30,6 +30,9 @@ const OPENED_BY_CODE: ReadonlySet<string> = new Set([
   "CAPITAL_PLAN",
   "CAPITAL_INVESTORS",
   "CRM_PIPELINE",
+  // Q Pitch v6: not in the destination list; v53 names it in its own
+  // rule (Q PITCH), read by meaning.
+  "Q_PITCH",
 ]);
 
 export const READER_DESTINATIONS = Q_NAVIGATE_DESTINATIONS.filter(
