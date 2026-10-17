@@ -3,6 +3,8 @@
  * coverage counts and the methodology name are data, not in here.
  */
 export const SCORES_AR: Readonly<Record<string, string>> = {
+  "Current company assessment": "التقييم الحالي للشركة",
+  "Premium investor access required": "يتطلب صلاحية وصول مميزة للمستثمر",
   "Investability and Suitability": "قابلية الاستثمار والملاءمة",
   Investability: "قابلية الاستثمار",
   Suitability: "الملاءمة",
