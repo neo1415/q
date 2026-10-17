@@ -111,7 +111,7 @@ export default async function GateqPage({ searchParams }: Props) {
             />
           ) : (
             // Lit by the founder track while Q explains the interview.
-            <div data-qp-anchor="fdr.09.gateq.applications">
+            <div data-qp-anchor="fdr.10.gateq.applications">
               <FounderApplications
                 state={
                   applications === null

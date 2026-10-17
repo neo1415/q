@@ -96,7 +96,7 @@ export default async function DailyPage({
       <PageContainer width="content" className="flex flex-col gap-10">
         <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
           {home.preparing ? <PreparingNotice /> : null}
-          <div data-qp-anchor="fdr.14.daily.paper">
+          <div data-qp-anchor="fdr.15.daily.paper">
             <Newspaper edition={latest} />
           </div>
           <DailyArchive
@@ -120,7 +120,7 @@ export default async function DailyPage({
           <div
             className="flex flex-col gap-3"
             data-state="off"
-            data-qp-anchor="fdr.14.daily.paper"
+            data-qp-anchor="fdr.15.daily.paper"
           >
             <p className="cq-body text-(--cq-text-secondary)">
               {t("The Q Daily is off.")}
@@ -133,14 +133,14 @@ export default async function DailyPage({
             </Link>
           </div>
         ) : home.preparing ? (
-          <div data-qp-anchor="fdr.14.daily.paper">
+          <div data-qp-anchor="fdr.15.daily.paper">
             <PreparingNotice />
           </div>
         ) : (
           <div
             className="flex flex-col gap-3"
             data-state="empty"
-            data-qp-anchor="fdr.14.daily.paper"
+            data-qp-anchor="fdr.15.daily.paper"
           >
             <p className="cq-body text-(--cq-text-primary)">
               {preferences.nextDueAt === null
