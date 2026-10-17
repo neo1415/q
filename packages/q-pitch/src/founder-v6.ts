@@ -615,11 +615,9 @@ const STEPS: readonly Built[] = [
     part: "q2q",
     title: "A rehearsal: Q presents Capital Q",
     feature: "FDR-REHEARSAL-Q2Q",
-    route: "/rehearsals/r/[rehearsalId]",
+    route: "/rehearsals/investor/[investorOrganisationId]",
     atlasTab: "REHEARSALS",
     spokenNames: ["rehearsal", "rehearse", "practice"],
-    ackTimeoutMs: 120_000,
-    fallbackSceneId: "s.fdr.13.rehearsals.home",
     actions: [
       {
         actionId: "ta_fdr-rehearse-open",
@@ -627,46 +625,50 @@ const STEPS: readonly Built[] = [
         investor: RECORD_INVESTOR,
         page: "REHEARSE",
       },
-      {
-        actionId: "ta_fdr-rehearse-q2q",
-        kind: "runShortRehearsal",
-        counterpart: "savanna-seed",
-        lines: [
-          "q.fdr-present-open",
-          "q.fdr-present-problem",
-          "q.fdr-present-ask",
-        ],
-        maxMs: 45_000,
-      },
     ],
+    // Prepared, not live (16 Oct finding): a live persona rehearses the
+    // SIGNED-IN founder's own company, so on any account but Capital Q's
+    // it would question that company, not Capital Q. The owner allows a
+    // precomputed exchange; it is said aloud that it is one.
     before: [
-      "Before a real meeting, you can rehearse with an investor persona. I'll show you: I'll present Capital Q as its founder, and the other voice is a labelled simulation of the investor, not the real person.",
+      "Before a real meeting, you rehearse with an investor persona. Here's a short prepared exchange: the persona's questions, and me presenting Capital Q as its founder. It's a demonstration, not a live session.",
     ],
     after: [
       {
-        text: "That's the rehearsal, saved with its review.",
+        text: "The persona asks: thanks for making the time. What does Capital Q do, and why now?",
+        anchor: "fdr.12.rehearsal.stage",
+      },
+      {
+        text: "Presenting, I answer: thank you for having me. Capital Q is an investment intelligence system for private capital. Every company presents itself differently, so investors start from scratch and good companies are missed. We put every company in one standard, evidence-labelled structure, and AI can now read like an analyst at a cost every founder can reach.",
+        anchor: "fdr.12.rehearsal.stage",
+      },
+      {
+        text: "The persona presses: what can you show us today, and what is still an estimate?",
+        anchor: "fdr.12.rehearsal.stage",
+      },
+      {
+        text: "Presenting: everything you've seen today works on the real product, with demonstration companies labelled as such. We're pre-seed and bootstrapping, so we claim no traction, revenue or market size yet.",
+        anchor: "fdr.12.rehearsal.stage",
+      },
+      {
+        text: "The persona: and what are you raising?",
+        anchor: "fdr.12.rehearsal.stage",
+      },
+      {
+        text: "Presenting: a raise of USD two million, as we state it. What would you want to see from us before a next meeting?",
+        anchor: "fdr.12.rehearsal.stage",
+      },
+      {
+        text: "In a real rehearsal, you speak and I play the investor by voice, from a persona built only from what you may see about them. Afterwards I review the call: what went right, what to improve, tips for that meeting, and the full transcript.",
         claim: true,
-        anchor: "fdr.12.rehearsal.score",
-      },
-      {
-        text: "What went right.",
-        anchor: "fdr.12.rehearsal.right",
-      },
-      {
-        text: "What to improve, and how I coach you on it.",
-        claim: true,
-        anchor: "fdr.12.rehearsal.improve",
-      },
-      {
-        text: "And the full transcript, every line as it was said.",
-        anchor: "fdr.12.rehearsal.transcript",
+        anchor: "fdr.12.rehearsal.stage",
       },
     ],
     fixture:
-      "A short voice rehearsal with Savanna Seed Partners (fictional persona), bounded and ended explicitly",
+      "The rehearsal lobby for Savanna Seed Partners (fictional persona); the exchange is prepared narration, no session is started",
     forbidden: [
+      "That the prepared exchange was a live session",
       "That the investor persona is the real investor",
-      "That a rehearsal score predicts a real outcome",
     ],
   }),
   step({
@@ -692,7 +694,8 @@ const STEPS: readonly Built[] = [
         anchor: "fdr.13.rehearsals.start",
       },
       {
-        text: "Past rehearsals and their reviews stay here, so you can see what improved.",
+        text: "Every rehearsal you run is saved here with its review and score, so you can see what improved from one to the next.",
+        claim: true,
         anchor: "fdr.13.rehearsals.history",
       },
     ],
@@ -774,9 +777,13 @@ const STEPS: readonly Built[] = [
 ];
 
 /**
- * The presenter's side of the Q-to-Q rehearsal: Q speaks as the founder of
- * Capital Q presenting to the investor persona. Prepared lines only, in
- * character as presenting; nothing invented (owner, 16 Oct).
+ * The presenter's side of a LIVE Q-to-Q rehearsal (runShortRehearsal): Q
+ * speaks as the founder of Capital Q presenting to the investor persona.
+ * Prepared lines only, in character as presenting; nothing invented.
+ * Coherent only on Capital Q's own founder account, because the persona
+ * rehearses the signed-in founder's company (live run, 16 Oct: on a demo
+ * founder it asked about that company). The default track uses the
+ * prepared exchange in step twelve instead.
  */
 export const FOUNDER_V6_PRESENTER_LINES: readonly ApprovedQuestion[] = [
   {

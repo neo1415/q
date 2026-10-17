@@ -166,36 +166,45 @@ describe("Capital Q on the fourteen-section template", () => {
 });
 
 describe("Q-to-Q: Q presents Capital Q", () => {
-  it("speaks only prepared lines, in the presenter's role", () => {
-    const [open, ...rest] = FOUNDER_V6_PRESENTER_LINES;
-    expect(open?.text).toMatch(/I'm presenting Capital Q/u);
-    for (const line of FOUNDER_V6_PRESENTER_LINES) {
-      // First person, as the company presenting; never the investor's
-      // side asking about "your company" or "your mandate".
-      expect(line.text, line.questionId).toMatch(
-        /\b(?:I|I'm|we|We|We're|our|Our)\b/u,
+  const scene = FOUNDER_V6_SCRIPT.scenes.find(
+    (s) => s.sceneId === "s.fdr.12.rehearsal.q2q",
+  );
+  const lines = scene?.lines ?? [];
+
+  it("says aloud that the exchange is prepared, and starts no paid session", () => {
+    expect(lines[0]?.text).toMatch(/prepared exchange/u);
+    expect(lines[0]?.text).toMatch(/not a live session/u);
+    expect(scene?.actions.some((a) => a.kind === "runShortRehearsal")).toBe(
+      false,
+    );
+  });
+
+  it("keeps Q in the presenter's role, and the persona labelled", () => {
+    const presenter = lines.filter((l) => /^Presenting/u.test(l.text));
+    const persona = lines.filter((l) => /^The persona/u.test(l.text));
+    expect(presenter.length).toBeGreaterThanOrEqual(3);
+    expect(persona.length).toBe(presenter.length);
+    for (const line of presenter) {
+      expect(line.text).toMatch(/\b(?:we|We|We're|I|our)\b|Capital Q/u);
+      expect(line.text).not.toMatch(
+        /\byour (?:company|startup|business|mandate|fund)\b/iu,
       );
+      expect(INVENTED.test(line.text), line.text).toBe(false);
+      expect(line.text).not.toMatch(/Harbourline/iu);
+    }
+    expect(presenter[0]?.text).toMatch(/Capital Q/u);
+  });
+
+  it("keeps live presenter lines in character for Capital Q's own account", () => {
+    expect(FOUNDER_V6_PRESENTER_LINES[0]?.text).toMatch(
+      /I'm presenting Capital Q/u,
+    );
+    for (const line of FOUNDER_V6_PRESENTER_LINES) {
       expect(line.text).not.toMatch(
         /\byour (?:company|startup|business|mandate|fund)\b/iu,
       );
       expect(INVENTED.test(line.text), line.questionId).toBe(false);
-      expect(line.text).not.toMatch(/Harbourline/iu);
     }
-    expect(rest.length).toBeGreaterThan(0);
-    const scene = FOUNDER_V6_SCRIPT.scenes.find((s) =>
-      s.actions.some((a) => a.kind === "runShortRehearsal"),
-    );
-    const run = scene?.actions.find((a) => a.kind === "runShortRehearsal");
-    expect(run?.kind === "runShortRehearsal" && run.lines).toEqual(
-      FOUNDER_V6_PRESENTER_LINES.map((l) => l.questionId),
-    );
-    expect(run?.kind === "runShortRehearsal" && run.maxMs).toBeLessThanOrEqual(
-      45_000,
-    );
-    // It says aloud that the other voice is a simulation.
-    expect(scene?.lines.map((l) => l.text).join(" ")).toMatch(
-      /labelled simulation/u,
-    );
   });
 });
 
