@@ -221,11 +221,17 @@ export function fitSweepAskOfReading(
   // v56: "three new ones" after a list is the next best of their own
   // candidates, never the same companies again and never "rank them".
   if (question.excludeShown === true && shown.length > 0) {
+    // "Who else fits?" names no number: as many again as the last set
+    // (owner live 2026-10-17: ten cards came up while Q spoke of three).
+    const again =
+      previous.length > 0
+        ? Math.min(previous.length, FIT_SWEEP_CARDS_MAX)
+        : null;
     return {
       scope: "CANDIDATES",
       place: placeOf(words),
       fitAsked: true,
-      count,
+      count: count ?? again,
       exclude: [...new Set(shown)],
     };
   }

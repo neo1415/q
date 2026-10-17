@@ -313,3 +313,25 @@ describe("shownCardCompanyIds", () => {
     expect(shownCardCompanyIds([])).toEqual([]);
   });
 });
+
+/** Owner live 2026-10-17: "who else fits?" put ten cards up after three. */
+describe("more without a number", () => {
+  it("is as many again as the last set", () => {
+    const ask = fitSweepAskOfReading(
+      { text: "who else fits?", count: null, excludeShown: true },
+      ["a", "b", "c"],
+      [],
+      ["a", "b", "c", "d", "e", "f"],
+    );
+    expect(ask.count).toBe(3);
+    expect(ask.exclude).toEqual(["a", "b", "c", "d", "e", "f"]);
+  });
+
+  it("keeps a number they did give", () => {
+    const ask = fitSweepAskOfReading(
+      { text: "five more please", count: 5, excludeShown: true },
+      ["a", "b", "c"],
+    );
+    expect(ask.count).toBe(5);
+  });
+});

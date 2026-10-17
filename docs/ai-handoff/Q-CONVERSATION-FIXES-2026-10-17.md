@@ -63,3 +63,32 @@ Still failing on AT:
 - Hosted read-only SQL: `NODE_USE_ENV_PROXY=1 /root/sb node scripts/handoff/live/hosted-read.mjs "select … from q_runtime.conversation_messages …"`. The columns are `conversation_id`, `role`, `content`, `result_blocks` and `created_at`.
 - Railway logs: helpers in the coordinator scratchpad (`qapilogs.mjs`, `rwdeploys.mjs`). Never commit tokens.
 - Browser: Playwright with `executablePath: "/opt/pw-browsers/chromium"`, using a fictional seed account.
+
+## Afternoon update (releases AU–AY, batch AZ)
+
+**Live:**
+
+| Release         | What it fixed                                                                                                                                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AU (`1a9829cc`) | Tool results are kept per conversation (migration `20261228190000`, applied on hosted: 246/246). Turn reader v55 page controls. Dialog state is no longer misread.                                             |
+| AV (`ec621370`) | Cards are keyed per answer; Q's presence is never lost; a new answer closes the old room view. Record-to-record moves commit (`loading.tsx`).                                                                  |
+| AW (`6dd794d5`) | Recall works live: the abort signal was inside the strict gateway request, which made every recall an INVALID_REQUEST. Sets are kept on single-card follow-ups. No "Replaced" banner. Restored cards are wide. |
+| AX (`390fda31`) | The fit ranking takes the reader's count when the words give none. Card names are never truncated.                                                                                                             |
+| AY (`26a51792`) | Turn reader v56 `excludeShown`: "new", "other" and "more" companies leave out everything already shown.                                                                                                        |
+
+**Live-verified on AY** (Savanna Seed, conversation `8dff5382`):
+
+| Check                      | Result                                                                                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Top three                  | pass                                                                                                                                      |
+| Three new companies        | pass: 3 cards, none repeated                                                                                                              |
+| Show again                 | pass                                                                                                                                      |
+| Data room, then pitch deck | pass, about 2 s each                                                                                                                      |
+| "Who else fits?"           | **10 cards**. Fixed in batch AZ: with no number, the count is as many as the last set.                                                    |
+| "What was the second one?" | correct, but 3.3 s: two classification calls plus a 1.8 s recall reply. Open: skip the classifications when the binding is already known. |
+
+**Open:**
+
+- Q Pitch narration tone (owner, deferred).
+- Typed turns still call `/api/q-speech`.
+- Voice delegation latency.
