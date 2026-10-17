@@ -291,6 +291,15 @@ describe("wordsNamePage", () => {
     ["Don't pitch Capital Q to me", "Q_PITCH", false],
     ["Can you pitch Capital Q to me?", "DISCOVER", false],
     ["Show me the pipeline", "Q_PITCH", false],
+    ["Peux-tu me présenter Capital Q ?", "Q_PITCH", true],
+    ["Explícame Capital Q", "Q_PITCH", true],
+    ["Kannst du mir Capital Q vorstellen?", "Q_PITCH", true],
+    ["Nieleze Capital Q", "Q_PITCH", true],
+    ["What can you do?", "Q_PITCH", true],
+    ["Que peux-tu faire ?", "Q_PITCH", true],
+    ["Ne me présente pas Capital Q", "Q_PITCH", false],
+    ["I'm on Capital Q's profile", "Q_PITCH", false],
+    ["How do I improve my pitch deck?", "Q_PITCH", false],
   ] as const)("%s / %s -> %s", (text, destination, expected) => {
     expect(wordsNamePage(text, { kind: "DESTINATION", destination })).toBe(
       expected,

@@ -448,6 +448,69 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     ]);
   });
 
+  it.each([
+    "Can you pitch Capital Q to me?",
+    "Peux-tu me présenter Capital Q ?",
+    "¿Qué puedes hacer?",
+  ])(
+    "starts Q Pitch for %s, read as a question about Capital Q (v6, live 2026-10-17)",
+    async (said) => {
+      const run = seam({
+        said,
+        reading: {
+          ...toolReading({
+            kind: "NAVIGATE",
+            destination: "Q_PITCH",
+            visibility: null,
+          }),
+          kind: "QUESTION_TO_Q",
+          question: {
+            kind: "ABOUT_CAPITAL_Q",
+            text: "what is Capital Q?",
+            about: [],
+            count: null,
+            discover: null,
+            subject: null,
+          },
+        },
+        outcomes: [],
+      });
+      await run.answer.answer(request());
+      expect(run.delegated()).toBe(0);
+      expect(run.stored[0]?.blocks).toEqual([
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "NAVIGATE", destination: "Q_PITCH" },
+        },
+      ]);
+    },
+  );
+
+  it("answers, without the tour, a question about pitches the reader sent to Q_PITCH", async () => {
+    const run = seam({
+      said: "Don't pitch Capital Q to me, just tell me what you found",
+      reading: {
+        ...toolReading({
+          kind: "NAVIGATE",
+          destination: "Q_PITCH",
+          visibility: null,
+        }),
+        kind: "QUESTION_TO_Q",
+        question: {
+          kind: "ABOUT_CAPITAL_Q",
+          text: "what is Capital Q?",
+          about: [],
+          count: null,
+          discover: null,
+          subject: null,
+        },
+      },
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+  });
+
   it("opens Explore for 'the explore page' whatever the reader thinks (voice-cards, Zino 2026-10-08)", async () => {
     const run = seam({
       said: "Take me to the explore page.",

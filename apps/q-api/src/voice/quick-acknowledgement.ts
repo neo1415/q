@@ -258,7 +258,7 @@ export function acknowledgementIn(
       const choices = choicesOf(item.stepKey, item.value);
       const value =
         choices === null
-          ? [item.value]
+          ? [figuresInDigits(item.value)]
           : choices.map((choice) => words(choice));
       if (label === null || value.some((v) => v === null)) return null;
       said.push(`${label}: ${value.join(separators.list)}`);
