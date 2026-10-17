@@ -14,6 +14,7 @@ import { cx } from "@capital-q/ui";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 
+import { OpenPdfButton } from "@/features/documents/in-app-reader";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import { ActivityBars } from "./activity-bars";
@@ -217,19 +218,23 @@ function Header({
         </nav>
         {props.showReports === false ? null : (
           <>
-            <a
-              href={`/results/report?format=pdf&${props.download}`}
+            {/* Owner 2026-10-17: the report opens here, in the app; the
+                reader offers "Save a copy". The CSV is a data export, so
+                it stays a download and says so. */}
+            <OpenPdfButton
+              title={`${tr("Report")} · ${name}`}
+              url={`/results/report?format=pdf&${props.download}`}
               className={buttonClassName("secondary")}
-              download
+              dataAttribute="data-results-report"
             >
-              {tr("Download PDF")}
-            </a>
+              {tr("Open report")}
+            </OpenPdfButton>
             <a
               href={`/results/report?format=csv&${props.download}`}
               className={buttonClassName("quiet")}
               download
             >
-              {tr("CSV")}
+              {tr("Download CSV")}
             </a>
           </>
         )}

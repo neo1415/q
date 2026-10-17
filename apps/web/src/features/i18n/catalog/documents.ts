@@ -505,4 +505,13 @@ export const DOCUMENTS_AR: Readonly<Record<string, string>> = {
   "{n} questions from {name}": "{n} أسئلة من {name}",
   "1 question from {name}": "سؤال واحد من {name}",
   "From your profile.": "من ملفك.",
+  // The in-app reader (owner 2026-10-17: everything happens in the app)
+  "Open report": "افتح التقرير",
+  "Open PDF": "افتح ملف PDF",
+  "Save a copy": "احفظ نسخة",
+  "Reading in Capital Q.": "تقرأ داخل Capital Q.",
+  "The document couldn't load.": "تعذّر تحميل المستند.",
+  "This file can't be shown here. Save a copy to open it.":
+    "لا يمكن عرض هذا الملف هنا. احفظ نسخة لفتحه.",
+  "Open the transcript": "افتح نص المحادثة",
 };

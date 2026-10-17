@@ -5,9 +5,10 @@ import type {
   QDailyStory,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
-import { Download, ExternalLink } from "@capital-q/ui/icons";
+import { ExternalLink, FileText } from "@capital-q/ui/icons";
 
 import { formatLongDay } from "@/components/date-format";
+import { OpenPdfButton } from "@/features/documents/in-app-reader";
 import { serverTNow } from "@/features/i18n/server-now";
 
 /**
@@ -337,15 +338,17 @@ export function Newspaper({ edition }: { readonly edition: QDailyEdition }) {
           </p>
         )}
         <div className="mt-1 flex flex-wrap justify-center gap-2">
-          <a
-            href={`/api/q-daily/${edition.id}/pdf`}
+          {/* Owner 2026-10-17: the edition opens in the app; the reader
+              offers "Save a copy" for the file itself. */}
+          <OpenPdfButton
+            title={t("The Q Daily")}
+            url={`/api/q-daily/${edition.id}/pdf`}
             className={buttonClassName("secondary", "compact")}
-            download
-            data-daily-pdf
+            dataAttribute="data-daily-pdf"
           >
-            <Download aria-hidden="true" size={16} strokeWidth={1.75} />
-            {t("Download PDF")}
-          </a>
+            <FileText aria-hidden="true" size={16} strokeWidth={1.75} />
+            {t("Open PDF")}
+          </OpenPdfButton>
           <a
             href="/settings#q-daily"
             className={buttonClassName("quiet", "compact")}

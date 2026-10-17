@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 
-import { HubNavigation, HubRelated } from "./hub-navigation";
+import { HubNavigation } from "./hub-navigation";
 import { hubTitle, type HubSide, type HubView } from "./hub-view";
 import { serverTNow } from "@/features/i18n/server-now";
 
 /**
- * The CRM's one header (redesign 2026-10-15): the Hub's name, the modules
- * the work continues in and any page action on one line, then the
- * workspace's tabs. One h1; a tab never repeats its own name as a heading.
+ * The CRM's one header (redesign 2026-10-15): the Hub's name and any page
+ * action on one line, then the workspace's tabs (GateQ is one of them
+ * since 2026-10-17, so no separate link beside the title). One h1; a tab never repeats its own name as a heading.
  */
 export function HubHeader({
   side,
@@ -26,12 +26,9 @@ export function HubHeader({
         <h1 className="cq-title-lg text-(--cq-text-primary)">
           {t(hubTitle(side))}
         </h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <HubRelated side={side} />
-          {actions}
-        </div>
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
       </div>
-      <HubNavigation view={view} />
+      <HubNavigation view={view} side={side} />
     </header>
   );
 }

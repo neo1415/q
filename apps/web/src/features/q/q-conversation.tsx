@@ -17,7 +17,7 @@ import { cx } from "@capital-q/ui";
 import { Button } from "@capital-q/ui/button";
 import {
   Captions,
-  Download,
+  FileText,
   History,
   PanelRight,
   ICON_SIZE,
@@ -113,6 +113,11 @@ const ArtifactViewer = lazy(() =>
 const QHistorySheet = lazy(() =>
   import("./q-history-sheet").then((module) => ({
     default: module.QHistorySheet,
+  })),
+);
+const InAppReader = lazy(() =>
+  import("@/features/documents/in-app-reader").then((module) => ({
+    default: module.InAppReader,
   })),
 );
 
@@ -733,20 +738,10 @@ export function QConversationPanel({
   // W7: the sheet's code loads the first time it is opened, then stays.
   const [historyUsed, setHistoryUsed] = useState(false);
   if (historyOpen && !historyUsed) setHistoryUsed(true);
-  const download =
-    turns.length === 0 && spoken.length === 0
-      ? undefined
-      : () => {
-          const blob = new Blob([transcriptText(turns, spoken)], {
-            type: "text/plain;charset=utf-8",
-          });
-          const url = URL.createObjectURL(blob);
-          const anchor = document.createElement("a");
-          anchor.href = url;
-          anchor.download = "capital-q-conversation.txt";
-          anchor.click();
-          URL.revokeObjectURL(url);
-        };
+  // Owner 2026-10-17 ("everything happens within the app"): the
+  // transcript opens in the reader; "Save a copy" there writes the file.
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const hasTranscript = turns.length > 0 || spoken.length > 0;
 
   // One way to say something to Q from the page: down the open line when
   // there is one (answered aloud), otherwise as a question.
@@ -1105,23 +1100,37 @@ export function QConversationPanel({
                 />
                 <span className="max-sm:sr-only">{t("Conversations")}</span>
               </button>
-              {download === undefined ? null : (
+              {hasTranscript ? (
                 <button
                   type="button"
                   className="cq-stage-quiet"
-                  onClick={download}
-                  aria-label={t("Save this conversation")}
-                  data-q-control="download"
+                  onClick={() => setTranscriptOpen(true)}
+                  aria-label={t("Open the transcript")}
+                  aria-haspopup="dialog"
+                  data-q-control="transcript"
                 >
-                  <Download
+                  <FileText
                     aria-hidden="true"
                     size={ICON_SIZE.compact}
                     strokeWidth={ICON_STROKE}
                   />
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
+          {transcriptOpen ? (
+            <Suspense fallback={null}>
+              <InAppReader
+                document={{
+                  kind: "text",
+                  title: t("Transcript"),
+                  text: transcriptText(turns, spoken),
+                  fileName: "capital-q-conversation.txt",
+                }}
+                onClose={() => setTranscriptOpen(false)}
+              />
+            </Suspense>
+          ) : null}
           {historyUsed ? (
             <Suspense fallback={null}>
               <QHistorySheet

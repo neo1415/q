@@ -6,10 +6,7 @@ import { classifyRoute } from "@/auth/route-policy";
 import { isActiveRoute } from "@/components/app-shell/navigation";
 import { isAppRoute, redirectedTo } from "@/features/q/control/app-routes";
 import { manifestControls, resetControls } from "@/features/q/control/registry";
-import {
-  HubNavigation,
-  HubRelated,
-} from "@/features/relationships/hub-navigation";
+import { HubNavigation } from "@/features/relationships/hub-navigation";
 import {
   crmTarget,
   hubDestinations,
@@ -163,22 +160,32 @@ describe("CRM tabs", () => {
     }
   });
 
-  it("keeps modules out of the tabs and Q's control ids on the links", () => {
-    render(
-      <>
-        <HubRelated side="INVESTOR" />
-        <HubNavigation view="overview" />
-      </>,
-    );
+  it("GateQ and company requests are CRM tabs, with Q's control ids on them", () => {
+    // Owner 2026-10-17: out of the sidebar, into the CRM's tabs.
+    expect(hubTabs("INVESTOR").map((tab) => [tab.view, tab.href])).toEqual([
+      ["overview", "/relationships?view=overview"],
+      ["pipeline", "/relationships?view=pipeline"],
+      ["capital", "/relationships?view=capital"],
+      ["gateq", "/gateq"],
+      ["requests", "/investors"],
+    ]);
+    expect(hubTabs("COMPANY").map((tab) => [tab.view, tab.href])).toEqual([
+      ["overview", "/relationships?view=overview"],
+      ["pipeline", "/relationships?view=pipeline"],
+      ["capital", "/relationships?view=capital"],
+      ["applications", "/gateq?tab=applications"],
+    ]);
+    render(<HubNavigation view="overview" side="INVESTOR" />);
     const tabs = screen.getByRole("navigation", { name: "CRM" });
-    expect(within(tabs).queryByRole("link", { name: /inbox/ })).toBeNull();
-    expect(within(tabs).queryByRole("link", { name: "Reports" })).toBeNull();
-    const related = screen.getByRole("navigation", { name: "Related" });
     expect(
-      within(related)
-        .getByRole("link", { name: "Investment inbox" })
+      within(tabs).getByRole("link", { name: "GateQ" }).getAttribute("href"),
+    ).toBe("/gateq");
+    expect(
+      within(tabs)
+        .getByRole("link", { name: "Company requests" })
         .getAttribute("href"),
-    ).toBe("/gateq?tab=inbox");
+    ).toBe("/investors");
+    expect(within(tabs).queryByRole("link", { name: "Reports" })).toBeNull();
     expect(
       manifestControls().some((entry) => entry.id === "button.hub-gateq"),
     ).toBe(true);

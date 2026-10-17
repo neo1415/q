@@ -25,7 +25,13 @@ import { useT } from "@/features/i18n/language";
  * the title (redesign 2026-10-15: they read as tabs and were not). On a
  * phone the strip scrolls sideways and keeps the open tab in view.
  */
-export function HubNavigation({ view }: { readonly view: HubView }) {
+export function HubNavigation({
+  view,
+  side = "NONE",
+}: {
+  readonly view: HubView;
+  readonly side?: HubSide;
+}) {
   const t = useT();
 
   const ref = useRef<HTMLElement>(null);
@@ -40,6 +46,20 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
       // Kept for Q (catalog-stable): the Relationships tab became the
       // Pipeline's List layout, so its id selects the Pipeline tab.
       "tab.relationships": '[data-hub-view="pipeline"]',
+      // GateQ, requests and applications are CRM tabs (owner 2026-10-17);
+      // the old GateQ link's id selects whichever this side has.
+      "tab.gateq": '[data-hub-view="gateq"]',
+      "tab.requests": '[data-hub-view="requests"]',
+      "tab.applications": '[data-hub-view="applications"]',
+    },
+  });
+  // The old GateQ link's id (catalog-stable) now acts on this side's tab.
+  useQControlGroup({
+    kind: "BUTTON",
+    ref,
+    ids: {
+      "button.hub-gateq":
+        '[data-hub-view="gateq"], [data-hub-view="applications"]',
     },
   });
 
@@ -69,7 +89,7 @@ export function HubNavigation({ view }: { readonly view: HubView }) {
         {...(view === "overview" ? { tab: "overview" as const } : {})}
         filters={{ view }}
       />
-      {hubTabs().map((entry) => {
+      {hubTabs(side).map((entry) => {
         // The tapped tab's pending mark is LinkPending (perf lane): one
         // mechanism for instant tab feedback across the CRM.
         const open = view === entry.view;

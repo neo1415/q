@@ -50,6 +50,7 @@ import {
 } from "@/features/q/context";
 import { QPageSubject } from "@/features/q/q-subject";
 import { serverT } from "@/features/i18n/server";
+import { qPitchEnabled } from "@/features/q-pitch/flag";
 
 export const metadata: Metadata = { title: "Profile" };
 export const dynamic = "force-dynamic";
@@ -482,6 +483,19 @@ export default async function ProfilePage() {
                 />
               ) : null}
             </ProfileSectionShell>
+          ) : null}
+
+          {/* Q Pitch lives here, not in the sidebar (owner 2026-10-17). */}
+          {qPitchEnabled() ? (
+            <div className="border-t border-(--cq-border-subtle) pt-6">
+              <Link
+                href="/q-pitch"
+                className={buttonClassName("secondary")}
+                data-profile-q-pitch
+              >
+                {t("Q Pitch")}
+              </Link>
+            </div>
           ) : null}
 
           <div className="border-t border-(--cq-border-subtle) pt-6">

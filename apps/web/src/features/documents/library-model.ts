@@ -239,6 +239,11 @@ export function mergePage(
   return [...byKey.values()];
 }
 
+/** A PDF the in-app reader can draw, by its stored file name. */
+export function isPdfFile(fileName: string | null): boolean {
+  return fileName !== null && fileName.toLowerCase().endsWith(".pdf");
+}
+
 /** A guess from the file's name, so a deck lands as a deck. */
 export function documentTypeForFile(name: string): DocumentType {
   const lower = name.toLowerCase();
