@@ -8,6 +8,7 @@ import {
   type InvestabilityStore,
   type InvestabilitySubject,
 } from "../investability/postgres.js";
+import { UNICORN_PILLARS } from "./method-v1.js";
 
 export type UnicornPotentialView = Omit<
   UnicornPotentialDto,
@@ -21,7 +22,10 @@ export type UnicornPotentialSnapshot = {
 };
 export type UnicornPotentialStore = {
   readonly inputs: InvestabilityStore["inputs"];
-  readonly listedCompanyIds: InvestabilityStore["listedCompanyIds"];
+  readonly listedCompanyIds: (
+    limit: number,
+    after?: string,
+  ) => Promise<readonly string[]>;
   readonly record: (input: {
     readonly subject: InvestabilitySubject;
     readonly methodVersion: string;
@@ -29,6 +33,7 @@ export type UnicornPotentialStore = {
     readonly cohortKey: string;
     readonly view: UnicornPotentialView;
     readonly observations: unknown;
+    readonly sourcesReadAt: string;
   }) => Promise<{ readonly revision: number; readonly created: boolean }>;
   readonly current: (
     ids: readonly string[],
@@ -40,6 +45,59 @@ export type UnicornPotentialStore = {
     limit?: number,
   ) => Promise<readonly UnicornPotentialSnapshot[]>;
 };
+export type UnicornEligibilityCandidate = {
+  company_id: string;
+  revision: number;
+  assessed_at: Date | string;
+  observations: unknown;
+};
+
+/** Time-sensitive eligibility only; no rubric, grading or extraction on a read. */
+export function unicornObservationsCurrent(
+  value: unknown,
+  now = Date.now(),
+): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.every((raw: unknown) => {
+    if (raw === null || typeof raw !== "object") return false;
+    const item = raw as Record<string, unknown>;
+    if (typeof item["stale"] !== "boolean") return false;
+    if (item["stale"]) return true;
+    const pillar = UNICORN_PILLARS.find((p) => p.id === item["pillar"]);
+    const rule = pillar?.criteria[item["criterion"] === "A" ? 0 : 1];
+    const source = item["source"];
+    if (rule === undefined || source === null || typeof source !== "object")
+      return false;
+    const at = (source as Record<string, unknown>)["at"];
+    if (typeof at !== "string") return false;
+    const date = Date.parse(at);
+    if (
+      !Number.isFinite(date) ||
+      date > now ||
+      now - date > rule.freshnessDays * 86400000
+    )
+      return false;
+    return (
+      pillar?.id !== "P4" ||
+      new Date(date).getUTCFullYear() === new Date(now).getUTCFullYear()
+    );
+  });
+}
+
+/** Reauthorize all contributing sources in one batched DB query, without grading. */
+export async function eligibleUnicornRevisions(
+  sql: DatabaseExecutor,
+  candidates: readonly UnicornEligibilityCandidate[],
+): Promise<ReadonlySet<string>> {
+  const current = candidates.filter((candidate) =>
+    unicornObservationsCurrent(candidate.observations),
+  );
+  if (current.length === 0) return new Set();
+  const rows = await sql<{ company_id: string; revision: number }[]>`
+    select company_id, revision from private.unicorn_potential_eligible_revisions(${sql.json(current as never)})`;
+  return new Set(rows.map((row) => `${row.company_id}:${row.revision}`));
+}
+
 type Row = {
   company_id: string;
   revision: number;
@@ -47,6 +105,7 @@ type Row = {
   cohort_key: string;
   summary: unknown;
   assessed_at: Date | string;
+  observations: unknown;
 };
 const iso = (at: Date | string): string => new Date(at).toISOString();
 function snapshot(row: Row): UnicornPotentialSnapshot {
@@ -125,12 +184,25 @@ export function createPostgresUnicornPotentialStore(options: {
     const bounded = Math.max(1, Math.min(100, Math.trunc(limit)));
     const rows = await sql<
       Row[]
-    >`select company_id, revision, basis_hash, cohort_key, summary, assessed_at from core.company_unicorn_potential_assessments where company_id = ${companyId}::uuid and method_version = ${methodVersion} order by revision desc limit ${bounded}`;
-    return rows.map(snapshot);
+    >`select company_id, revision, basis_hash, cohort_key, summary, assessed_at, observations from core.company_unicorn_potential_assessments where company_id = ${companyId}::uuid and method_version = ${methodVersion} order by revision desc limit ${bounded}`;
+    const allowed = await eligibleUnicornRevisions(sql, rows);
+    return rows
+      .filter((row) => allowed.has(`${row.company_id}:${row.revision}`))
+      .map(snapshot);
   };
   return {
     inputs: eligible.inputs,
-    listedCompanyIds: eligible.listedCompanyIds,
+    listedCompanyIds: async (limit, after) => {
+      const rows =
+        after === undefined
+          ? await sql<
+              { company_id: string }[]
+            >`select p.company_id from knowledge.company_profiles p join core.companies c on c.id = p.company_id where p.listed and c.company_status = 'active' order by p.company_id limit ${limit}`
+          : await sql<
+              { company_id: string }[]
+            >`select p.company_id from knowledge.company_profiles p join core.companies c on c.id = p.company_id where p.listed and c.company_status = 'active' and p.company_id > ${after}::uuid order by p.company_id limit ${limit}`;
+      return rows.map((row) => row.company_id);
+    },
     history,
     record: async (input) =>
       transactions.run(async ({ sql: tx }) => {
@@ -141,6 +213,16 @@ export function createPostgresUnicornPotentialStore(options: {
         >`select id from core.companies where id = ${input.subject.companyId}::uuid and tenant_id = ${input.subject.tenantId}::uuid and organisation_id = ${input.subject.organisationId}::uuid for update`;
         if (subject === undefined)
           throw new Error("Unicorn Potential canonical subject mismatch");
+        const allowed = await eligibleUnicornRevisions(tx, [
+          {
+            company_id: subject.id,
+            revision: 0,
+            assessed_at: input.sourcesReadAt,
+            observations: input.observations,
+          },
+        ]);
+        if (!allowed.has(`${subject.id}:0`))
+          throw new Error("Unicorn Potential sources no longer eligible");
         const [latest] = await tx<
           { revision: number; basis_hash: string }[]
         >`select revision, basis_hash from core.company_unicorn_potential_assessments where company_id = ${subject.id}::uuid and method_version = ${input.methodVersion} order by revision desc limit 1`;
@@ -162,7 +244,8 @@ export function createPostgresUnicornPotentialStore(options: {
       // Bounded history in one query, never an N+1 read per feed item.
       const rows = await sql<
         Row[]
-      >`select a.company_id, a.revision, a.basis_hash, a.cohort_key, a.summary, a.assessed_at from unnest(${[...new Set(ids)]}::uuid[]) requested(id) cross join lateral (select company_id, revision, basis_hash, cohort_key, summary, assessed_at from core.company_unicorn_potential_assessments where company_id = requested.id and method_version = ${methodVersion} order by revision desc limit 20) a`;
+      >`select a.company_id, a.revision, a.basis_hash, a.cohort_key, a.summary, a.assessed_at, a.observations from unnest(${[...new Set(ids)]}::uuid[]) requested(id) cross join lateral (select company_id, revision, basis_hash, cohort_key, summary, assessed_at, observations from core.company_unicorn_potential_assessments where company_id = requested.id and method_version = ${methodVersion} order by revision desc limit 20) a`;
+      const allowed = await eligibleUnicornRevisions(sql, rows);
       const grouped = new Map<string, UnicornPotentialSnapshot[]>();
       for (const row of rows) {
         const items = grouped.get(row.company_id) ?? [];
@@ -173,8 +256,16 @@ export function createPostgresUnicornPotentialStore(options: {
       for (const [id, items] of grouped) {
         items.sort((a, b) => b.revision - a.revision);
         const first = items[0];
-        if (first !== undefined)
-          output.set(id, withMomentum(first, items.slice(1)));
+        if (first !== undefined && allowed.has(`${id}:${first.revision}`))
+          output.set(
+            id,
+            withMomentum(
+              first,
+              items
+                .slice(1)
+                .filter((item) => allowed.has(`${id}:${item.revision}`)),
+            ),
+          );
       }
       return output;
     },

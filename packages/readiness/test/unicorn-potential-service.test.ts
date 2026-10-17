@@ -13,56 +13,52 @@ function fixture(listed = true) {
     .fn<UnicornPotentialStore["listedCompanyIds"]>()
     .mockResolvedValue(["company"]);
   const store: UnicornPotentialStore = {
-    inputs: vi
-      .fn()
-      .mockResolvedValue({
-        subject: {
-          companyId: "company",
-          tenantId: "tenant",
-          organisationId: "organisation",
+    inputs: vi.fn().mockResolvedValue({
+      subject: {
+        companyId: "company",
+        tenantId: "tenant",
+        organisationId: "organisation",
+      },
+      inputs: {
+        companyId: "company",
+        stageCode: "seed",
+        sectorCodes: ["b", "a", "a"],
+        businessModelCodes: [],
+        profile: {
+          listed,
+          description: false,
+          website: false,
+          updatedAt: null,
         },
-        inputs: {
-          companyId: "company",
-          stageCode: "seed",
-          sectorCodes: ["b", "a", "a"],
-          businessModelCodes: [],
-          profile: {
-            listed,
-            description: false,
-            website: false,
-            updatedAt: null,
-          },
-          verification: { organisation: false, domain: false, decidedAt: null },
-          founders: [],
-          claims: [],
-        },
-      }),
+        verification: { organisation: false, domain: false, decidedAt: null },
+        founders: [],
+        claims: [],
+      },
+    }),
     record,
     listedCompanyIds: ids,
-    current: async () => new Map(),
-    history: async () => [],
+    current: () => Promise.resolve(new Map()),
+    history: () => Promise.resolve([]),
   };
-  const assess = vi
-    .fn<UnicornPotentialEngine>()
-    .mockReturnValue({
-      view: {
-        status: "NOT_ASSESSED",
-        overallScore: null,
-        band: null,
-        confidence: "LOW",
-        coverage: 0,
-        stage: "SEED",
-        methodVersion: "unicorn-potential.v1.0.0",
-        inputRulesVersion: "inputs.v1",
-        pillars: [],
-        up: [],
-        down: [],
-        missing: [],
-        benchmark: "Comparable benchmark unavailable",
-      },
-      basisHash: "a".repeat(64),
-      observations: {},
-    });
+  const assess = vi.fn<UnicornPotentialEngine>().mockReturnValue({
+    view: {
+      status: "NOT_ASSESSED",
+      overallScore: null,
+      band: null,
+      confidence: "LOW",
+      coverage: 0,
+      stage: "SEED",
+      methodVersion: "unicorn-potential.v1.0.0",
+      inputRulesVersion: "inputs.v1",
+      pillars: [],
+      up: [],
+      down: [],
+      missing: [],
+      benchmark: "Comparable benchmark unavailable",
+    },
+    basisHash: "a".repeat(64),
+    observations: {},
+  });
   const deck = vi.fn().mockResolvedValue(null);
   const sleep = vi.fn().mockResolvedValue(undefined);
   const service = createUnicornPotentialService({
@@ -144,5 +140,25 @@ describe("Unicorn Potential recompute service", () => {
     expect(f.ids).toHaveBeenCalledWith(500);
     expect(f.sleep).toHaveBeenCalledTimes(2);
     expect(f.sleep).toHaveBeenLastCalledWith(100);
+  });
+  it("rotates bounded sweep pages and wraps only at the end", async () => {
+    const f = fixture();
+    f.ids
+      .mockResolvedValueOnce(["a", "b"])
+      .mockResolvedValueOnce(["c"])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(["a", "b"]);
+    await f.service.sweep({ limit: 2 });
+    await f.service.sweep({ limit: 2 });
+    await f.service.sweep({ limit: 2 });
+    expect(f.ids.mock.calls).toEqual([[2], [2, "b"], [2, "c"], [2]]);
+  });
+  it("advances past failed records instead of starving later companies", async () => {
+    const f = fixture();
+    f.ids.mockResolvedValueOnce(["a"]).mockResolvedValueOnce(["b"]);
+    f.record.mockRejectedValueOnce(new Error("sources revoked"));
+    expect((await f.service.sweep({ limit: 1 })).failed).toBe(1);
+    await f.service.sweep({ limit: 1 });
+    expect(f.ids).toHaveBeenLastCalledWith(1, "a");
   });
 });
