@@ -138,7 +138,7 @@ export function createPostgresConversationToolResults(dependencies: {
 export function withKeptToolResults(
   tools: QToolPort,
   store: ConversationToolResultsStore,
-  logger?: Logger  ,
+  logger?: Logger,
 ): QToolPort {
   const calls = new Map<string, number>();
   let warned = false;
