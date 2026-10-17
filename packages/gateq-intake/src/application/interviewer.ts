@@ -121,6 +121,8 @@ export type InterviewTurnInput = {
   readonly tangents: number;
   /** Dimensions Q has already asked about this session. */
   readonly askedAlready: readonly ApplicationDimension[];
+  /** How many Q turns asked about each dimension; parks a repeated one. */
+  readonly askedCounts?: ReadonlyMap<ApplicationDimension, number> | undefined;
   /** Who the work is attributed to. A guest carries no user. */
   readonly attribution: {
     readonly tenantId: string;
@@ -407,6 +409,7 @@ export function createGateQInterviewer(
               policy: application.policy,
               qualification: application.qualification,
               facts: application.facts,
+              askedCounts: input.askedCounts,
             });
 
       // The renderer supplies the charter-level four; this is the rest.

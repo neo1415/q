@@ -420,6 +420,70 @@ describe("what the model is given", () => {
     );
   });
 
+  it("does not ask one dimension a third time, and moves to what is still unknown (live 2026-10-17)", () => {
+    // Partech/FDN Advisory: "what are you building, and who is it for?"
+    // was asked four times while nothing was recorded on that dimension.
+    const empty = {
+      policy: { criteria: [] } as unknown as GatewayPolicy,
+      qualification: {
+        unknowns: [],
+        criteria: [],
+      } as unknown as QualificationResult,
+      facts: [
+        {
+          id: randomUUID() as ApplicationFact["id"],
+          applicationId: randomUUID() as ApplicationFact["applicationId"],
+          dimension: "company.name",
+          value: { kind: "TEXT", text: "FDN Advisory" },
+          provenance: "APPLICANT_PROVIDED",
+          recordedAt: "2026-10-17T16:00:00.000Z",
+          supersededAt: null,
+        },
+      ] as ApplicationFact[],
+    };
+    expect(questionNeedsFor(empty)[0]?.dimension).toBe("company.description");
+    const once = questionNeedsFor({
+      ...empty,
+      askedCounts: new Map([["company.description", 1]]),
+    });
+    expect(once[0]?.dimension).toBe("company.description");
+    const twice = questionNeedsFor({
+      ...empty,
+      askedCounts: new Map([["company.description", 2]]),
+    });
+    expect(twice.map((need) => need.dimension)).not.toContain(
+      "company.description",
+    );
+    expect(twice[0]?.dimension).toBe("company.problem");
+  });
+
+  it("treats an explained solution as having described the company", () => {
+    const needs = questionNeedsFor({
+      policy: { criteria: [] } as unknown as GatewayPolicy,
+      qualification: {
+        unknowns: [],
+        criteria: [],
+      } as unknown as QualificationResult,
+      facts: [
+        {
+          id: randomUUID() as ApplicationFact["id"],
+          applicationId: randomUUID() as ApplicationFact["applicationId"],
+          dimension: "company.solution",
+          value: { kind: "TEXT", text: "Investment-readiness programme" },
+          provenance: "APPLICANT_PROVIDED",
+          recordedAt: "2026-10-17T16:00:00.000Z",
+          supersededAt: null,
+        },
+      ],
+    });
+    const dimensions = needs.map((need) => need.dimension);
+    expect(dimensions).not.toContain("company.description");
+    expect(dimensions).not.toContain("company.solution");
+    // The investment substance still follows: model and market.
+    expect(dimensions).toContain("company.business_model");
+    expect(dimensions).toContain("company.market");
+  });
+
   it("22: a required criterion outranks everything a partner merely wants", () => {
     const criterionId = randomUUID();
     const needs = questionNeedsFor({

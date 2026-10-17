@@ -130,6 +130,7 @@ function historyFrom(stored: readonly StoredTurn[]): {
     readonly text: string;
   }[];
   readonly askedAlready: readonly ApplicationDimension[];
+  readonly askedCounts: ReadonlyMap<ApplicationDimension, number>;
   readonly tangents: number;
 } {
   const recentTurns = stored.slice(-RECENT_TURNS).map((turn) => ({
@@ -139,7 +140,14 @@ function historyFrom(stored: readonly StoredTurn[]): {
   // What Q actually asked about, in the order it first asked: not what
   // happens to be answered, which is a different list.
   const askedAlready: ApplicationDimension[] = [];
+  const askedCounts = new Map<ApplicationDimension, number>();
   for (const turn of stored) {
+    if (turn.role === "Q" && turn.askingDimension !== null) {
+      askedCounts.set(
+        turn.askingDimension,
+        (askedCounts.get(turn.askingDimension) ?? 0) + 1,
+      );
+    }
     if (
       turn.askingDimension !== null &&
       !askedAlready.includes(turn.askingDimension)
@@ -158,7 +166,7 @@ function historyFrom(stored: readonly StoredTurn[]): {
       break;
     }
   }
-  return { recentTurns, askedAlready, tangents };
+  return { recentTurns, askedAlready, askedCounts, tangents };
 }
 
 export function createConversationService(
@@ -307,6 +315,7 @@ export function createConversationService(
               // has drifted; it decides how much of a person to be about it.
               tangents: history.tangents,
               askedAlready: history.askedAlready,
+              askedCounts: history.askedCounts,
               attribution: {
                 tenantId: guest.application.tenantId,
                 correlationId: input.correlationId,
