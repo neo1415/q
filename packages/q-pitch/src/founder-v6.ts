@@ -179,32 +179,33 @@ const NO_TRACTION = [
 ];
 
 const pitchLines: Said[] = CAPITAL_Q_PITCH.map((section) => {
+  // One strong line per section (lead, 17 Oct: the board ran about 160 s
+  // of narration; the highlight carries the detail, the line the point).
   const said: Record<string, string> = {
     opportunity:
-      "Opportunity and economics. Private capital runs on fragmented, inconsistent information, and Capital Q turns it into trusted intelligence both sides can compare. Market size hasn't been provided as approved material, so I won't estimate it.",
+      "Private capital runs on fragmented information; Capital Q turns it into intelligence both sides can compare.",
     problem:
-      "The problem isn't a lack of opportunities; it's finding the right ones. Every business presents itself differently, so investors start from scratch each time, and founders can't see what stops them raising.",
+      "The problem isn't finding opportunities; it's finding the right ones, comparably.",
     solution:
-      "The solution: an investment intelligence operating system, with one analyst at its centre, me. It is not a marketplace, a CRM or a directory. Evidence comes first, opinion second.",
+      "The solution: an investment intelligence system, with me as its analyst. Evidence first.",
     "how-it-works":
-      "How it works: I learn each investor's thesis and interview each founder, put every company in the same structure, assess it on its evidence, and match it against declared mandates. GateQ lets investors set the bar before anyone meets.",
+      "I learn each mandate, interview each founder, and assess every company on its evidence.",
     "business-model":
-      "The business model is layered: diagnosis at the core, deeper strategic intelligence as the paid layer, and specialist human help on top. Ranking is never for sale, and price levels are not set yet.",
+      "Diagnosis at the core, deeper intelligence paid, and ranking never for sale.",
     vision:
-      "The vision is the operating system both sides of private capital work in, built for long-term relationships, not activity.",
-    team: "The team isn't the subject of this pitch right now, and I make no claim about its size. The founders speak for themselves.",
+      "The system both sides of private capital work in, built for relationships.",
+    team: "The team isn't my subject here, and I make no claim about its size.",
     "go-to-market":
-      "Go-to-market: Capital Q is offered through FDN Capital Partners, with a waitlist and demos. Beyond that, the plan is the founders' to set out.",
+      "Offered through FDN Capital Partners, with a waitlist and demos.",
     competition:
-      "The incumbents are CRMs, marketplaces, directories and document stores. General AI assistants summarise, but hold no trusted, permissioned record. Capital Q's category is investment intelligence.",
+      "CRMs and AI assistants summarise; none holds a trusted, permissioned record.",
     moats:
-      "The moat is the trusted structure, not the model: one canonical record per company, investor and relationship, evidence on every fact, a proprietary assessment framework, and history that compounds.",
-    roadmap:
-      "On the roadmap: the whole system is specified, and what you see today is its working core, on the real product. The sequencing is the founders' to set.",
+      "The moat is the trusted structure: one canonical record, evidence on every fact.",
+    roadmap: "The whole system is specified; what you see is its working core.",
     "why-now":
-      "Why now? AI can finally read a deck and a data room like an analyst, at a cost every founder can reach, while deal flow grows faster than investors' time. And Capital Q was built evidence-first from the start.",
-    ask: "The ask, as the founders state it: a raise of USD two million. That's their claim, shown like anyone else's. It's pre-seed, and bootstrapped so far.",
-    closing: "In one line: evidence before opinion, and trust over engagement.",
+      "AI can now read a data room like an analyst, at a cost every founder can reach.",
+    ask: "Their ask, as they state it: USD two million. Pre-seed, and bootstrapped so far.",
+    closing: "Evidence before opinion, and trust over engagement.",
   };
   const text = said[section.key];
   if (text === undefined) {
