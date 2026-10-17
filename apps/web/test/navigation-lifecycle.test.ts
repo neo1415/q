@@ -138,6 +138,30 @@ describe("the lifecycle", () => {
     });
   });
 
+  it("standing where a page would redirect is not arriving: the move is pushed (Q Pitch v6, 2026-10-17)", async () => {
+    const base = "/relationships/company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe";
+    land(base);
+    pushes = [];
+    const move = requestNavigation({ path: `${base}/messages` });
+    expect(pushes).toEqual([`${base}/messages`]);
+    land(`${base}/messages`);
+    await expect(move.settled).resolves.toMatchObject({
+      status: "DONE",
+      route: `${base}/messages`,
+    });
+  });
+
+  it("a move to a sub-page that redirects back still lands where it was sent", async () => {
+    const base = "/relationships/company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe";
+    land("/home");
+    const move = requestNavigation({ path: `${base}/messages` });
+    land(base);
+    await expect(move.settled).resolves.toMatchObject({
+      status: "DONE",
+      route: base,
+    });
+  });
+
   it("a nested tab is VERIFIED only once the route has its tab and the tab control registers", async () => {
     const move = requestNavigation({
       path: "/capital?tab=readiness",
