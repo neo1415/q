@@ -139,6 +139,7 @@ export function QPresenceStage({
   onAsk,
   onOpenArtifact,
   onShowingChange,
+  onCardsShowingChange,
   live = false,
   onBoardLanded,
   onPin,
@@ -165,6 +166,8 @@ export function QPresenceStage({
   readonly presence: (compact: boolean, mini?: boolean) => ReactNode;
   /** Told when an object starts or stops being shown (the stage stops following newest). */
   readonly onShowingChange?: ((showing: boolean) => void) | undefined;
+  /** Told when an answer's cards come on or leave the stage (the wide layout). */
+  readonly onCardsShowingChange?: ((cards: boolean) => void) | undefined;
   readonly turns: readonly QTurn[];
   /** The person's captions setting. */
   readonly captions: boolean;
@@ -230,6 +233,16 @@ export function QPresenceStage({
   const latestQ = turns.findLast(
     (turn): turn is Extract<QTurn, { kind: "Q" }> => turn.kind === "Q",
   );
+
+  // What the line over the cards says: the answer that showed them, or,
+  // for a set kept or brought back, the latest settled exchange.
+  const captionTurn =
+    pick.why === "SHOWN"
+      ? undefined
+      : turns.findLast(
+          (turn): turn is Extract<QTurn, { kind: "Q" }> =>
+            turn.kind === "Q" && !turn.streaming,
+        );
 
   const dismiss = (item: ShownItem) => hideKey(stageCardRef(item).key);
 
@@ -331,6 +344,13 @@ export function QPresenceStage({
   useEffect(() => {
     onShowingChange?.(showing);
   }, [showing, onShowingChange]);
+  // Owner 2026-10-17: a set kept or brought back gets the same wide
+  // layout as a fresh one (the page widened only for the latest answer's
+  // own cards, so a restored set was squeezed and its names cut).
+  const cardsUp = canvas !== null;
+  useEffect(() => {
+    onCardsShowingChange?.(cardsUp);
+  }, [cardsUp, onCardsShowingChange]);
   // W7: the room card stays mounted once shown, so its exit still plays.
   const [roomShown, setRoomShown] = useState(false);
   if (!roomShown && (roomOpen !== null || room.note !== null)) {
@@ -412,8 +432,10 @@ export function QPresenceStage({
             answerId={canvas.item.id}
             block={canvas.block}
             turns={turns}
-            asked={askedBefore(turns, canvas.item.id)}
-            closing={closingLine(canvas.turn)}
+            // Owner 2026-10-17: a set kept or brought back carries the
+            // latest exchange over it, never the turn that first showed it.
+            asked={askedBefore(turns, captionTurn?.id ?? canvas.item.id)}
+            closing={closingLine(captionTurn ?? canvas.turn)}
             live={live}
             presence={presence(true, true)}
             onCloseAll={() => dismiss(canvas.item)}
