@@ -44,7 +44,7 @@ export function anchorElement(anchor: string): HTMLElement | null {
   if (marked !== null) return marked;
   const placement = placements.get(anchor);
   if (placement === undefined) return null;
-  let found: HTMLElement | null = null;
+  let found: HTMLElement | null;
   try {
     found = document.querySelector<HTMLElement>(placement.select);
   } catch {
