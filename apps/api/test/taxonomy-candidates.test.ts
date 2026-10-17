@@ -133,6 +133,36 @@ describe("POST /v1/taxonomy/candidates", () => {
     expect(response.statusCode).toBe(200);
   });
 
+  it("on that path, only the shared vocabulary is read: no tenant or organisation reaches the finder, and no other taxonomy route opens", async () => {
+    const { finder, calls } = fakeFinder();
+    const app = buildApp({
+      principal: PRINCIPAL,
+      finder,
+      noOrganisation: { hasIdentity: true },
+    });
+    const response = await post(app, {
+      text: "payments rails",
+      vocabularyCodes: ["product_category"],
+    });
+    expect(response.statusCode).toBe(200);
+    // The finder is given the phrase and vocabularies only: nothing that
+    // could select organisation-scoped or custom rows.
+    for (const call of calls) {
+      for (const key of Object.keys(call)) {
+        expect(["text", "vocabularyCodes", "strategy", "limit"]).toContain(key);
+      }
+    }
+    // Organisation-scoped taxonomy (company or mandate assignments) has no
+    // route here; nothing new is reachable without an organisation.
+    for (const url of [
+      "/v1/taxonomy/assignments",
+      "/v1/taxonomy/mandate-preferences",
+    ]) {
+      const other = await app.inject({ method: "GET", url });
+      expect(other.statusCode).toBe(404);
+    }
+  });
+
   it("still refuses a principal with no application identity", async () => {
     const app = buildApp({
       principal: PRINCIPAL,
