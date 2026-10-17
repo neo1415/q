@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { NO_DISCOVER_FILTERS } from "@capital-q/contracts";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
 import {
@@ -224,6 +225,7 @@ function harness(
     >;
     /** Discover filter facts (ux/discover-filters). */
     readonly filterFacts?: SlateReadServiceDependencies["filterFacts"];
+    readonly unicornPotential?: SlateReadServiceDependencies["unicornPotential"];
   } = {},
 ) {
   const store = memorySlates();
@@ -402,6 +404,7 @@ function harness(
     eligibility,
     suppression,
     slates: store.repo,
+    unicornPotential: options.unicornPotential,
     cards,
     pool,
     requester: options.requester === false ? undefined : requester,
@@ -1157,5 +1160,99 @@ describe("plan recommendation volume (BILLING-2, ADR 0036): volume only, never p
     await publish(h.store, KEY, 6);
     const page = await h.reader.pageCompanies({ actor, limit: 10 });
     expect(page.items).toHaveLength(6);
+  });
+});
+
+describe("explicit premium Unicorn Potential selection", () => {
+  it("denies missing entitlement even when there is no slate", async () => {
+    const h = harness();
+    await expect(
+      h.reader.pageCompanies({
+        actor,
+        filters: { ...NO_DISCOVER_FILTERS, unicornPotentialSort: true },
+      }),
+    ).rejects.toThrow("Premium Unicorn Potential");
+  });
+  it("only sorts on opt-in, preserves eligibility and plan volume, and restarts after score revocation", async () => {
+    let allowed = true;
+    const reads: string[][] = [];
+    const scores = new Map([
+      [id(1), 30],
+      [id(2), 90],
+      [id(3), 80],
+      [id(4), 100],
+    ]);
+    const h = harness({
+      volume: 3,
+      ineligible: [id(3)],
+      unicornPotential: {
+        readMany: ({ companyIds }) => {
+          reads.push([...companyIds]);
+          return Promise.resolve(
+            allowed
+              ? new Map(
+                  companyIds
+                    .filter((companyId) => scores.has(companyId))
+                    .map((companyId) => [
+                      companyId,
+                      scores.get(companyId) ?? null,
+                    ]),
+                )
+              : null,
+          );
+        },
+      },
+    });
+    await publish(h.store, KEY, 4);
+    const normal = await h.reader.pageCompanies({ actor, limit: 2 });
+    expect(normal.items.map((item) => item.companyId)).toEqual([id(1), id(2)]);
+    expect(reads).toEqual([]);
+    const filters = { ...NO_DISCOVER_FILTERS, unicornPotentialSort: true };
+    const first = await h.reader.pageCompanies({ actor, limit: 1, filters });
+    expect(first.items.map((item) => item.companyId)).toEqual([id(2)]);
+    expect(reads).toEqual([[], [id(1), id(2)]]);
+    expect(JSON.stringify(first)).not.toContain("overallScore");
+    expect(decodeSlateCursor(first.nextCursor ?? "").afterRank).toBe(2);
+    const second = await h.reader.pageCompanies({
+      actor,
+      limit: 1,
+      filters,
+      cursor: first.nextCursor,
+    });
+    expect(second.items.map((item) => item.companyId)).toEqual([id(1)]);
+    scores.delete(id(2));
+    const revoked = await h.reader.pageCompanies({
+      actor,
+      limit: 1,
+      filters,
+      cursor: first.nextCursor,
+    });
+    expect(revoked.items.map((item) => item.companyId)).toEqual([id(1)]);
+    expect(revoked.notes).toContain("SLATE_RESTARTED");
+    allowed = false;
+    await expect(
+      h.reader.pageCompanies({ actor, filters, cursor: first.nextCursor }),
+    ).rejects.toThrow("Premium Unicorn Potential");
+  });
+  it("does not fabricate unavailable scores and respects minimum zero", async () => {
+    const h = harness({
+      unicornPotential: {
+        readMany: ({ companyIds }) =>
+          Promise.resolve(
+            new Map(
+              companyIds.map((companyId) => [
+                companyId,
+                companyId === id(1) ? 0 : null,
+              ]),
+            ),
+          ),
+      },
+    });
+    await publish(h.store, KEY, 3);
+    const page = await h.reader.pageCompanies({
+      actor,
+      filters: { ...NO_DISCOVER_FILTERS, unicornPotentialMin: 0 },
+    });
+    expect(page.items.map((item) => item.companyId)).toEqual([id(1)]);
   });
 });

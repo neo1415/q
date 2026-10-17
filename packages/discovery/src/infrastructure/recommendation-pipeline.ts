@@ -242,6 +242,7 @@ export type SlateReadPipelineDependencies = {
    * here, from declared taxonomy assignments.
    */
   readonly filterFacts?: Omit<DiscoverFilterFactsPort, "sectors"> | undefined;
+  readonly unicornPotential?: SlateReadServiceDependencies["unicornPotential"];
   readonly policy?: SlatePolicy | undefined;
   /** BILLING-2 (ADR 0036): the reader's plan volume; see the slate reader. */
   readonly volume?: SlateReadServiceDependencies["volume"];
@@ -319,6 +320,7 @@ export function createSlateReadPipeline(
     slates,
     cards: createPostgresCompanyCardPort({ sql }),
     pool: createPostgresDiscoverablePoolPort({ sql }),
+    unicornPotential: dependencies.unicornPotential,
     filterFacts: {
       ...dependencies.filterFacts,
       ...createPostgresCompanySectorsPort({ sql }),

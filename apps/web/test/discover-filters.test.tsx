@@ -243,6 +243,41 @@ describe("Discover with filters", () => {
     );
   });
 
+  it("applies premium indicator choices only after explicit confirmation and clears the selection", async () => {
+    render(<InvestorFeedScreen sectors={SECTORS} />);
+    await screen.findByRole("heading", { name: "Company 1" });
+    loadSlatePageAction.mockClear();
+    const button = screen.getAllByRole("button", { name: "Filters" })[0];
+    if (button === undefined) throw new Error("no filter button");
+    fireEvent.click(button);
+    await screen.findByRole("dialog");
+    fireEvent.change(screen.getByLabelText("Minimum indicator score"), {
+      target: { value: "50" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sort by Unicorn Potential" }),
+    );
+    expect(loadSlatePageAction).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Show companies" }));
+    await waitFor(() =>
+      expect(loadSlatePageAction).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({
+          unicornPotentialMin: 50,
+          unicornPotentialSort: true,
+        }),
+      ),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Remove filter: Unicorn Potential 50+ · sorted",
+      }),
+    );
+    await waitFor(() =>
+      expect(loadSlatePageAction).toHaveBeenLastCalledWith(null, null),
+    );
+  });
+
   it("a card the filters could not check says which, and stays", async () => {
     loadSlatePageAction.mockResolvedValue(
       page([company(3, { filterUnknown: ["raise"] })]),

@@ -188,6 +188,8 @@ export const DiscoverFiltersSchema = z
     raiseDisclosedOnly: z.boolean().default(false),
     verifiedOnly: z.boolean().default(false),
     hasPitch: z.boolean().default(false),
+    unicornPotentialMin: z.number().int().min(0).max(100).optional(),
+    unicornPotentialSort: z.boolean().optional(),
   })
   .strict();
 export type DiscoverFilters = z.infer<typeof DiscoverFiltersSchema>;
@@ -212,7 +214,9 @@ export function isEmptyDiscoverFilters(filters: DiscoverFilters): boolean {
       (filters.raise.min === undefined && filters.raise.max === undefined)) &&
     !filters.raiseDisclosedOnly &&
     !filters.verifiedOnly &&
-    !filters.hasPitch
+    !filters.hasPitch &&
+    filters.unicornPotentialMin === undefined &&
+    filters.unicornPotentialSort !== true
   );
 }
 
@@ -227,6 +231,8 @@ export function activeDiscoverFilterCount(filters: DiscoverFilters): number {
       filters.raiseDisclosedOnly,
     filters.verifiedOnly,
     filters.hasPitch,
+    filters.unicornPotentialMin !== undefined ||
+      filters.unicornPotentialSort === true,
   ].filter(Boolean).length;
 }
 
@@ -257,6 +263,12 @@ export function canonicalDiscoverFilters(
     raiseDisclosedOnly: filters.raiseDisclosedOnly,
     verifiedOnly: filters.verifiedOnly,
     hasPitch: filters.hasPitch,
+    ...(filters.unicornPotentialMin === undefined
+      ? {}
+      : { unicornPotentialMin: filters.unicornPotentialMin }),
+    ...(filters.unicornPotentialSort === true
+      ? { unicornPotentialSort: true }
+      : {}),
   };
 }
 
@@ -271,6 +283,8 @@ export const DISCOVER_FILTER_QUERY_KEYS = [
   "raiseDisclosedOnly",
   "verifiedOnly",
   "hasPitch",
+  "unicornPotentialMin",
+  "unicornPotentialSort",
 ] as const;
 
 const list = (value: unknown): string[] =>
@@ -298,6 +312,11 @@ export const DiscoverFiltersQuerySchema = z
     raiseDisclosedOnly: flag,
     verifiedOnly: flag,
     hasPitch: flag,
+    unicornPotentialMin: z
+      .string()
+      .regex(/^(?:100|[1-9]?\d)$/)
+      .optional(),
+    unicornPotentialSort: flag,
   })
   .refine(
     (q) =>
@@ -322,6 +341,12 @@ export const DiscoverFiltersQuerySchema = z
       raiseDisclosedOnly: q.raiseDisclosedOnly === "true",
       verifiedOnly: q.verifiedOnly === "true",
       hasPitch: q.hasPitch === "true",
+      ...(q.unicornPotentialMin === undefined
+        ? {}
+        : { unicornPotentialMin: Number(q.unicornPotentialMin) }),
+      ...(q.unicornPotentialSort === "true"
+        ? { unicornPotentialSort: true }
+        : {}),
     });
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
@@ -353,6 +378,9 @@ export function discoverFiltersToQuery(
   if (f.raiseDisclosedOnly) out.raiseDisclosedOnly = "true";
   if (f.verifiedOnly) out.verifiedOnly = "true";
   if (f.hasPitch) out.hasPitch = "true";
+  if (f.unicornPotentialMin !== undefined)
+    out.unicornPotentialMin = String(f.unicornPotentialMin);
+  if (f.unicornPotentialSort === true) out.unicornPotentialSort = "true";
   return out;
 }
 
