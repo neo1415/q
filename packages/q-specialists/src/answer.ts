@@ -98,8 +98,11 @@ import {
 } from "@capital-q/q-tools";
 import {
   asksForOwnMandate,
+  conversationContextOf,
   ownInvestorOrganisationIn,
   reRenderAskOf,
+  reshownBlocks,
+  shownTurnOf,
   withoutStatusTalk,
 } from "@capital-q/model-gateway/q";
 import {
@@ -309,11 +312,6 @@ import {
   type OpenRecordIntent,
 } from "./fast-navigation.js";
 import { deckSectionSpeech, deckSpeech } from "./deck-speech.js";
-import {
-  conversationContextOf,
-  reshownBlocks,
-  shownTurnOf,
-} from "./conversation-context.js";
 import {
   screenTabTarget,
   lastOpenedScreen,

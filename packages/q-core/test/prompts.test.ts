@@ -148,6 +148,8 @@ describe("registry", () => {
         "BRIEFING_COMMAND",
         // RECOVERY-2026-10 B5: small talk in one tool-free call.
         "SMALL_TALK",
+        // Owner live 2026-10-17: a follow-up from what Q already showed.
+        "CONVERSATION_RECALL",
         // Founder brief K: the fast lane's short first read.
         "TURN_SKIM",
         // W2: public pages about a person or organisation, read into a quoted brief.

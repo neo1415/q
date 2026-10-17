@@ -7,7 +7,6 @@ import {
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
   type QResultBlock,
 } from "@capital-q/contracts";
-import type { QTurnReader } from "@capital-q/model-gateway/q";
 import type {
   QAnswerRequest,
   QConversationMessage,
@@ -19,7 +18,8 @@ import { createSpecialistQAnswer, RESHOWN_LINE } from "../src/answer.js";
 import {
   conversationContextOf,
   reshownBlocks,
-} from "../src/conversation-context.js";
+  type QTurnReader,
+} from "@capital-q/model-gateway/q";
 
 /**
  * Owner live 2026-10-17 (conversation 971c5a53, investor account): Q named
