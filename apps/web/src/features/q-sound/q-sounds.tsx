@@ -9,6 +9,7 @@ import { useSoundPreference } from "./sound-preference";
 import {
   cueForTransition,
   isWorkingState,
+  QUIET_AFTER_SPEECH_MS,
   soundAllowed,
   WORKING_TONE_AFTER_MS,
   type QSound,
@@ -26,6 +27,7 @@ export function QSounds() {
   const pathname = usePathname();
   const mode = useSoundPreference();
   const state = session?.presence?.state ?? "IDLE";
+  const voiceLine = session?.voice.active === true;
   // What the person just sent: the newest of their turns the server has
   // not confirmed yet. A conversation loaded from the server sends nothing.
   const sending = session?.turns.findLast(
@@ -34,6 +36,12 @@ export function QSounds() {
 
   const working = isWorkingState(state);
   const previous = useRef<typeof state | null>(null);
+  // When Q last spoke: read-aloud answers pause between sentences, and a
+  // pause read as a new state beeped (owner 2026-10-17), so a short quiet
+  // follows Q's voice too.
+  const spokeAt = useRef<number | null>(null);
+  const justSpoke = (now: number) =>
+    spokeAt.current !== null && now - spokeAt.current < QUIET_AFTER_SPEECH_MS;
   const lastAt = useRef<number | null>(null);
   const sent = useRef<string | undefined>(undefined);
 
@@ -43,7 +51,8 @@ export function QSounds() {
       window.matchMedia(query).matches;
     const context = (): SoundContext => ({
       mode,
-      speaking: state === "SPEAKING",
+      speaking: state === "SPEAKING" || justSpoke(performance.now()),
+      voiceLine,
       pathname,
       reducedMotion: media("(prefers-reduced-motion: reduce)"),
       reducedTransparency: media("(prefers-reduced-transparency: reduce)"),
@@ -57,6 +66,10 @@ export function QSounds() {
       playSound(sound);
     };
 
+    // When Q's voice stops is what counts, not when it started.
+    if (state === "SPEAKING" || previous.current === "SPEAKING") {
+      spokeAt.current = performance.now();
+    }
     const cue = cueForTransition(previous.current, state);
     previous.current = state;
     if (cue.hum === "STOP" || !soundAllowed("hum", context())) endHum();
@@ -72,7 +85,7 @@ export function QSounds() {
     // The person sent something: one light tick.
     if (sending !== undefined && sending !== sent.current) play("sent");
     sent.current = sending;
-  }, [state, pathname, mode, sending]);
+  }, [state, pathname, mode, sending, voiceLine]);
 
   // ADR 0062, the silence ladder's first rung: Q has been working 0.7 s
   // and is still at it, so one soft tone, under the same rules as every
@@ -83,7 +96,8 @@ export function QSounds() {
       const now = performance.now();
       const allowed = soundAllowed("working", {
         mode,
-        speaking: false,
+        speaking: justSpoke(now),
+        voiceLine,
         pathname,
         reducedMotion: false,
         reducedTransparency: false,
@@ -98,7 +112,7 @@ export function QSounds() {
       window.clearTimeout(timer);
     };
     // Once per wait: a move between thinking and working is the same wait.
-  }, [working, mode, pathname]);
+  }, [working, mode, pathname, voiceLine]);
 
   // Leaving the signed-in app (or this provider) ends the hum.
   useEffect(() => endHum, []);
