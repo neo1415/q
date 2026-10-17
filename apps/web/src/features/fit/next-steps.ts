@@ -32,12 +32,15 @@ export function nextStepsFor(input: {
   const { name, state } = input;
   const questions = input.questions.slice(0, 3);
   const asked = questions.length > 0;
+  // Asked as a question to answer here: live 2026-10-17, "Draft the
+  // questions..." sent Q to the send-questions action, which an unconnected
+  // company refuses, so the investor got a refusal instead of the draft.
   const draft: NextStep = {
     kind: "ASK",
     label: "Draft questions for the founder",
     ask: asked
-      ? `Draft the questions I should put to ${name}'s founder, starting from: ${numbered(questions)} Draft only; don't send anything.`
-      : `Draft the questions I should put to ${name}'s founder from the evidence I can see. Draft only; don't send anything.`,
+      ? `What questions should I put to ${name}'s founder? Start from: ${numbered(questions)} Write them out here for me to review; nothing goes to the founder.`
+      : `What questions should I put to ${name}'s founder, from the evidence I can see? Write them out here for me to review; nothing goes to the founder.`,
   };
   const send: NextStep = {
     kind: "ASK",
