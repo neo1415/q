@@ -65,7 +65,7 @@ function sourcesOf(inputs: InvestabilityInputs): Source[] {
     out.push({
       id: founder.id,
       revision: inputs.profile.updatedAt ?? "undated",
-      at: inputs.profile.updatedAt,
+      at: null,
       kind: "FOUNDER_BACKGROUND",
       label: `Founder ${founder.title} ${founder.detail ?? ""}`,
       truthClass: "USER_CLAIM",
@@ -109,6 +109,44 @@ function sourcesOf(inputs: InvestabilityInputs): Source[] {
     (a, b) => a.id.localeCompare(b.id) || a.revision.localeCompare(b.revision),
   );
 }
+
+/** Only an explicit measurement period can date a growth/traction claim. */
+function metricPeriodOf(text: string): string | null {
+  const iso = /\b(20\d\d)-(0[1-9]|1[0-2])(?:-([0-2]\d|3[01]))?\b/gu;
+  const dates: string[] = [];
+  for (const m of text.matchAll(iso)) {
+    const year = m[1],
+      month = m[2],
+      day = m[3] ?? "01";
+    const value = `${year}-${month}-${day}T00:00:00.000Z`;
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed) && new Date(parsed).toISOString() === value)
+      dates.push(value);
+  }
+  const months = [
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+  ];
+  for (const m of text.matchAll(
+    /\b(January|February|March|April|May|June|July|August|September|October|November|December) (20\d\d)\b/giu,
+  )) {
+    const month = months.indexOf((m[1] ?? "").toLowerCase()) + 1;
+    if (month > 0)
+      dates.push(`${m[2]}-${String(month).padStart(2, "0")}-01T00:00:00.000Z`);
+  }
+  return dates.sort().at(-1) ?? null;
+}
+
 /** Three anchored semantic rules per criterion; no grade for mere topic/presence. */
 export function observeUnicornPotential(
   inputs: InvestabilityInputs,
@@ -154,7 +192,12 @@ export function observeUnicornPotential(
           !forecast &&
           !/\b(no|not|never|unproven|unverified)\b/iu.test(text);
         if (!adverse && !weakness && !limited && !positive) continue;
-        const date = source.at === null ? NaN : Date.parse(source.at);
+        // Claim assertion time is provenance, not the metric's measurement period.
+        const metricDate =
+          pillar.id === "P4" && source.kind === "CLAIM"
+            ? metricPeriodOf(text)
+            : source.at;
+        const date = metricDate === null ? NaN : Date.parse(metricDate);
         const periodYears =
           pillar.id === "P4"
             ? [...text.matchAll(/\b(20\d\d)\b/gu)].map((m) => Number(m[1]))
@@ -162,7 +205,12 @@ export function observeUnicornPotential(
         const oldPeriod =
           periodYears.length > 0 &&
           Math.max(...periodYears) < new Date(now).getUTCFullYear();
+        const asserted = source.at === null ? NaN : Date.parse(source.at);
+        const invalidProvenance =
+          source.kind === "CLAIM" &&
+          (!Number.isFinite(asserted) || date > asserted);
         const stale =
+          invalidProvenance ||
           oldPeriod ||
           source.lifecycleStatus === "STALE" ||
           !Number.isFinite(date) ||
@@ -185,7 +233,7 @@ export function observeUnicornPotential(
           pillar: pillar.id,
           criterion: index === 0 ? "A" : "B",
           grade: quality <= 0.5 ? Math.min(3, grade) : grade,
-          source,
+          source: pillar.id === "P4" ? { ...source, at: metricDate } : source,
           reliability: stale ? quality * 0.5 : quality,
           stale,
           conflicted:

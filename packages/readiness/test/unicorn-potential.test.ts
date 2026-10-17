@@ -14,7 +14,10 @@ const statements = [
   ],
   ["Accessible market has validated demand", "Expansion has paying customers"],
   ["Paid pilots validate the product", "Customers renewed"],
-  ["Revenue growth last quarter 2026", "Revenue is non-recurring"],
+  [
+    "Revenue growth last quarter 2026 through 2026-09-30",
+    "Revenue is non-recurring through 2026-09-30",
+  ],
   ["Modelled contribution margin", "Acquisition payback forecast"],
   [
     "Proprietary technology deployed",
@@ -51,6 +54,28 @@ function inputs(texts: readonly string[] = statements): InvestabilityInputs {
   };
 }
 describe("provisional Unicorn Potential pure engine", () => {
+  it("never freshens a metric from its claim assertion timestamp", () => {
+    for (const statement of [
+      "Revenue grew by 100% last quarter 2026",
+      "Revenue grew by 100% last quarter 2024",
+      "Recurring revenue 2026",
+    ]) {
+      const v = assessUnicornPotential(inputs([statement]), NOW).view;
+      expect(v.pillars[3]?.grade).toBeNull();
+    }
+  });
+  it("accepts a real dated metric window and excludes a historical one", () => {
+    const good = assessUnicornPotential(
+      inputs(["Revenue grew by 100% last quarter 2026 through 2026-09-30"]),
+      NOW,
+    ).view;
+    expect(good.pillars[3]?.criteria[0]?.grade).toBe(3);
+    const old = assessUnicornPotential(
+      inputs(["Revenue grew by 100% last quarter 2024 through 2024-09-30"]),
+      NOW,
+    ).view;
+    expect(old.pillars[3]?.criteria[0]?.state).toBe("STALE");
+  });
   it("does not score denied allegations, hypothetical or competitor descriptions", () => {
     for (const text of [
       "No founder has falsified credentials",
