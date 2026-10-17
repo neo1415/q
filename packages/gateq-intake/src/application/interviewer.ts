@@ -41,6 +41,7 @@ import {
   questionNeedsFor,
   type QuestionNeed,
 } from "./question-needs.js";
+import { questionAngle } from "./answer-specificity.js";
 import { amountStatedIn } from "./stated-amount.js";
 
 /**
@@ -125,6 +126,12 @@ export type InterviewTurnInput = {
   readonly askedCounts?: ReadonlyMap<ApplicationDimension, number> | undefined;
   /** Dimensions the investor's mandate emphasises (never its values). */
   readonly emphasis?: readonly ApplicationDimension[] | undefined;
+  /**
+   * Stable per application (its id): picks which of several wordings is
+   * suggested for a figure, so founders are not all read one script.
+   * Absent: the application id on its facts, else a fixed default.
+   */
+  readonly variationSeed?: string | undefined;
   /** Who the work is attributed to. A guest carries no user. */
   readonly attribution: {
     readonly tenantId: string;
@@ -227,12 +234,41 @@ function renderFacts(facts: readonly ApplicationFact[]): string {
     .join("\n");
 }
 
-function renderNeeds(needs: readonly QuestionNeed[]): string {
+/** The prompt variable's own bound (GateQInterviewerVariablesSchema). */
+const NEEDS_MAX_CHARS = 2000;
+
+function renderNeeds(
+  needs: readonly QuestionNeed[],
+  seed: string,
+  askedCounts: ReadonlyMap<ApplicationDimension, number> | undefined,
+): string {
   if (needs.length === 0) return "(nothing pressing)";
-  // The dimension and why it matters, never the rule behind it (§28).
+  // The dimension and why it matters, never the rule behind it (§28). A
+  // follow-up names the kind of figure missing, in platform words: the
+  // applicant's own text stays in KNOWN FACTS, untrusted, and never enters
+  // this trusted list.
   return needs
-    .map((need) => `${need.dimension} (${need.reason.toLowerCase()})`)
-    .join("\n");
+    .map((need) => {
+      const head = `${need.dimension} (${need.reason.toLowerCase()})`;
+      const angle = questionAngle(
+        need.dimension,
+        seed,
+        askedCounts?.get(need.dimension) ?? 0,
+      );
+      const suggestion =
+        angle === null ? "" : ` one way in, in your own words: "${angle}"`;
+      if (need.reason === "NEEDS_SPECIFICS" && need.missing !== undefined) {
+        return `${head}: they answered (see KNOWN FACTS) but not in figures an investor can use. Acknowledge what they said, then ask for ${need.missing};${suggestion}`.slice(
+          0,
+          400,
+        );
+      }
+      return angle === null
+        ? head
+        : `${head}: aim for figures;${suggestion}`.slice(0, 400);
+    })
+    .join("\n")
+    .slice(0, NEEDS_MAX_CHARS);
 }
 
 function renderPublicGateway(gateway: PublicGateway): string {
@@ -431,7 +467,11 @@ export function createGateQInterviewer(
           application === undefined
             ? "(no application yet)"
             : renderFacts(application.facts),
-        questionNeeds: renderNeeds(needs),
+        questionNeeds: renderNeeds(
+          needs,
+          input.variationSeed ?? application?.facts[0]?.applicationId ?? "",
+          input.askedCounts,
+        ),
         // Historical injected registries retain their original variable schema.
         // Only v3 receives the independent server-owned recording inventory.
         ...(registry.getActive("GATEQ_INTERVIEWER").definition.version >= 3

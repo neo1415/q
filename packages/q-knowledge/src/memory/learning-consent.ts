@@ -7,9 +7,9 @@ import type { ActorContext } from "@capital-q/security";
  * Consent to learn communication preferences (lane ob1; owner decision
  * 2026-10-16: "with consent and user controls").
  *
- *   - Inferring a NEW communication preference from a conversation needs a
- *     GRANTED decision for this person in this tenant. No row is not
- *     granted, for every existing user too.
+ *   - Owner 2026-10-17: Q learns by default; the terms of service say so,
+ *     and nobody is asked. No row is granted. Turning it off in Settings
+ *     (REVOKED), or an earlier "Not now" (DECLINED), is respected.
  *   - A preference the person states explicitly ("be brief with me") is
  *     consent by statement and is kept regardless (note_preference).
  *   - "Not now" is remembered: Q does not ask again for 30 days.
@@ -47,14 +47,13 @@ export function preferenceLearningState(
   now: Date,
 ): PreferenceLearningState {
   if (row === null) {
-    return { status: "NOT_ASKED", mayAsk: true, askAgainAfter: null };
+    return { status: "NOT_ASKED", mayAsk: false, askAgainAfter: null };
   }
   if (row.status === "DECLINED") {
-    const after = row.askAgainAfter ?? now;
     return {
       status: "DECLINED",
-      mayAsk: after.getTime() <= now.getTime(),
-      askAgainAfter: after.toISOString(),
+      mayAsk: false,
+      askAgainAfter: (row.askAgainAfter ?? now).toISOString(),
     };
   }
   return { status: row.status, mayAsk: false, askAgainAfter: null };
@@ -98,9 +97,16 @@ export function createPostgresPreferenceLearningConsent(dependencies: {
   };
   return {
     state: async (actor) => preferenceLearningState(await read(actor), now()),
-    // Fails closed: a read that fails is not consent.
-    granted: async (actor) =>
-      (await read(actor).catch(() => null))?.status === "GRANTED",
+    // Fails closed: a read that fails is not consent. No decision is
+    // consent (owner 2026-10-17); a "no" either way is respected.
+    granted: async (actor) => {
+      const row = await read(actor).then(
+        (found) => ({ found }),
+        () => null,
+      );
+      if (row === null) return false;
+      return row.found === null || row.found.status === "GRANTED";
+    },
     decide: async (actor, choice, via) => {
       const at = now();
       const status =

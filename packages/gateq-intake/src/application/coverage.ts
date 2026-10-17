@@ -196,8 +196,12 @@ export function explainQualification(
 
 function applicantReason(
   reason: QuestionNeed["reason"] | undefined,
-): Exclude<QuestionNeed["reason"], "INVESTOR_EMPHASIS"> {
-  return reason === undefined || reason === "INVESTOR_EMPHASIS"
+): Exclude<QuestionNeed["reason"], "INVESTOR_EMPHASIS" | "NEEDS_SPECIFICS"> {
+  // NEEDS_SPECIFICS only arises for an answered dimension, which is never
+  // reported missing; mapped anyway so the applicant contract stays closed.
+  return reason === undefined ||
+    reason === "INVESTOR_EMPHASIS" ||
+    reason === "NEEDS_SPECIFICS"
     ? "UNDERSTANDING"
     : reason;
 }
