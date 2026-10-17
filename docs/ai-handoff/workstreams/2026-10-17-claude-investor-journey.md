@@ -26,3 +26,36 @@ Evidence: hosted read-only SQL through `scripts/handoff/live/hosted-read.mjs` (o
 1. GateQ interview repeats questions and fixes on one dimension (both investors, two founders).
 2. A detailed private mandate does not shape the interview when the published gate has no criteria (Partech).
 3. Mandate review page omits the stored mandate text (Atlas).
+
+## Product audit (production, 2026-10-17, fictional Savanna Seed Partners, desktop 1280 + mobile 390)
+
+Screenshots are private receipts under the session scratchpad (not committed): Discover, Ledgerfold profile (full page), CRM overview, pipeline desktop/mobile.
+
+| Executive concern                             | Evidence                                                                                                                                                            | Class                                                                                                   |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Too many tabs                                 | Primary nav is already Discover · Explore · Q · CRM with Workspace and You groups (desktop sidebar and mobile bottom bar)                                           | 1 — working and discoverable (shipped before this stream)                                               |
+| Scores visible                                | Company profile shows Investability (FDN InvestIQ v1) and Suitability separately with factor coverage and confidence; pipeline rows repeat both                     | 1                                                                                                       |
+| In-app brief                                  | Q's view card (verdict, main qualification, three open questions) plus Full assessment / Risks and gaps asks; section-by-section deck reading with claim provenance | 2 — present, but ended without an action                                                                |
+| Next logical step after analysis              | Header offered only Pass and Your relationship; open questions only asked Q                                                                                         | 4 — **fixed**: Next step row chosen from relationship state (`apps/web/src/features/fit/next-steps.ts`) |
+| CRM shows what needs action / awaiting / next | Pipeline: filters All / Needs you / Awaiting reply / Connected / In diligence; List / Table / Board; per-row scores, fit words and Next step; search                | 1                                                                                                       |
+| CRM "Needs you"                               | Folded by owner decision 2026-10-16 (`components/panel.tsx`); left as decided                                                                                       | 1 (owner choice)                                                                                        |
+| CRM "advanced" / "new evidence" views         | No filter for recently advanced or newly evidenced relationships                                                                                                    | 5 — not implemented (next)                                                                              |
+| Mobile                                        | Bottom bar with Q centred; large Book a call targets; Q greeting card covers about a third of the pipeline on 390px                                                 | 2 — friction noted                                                                                      |
+| Speed                                         | Ready main content: pipeline 1.3–1.5 s, CRM 1.15 s, Discover 1.25 s, company 1.7 s (commit→main, warm); "network idle" 10.7 s is streaming, not user wait           | 1                                                                                                       |
+| GateQ interview depth                         | Repeated questions; mandate unused when the gate has no criteria                                                                                                    | 4 — **fixed** (see commits)                                                                             |
+
+## Changes on this branch
+
+- `56528969a` handoff evidence (this file).
+- `10250157c` GateQ question needs park a dimension after two asks; solution/problem cover the description; general assessment ordered through business model, market, traction, revenue (`packages/gateq-intake/src/application/question-needs.ts`, interviewer, conversation service).
+- `4ee3b12c5` GateQ mandate emphasis: dimensions (never values) from the owner's automation-eligible mandate shape the interview (`apps/api/src/gateq/mandate-emphasis.ts`, `main.ts` wiring, `INVESTOR_EMPHASIS` need reason; applicant coverage maps it to UNDERSTANDING).
+- `674505a28` Next step row on Q's view (`apps/web/src/features/fit/{next-steps.ts,fit-panel.tsx}`, slot + profile view pass relationship state). Every consequential step asks Q to prepare the existing action for approval.
+
+Tests: gateq-intake 201+ (park, cover, emphasis), API emphasis 3, web next steps 5; root tsc, web/api tsc, eslint, prettier clean on changed files. No migrations, no contract change, no flag.
+
+## Next
+
+1. Release this branch (int-rc → CI → production) and re-run a live GateQ interview against Partech's gate and Atlas's gate with two different founders; record that questions differ and none repeat a third time.
+2. Partech's gate has 0 criteria: the owner may draft rules from the mandate (Your gate → Draft rules with Q), a policy decision for the account owner, not changed here.
+3. CRM: add "Advanced recently" / "New evidence" pipeline filters over existing relationship events.
+4. Investor follow-up about one exact GateQ application through Q (inbox has no "Ask Q about this application" entry point yet).
