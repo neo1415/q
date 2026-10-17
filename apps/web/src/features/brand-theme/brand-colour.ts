@@ -278,8 +278,8 @@ const HEX_ONLY = /^#[0-9a-f]{6}$/u;
  * rendered after the stylesheets). Q's own light (--cq-q-*) and the stage
  * accent are deliberately untouched (ADR 0017 F2: Q keeps its colour; a
  * preset, not a custom colour, sets Q's light -- ADR 0051). The dark
- * accent also becomes the menu bar's accent, since a preset's menu bar is
- * dark in both themes.
+ * accent also becomes the menu bar's accent: a preset's menu bar is
+ * dark in the dark theme.
  *
  * Every value is re-checked as a plain hex before it is written, so nothing
  * but a colour can ever reach the style element.

@@ -195,11 +195,15 @@ export function QSheetConversation({
             // pushes the answer below the fold. The full words stay in the
             // title and the Q page's transcript.
             title={lastPerson}
-            className="cq-body-sm line-clamp-2 self-end scroll-mt-3 bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)"
+            className="cq-body-sm self-end scroll-mt-3 bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)"
             data-q-panel-person
           >
-            <span className="sr-only">{t("You:")} </span>
-            {lastPerson}
+            {/* Clamped inside the padding: clamping the padded box itself
+                shows half of the third line in its bottom padding. */}
+            <span className="line-clamp-2">
+              <span className="sr-only">{t("You:")} </span>
+              {lastPerson}
+            </span>
           </p>
         ) : null}
         {latestAnswer !== undefined ? (
@@ -236,7 +240,10 @@ export function QSheetConversation({
       </div>
 
       <div
-        className="sticky bottom-0 z-(--cq-z-sticky) flex flex-col gap-2 bg-(--cq-surface-raised) pt-2 pb-[max(8px,var(--cq-safe-bottom))]"
+        // Sticks over the sheet's own bottom padding too (-bottom-4 with
+        // that padding added back): stuck at bottom-0, a long answer showed
+        // through the 16px strip beneath the composer.
+        className="sticky -bottom-4 z-(--cq-z-sticky) flex flex-col gap-2 bg-(--cq-surface-raised) pt-2 pb-[calc(max(8px,var(--cq-safe-bottom))+1rem)]"
         // Latency: a record named as they type is resolved and its page
         // prefetched before Send (fast-navigation.ts).
         onInput={readTypedDraft}

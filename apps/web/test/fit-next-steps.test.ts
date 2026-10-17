@@ -55,7 +55,9 @@ describe("nextStepsFor (executive review 2026-10-17)", () => {
       for (const step of nextStepsFor({ ...base, state })) {
         expect(step.label).not.toMatch(/Express interest|Pass/);
         if (step.kind === "ASK") {
-          expect(step.ask).toMatch(/for my approval|Draft only/);
+          expect(step.ask).toMatch(
+            /for my approval|nothing goes to the founder/,
+          );
         }
       }
     }
