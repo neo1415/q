@@ -23,6 +23,7 @@ import { codeReading } from "../src/voice/code-reading.js";
 import { resumeTurnRef } from "../src/voice/onboarding-conductor.js";
 import {
   acknowledgementParts,
+  figuresInDigits,
   FIXED_LEAD,
   OPTIONAL_ACKNOWLEDGEMENT_TAIL,
   quickAcknowledgement,
@@ -615,5 +616,94 @@ describe("live AL: a choice they never named is not saved", () => {
       },
     ]);
     expect(result?.outcome).toBe("COMMITTED");
+  });
+});
+
+describe("live AL: Arabic read-back has no English labels", () => {
+  it("choices go whole through the label path, and figures are written in digits", async () => {
+    const said = "نعم، نجمع حالياً مليوني دولار عبر SAFE.";
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F6.raising",
+      recorded: { "F0.intent": "raising_now", "F1.company_name": "Rimal" },
+    });
+    let calls = 0;
+    const gateway = {
+      execute: () => {
+        calls += 1;
+        return Promise.resolve(
+          calls === 1
+            ? {
+                output: {
+                  kind: "TOOL_CALLS",
+                  calls: [
+                    {
+                      callId: "c1",
+                      name: "record_answers",
+                      arguments: {
+                        answers: [
+                          {
+                            stepKey: "F6.raising",
+                            value: "active",
+                            quote: "نعم، نجمع حالياً",
+                          },
+                          {
+                            stepKey: "F6.instrument",
+                            value: "safe",
+                            quote: "SAFE",
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              }
+            : {
+                output: {
+                  kind: "TEXT",
+                  text: JSON.stringify({ reply: "x", asking: null }),
+                },
+              },
+        );
+      },
+    } as unknown as ModelGateway;
+    const labelled: string[] = [];
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall,
+      logger,
+      delegation: readerOf(
+        reading({ stated: ["F6.raising", "F6.instrument"] }),
+      ),
+      replyByCodeAfterCleanSave: true,
+      standing: {
+        read: () =>
+          Promise.resolve({
+            personality: "AUTO",
+            language: "ar" as never,
+            conduct: { suspended: false } as never,
+          }),
+        saveConduct: () => Promise.resolve(),
+        setPersonality: () => Promise.resolve(),
+        setLanguage: () => Promise.resolve(),
+        suspend: () => Promise.resolve(false),
+      } as never,
+      localiseWords: (_a, _l, texts) => Promise.resolve(texts.map(() => "ع")),
+      localiseLabels: (_a, _l, labels) => {
+        labelled.push(...labels);
+        return Promise.resolve(labels.map(() => "خيار"));
+      },
+    }).turn({ ...turn(world, said), actor });
+    // Written by code (one model round), with the choices in Arabic.
+    expect(calls).toBe(1);
+    expect(outcome.reply).toContain("خيار");
+    expect(labelled).toContain("Yes, actively");
+    expect(outcome.reply).not.toMatch(/Yes, actively/u);
+  });
+
+  it("'$2 million' reads back as $2,000,000", () => {
+    expect(figuresInDigits("$2 million")).toBe("$2,000,000");
+    expect(figuresInDigits("€1.5m")).toBe("€1,500,000");
+    expect(figuresInDigits("Seed")).toBe("Seed");
   });
 });

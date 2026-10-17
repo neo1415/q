@@ -188,6 +188,12 @@ export function quickAcknowledgement(
 export type AcknowledgementCopy = {
   /** Product copy to translate, English. */
   readonly lines: readonly string[];
+  /**
+   * Of those, the choices' own labels ("Seed", "CEO", "US dollar"): whole
+   * labels, translated as they are (a sentence path would read "Seed" as
+   * a name and keep it English; live AL Arabic read-back).
+   */
+  readonly choices: readonly string[];
 };
 
 export type ChoicesOf = (
@@ -212,6 +218,7 @@ export function acknowledgementCopy(
   hand: { readonly question: string | null; readonly tail: string | null },
 ): AcknowledgementCopy | null {
   const lines: string[] = [parts.lead];
+  const choices: string[] = [];
   for (const item of parts.items) {
     if (item.kind === "KEPT") {
       const kept = keptParts(item.text);
@@ -219,14 +226,14 @@ export function acknowledgementCopy(
       lines.push(kept.label);
     } else {
       lines.push(item.label.toLowerCase());
-      lines.push(...(choicesOf(item.stepKey, item.value) ?? []));
+      choices.push(...(choicesOf(item.stepKey, item.value) ?? []));
     }
   }
   if (parts.aside !== undefined) lines.push(parts.aside);
   if (hand.question === null) lines.push(parts.question);
   if (parts.optional && hand.tail === null)
     lines.push(OPTIONAL_ACKNOWLEDGEMENT_TAIL);
-  return { lines: [...new Set(lines)] };
+  return { lines: [...new Set(lines)], choices: [...new Set(choices)] };
 }
 
 export function acknowledgementIn(
@@ -273,4 +280,28 @@ export function acknowledgementIn(
 /** Latin-script words only: the code-written reply is English (lane ml owns others). */
 export function writtenInLatinScript(text: string): boolean {
   return /^[\p{Script=Latin}\p{N}\p{P}\p{S}\p{Zs}\s]*$/u.test(text);
+}
+
+/**
+ * A figure read back in another language with its English scale word
+ * written out in digits ("$2 million" -> "$2,000,000"; live AL Arabic).
+ */
+export function figuresInDigits(value: string): string {
+  const scales: Readonly<Record<string, number>> = {
+    thousand: 1e3,
+    k: 1e3,
+    million: 1e6,
+    m: 1e6,
+    billion: 1e9,
+    bn: 1e9,
+  };
+  return value.replace(
+    /(\d+(?:\.\d+)?)\s*(thousand|million|billion|bn|k|m)\b/giu,
+    (whole, figure: string, scale: string) => {
+      const factor = scales[scale.toLowerCase()];
+      return factor === undefined
+        ? whole
+        : Math.round(Number(figure) * factor).toLocaleString("en-US");
+    },
+  );
 }
