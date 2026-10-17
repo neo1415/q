@@ -79,7 +79,8 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/admin": "platform operators only",
   // v6: /q-pitch is Q_PITCH's page; its Capital Q pitch page is the
   // founder track's own step, opened by the tour.
-  "/q-pitch/capital-q": "the founder track's Capital Q pitch page, opened by the tour",
+  "/q-pitch/capital-q":
+    "the founder track's Capital Q pitch page, opened by the tour",
   "/find": "old address, redirects to /search",
   "/gateway": "old address, redirects to /gateq",
   "/crm": "the CRM's alias, redirects to /relationships (Q's RELATIONSHIPS)",
