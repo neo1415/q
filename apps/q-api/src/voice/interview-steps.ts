@@ -625,7 +625,30 @@ export function asciiDigits(text: string): string {
     .replace(/\u066c/gu, ",");
 }
 
-const SCALE_WORDS: Readonly<Record<string, number>> = {
+export const SCALE_WORDS: Readonly<Record<string, number>> = {
+  // Scale words in the languages people answer in (live AJ 2026-10-16:
+  // "400 mille euros" was saved as 400). Each is unambiguous: Spanish and
+  // Portuguese "mil" is a thousand, never a million.
+  mille: 1e3,
+  mil: 1e3,
+  tausend: 1e3,
+  millions: 1e6,
+  millón: 1e6,
+  millon: 1e6,
+  millones: 1e6,
+  milhão: 1e6,
+  milhões: 1e6,
+  millionen: 1e6,
+  mio: 1e6,
+  mn: 1e6,
+  milliard: 1e9,
+  milliards: 1e9,
+  mrd: 1e9,
+  bn: 1e9,
+  lakh: 1e5,
+  lakhs: 1e5,
+  crore: 1e7,
+  crores: 1e7,
   // Arabic scale words ("ألف", "مليون", "مليار") and their plurals.
   ألف: 1e3,
   الف: 1e3,

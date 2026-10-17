@@ -13,7 +13,32 @@
  * here.
  */
 
-import { asciiDigits, spokenFiguresIn } from "./interview-steps.js";
+import {
+  asciiDigits,
+  SCALE_WORDS,
+  spokenFiguresIn,
+} from "./interview-steps.js";
+
+/**
+ * Whether `value` is a figure of the quote with its scale word left off:
+ * 400 from "400 mille euros", 2 from "2 million". Only when the quote
+ * gives those digits nowhere without a scale.
+ */
+export function scaleDroppedIn(value: string, quote: string): boolean {
+  const wanted = Number(value);
+  if (!Number.isFinite(wanted)) return false;
+  const text = asciiDigits(quote).toLowerCase();
+  let scaled = false;
+  let bare = false;
+  for (const match of text.matchAll(/(\d+(?:[.,]\d+)?)(?:\s*([\p{L}]+))?/gu)) {
+    const number = Number((match[1] ?? "").replace(",", "."));
+    if (number !== wanted) continue;
+    const scale = SCALE_WORDS[match[2] ?? ""];
+    if (scale !== undefined && scale > 1) scaled = true;
+    else bare = true;
+  }
+  return scaled && !bare;
+}
 
 /**
  * Digit sequences in text, with grouping and decimal marks between digits
