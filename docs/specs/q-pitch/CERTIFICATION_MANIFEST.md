@@ -423,7 +423,7 @@ Every other atlas feature currently has no certification entry and must not be p
 - **Languages:** the trigger is certified in English, French and Spanish. The narration itself is English.
 - **Console:**
   - The AR runs logged no console errors and no page errors, except failed resource loads, which the driver does not count.
-  - Unfiltered probes saw several `404` resource loads on the CRM and Capital views; the resource was not identified. That is still open against "no console errors".
+  - Unfiltered, the CRM and Capital views log one `404` per company without a photo: `GET /api/company-photo/<companyId>` for seven of Savanna's companies. The image falls back, but each 404 is a console error, so this is still open against "no console errors".
 
 ### Spend
 
