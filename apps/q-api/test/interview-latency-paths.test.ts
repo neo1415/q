@@ -583,7 +583,7 @@ describe("the reply is in their language (ob1 live on AF)", () => {
     // Only product copy was sent for translation, and without waiting.
     expect(asked[0]?.cachedOnly).toBe(true);
     expect(asked[0]?.texts).toContain("stage");
-    expect(asked[0]?.texts).toContain("Seed");
+    expect(asked.flatMap((a) => a.texts)).toContain("Seed");
     expect(asked[0]?.texts.join("\n")).not.toMatch(/Seed stage|based in/u);
     expect(outcome.reply).toMatch(
       /^\[fr\] [^:]+: \[fr\] stage: \[fr\] Seed; /u,

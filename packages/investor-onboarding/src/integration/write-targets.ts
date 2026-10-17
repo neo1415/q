@@ -1051,20 +1051,48 @@ export function createInvestorWriteTargets(
       }
     },
 
-    [INVESTOR_WRITE_TARGETS.stageCheque]: (services, context, values) =>
-      withMandate(services, context, values, (mandate) => {
-        const patch = stageChequePatch(values);
-        return {
+    [INVESTOR_WRITE_TARGETS.stageCheque]: (services, context, values) => {
+      const update = (
+        servicesNow: InvestorDomainServices,
+        contextNow: OnboardingWriteContext,
+      ) =>
+        withMandate(servicesNow, contextNow, values, (mandate) => {
+          const patch = stageChequePatch(values);
+          return {
+            minStageCode: patch.minStageCode,
+            maxStageCode: patch.maxStageCode,
+            chequeRange: patch.chequeRange,
+            constraints: mergeConstraints(
+              mandate,
+              ["stage", "investment_role"],
+              patch.constraints,
+            ),
+          };
+        });
+      if (context.defer === undefined) return update(services, context);
+      // In a batch the stage and cheque answers (up to six, each the same
+      // mandate update) become one update at its end (live AM: ~270 ms an
+      // answer). This answer's own values are checked now, so a bad one
+      // is refused as itself; the deferred update reads every answer, and
+      // if the domain refuses it the runtime replays the batch answer by
+      // answer.
+      const patch = stageChequePatch(values);
+      parseContract(
+        UpdateInvestorMandateRequestSchema,
+        {
+          expectedVersion: 1,
           minStageCode: patch.minStageCode,
           maxStageCode: patch.maxStageCode,
           chequeRange: patch.chequeRange,
-          constraints: mergeConstraints(
-            mandate,
-            ["stage", "investment_role"],
-            patch.constraints,
-          ),
-        };
-      }),
+          constraints: patch.constraints,
+        },
+        "The mandate details are not valid.",
+      );
+      context.defer(INVESTOR_WRITE_TARGETS.stageCheque, (tx) =>
+        update(servicesFor(tx), { ...context, tx }),
+      );
+      return Promise.resolve();
+    },
 
     [INVESTOR_WRITE_TARGETS.taxonomy]: (services, context, values) =>
       withMandate(services, context, values, async () => ({

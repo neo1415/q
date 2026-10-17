@@ -51,6 +51,7 @@ import {
   createFounderDomainServices,
   createFounderOnboardingIntegration,
   FOUNDER_FINANCIAL_STEPS,
+  FOUNDER_PROFILE_STEPS,
   FOUNDER_STEPS,
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
@@ -58,17 +59,26 @@ import {
   resolveFounderContext,
 } from "../src/index.js";
 
-/** v4's financials are optional: these journeys skip whatever of them is asked. */
-const FINANCIAL_KEYS: ReadonlySet<string> = new Set(
-  Object.values(FOUNDER_FINANCIAL_STEPS),
-);
+/**
+ * v4's financials and v6's company-profile sections are optional: these
+ * journeys skip whatever of them is asked.
+ */
+const FINANCIAL_KEYS: ReadonlySet<string> = new Set([
+  ...Object.values(FOUNDER_FINANCIAL_STEPS),
+  ...Object.values(FOUNDER_PROFILE_STEPS),
+]);
 async function skipFinancials(journey: {
   readonly view: () => OnboardingSessionView;
   readonly skip: (stepKey: string) => Promise<OnboardingSessionView>;
 }): Promise<void> {
-  for (let guard = 0; guard < 12; guard += 1) {
+  for (let guard = 0; guard < 40; guard += 1) {
     const key = journey.view().currentStep?.stepKey;
-    if (key === undefined || !FINANCIAL_KEYS.has(key)) return;
+    // Every v6 company-profile step (F9.*) is optional too.
+    if (
+      key === undefined ||
+      !(FINANCIAL_KEYS.has(key) || key.startsWith("F9."))
+    )
+      return;
     await journey.skip(key);
   }
 }
@@ -401,9 +411,9 @@ describe("@capital-q/founder-onboarding against local PostgreSQL", () => {
       const journey = await startFounder(world, newcomer);
       expect(journey.view().session.subject).toBeNull();
       expect(journey.view().currentStep?.stepKey).toBe(FOUNDER_STEPS.intent);
-      // v4 is the published journey (20261218100000): v3 plus the optional
-      // financials block (Q.01).
-      expect(journey.view().session.definitionVersion).toBe(4);
+      // v6 is the published journey (20261228180500): v4's optional
+      // financials, then v5 and v6's optional company-profile sections.
+      expect(journey.view().session.definitionVersion).toBe(6);
 
       await journey.submit(FOUNDER_STEPS.intent, single("raising_now"));
       expect(journey.view().currentStep?.stepKey).toBe(

@@ -363,6 +363,18 @@ export type InterviewAgentDependencies = {
    * Any language: the questions code adds, through Q's shared translation
    * layer (English product copy). Each entry, or null to keep the English.
    */
+  /**
+   * Choice labels in any language, whole (translateLines, no sentence
+   * lifting). Absent: they go through localiseWords.
+   */
+  readonly localiseLabels?:
+    | ((
+        actor: ActorContext,
+        language: string,
+        labels: readonly string[],
+        options?: { readonly cachedOnly?: boolean | undefined },
+      ) => Promise<readonly (string | null)[]>)
+    | undefined;
   /** Warms a chosen language's acknowledgement copy (once per process). */
   readonly warmAcknowledgements?:
     | ((
@@ -1625,14 +1637,26 @@ export function createInterviewAgent(
       };
       const copy = acknowledgementCopy(parts, choicesOf, hand);
       if (copy === null) return null;
-      const translated = await localise(actor, info.tag, copy.lines, {
-        cachedOnly: true,
-      }).catch(() => copy.lines.map(() => null));
+      const labels = dependencies.localiseLabels;
+      const [translated, translatedChoices] = await Promise.all([
+        localise(actor, info.tag, copy.lines, { cachedOnly: true }).catch(() =>
+          copy.lines.map(() => null),
+        ),
+        // Choice labels whole, through the label path when there is one.
+        (labels ?? localise)(actor, info.tag, copy.choices, {
+          cachedOnly: true,
+        }).catch(() => copy.choices.map(() => null)),
+      ]);
       const words = new Map<string, string>();
       copy.lines.forEach((line, i) => {
         const text = translated[i];
         if (text !== null && text !== undefined) words.set(line, text);
       });
+      copy.choices.forEach((line, i) => {
+        const text = translatedChoices[i];
+        if (text !== null && text !== undefined) words.set(line, text);
+      });
+      const missing = copy.lines.length + copy.choices.length - words.size;
       const reply = acknowledgementIn(
         parts,
         (english) => words.get(english) ?? null,
@@ -1645,7 +1669,7 @@ export function createInterviewAgent(
       );
       if (reply === null) {
         logger.info(
-          { language: info.tag, missing: copy.lines.length - words.size },
+          { language: info.tag, missing },
           "code reply waits for translations; the model replies this turn",
         );
       }
