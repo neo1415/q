@@ -60,6 +60,15 @@ export type FitSweepAsk = {
    * showed, in its order; the sweep scores exactly these.
    */
   readonly within?: readonly string[] | undefined;
+  /**
+   * CANDIDATES only (TURN_READER v56 `excludeShown`, production
+   * 2026-10-17): the canonical company ids Q already showed in this
+   * conversation, which they asked to see past ("three new ones", "who
+   * else fits?"). The sweep leaves them out of the same deterministic
+   * ranking and returns the asked count from the rest. It only removes:
+   * it never adds a company to what the tools are asked to read.
+   */
+  readonly exclude?: readonly string[] | undefined;
 };
 
 const COUNT_WORDS: Readonly<Record<string, number>> = {
@@ -187,9 +196,13 @@ export function fitSweepAskOfReading(
     readonly text: string;
     readonly count: number | null;
     readonly previous?: boolean | undefined;
+    /** v56: they want companies other than those already shown. */
+    readonly excludeShown?: boolean | undefined;
   },
   previous: readonly string[] = [],
   named: readonly string[] = [],
+  /** Every company card Q showed in this conversation (v56 exclusion). */
+  shown: readonly string[] = previous,
 ): FitSweepAsk {
   const words = question.text.trim().slice(0, 400);
   if (named.length >= 2) {
@@ -205,6 +218,17 @@ export function fitSweepAskOfReading(
     question.count === null
       ? null
       : Math.min(Math.max(question.count, 1), FIT_SWEEP_CARDS_MAX);
+  // v56: "three new ones" after a list is the next best of their own
+  // candidates, never the same companies again and never "rank them".
+  if (question.excludeShown === true && shown.length > 0) {
+    return {
+      scope: "CANDIDATES",
+      place: placeOf(words),
+      fitAsked: true,
+      count,
+      exclude: [...new Set(shown)],
+    };
+  }
   if (
     previous.length > 0 &&
     (question.previous === true || refersToShown(words))
@@ -231,6 +255,8 @@ export type FitSweepResult = {
   readonly fits: readonly RunFit[];
   /** How many companies the set held before the place filter and cap. */
   readonly considered: number;
+  /** v56: how many already-shown companies the ranking left out. */
+  readonly excluded: number;
   readonly calls: readonly QToolCallOutcome[];
 };
 
@@ -312,9 +338,14 @@ export async function runFitSweep(input: {
     return fitsInOutcome(outcome);
   };
   const own = ownSetOf(await input.own.catch(() => null));
+  // v56: only for CANDIDATES; a PREVIOUS or named set is exactly its ids.
+  const excluded = new Set(
+    ask.scope === "CANDIDATES" ? (ask.exclude ?? []) : [],
+  );
   const wanted = new Map<string, string>();
   const add = (rows: readonly { id: string; name: string }[]) => {
     for (const row of rows) {
+      if (excluded.has(row.id)) continue;
       if (!wanted.has(row.id)) wanted.set(row.id, row.name);
     }
   };
@@ -337,7 +368,17 @@ export async function runFitSweep(input: {
           // The domain ranks all eligible candidates before taking this
           // window. Fetch only the requested count when no place filter
           // needs a wider set; ten rich profiles can exceed the tool bound.
-          { limit: ask.place === null ? (ask.count ?? 10) : 10 },
+          // v56: the window widens by the companies left out, so the next
+          // best still fill the asked count (the tool's own cap is ten).
+          {
+            limit:
+              ask.place === null
+                ? Math.min(
+                    (ask.count ?? FIT_SWEEP_CARDS_MAX) + excluded.size,
+                    FIT_SWEEP_CARDS_MAX,
+                  )
+                : FIT_SWEEP_CARDS_MAX,
+          },
           "q-fit-sweep-top",
         )
       : Promise.resolve([] as RunFit[]),
@@ -348,7 +389,12 @@ export async function runFitSweep(input: {
     ),
   ]);
   const byId = new Map<string, RunFit>();
+  const leftOut = new Set<string>();
   for (const fit of [...top, ...each.flat()]) {
+    if (excluded.has(fit.companyId)) {
+      leftOut.add(fit.companyId);
+      continue;
+    }
     if (!byId.has(fit.companyId)) byId.set(fit.companyId, fit);
   }
   const all = [...byId.values()];
@@ -365,6 +411,7 @@ export async function runFitSweep(input: {
     ask,
     fits: ranked,
     considered: ask.scope === "CANDIDATES" ? all.length : wanted.size,
+    excluded: leftOut.size,
     calls,
   };
 }

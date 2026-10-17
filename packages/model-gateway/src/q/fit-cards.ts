@@ -398,6 +398,12 @@ export function fitSweepSummary(input: {
   readonly considered: number;
   /** The person's own words, for how many they asked for. */
   readonly asked: string;
+  /**
+   * TURN_READER v56: the ranking left out companies already shown, at
+   * their asking ("three new ones"); `count` is how many they asked for.
+   * Said first, and honestly when fewer than that remain.
+   */
+  readonly beyondShown?: { readonly count: number | null } | undefined;
 }): string {
   const { block, place } = input;
   if (block.shape === "SIDE_BY_SIDE") return comparisonSummary(block);
@@ -417,7 +423,15 @@ export function fitSweepSummary(input: {
             ? // INC-1: "rank them" is the set just shown, said as such.
               `Here are the same ${counted(block.cards.length)} ${plural(block.cards.length)}, ranked.`
             : null;
-  const lead = set === null ? "" : `${set} `;
+  const beyond =
+    input.beyondShown === undefined
+      ? null
+      : input.beyondShown.count !== null &&
+          block.cards.length < input.beyondShown.count
+        ? `Beyond the ones I've already shown, I have only ${counted(block.cards.length)} more ${plural(block.cards.length)} to put against your mandate, not ${counted(input.beyondShown.count)}.`
+        : "Leaving out the ones I've already shown, here are the next best.";
+  const leading = [beyond, set].filter((part) => part !== null);
+  const lead = leading.length === 0 ? "" : `${leading.join(" ")} `;
   if (scored.length === 0) {
     return `${lead}None of them has enough information for a score yet.`;
   }
