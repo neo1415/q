@@ -240,6 +240,7 @@ function sample(schema: unknown): unknown {
  */
 const RELATIONSHIP = { relationshipId: UUID };
 const SCRIPTED_INPUTS: Readonly<Record<string, unknown>> = {
+  unicorn_potential: { companyId: UUID },
   // K1: a sector and an ISO country (a pattern, not free text).
   discover_companies: { sectors: ["fintech"], countries: ["NG"], limit: 3 },
   // "A company id or name is required" (Explore, ADR 0055).

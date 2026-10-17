@@ -1,3 +1,4 @@
+import { createUnicornPotentialTool } from "./tools/unicorn-potential.js";
 import type { Logger } from "@capital-q/observability";
 import type { QToolPort } from "@capital-q/q-runtime";
 
@@ -146,6 +147,7 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
       ? []
       : [
           createFitProfileTool(ports),
+          createUnicornPotentialTool(ports),
           createFitTopCandidatesTool(ports),
           // Q.10: 2-4 picked (default: their latest saved), side by side.
           createFitCompareTool(ports),
