@@ -20,6 +20,7 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { QViewMark } from "@/features/fit/q-view-note";
+import { HubNavigation } from "@/features/relationships/hub-navigation";
 import { ConnectionRequestsInbox } from "@/features/network/connection-requests-inbox";
 import {
   apiSession,
@@ -66,6 +67,8 @@ export default async function InvestorsPage() {
     );
     return (
       <PageContainer>
+        {/* Company requests is a CRM tab (owner 2026-10-17). */}
+        <HubNavigation side="INVESTOR" view="requests" />
         <PageHeader
           title={t("Company requests")}
           description={`Companies that asked to connect with ${context.label ?? "you"}. Accepting connects you; it isn’t an investment.`}

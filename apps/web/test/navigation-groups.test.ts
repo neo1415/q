@@ -36,10 +36,8 @@ describe("the sidebar's groups", () => {
       "/home",
       // Capital is the CRM's Capital tab (owner 2026-10-16).
       "/relationships",
-      // F2: GateQ, its own page, first in Workspace.
-      "/gateq",
+      // GateQ and company requests are CRM tabs (owner 2026-10-17).
       "/work",
-      "/investors",
       "/documents",
       "/rehearsals",
       "/daily",
@@ -52,7 +50,7 @@ describe("the sidebar's groups", () => {
       group.items.map((item) => item.href),
     );
     expect(founder).toContain("/pitch");
-    expect(founder).toContain("/gateq");
+    expect(founder).not.toContain("/gateq");
     expect(founder).not.toContain("/investors");
     expect(founder).not.toContain("/admin");
     expect(sectionsFor("unset").map((item) => item.href)).toContain("/explore");
