@@ -30,7 +30,7 @@ export const TURN_READER_V53: PromptDefinition<
 > = {
   ...TURN_READER_V52,
   version: 53,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Q Pitch v6 (owner 2026-10-16): Q_PITCH, read from meaning in any language, so 'pitch / explain / show Capital Q' or 'what can you do?' starts the guided tour; questions about pitches or pitch decks are not it. v52's rules and schema unchanged.",
   effectiveFrom: "2026-10-16",

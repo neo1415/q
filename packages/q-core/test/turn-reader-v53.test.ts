@@ -12,9 +12,10 @@ import {
 
 /** Q Pitch v6 (owner 2026-10-16): the tour starts from a request, by meaning. */
 describe("TURN_READER v53: Q_PITCH read by meaning", () => {
-  it("is the active reader, on top of v52's rules (lane ml's nextSteps kept)", () => {
+  it("sits on top of v52's rules (lane ml's nextSteps kept); v54 extends it", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(53);
+    expect(active.definition.version).toBe(54);
+    expect(active.definition.template).toContain(V53_Q_PITCH);
     expect(TURN_READER_V52.status).toBe("DEPRECATED");
     expect(TURN_READER_V53.template).toContain(V52_NEXT_STEPS);
     expect(TURN_READER_V53.template).toContain(V53_Q_PITCH);

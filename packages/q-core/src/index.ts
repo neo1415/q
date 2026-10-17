@@ -401,6 +401,11 @@ export {
   TURN_READER_V52_SCHEMA_VERSION,
   TurnReaderV52ResultSchema,
   type TurnReaderV52Result,
+  TURN_READER_V54_SCHEMA_VERSION,
+  TurnReaderV54ResultSchema,
+  TurnReaderV54VariablesSchema,
+  type TurnReaderV54Result,
+  type TurnReaderV54Variables,
   type TurnReference,
   type TurnReferenceOpenKind,
   TurnReaderV30ResultSchema,
@@ -1612,6 +1617,10 @@ export {
   TURN_READER_V53,
   V53_Q_PITCH,
 } from "./prompts/tasks/turn-reader.v53.js";
+export {
+  TURN_READER_V54,
+  V54_SCREEN_CONTROLS,
+} from "./prompts/tasks/turn-reader.v54.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 
 export {
