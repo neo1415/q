@@ -10,6 +10,9 @@ export const FEATURE_AI_IMAGES = "documents.ai_images" as const;
 export const FEATURE_RESEARCH = "q.research" as const;
 export const FEATURE_DAILY_EDITIONS = "q.daily_editions" as const;
 export const FEATURE_GATEWAYS = "gateq.gateways" as const;
+/** Optional advanced present-evidence indicator; core InvestIQ stays free. */
+export const FEATURE_UNICORN_POTENTIAL =
+  "intelligence.unicorn_potential" as const;
 
 export const GATED_FEATURE_KEYS = [
   FEATURE_REHEARSALS,

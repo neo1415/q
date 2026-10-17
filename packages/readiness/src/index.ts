@@ -52,3 +52,17 @@ export * from "./investiq/index.js";
 // ONLY from investor-eligible inputs (src/investability/inputs.ts). It never
 // reads the founder's readiness diagnosis, coaching or private records.
 export * from "./investability/index.js";
+// Optional present-evidence growth indicator; separate from InvestIQ and fit.
+export {
+  assessUnicornPotential,
+  type UnicornPotentialResult,
+} from "./unicorn-potential/assess.js";
+export {
+  observeUnicornPotential,
+  type UnicornObservation,
+} from "./unicorn-potential/observe.js";
+export {
+  UNICORN_PILLARS,
+  UNICORN_POTENTIAL_METHOD_VERSION,
+  UNICORN_POTENTIAL_INPUT_RULES_VERSION,
+} from "./unicorn-potential/method-v1.js";

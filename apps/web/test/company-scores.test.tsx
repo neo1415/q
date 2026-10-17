@@ -154,3 +154,55 @@ describe("CompanyScores", () => {
     expect([...(calls[0] ?? [])].sort()).toEqual([COMPANY, OTHER].sort());
   });
 });
+
+describe("score read authorization lifetime", () => {
+  it("reauthorizes a company after remount instead of reusing a prior reader's result", async () => {
+    const port = vi.fn(async (ids: readonly string[]) =>
+      ids.map((companyId) => ({
+        companyId,
+        name: "Co",
+        line: null,
+        profile: {} as never,
+        scores: { ...scored, companyId },
+      })),
+    );
+    function Card() {
+      const scores = useCompanyScores([COMPANY], { port });
+      return <CompanyScoresFor scores={scores} companyId={COMPANY} />;
+    }
+    const first = render(<Card />);
+    await waitFor(() => expect(port).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-company-scores="compact"]'),
+      ).not.toBeNull(),
+    );
+    first.unmount();
+    render(<Card />);
+    await waitFor(() => expect(port).toHaveBeenCalledTimes(2));
+  });
+  it("does not attach a new reader to an earlier in-flight request", async () => {
+    let finish: ((value: readonly FitCompanyDto[]) => void) | undefined;
+    const earlier = vi.fn(
+      () =>
+        new Promise<readonly FitCompanyDto[]>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const later = vi.fn(async () => []);
+    function Card({
+      port,
+    }: {
+      port: (ids: readonly string[]) => Promise<readonly FitCompanyDto[]>;
+    }) {
+      useCompanyScores([COMPANY], { port });
+      return null;
+    }
+    const first = render(<Card port={earlier} />);
+    await waitFor(() => expect(earlier).toHaveBeenCalledTimes(1));
+    first.unmount();
+    render(<Card port={later} />);
+    await waitFor(() => expect(later).toHaveBeenCalledTimes(1));
+    finish?.([]);
+  });
+});
