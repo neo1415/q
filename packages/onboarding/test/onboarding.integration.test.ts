@@ -563,17 +563,36 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
       await expect(
         submit(world, adminA, id, "intent", select("maybe"), 1),
       ).rejects.toBeInstanceOf(ContractValidationError);
+      // Their own words for a choice are kept, like "Other" with text
+      // (owner 2026-10-16, always save); that opens no branch.
+      const own = await submit(world, adminA, id, "intent", text("raising"), 1);
+      expect(own.responses.find((r) => r.stepKey === "intent")?.value).toEqual({
+        type: "TEXT",
+        text: "raising",
+      });
+      const current = own.session.version;
+      // Out of path and unknown steps are still refused, whatever is sent.
       await expect(
-        submit(world, adminA, id, "intent", text("raising"), 1),
-      ).rejects.toBeInstanceOf(ContractValidationError);
-      await expect(
-        submit(world, adminA, id, "raise_amount", range("5"), 1),
+        submit(world, adminA, id, "raise_amount", range("5"), current),
       ).rejects.toMatchObject({ reason: "STEP_NOT_ELIGIBLE" });
       await expect(
-        submit(world, adminA, id, "ghost", select("x"), 1),
+        submit(
+          world,
+          adminA,
+          id,
+          "raise_amount",
+          text("five million"),
+          current,
+        ),
       ).rejects.toMatchObject({ reason: "STEP_NOT_ELIGIBLE" });
       await expect(
-        submit(world, adminA, id, "intent", select("raising_now"), 2),
+        submit(world, adminA, id, "ghost", select("x"), current),
+      ).rejects.toMatchObject({ reason: "STEP_NOT_ELIGIBLE" });
+      await expect(
+        submit(world, adminA, id, "ghost", text("anything"), current),
+      ).rejects.toMatchObject({ reason: "STEP_NOT_ELIGIBLE" });
+      await expect(
+        submit(world, adminA, id, "intent", select("raising_now"), 1),
       ).rejects.toBeInstanceOf(OnboardingSessionVersionConflictError);
     });
   });
@@ -1379,9 +1398,10 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
       const out = await coalescing.runtime.submitResponses({
         actor: adminA,
         sessionId: id,
+        // "name" is the step that writes the canonical target here.
         responses: [
           { stepKey: "intent", response: select("raising_now") },
-          { stepKey: "raise_amount", response: range("5000000") },
+          { stepKey: "name", response: text("Alpha Rails") },
         ],
         expectedSessionVersion: 1,
         idempotencyKey: randomUUID(),
@@ -1391,22 +1411,23 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
         "COMMITTED",
         "COMMITTED",
       ]);
-      // Two answers, one update.
-      expect(runs.filter((r) => r === "deferred")).toHaveLength(1);
+      // Handed to the batch's end and run there once; never written as
+      // the answer committed.
+      expect(runs).toEqual(["deferred"]);
 
       runs.length = 0;
       refuseDeferred = true;
       const again = await coalescing.runtime.submitResponses({
         actor: adminA,
         sessionId: id,
-        responses: [{ stepKey: "raise_amount", response: range("6000000") }],
+        responses: [{ stepKey: "name", response: text("Beta Rails") }],
         expectedSessionVersion: out.view.session.version,
         idempotencyKey: randomUUID(),
         correlationId: CORRELATION(),
       });
       // Refused together: replayed answer by answer, each writing as it
       // commits, and each reporting its own outcome.
-      expect(runs).toEqual(["deferred", "now:raise_amount"]);
+      expect(runs).toEqual(["deferred", "now:name"]);
       expect(again.results.map((r) => r.outcome)).toEqual(["COMMITTED"]);
     });
   });
