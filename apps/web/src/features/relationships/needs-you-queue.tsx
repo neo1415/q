@@ -160,6 +160,7 @@ export function NeedsYouQueue({
       collapsible
       defaultOpen={false}
       data-needs-you
+      data-qp-anchor="fdr.06.crm.needs-you"
       action={
         left.length > NEEDS_YOU_SHOWN ? (
           <button

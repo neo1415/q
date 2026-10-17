@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { FOUNDER_QA_ENTRIES } from "./qa-bank-founder.js";
+
 /**
  * Q Pitch v6: the Q&A bank (owner, 16 Oct). Questions people are likely to
  * ask after or during the pitch, each with a prepared answer grounded in
@@ -337,6 +339,7 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
       "Q works first: upload what you already have and it builds your company record, tells you what may stop you from raising and what to improve next, and shows you the investors whose mandates you actually match. You can apply through their gateways, rehearse with an investor persona, and keep every conversation in one place.",
     sources: [`${LANDING} LP-15, LP-16`, `${SPEC} founder onboarding`],
   },
+  ...FOUNDER_QA_ENTRIES,
 ]);
 
 const STOP = new Set(

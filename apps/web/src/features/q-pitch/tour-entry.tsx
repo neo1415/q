@@ -13,7 +13,8 @@ function choiceOf(value: string | null): TourChoice | null {
   return value === "pilot" ||
     value === "premiere" ||
     value === "short" ||
-    value === "atlas"
+    value === "atlas" ||
+    value === "founder-v6"
     ? value
     : null;
 }

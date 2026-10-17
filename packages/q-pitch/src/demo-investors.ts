@@ -8,6 +8,11 @@ export const DEMO_INVESTORS = {
     investorOrganisationId: "1c4b9266-350c-409d-9582-04a0f771b8a8",
     name: "Savanna Seed Partners",
   },
+  // Fictional; publishes a GateQ gate (the founder track's apply step).
+  "sahel-bridge-ventures": {
+    investorOrganisationId: "8fa742b6-af8d-4f0a-adac-8214b3da2c92",
+    name: "Sahel Bridge Ventures",
+  },
 } as const satisfies Readonly<
   Record<
     string,

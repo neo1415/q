@@ -96,7 +96,9 @@ export default async function DailyPage({
       <PageContainer width="content" className="flex flex-col gap-10">
         <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
           {home.preparing ? <PreparingNotice /> : null}
-          <Newspaper edition={latest} />
+          <div data-qp-anchor="fdr.14.daily.paper">
+            <Newspaper edition={latest} />
+          </div>
           <DailyArchive
             items={home.archive.filter((item) => item.id !== latest.id)}
             nextCursor={home.nextCursor}
@@ -115,7 +117,11 @@ export default async function DailyPage({
           description={t("Your news, every story sourced.")}
         />
         {preferences.frequency === "OFF" ? (
-          <div className="flex flex-col gap-3" data-state="off">
+          <div
+            className="flex flex-col gap-3"
+            data-state="off"
+            data-qp-anchor="fdr.14.daily.paper"
+          >
             <p className="cq-body text-(--cq-text-secondary)">
               {t("The Q Daily is off.")}
             </p>
@@ -127,9 +133,15 @@ export default async function DailyPage({
             </Link>
           </div>
         ) : home.preparing ? (
-          <PreparingNotice />
+          <div data-qp-anchor="fdr.14.daily.paper">
+            <PreparingNotice />
+          </div>
         ) : (
-          <div className="flex flex-col gap-3" data-state="empty">
+          <div
+            className="flex flex-col gap-3"
+            data-state="empty"
+            data-qp-anchor="fdr.14.daily.paper"
+          >
             <p className="cq-body text-(--cq-text-primary)">
               {preferences.nextDueAt === null
                 ? t("First edition on its way")

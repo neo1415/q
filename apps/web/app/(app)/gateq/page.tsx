@@ -110,16 +110,19 @@ export default async function GateqPage({ searchParams }: Props) {
               initialResults={claimResults}
             />
           ) : (
-            <FounderApplications
-              state={
-                applications === null
-                  ? "error"
-                  : applications.length === 0
-                    ? "empty"
-                    : "full"
-              }
-              applications={applications ?? []}
-            />
+            // Lit by the founder track while Q explains the interview.
+            <div data-qp-anchor="fdr.09.gateq.applications">
+              <FounderApplications
+                state={
+                  applications === null
+                    ? "error"
+                    : applications.length === 0
+                      ? "empty"
+                      : "full"
+                }
+                applications={applications ?? []}
+              />
+            </div>
           )}
         </GateqChrome>
       </PageContainer>
