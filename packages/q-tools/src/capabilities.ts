@@ -319,6 +319,9 @@ const SCREEN_DOES: Readonly<Record<QNavigateDestination, string>> = {
   // Overview, CAPITAL its Capital tab).
   CRM_PIPELINE:
     "Opens the CRM's Pipeline tab: every relationship as a list, table or board, by stage.",
+  // Q Pitch v6 (owner 2026-10-16).
+  Q_PITCH:
+    "Starts Q Pitch: Q presents Capital Q itself as a guided, step-by-step tour of the app, for the person's side (investor or founder).",
 };
 
 /** Screens that belong to a company's own people. */

@@ -87,7 +87,7 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
       "walk me through how it works",
       "what happens step by step",
       "how does a company get onto the platform",
-      "how does q learn about me",
+      "what does q do with my information",
       "how does matching work",
     ],
     answer:
@@ -294,6 +294,22 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
     answer:
       "Capital Q is offered through FDN Capital Partners, with a waitlist and demos for investors and businesses. The plan beyond that is not something I will state as fact; the founders can take you through it.",
     sources: [`${LANDING} LP-04`],
+  },
+  {
+    id: "qa.onboarding",
+    side: "BOTH",
+    question: "How does onboarding work?",
+    paraphrases: [
+      "how do i get started",
+      "how do you learn about my company",
+      "how do you learn my mandate",
+      "do i have to fill in long forms",
+      "how does q get to know me",
+      "what happens when i sign up",
+    ],
+    answer:
+      "From the start, Q interviews you to onboard you. It learns as much as it can about you and your company, or about your mandate as an investor, from a conversation and from what you already have, such as a deck. There is no long questionnaire: you can skip anything, unknown stays unknown, and Q asks you to confirm what it extracted before it becomes part of your record.",
+    sources: [`${LANDING} LP-15`, "CLAUDE.md Onboarding"],
   },
   {
     id: "qa.investor.value",

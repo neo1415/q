@@ -138,6 +138,11 @@ export const PAGE_NAMES: Readonly<Record<string, PageTarget>> = {
   "pipeline board": d("CRM_PIPELINE"),
   "pipeline list": d("CRM_PIPELINE"),
   "crm records": d("CRM_PIPELINE"),
+  // Q Pitch v6: the tour by its page's name ("open Q Pitch"). Asking Q to
+  // pitch or explain Capital Q is read by meaning (TURN_READER v53).
+  "q pitch": d("Q_PITCH"),
+  "q pitch tour": d("Q_PITCH"),
+  "capital q tour": d("Q_PITCH"),
   "crm capital": d("CAPITAL"),
   // Settings and its sections
   settings: d("SETTINGS"),
