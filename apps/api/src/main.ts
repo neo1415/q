@@ -1,3 +1,4 @@
+import { createGateqUnicornReader } from "./gateq/unicorn.js";
 import type { ActorContext } from "@capital-q/security";
 /**
  * Capital Q application API — deployable composition root (doc 23, 8; ERA-002).
@@ -2987,6 +2988,25 @@ const { app, logger } = createApp(config, security, {
           },
         }),
   // F27: the founder's own unlinked applications are repaired on read.
+  gateqUnicornPotential: createGateqUnicornReader({
+    onError: (error) =>
+      gateqLogger.warn(
+        { errorName: error instanceof Error ? error.name : "unknown" },
+        "GateQ current company assessment unavailable",
+      ),
+    premium: async (actor) =>
+      (
+        await entitlements.check(
+          billingAccountOf(actor),
+          FEATURE_UNICORN_POTENTIAL,
+        )
+      ).allowed,
+    companies: gateqFounders.scoreCompanies,
+    investorMayRead: async (actor, companyId) =>
+      (await resolveViewableCompany(actor, companyId)) !== null,
+    current: (companyIds) =>
+      unicornStore.current(companyIds, UNICORN_POTENTIAL_METHOD_VERSION),
+  }),
   gateqMyApplications: async (actor) => {
     for (const row of await gateqFounders.unlinkedFor(actor)) {
       await joinGateqRelationship({ ...row, actor }).catch((error: unknown) =>
