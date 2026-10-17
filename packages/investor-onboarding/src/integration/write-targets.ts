@@ -908,17 +908,24 @@ async function withMandate(
     context.requestMemo,
   );
   const mandateId = await mandateInScope(services, bound, values, context);
-  const mandate = await currentMandate(services, bound, mandateId);
+  // The mandate as this request's own last update left it (live AM: each
+  // of an investor's first answers read it again, ~270 ms an answer). The
+  // runtime drops the memo whenever an answer is refused, so a rolled-back
+  // update is never reused; the domain still locks the mandate and checks
+  // this version on every write.
+  const stateKey = `mandate-state|${mandateId}`;
+  const mandate =
+    remembered<InvestorMandate>(context.requestMemo, stateKey) ??
+    (await currentMandate(services, bound, mandateId));
   const resolved = await patch(mandate);
-  // The mandate just read is the one updated: no second read. The domain
-  // still locks it and checks this version (a concurrent change refuses).
-  await updateMandate(
+  const updated = await updateMandate(
     services,
     bound,
     mandate,
     () => resolved,
     context.correlationId,
   );
+  remember(context.requestMemo, stateKey, updated);
 }
 
 export function createInvestorWriteTargets(

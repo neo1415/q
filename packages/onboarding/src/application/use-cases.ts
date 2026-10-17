@@ -684,6 +684,8 @@ async function commitResponse(
         await applyAll({ sql: inner });
       });
     } catch (error: unknown) {
+      // Rolled back: nothing a target read or wrote in it may be reused.
+      options.requestMemo?.clear();
       if (!(error instanceof ContractValidationError)) throw error;
     }
   } else {
@@ -1327,6 +1329,9 @@ export function createOnboardingUseCases(
               `${item.stepKey}:${String(Math.round(performance.now() - startedAt))}`,
             );
           } catch (error: unknown) {
+            // A refused answer's savepoint rolled back whatever it wrote:
+            // nothing read or written for it may be reused.
+            requestMemo.clear();
             const refusal = batchRefusalOf(error);
             if (refusal === null) throw error;
             results.set(index, {

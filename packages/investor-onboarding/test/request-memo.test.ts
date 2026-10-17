@@ -103,3 +103,86 @@ describe("one request reads its investor context and mandate once", () => {
     expect(counts.listed).toBe(1);
   });
 });
+
+describe("one request reads the mandate once across its answers", () => {
+  it("two stage/cheque answers: one mandate read, two versioned updates", async () => {
+    const { createInvestorWriteTargets } =
+      await import("../src/integration/write-targets.js");
+    const counts = { read: 0, versions: [] as number[] };
+    let version = 1;
+    const mandate = () => ({
+      id: "f0000000-0000-4000-8000-000000000001",
+      version,
+      status: "DRAFT",
+      constraints: [],
+    });
+    const fake = {
+      resolver: {
+        resolveHumanContext: () =>
+          Promise.resolve({ status: "RESOLVED", context: CONTEXT }),
+      },
+      investors: {
+        listInvestorMandates: () =>
+          Promise.resolve({ items: [{ id: mandate().id, status: "DRAFT" }] }),
+        getInvestorMandate: () => {
+          counts.read += 1;
+          return Promise.resolve(mandate());
+        },
+        updateInvestorMandate: (input: {
+          readonly input: { readonly expectedVersion: number };
+        }) => {
+          counts.versions.push(input.input.expectedVersion);
+          version += 1;
+          return Promise.resolve(mandate());
+        },
+      },
+    } as unknown as InvestorDomainServices;
+    const target = createInvestorWriteTargets({
+      services: () => fake,
+    } as never).find((t) => t.targetKey === "investor.mandate.stage_cheque");
+    const memo = new Map<string, unknown>();
+    const context = {
+      tx: {},
+      actor,
+      session: {
+        id: "a1000000-0000-4000-8000-000000000001",
+        subject: {
+          subjectType: "INVESTOR_ORGANISATION",
+          subjectId: "e1000000-0000-4000-8000-000000000001",
+        },
+        organisationId: ORG,
+      },
+      correlationId: "cor_x",
+      currentResponses: new Map(),
+      bindContext: () => Promise.reject(new Error("not used")),
+      requestMemo: memo,
+    };
+    await target?.apply(
+      context as never,
+      {
+        stepKey: "I2.stages",
+        value: { type: "MULTI_SELECT", optionKeys: ["seed"] },
+      } as never,
+    );
+    await target?.apply(
+      context as never,
+      {
+        stepKey: "I2.currency",
+        value: { type: "SINGLE_SELECT", optionKey: "eur" },
+      } as never,
+    );
+    expect(counts.read).toBe(1);
+    // Each update carries the version the previous one left.
+    expect(counts.versions).toEqual([1, 2]);
+    // A refused answer drops the memo (the runtime clears it): read again.
+    memo.clear();
+    await target?.apply(
+      context as never,
+      {
+        stepKey: "I2.cheque_min",
+        value: { type: "RANGE", value: "150000" },
+      } as never,
+    );
+    expect(counts.read).toBe(2);
+  });
+});

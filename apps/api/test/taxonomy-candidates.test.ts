@@ -89,14 +89,27 @@ function fakeFinder() {
 function buildApp(options: {
   readonly principal: AuthenticatedPrincipal | null;
   readonly finder: TaxonomyCandidateFinder;
+  /** No organisation yet (a new investor mid-way through their first answer). */
+  readonly noOrganisation?: { readonly hasIdentity: boolean };
 }): FastifyInstance {
   const security: ApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(options.principal) },
     resolver: {
       resolveHumanContext: () =>
-        Promise.resolve({ status: "RESOLVED", context: CONTEXT }),
+        Promise.resolve(
+          options.noOrganisation === undefined
+            ? { status: "RESOLVED", context: CONTEXT }
+            : { status: "CONTEXT_REQUIRED" },
+        ),
     },
-    identities: { lookup: () => Promise.resolve(null) },
+    identities: {
+      lookup: () =>
+        Promise.resolve(
+          options.noOrganisation?.hasIdentity === true
+            ? ({ userId: CONTEXT.userId } as never)
+            : null,
+        ),
+    },
   };
   const query = {
     listVocabularies: notUnderTest,
@@ -110,6 +123,26 @@ const post = (app: FastifyInstance, payload: string | object) =>
   app.inject({ method: "POST", url: "/v1/taxonomy/candidates", payload });
 
 describe("POST /v1/taxonomy/candidates", () => {
+  it("serves a signed-in person with no organisation yet (live AM: 400 for a new investor)", async () => {
+    const app = buildApp({
+      principal: PRINCIPAL,
+      finder: fakeFinder().finder,
+      noOrganisation: { hasIdentity: true },
+    });
+    const response = await post(app, { text: "payments rails" });
+    expect(response.statusCode).toBe(200);
+  });
+
+  it("still refuses a principal with no application identity", async () => {
+    const app = buildApp({
+      principal: PRINCIPAL,
+      finder: fakeFinder().finder,
+      noOrganisation: { hasIdentity: false },
+    });
+    const response = await post(app, { text: "payments rails" });
+    expect(response.statusCode).toBe(403);
+  });
+
   it("requires an authenticated context", async () => {
     const app = buildApp({ principal: null, finder: fakeFinder().finder });
     const response = await post(app, { text: "payments rails" });
