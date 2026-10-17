@@ -204,6 +204,25 @@ function attribute(element: Element, name: string): string | null {
   return element.getAttribute(name);
 }
 
+/**
+ * The open state of a wrapper's own trigger: a direct child that declares
+ * aria-expanded, only when the wrapper is layout-less (`display: contents`),
+ * so a dialog's own content (its disclosures) is never read as the dialog.
+ */
+function triggerExpanded(element: HTMLElement): string | null {
+  const contents =
+    element.classList.contains("contents") ||
+    element.style.display === "contents" ||
+    (typeof getComputedStyle === "function" &&
+      getComputedStyle(element).display === "contents");
+  if (!contents) return null;
+  for (const child of Array.from(element.children)) {
+    const expanded = attribute(child, "aria-expanded");
+    if (expanded !== null) return expanded;
+  }
+  return null;
+}
+
 export function isDisabled(element: HTMLElement): boolean {
   if (attribute(element, "aria-disabled") === "true") return true;
   return "disabled" in element && element.disabled === true;
@@ -233,7 +252,14 @@ export function stateOf(
       ) {
         return element.parentElement.open ? "OPEN" : "CLOSED";
       }
-      const expanded = attribute(element, "aria-expanded");
+      // A control registered on a layout-less wrapper (`display: contents`
+      // around a dialog's root, whose popup is portalled away) carries no
+      // state itself: its own trigger, a direct child, says whether it is
+      // open. Live 2026-10-17 (conversation 971c5a53): every manifest said
+      // the notifications dialog was OPEN while it was closed, because the
+      // wrapper fell through to the dialog default below.
+      const expanded =
+        attribute(element, "aria-expanded") ?? triggerExpanded(element);
       if (expanded === "true") return "OPEN";
       if (expanded === "false") return "CLOSED";
       if (kind === "DIALOG") return "OPEN";
