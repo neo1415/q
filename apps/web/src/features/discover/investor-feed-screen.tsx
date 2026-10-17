@@ -493,6 +493,25 @@ function InvestorFeed({
     );
   }
 
+  if (feed.state.status === "FAILED" && feed.premiumAccessRequired) {
+    return (
+      <div className="flex flex-col gap-4">
+        {controls.row("flex")}
+        <EmptyState
+          title={t("Premium investor access required")}
+          description={t(
+            "Unicorn Potential filters require premium investor access. Clear filters to return to your recommendations.",
+          )}
+          action={
+            <Button variant="primary" onClick={controls.clear}>
+              {t("Clear filters")}
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   if (card === null) {
     /*
       A feed that could not load is not an empty feed. Saying "nothing to
