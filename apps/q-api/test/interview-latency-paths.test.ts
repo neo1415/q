@@ -370,6 +370,74 @@ describe("a code receipt is never cut by the claim guard (live AL)", () => {
   });
 });
 
+describe("a refusal later put right in the same turn does not hold the reply (live AP)", () => {
+  it("amount refused for its scale, saved by code: one model round, code writes the reply", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F6.raising",
+      recorded: { "F0.intent": "raising_now", "F1.company_name": "Tidewell" },
+    });
+    const said =
+      "Yes, we're actively raising about 750 thousand dollars on a SAFE.";
+    const model = recordingModel([
+      { stepKey: "F6.raising", value: "active", quote: "actively raising" },
+      {
+        stepKey: "F6.target_amount",
+        value: 750,
+        quote: "750 thousand dollars",
+      },
+    ]);
+    const outcome = await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(
+        reading({ stated: ["F6.raising", "F6.target_amount"] }),
+      ),
+      replyByCodeAfterCleanSave: true,
+    }).turn({ ...turn(world, said), actor });
+    const amount = world.recordedValue("F6.target_amount");
+    expect(amount?.type === "RANGE" ? Number(amount.value) : null).toBe(
+      750_000,
+    );
+    expect(model.calls()).toBe(1);
+    expect(outcome.reply).toMatch(/750,000/u);
+  });
+
+  it("the same answer again is not written again", async () => {
+    const world = founderWorld();
+    const said = "We're seed stage.";
+    const port = createOnboardingPort({
+      session: turn(world, said).session,
+      onboardingSessionId: turn(world, said).onboardingSessionId,
+      journeyType: "founder",
+      ownerUserId: actor.userId,
+      personTurns: [said],
+    });
+    await port.record([
+      {
+        stepKey: "F1.stage",
+        value: "seed",
+        quote: "seed stage",
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    const before = world.attempts().length;
+    const [again] = await port.record([
+      {
+        stepKey: "F1.stage",
+        value: "seed",
+        quote: "seed stage",
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    expect(again?.outcome).toBe("COMMITTED");
+    expect(world.attempts().length).toBe(before);
+  });
+});
+
 describe("quickAcknowledgement", () => {
   const next = { question: "What does the company do?", optional: false };
   const labelOf = (key: string) =>

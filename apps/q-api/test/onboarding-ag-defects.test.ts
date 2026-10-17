@@ -218,6 +218,21 @@ describe("stated but not on the record: the next round is told to record it", ()
       new Set(["I3.geography", "I2.stages"]),
     );
     expect(open).toEqual(["I3.geography"]);
+    // Covered by its concept family's answer (live AP): not unsaved.
+    expect(
+      unrecordedStatedIn(
+        {
+          steps: [
+            {
+              stepKey: "I7.sector_exclusions",
+              status: "OPEN",
+              coveredBy: "I7.avoid",
+            },
+          ],
+        },
+        new Set(["I7.sector_exclusions"]),
+      ),
+    ).toEqual([]);
     const notes = turnNotesFor({
       pausing: false,
       lookup: null,
@@ -525,6 +540,14 @@ describe("live AJ: a figure keeps its scale, in any language", () => {
     expect(scaleDroppedIn("2", "2 millones de dólares")).toBe(true);
     expect(scaleDroppedIn("11", "about 11 people")).toBe(false);
     expect(scaleDroppedIn("150", "150 mil reais")).toBe(true);
+    // Said in words, Arabic duals included (live AP).
+    expect(scaleDroppedIn("2", "نجمع مليوني دولار")).toBe(true);
+    expect(scaleDroppedIn("2000000", "نجمع مليوني دولار")).toBe(false);
+    expect(scaleDroppedIn("2", "raising two million")).toBe(true);
+    expect(scaleDroppedIn("2", "2 founders, raising two million")).toBe(false);
+    expect(
+      moneyFiguresIn("نجمع حالياً مليوني دولار").map((f) => f.value),
+    ).toEqual([2_000_000]);
   });
 
   it("the read-back has no English note and no doubled stops", () => {
