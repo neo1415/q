@@ -6,6 +6,11 @@
  * sends a founder stay as written: they are the investor's words.
  */
 export const GATEQ_AR: Readonly<Record<string, string>> = {
+  // Asking Q about one application (executive review 2026-10-17)
+  "Ask Q about this application": "اسأل Q عن هذا الطلب",
+  "What should we ask next?": "ماذا يجب أن نسأل بعد ذلك؟",
+  "What is still unverified?": "ما الذي لم يُتحقق منه بعد؟",
+  "Fit versus quality": "الملاءمة مقابل الجودة",
   // Chrome and tabs
   Applications: "الطلبات",
   "Find my startup": "ابحث عن شركتي الناشئة",
