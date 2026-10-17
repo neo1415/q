@@ -1,0 +1,21 @@
+# Workstream A — Unicorn Potential and Home Q files
+
+Branch: `codex/unicorn-qfiles-oct17`, created from clean integration `995b716a0756c757ec2535b9536602cc80b44aab` on 17 October 2026. Dedicated ownership: scoring, score UI, Unicorn-specific Q readers and Home Q file intelligence. Claude owns CRM/navigation/GateQ/Work/general investor journeys; do not change them here.
+
+Priority: finish and live-verify Unicorn Potential first; then Home Q private file intelligence; public-web research only after both. Current status: IMPLEMENTING, not deployed. No production merge or migrations applied. Coordinate release with integration owner; do not deploy over overlapping work.
+
+Owner methodology is preserved verbatim at `docs/product-sources/unicorn-potential/research-methodology-v1-2026-10-17.md`. Only that attachment was available initially; the separate developer brief has been requested, without blocking independent implementation. PADL #46 prohibits unvalidated forecasts: this is a separate present-evidence growth-characteristics indicator, never a calibrated probability. Investability, Suitability and default fit-order.v2 remain unchanged.
+
+Reuse map: `packages/readiness/src/investability/{inputs,observe,assess,postgres,service}.ts`, canonical eligible profile/claims/deck sources; existing billing entitlement resolution; `apps/q-api/src/composition/fit.ts` and `http/fit.ts`; `packages/contracts/src/http/company-scores.ts`; `apps/web/src/features/scores/{company-scores,use-company-scores}.tsx`; existing workers investability composition/deck source and paced sweeps. No new scoring platform, canonical company or Q runtime.
+
+Shared contract addition: `packages/contracts/src/http/unicorn-potential.ts`, exported via http/index.ts. Separate typed DTO: twelve pillars/two criteria each, evidence references and truth/evidence/lifecycle/scope axes, coverage/confidence, gated overall score, append-revision momentum and explicit caveat. No change to existing Q core contracts or CompanyScores yet. Root owns shared contracts, persistence, API/authorization and integration; isolated engine worker owns only new readiness pure engine files/tests in its worktree.
+
+Setup: Node24.19.0. Frozen pnpm11.25 install verified lockfile/supply-chain policies (857entries) and installed706packages. Initial default data path /home/agent was unavailable; successful supported local override:
+
+```bash
+PNPM_HOME=/workspace/.pnpm XDG_DATA_HOME=/workspace/.local/share COREPACK_HOME=/workspace/.corepack corepack pnpm install --frozen-lockfile --store-dir /workspace/.pnpm-store
+```
+
+No lockfile/dependency changes or TLS bypass. Build package dist before targeted tests/types. No live credentials/private session artifacts recovered from previous machine; inspect existing bindings before requesting account action. GitHub Git/API read access verified; production service revisions not re-certified in this fresh environment. STATE's older release notes are historical, not a fresh live read.
+
+Next: complete deterministic engine and source lineage; append-only premium-gated storage/API; third CompanyScores disclosure and Q reader; explicit Discover filter; complete protected tests and authorized browser proof. Backfill must be bounded/paced, never score on feed render. Do not start Home file/public-web work until first milestone live-verified. Exact commits/tests/migrations/CI/browser proof will be appended here each cycle.
