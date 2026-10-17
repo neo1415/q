@@ -138,6 +138,16 @@ describe("the lifecycle", () => {
     });
   });
 
+  it("a revisit under a new turn is pushed again, not answered by the old receipt (Q Pitch v6, 2026-10-17)", async () => {
+    const first = requestNavigation({ path: "/investors/abc", turn: "t1" });
+    land("/investors/abc");
+    await first.settled;
+    land("/relationships");
+    pushes = [];
+    requestNavigation({ path: "/investors/abc", turn: "t2" });
+    expect(pushes).toEqual(["/investors/abc"]);
+  });
+
   it("standing where a page would redirect is not arriving: the move is pushed (Q Pitch v6, 2026-10-17)", async () => {
     const base = "/relationships/company/6b2f9851-d7e3-4197-9fd1-beffbdc153fe";
     land(base);

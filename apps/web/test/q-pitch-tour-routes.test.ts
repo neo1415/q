@@ -1,3 +1,4 @@
+import { tourStartFor } from "@/features/q-pitch/tour-start";
 import { describe, expect, it } from "vitest";
 
 import { TOUR_PAGES, routeMatchesPattern } from "@capital-q/q-pitch";
@@ -28,4 +29,12 @@ describe("pages a tour opens are app routes", () => {
       expect(known(path ?? "")).toBe(true);
     },
   );
+});
+
+describe("where Q's Q_PITCH move starts the tour", () => {
+  it("opens the side's v6 track on a new Home conversation", () => {
+    expect(tourStartFor("INVESTOR")).toBe("/home?qpitch=investor-v6&new=1");
+    expect(tourStartFor("FOUNDER")).toBe("/home?qpitch=founder-v6&new=1");
+    expect(tourStartFor("NONE")).toBeNull();
+  });
 });
