@@ -36,7 +36,7 @@ export const TURN_READER_V55: PromptDefinition<
 > = {
   ...TURN_READER_V54,
   version: 55,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Owner 2026-10-17: v54 (SHOWN, fromShown) plus the page's registered tabs and sections (id, kind, visible name, state) as fenced input, and control naming the one the turn asks to open or show, by meaning in any language; code selects it with no further model call.",
   effectiveFrom: "2026-10-17",

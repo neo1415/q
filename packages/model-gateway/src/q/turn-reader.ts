@@ -4,15 +4,15 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV55ResultSchema,
+  TurnReaderV56ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
   type TurnReaderV40Result,
   type TurnReaderV54Result,
-  type TurnReaderV55Result,
   type TurnReaderV55Variables,
+  type TurnReaderV56Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError } from "../errors.js";
@@ -77,8 +77,18 @@ export type QTurnReader = {
  */
 export type QTurnReading = Omit<
   TurnReaderV15Result,
-  "moreDocuments" | "sequence" | "addressedToQ"
+  "moreDocuments" | "sequence" | "addressedToQ" | "question"
 > & {
+  /**
+   * v56: a FIT question may carry `excludeShown` -- they want companies
+   * other than those Q already showed in this conversation. Optional so a
+   * reading without it fits; absent is false.
+   */
+  readonly question:
+    | (NonNullable<TurnReaderV15Result["question"]> & {
+        readonly excludeShown?: boolean | undefined;
+      })
+    | null;
   /** v15: false when spoken words were plainly for someone else. */
   readonly addressedToQ?: boolean | undefined;
   readonly moreDocuments?: TurnReaderV14Result["moreDocuments"] | undefined;
@@ -359,8 +369,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV55Result>> =>
-          gateway.execute<TurnReaderV55Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV56Result>> =>
+          gateway.execute<TurnReaderV56Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               // A closed classification needs little thought; left unset, a
@@ -376,7 +386,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV55ResultSchema,
+              schema: TurnReaderV56ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -418,7 +428,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV55ResultSchema.safeParse(
+        const parsed = TurnReaderV56ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;
