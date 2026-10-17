@@ -597,6 +597,8 @@ export {
   type SlatePageNote,
   type SlateReadService,
   type SlateReadServiceDependencies,
+  type UnicornPotentialDiscoverPort,
+  UnicornPotentialDiscoverDeniedError,
 } from "./slates/reader.js";
 export {
   compareAmounts,

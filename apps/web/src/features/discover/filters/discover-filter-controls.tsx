@@ -140,7 +140,7 @@ function FilterSheetBody({
       side="side"
       title={t("Filter Discover")}
       description={t(
-        "Narrows your recommendations. The order stays as Q ranked them.",
+        "Narrows your recommendations. Q’s order is preserved unless you choose Unicorn Potential.",
       )}
     >
       <form
@@ -150,6 +150,45 @@ function FilterSheetBody({
           apply();
         }}
       >
+        <fieldset className="flex flex-col gap-2">
+          <legend className="cq-label mb-2 text-(--cq-text-primary)">
+            Unicorn Potential · Premium
+          </legend>
+          <p className="cq-caption text-(--cq-text-secondary)">
+            Evidence-based growth characteristics, not a probability of becoming
+            a unicorn. Only current, available assessments are included.
+          </p>
+          <Select
+            id="unicorn-min"
+            label="Minimum indicator score"
+            value={draft.unicornPotentialMin ?? ""}
+            options={[
+              { value: "", label: "No minimum" },
+              ...[0, 25, 50, 75].map((value) => ({
+                value: String(value),
+                label: `${value}/100 and above`,
+              })),
+            ]}
+            onChange={(event) => {
+              const value = event.target.value;
+              setDraft({
+                ...draft,
+                unicornPotentialMin: value === "" ? undefined : Number(value),
+              });
+            }}
+          />
+          <ChoiceChip
+            selected={draft.unicornPotentialSort === true}
+            onClick={() =>
+              setDraft({
+                ...draft,
+                unicornPotentialSort: draft.unicornPotentialSort !== true,
+              })
+            }
+          >
+            Sort by Unicorn Potential
+          </ChoiceChip>
+        </fieldset>
         <fieldset className="flex flex-col gap-2">
           <legend className="cq-label mb-2 text-(--cq-text-primary)">
             {t("Sector")}
