@@ -13,6 +13,8 @@ import {
   type TourAction,
   type TourActor,
   demoApplication,
+  demoInvestor,
+  TOUR_PAGES,
   type TourPorts,
   type TourScript,
 } from "@capital-q/q-pitch";
@@ -45,6 +47,7 @@ import {
   type Narrator,
 } from "./narrator";
 import { rehearsalPorts } from "./rehearsal-ports";
+import { lightSection, unlightAll } from "./section-light";
 import { TOUR_BRIEF } from "./tour-voice";
 
 /**
@@ -208,8 +211,28 @@ const UI_ACT_WAIT_MS = 6_000;
  * company (the record page, or its call-booking dialog, which the page
  * opens from its own hash). The pages authorise the viewer themselves.
  */
+/** v6 founder track: a fictional investor's page, by fixture key. */
+export function investorPath(
+  page: "PROFILE" | "RELATIONSHIP" | "REHEARSE",
+  key: string,
+): string | null {
+  const investor = demoInvestor(key);
+  if (investor === null) return null;
+  const id = encodeURIComponent(investor.investorOrganisationId);
+  return page === "PROFILE"
+    ? `/investors/${id}`
+    : page === "RELATIONSHIP"
+      ? `/relationships/investor/${id}`
+      : `/rehearsals/investor/${id}`;
+}
+
 export function recordPath(
-  record: "GATEQ_APPLICATION" | "RELATIONSHIP" | "RELATIONSHIP_CALLS",
+  record:
+    | "GATEQ_APPLICATION"
+    | "RELATIONSHIP"
+    | "RELATIONSHIP_CALLS"
+    | "RELATIONSHIP_MESSAGES"
+    | "RELATIONSHIP_SCHEDULE",
   key: string,
   companyOf: (key: string) => ResolvedCompany | null,
 ): string | null {
@@ -222,7 +245,13 @@ export function recordPath(
   const company = companyOf(key);
   if (company === null) return null;
   const base = `/relationships/company/${encodeURIComponent(company.companyId.toLowerCase())}`;
-  return record === "RELATIONSHIP_CALLS" ? `${base}#calls` : base;
+  return record === "RELATIONSHIP_CALLS"
+    ? `${base}#calls`
+    : record === "RELATIONSHIP_MESSAGES"
+      ? `${base}/messages`
+      : record === "RELATIONSHIP_SCHEDULE"
+        ? `${base}/calls`
+        : base;
 }
 
 /** Where rehearsal transcript segments go: the host's runner and captions. */
@@ -331,6 +360,7 @@ export function useTourPorts(
       signal: AbortSignal,
     ): Promise<ActionOutcome> => {
       setOpen(false);
+      unlightAll();
       await closePanels();
       const handle = requestMove({ path });
       const settled = await Promise.race([
@@ -514,6 +544,14 @@ export function useTourPorts(
             ? outcome(false, "FIXTURE_UNRESOLVED")
             : navigate(path, signal);
         }
+        case "openInvestor": {
+          const path = investorPath(action.page, action.investor);
+          return path === null
+            ? outcome(false, "FIXTURE_UNRESOLVED")
+            : navigate(path, signal);
+        }
+        case "openTourPage":
+          return navigate(TOUR_PAGES[action.page], signal);
         case "askApprovedQuestion": {
           const text = questionText(action.question);
           if (text === null) return outcome(false, "FIXTURE_UNRESOLVED");
@@ -648,15 +686,27 @@ export function useTourPorts(
                     })()
                   : action.kind === "openRecord"
                     ? recordPath(action.record, action.key, companyOf)
-                    : null;
+                    : action.kind === "openInvestor"
+                      ? investorPath(action.page, action.investor)
+                      : action.kind === "openTourPage"
+                        ? TOUR_PAGES[action.page]
+                        : null;
             if (path !== null) router.prefetch(path);
           }
         }
       },
       execute,
-      speak: (lines, signal) => {
+      speak: async (lines, signal) => {
         narrator ??= sessionNarrator(() => qRef.current);
-        return narrator.speak(lines, signal);
+        // v6: a line about a section lights that section first, so the
+        // light moves with the narration (owner, 16 Oct).
+        for (const line of lines) {
+          if (signal.aborted) return;
+          if (line.anchor !== undefined) {
+            await lightSection(line.anchor, { open: line.open }, signal);
+          }
+          await narrator.speak([line], signal);
+        }
       },
       clearScoped: () => {
         receipt.current = [];

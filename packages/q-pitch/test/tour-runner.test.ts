@@ -616,3 +616,64 @@ describe("TourRunner.hearAudience — spoken chapter jumps (slice 6)", () => {
     );
   });
 });
+
+describe("TourRunner — v6 step commands, typed or spoken", () => {
+  const QUIET = {
+    narratorPlaying: false,
+    counterpartPlaying: false,
+    echoCancellation: true,
+  };
+
+  it("goes to exactly the step asked, and leaves a question alone", async () => {
+    const h = harness();
+    h.runner.start();
+    await flush();
+    const typed = h.runner.stepCommand(
+      "go to step 3",
+      { intentId: "qp-typed-1", modality: "KEYBOARD" },
+      QUIET,
+    );
+    expect(typed?.move).toEqual({ kind: "STEP", step: 3 });
+    expect(typed?.decision?.admitted).toBe(true);
+    expect(h.runner.state.sceneIndex).toBe(2);
+    expect(
+      h.runner.stepCommand(
+        "what happens next with this company?",
+        { intentId: "qp-typed-2", modality: "KEYBOARD" },
+        QUIET,
+      ),
+    ).toBeNull();
+  });
+
+  it("refuses a step the tour does not have, without moving", async () => {
+    const h = harness();
+    h.runner.start();
+    await flush();
+    const before = h.runner.state.sceneIndex;
+    const out = h.runner.stepCommand(
+      "go to step 40",
+      { intentId: "qp-typed-3", modality: "KEYBOARD" },
+      QUIET,
+    );
+    expect(out).toEqual({ move: { kind: "OUT_OF_RANGE" }, decision: null });
+    expect(h.runner.state.sceneIndex).toBe(before);
+  });
+
+  it("hears a spoken step command from the audience, numbers and all", async () => {
+    const h = harness();
+    h.runner.start();
+    await flush();
+    const decision = h.runner.hearAudience(
+      {
+        segmentId: "seg-7",
+        source: "AUDIENCE_MIC",
+        channelId: "mic-1",
+        text: "forward two steps",
+        final: true,
+      },
+      QUIET,
+    );
+    expect(decision?.admitted).toBe(true);
+    expect(h.runner.state.sceneIndex).toBe(2);
+  });
+});

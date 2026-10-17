@@ -177,6 +177,9 @@ export const Q_NAVIGATE_DESTINATIONS = [
   "CAPITAL_INVESTORS",
   // Lane ov 2026-10-16: the CRM's Pipeline tab ("open the pipeline").
   "CRM_PIPELINE",
+  // Q Pitch v6 (owner 2026-10-16): Q presents Capital Q itself, a guided
+  // tour on the person's own workspace (track by their side).
+  "Q_PITCH",
 ] as const satisfies readonly QVoiceDestination[];
 
 export type QNavigateDestination = (typeof Q_NAVIGATE_DESTINATIONS)[number];

@@ -321,6 +321,7 @@ function AnswerCard({
       className="cq-ac-card"
       data-state={state}
       data-ac-card={card.key}
+      data-ac-rank={rank}
       data-ac-spot={spot ? "" : undefined}
       data-hue={String(card.hue)}
       aria-current={state === "focus" ? "true" : undefined}
@@ -775,6 +776,7 @@ function StripCard({
       className="cq-ac-stripcard"
       data-hue={String(card.hue)}
       data-ac-card={card.key}
+      data-ac-rank={rank}
       data-ac-strip
       aria-label={`Bring ${card.name} forward`}
       onClick={() => onFocus?.(rank - 1)}

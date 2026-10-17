@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { DraftFill } from "@/features/q-pitch/founder/draft-fill";
 import {
   discoverInvestors,
   getInvestorGates,
@@ -164,6 +165,7 @@ export async function LooksForSection({
       <section
         id="looks-for"
         aria-labelledby="investor-looks-for"
+        data-qp-anchor="fdr.04.investor.looks-for fdr.09.gateq.criteria"
         // The profile's section frame (ProfileSectionShell's), so the
         // investor reads the same to a founder as on their own profile.
         className="flex scroll-mt-4 flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-5"
@@ -230,9 +232,9 @@ export async function LooksForSection({
           </p>
         </section>
       ) : (
-        <section
+        <DraftFill
           id="apply"
-          aria-labelledby="investor-draft"
+          labelledBy="investor-draft"
           className="flex scroll-mt-4 flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4 sm:p-5"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -253,31 +255,58 @@ export async function LooksForSection({
               {t("Q starts the form from your company profile.")}
             </p>
           ) : (
-            <dl className="cq-body-sm grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[10rem_1fr]">
-              <dt className="text-(--cq-text-tertiary)">{t("Company")}</dt>
-              <dd className="text-(--cq-text-primary)">
-                {prefill.companyName}
-              </dd>
-              <dt className="text-(--cq-text-tertiary)">{t("One line")}</dt>
-              <dd className="text-(--cq-text-primary)">
-                {prefill.oneLiner ?? "Not on your profile yet"}
-              </dd>
-              <dt className="text-(--cq-text-tertiary)">{t("Stage")}</dt>
-              <dd className="text-(--cq-text-primary)">
-                {stageLabel(prefill.stageCode) ?? "Not on your profile yet"}
-              </dd>
-              <dt className="text-(--cq-text-tertiary)">{t("Country")}</dt>
-              <dd className="text-(--cq-text-primary)">
-                {countryLabel(prefill.country) ?? "Not on your profile yet"}
-              </dd>
+            <dl className="cq-body-sm flex flex-col gap-1">
+              <div
+                className="-mx-2 grid grid-cols-1 gap-x-4 px-2 py-0.5 sm:grid-cols-[10rem_1fr]"
+                data-qp-fill
+                data-qp-anchor="fdr.09.gateq.field-company"
+              >
+                <dt className="text-(--cq-text-tertiary)">{t("Company")}</dt>
+                <dd className="text-(--cq-text-primary)">
+                  {prefill.companyName}
+                </dd>
+              </div>
+              <div
+                className="-mx-2 grid grid-cols-1 gap-x-4 px-2 py-0.5 sm:grid-cols-[10rem_1fr]"
+                data-qp-fill
+                data-qp-anchor="fdr.09.gateq.field-line"
+              >
+                <dt className="text-(--cq-text-tertiary)">{t("One line")}</dt>
+                <dd className="text-(--cq-text-primary)">
+                  {prefill.oneLiner ?? "Not on your profile yet"}
+                </dd>
+              </div>
+              <div
+                className="-mx-2 grid grid-cols-1 gap-x-4 px-2 py-0.5 sm:grid-cols-[10rem_1fr]"
+                data-qp-fill
+                data-qp-anchor="fdr.09.gateq.field-stage"
+              >
+                <dt className="text-(--cq-text-tertiary)">{t("Stage")}</dt>
+                <dd className="text-(--cq-text-primary)">
+                  {stageLabel(prefill.stageCode) ?? "Not on your profile yet"}
+                </dd>
+              </div>
+              <div
+                className="-mx-2 grid grid-cols-1 gap-x-4 px-2 py-0.5 sm:grid-cols-[10rem_1fr]"
+                data-qp-fill
+                data-qp-anchor="fdr.09.gateq.field-country"
+              >
+                <dt className="text-(--cq-text-tertiary)">{t("Country")}</dt>
+                <dd className="text-(--cq-text-primary)">
+                  {countryLabel(prefill.country) ?? "Not on your profile yet"}
+                </dd>
+              </div>
             </dl>
           )}
-          <div className="flex flex-wrap gap-2">
+          <div
+            className="flex flex-wrap gap-2 self-start"
+            data-qp-anchor="fdr.09.gateq.send"
+          >
             <Link href={href} className={buttonClassName("primary")}>
               {t("Review and send")}
             </Link>
           </div>
-        </section>
+        </DraftFill>
       )}
     </>
   );

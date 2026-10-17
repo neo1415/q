@@ -333,6 +333,7 @@ export function RelationshipsBoard({
             aria-label={t("Relationships")}
             className="flex flex-col divide-y divide-(--cq-border-subtle) overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
             data-relationships-list
+            data-qp-anchor="fdr.07.crm.pipeline"
           >
             {visible.map((row) => (
               <li

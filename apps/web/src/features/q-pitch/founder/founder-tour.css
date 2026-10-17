@@ -1,0 +1,152 @@
+/*
+ * Q Pitch v6, founder track (Lane qpf). Only what the founder track's
+ * own surfaces need; the gold light itself is globals.css
+ * ([data-qp-anchor][data-qp-lit]). Tokens only; reduced motion keeps
+ * every state, without the movement.
+ */
+
+/* ---- The Capital Q pitch board (/q-pitch/capital-q) ---- */
+
+.cq-qp-board {
+  display: grid;
+  gap: 2.5rem;
+}
+@media (min-width: 64rem) {
+  .cq-qp-board {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    gap: 3.5rem;
+  }
+}
+
+/* The index: the template's fourteen parts, in order. A gold thread runs
+   down it to the part Q is talking about. */
+.cq-qp-rail {
+  display: none;
+}
+@media (min-width: 64rem) {
+  .cq-qp-rail {
+    display: block;
+    position: sticky;
+    top: 5rem;
+    align-self: start;
+  }
+}
+.cq-qp-rail-track {
+  position: relative;
+}
+.cq-qp-rail ol {
+  margin: 0;
+  padding: 0 0 0 1rem;
+  list-style: none;
+  border-inline-start: 1px solid var(--cq-border-subtle);
+}
+.cq-qp-thread {
+  position: absolute;
+  inset-inline-start: -1px;
+  top: 0;
+  width: 2px;
+  height: var(--qp-thread, 0px);
+  background: var(--cq-gold-mid);
+  transition: height var(--cq-motion-slow) var(--cq-ease);
+}
+.cq-qp-rail a {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  align-items: baseline;
+  min-height: 2.25rem;
+  padding-block: 0.25rem;
+  color: var(--cq-text-tertiary);
+  text-decoration: none;
+  transition: color var(--cq-motion-base) var(--cq-ease);
+}
+.cq-qp-rail a:hover {
+  color: var(--cq-text-primary);
+}
+.cq-qp-rail a:focus-visible {
+  outline: 2px solid var(--cq-focus-ring);
+  outline-offset: 2px;
+}
+.cq-qp-rail a[data-passed] {
+  color: var(--cq-text-secondary);
+}
+.cq-qp-rail a[aria-current="true"] {
+  color: var(--cq-text-primary);
+  font-weight: 600;
+}
+.cq-qp-rail .cq-qp-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.cq-qp-section > summary {
+  list-style: none;
+}
+.cq-qp-section > summary::-webkit-details-marker {
+  display: none;
+}
+.cq-qp-section[open] .cq-qp-caret {
+  transform: rotate(180deg);
+}
+.cq-qp-caret {
+  transition: transform var(--cq-motion-base) var(--cq-ease);
+}
+.cq-qp-points {
+  border-inline-start: 2px solid var(--cq-border-subtle);
+  transition: border-color var(--cq-motion-emphasis) var(--cq-ease);
+}
+.cq-qp-section[data-qp-lit] .cq-qp-points {
+  border-inline-start-color: var(--cq-gold-mid);
+}
+
+/* ---- Discover: the matching investor in focus grows into view ---- */
+
+/* Transform only: the cards that follow never move (no layout shift). */
+[data-investor-cards] > li[data-qp-anchor] {
+  position: relative;
+  transition:
+    transform var(--cq-motion-slow) var(--cq-ease),
+    box-shadow var(--cq-motion-emphasis) var(--cq-ease);
+}
+[data-investor-cards] > li[data-qp-anchor][data-qp-lit] {
+  z-index: var(--cq-z-sticky);
+  transform: scale(1.06);
+}
+
+/* ---- GateQ draft: Q fills the application, field by field ---- */
+
+[data-qp-fill] > dd {
+  transition: color var(--cq-motion-base) var(--cq-ease);
+}
+/* Until Q reaches a field, the value waits as a quiet line. Only while a
+   tour is lighting this draft; otherwise the draft shows as always. */
+[data-qp-draft][data-qp-filling] [data-qp-fill]:not([data-qp-filled]) > dd {
+  color: transparent;
+  background: linear-gradient(var(--cq-border-subtle), var(--cq-border-subtle))
+    0 60% / 40% 1px no-repeat;
+}
+[data-qp-fill][data-qp-filled] > dd {
+  animation: cq-qp-type 900ms steps(28, end) both;
+}
+@keyframes cq-qp-type {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cq-qp-thread,
+  .cq-qp-rail a,
+  .cq-qp-caret,
+  .cq-qp-points,
+  [data-investor-cards] > li[data-qp-anchor] {
+    transition: none;
+  }
+  [data-investor-cards] > li[data-qp-anchor][data-qp-lit] {
+    transform: none;
+  }
+  [data-qp-fill][data-qp-filled] > dd {
+    animation: none;
+  }
+}

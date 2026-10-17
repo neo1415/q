@@ -28,6 +28,7 @@ import { ViewTransition } from "@/components/view-transition";
 
 import { QAperture, QLumen } from "../q-aperture";
 import { useDockMenu } from "../q-dock/use-dock-menu";
+import { interceptTyped } from "./typed-intercept";
 import { homeHref } from "./active-conversation";
 import { failureMessage, recoveryHint } from "./conversation";
 import { useFollowNewest } from "./follow-newest";
@@ -267,15 +268,18 @@ export function QSheetConversation({
                 onSubmit:
                   voice.active && voice.client.connected
                     ? (text: string) => {
+                        if (interceptTyped(text)) return;
                         voice.client.sendText(text);
                       }
                     : (text: string) =>
-                        q.ask(
-                          text,
-                          moment === null
-                            ? undefined
-                            : { viewing: viewingOf(moment) },
-                        ),
+                        interceptTyped(text)
+                          ? Promise.resolve()
+                          : q.ask(
+                              text,
+                              moment === null
+                                ? undefined
+                                : { viewing: viewingOf(moment) },
+                            ),
               }
             : {})}
         />

@@ -317,6 +317,33 @@
       padding-bottom: 10rem;
     }
   }
+  /* Q Pitch v6: the section Q is talking about (section-light.ts). Q's own
+     gold, as a ring and a soft halo drawn outside the box: no border, no
+     size change, so nothing on the page moves (ADR 0017: glow belongs to
+     Q, and this is Q pointing). Fades in and out; instant with reduced
+     motion. Anchors clear a sticky header when scrolled to. */
+  [data-qp-anchor] {
+    scroll-margin-top: 5rem;
+    transition:
+      box-shadow var(--cq-motion-emphasis) var(--cq-ease),
+      background-color var(--cq-motion-emphasis) var(--cq-ease);
+  }
+  [data-qp-anchor][data-qp-lit] {
+    box-shadow:
+      0 0 0 2px var(--cq-gold-mid),
+      0 0 0 6px color-mix(in oklch, var(--cq-gold-light) 28%, transparent),
+      0 0 28px 4px color-mix(in oklch, var(--cq-gold-mid) 22%, transparent);
+    background-color: color-mix(
+      in oklch,
+      var(--cq-gold-highlight) 10%,
+      transparent
+    );
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-qp-anchor] {
+      transition: none;
+    }
+  }
   /* The "fictional" foot note never sits under a full-height stage or a
      thread, where it added a strip and a second scroll. The names on those
      pages still lose their mark; the note shows on the next page. */
