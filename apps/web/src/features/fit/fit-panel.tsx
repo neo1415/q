@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import {
@@ -8,9 +9,10 @@ import {
   FIT_PARAMETER_LABELS,
   Q_VIEW_VERDICT_LABELS,
   type QViewDto,
+  type RelationshipStateV2,
 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
-import { Button } from "@capital-q/ui/button";
+import { Button, buttonClassName } from "@capital-q/ui/button";
 import { Skeleton } from "@capital-q/ui/states";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
@@ -19,6 +21,7 @@ import { FitBreakdownSheet } from "./fit-breakdown";
 import { FitContextValues } from "./fit-context";
 import { FitGlyph, glyphKindOf, outcomeWord } from "./fit-glyph";
 import { QViewMark, useQView, type QViewPort } from "./q-view-note";
+import { nextStepsFor, type NextStep } from "./next-steps";
 import type { CompanyFit } from "./use-company-fit";
 import { useT } from "@/features/i18n/language";
 
@@ -41,10 +44,13 @@ export function FitPanel({
   qViewPort,
   className,
   defaultOpen = false,
+  relationshipState = null,
 }: {
   readonly companyId: string;
   readonly name: string;
   readonly fit: CompanyFit;
+  /** The reader's relationship, so Q's view offers only steps it allows. */
+  readonly relationshipState?: RelationshipStateV2 | null | undefined;
   /** Open the breakdown at once (design review). */
   readonly defaultOpen?: boolean | undefined;
   /** A view in hand; undefined asks the Q API after the panel renders. */
@@ -75,6 +81,7 @@ export function FitPanel({
           qView={qView}
           qViewPort={qViewPort}
           defaultOpen={defaultOpen}
+          relationshipState={relationshipState}
         />
       )}
     </aside>
@@ -88,11 +95,13 @@ function ReadyPanel({
   qView,
   qViewPort,
   defaultOpen,
+  relationshipState,
 }: {
   readonly companyId: string;
   readonly name: string;
   readonly fit: Extract<CompanyFit, { status: "READY" }>;
   readonly defaultOpen: boolean;
+  readonly relationshipState: RelationshipStateV2 | null;
   readonly qView: QViewDto | null | undefined;
   readonly qViewPort: QViewPort | undefined;
 }) {
@@ -183,6 +192,14 @@ function ReadyPanel({
             </div>
           )}
           <OpenQuestions name={name} questions={view.unknowns.slice(0, 3)} />
+          <NextSteps
+            steps={nextStepsFor({
+              name,
+              companyId,
+              state: relationshipState,
+              questions: view.unknowns.slice(0, 3),
+            })}
+          />
           <GoDeeper name={name} />
         </section>
       )}
@@ -234,6 +251,46 @@ function OpenQuestions({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * What to do about it, from the relationship as it stands (next-steps.ts).
+ * Large enough to press on a phone; each asks Q to prepare, never sends.
+ */
+function NextSteps({ steps }: { readonly steps: readonly NextStep[] }) {
+  const t = useT();
+  const { askNow } = useGlobalQ();
+  if (steps.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1.5" data-q-view-part="NEXT">
+      <span className="cq-caption text-(--cq-text-secondary)">
+        {t("Next step")}
+      </span>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {steps.map((step, index) =>
+          step.kind === "LINK" ? (
+            <Link
+              key={step.label}
+              href={step.href}
+              className={buttonClassName(index === 0 ? "primary" : "secondary")}
+              data-next-step={step.label}
+            >
+              {t(step.label)}
+            </Link>
+          ) : (
+            <Button
+              key={step.label}
+              variant={index === 0 ? "primary" : "secondary"}
+              onClick={() => askNow(step.ask)}
+              data-next-step={step.label}
+            >
+              {t(step.label)}
+            </Button>
+          ),
+        )}
+      </div>
     </div>
   );
 }

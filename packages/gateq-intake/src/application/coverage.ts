@@ -15,7 +15,11 @@ import {
   LEAD_WORDS,
   STAGE_WORDS,
 } from "../inbox/domain.js";
-import { contradictionsIn, questionNeedsFor } from "./question-needs.js";
+import {
+  contradictionsIn,
+  questionNeedsFor,
+  type QuestionNeed,
+} from "./question-needs.js";
 import { amountWords } from "./stated-amount.js";
 
 /**
@@ -190,6 +194,14 @@ export function explainQualification(
   };
 }
 
+function applicantReason(
+  reason: QuestionNeed["reason"] | undefined,
+): Exclude<QuestionNeed["reason"], "INVESTOR_EMPHASIS"> {
+  return reason === undefined || reason === "INVESTOR_EMPHASIS"
+    ? "UNDERSTANDING"
+    : reason;
+}
+
 export function coverageFor(input: {
   readonly policy: GatewayPolicy;
   readonly qualification: QualificationResult;
@@ -229,7 +241,9 @@ export function coverageFor(input: {
         if (!NOT_REPORTED_MISSING.has(dimension)) {
           missing.push({
             ...base,
-            reason: reasons.get(dimension) ?? "UNDERSTANDING",
+            // The applicant's coverage never names the investor's private
+            // emphasis; to them it is simply something worth understanding.
+            reason: applicantReason(reasons.get(dimension)),
           });
         }
         continue;
