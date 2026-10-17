@@ -17,7 +17,8 @@ vi.mock("next/navigation", () => ({
 
 const { QPresenceStage } = await import("../src/features/q/q-presence-stage");
 const { roomStage } = await import("../src/features/q/room/room-stage");
-const { shownItems, stageOf } = await import("../src/features/q/shown");
+const { shownItems, stageNoteOf, stageOf } =
+  await import("../src/features/q/shown");
 const { clearResultShelf } = await import("../src/features/q/result-shelf");
 const store = await import("../src/features/q/cards/card-visibility-store");
 const { loadWire } = await import("../src/features/q/wire");
@@ -389,5 +390,81 @@ describe("the same display twice (owner, new voice chat, 2026-10-17)", () => {
       expect(view.container.querySelector("[data-q-canvas]")).toBeNull(),
     );
     expect(view.getByTestId("aperture").dataset.compact).toBe("false");
+  });
+});
+
+describe("live check on AV (conversation eef33ec5, 2026-10-17)", () => {
+  const RENAMED: QAnswerCardsBlock = {
+    ...FIT,
+    title: "Companies: fit against your mandate",
+  };
+  const second = FIT.cards[1];
+  if (second === undefined) throw new Error("fixture");
+  const ONE: QAnswerCardsBlock = { ...FIT, cards: [second] };
+  const turns: readonly QTurn[] = [
+    person("w1", "give me three new companies that fit my mandate"),
+    answer("w2", said, [FIT]),
+    person("w3", "and again, three that fit my mandate"),
+    answer("w4", said, [RENAMED]),
+    person("w5", "what was the second one?"),
+    answer(
+      "w6",
+      "The second was Clearwater Assurance, at 8.8. Want the detail?",
+      [ONE],
+    ),
+  ];
+  const upToTurn = (id: string) =>
+    turns.slice(0, turns.findIndex((turn) => turn.id === id) + 1);
+
+  it("cards replacing cards puts no banner over the answer", () => {
+    const now = upToTurn("w4");
+    const items = shownItems(now);
+    const pick = stageOf(items, now);
+    expect(pick.item?.id).toBe("w4");
+    // FAILED BEFORE: Replaced "Fit against your mandate" with "Companies: …".
+    expect(stageNoteOf(items, now, pick, () => false)).toBeNull();
+  });
+
+  it("a follow-up about one card on screen keeps the set", () => {
+    const items = shownItems(turns);
+    const pick = stageOf(items, turns);
+    // FAILED BEFORE: the three cards were replaced by the one card.
+    expect(pick.item?.id).toBe("w4");
+    expect(pick.why).toBe("KEPT");
+    expect(stageNoteOf(items, turns, pick, () => false)).toBeNull();
+    // A single card that is not on screen is a new display.
+    const other: QAnswerCardsBlock = {
+      ...FIT,
+      cards: [{ ...second, key: "new-one", name: "Lantern Bio" }],
+    };
+    const fresh = [...upToTurn("w5"), answer("w6", "Lantern Bio.", [other])];
+    expect(stageOf(shownItems(fresh), fresh).item?.id).toBe("w6");
+  });
+
+  it("a kept set is drawn whole, wide, under the latest exchange", async () => {
+    const wide = vi.fn();
+    const view = render(
+      <QPresenceStage
+        presence={() => <div data-testid="aperture" />}
+        turns={turns}
+        captions={false}
+        caption={null}
+        onCardsShowingChange={wide}
+      />,
+    );
+    await waitFor(
+      () =>
+        expect(
+          view.container.querySelectorAll('[data-q-canvas="w4"] [data-ac-card]')
+            .length,
+        ).toBe(3),
+      { timeout: 10_000 },
+    );
+    // FAILED BEFORE: the page widened only for the latest answer's own
+    // cards, and the line over them was the turn that first showed them.
+    await waitFor(() => expect(wide).toHaveBeenLastCalledWith(true));
+    expect(view.container.querySelector(".cq-ac-asked")?.textContent).toBe(
+      "what was the second one?",
+    );
   });
 });

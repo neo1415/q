@@ -363,6 +363,38 @@ function settledAnswers(turns: readonly QTurn[]): readonly SettledAnswer[] {
   return out;
 }
 
+type CardsBlock = Extract<QTurnObjectBlock, { kind: "ANSWER_CARDS" }>;
+
+/** An object that is cards only (no table, map, or document beside them). */
+function onlyCardsOf(item: ShownItem): CardsBlock | null {
+  const [block, ...rest] = item.blocks;
+  return block?.kind === "ANSWER_CARDS" && rest.length === 0 ? block : null;
+}
+
+/**
+ * Fewer cards, every one already in the set on screen (by key, record or
+ * name): a follow-up about part of what is shown, not a new display.
+ */
+function isPartOf(cards: CardsBlock, shown: ShownItem): boolean {
+  const there = shown.blocks.find(
+    (block): block is CardsBlock => block.kind === "ANSWER_CARDS",
+  );
+  if (there === undefined || cards.cards.length === 0) return false;
+  if (cards.cards.length >= there.cards.length) return false;
+  const sameCard = (
+    a: CardsBlock["cards"][number],
+    b: CardsBlock["cards"][number],
+  ) => {
+    if (a.key === b.key) return true;
+    const ida = subjectId(a.subject);
+    if (ida !== null && ida === subjectId(b.subject)) return true;
+    return folded(a.name) === folded(b.name);
+  };
+  return cards.cards.every((card) =>
+    there.cards.some((other) => sameCard(card, other)),
+  );
+}
+
 /** "Shown recently" brought `run` back after the answer `after` (null: before any). */
 export type StageReopened = {
   readonly run: string;
@@ -419,7 +451,23 @@ export function stageOf(
     const one = answers[at];
     if (one === undefined) break;
     const own = items.find((item) => item.run === one.run);
-    if (own !== undefined) return { item: own, why: "SHOWN" };
+    if (own !== undefined) {
+      // Owner 2026-10-17: "what was the second one?" answered with that
+      // one card keeps the set on screen (its card is spotlit by what was
+      // said), rather than replacing three cards with one.
+      const ownCards = onlyCardsOf(own);
+      if (ownCards !== null) {
+        const earlier = stageOf(
+          items.filter((item) => item.run !== own.run),
+          turns.slice(0, turns.indexOf(one.turn)),
+          reopened,
+        );
+        if (earlier.item !== null && isPartOf(ownCards, earlier.item)) {
+          return { item: earlier.item, why: "KEPT" };
+        }
+      }
+      return { item: own, why: "SHOWN" };
+    }
     // Owner 2026-10-17: an answer that opens a room card is the most
     // recent display; older cards leave the stage rather than sit over it.
     if (roomShowOf(one.turn, one.question ?? null) !== undefined) {
@@ -473,12 +521,12 @@ export function stageNoteOf(
   const earlier = items.filter((item) => item.run !== latest.run);
   const then = stageOf(earlier, before);
   if (then.item === null || then.item.run === now.item?.run) return null;
-  // The same set again (the voice line's copy, then the stored one; or
-  // the same three asked twice) replaced nothing anyone can see.
+  // Owner 2026-10-17: cards replacing cards (a table a table, ...) is the
+  // person seeing the new answer, not news: no banner over it. The old one
+  // stays in "Shown recently".
   if (
     now.item !== null &&
-    now.item.title === then.item.title &&
-    JSON.stringify(now.item.blocks) === JSON.stringify(then.item.blocks)
+    now.item.blocks[0]?.kind === then.item.blocks[0]?.kind
   ) {
     return null;
   }

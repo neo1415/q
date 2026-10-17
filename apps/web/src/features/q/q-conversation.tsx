@@ -626,14 +626,18 @@ export function QConversationPanel({
   );
   const chooseView = writeStageView;
   const latestAnswer = turns.findLast((turn) => turn.kind === "Q");
+  // Owner 2026-10-17: cards on the presence stage (kept or brought back
+  // by a later answer too) get the same wide layout as fresh ones.
+  const [stageCards, setStageCards] = useState(false);
   // Cards stay wide while Q talks over them or works on a follow-up.
   const showingCards =
-    latestAnswer?.kind === "Q" &&
-    !latestAnswer.streaming &&
-    latestAnswer.blocks.some(
-      (block) =>
-        block.kind === "COMPARISON_CARDS" || block.kind === "ANSWER_CARDS",
-    );
+    (latestAnswer?.kind === "Q" &&
+      !latestAnswer.streaming &&
+      latestAnswer.blocks.some(
+        (block) =>
+          block.kind === "COMPARISON_CARDS" || block.kind === "ANSWER_CARDS",
+      )) ||
+    (view === "presence" && stageCards);
   // Presence view is Q's presence only (founder request 2026-10-03): a
   // laid-out answer is shown over it (QPresenceStage), not as a thread.
   const bigPresence = !conversing || view === "presence";
@@ -1234,6 +1238,7 @@ export function QConversationPanel({
                         )
                       }
                       onShowingChange={setObjectShown}
+                      onCardsShowingChange={setStageCards}
                       turns={turns}
                       captions={captions}
                       caption={
