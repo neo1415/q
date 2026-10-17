@@ -2899,7 +2899,7 @@ function normalisedWords(text: string): string {
   return ` ${text
     .toLowerCase()
     .replace(/[’']/gu, "'")
-    .replace(/[^\p{L}\p{N}'$£€₦ ]+/gu, " ")
+    .replace(/[^\p{L}\p{M}\p{N}'$£€₦ ]+/gu, " ")
     .replace(/\s+/gu, " ")
     .trim()} `;
 }
@@ -3077,7 +3077,7 @@ const FIELD_STOP_WORDS = new Set(
 );
 
 function contentWords(text: string): string[] {
-  return (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
+  return (text.toLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) ?? [])
     .filter((word) => word.length >= 3 && !FIELD_STOP_WORDS.has(word))
     .map((word) => (word.length > 4 ? word.replace(/(?:es|s)$/u, "") : word));
 }
@@ -3242,9 +3242,12 @@ export function moneyFiguresIn(
 ): readonly { readonly value: number; readonly text: string }[] {
   const out: { value: number; text: string }[] = [];
   const digits = asciiDigits(text);
-  const pattern = /(?:[$€£₦]\s*)?(\d+(?:[.,]\d+)*)(?:\s*([\p{L}]+))?/giu;
+  // The scale after the figure ("750 thousand") or, as some languages
+  // put it, before ("milioni 2").
+  const pattern =
+    /(?:([\p{L}\p{M}]+)\s+)?(?:[$€£₦]\s*)?(\d+(?:[.,]\d+)*)(?:\s*([\p{L}\p{M}]+))?/giu;
   for (const match of digits.matchAll(pattern)) {
-    const raw = match[1] ?? "";
+    const raw = match[2] ?? "";
     // "1,500,000" and "1.5": a comma before three digits groups thousands.
     const number = Number(
       /^\d{1,3}(?:,\d{3})+$/u.test(raw)
@@ -3252,16 +3255,22 @@ export function moneyFiguresIn(
         : raw.replace(/,/gu, "."),
     );
     if (!Number.isFinite(number)) continue;
-    const word = (match[2] ?? "").toLowerCase();
-    const scale = FIGURE_SCALES[word];
-    out.push({
-      value: Math.round(number * (scale ?? 1)),
-      // Only the figure and its scale: a following word is not part of it.
-      text: (scale === undefined
-        ? match[0].slice(0, match[0].length - word.length)
-        : match[0]
-      ).trim(),
-    });
+    const before = (match[1] ?? "").toLowerCase();
+    const after = (match[3] ?? "").toLowerCase();
+    const scaleAfter = FIGURE_SCALES[after];
+    const scaleBefore =
+      scaleAfter === undefined ? FIGURE_SCALES[before] : undefined;
+    const scale = scaleAfter ?? scaleBefore;
+    // Only the figure and its scale: a word on either side that is not
+    // its scale is not part of it.
+    let text = match[0];
+    if (scaleAfter === undefined && after.length > 0) {
+      text = text.slice(0, text.length - after.length);
+    }
+    if (scaleBefore === undefined && before.length > 0) {
+      text = text.slice(before.length);
+    }
+    out.push({ value: Math.round(number * (scale ?? 1)), text: text.trim() });
   }
   if (out.length === 0) {
     for (const value of spokenFiguresIn(text)) {

@@ -748,7 +748,7 @@ function spokenNumber(text: string): number | null {
 export function spokenFiguresIn(text: string): readonly number[] {
   const tokens = asciiDigits(text)
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .replace(/[^\p{L}\p{M}\p{N}\s-]/gu, " ")
     .split(/\s+/)
     .filter((t) => t.length > 0);
   const figures: number[] = [];

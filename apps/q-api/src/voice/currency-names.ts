@@ -86,9 +86,20 @@ function vocabulary(): ReadonlyMap<string, CurrencyWords> {
   return VOCABULARY;
 }
 
-/** A word of theirs that is the unit word, with a plural or attached particle. */
+/** A word of theirs that is the unit word, inflected or with an attached particle. */
 function carriesUnit(word: string, unit: string): boolean {
   if (word === unit) return true;
+  // An inflected ending ("रुपये" for "रुपया"): the same word but for its
+  // last letter.
+  if (
+    // Five letters or more, one letter apart at most: "Europe" is not
+    // "euro".
+    unit.length >= 5 &&
+    Math.abs(word.length - unit.length) <= 1 &&
+    word.slice(0, unit.length - 1) === unit.slice(0, unit.length - 1)
+  ) {
+    return true;
+  }
   if (word.startsWith(unit) && word.length <= unit.length + 2) return true;
   return word.endsWith(unit) && word.length <= unit.length + 3;
 }

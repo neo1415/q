@@ -30,10 +30,14 @@ export function scaleDroppedIn(value: string, quote: string): boolean {
   const text = asciiDigits(quote).toLowerCase();
   let scaled = false;
   let bare = false;
-  for (const match of text.matchAll(/(\d+(?:[.,]\d+)?)(?:\s*([\p{L}]+))?/gu)) {
-    const number = Number((match[1] ?? "").replace(",", "."));
+  // The scale beside the figure, after it ("2 million") or before it, as
+  // some languages say it ("milioni 2").
+  for (const match of text.matchAll(
+    /(?:([\p{L}\p{M}]+)\s+)?(\d+(?:[.,]\d+)?)(?:\s*([\p{L}\p{M}]+))?/gu,
+  )) {
+    const number = Number((match[2] ?? "").replace(",", "."));
     if (number !== wanted) continue;
-    const scale = SCALE_WORDS[match[2] ?? ""];
+    const scale = SCALE_WORDS[match[3] ?? ""] ?? SCALE_WORDS[match[1] ?? ""];
     if (scale !== undefined && scale > 1) scaled = true;
     else bare = true;
   }
@@ -112,7 +116,7 @@ function normalised(text: string): string {
   return text
     .normalize("NFKC")
     .toLocaleLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, " ")
     .trim();
 }
 

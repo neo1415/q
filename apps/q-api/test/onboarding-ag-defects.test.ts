@@ -541,6 +541,15 @@ describe("live AJ: a figure keeps its scale, in any language", () => {
     expect(scaleDroppedIn("2", "2 millones de dólares")).toBe(true);
     expect(scaleDroppedIn("11", "about 11 people")).toBe(false);
     expect(scaleDroppedIn("150", "150 mil reais")).toBe(true);
+    // Scale words from Intl in any language, either side of the figure.
+    expect(
+      moneyFiguresIn("हम 10 लाख रुपये जुटा रहे हैं").map((f) => f.value),
+    ).toEqual([1_000_000]);
+    expect(
+      moneyFiguresIn("Tunakusanya dola milioni 2").map((f) => f.value),
+    ).toEqual([2_000_000]);
+    expect(scaleDroppedIn("10", "हम 10 लाख रुपये जुटा रहे हैं")).toBe(true);
+    expect(scaleDroppedIn("2", "Tunakusanya dola milioni 2")).toBe(true);
     // Said in words, Arabic duals included (live AP).
     expect(scaleDroppedIn("2", "نجمع مليوني دولار")).toBe(true);
     expect(scaleDroppedIn("2000000", "نجمع مليوني دولار")).toBe(false);

@@ -46,3 +46,19 @@ describe("currency in their words, any language", () => {
     ).toEqual({ kind: "ONE", code: "SGD" });
   });
 });
+
+describe("generic scale and currency words beyond English and Arabic", () => {
+  it("Hindi lakh with an inflected rupee, Swahili scale before the figure, and Europe is not the euro", () => {
+    expect(currencyInWords("हम 10 लाख रुपये जुटा रहे हैं", OFFERED)).toEqual({
+      kind: "ONE",
+      code: "INR",
+    });
+    expect(currencyInWords("Tunakusanya shilingi milioni 2", OFFERED)).toEqual({
+      kind: "ONE",
+      code: "KES",
+    });
+    expect(
+      currencyInWords("raising 2 million dollars to grow in Europe", OFFERED),
+    ).toEqual({ kind: "ONE", code: "USD" });
+  });
+});
