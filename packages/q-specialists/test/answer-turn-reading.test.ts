@@ -464,7 +464,14 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
             visibility: null,
           }),
           kind: "QUESTION_TO_Q",
-          question: "ABOUT_CAPITAL_Q",
+          question: {
+            kind: "ABOUT_CAPITAL_Q",
+            text: "what is Capital Q?",
+            about: [],
+            count: null,
+            discover: null,
+            subject: null,
+          },
         },
         outcomes: [],
       });
@@ -489,9 +496,16 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
           visibility: null,
         }),
         kind: "QUESTION_TO_Q",
-        question: "ABOUT_CAPITAL_Q",
+        question: {
+          kind: "ABOUT_CAPITAL_Q",
+          text: "what is Capital Q?",
+          about: [],
+          count: null,
+          discover: null,
+          subject: null,
+        },
       },
-      outcomes: [{ content: "Here is what I found." }],
+      outcomes: [],
     });
     await run.answer.answer(request());
     expect(run.delegated()).toBe(1);
