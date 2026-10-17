@@ -170,11 +170,14 @@ export function CanvasPreview({
   n,
   focus,
   theme,
+  opens = false,
 }: {
   readonly state: string;
   readonly n: number;
   readonly focus: number;
   readonly theme: "light" | "dark";
+  /** Cards with a company behind them, so each carries its Open control. */
+  readonly opens?: boolean;
 }) {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -242,6 +245,18 @@ export function CanvasPreview({
     block = DEMO_RESEARCH;
     asked = "Research Y Combinator";
     said = DEMO_RESEARCH.cards[focus]?.said ?? "";
+  }
+  if (opens) {
+    block = {
+      ...block,
+      cards: block.cards.map((card, index) => ({
+        ...card,
+        subject: {
+          kind: "COMPANY",
+          companyId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+        },
+      })),
+    };
   }
   return (
     <div className="min-h-dvh bg-(--cq-canvas) text-(--cq-text-primary)">
