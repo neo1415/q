@@ -4,6 +4,7 @@ import { assessUnicornPotential } from "../src/unicorn-potential/assess.js";
 import {
   createPostgresUnicornPotentialStore,
   unicornObservationsCurrent,
+  eligibleUnicornRevisions,
 } from "../src/unicorn-potential/postgres.js";
 
 const company = "00000000-0000-4000-8000-000000000001";
@@ -24,18 +25,58 @@ const inputs = {
   deck: null,
 };
 const view = assessUnicornPotential(inputs, "2026-10-17T12:00:00Z").view;
-function fixture(allowed: number[], revisions = [2, 1]) {
+function fixture(
+  allowed: number[],
+  revisions = [2, 1],
+  cohorts: Record<number, string> = {},
+  scored = false,
+) {
   const query = vi.fn(async (parts: TemplateStringsArray) => {
     await Promise.resolve();
     const text = parts.join("?");
-    if (text.includes("unicorn_potential_eligible_revisions"))
+    if (
+      text.includes("unicorn_potential_eligible_revisions") ||
+      text.includes("unicorn_potential_historical_revisions")
+    )
       return allowed.map((revision) => ({ company_id: company, revision }));
     return revisions.map((revision) => ({
       company_id: company,
       revision,
       basis_hash: String(revision).repeat(64),
-      cohort_key: "seed",
-      summary: view,
+      cohort_key: cohorts[revision] ?? "seed",
+      summary: scored
+        ? {
+            ...view,
+            status: "SCORED",
+            overallScore: 75,
+            band: "STRONG_SIGNALS",
+            coverage: 1,
+            stage: "SEED",
+            pillars: view.pillars.map((pillar) => ({
+              ...pillar,
+              grade: 3,
+              coverage: 1,
+              criteria: pillar.criteria.map((criterion) => ({
+                ...criterion,
+                state: "OBSERVED",
+                grade: 3,
+                sources: [
+                  {
+                    id: company,
+                    revision: company,
+                    at: "2026-10-17T00:00:00Z",
+                    kind: "CLAIM",
+                    label: "Public dated fact",
+                    truthClass: "USER_CLAIM",
+                    evidenceStatus: "SELF_REPORTED",
+                    visibilityScope: "network_visible",
+                    lifecycleStatus: "CURRENT",
+                  },
+                ],
+              })),
+            })),
+          }
+        : view,
       assessed_at: "2026-10-17T12:00:00Z",
       observations: [],
     }));
@@ -49,6 +90,7 @@ function fixture(allowed: number[], revisions = [2, 1]) {
   return {
     store: createPostgresUnicornPotentialStore({ sql, transactions }),
     query,
+    sql,
   };
 }
 describe("persisted Unicorn source reauthorization", () => {
@@ -57,7 +99,7 @@ describe("persisted Unicorn source reauthorization", () => {
     expect(
       (await f.store.current([company], "unicorn-potential.v1.0.0")).size,
     ).toBe(0);
-    expect(f.query).toHaveBeenCalledTimes(2);
+    expect(f.query).toHaveBeenCalledTimes(3);
   });
   it("history omits revoked source labels rather than retaining private old explanations", async () => {
     const f = fixture([2]);
@@ -74,6 +116,53 @@ describe("persisted Unicorn source reauthorization", () => {
       "unicorn-potential.v1.0.0",
     );
     expect(current.get(company)?.momentum).toBeNull();
+  });
+  it("does not skip an intervening incomparable cohort when computing momentum", async () => {
+    const f = fixture(
+      [3, 2, 1],
+      [3, 2, 1],
+      { 3: "seed", 2: "pre-seed", 1: "seed" },
+      true,
+    );
+    expect(
+      (await f.store.current([company], view.methodVersion)).get(company)
+        ?.momentum,
+    ).toBeNull();
+  });
+  it("retains dated momentum from an authorized immediate comparable historical revision", async () => {
+    const f = fixture([2, 1], [2, 1], {}, true);
+    expect(
+      (await f.store.current([company], view.methodVersion)).get(company)
+        ?.momentum,
+    ).toEqual(expect.objectContaining({ delta: 0, previousScore: 75 }));
+    expect(
+      f.query.mock.calls.some(([parts]) =>
+        parts.join("").includes("unicorn_potential_historical_revisions"),
+      ),
+    ).toBe(true);
+  });
+  it("does not erase authorized historical observations because their freshness window elapsed", async () => {
+    const f = fixture([1]);
+    const candidate = {
+      company_id: company,
+      revision: 1,
+      assessed_at: "2020-01-01T00:00:00Z",
+      observations: [
+        {
+          pillar: "P4",
+          criterion: "A",
+          stale: false,
+          source: { at: "2019-01-01T00:00:00Z" },
+        },
+      ],
+    };
+    expect((await eligibleUnicornRevisions(f.sql, [candidate])).size).toBe(0);
+    expect(f.query).not.toHaveBeenCalled();
+    expect(
+      (await eligibleUnicornRevisions(f.sql, [candidate], true)).has(
+        `${company}:1`,
+      ),
+    ).toBe(true);
   });
   it("does no source query for an empty requested page", async () => {
     const f = fixture([]);
@@ -135,7 +224,10 @@ describe("append revisions and source revocation during assessment", () => {
         await Promise.resolve();
         const text = parts.join("?");
         if (text.includes("for update")) return [{ id: company }];
-        if (text.includes("unicorn_potential_eligible_revisions"))
+        if (
+          text.includes("unicorn_potential_eligible_revisions") ||
+          text.includes("unicorn_potential_historical_revisions")
+        )
           return allowed ? [{ company_id: company, revision: 0 }] : [];
         if (text.startsWith("select revision")) return history.slice(-1);
         if (text.startsWith("insert into")) {

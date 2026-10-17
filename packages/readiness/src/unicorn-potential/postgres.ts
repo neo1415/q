@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   UnicornPotentialDtoSchema,
   type UnicornPotentialDto,
@@ -88,13 +89,27 @@ export function unicornObservationsCurrent(
 export async function eligibleUnicornRevisions(
   sql: DatabaseExecutor,
   candidates: readonly UnicornEligibilityCandidate[],
+  historical = false,
 ): Promise<ReadonlySet<string>> {
-  const current = candidates.filter((candidate) =>
-    unicornObservationsCurrent(candidate.observations),
-  );
+  const current = historical
+    ? candidates
+    : candidates.filter((candidate) =>
+        unicornObservationsCurrent(candidate.observations),
+      );
   if (current.length === 0) return new Set();
-  const rows = await sql<{ company_id: string; revision: number }[]>`
-    select company_id, revision from private.unicorn_potential_eligible_revisions(${sql.json(current as never)})`;
+  const payload = z.json().parse(
+    current.map((candidate) => ({
+      ...candidate,
+      assessed_at: new Date(candidate.assessed_at).toISOString(),
+    })),
+  );
+  const rows = historical
+    ? await sql<
+        { company_id: string; revision: number }[]
+      >`select company_id, revision from private.unicorn_potential_historical_revisions(${sql.json(payload)})`
+    : await sql<
+        { company_id: string; revision: number }[]
+      >`select company_id, revision from private.unicorn_potential_eligible_revisions(${sql.json(payload)})`;
   return new Set(rows.map((row) => `${row.company_id}:${row.revision}`));
 }
 
@@ -124,13 +139,15 @@ function withMomentum(
   current: UnicornPotentialSnapshot,
   older: readonly UnicornPotentialSnapshot[],
 ): UnicornPotentialDto {
-  const previous = older.find(
-    (item) =>
-      item.cohortKey === current.cohortKey &&
-      item.view.stage === current.view.stage &&
-      item.view.inputRulesVersion === current.view.inputRulesVersion &&
-      item.view.overallScore !== null,
-  );
+  const candidate = older[0];
+  const previous =
+    candidate !== undefined &&
+    candidate.cohortKey === current.cohortKey &&
+    candidate.view.stage === current.view.stage &&
+    candidate.view.inputRulesVersion === current.view.inputRulesVersion &&
+    candidate.view.overallScore !== null
+      ? candidate
+      : undefined;
   if (
     current.view.overallScore === null ||
     previous?.view.overallScore === null ||
@@ -185,7 +202,7 @@ export function createPostgresUnicornPotentialStore(options: {
     const rows = await sql<
       Row[]
     >`select company_id, revision, basis_hash, cohort_key, summary, assessed_at, observations from core.company_unicorn_potential_assessments where company_id = ${companyId}::uuid and method_version = ${methodVersion} order by revision desc limit ${bounded}`;
-    const allowed = await eligibleUnicornRevisions(sql, rows);
+    const allowed = await eligibleUnicornRevisions(sql, rows, true);
     return rows
       .filter((row) => allowed.has(`${row.company_id}:${row.revision}`))
       .map(snapshot);
@@ -236,7 +253,7 @@ export function createPostgresUnicornPotentialStore(options: {
         if (input.view.methodVersion !== input.methodVersion)
           throw new Error("Unicorn Potential method mismatch");
         const revision = (latest?.revision ?? 0) + 1;
-        await tx`insert into core.company_unicorn_potential_assessments (tenant_id, organisation_id, company_id, method_version, revision, basis_hash, cohort_key, status, score, summary, observations) values (${input.subject.tenantId}::uuid, ${input.subject.organisationId}::uuid, ${subject.id}::uuid, ${input.methodVersion}, ${revision}, ${input.basisHash}, ${input.cohortKey}, ${input.view.status}, ${input.view.overallScore}, ${tx.json(input.view)}, ${tx.json(input.observations as never)})`;
+        await tx`insert into core.company_unicorn_potential_assessments (tenant_id, organisation_id, company_id, method_version, revision, basis_hash, cohort_key, status, score, summary, observations) values (${input.subject.tenantId}::uuid, ${input.subject.organisationId}::uuid, ${subject.id}::uuid, ${input.methodVersion}, ${revision}, ${input.basisHash}, ${input.cohortKey}, ${input.view.status}, ${input.view.overallScore}, ${tx.json(input.view)}, ${tx.json(z.json().parse(input.observations))})`;
         return { revision, created: true };
       }),
     current: async (ids, methodVersion) => {
@@ -245,7 +262,20 @@ export function createPostgresUnicornPotentialStore(options: {
       const rows = await sql<
         Row[]
       >`select a.company_id, a.revision, a.basis_hash, a.cohort_key, a.summary, a.assessed_at, a.observations from unnest(${[...new Set(ids)]}::uuid[]) requested(id) cross join lateral (select company_id, revision, basis_hash, cohort_key, summary, assessed_at, observations from core.company_unicorn_potential_assessments where company_id = requested.id and method_version = ${methodVersion} order by revision desc limit 20) a`;
-      const allowed = await eligibleUnicornRevisions(sql, rows);
+      const newest = new Map<string, Row>();
+      for (const row of rows) {
+        const prior = newest.get(row.company_id);
+        if (prior === undefined || row.revision > prior.revision)
+          newest.set(row.company_id, row);
+      }
+      const allowed = await eligibleUnicornRevisions(sql, [...newest.values()]);
+      const historicalAllowed = await eligibleUnicornRevisions(
+        sql,
+        rows.filter(
+          (row) => row.revision !== newest.get(row.company_id)?.revision,
+        ),
+        true,
+      );
       const grouped = new Map<string, UnicornPotentialSnapshot[]>();
       for (const row of rows) {
         const items = grouped.get(row.company_id) ?? [];
@@ -261,9 +291,10 @@ export function createPostgresUnicornPotentialStore(options: {
             id,
             withMomentum(
               first,
-              items
-                .slice(1)
-                .filter((item) => allowed.has(`${id}:${item.revision}`)),
+              items[1] !== undefined &&
+                historicalAllowed.has(`${id}:${items[1].revision}`)
+                ? [items[1]]
+                : [],
             ),
           );
       }
