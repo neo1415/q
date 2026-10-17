@@ -10,13 +10,66 @@
  */
 
 /**
+ * Anchors placed by a stable existing marker rather than by markup: one
+ * table per track, so a page's own markup never encodes tour step numbers.
+ * `select` finds the element; `tap`, when the line opens it, is what a
+ * person would press to bring it forward (a card into the spotlight).
+ */
+export type AnchorPlacement = {
+  readonly select: string;
+  readonly tap?: string | undefined;
+};
+const placements = new Map<string, AnchorPlacement>();
+
+/** Registers a track's placements (idempotent; later ones win). */
+export function placeAnchors(
+  table: Readonly<Record<string, AnchorPlacement>>,
+): void {
+  for (const [anchor, placement] of Object.entries(table)) {
+    placements.set(anchor, placement);
+  }
+}
+
+/**
  * An anchor's element, or null when the page does not have it (yet). A
  * shared element may carry several anchors, space-separated (one per
- * track: `inv.07.crm.hub fdr.05.crm.hub`).
+ * track: `inv.07.crm.hub fdr.05.crm.hub`). An anchor placed by marker is
+ * written onto the element it finds, so the stylesheet treats both alike.
  */
 export function anchorElement(anchor: string): HTMLElement | null {
   const escaped = anchor.replace(/["\\\s]/gu, "");
-  return document.querySelector<HTMLElement>(`[data-qp-anchor~="${escaped}"]`);
+  const marked = document.querySelector<HTMLElement>(
+    `[data-qp-anchor~="${escaped}"]`,
+  );
+  if (marked !== null) return marked;
+  const placement = placements.get(anchor);
+  if (placement === undefined) return null;
+  let found: HTMLElement | null = null;
+  try {
+    found = document.querySelector<HTMLElement>(placement.select);
+  } catch {
+    return null;
+  }
+  if (found === null) return null;
+  const existing = found.getAttribute("data-qp-anchor");
+  found.setAttribute(
+    "data-qp-anchor",
+    existing === null ? anchor : `${existing} ${anchor}`,
+  );
+  return found;
+}
+
+/** What to press to bring the anchor forward, when its placement says. */
+function tapOf(anchor: string, element: HTMLElement): HTMLElement | null {
+  const tap = placements.get(anchor)?.tap;
+  if (tap === undefined) return null;
+  try {
+    return element.matches(tap)
+      ? element
+      : element.querySelector<HTMLElement>(tap);
+  } catch {
+    return null;
+  }
 }
 
 const LIT = "data-qp-lit";
@@ -55,6 +108,9 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/** A card's move into the spotlight (its layout animation is 380 ms). */
+const TAP_SETTLE_MS = 450;
+
 /** How long a page may take to render a section the step opened. */
 export const ANCHOR_WAIT_MS = 4_000;
 
@@ -76,6 +132,16 @@ export async function lightSection(
     element = anchorElement(anchor);
   }
   if (element === null || signal.aborted) return false;
+  if (options.open === true) {
+    const tap = tapOf(anchor, element);
+    if (tap !== null && tap.getAttribute("aria-expanded") !== "true") {
+      // Pressed as a person would; the page re-renders the section in its
+      // larger place, so it is found again once the move has settled.
+      tap.click();
+      await sleep(TAP_SETTLE_MS, signal);
+      element = anchorElement(anchor) ?? element;
+    }
+  }
   const disclosure = disclosureOf(element);
   if (disclosure !== null && options.open !== undefined) {
     disclosure.open = options.open;
@@ -86,6 +152,7 @@ export async function lightSection(
     element.scrollIntoView({
       behavior: reducedMotion() ? "auto" : "smooth",
       block: "start",
+      inline: "nearest",
     });
   }
   return true;

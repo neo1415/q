@@ -4,7 +4,7 @@
  * host still admits only accounts it may run on; this only picks the track.
  */
 export function tourStartFor(kind: string): string | null {
-  if (kind === "INVESTOR") return "/home?qpitch=premiere";
+  if (kind === "INVESTOR") return "/home?qpitch=investor-v6";
   if (kind === "FOUNDER") return "/home?qpitch=founder-v6";
   return null;
 }

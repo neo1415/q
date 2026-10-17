@@ -197,7 +197,14 @@ export const OpenRecordActionSchema = z
   .object({
     ...base,
     kind: z.literal("openRecord"),
-    record: z.enum(["GATEQ_APPLICATION", "RELATIONSHIP", "RELATIONSHIP_CALLS"]),
+    record: z.enum([
+      "GATEQ_APPLICATION",
+      "RELATIONSHIP",
+      "RELATIONSHIP_CALLS",
+      // v6: the relationship's own tabs.
+      "RELATIONSHIP_MESSAGES",
+      "RELATIONSHIP_SCHEDULE",
+    ]),
     key: FixtureKeySchema,
   })
   .strict();

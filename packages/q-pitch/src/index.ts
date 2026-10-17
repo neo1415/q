@@ -73,4 +73,9 @@ export {
   FOUNDER_V6_PRESENTER_LINES,
   FOUNDER_V6_SCRIPT,
 } from "./founder-v6.js";
+export {
+  INVESTOR_V6_ACTOR,
+  INVESTOR_V6_LEDGER,
+  INVESTOR_V6_SCRIPT,
+} from "./investor-v6.js";
 export { FOUNDER_QA_ENTRIES } from "./qa-bank-founder.js";

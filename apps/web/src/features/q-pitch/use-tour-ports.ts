@@ -227,7 +227,12 @@ export function investorPath(
 }
 
 export function recordPath(
-  record: "GATEQ_APPLICATION" | "RELATIONSHIP" | "RELATIONSHIP_CALLS",
+  record:
+    | "GATEQ_APPLICATION"
+    | "RELATIONSHIP"
+    | "RELATIONSHIP_CALLS"
+    | "RELATIONSHIP_MESSAGES"
+    | "RELATIONSHIP_SCHEDULE",
   key: string,
   companyOf: (key: string) => ResolvedCompany | null,
 ): string | null {
@@ -240,7 +245,13 @@ export function recordPath(
   const company = companyOf(key);
   if (company === null) return null;
   const base = `/relationships/company/${encodeURIComponent(company.companyId.toLowerCase())}`;
-  return record === "RELATIONSHIP_CALLS" ? `${base}#calls` : base;
+  return record === "RELATIONSHIP_CALLS"
+    ? `${base}#calls`
+    : record === "RELATIONSHIP_MESSAGES"
+      ? `${base}/messages`
+      : record === "RELATIONSHIP_SCHEDULE"
+        ? `${base}/calls`
+        : base;
 }
 
 /** Where rehearsal transcript segments go: the host's runner and captions. */

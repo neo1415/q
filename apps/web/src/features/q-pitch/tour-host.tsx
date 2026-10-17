@@ -13,6 +13,8 @@ import {
 import {
   FOUNDER_V6_LEDGER,
   FOUNDER_V6_SCRIPT,
+  INVESTOR_V6_LEDGER,
+  INVESTOR_V6_SCRIPT,
   PILOT_CERTIFICATION_LEDGER,
   PILOT_SCRIPT,
   PREMIERE_CERTIFICATION_LEDGER,
@@ -44,7 +46,8 @@ import {
   standardVoicePlaying,
 } from "./narrator";
 import { RESUME_KEY } from "./resume";
-import { unlightAll } from "./section-light";
+import { INVESTOR_ANCHORS } from "./investor-anchors";
+import { placeAnchors, unlightAll } from "./section-light";
 import { openTourVoice } from "./tour-voice";
 import { viewerQuestions } from "./live-question";
 import { useTourPorts, type TranscriptSink } from "./use-tour-ports";
@@ -109,7 +112,7 @@ function actionWords(snapshot: TourSnapshot): string | null {
 }
 
 export type TourChoice =
-  "pilot" | "premiere" | "short" | "atlas" | "founder-v6";
+  "pilot" | "premiere" | "short" | "atlas" | "founder-v6" | "investor-v6";
 
 /**
  * Which script, and what the gate may admit. The premiere opts into
@@ -137,6 +140,12 @@ const TOURS = {
       "Internal rehearsal · Feature Atlas · includes code-verified scenes without a browser receipt · demonstration data",
   },
   // Q Pitch v6, founder track (Lane qpf): Capital Q presented to founders.
+  "investor-v6": {
+    script: INVESTOR_V6_SCRIPT,
+    ledger: INVESTOR_V6_LEDGER,
+    accepted: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
+    label: "Q Pitch · investor track · demonstration data",
+  },
   "founder-v6": {
     script: FOUNDER_V6_SCRIPT,
     ledger: FOUNDER_V6_LEDGER,
@@ -151,6 +160,9 @@ const TOURS = {
       "Internal rehearsal · premiere v5 · includes code-verified scenes without a browser receipt · demonstration data",
   },
 } as const;
+
+// The investor track's sections, by the pages' own markers.
+placeAnchors(INVESTOR_ANCHORS);
 
 /** Phases in which nothing is running, so an answer interrupts nothing. */
 const HALTED: ReadonlySet<string> = new Set([

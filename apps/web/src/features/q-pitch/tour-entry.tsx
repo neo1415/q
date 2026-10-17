@@ -14,7 +14,8 @@ function choiceOf(value: string | null): TourChoice | null {
     value === "premiere" ||
     value === "short" ||
     value === "atlas" ||
-    value === "founder-v6"
+    value === "founder-v6" ||
+    value === "investor-v6"
     ? value
     : null;
 }
