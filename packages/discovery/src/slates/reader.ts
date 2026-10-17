@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   ContractValidationError,
   type DiscoverFilterDimension,
@@ -167,7 +168,23 @@ export class SlateCursorRejectedError extends Error {
   }
 }
 
+export type UnicornPotentialDiscoverPort = {
+  /** Null denies entitlement; values must be persisted, source-current and authorized for this actor. */
+  readonly readMany: (input: {
+    readonly actor: ActorContext;
+    readonly companyIds: readonly string[];
+  }) => Promise<ReadonlyMap<string, number | null> | null>;
+};
+
+export class UnicornPotentialDiscoverDeniedError extends Error {
+  constructor() {
+    super("Premium Unicorn Potential access is required.");
+    this.name = "UnicornPotentialDiscoverDeniedError";
+  }
+}
+
 export type SlateReadServiceDependencies = {
+  readonly unicornPotential?: UnicornPotentialDiscoverPort | undefined;
   readonly ports: Pick<EligibilityPorts, "investorSubject" | "mandates">;
   readonly eligibility: EligibilityService;
   /**
@@ -618,6 +635,18 @@ export function createSlateReadService(
   return {
     pageCompanies: async (query) => {
       const now = clock();
+      const premiumSelection =
+        query.filters?.unicornPotentialMin !== undefined ||
+        query.filters?.unicornPotentialSort === true;
+      if (
+        premiumSelection &&
+        (await dependencies.unicornPotential?.readMany({
+          actor: query.actor,
+          companyIds: [],
+        })) == null
+      ) {
+        throw new UnicornPotentialDiscoverDeniedError();
+      }
       const limit = Math.max(
         1,
         Math.min(
@@ -728,6 +757,115 @@ export function createSlateReadService(
           reason: "SLATE_EXPIRED",
           priority: "HIGH",
         });
+      }
+
+      if (premiumSelection && filters !== null && fingerprint !== undefined) {
+        // Explicit selection only: never write this order back to the canonical slate.
+        // Re-read and guard the bounded existing pool on every page, including revocation.
+        const candidates: RecommendationItem[] = [];
+        let scanRank = 0;
+        while (candidates.length < policy.candidatePoolMax) {
+          const batch = await pageWithin(
+            {
+              slateId: slate.id,
+              afterRank: scanRank,
+              limit: Math.min(
+                ELIGIBILITY_BATCH_MAX,
+                policy.candidatePoolMax - candidates.length,
+              ),
+            },
+            volume,
+          );
+          if (batch.length === 0) break;
+          candidates.push(...batch);
+          scanRank = batch.at(-1)?.rank ?? scanRank;
+        }
+        const guardedItems: (SlatePageItem & { readonly rank: number })[] = [];
+        for (
+          let start = 0;
+          start < candidates.length;
+          start += ELIGIBILITY_BATCH_MAX
+        ) {
+          const guarded = await guard({
+            actor: query.actor,
+            key,
+            mandateVersion: lookup.mandate.version,
+            items: candidates.slice(start, start + ELIGIBILITY_BATCH_MAX),
+          });
+          guardedItems.push(...guarded.items);
+        }
+        const passed = await applyFilters({
+          actor: query.actor,
+          filters,
+          items: guardedItems,
+        });
+        const scores = await dependencies.unicornPotential?.readMany({
+          actor: query.actor,
+          companyIds: [...passed.keys()],
+        });
+        if (scores == null) throw new UnicornPotentialDiscoverDeniedError();
+        const selected = guardedItems.filter((item) => {
+          if (!passed.has(item.companyId)) return false;
+          const score = scores.get(item.companyId);
+          return (
+            typeof score === "number" &&
+            Number.isFinite(score) &&
+            score >= 0 &&
+            score <= 100 &&
+            (filters.unicornPotentialMin === undefined ||
+              score >= filters.unicornPotentialMin)
+          );
+        });
+        if (filters.unicornPotentialSort === true)
+          selected.sort(
+            (a, b) =>
+              (scores.get(b.companyId) ?? -1) -
+                (scores.get(a.companyId) ?? -1) || a.rank - b.rank,
+          );
+        // Scores never enter the cursor. A changed authorized snapshot restarts safely.
+        const snapshot = createHash("sha256")
+          .update(JSON.stringify(selected.map((item) => item.companyId)))
+          .digest("hex")
+          .slice(0, 16);
+        const start =
+          cursor !== undefined &&
+          slate.id === cursor.slateId &&
+          cursor.f === fingerprint &&
+          cursor.u === snapshot
+            ? Math.max(
+                0,
+                selected.findIndex((item) => item.rank === afterRank) + 1,
+              )
+            : 0;
+        if (
+          cursor !== undefined &&
+          cursor.u !== snapshot &&
+          !notes.includes("SLATE_RESTARTED")
+        )
+          notes.push("SLATE_RESTARTED");
+        const page = selected.slice(start, start + limit);
+        return {
+          slateId: slate.id,
+          rankingVersion: slate.rankingConfigVersion,
+          items: page.flatMap((item) => {
+            const kept = passed.get(item.companyId);
+            return kept === undefined ? [] : [kept];
+          }),
+          notes: page.length === 0 ? [...notes, "NONE_MATCH_FILTERS"] : notes,
+          nextCursor:
+            selected.length > start + limit
+              ? encodeSlateCursor({
+                  v: 1,
+                  slateId: slate.id,
+                  afterRank: page.at(-1)?.rank ?? 0,
+                  f: fingerprint,
+                  u: snapshot,
+                })
+              : null,
+          unverifiableExclusions: unverifiable,
+          excludingRules: [],
+          discoverableCount: null,
+        };
       }
 
       if (filters !== null && fingerprint !== undefined) {
