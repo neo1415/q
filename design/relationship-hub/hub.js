@@ -14,7 +14,7 @@
   const D = window.HUB_DATA;
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms * (window.HUB_PACE || 1)));
 
   /* ---------------- icons (simple strokes, no AI imagery) ---------------- */
   const P = {
@@ -439,7 +439,7 @@
     </div></section>`;
   }
   function recWork() {
-    return `<section class="panel"><header><h2>Q Work on this relationship</h2></header><div class="rows">${D.work.slice(0, 2).map((w) => `<div class="row link" data-action="work:${w.id}">${qMark(w.state === "RUNNING").replace('class="aperture', 'style="width:24px;height:24px" class="aperture')}<div class="grow"><div class="title">${w.title}</div><div class="meta">${workWord(w.state)}</div></div><button class="btn sm">Open</button></div>`).join("")}</div></section>`;
+    return `<section class="panel"><header><h2>Q Work on this relationship</h2></header><div class="rows">${D.work.slice(0, 2).map((w) => `<div class="row link" data-action="work:${w.id}" ${q("item.work-" + w.id)}>${qMark(w.state === "RUNNING").replace('class="aperture', 'style="width:24px;height:24px" class="aperture')}<div class="grow"><div class="title">${w.title}</div><div class="meta">${workWord(w.state)}</div></div><button class="btn sm">Open</button></div>`).join("")}</div></section>`;
   }
   function recHistory(c) {
     const ev = [["14", "10 Oct 08:14", "document_shared", "HUMAN", "Financial model v3 shared (relationship_shared)"], ["13", "9 Oct 14:52", "meeting_held", "SYSTEM", "Meeting held · 52 min"], ["12", "26 Sep", "diligence_started", "HUMAN", "Diligence started by Amara Okafor"], ["9", "25 Sep", "connection_accepted", "HUMAN", "Founder accepted connection"], ["8", "24 Sep", "interest_expressed", "HUMAN", "Interest expressed by Amara Okafor"], ["1", "21 Sep", "gateq_application", "CONNECTED_SYSTEM", "Applied through GateQ"]];
@@ -591,6 +591,7 @@ Asks: introductions to two Nordic grid operators.</div>
     $("#app").innerHTML = `<div class="shell">${sidebar()}<main class="main" id="main"><div class="page">${content}</div></main></div>${bottomNav()}${qPanel()}${S.drawer ? drawer() : ""}`;
     $("#role-seg").innerHTML = ["investor", "founder"].map((r) => `<button data-action="role:${r}" aria-pressed="${S.role === r}">${r === "investor" ? "Investor view" : "Founder view"}</button>`).join("");
     if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); if (el.setSelectionRange) el.setSelectionRange(el.value.length, el.value.length); } }
+    document.body.classList.toggle("q-side", S.qOpen);
     toHash();
     afterRender();
   }
@@ -740,7 +741,7 @@ Asks: introductions to two Nordic grid operators.</div>
   // Video 3: Q drives the workspace by semantic control ids, then returns.
   async function tour() {
     await say(`I'll find Halden Grid's margin evidence: the pipeline first, then the record, the model page and the meeting passage.`);
-    if (S.area !== "pipeline") await act("Go to Pipeline", "SELECT_TAB", "tab.hub-pipeline", async () => go("pipeline"), selected("tab.hub-pipeline"));
+    if (S.area !== "pipeline") await act("Go to Pipeline", S.area === "record" ? "NAVIGATE" : "SELECT_TAB", S.area === "record" ? "button.record-back" : "tab.hub-pipeline", async () => go("pipeline"), selected("tab.hub-pipeline"));
     await act("Search “Halden”", "FOCUS + INPUT", "input.pipeline-search", async () => { S.search = "Halden"; render(); }, () => $("#pipe-search")?.value === "Halden");
     await act("Filter: In diligence", "FILTER", "filter.stage-in_diligence", async () => { S.stage = "IN_DILIGENCE"; render(); }, pressed("filter.stage-in_diligence"));
     await act("Open the first result", "SELECT_ITEM 1", "item.pipeline-1", async () => openRecord("halden", "overview"), exists("section.next-action"));
@@ -750,7 +751,7 @@ Asks: introductions to two Nordic grid operators.</div>
     await act("Jump to transcript 22:05", "SELECT_TAB + SCROLL_TO", "tab.record-meetings", async () => { S.recordTab = "meetings"; S.transcriptAt = "22:05"; render(); }, () => !!$("#ts-2205.hit"));
     await say(`At 22:05 Amara asks which margin is current; at 22:41 the founder says hosting moved in-house. Next, the diligence brief job.`);
     await act("Tab: Q Work", "SELECT_TAB", "tab.record-work", async () => { S.recordTab = "work"; render(); }, selected("tab.record-work"));
-    await act("Open job: diligence brief", "ACTIVATE", "tab.record-work", async () => handle("work:w1"), exists("section.work-steps"));
+    await act("Open job: diligence brief", "ACTIVATE", "item.work-w1", async () => handle("work:w1"), exists("section.work-steps"));
     await sleep(1400);
     await act("Return to Halden Grid", "BACK", "button.work-back", async () => handle("return"), exists("section.next-action"));
     await say(`Back on Halden Grid where you were. The margin stays contradictory until the hosting invoices arrive; I've suggested requesting them in Diligence.<div class="src faint">9 acts · all receipts from page read-back · simulated</div>`);

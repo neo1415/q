@@ -44,7 +44,7 @@ a { color: inherit; }
 .seg button[aria-pressed="true"] { background: var(--cq-accent-soft); color: var(--cq-accent); font-weight: 600; }
 
 /* ---------- shell ---------- */
-.shell { display: grid; grid-template-columns: var(--cq-sidebar-width) 1fr; min-height: calc(100vh - 36px); }
+.shell { display: grid; grid-template-columns: var(--cq-sidebar-width) minmax(0, 1fr); min-height: calc(100vh - 36px); }
 .sidebar {
   border-right: 1px solid var(--cq-border-subtle); background: var(--cq-surface);
   padding: 14px 10px; display: flex; flex-direction: column; gap: 2px;
@@ -318,6 +318,12 @@ td .sub { font-size: 12px; color: var(--cq-text-secondary); }
 
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: var(--cq-z-toast); background: var(--cq-text-primary); color: var(--cq-text-inverse); padding: 10px 14px; border-radius: var(--cq-radius-md); font-size: 13px; box-shadow: var(--cq-shadow-overlay); }
 
+/* On wide screens Q opens as a side panel and the page reflows beside it, so
+   the controls Q acts on are never hidden behind Q. */
+@media (min-width: 1100px) {
+  body.q-side .page { padding-right: 420px; }
+  body.q-side .q-panel { top: 52px; bottom: 84px; max-height: none; width: 384px; right: 16px; }
+}
 /* mobile bottom nav */
 .bottom-nav { display: none; }
 
@@ -328,7 +334,7 @@ td .sub { font-size: 12px; color: var(--cq-text-secondary); }
   .axis:nth-child(n+4) { border-top: 1px solid var(--cq-border-subtle); }
 }
 @media (max-width: 767px) {
-  .shell { grid-template-columns: 1fr; }
+  .shell { grid-template-columns: minmax(0, 1fr); }
   .sidebar { display: none; }
   .page { padding: 14px 16px 150px; }
   .page-head h1 { font-size: 21px; }
@@ -373,6 +379,11 @@ td .sub { font-size: 12px; color: var(--cq-text-secondary); }
   .q-dock { padding: 4px; min-height: 0; }
   .q-dock .state { display: none; }
   .facts { gap: 12px; }
+  .panel > header { flex-wrap: wrap; }
+  .panel > header .right { margin-left: 0; }
+  .panel > header .search { min-width: 0; width: 100%; }
+  .claim { grid-template-columns: minmax(0, 1fr); }
+  .compare th, .compare td { min-width: 140px; }
   .axes.compact, .record-head.compact .facts, .record-head.compact .next-action .btn { display: none; }
   .record-head.compact .next-action { padding: 6px 10px; }
   .record-head.compact .next-action div[style] { margin: 0 !important; }
