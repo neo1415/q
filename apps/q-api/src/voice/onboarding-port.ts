@@ -43,6 +43,7 @@ import {
   type QRecommendationPublicSourceType,
 } from "@capital-q/onboarding";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
+import { turnIsEnglish } from "./reply-language.js";
 
 import {
   figureCountIn,
@@ -1724,6 +1725,45 @@ export function createOnboardingPort(input: {
           "That comes from something they said earlier, and which choice it is was your reading. Say back what you understood in a few words and record it when they agree.",
       });
     }
+    // A choice their English words never name, on a step the independent
+    // reading did not find stated, is the model's inference, not their
+    // statement (live AL 2026-10-16: "co-invest alongside a lead" saved
+    // for a partner at a small VC fund who never said how they take part).
+    // Words in another language are the reading's and the model's, as
+    // before: their names for the choices are not listed here.
+    if (
+      answer.basis !== "DELEGATED" &&
+      !verbatimMatch &&
+      (resolved.value.type === "SINGLE_SELECT" ||
+        resolved.value.type === "MULTI_SELECT") &&
+      // "Other" with their own words is their statement, checked below.
+      resolved.note === undefined &&
+      reading !== null &&
+      !statedIn(reading.stated, resolved.step.stepKey) &&
+      turnIsEnglish(answer.quote)
+    ) {
+      // Named in the quote, or in the turn of theirs it is cut from.
+      const named = new Set([
+        ...optionsNamedIn(input.journeyType, resolved.step, answer.quote),
+        ...input.personTurns
+          .filter((said) => quoteOccursIn(answer.quote, said))
+          .flatMap((said) => [
+            ...optionsNamedIn(input.journeyType, resolved.step, said),
+          ]),
+      ]);
+      const chosen =
+        resolved.value.type === "SINGLE_SELECT"
+          ? [resolved.value.optionKey]
+          : resolved.value.optionKeys;
+      if (chosen.some((key) => !named.has(key))) {
+        return done({
+          stepKey: resolved.step.stepKey,
+          outcome: "REJECTED",
+          reason:
+            "Their words do not name this choice and nothing else says they stated it, so nothing was recorded: it would be your inference. Ask them if you want to know.",
+        });
+      }
+    }
     const refused = unsupported(
       resolved.step,
       resolved.value,
@@ -3112,3 +3152,47 @@ export function moneyFiguresIn(
 const SAVED_AFTER: Readonly<Record<string, readonly string[]>> = {
   "I0.organisation_name": ["I0.investor_type"],
 };
+
+/**
+ * Every choice of a single- or multi-select step their words name, by its
+ * label, key or the journey's aliases (case and plural aside).
+ */
+export function optionsNamedIn(
+  journeyType: "founder" | "investor",
+  step: { readonly stepKey: string; readonly configuration: unknown },
+  quote: string,
+): ReadonlySet<string> {
+  const configuration = step.configuration as {
+    readonly options?: readonly {
+      readonly optionKey?: string;
+      readonly key?: string;
+      readonly label?: string;
+    }[];
+  };
+  const aliases = (
+    journeyType === "founder"
+      ? FOUNDER_UTTERANCE_ALIASES
+      : INVESTOR_UTTERANCE_ALIASES
+  )[step.stepKey];
+  const said = normalisedWords(quote);
+  const named = new Set<string>();
+  for (const option of configuration.options ?? []) {
+    const key = option.optionKey ?? option.key ?? "";
+    const names = [
+      option.label ?? "",
+      ...(key.length >= 3 ? [key.replace(/_/gu, " ")] : []),
+      ...(aliases?.[key] ?? []),
+    ]
+      .map((name) => normalisedWords(name).trim())
+      .filter((name) => name.length > 0);
+    const forms = names.flatMap((name) => [
+      name,
+      `${name}s`,
+      name.replace(/s$/u, ""),
+    ]);
+    if (forms.some((form) => form.length > 0 && said.includes(` ${form} `))) {
+      named.add(key);
+    }
+  }
+  return named;
+}

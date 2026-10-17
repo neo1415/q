@@ -568,3 +568,52 @@ describe("live AJ: no turn opens with a request the journey must refuse", () => 
     expect(world.attempts()).not.toContain("I0.organisation_name");
   });
 });
+
+describe("live AL: a choice they never named is not saved", () => {
+  it("'co-invest' for a partner who never said how they take part", async () => {
+    const world = investorSession({ currentStepKey: "I2.investment_role" });
+    const port = createOnboardingPort({
+      session: turn(world, AG_INVESTOR).session,
+      onboardingSessionId: turn(world, AG_INVESTOR).onboardingSessionId,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [AG_INVESTOR],
+      authority: () =>
+        Promise.resolve(reading({ stated: ["I0.business_title"] })),
+    });
+    const [result] = await port.record([
+      {
+        stepKey: "I2.investment_role",
+        value: ["co_invest"],
+        quote: "it's a small VC fund out of Lisbon",
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    expect(result?.outcome).toBe("REJECTED");
+    expect(world.recordedValue("I2.investment_role")).toBeUndefined();
+  });
+
+  it("the same choice, named in their words, is saved", async () => {
+    const said = "We usually co-invest alongside a lead.";
+    const world = investorSession({ currentStepKey: "I2.investment_role" });
+    const port = createOnboardingPort({
+      session: turn(world, said).session,
+      onboardingSessionId: turn(world, said).onboardingSessionId,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [said],
+      authority: () => Promise.resolve(reading({})),
+    });
+    const [result] = await port.record([
+      {
+        stepKey: "I2.investment_role",
+        value: ["co_invest"],
+        quote: "co-invest alongside a lead",
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    expect(result?.outcome).toBe("COMMITTED");
+  });
+});
