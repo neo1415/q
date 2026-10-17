@@ -3862,7 +3862,14 @@ export function createSpecialistQAnswer(
       read.confidence !== "LOW" &&
       (read.kind === "TOOL_REQUEST" ||
         (read.kind === "RESEARCH_REQUEST" &&
-          read.tool?.kind === "PREPARE_DOCUMENT"))
+          read.tool?.kind === "PREPARE_DOCUMENT") ||
+        // Q Pitch v6 (live 2026-10-17): "Can you pitch Capital Q to me?"
+        // is read as a question about Capital Q that carries NAVIGATE to
+        // Q_PITCH; the tour is the answer to it. Still gated by the words
+        // (wordsNamePage) in actOnTool.
+        (read.kind === "QUESTION_TO_Q" &&
+          read.tool?.kind === "NAVIGATE" &&
+          read.tool.destination === "Q_PITCH"))
         ? read.tool
         : null;
     // A piece Q writes for them as a document (Q_REPORT) is answered

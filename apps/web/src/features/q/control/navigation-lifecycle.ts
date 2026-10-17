@@ -347,7 +347,10 @@ export function arrivedAt(expected: string, actual: string): boolean {
 }
 
 /** Where this tab is now: the router's settled route, else its URL. */
-function landedOn(expected: string): string | null {
+function landedOn(
+  expected: string,
+  arrived: (expected: string, actual: string) => boolean = arrivedAt,
+): string | null {
   const candidates = [
     currentRoute(),
     typeof window === "undefined"
@@ -355,7 +358,7 @@ function landedOn(expected: string): string | null {
       : `${window.location.pathname}${window.location.search}`,
   ];
   for (const candidate of candidates) {
-    if (candidate !== null && arrivedAt(expected, candidate)) return candidate;
+    if (candidate !== null && arrived(expected, candidate)) return candidate;
   }
   return null;
 }
@@ -410,7 +413,11 @@ function execute(entry: Entry): void {
   if (active !== null && active !== entry) fail(active, "SUPERSEDED");
   active = entry;
   setPhase(entry, { phase: "EXECUTING" });
-  const there = landedOn(expected);
+  // Already there only when this IS the page asked for. Standing on where
+  // the page would redirect is not arriving (Q Pitch v6, live 2026-10-17:
+  // on a relationship, ".../messages" was taken as landed without a push,
+  // since an unmatched relationship's Messages redirects to it).
+  const there = landedOn(expected, routesMatch);
   if (there !== null) {
     verify(entry, there);
     return;

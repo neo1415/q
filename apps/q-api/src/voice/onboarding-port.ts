@@ -461,6 +461,8 @@ export function createOnboardingPort(input: {
   const current = async (): Promise<OnboardingSessionView> =>
     latest ?? (await fresh());
 
+  /** Category names the classifier gave this turn, by node id. */
+  const nodeNames = new Map<string, string>();
   const spoken = async (
     step: OnboardingStepManifest,
     value: OnboardingResponseValue,
@@ -470,15 +472,21 @@ export function createOnboardingPort(input: {
       value.type === "RESOURCE_REFERENCE" &&
       value.resourceType === "TAXONOMY_NODE"
     ) {
-      const names: string[] = [];
-      for (const id of value.resourceIds.slice(0, 8)) {
-        try {
-          names.push((await getTaxonomyNode(input.session, id)).displayName);
-        } catch {
-          // A name that cannot be read is left out, never guessed.
-        }
-      }
-      return names.join(", ");
+      // Names the classifier already gave this turn, then the rest read
+      // together (live AO: eight node reads one after another, ~0.4 s).
+      const names = await Promise.all(
+        value.resourceIds.slice(0, 8).map(async (id) => {
+          const known = nodeNames.get(id);
+          if (known !== undefined) return known;
+          try {
+            return (await getTaxonomyNode(input.session, id)).displayName;
+          } catch {
+            // A name that cannot be read is left out, never guessed.
+            return null;
+          }
+        }),
+      );
+      return names.filter((name): name is string => name !== null).join(", ");
     }
     return describeValue(step, value, recordedCurrency(view, steps)).trim();
   };
@@ -821,10 +829,28 @@ export function createOnboardingPort(input: {
           continue;
         }
         if (!ids.includes(best.nodeId)) ids.push(best.nodeId);
+        nodeNames.set(best.nodeId, best.displayName);
       }
       if (unmatched.length > 0 && ids.length > 0) {
-        // The categories that matched, with their other words beside them.
-        otherWords = unmatched.join(", ").slice(0, 200);
+        // The categories that matched, with their other words beside them:
+        // the model's phrase where it is theirs, else the part of their
+        // quote it stands for; a phrase in neither is left out and the
+        // categories still save (live AO 2026-10-17: "port technology"
+        // for "anything that makes ports less painful" lost all sectors).
+        const quote = answer.quote ?? "";
+        const kept = unmatched
+          .map((phrase) =>
+            textStatedIn(phrase, quote)
+              ? phrase
+              : quote.trim().length > 0
+                ? fieldClausesOf(quote, phrase)
+                : null,
+          )
+          .filter((words): words is string => words !== null);
+        otherWords =
+          kept.length === 0
+            ? undefined
+            : [...new Set(kept)].join("; ").slice(0, 200);
       } else if (unmatched.length > 0) {
         // No category holds their words: kept as they said them, like
         // ticking "Other" and typing (owner 2026-10-16).
@@ -1774,7 +1800,11 @@ export function createOnboardingPort(input: {
     if (
       resolved.note !== undefined &&
       answer.basis !== "DELEGATED" &&
-      !textStatedIn(resolved.note, answer.quote) &&
+      // Each piece of their other words is theirs (pieces need not sit
+      // side by side in the quote).
+      !resolved.note
+        .split(/\s*;\s*/u)
+        .every((piece) => textStatedIn(piece, answer.quote)) &&
       !(
         input.lastQTurn !== undefined &&
         textStatedIn(resolved.note, input.lastQTurn)
