@@ -37,6 +37,34 @@ function company(
 const criterion = (x: InvestabilityInputs, p: number, c = 0) =>
   assessUnicornPotential(x, NOW).view.pillars[p]?.criteria[c];
 describe("canonical structured evidence mapping", () => {
+  it("supports canonical PERCENTAGE as well as source PERCENT vocabulary", () => {
+    for (const kind of ["PERCENTAGE", "PERCENT"]) {
+      expect(
+        criterion(
+          company("financial.nrr", { kind, value: "118", asOf: "2026-09-30" }),
+          2,
+          1,
+        )?.grade,
+      ).toBe(3);
+    }
+  });
+  it("does not promote a financial estimate to actual revenue", () => {
+    expect(
+      criterion(
+        company(
+          "financial.arr",
+          {
+            kind: "MONEY",
+            amount: "6400000",
+            currency: "USD",
+            asOf: "2026-09-30",
+          },
+          { truthClass: "ESTIMATE" },
+        ),
+        2,
+      )?.grade,
+    ).toBeNull();
+  });
   it("normalizes confirmed deck figures but never an unconfirmed Q read", () => {
     const x = company("unknown", {});
     const section: DeckSection = {
