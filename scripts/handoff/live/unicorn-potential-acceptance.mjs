@@ -635,12 +635,47 @@ async function main() {
             { timeout: 30000 },
           );
           write("investor-q-run.json", run);
+          await page.screenshot({
+            path: join(evidence, "investor-q-answer.png"),
+            fullPage: true,
+          });
+          await page.keyboard.press("Escape");
           q = "PASS_CURRENT_RUN_RENDERED";
         }
         await page.screenshot({
           path: join(evidence, `${actor.role}-${device}.png`),
           fullPage: true,
         });
+        if (actor.role === "premiumInvestor") {
+          await page.goto(
+            new URL(`/companies/${fixture.unscoredCompanyId}`, web).href,
+            { waitUntil: "domcontentloaded", timeout: 60000 },
+          );
+          const thinPanel = page.locator(
+            `[id="unicorn-potential-${fixture.unscoredCompanyId}"]`,
+          );
+          await thinPanel.waitFor({ timeout: 45000 });
+          const summary = thinPanel.locator(":scope > summary");
+          assert.ok(
+            (await summary.innerText()).includes("Insufficient evidence"),
+            "Unscored browser state missing",
+          );
+          assert.ok(
+            !(await summary.innerText()).includes("/100"),
+            "Unscored browser displays a fabricated score",
+          );
+          await summary.click();
+          assert.equal(
+            await thinPanel.locator("[data-unicorn-pillar]").count(),
+            12,
+            "Unscored pillar details missing",
+          );
+          await page.screenshot({
+            path: join(evidence, `unscored-${device}.png`),
+            fullPage: true,
+          });
+          outcomes.push({ role: actor.role, device, unscoredBrowser: "PASS" });
+        }
         if (actor.role === "premiumInvestor" && device === "desktop") {
           const collect = async (query, maxPages = 3) => {
             const items = [];
