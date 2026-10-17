@@ -120,7 +120,11 @@ describe("brand presets", () => {
     expect(css).toContain("--cq-accent:#8a6a12");
     expect(css).toContain(':root[data-theme="dark"]');
     expect(css).toContain("prefers-color-scheme: dark");
-    expect(css).toContain(".cq-shell-sidebar,.cq-bottom-nav{");
+    // The black menu bar is the dark theme's; light follows the page.
+    expect(css).toContain(
+      ':root[data-theme="dark"] :is(.cq-shell-sidebar,.cq-bottom-nav){',
+    );
+    expect(css).not.toMatch(/^\.cq-shell-sidebar/mu);
     expect(css).toContain("--cq-stage-q-light:#e2b858");
     expect(css).not.toMatch(/<\/style|<script/iu);
     expect(presetStyleSheet(CLASSIC_BLUE)).toBe("");
