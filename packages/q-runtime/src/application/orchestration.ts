@@ -345,6 +345,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
         readonly count: number | null;
         /** The reader read it as about the companies Q just showed. */
         readonly previous?: boolean | undefined;
+        /**
+         * TURN_READER v56: they want companies other than those Q already
+         * showed in this conversation ("three new ones", "who else
+         * fits?"); the ranking leaves those out. Absent is false.
+         */
+        readonly excludeShown?: boolean | undefined;
       }
     | undefined;
   /**

@@ -778,3 +778,26 @@ export const TURN_READER_V55_UNTRUSTED = [
   ...TURN_READER_V54_UNTRUSTED,
   "screenControls",
 ] as const;
+
+export const TURN_READER_V56_SCHEMA_VERSION = 56;
+
+/**
+ * v56 (production 2026-10-17, conversation 4f07dae7): after Q showed the
+ * top three, "give me three new companies that fit my mandate" returned
+ * two of the same three. The FIT question now carries `excludeShown`: the
+ * person wants companies other than those Q already showed in this
+ * conversation ("new", "other", "more", "different ones", "anything
+ * else?", "who else fits?"), read from meaning in any language -- never a
+ * phrase list. Code then leaves the shown ids out of the same
+ * deterministic ranking. Lenient: a malformed value reads as false and
+ * never costs the reading.
+ */
+export const TurnQuestionV56Schema = QuestionToQSchema.extend({
+  excludeShown: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnQuestionV56 = z.infer<typeof TurnQuestionV56Schema>;
+
+export const TurnReaderV56ResultSchema = TurnReaderV55ResultSchema.extend({
+  question: TurnQuestionV56Schema.nullable().default(null),
+}).strict();
+export type TurnReaderV56Result = z.infer<typeof TurnReaderV56ResultSchema>;
