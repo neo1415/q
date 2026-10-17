@@ -7,6 +7,7 @@ import {
   notAssessedInvestability,
   type CompanyScoresDto,
   type FitCompanyDto,
+  type UnicornPotentialDto,
 } from "@capital-q/contracts";
 
 /**
@@ -70,6 +71,51 @@ const scored: CompanyScoresDto = CompanyScoresDtoSchema.parse({
 });
 
 describe("CompanyScores", () => {
+  it("adds an entitled third assessment without changing either existing score", () => {
+    const unicornPotential: UnicornPotentialDto = {
+      status: "NOT_ASSESSED",
+      overallScore: null,
+      band: null,
+      confidence: "LOW",
+      coverage: 0,
+      stage: null,
+      methodVersion: "unicorn-potential.v1.0.0",
+      inputRulesVersion: "unicorn-inputs.v1",
+      assessedAt: null,
+      pillars: [],
+      up: [],
+      down: [],
+      missing: [],
+      momentum: null,
+      benchmark: "Comparable benchmark unavailable",
+    };
+    const premium = { ...scored, unicornPotential };
+    const { rerender } = render(<CompanyScores scores={premium} />);
+    expect(
+      document.querySelector('[data-score="investability"]')?.textContent,
+    ).toContain("58");
+    expect(
+      document.querySelector('[data-score="suitability"]')?.textContent,
+    ).toContain("80");
+    expect(
+      document.querySelector('[data-score="unicorn-potential"] > summary')
+        ?.textContent,
+    ).toContain("Not assessed yet");
+    expect(companyScoresLabel(premium)).toContain(
+      "Unicorn Potential: not assessed yet",
+    );
+    rerender(<CompanyScores scores={premium} variant="compact" />);
+    expect(
+      document.querySelector('[data-score="unicorn-potential"]')?.textContent,
+    ).toBe("Unicorn Potential: not assessed yet");
+    expect(document.querySelector("details")).toBeNull();
+    rerender(<CompanyScores scores={scored} variant="full" />);
+    expect(
+      document.querySelector('[data-score="unicorn-potential"]'),
+    ).toBeNull();
+    expect(companyScoresLabel(scored)).not.toContain("Unicorn");
+  });
+
   it("shows both scores separately, with coverage, confidence and why", () => {
     render(<CompanyScores scores={scored} variant="full" />);
     const inv = document.querySelector('[data-score="investability"]');
