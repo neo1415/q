@@ -272,12 +272,20 @@ describe("a document Q was asked to open (follow-55)", () => {
   });
 });
 
+function ViewingNow() {
+  return (
+    <output data-testid="viewing-now">{useViewingDocument() ?? "none"}</output>
+  );
+}
+
 function Count() {
   return <output data-testid="ready">{useReadyDocuments().length}</output>;
 }
 
 describe("an answer as a PDF", () => {
-  it("files exactly that answer and pops up the ready card", async () => {
+  afterEach(() => openDocumentViewer(null));
+
+  it("files exactly that answer, pops up the ready card and opens it in the app's viewer", async () => {
     actions.exportAnswerAction.mockResolvedValue({
       ok: true,
       value: {
@@ -299,8 +307,10 @@ describe("an answer as a PDF", () => {
           messageId="33333333-0000-4000-8000-000000000002"
         />
         <Count />
+        <ViewingNow />
       </>,
     );
+    expect(screen.getByTestId("viewing-now").textContent).toBe("none");
     await userEvent.click(
       screen.getByRole("button", { name: "Save this answer as a PDF" }),
     );
@@ -312,6 +322,10 @@ describe("an answer as a PDF", () => {
       expect(screen.getByTestId("ready").textContent).toBe("1");
     });
     expect(screen.getByText("PDF ready")).toBeTruthy();
+    // Owner 2026-10-17: the primary act opens it inside the app.
+    expect(screen.getByTestId("viewing-now").textContent).toBe(
+      "a0000000-0000-4000-8000-000000000009",
+    );
   });
 });
 
