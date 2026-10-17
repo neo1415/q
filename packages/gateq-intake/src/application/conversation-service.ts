@@ -336,6 +336,7 @@ export function createConversationService(
               askedAlready: history.askedAlready,
               askedCounts: history.askedCounts,
               emphasis,
+              variationSeed: applicationId,
               attribution: {
                 tenantId: guest.application.tenantId,
                 correlationId: input.correlationId,
