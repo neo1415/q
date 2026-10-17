@@ -138,6 +138,7 @@ import {
 import {
   fitSweepAsk,
   fitSweepAskOfReading,
+  withReadCount,
   isSingleCompanyQuestion,
   runFitSweep,
   type FitSweepAsk,
@@ -2557,14 +2558,17 @@ export function createModelGatewayQAnswer(
       }).catch(() => null);
     const sweepAsk = !sweepable
       ? null
-      : (fitSweepAsk(latest.content, shownBefore, namedComparison) ??
-        (request.fitQuestion === undefined
-          ? null
-          : fitSweepAskOfReading(
-              request.fitQuestion,
-              shownBefore,
-              namedComparison,
-            )));
+      : withReadCount(
+          fitSweepAsk(latest.content, shownBefore, namedComparison) ??
+            (request.fitQuestion === undefined
+              ? null
+              : fitSweepAskOfReading(
+                  request.fitQuestion,
+                  shownBefore,
+                  namedComparison,
+                )),
+          request.fitQuestion?.count ?? null,
+        );
     const fitSweep: Promise<FitSweepResult | null> =
       sweepAsk === null ? Promise.resolve(null) : sweepFor(sweepAsk);
     // Live 2026-10-09: a FIT reading arrives after a warmed prepare, which

@@ -225,6 +225,26 @@ export function fitSweepAskOfReading(
 export const FIT_SWEEP_MAX = 24;
 export const FIT_SWEEP_CARDS_MAX = 10;
 
+/**
+ * The reader's count fills a count the words did not give (owner live
+ * 2026-10-17: "give me three new companies that fit my mandate" put ten
+ * cards up, because "new" sits between the number and "companies"). The
+ * reading understands the number in any wording; words never override a
+ * number they did not find. A set of shown or named cards keeps its bound.
+ */
+export function withReadCount(
+  ask: FitSweepAsk | null,
+  readCount: number | null,
+): FitSweepAsk | null {
+  if (ask === null || ask.count !== null || readCount === null) return ask;
+  const bounded = Math.min(Math.max(readCount, 1), FIT_SWEEP_CARDS_MAX);
+  return {
+    ...ask,
+    count:
+      ask.within === undefined ? bounded : Math.min(bounded, ask.within.length),
+  };
+}
+
 export type FitSweepResult = {
   readonly ask: FitSweepAsk;
   /** Ranked, highest score first, place-filtered, at most the card cap. */

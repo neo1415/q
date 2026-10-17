@@ -6,6 +6,7 @@ import {
   askedCount,
   fitSweepAsk,
   fitSweepAskOfReading,
+  withReadCount,
 } from "../src/q/fit-sweep.js";
 import {
   claimsListOnScreen,
@@ -135,5 +136,37 @@ describe("named comparison stays within resolved records", () => {
     expect(
       fitSweepAskOfReading({ text, count: null }, [], named),
     ).toMatchObject({ scope: "PREVIOUS", within: named, count: 2 });
+  });
+});
+
+/** Owner live 2026-10-17: "three new companies" put ten cards up. */
+describe("the reader's count fills what the words did not give", () => {
+  it("uses the reading's three when the words carry no count", () => {
+    const words = fitSweepAsk(
+      "give me three new companies that fit my mandate",
+    );
+    expect(words?.count ?? null).toBeNull();
+    expect(withReadCount(words, 3)?.count).toBe(3);
+  });
+
+  it("never overrides a count the words did give", () => {
+    const ask = fitSweepAsk("show me the top 4 companies that fit my mandate");
+    expect(withReadCount(ask, 3)?.count).toBe(4);
+  });
+
+  it("keeps a shown set's bound and leaves no ask alone", () => {
+    expect(
+      withReadCount(
+        {
+          scope: "PREVIOUS",
+          place: null,
+          fitAsked: true,
+          count: null,
+          within: ["a", "b"],
+        },
+        5,
+      )?.count,
+    ).toBe(2);
+    expect(withReadCount(null, 3)).toBeNull();
   });
 });
