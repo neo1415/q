@@ -113,6 +113,25 @@ describe("a follow-up answered from what Q already showed", () => {
     expect(prompt).toContain("Clearwater Assurance");
   });
 
+  it("answers with a live run's abort signal (live 2026-10-17: the signal made the request invalid)", async () => {
+    const { recall, alpha, request } = setup({
+      answerable: true,
+      say: "The second was Clearwater Assurance.",
+    });
+    const live = {
+      ...request,
+      signal: new AbortController().signal,
+    } as QAnswerRequest;
+    const said = await recall(live, {
+      said: "what was the second one?",
+      recent: [],
+      shown,
+      turn: 1,
+    });
+    expect(said).toMatch(/Clearwater Assurance/u);
+    expect(alpha.calls).toHaveLength(1);
+  });
+
   it("is null when the record does not hold the answer, so the full path looks it up", async () => {
     const { recall, request } = setup({ answerable: false, say: null });
     expect(

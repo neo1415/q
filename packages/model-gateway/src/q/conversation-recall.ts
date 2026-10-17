@@ -95,9 +95,13 @@ export function createConversationRecall(dependencies: {
               qRunId: request.runId,
               correlationId: request.correlationId,
             },
+          },
+          // The signal is an execute option: the request schema is strict,
+          // so a signal in the request body made every live recall invalid.
+          {
+            schema: ConversationRecallResultSchema,
             ...(request.signal === undefined ? {} : { signal: request.signal }),
           },
-          { schema: ConversationRecallResultSchema },
         );
       if (response.output.kind !== "STRUCTURED") return null;
       const read = ConversationRecallResultSchema.safeParse(
