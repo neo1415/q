@@ -1,4 +1,5 @@
 import {
+  UNICORN_POTENTIAL_CAVEAT,
   FIT_BAND_LABELS,
   FIT_CONFIDENCE_LABELS,
   FIT_OUTCOME_LABELS,
@@ -492,7 +493,9 @@ export function companyScoresText(scores: CompanyScoresDto): string {
       : investabilityLine(inv);
   const suit =
     scores.suitability === null ? null : suitabilityLine(scores.suitability);
-  return [invWords, suit].filter((part) => part !== null).join(". ") + ".";
+  const potential = scores.unicornPotential;
+  const unicorn = potential === undefined ? null : `Unicorn Potential: ${potential.overallScore === null ? "insufficient evidence, no score" : `${potential.overallScore}/100`}; evidence coverage ${Math.round(potential.coverage * 100)}%; ${potential.confidence.toLowerCase()} confidence; method ${potential.methodVersion}. ${UNICORN_POTENTIAL_CAVEAT}`;
+  return [invWords, suit, unicorn].filter((part) => part !== null).join(". ") + ".";
 }
 
 export function fitProfileText(

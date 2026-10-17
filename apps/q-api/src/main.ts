@@ -1,3 +1,4 @@
+import { notAssessedUnicornPotential } from "@capital-q/contracts";
 /**
  * Q runtime service — a separate deployable boundary, not a module of the
  * application API and not a component of the web app (TA-005, IDA-002;
@@ -468,6 +469,7 @@ import {
 import {
   billingAccountOf,
   createEntitlementService,
+  FEATURE_UNICORN_POTENTIAL,
   FEATURE_DELEGATIONS,
   VALUE_RECOMMENDATION_VOLUME,
 } from "@capital-q/billing";
@@ -758,6 +760,8 @@ import {
 // ADMIN block
 import { createResultsReader, resultsWindow } from "@capital-q/results";
 import {
+  createPostgresUnicornPotentialStore,
+  UNICORN_POTENTIAL_METHOD_VERSION,
   createPostgresReadinessStore,
   createReadinessService,
   readinessDataRoomFrom,
@@ -1300,8 +1304,18 @@ logger.info(
 // plan lets the feed page. Today every plan carries the slate policy's
 // own number, so nothing changes; ranking never reads a plan.
 const recommendationVolume = createEntitlementService({ sql: database.sql });
+const unicornStore = createPostgresUnicornPotentialStore({ sql: database.sql, transactions: database.transactions });
+const unicornDiscover = {
+  readMany: async ({ actor, companyIds }: { readonly actor: ActorContext; readonly companyIds: readonly string[] }) => {
+    const access = await recommendationVolume.check(billingAccountOf(actor), FEATURE_UNICORN_POTENTIAL);
+    if (!access.allowed) return null;
+    const values = await unicornStore.current(companyIds, UNICORN_POTENTIAL_METHOD_VERSION);
+    return new Map([...values].map(([id, value]) => [id, value.overallScore]));
+  },
+};
 // end BILLING-2 block
 const slateRead = createSlateReadPipeline({
+  unicornPotential: unicornDiscover,
   sql: database.sql,
   disclosure,
   // discover-feed-eligibility.v1, re-checked at read (same rule as api).
@@ -2390,6 +2404,12 @@ const investorFeed = createInvestorFeedPort({
 // for Q's tools and the /v1/fit routes alike -- one fit service, so the
 // card, the profile and Q's answer say the same thing.
 const fitComposition = createFitComposition({
+  unicornPotential: async (actor, companyIds) => {
+    const access = await entitlements.check(billingAccountOf(actor), FEATURE_UNICORN_POTENTIAL);
+    if (!access.allowed) return new Map();
+    const values = await unicornStore.current(companyIds, UNICORN_POTENTIAL_METHOD_VERSION);
+    return new Map(companyIds.map(id => [id, values.get(id) ?? notAssessedUnicornPotential(UNICORN_POTENTIAL_METHOD_VERSION)]));
+  },
   sql: database.sql,
   eligibilityPorts: slateRead.eligibilityPorts,
   eligibility: slateRead.eligibility,
