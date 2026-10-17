@@ -84,6 +84,12 @@ export function validateFixtures(value) {
       ),
     "Two to eight authorized Q evidence terms required",
   );
+  for (const role of ["premiumInvestor", "noMandateInvestor"])
+    assert.equal(
+      value.actors.find((actor) => actor.role === role).expectedScoreHttp,
+      200,
+      "Premium investor cases require permitted score access",
+    );
   const founder = value.actors.find((a) => a.role === "premiumFounder");
   assert.ok(
     UUID.test(founder.applicationId) && founder.gateqPath,
@@ -501,7 +507,7 @@ async function main() {
           "Assessment control touch target below 44px",
         );
         const overflow = await page.evaluate(
-          () => document.documentElement.scrollWidth > innerWidth + 1,
+          () => document.documentElement.scrollWidth > window.innerWidth + 1,
         );
         assert.equal(overflow, false, "Mobile/desktop document overflow");
         const expected =
@@ -543,7 +549,9 @@ async function main() {
             ) {
               try {
                 receipts.push(r.postDataJSON());
-              } catch {}
+              } catch {
+                // Ignore non-JSON browser requests, never treat them as receipts.
+              }
             }
           });
           const prior = new Set(runs),
@@ -739,7 +747,7 @@ async function main() {
             .waitFor({ timeout: 45000 });
           const stored = await page.evaluate(() =>
             JSON.parse(
-              localStorage.getItem("cq.discover.filters.v1") ?? "null",
+              window.localStorage.getItem("cq.discover.filters.v1") ?? "null",
             ),
           );
           assert.equal(
