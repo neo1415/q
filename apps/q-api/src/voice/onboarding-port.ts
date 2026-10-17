@@ -1817,6 +1817,33 @@ export function createOnboardingPort(input: {
           "That is none of this step's options and not in their words, so nothing was recorded. Record their own words for it, or the option that means what they said.",
       });
     }
+    // The same answer already on the record, with nothing new beside it:
+    // nothing to write (live AP: the same early signal saved three times
+    // in one turn, each a revision and a round trip).
+    const onRecord = latest?.responses.find(
+      (r) => r.stepKey === resolved.step.stepKey,
+    );
+    if (
+      onRecord !== undefined &&
+      resolved.note === undefined &&
+      sameValue(onRecord.value, resolved.value)
+    ) {
+      return done({
+        stepKey: resolved.step.stepKey,
+        outcome: "COMMITTED",
+        question: (
+          SPOKEN_QUESTIONS[resolved.step.stepKey] ??
+          resolved.step.configuration.prompt
+        ).slice(0, 400),
+        recorded: (
+          await spoken(
+            resolved.step,
+            resolved.value,
+            latest ?? (await current()),
+          )
+        ).slice(0, 600),
+      });
+    }
     return {
       kind: "WRITE",
       step: resolved.step,

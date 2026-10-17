@@ -218,6 +218,21 @@ describe("stated but not on the record: the next round is told to record it", ()
       new Set(["I3.geography", "I2.stages"]),
     );
     expect(open).toEqual(["I3.geography"]);
+    // Covered by its concept family's answer (live AP): not unsaved.
+    expect(
+      unrecordedStatedIn(
+        {
+          steps: [
+            {
+              stepKey: "I7.sector_exclusions",
+              status: "OPEN",
+              coveredBy: "I7.avoid",
+            },
+          ],
+        },
+        new Set(["I7.sector_exclusions"]),
+      ),
+    ).toEqual([]);
     const notes = turnNotesFor({
       pausing: false,
       lookup: null,
