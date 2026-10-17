@@ -365,18 +365,19 @@ export function QConversationPanel({
   /**
    * Attaching a document to this conversation (QX-001 §5): permission,
    * then the bytes straight into private storage, then the server checks
-   * what landed. Only for a founder with a company.
+   * what landed. A founder's file belongs to their company; anyone else's
+   * to their organisation's own documents (owner 2026-10-17: everyone can
+   * upload from the box; reading it into answers comes later).
    */
   const [attachments, setAttachments] = useState<readonly string[]>([]);
   const attach = async (file: File) => {
     const companyId = context.companyId;
-    if (companyId === undefined) return;
     setAttachments((current) => [...current, `${file.name} · uploading`]);
     const target = await materialUploadTargetAction({
-      companyId,
+      ...(companyId === undefined ? {} : { companyId }),
       documentType: "UNCLASSIFIED",
       filename: file.name,
-      mimeType: file.type,
+      mimeType: file.type || "application/octet-stream",
       sizeBytes: file.size,
     });
     const settle = (note: string) => {
@@ -724,10 +725,9 @@ export function QConversationPanel({
     ? client.muted
       ? "Muted"
       : (presence.label ?? "Listening")
-    : // An invitation before the first question; once Q has answered it
-      // would read as stale, so the idle label is just Q's name.
-      (presence.label ??
-      (connected && lines.length === 0 ? "Ready when you are" : "Q"));
+    : // Idle says nothing (owner 2026-10-17: the greeting is the
+      // invitation); a label only while Q is doing something.
+      (presence.label ?? null);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   // W7: the sheet's code loads the first time it is opened, then stays.
@@ -1010,7 +1010,7 @@ export function QConversationPanel({
                     />
                   </ViewTransition>
                   <span className="cq-caption text-(--cq-text-secondary) max-sm:sr-only">
-                    {t(stateLabel)}
+                    {t(stateLabel ?? "Q")}
                   </span>
                 </span>
               )}
@@ -1414,7 +1414,7 @@ export function QConversationPanel({
                   >
                     {q.working ? <QSwarm state="WORKING" pixels={40} /> : null}
                     <span className="cq-caption text-(--cq-text-secondary)">
-                      {t(stateLabel)}
+                      {t(stateLabel ?? "Q")}
                       {q.working &&
                       stage !== undefined &&
                       (!voice.active || documentStage)
@@ -1464,26 +1464,48 @@ export function QConversationPanel({
                 )}
               >
                 <ArrivalRoom>
-                  <ViewTransition
-                    name="q-aperture"
-                    share="cq-q-morph"
-                    default="none"
-                  >
-                    <QAperture
-                      state={presence.state}
-                      size="stage"
-                      inputLevel={client.inputLevel}
-                      outputLevel={client.outputLevel}
-                      stage
-                    />
-                  </ViewTransition>
+                  {/* 10% larger while nothing sits beside Q (owner
+                      2026-10-17); transform only, so the layout holds. */}
                   <div
-                    className="flex flex-col items-center gap-1"
+                    className={cx(
+                      "transition-transform duration-(--cq-motion-base) ease-(--cq-ease)",
+                      !room.filled && "scale-110",
+                    )}
+                  >
+                    <ViewTransition
+                      name="q-aperture"
+                      share="cq-q-morph"
+                      default="none"
+                    >
+                      <QAperture
+                        state={presence.state}
+                        size="stage"
+                        inputLevel={client.inputLevel}
+                        outputLevel={client.outputLevel}
+                        stage
+                      />
+                    </ViewTransition>
+                  </div>
+                  <div
+                    className="flex min-h-6 flex-col items-center gap-1"
                     role="status"
                   >
-                    <span className="cq-label text-(--cq-text-primary)">
-                      {t(stateLabel)}
-                    </span>
+                    {stateLabel === null ? null : (
+                      // A dot and a word ("Listening", "Speaking"), quiet.
+                      <span
+                        className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                        data-q-state-pill
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={cx(
+                            "size-2 rounded-full bg-(--cq-accent)",
+                            voice.active && "motion-safe:animate-pulse",
+                          )}
+                        />
+                        {t(stateLabel)}
+                      </span>
+                    )}
                     {!voice.active && q.working && stage !== undefined ? (
                       <span className="cq-caption text-(--cq-text-secondary)">
                         {stage}
@@ -1492,25 +1514,8 @@ export function QConversationPanel({
                   </div>
                 </ArrivalRoom>
 
-                {voice.active ? null : (
-                  <button
-                    type="button"
-                    className="cq-q-talk"
-                    disabled={!connected}
-                    onClick={() => void talk()}
-                    data-q-control="talk"
-                  >
-                    <Mic
-                      size={ICON_SIZE.prominent}
-                      strokeWidth={2}
-                      aria-hidden="true"
-                    />
-                    {t(
-                      connected ? "Talk with Q" : "Q isn't available right now",
-                    )}
-                  </button>
-                )}
-
+                {/* Voice starts from the microphone in the message box
+                    (owner 2026-10-17: one way in, no second button). */}
                 {showWelcome ? (
                   <div
                     className="flex w-full flex-col items-center"
@@ -1654,7 +1659,7 @@ export function QConversationPanel({
                   voice.active ? "Type instead — Q hears this too" : "Message Q"
                 }
                 attachments={attachments}
-                {...(connected && context.companyId !== undefined
+                {...(connected
                   ? { onAttach: attach, attachLabel: "Attach a document" }
                   : {})}
                 {...(connected ? { onSubmit: submitTyped } : {})}

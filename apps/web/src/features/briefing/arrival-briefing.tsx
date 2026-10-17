@@ -79,7 +79,11 @@ import {
   useOpener,
   type ArrivalLoader,
 } from "./arrival-store";
-import { SOMETHING_ELSE_QUESTION, type OpenerChoice } from "./opener";
+import {
+  OPEN_QUESTION,
+  SOMETHING_ELSE_QUESTION,
+  type OpenerChoice,
+} from "./opener";
 import { tellLineOpenerAnswer } from "./opener-answer";
 import { useQControl } from "@/features/q/control/q-control";
 
@@ -1302,8 +1306,11 @@ export function ArrivalBriefing({
       : opener.choice === "SHOW" && words.opener.offersChoice
         ? "Here's what's waiting."
         : words.opener.line;
+  // Owner 2026-10-17: the Q page greets and asks one open question, like a
+  // chat app's first screen; what waits comes up when they ask for it
+  // (typed or said, useOpener). The dock elsewhere still offers the choice.
   const choices =
-    words.opener.offersChoice && opener.choice === null ? (
+    compact && words.opener.offersChoice && opener.choice === null ? (
       <OpenerChoices
         pending={words.opener.pending}
         compact={compact}
@@ -1368,12 +1375,7 @@ export function ArrivalBriefing({
             className="cq-body-lg cq-prose text-balance text-(--cq-text-secondary)"
             data-arrival-lowdown
           >
-            {words.welcome === null ? null : (
-              <span className="text-(--cq-text-primary)" data-arrival-welcome>
-                {words.welcome}{" "}
-              </span>
-            )}
-            {t(after)}
+            {t(opener.choice === null ? OPEN_QUESTION : after)}
           </p>
         </div>
       )}

@@ -4054,6 +4054,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "What {fund} looks at",
   "What {fund} looks for",
   "What's happened",
+  "What's on your mind today?",
   "What's still needed",
   "What's still open, listed as open",
   "What’s in it, folder by folder:",

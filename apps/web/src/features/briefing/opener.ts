@@ -59,6 +59,8 @@ export function pendingCount(data: ArrivalData): number {
 
 export const SOMETHING_ELSE_QUESTION = "What would you like to know?";
 export const NOTHING_WAITING_QUESTION = "What would you like to look at?";
+/** The Q page's one question under the greeting (owner 2026-10-17). */
+export const OPEN_QUESTION = "What's on your mind today?";
 
 export function openerOf(data: ArrivalData): Opener {
   const pending = pendingCount(data);
