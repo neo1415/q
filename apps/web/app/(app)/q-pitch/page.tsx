@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { buttonClassName } from "@capital-q/ui/button";
 
@@ -7,6 +7,7 @@ import { PageContainer } from "@/components/app-shell/page-container";
 import { resolveOwnContext } from "@/features/q/context";
 import { atlasChapters, tourOptions } from "@/features/q-pitch/atlas";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
+import { tourStartFor } from "@/features/q-pitch/tour-start";
 import { resolveTourSubject } from "@/features/q-pitch/subject";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
@@ -21,10 +22,18 @@ export const dynamic = "force-dynamic";
  * page load into the layout-mounted host, which admits only fictional demo
  * accounts; nothing here grants access to anything.
  */
-export default async function QPitchPage() {
+export default async function QPitchPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const t = await serverT();
   if (!qPitchEnabled()) notFound();
   const context = await resolveOwnContext();
+  if ((await searchParams)["start"] === "1") {
+    const start = tourStartFor(context.kind);
+    if (start !== null) redirect(start);
+  }
   const now = new Date().toISOString();
 
   if (context.kind !== "INVESTOR") {

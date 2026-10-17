@@ -66,6 +66,8 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
   WORK_DONE: "/work?view=done",
   WORK_TEAM: "/work?view=team",
   WORK_COST: "/work?view=cost",
+  // Q Pitch v6: the entry starts the tour for the person's side.
+  Q_PITCH: "/q-pitch?start=1",
 };
 
 /**
@@ -75,9 +77,10 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
  */
 const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/admin": "platform operators only",
-  // A flag-gated demo entry (CQ_Q_PITCH_TOUR); adding a Q destination is a
-  // shared contract change (lane S), not part of the sidebar request.
-  "/q-pitch": "Q Pitch tour entry, flag-gated; reached from the sidebar",
+  // v6: /q-pitch is Q_PITCH's page; its Capital Q pitch page is the
+  // founder track's own step, opened by the tour.
+  "/q-pitch/capital-q":
+    "the founder track's Capital Q pitch page, opened by the tour",
   "/find": "old address, redirects to /search",
   "/gateway": "old address, redirects to /gateq",
   "/crm": "the CRM's alias, redirects to /relationships (Q's RELATIONSHIPS)",

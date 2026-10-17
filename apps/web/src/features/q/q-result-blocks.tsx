@@ -320,6 +320,7 @@ const DESTINATION_LABELS: Readonly<
   CAPITAL_PLAN: "Open your 12-month plan",
   CAPITAL_INVESTORS: "Open your investors on Capital",
   CRM_PIPELINE: "Open your pipeline",
+  Q_PITCH: "Start Q Pitch",
 };
 
 function subjectLabel(subject: QSubjectRef): string {

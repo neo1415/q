@@ -1,11 +1,12 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { ChevronUp, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { useQSessionOptional } from "@/features/q/q-session";
+import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
 
 import { ArrivalBriefing } from "./arrival-briefing";
 import { useArrivalStatus } from "./arrival-store";
@@ -14,6 +15,11 @@ import { useT } from "@/features/i18n/language";
 
 /** The Q page gives the briefing itself; everywhere else, the dock does. */
 const Q_PAGE = "/home";
+/** The pitch-mode flag changes only with a page load or the tour's start. */
+function noSubscription(): () => void {
+  return () => undefined;
+}
+
 /** After the last card, the dock's line stays this long, then goes. */
 const SETTLE_MS = 4_000;
 
@@ -71,7 +77,16 @@ export function ArrivalDock() {
     const timer = window.setTimeout(() => setClosed(true), SETTLE_MS);
     return () => window.clearTimeout(timer);
   }, [settled]);
-  if (session === null || pathname === Q_PAGE || closed) return null;
+  // Q Pitch (lane qpf, 17 Oct): while a tour runs, the briefing waits; it
+  // sat beside the tour strip on every step. Read after hydration only.
+  const pitchMode = useSyncExternalStore(
+    noSubscription,
+    qPitchHoldsVoice,
+    () => false,
+  );
+  if (session === null || pathname === Q_PAGE || closed || pitchMode) {
+    return null;
+  }
   const tucked = over && !opened;
   return (
     <aside

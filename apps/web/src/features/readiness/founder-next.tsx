@@ -34,6 +34,7 @@ export async function FounderNext() {
         <section
           aria-labelledby="next-actions-heading"
           className="flex flex-col gap-3"
+          data-qp-anchor="fdr.01.home.next-actions"
         >
           <div className="flex items-baseline justify-between gap-3">
             <h2
@@ -81,6 +82,7 @@ export async function FounderNext() {
       <section
         aria-labelledby="stop-raise-home"
         className="flex flex-col gap-2"
+        data-qp-anchor="fdr.01.home.stop-raise"
       >
         <div className="flex items-baseline justify-between gap-3">
           <h2

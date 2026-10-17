@@ -10,6 +10,7 @@ export {
   uiTextBatches,
   uiTranslationMessages,
   type UiTranslationBatchResult,
+  type UiTranslationTarget,
   type UiTranslationVerdict,
 } from "./translate.js";
 export {

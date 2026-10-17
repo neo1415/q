@@ -1056,6 +1056,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/q-pitch": exempt(
     "Q Pitch tour entry (owner request 15 Oct), flag-gated; the sidebar opens it and Q narrates the tour itself",
   ),
+  "/q-pitch/capital-q": exempt(
+    "Capital Q's own pitch page, opened only by the Q Pitch founder track while Q narrates it",
+  ),
   "/rehearsals": cap("navigate.REHEARSALS"),
   "/rehearsals/investor/[investorOrganisationId]": cap("tool.open_page"),
   "/rehearsals/company/[companyId]": cap("tool.open_page"),

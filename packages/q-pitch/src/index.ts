@@ -62,3 +62,20 @@ export {
   PREMIERE_SCRIPT,
   SHORT_SCRIPT,
 } from "./premiere.js";
+export * from "./step-commands.js";
+export * from "./step-graph.js";
+export * from "./qa-bank.js";
+export * from "./demo-investors.js";
+export * from "./capital-q-pitch.js";
+export {
+  FOUNDER_V6_ACTOR,
+  FOUNDER_V6_LEDGER,
+  FOUNDER_V6_PRESENTER_LINES,
+  FOUNDER_V6_SCRIPT,
+} from "./founder-v6.js";
+export {
+  INVESTOR_V6_ACTOR,
+  INVESTOR_V6_LEDGER,
+  INVESTOR_V6_SCRIPT,
+} from "./investor-v6.js";
+export { FOUNDER_QA_ENTRIES } from "./qa-bank-founder.js";
