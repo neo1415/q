@@ -101,3 +101,29 @@ export function useFollowNewest(
     }
   }, [endRef, newest, force, anchor]);
 }
+
+/**
+ * Brings the person's newest question to the top of its scroller, once per
+ * question, and then leaves the scroll alone while the answer arrives.
+ *
+ * Owner 2026-10-17: in the Q panel beside a page, following the newest line
+ * kept dragging the reader down through a long answer, away from where it
+ * starts. Reading an answer begins at the question, like a page, not at
+ * whatever streamed last. `key` changes only when a new question is asked.
+ */
+export function useAnchorQuestion(
+  questionRef: RefObject<HTMLElement | null>,
+  key: string | undefined,
+): void {
+  useEffect(() => {
+    const question = questionRef.current;
+    if (question === null || key === undefined) return;
+    const scroller = scrollerOf(question);
+    const top =
+      scroller === document.scrollingElement
+        ? 0
+        : scroller.getBoundingClientRect().top;
+    const offset = question.getBoundingClientRect().top - top - 12;
+    scroller.scrollTo({ top: scroller.scrollTop + offset, behavior: "smooth" });
+  }, [questionRef, key]);
+}

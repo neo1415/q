@@ -1,3 +1,4 @@
+import { createGateqUnicornReader } from "./gateq/unicorn.js";
 import type { ActorContext } from "@capital-q/security";
 /**
  * Capital Q application API — deployable composition root (doc 23, 8; ERA-002).
@@ -230,6 +231,7 @@ import {
   createGateQOrganisationDisplayPort,
 } from "./gateq/company-projection.js";
 import { mandateVocabularyFrom } from "./gateq/mandate-vocabulary.js";
+import { emphasisFromMandate } from "./gateq/mandate-emphasis.js";
 import {
   createAccountEmailPort,
   createIntakeBoundPolicyPort,
@@ -995,6 +997,33 @@ const gateqApply =
             }),
           }),
           policies: gateqIntakePolicies,
+          // The gateway owner's active mandate, as dimensions to lean on
+          // and nothing else (see emphasisFromMandate).
+          investorEmphasisFor: async ({ gatewayId }) => {
+            const gateway = await gateqGateways.findById(
+              gatewayId as Parameters<typeof gateqGateways.findById>[0],
+            );
+            if (gateway === null) return [];
+            const mandates = createPostgresInvestorMandateQueryPort({
+              sql: database.sql,
+            });
+            const tenantId = TenantIdSchema.parse(gateway.tenantId);
+            const investorOrganisationId = InvestorOrganisationIdSchema.parse(
+              gateway.investorOrganisationId,
+            );
+            const active = await mandates.listActiveMandates(
+              tenantId,
+              investorOrganisationId,
+            );
+            const first = active[0];
+            if (first === undefined) return [];
+            const snapshot = await mandates.getMandate(
+              tenantId,
+              investorOrganisationId,
+              first.id,
+            );
+            return snapshot === null ? [] : emphasisFromMandate(snapshot);
+          },
           publicGatewayFor: async (gatewayId) => {
             const gateway = await gateqGateways.findById(
               gatewayId as Parameters<typeof gateqGateways.findById>[0],
@@ -2959,6 +2988,25 @@ const { app, logger } = createApp(config, security, {
           },
         }),
   // F27: the founder's own unlinked applications are repaired on read.
+  gateqUnicornPotential: createGateqUnicornReader({
+    onError: (error) =>
+      gateqLogger.warn(
+        { errorName: error instanceof Error ? error.name : "unknown" },
+        "GateQ current company assessment unavailable",
+      ),
+    premium: async (actor) =>
+      (
+        await entitlements.check(
+          billingAccountOf(actor),
+          FEATURE_UNICORN_POTENTIAL,
+        )
+      ).allowed,
+    companies: gateqFounders.scoreCompanies,
+    investorMayRead: async (actor, companyId) =>
+      (await resolveViewableCompany(actor, companyId)) !== null,
+    current: (companyIds) =>
+      unicornStore.current(companyIds, UNICORN_POTENTIAL_METHOD_VERSION),
+  }),
   gateqMyApplications: async (actor) => {
     for (const row of await gateqFounders.unlinkedFor(actor)) {
       await joinGateqRelationship({ ...row, actor }).catch((error: unknown) =>

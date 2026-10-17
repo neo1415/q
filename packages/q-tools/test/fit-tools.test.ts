@@ -221,10 +221,9 @@ describe("fit tools", () => {
     expect(JSON.stringify(allowed.result.data).length).toBeLessThan(
       MODEL_TOOL_RESULT_MAX_CHARS,
     );
-    expect(allowed.result.data).toMatchObject({
-      text: expect.stringContaining("Unicorn Potential: 50/100"),
-      guidance: expect.stringContaining("not a probability"),
-    });
+    const authorized = FitProfileOutputSchema.parse(allowed.result.data);
+    expect(authorized.text).toContain("Unicorn Potential: 50/100");
+    expect(authorized.guidance).toContain("not a probability");
     entitled = false;
     const revoked = await invoke();
     if (!revoked.result.ok) throw new Error("Expected denied-feature profile");
@@ -248,7 +247,8 @@ describe("fit tools", () => {
       contextFor(actorB, investorPlan),
     );
     expect(result.result.ok).toBe(true);
-    if (!result.result.ok) throw new Error(result.failureCode);
+    if (!result.result.ok)
+      throw new Error(result.failureCode ?? "Expected successful fit result");
     const reading = FitProfileOutputSchema.parse(result.result.data);
     expect(JSON.stringify(reading).length).toBeLessThanOrEqual(
       MODEL_TOOL_RESULT_MAX_CHARS,

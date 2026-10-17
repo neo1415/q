@@ -32,6 +32,12 @@ export type QuestionNeed = {
   readonly reason:
     | "REQUIRED_BY_GATEWAY"
     | "PREFERRED_BY_GATEWAY"
+    /**
+     * The investor's own private mandate emphasises this dimension. Only
+     * the dimension crosses: never the mandate's values, wording or
+     * thresholds (§28), and never a qualification decision.
+     */
+    | "INVESTOR_EMPHASIS"
     | "CONTRADICTION"
     | "UNDERSTANDING";
 };
@@ -62,19 +68,54 @@ const UNDERSTANDING_ORDER: readonly ApplicationDimension[] = [
   "company.problem",
   "company.solution",
   "company.customers",
+  "company.business_model",
   "company.market",
-  "company.team",
   "claims.traction",
+  "claims.revenue",
+  "company.team",
   "raise.use_of_funds",
   "contact.name",
 ];
+
+/**
+ * What a founder has, in substance, already told us about a dimension.
+ *
+ * Live 2026-10-17 (Partech, Atlas): founders who explained the product were
+ * asked "what are you building, and who is it for?" four times, because
+ * their answer was recorded as the solution or problem rather than the
+ * description. Any of these answers the description.
+ */
+const COVERED_BY: Readonly<
+  Partial<Record<ApplicationDimension, readonly ApplicationDimension[]>>
+> = {
+  "company.description": ["company.solution", "company.problem"],
+};
+
+/**
+ * How many times a dimension may be asked before the interview moves on.
+ *
+ * Twice: once, and once more when the first answer was lost or unclear
+ * (a dropped spoken fragment). A third time is a script, not an analyst;
+ * what is still unknown afterwards is reported as unknown, never pressed.
+ */
+export const MAX_ASKS_PER_DIMENSION = 2;
 
 export function questionNeedsFor(input: {
   readonly policy: GatewayPolicy;
   readonly qualification: QualificationResult;
   readonly facts: readonly ApplicationFact[];
-  /** Dimensions Q has already asked about and been answered "don't know". */
   readonly limit?: number | undefined;
+  /**
+   * How many Q turns already asked about each dimension. A dimension asked
+   * MAX_ASKS_PER_DIMENSION times is parked, whatever its reason.
+   */
+  readonly askedCounts?: ReadonlyMap<ApplicationDimension, number> | undefined;
+  /**
+   * Dimensions the investor's active mandate emphasises, derived by the
+   * composition from automation-eligible mandate fields. Shapes what is
+   * asked; never what qualifies.
+   */
+  readonly emphasis?: readonly ApplicationDimension[] | undefined;
 }): readonly QuestionNeed[] {
   const limit = input.limit ?? 6;
   const answered = new Set(
@@ -82,8 +123,15 @@ export function questionNeedsFor(input: {
       .filter((fact) => fact.supersededAt === null)
       .map((fact) => fact.dimension),
   );
+  for (const [dimension, covers] of Object.entries(COVERED_BY)) {
+    if (covers?.some((covering) => answered.has(covering))) {
+      answered.add(dimension as ApplicationDimension);
+    }
+  }
   const needs: QuestionNeed[] = [];
   const seen = new Set<ApplicationDimension>();
+  const parked = (dimension: ApplicationDimension): boolean =>
+    (input.askedCounts?.get(dimension) ?? 0) >= MAX_ASKS_PER_DIMENSION;
 
   const add = (
     dimension: ApplicationDimension | undefined,
@@ -91,6 +139,7 @@ export function questionNeedsFor(input: {
   ): void => {
     if (dimension === undefined) return;
     if (seen.has(dimension)) return;
+    if (parked(dimension)) return;
     if (!APPLICATION_DIMENSIONS.includes(dimension)) return;
     seen.add(dimension);
     needs.push({ dimension, reason });
@@ -123,6 +172,14 @@ export function questionNeedsFor(input: {
       CRITERION_DIMENSION[criterion?.config.type ?? ""],
       "PREFERRED_BY_GATEWAY",
     );
+  }
+
+  // Then what this investor's own mandate emphasises, ahead of the general
+  // order: two founders applying to two different funds should not be asked
+  // the same things in the same order.
+  for (const dimension of input.emphasis ?? []) {
+    if (answered.has(dimension)) continue;
+    add(dimension, "INVESTOR_EMPHASIS");
   }
 
   // Then what a partner would want to know, in the order they would want

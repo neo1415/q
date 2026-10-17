@@ -19,8 +19,8 @@ select ok(not has_table_privilege('anon','core.company_unicorn_potential_assessm
 select ok(not has_table_privilege('authenticated','core.company_unicorn_potential_assessments','insert'),'browser cannot write scores');
 select ok((select relrowsecurity from pg_class where oid='core.company_unicorn_potential_assessments'::regclass),'RLS enabled');
 select is((select kind from billing.features where key='intelligence.unicorn_potential'),'ACCESS','premium feature registered');
-select is((select count(*)::int from billing.plan_features pf join billing.plans p on p.id=pf.plan_id where pf.feature_key='intelligence.unicorn_potential' and pf.included and p.key not in ('investor_pro','fund')),0,'no free or default plan silently entitled');
-select ok((select bool_and(pf.included) from billing.plan_features pf join billing.plans p on p.id=pf.plan_id where pf.feature_key='intelligence.unicorn_potential' and p.key in ('investor_pro','fund')),'pro and fund plans entitled');
+select is((select count(*)::int from billing.plan_features pf join billing.plans p on p.id=pf.plan_id where pf.feature_key='intelligence.unicorn_potential' and pf.included and p.key not in ('founder_pro','investor_pro','fund')),0,'no free or default plan silently entitled');
+select is((select count(*)::int from billing.plan_features pf join billing.plans p on p.id=pf.plan_id where pf.feature_key='intelligence.unicorn_potential' and pf.included and p.key in ('founder_pro','investor_pro','fund')),3,'founder pro, investor pro and fund plans entitled');
 -- A→B→A remains legal history; only adjacent identical basis is skipped by
 -- the transactional repository, never a global unique hash constraint.
 insert into core.company_unicorn_potential_assessments(tenant_id,organisation_id,company_id,method_version,revision,basis_hash,cohort_key,status,summary,observations)
@@ -32,7 +32,9 @@ select throws_ok($$insert into core.company_unicorn_potential_assessments(tenant
 
 -- Exercise the actual source predicate used by the TypeScript repository.
 insert into knowledge.company_profiles(company_id, company_tenant_id, listed, visibility, canonical_name, fingerprint, version)
-values ('00000000-0000-4000-8000-0000000098c1', pg_temp.rls_id('tenant_a'), true, 'network_visible', 'Unicorn Test', 'fixture', 1);
+values ('00000000-0000-4000-8000-0000000098c1', pg_temp.rls_id('tenant_a'), true, 'network_visible', 'Unicorn Test', 'fixture', 1)
+on conflict (company_id) do update set listed = excluded.listed, visibility = excluded.visibility,
+  canonical_name = excluded.canonical_name, fingerprint = excluded.fingerprint;
 create temporary table unicorn_candidates as select jsonb_build_array(jsonb_build_object('company_id', '00000000-0000-4000-8000-0000000098c1', 'revision', 1, 'assessed_at', clock_timestamp() + interval '1 second', 'observations', '[]'::jsonb)) as value;
 select is((select count(*)::int from private.unicorn_potential_eligible_revisions((select value from unicorn_candidates))), 1, 'listed active company with no contributing evidence remains insufficient, not denied');
 select ok(not has_function_privilege('authenticated', 'private.unicorn_potential_eligible_revisions(jsonb)', 'execute'), 'browser cannot call source eligibility oracle');
@@ -54,9 +56,9 @@ update evidence.claims set visibility_scope = 'network_visible' where id = '0000
 update unicorn_candidates set value = jsonb_set(value, '{0,observations,0,source,label}', '"Different revenue claim"'::jsonb);
 select is((select count(*)::int from private.unicorn_potential_eligible_revisions((select value from unicorn_candidates))), 0, 'changed source statement cannot authorize an older explanation');
 update unicorn_candidates set value = jsonb_set(value, '{0,observations}', '[]'::jsonb);
-update knowledge.company_profiles set listed = false, visibility = null, canonical_name = null where company_id = '00000000-0000-4000-8000-0000000098c1';
+update core.companies set marketplace_visibility = 'founder_private' where id = '00000000-0000-4000-8000-0000000098c1';
 select is((select count(*)::int from private.unicorn_potential_eligible_revisions((select value from unicorn_candidates))), 0, 'withdrawn company fails closed even with no claim references');
-update knowledge.company_profiles set listed = true, visibility = 'network_visible', canonical_name = 'Unicorn Test' where company_id = '00000000-0000-4000-8000-0000000098c1';
+update core.companies set marketplace_visibility = 'network_visible' where id = '00000000-0000-4000-8000-0000000098c1';
 update core.companies set company_status = 'closed' where id = '00000000-0000-4000-8000-0000000098c1';
 select is((select count(*)::int from private.unicorn_potential_eligible_revisions((select value from unicorn_candidates))), 0, 'closed canonical company cannot expose its old score');
 update core.companies set company_status = 'active' where id = '00000000-0000-4000-8000-0000000098c1';

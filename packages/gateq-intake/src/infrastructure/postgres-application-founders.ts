@@ -23,6 +23,42 @@ export function createPostgresApplicationFounders(options: {
 }) {
   const { sql } = options;
   return {
+    /** Only the canonical submitted application/company link, never a name match. */
+    scoreCompanies: async (
+      actor: ActorContext,
+      applicationIds: readonly string[],
+      audience: "INVESTOR" | "FOUNDER",
+    ): Promise<ReadonlyMap<string, string>> => {
+      if (applicationIds.length === 0 || actor.actorType !== "HUMAN")
+        return new Map();
+      const ids = [...new Set(applicationIds)].slice(0, 100);
+      const rows =
+        audience === "FOUNDER"
+          ? await sql<{ application_id: string; company_id: string }[]>`
+          select f.application_id, c.id as company_id
+          from gateq.application_founders f
+          join gateq.applications a on a.id = f.application_id and a.status = 'SUBMITTED'
+          join gateq.application_submissions s on s.application_id = a.id
+          join core.companies c on c.id = f.company_id and c.company_status = 'active'
+          join identity.organisation_memberships m on m.organisation_id = c.organisation_id
+            and m.tenant_id = c.tenant_id and m.user_id = f.founder_user_id and m.membership_status = 'active'
+          where f.application_id = any(${ids}::uuid[]) and f.founder_user_id = ${actor.userId}::uuid
+            and c.tenant_id = ${actor.tenantId}::uuid and c.organisation_id = ${actor.organisationId ?? null}::uuid
+            and m.id = ${actor.membershipId ?? null}::uuid`
+          : await sql<{ application_id: string; company_id: string }[]>`
+          select f.application_id, c.id as company_id
+          from gateq.application_founders f
+          join gateq.applications a on a.id = f.application_id and a.status = 'SUBMITTED'
+          join gateq.application_submissions s on s.application_id = a.id
+          join gateq.gateways g on g.id = a.gateway_id and g.tenant_id = a.tenant_id
+          join core.investor_organisations i on i.id = g.investor_organisation_id
+          join identity.organisation_memberships m on m.organisation_id = i.organisation_id
+            and m.tenant_id = i.tenant_id and m.user_id = ${actor.userId}::uuid and m.membership_status = 'active'
+          join core.companies c on c.id = f.company_id and c.company_status = 'active'
+          where f.application_id = any(${ids}::uuid[]) and i.organisation_id = ${actor.organisationId ?? null}::uuid
+            and i.tenant_id = ${actor.tenantId}::uuid and m.id = ${actor.membershipId ?? null}::uuid`;
+      return new Map(rows.map((row) => [row.application_id, row.company_id]));
+    },
     /**
      * Links the founder; returns the canonical pair the application names
      * (their company and the gateway's investor organisation), or null

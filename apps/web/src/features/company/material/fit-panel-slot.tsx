@@ -2,7 +2,11 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-import { FIT_BAND_LABELS, FIT_CONFIDENCE_LABELS } from "@capital-q/contracts";
+import {
+  FIT_BAND_LABELS,
+  FIT_CONFIDENCE_LABELS,
+  type RelationshipStateV2,
+} from "@capital-q/contracts";
 import { ChevronDown, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { FitPanel, useCompanyFit, type CompanyFit } from "@/features/fit";
@@ -104,9 +108,11 @@ export function ProfileUnicornAssessment() {
 export function FitPanelSlot({
   companyId,
   companyName,
+  relationshipState = null,
 }: {
   readonly companyId: string;
   readonly companyName: string;
+  readonly relationshipState?: RelationshipStateV2 | null | undefined;
 }) {
   const t = useT();
   const fit = useContext(ProfileFit);
@@ -138,7 +144,12 @@ export function FitPanelSlot({
         className="pb-3 empty:hidden lg:pb-0"
       >
         <ProfileCompanyScores className="mb-3" />
-        <FitPanel companyId={companyId} name={companyName} fit={fit} />
+        <FitPanel
+          companyId={companyId}
+          name={companyName}
+          fit={fit}
+          relationshipState={relationshipState}
+        />
       </div>
     </details>
   );

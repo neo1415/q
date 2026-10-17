@@ -48,7 +48,7 @@ insert into billing.features(key, name, description, kind, unit_singular, unit_p
 values ('intelligence.unicorn_potential', 'Unicorn Potential', 'Evidence-backed provisional growth-characteristics score and explanations; not a probability.', 'ACCESS', 'assessment', 'assessments');
 -- Explicitly off for every existing default/free plan. No plan reassignment.
 insert into billing.plan_features(plan_id, feature_key, included, limit_value)
-select id, 'intelligence.unicorn_potential', key in ('investor_pro', 'fund'), null from billing.plans;
+select id, 'intelligence.unicorn_potential', key in ('founder_pro', 'investor_pro', 'fund'), null from billing.plans;
 
 -- Invoker-only batch source reauthorization, never a browser score oracle.
 create function private.unicorn_potential_eligible_revisions(p_candidates jsonb)
