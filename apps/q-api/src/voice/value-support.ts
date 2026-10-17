@@ -37,7 +37,15 @@ export function scaleDroppedIn(value: string, quote: string): boolean {
     if (scale !== undefined && scale > 1) scaled = true;
     else bare = true;
   }
-  return scaled && !bare;
+  if (bare) return false;
+  if (scaled) return true;
+  // Said in words ("مليوني دولار", "two million"): a value that is the
+  // figure's digits without its scale is the figure with its scale lost.
+  return spokenFiguresIn(quote).some(
+    (figure) =>
+      figure > wanted &&
+      significantOf(String(figure)) === significantOf(String(wanted)),
+  );
 }
 
 /**
@@ -60,6 +68,10 @@ function digitRuns(raw: string): string[] {
     }
   }
   return runs;
+}
+
+function significantOf(value: string): string {
+  return significant(value.replace(/\D/g, ""));
 }
 
 /** A figure's significant digits: no sign, no decimal mark, no zeros at either end. */

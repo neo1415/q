@@ -540,6 +540,14 @@ describe("live AJ: a figure keeps its scale, in any language", () => {
     expect(scaleDroppedIn("2", "2 millones de dólares")).toBe(true);
     expect(scaleDroppedIn("11", "about 11 people")).toBe(false);
     expect(scaleDroppedIn("150", "150 mil reais")).toBe(true);
+    // Said in words, Arabic duals included (live AP).
+    expect(scaleDroppedIn("2", "نجمع مليوني دولار")).toBe(true);
+    expect(scaleDroppedIn("2000000", "نجمع مليوني دولار")).toBe(false);
+    expect(scaleDroppedIn("2", "raising two million")).toBe(true);
+    expect(scaleDroppedIn("2", "2 founders, raising two million")).toBe(false);
+    expect(
+      moneyFiguresIn("نجمع حالياً مليوني دولار").map((f) => f.value),
+    ).toEqual([2_000_000]);
   });
 
   it("the read-back has no English note and no doubled stops", () => {
