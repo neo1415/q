@@ -44,6 +44,8 @@ export const UnicornSourceSchema = z
     id: z.string().min(1).max(200),
     revision: z.string().min(1).max(200),
     at: UtcTimestampSchema.nullable(),
+    /** Source observation timestamp; never substitutes for a metric measurement date. */
+    recordedAt: UtcTimestampSchema.optional(),
     kind: z.enum(["CLAIM", "DECK_SECTION", "FOUNDER_BACKGROUND", "PITCH"]),
     label: z.string().min(1).max(200),
     truthClass: TruthClassSchema,
