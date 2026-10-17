@@ -15,6 +15,7 @@ import {
   suitabilityLine,
   type CompanyScoresDto,
   type InvestabilityDto,
+  type UnicornPotentialDto,
   type FitCandidateSource,
   type FitComparisonDto,
   type FitOutcome,
@@ -121,6 +122,13 @@ export type FitServiceDependencies = {
     | ((
         companyIds: readonly string[],
       ) => Promise<ReadonlyMap<string, InvestabilityDto>>)
+    | undefined;
+  /** Premium read, reauthorized for this actor after company eligibility. */
+  readonly unicornPotential?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, UnicornPotentialDto>>)
     | undefined;
   /** The method label a NOT_ASSESSED company is shown under. */
   readonly investabilityMethodVersion?: string | undefined;
@@ -298,6 +306,13 @@ export function createFitService(
         : await dependencies
             .investability(items.map((i) => i.assessment.profile.companyId))
             .catch(() => new Map<string, InvestabilityDto>());
+    const unicornPotential =
+      dependencies.unicornPotential === undefined || items.length === 0
+        ? new Map<string, UnicornPotentialDto>()
+        : await dependencies.unicornPotential(
+            actor,
+            items.map((i) => i.assessment.profile.companyId),
+          );
     const method = dependencies.investabilityMethodVersion ?? "investiq/v1";
     return {
       kind: "OK",
@@ -310,6 +325,9 @@ export function createFitService(
             investability:
               investability.get(companyId) ?? notAssessedInvestability(method),
             suitability: suitabilityFromFit(item.assessment.profile),
+            ...(unicornPotential.get(companyId) === undefined
+              ? {}
+              : { unicornPotential: unicornPotential.get(companyId) }),
           },
         };
       }),

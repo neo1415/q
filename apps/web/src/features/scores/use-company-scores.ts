@@ -18,19 +18,14 @@ import { fitProfilesAction } from "@/features/fit/fit-actions";
  * batched into one `/v1/fit/companies` call (up to 50), through the reader's
  * own session (server action). The Q API answers only for companies this
  * reader may see; anything else is simply absent, and a card without
- * scores is still a card. Results are kept briefly so scrolling back does
- * not ask again. No score is ever computed here.
+ * scores is still a card. Every mounted read is authorized afresh; premium and investor-private
+ * results are never retained in a company-id-only browser cache. No score is computed here.
  */
 
 export type ScoresPort = (
   companyIds: readonly string[],
 ) => Promise<readonly FitCompanyDto[] | null>;
 
-const TTL_MS = 60_000;
-
-type Entry = { readonly at: number; readonly scores: CompanyScoresDto | null };
-
-const cache = new Map<string, Entry>();
 const waiting = new Map<
   string,
   ((scores: CompanyScoresDto | null) => void)[]
@@ -42,19 +37,19 @@ function flush(port: ScoresPort): void {
   pending = null;
   for (let i = 0; i < ids.length; i += FIT_IDS_MAX) {
     const chunk = ids.slice(i, i + FIT_IDS_MAX);
+    // Capture this batch before I/O. A later authentication-context read
+    // must never attach to an older account's in-flight result.
+    const resolvers = new Map(chunk.map((id) => [id, waiting.get(id) ?? []]));
+    for (const id of chunk) waiting.delete(id);
     void port(chunk)
       .catch(() => null)
       .then((items) => {
         const byId = new Map(
           (items ?? []).map((item) => [item.companyId, item.scores ?? null]),
         );
-        const at = Date.now();
-        for (const id of chunk) {
-          const scores = byId.get(id) ?? null;
-          cache.set(id, { at, scores });
-          for (const resolve of waiting.get(id) ?? []) resolve(scores);
-          waiting.delete(id);
-        }
+        for (const id of chunk)
+          for (const resolve of resolvers.get(id) ?? [])
+            resolve(byId.get(id) ?? null);
       });
   }
 }
@@ -63,10 +58,6 @@ function request(
   id: string,
   port: ScoresPort,
 ): Promise<CompanyScoresDto | null> {
-  const hit = cache.get(id);
-  if (hit !== undefined && Date.now() - hit.at < TTL_MS) {
-    return Promise.resolve(hit.scores);
-  }
   return new Promise((resolve) => {
     const list = waiting.get(id);
     if (list !== undefined) {
@@ -84,7 +75,6 @@ function request(
 
 /** Test seam: forget everything read. */
 export function resetCompanyScoresCache(): void {
-  cache.clear();
   waiting.clear();
   pending = null;
 }
