@@ -6,14 +6,14 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { Download, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import { exportAnswerAction } from "./actions";
-import { announceDocument } from "./document-ready";
+import { announceDocument, openDocumentViewer } from "./document-ready";
 import { useT } from "@/features/i18n/language";
 
 /**
  * Any of Q's answers as a PDF (DOCS spec §3 F5; founder directive
  * 2026-10-01). One quiet control under a substantive answer: the server
- * files exactly the words shown as a private document, and the
- * document-ready card offers the download wherever the person is.
+ * files exactly the words shown as a private document and opens it in
+ * the app's viewer; the viewer and the ready card offer the download.
  */
 
 /** Shorter answers are a line of conversation, not a document. */
@@ -51,6 +51,9 @@ export function AnswerPdf({
       version: Math.max(1, result.value.currentVersion),
       status: "READY",
     });
+    // Owner 2026-10-17: the PDF opens in the app's viewer, where
+    // downloading is the secondary act.
+    openDocumentViewer(result.value.artifactId);
   };
 
   return (

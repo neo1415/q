@@ -70,11 +70,21 @@ import {
 } from "@/features/relationships/portfolio";
 import { PortfolioSection } from "@/features/relationships/portfolio-section";
 import {
-  listOrder,
   needsYouCards,
-  pageAfter,
+  PAGE_SIZE,
 } from "@/features/relationships/relationships-view";
+import {
+  listOrdered,
+  listSortOf,
+  pipelineScoresById,
+  rankBySuitability,
+  scoreOf,
+  type PipelineScores,
+} from "@/features/relationships/pipeline-scores";
 import { serverT } from "@/features/i18n/server";
+
+/** The API's widest page: what a Suitability-ranked Table/Board ranks. */
+const RANKED_PAGE_SIZE = 50;
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await serverT();
@@ -140,17 +150,50 @@ export default async function RelationshipsPage({
     );
     const ownCompany =
       context.kind === "FOUNDER" ? context.companyId : undefined;
+    // Owner 2026-10-17: with no sort chosen, an investor's view is ranked
+    // by Suitability. The API pages by its own keys, so the widest page is
+    // read and ranked here, and the view says it ranks page by page. A
+    // chosen sort stays the API's.
+    const ranked =
+      side === "INVESTOR" && parsed.success && parsed.data.sort === undefined;
+    const apiQuery =
+      parsed.success && ranked
+        ? {
+            ...parsed.data,
+            pageSize: parsed.data.pageSize ?? RANKED_PAGE_SIZE,
+          }
+        : parsed.data;
     // The saved views are their own read: a failure leaves the pipeline
     // working and says the views couldn't load.
-    const [data, views] =
-      session === null || side === "NONE" || !parsed.success
+    const [read, views] =
+      session === null ||
+      side === "NONE" ||
+      !parsed.success ||
+      apiQuery === undefined
         ? [null, null]
         : await Promise.all([
-            queryRelationshipPipeline(session, parsed.data, ownCompany).catch(
+            queryRelationshipPipeline(session, apiQuery, ownCompany).catch(
               () => null,
             ),
             listRelationshipViews(session, ownCompany).catch(() => null),
           ]);
+    // The page's companies' scores (investor only); unknown ranks last.
+    const scored =
+      read === null || side !== "INVESTOR"
+        ? undefined
+        : (await relationshipScores(read.items)).scores;
+    const data =
+      read === null || !ranked || scored === undefined
+        ? read
+        : {
+            ...read,
+            items: [
+              ...rankBySuitability(
+                read.items,
+                (item) => scoreOf(scored, item)?.suitability ?? null,
+              ),
+            ],
+          };
     const subjectId =
       context.kind === "FOUNDER"
         ? context.companyId
@@ -202,6 +245,8 @@ export default async function RelationshipsPage({
               views={views}
               query={parsed.data}
               layout={layout}
+              scores={scored}
+              ranked={ranked}
             />
           </QSection>
         )}
@@ -405,17 +450,31 @@ export default async function RelationshipsPage({
     unreadByRelationship(),
     ownCommitmentFacts(context),
   ]);
-  // The first page's cards are read in full (later pages by cursor), beside
-  // the investor's fit read: both need only the list (L1 latency sweep).
-  const [digests, fits] = await Promise.all([
+  // Owner 2026-10-17: an investor's list is ranked by Suitability unless
+  // they chose the latest change first. The first page's cards are read in
+  // full in the order shown (later pages by id), so a ranked list waits for
+  // the scores; a founder's (or a time-ordered) list reads both side by
+  // side (L1 latency sweep).
+  const sort = listSortOf(params["sort"], side);
+  const scored =
+    side === "INVESTOR"
+      ? relationshipScores(items)
+      : Promise.resolve(undefined);
+  const firstPage = (
+    scores: Readonly<Record<string, PipelineScores>> | undefined,
+  ) =>
     items === undefined
-      ? {}
+      ? Promise.resolve({})
       : relationshipDigests(
           context,
-          pageAfter(items.toSorted(listOrder), null).items,
-        ),
-    side === "INVESTOR" ? relationshipFits(items) : undefined,
-  ]);
+          listOrdered(items, scores, sort).slice(0, PAGE_SIZE),
+        );
+  const [digests, read] =
+    sort === "suitability"
+      ? await scored.then(
+          async (found) => [await firstPage(found?.scores), found] as const,
+        )
+      : await Promise.all([firstPage(undefined), scored]);
   const now = readClock();
   // The search carries into Table and Board when it is a valid one.
   const searched = RelationshipPipelineQuerySchema.safeParse(
@@ -477,12 +536,16 @@ export default async function RelationshipsPage({
         label={t(`${String(items?.length ?? 0)} relationships`)}
       >
         <RelationshipsIndex
+          // Another order is another first page: the list starts afresh.
+          key={sort}
           side={side}
           items={items}
           unread={unread}
           digests={digests}
           now={now}
-          fits={fits}
+          fits={read?.profiles}
+          scores={read?.scores}
+          sort={sort}
           commitments={commitments}
         />
       </QSection>
@@ -531,25 +594,44 @@ async function noticesAndReminders(): Promise<{
 }
 
 /**
- * Fit with the investor's own mandate for the companies they are in touch
- * with (ADR 0052; B3). A company without a fit simply shows none.
+ * Fit with the investor's own mandate (ADR 0052; B3) and the two company
+ * scores (ADR 0074) for the companies they are in touch with, from the Q
+ * API under their own session, in batches of the endpoint's maximum. A
+ * company the Q API did not answer for simply has none: its scores read
+ * as not known yet and it ranks after every scored company. No score is
+ * computed here.
  */
-async function relationshipFits(
+async function relationshipScores(
   items: readonly RelationshipSummaryDto[] | undefined,
-): Promise<Readonly<Record<string, FitProfileDto>>> {
+): Promise<{
+  readonly profiles: Readonly<Record<string, FitProfileDto>>;
+  readonly scores: Readonly<Record<string, PipelineScores>>;
+}> {
   const ids = [
     ...new Set(
       (items ?? [])
         .filter((item) => item.counterpart.kind === "COMPANY")
         .map((item) => item.counterpart.id),
     ),
-  ].slice(0, FIT_IDS_MAX);
+  ];
   const session = await qApiSession();
-  if (session === null || ids.length === 0) return {};
-  try {
-    const { items: fits } = await getFitProfiles(session, ids);
-    return Object.fromEntries(fits.map((f) => [f.companyId, f.profile]));
-  } catch {
-    return {};
+  if (session === null || ids.length === 0) return { profiles: {}, scores: {} };
+  const batches: string[][] = [];
+  for (let at = 0; at < ids.length; at += FIT_IDS_MAX) {
+    batches.push(ids.slice(at, at + FIT_IDS_MAX));
   }
+  const read = await Promise.all(
+    batches.map((batch) =>
+      getFitProfiles(session, batch)
+        .then((list) => list.items)
+        .catch(() => []),
+    ),
+  );
+  const found = read.flat();
+  return {
+    profiles: Object.fromEntries(found.map((f) => [f.companyId, f.profile])),
+    scores: pipelineScoresById(
+      found.flatMap((f) => (f.scores === undefined ? [] : [f.scores])),
+    ),
+  };
 }

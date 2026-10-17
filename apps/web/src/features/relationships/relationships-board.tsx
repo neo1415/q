@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 
 import type {
@@ -22,17 +23,23 @@ import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { effectShown } from "@/features/q/control/perform";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 import { RelationshipFitLine } from "@/features/fit/relationship-fit-chips";
-import { CompanyScoresLive } from "@/features/scores";
 
+import { ScoreFigure, ScoreLine } from "./pipeline-score-figure";
+import {
+  listOrdered,
+  scoreOf,
+  UNKNOWN_SCORES,
+  type ListSort,
+  type PipelineScores,
+} from "./pipeline-scores";
 import type { RelationshipDigest } from "./relationship-data";
 import { relationshipHref, STATE_WORDS } from "./relationship-words";
 import { moreRelationshipDigestsAction } from "./relationships-actions";
 import {
   isOwnStep,
   lastActivityAt,
-  listOrder,
   nextStepFor,
-  pageAfter,
+  PAGE_SIZE,
   rowFacts,
   since,
   stageTone,
@@ -47,7 +54,10 @@ import { useT } from "@/features/i18n/language";
  * The Relationships list (founder critique 2026-10-04): search first, then
  * where each stands as tabs with counts, then one row per relationship with its
  * counterpart, its stage, the time since anything last happened, and the
- * ONE next step as a button. Rows page by cursor; nothing is ranked.
+ * ONE next step as a button. For an investor, each company's Suitability
+ * and Investability sit beside it and the list is ranked by Suitability,
+ * unless they chose the latest change first (owner 2026-10-17); a founder's
+ * list keeps the projection's own time. Row details load a page at a time.
  */
 
 type Filter =
@@ -93,6 +103,14 @@ const TONE: Readonly<Record<ReturnType<typeof stageTone>, StatusTone>> = {
   neutral: "neutral",
 };
 
+/**
+ * The List's columns from tablet-landscape up. An investor's rows carry the
+ * two score columns after the name (literal classes, for Tailwind).
+ */
+const GRID_PLAIN = "lg:grid-cols-[40px_minmax(0,1fr)_150px_96px_190px]";
+const GRID_SCORED =
+  "lg:grid-cols-[40px_minmax(0,1fr)_84px_84px_140px_88px_176px]";
+
 const ICONS = {
   upload: Upload,
   file: FileText,
@@ -108,9 +126,10 @@ export function RelationshipsBoard({
   digests: initialDigests,
   unread,
   commitments = {},
-  firstCursor,
   now,
   fits,
+  scores,
+  sort: initialSort = "recent",
 }: {
   readonly side: ListSide;
   /**
@@ -118,18 +137,25 @@ export function RelationshipsBoard({
    * Absent: no fit is shown. A null entry: no mandate to fit against.
    */
   readonly fits?: Readonly<Record<string, FitProfileDto | null>> | undefined;
+  /**
+   * Suitability and Investability by company id, from the Q API (ADR 0074).
+   * Absent: no score columns (a founder's list). A company missing from it
+   * shows both as not known yet.
+   */
+  readonly scores?: Readonly<Record<string, PipelineScores>> | undefined;
+  /** The order the page was asked for (URL); suitability needs `scores`. */
+  readonly sort?: ListSort | undefined;
   readonly items: readonly RelationshipSummaryDto[];
   readonly digests: Readonly<Record<string, RelationshipDigest>>;
   /** R34: unread chat messages per relationship id. */
   readonly unread: Readonly<Record<string, number>>;
   /** Commitments waiting on this side, by relationship id (Capital). */
   readonly commitments?: Readonly<Record<string, CommitmentFact>> | undefined;
-  /** The cursor after the first page; null when it is the whole list. */
-  readonly firstCursor: string | null;
   /** When the page was read, so server and browser say the same "2h". */
   readonly now: number;
 }) {
   const t = useT();
+  const router = useRouter();
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("ALL");
@@ -160,11 +186,15 @@ export function RelationshipsBoard({
     },
   });
   const [digests, setDigests] = useState(initialDigests);
-  const [cursor, setCursor] = useState(firstCursor);
-  const ordered = useMemo(() => items.toSorted(listOrder), [items]);
-  const [shown, setShown] = useState(
-    () => pageAfter(ordered, null).items.length,
+  const sort: ListSort =
+    scores === undefined || initialSort !== "suitability"
+      ? "recent"
+      : "suitability";
+  const ordered = useMemo(
+    () => listOrdered(items, scores, sort),
+    [items, scores, sort],
   );
+  const [shown, setShown] = useState(() => Math.min(PAGE_SIZE, ordered.length));
   const [loading, startLoading] = useTransition();
   const [moreFailed, setMoreFailed] = useState(false);
 
@@ -221,19 +251,31 @@ export function RelationshipsBoard({
   const paging = filter === "ALL" && needle.length === 0;
   const visible = paging ? filtered.slice(0, shown) : filtered;
 
+  // The next rows in this list's own order: their details are read by id,
+  // so paging follows whichever order is shown.
   const more = () => {
-    if (cursor === null) return;
+    const ids = ordered
+      .slice(shown, shown + PAGE_SIZE)
+      .map((item) => item.relationshipId);
+    if (ids.length === 0) return;
     setMoreFailed(false);
     startLoading(async () => {
-      const page = await moreRelationshipDigestsAction(cursor);
+      const page = await moreRelationshipDigestsAction(ids);
       if (!page.ok) {
         setMoreFailed(true);
         return;
       }
       setDigests((current) => ({ ...current, ...page.digests }));
-      setShown((count) => count + page.ids.length);
-      setCursor(page.next);
+      setShown((count) => count + ids.length);
     });
+  };
+  // Another order is a fresh server read (its first rows' details come
+  // with it); the choice stays in the URL, so a reload keeps it.
+  const chooseSort = (next: ListSort) => {
+    const url = new URL(window.location.href);
+    if (next === "recent") url.searchParams.set("sort", "recent");
+    else url.searchParams.delete("sort");
+    router.push(`${url.pathname}${url.search}`);
   };
 
   const tabs = FILTERS.filter(
@@ -264,6 +306,27 @@ export function RelationshipsBoard({
           data-relationships-search
         />
       </label>
+
+      {scores === undefined ? null : (
+        <label className="cq-body-sm flex flex-wrap items-center gap-2 text-(--cq-text-secondary)">
+          {t("Sort relationships")}
+          <select
+            value={sort}
+            onChange={(event) =>
+              chooseSort(
+                event.target.value === "recent" ? "recent" : "suitability",
+              )
+            }
+            className="cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface-raised) px-3 pe-8 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+            data-relationships-sort
+          >
+            <option value="suitability">
+              {t("Suitability, highest first")}
+            </option>
+            <option value="recent">{t("Latest state change")}</option>
+          </select>
+        </label>
+      )}
 
       <div
         ref={filterRef}
@@ -319,10 +382,19 @@ export function RelationshipsBoard({
         <div className="flex flex-col gap-2">
           <div
             aria-hidden="true"
-            className="cq-caption hidden grid-cols-[40px_minmax(0,1fr)_150px_96px_190px] gap-3 px-4 text-(--cq-text-tertiary) lg:grid"
+            className={cx(
+              "cq-caption hidden gap-3 px-4 text-(--cq-text-tertiary) lg:grid",
+              scores === undefined ? GRID_PLAIN : GRID_SCORED,
+            )}
           >
             <span />
             <span>{t("Name")}</span>
+            {scores === undefined ? null : (
+              <>
+                <span>{t("Suitability")}</span>
+                <span>{t("Investability")}</span>
+              </>
+            )}
             <span>{t("Stage")}</span>
             <span className="text-end">{t("Last activity")}</span>
             <span className="text-end">{t("Next step")}</span>
@@ -353,6 +425,11 @@ export function RelationshipsBoard({
                   }
                   unread={(row.facts?.unread ?? 0) > 0}
                   now={now}
+                  scores={
+                    scores === undefined
+                      ? undefined
+                      : (scoreOf(scores, row.item) ?? UNKNOWN_SCORES)
+                  }
                   fit={
                     fits === undefined ||
                     row.item.counterpart.kind !== "COMPANY" ||
@@ -367,7 +444,7 @@ export function RelationshipsBoard({
         </div>
       )}
 
-      {paging && cursor !== null && shown < filtered.length ? (
+      {paging && shown < filtered.length ? (
         <div className="flex flex-col items-center gap-2">
           <button
             type="button"
@@ -398,9 +475,12 @@ function RelationshipRow({
   unread,
   now,
   fit,
+  scores,
 }: {
   readonly item: RelationshipSummaryDto;
   readonly fit?: FitProfileDto | null | undefined;
+  /** Undefined: no score columns on this list. */
+  readonly scores?: PipelineScores | undefined;
   readonly step: NextStep;
   readonly activity: string;
   readonly about: string | null;
@@ -430,7 +510,10 @@ function RelationshipRow({
   return (
     <article
       aria-labelledby={`relationship-${item.relationshipId}`}
-      className="relative grid grid-cols-[40px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 p-3.5 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:grid-cols-[40px_minmax(0,1fr)_150px_96px_190px] lg:px-4 lg:py-3"
+      className={cx(
+        "relative grid grid-cols-[40px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 p-3.5 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:px-4 lg:py-3",
+        scores === undefined ? GRID_PLAIN : GRID_SCORED,
+      )}
       data-relationship-card={item.state}
     >
       {item.counterpart.kind === "COMPANY" ? (
@@ -478,15 +561,34 @@ function RelationshipRow({
           </p>
         )}
         {fit === undefined ? null : <RelationshipFitLine profile={fit} />}
-        {fit === undefined ? null : (
-          // Investability and Suitability (ADR 0074): the investor's rows only.
-          <CompanyScoresLive companyId={item.counterpart.id} />
+        {scores === undefined ? null : (
+          // A phone card says both scores, labelled; from tablet-landscape
+          // up they are the columns beside the name.
+          <ScoreLine scores={scores} className="mt-0.5 lg:hidden" />
         )}
         <div className="flex items-center gap-2 lg:hidden">
           {pill}
           {when}
         </div>
       </div>
+      {scores === undefined ? null : (
+        <>
+          <div className="hidden lg:block">
+            <ScoreFigure
+              label="Suitability"
+              value={scores.suitability}
+              variant="column"
+            />
+          </div>
+          <div className="hidden lg:block">
+            <ScoreFigure
+              label="Investability"
+              value={scores.investability}
+              variant="column"
+            />
+          </div>
+        </>
+      )}
       <div className="hidden lg:block">{pill}</div>
       <div className="hidden text-end lg:block">{when}</div>
       <div

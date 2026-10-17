@@ -267,18 +267,16 @@ export function navigationGroupsFor(
     { label: null, items: PRIMARY_NAVIGATION },
     {
       label: "Workspace",
+      // Owner 2026-10-17: fewer entries. GateQ, company requests and a
+      // founder's applications are CRM tabs; Q Pitch lives in Profile.
+      // Their pages and addresses are unchanged (Q still opens them).
       items: [
-        ...(founder || investor ? [GATEQ_NAVIGATION] : []),
         WORK_NAVIGATION,
         ...(founder
           ? [FOUNDER_MEDIA_NAVIGATION, FOUNDER_DATA_ROOM_NAVIGATION]
           : []),
-        ...(investor ? [COMPANY_REQUESTS_NAVIGATION] : []),
         DOCUMENTS_NAVIGATION,
         ...(founder || investor ? [REHEARSALS_NAVIGATION] : []),
-        ...((founder || investor) && options.qPitch === true
-          ? [Q_PITCH_NAVIGATION]
-          : []),
         DAILY_NAVIGATION,
       ],
     },
@@ -347,7 +345,8 @@ export const MOBILE_CENTRE_HREF = "/home" satisfies NavigationItem["href"];
  * the Results URL, and /crm is the CRM's alias.
  */
 const AREA_ALIASES: Readonly<Record<string, readonly string[]>> = {
-  "/relationships": ["/results", "/crm", "/capital"],
+  // GateQ and company requests are CRM tabs (owner 2026-10-17).
+  "/relationships": ["/results", "/crm", "/capital", "/gateq", "/investors"],
 };
 
 export function isActiveRoute(pathname: string, href: string): boolean {

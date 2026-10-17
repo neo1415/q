@@ -41,6 +41,12 @@ import {
   type PipelinePreferences,
 } from "./pipeline-preferences";
 import { PipelineSavedViews, type AppliedView } from "./pipeline-saved-views";
+import { ScoreFigure, ScoreLine } from "./pipeline-score-figure";
+import {
+  scoreOf,
+  UNKNOWN_SCORES,
+  type PipelineScores,
+} from "./pipeline-scores";
 import { useT } from "@/features/i18n/language";
 
 const inputClass =
@@ -57,6 +63,18 @@ function localStorageOrNull() {
   }
 }
 
+/**
+ * The URL's sort for a chosen option: Suitability is the investor's default
+ * (no `sort`); every other order is the API's own.
+ */
+function sortParam(value: string): RelationshipPipelineQuery["sort"] {
+  return value === "oldest" || value === "name" || value === "name-desc"
+    ? value
+    : value === "recent"
+      ? "recent"
+      : undefined;
+}
+
 /** Presentation and personal preferences only. The API owns scope/filter/state. */
 export function RelationshipPipeline({
   data,
@@ -65,7 +83,16 @@ export function RelationshipPipeline({
   layout: initialLayout,
   side,
   views = null,
+  scores,
+  ranked = false,
 }: {
+  /**
+   * Suitability and Investability by company id, from the Q API (ADR
+   * 0074); investor only. Absent: no score columns.
+   */
+  readonly scores?: Readonly<Record<string, PipelineScores>> | undefined;
+  /** No sort chosen: the server ranked this page by Suitability. */
+  readonly ranked?: boolean | undefined;
   /** The server's saved views; null when they could not be read. */
   readonly views?: SavedRelationshipViewList | null;
   readonly data: RelationshipPipelineDto;
@@ -185,12 +212,15 @@ export function RelationshipPipeline({
     onAct: async (intent) => {
       if (
         typeof intent.value !== "string" ||
-        !["recent", "oldest", "name", "name-desc"].includes(intent.value)
+        !["recent", "oldest", "name", "name-desc", "suitability"].includes(
+          intent.value,
+        ) ||
+        (intent.value === "suitability" && scores === undefined)
       )
         return "NOT_APPLICABLE";
       const next = {
         ...query,
-        sort: intent.value as RelationshipPipelineQuery["sort"],
+        sort: sortParam(intent.value),
         cursor: undefined,
       };
       const target = pipelineHref(next, layout);
@@ -325,9 +355,11 @@ export function RelationshipPipeline({
         <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) md:hidden [&::-webkit-details-marker]:hidden">
           <span className="font-medium">{t("View options")}</span>
           <span className="truncate text-(--cq-text-secondary)">
-            {optionsSummary === ""
-              ? t("All · latest first")
-              : t(optionsSummary)}
+            {optionsSummary !== ""
+              ? t(optionsSummary)
+              : ranked
+                ? t("All · best suited first")
+                : t("All · latest first")}
           </span>
         </summary>
         <div className="flex flex-col gap-2 pt-3 md:flex-row md:flex-wrap md:items-center md:border-y md:border-(--cq-border-subtle) md:py-2">
@@ -364,15 +396,20 @@ export function RelationshipPipeline({
               ref={sortRef}
               aria-label={t("Sort relationships")}
               className={selectClass}
-              value={query.sort ?? "recent"}
+              value={query.sort ?? (ranked ? "suitability" : "recent")}
               onChange={(event) =>
                 move({
                   ...query,
-                  sort: event.target.value as RelationshipPipelineQuery["sort"],
+                  sort: sortParam(event.target.value),
                   cursor: undefined,
                 })
               }
             >
+              {scores === undefined ? null : (
+                <option value="suitability">
+                  {t("Suitability, highest first")}
+                </option>
+              )}
               <option value="recent">{t("Latest state change")}</option>
               <option value="oldest">{t("Earliest state change")}</option>
               <option value="name">{t("Name A–Z")}</option>
@@ -454,6 +491,9 @@ export function RelationshipPipeline({
         {String(data.items.length)} {t("on this page ·")}{" "}
         {data.totalExact === false ? t("up to ") : ""}
         {String(data.total)} {t("matching relationships")}
+        {ranked && (data.nextCursor !== null || query.cursor !== undefined)
+          ? ` · ${t("ranked by suitability within each page")}`
+          : ""}
       </p>
       {data.total === 0 ? (
         <div
@@ -509,6 +549,12 @@ export function RelationshipPipeline({
                 <th className="py-2 pe-4">
                   {side === "INVESTOR" ? t("Company") : t("Investor")}
                 </th>
+                {scores === undefined ? null : (
+                  <>
+                    <th className="py-2 pe-4 text-end">{t("Suitability")}</th>
+                    <th className="py-2 pe-4 text-end">{t("Investability")}</th>
+                  </>
+                )}
                 {preferences.columns.includes("state") ? (
                   <th className="py-2 pe-4">{t("State")}</th>
                 ) : null}
@@ -558,10 +604,34 @@ export function RelationshipPipeline({
                     >
                       {row.counterpart.name}
                     </Link>
-                    {row.counterpart.kind === "COMPANY" ? (
+                    {scores === undefined &&
+                    row.counterpart.kind === "COMPANY" ? (
                       <CompanyScoresLive companyId={row.counterpart.id} />
                     ) : null}
                   </td>
+                  {scores === undefined ? null : (
+                    <>
+                      <td className="py-3 pe-4 text-end">
+                        <ScoreFigure
+                          label="Suitability"
+                          value={
+                            (scoreOf(scores, row) ?? UNKNOWN_SCORES).suitability
+                          }
+                          variant="cell"
+                        />
+                      </td>
+                      <td className="py-3 pe-4 text-end">
+                        <ScoreFigure
+                          label="Investability"
+                          value={
+                            (scoreOf(scores, row) ?? UNKNOWN_SCORES)
+                              .investability
+                          }
+                          variant="cell"
+                        />
+                      </td>
+                    </>
+                  )}
                   {preferences.columns.includes("state") ? (
                     <td className="py-3 pe-4 whitespace-nowrap text-(--cq-text-primary)">
                       {t(STATE_WORDS[row.state])}
@@ -640,9 +710,14 @@ export function RelationshipPipeline({
                         >
                           {row.counterpart.name}
                         </Link>
-                        {row.counterpart.kind === "COMPANY" ? (
+                        {row.counterpart.kind !== "COMPANY" ? null : scores ===
+                          undefined ? (
                           <CompanyScoresLive companyId={row.counterpart.id} />
-                        ) : null}
+                        ) : (
+                          <ScoreLine
+                            scores={scoreOf(scores, row) ?? UNKNOWN_SCORES}
+                          />
+                        )}
                         {row.nextStep === "NONE" ? null : (
                           <p className="cq-caption text-(--cq-text-secondary)">
                             {t(PIPELINE_NEXT_WORDS[row.nextStep])}
