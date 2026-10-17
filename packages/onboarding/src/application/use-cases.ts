@@ -607,6 +607,8 @@ async function commitResponse(
   options: {
     /** The proposal being accepted or corrected by this very commit. */
     readonly resolvingSuggestionId?: OnboardingSuggestionId | undefined;
+    /** Reads reused across one batch's answers (see OnboardingWriteContext). */
+    readonly requestMemo?: Map<string, unknown> | undefined;
   } = {},
 ): Promise<{
   readonly session: OnboardingSession;
@@ -666,6 +668,7 @@ async function commitResponse(
           correlationId,
           currentResponses: aggregate.currentResponses,
           bindContext,
+          requestMemo: options.requestMemo,
         },
         validated,
       );
@@ -1272,6 +1275,10 @@ export function createOnboardingUseCases(
       );
       const results = new Map<number, OnboardingBatchOutcome>();
       let changes: OnboardingPathChanges | undefined;
+      // One request's reads, reused by its answers' write targets.
+      const requestMemo = new Map<string, unknown>();
+      // Milliseconds per committed answer, for the batch's own log line.
+      const timings: string[] = [];
       let open = command.responses.map((_, index) => index);
       // Each pass commits what it can; another pass only after progress,
       // so a batch ends after at most as many passes as it has answers.
@@ -1280,6 +1287,7 @@ export function createOnboardingUseCases(
         for (const index of open) {
           const item = command.responses[index];
           if (item === undefined) continue;
+          const startedAt = performance.now();
           try {
             const before = session;
             const committed = await tx.sql.savepoint(async (inner) => {
@@ -1295,6 +1303,7 @@ export function createOnboardingUseCases(
                 step,
                 validated,
                 command.correlationId,
+                { requestMemo },
               );
               await outbox.enqueue(
                 unit,
@@ -1314,6 +1323,9 @@ export function createOnboardingUseCases(
             session = committed.session;
             changes = committed.changes;
             results.set(index, { stepKey: item.stepKey, outcome: "COMMITTED" });
+            timings.push(
+              `${item.stepKey}:${String(Math.round(performance.now() - startedAt))}`,
+            );
           } catch (error: unknown) {
             const refusal = batchRefusalOf(error);
             if (refusal === null) throw error;
@@ -1340,6 +1352,8 @@ export function createOnboardingUseCases(
         committed: [...results.values()].filter(
           (r) => r.outcome === "COMMITTED",
         ).length,
+        // Step keys and milliseconds only: no values.
+        timings: timings.join(" ").slice(0, 800),
       });
       return {
         view: await view(tx.sql, actor, session, changes),
