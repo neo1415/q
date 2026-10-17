@@ -221,10 +221,9 @@ describe("fit tools", () => {
     expect(JSON.stringify(allowed.result.data).length).toBeLessThan(
       MODEL_TOOL_RESULT_MAX_CHARS,
     );
-    expect(allowed.result.data).toMatchObject({
-      text: expect.stringContaining("Unicorn Potential: 50/100"),
-      guidance: expect.stringContaining("not a probability"),
-    });
+    const authorized = FitProfileOutputSchema.parse(allowed.result.data);
+    expect(authorized.text).toContain("Unicorn Potential: 50/100");
+    expect(authorized.guidance).toContain("not a probability");
     entitled = false;
     const revoked = await invoke();
     if (!revoked.result.ok) throw new Error("Expected denied-feature profile");
