@@ -44,9 +44,15 @@ export type InvestabilityClaimInput = {
   /** Checked again by the producer: anything else is dropped. */
   readonly visibilityScope: string;
   readonly assertedAt: string;
+  readonly structuredValue?: Readonly<Record<string, unknown>> | null;
+  readonly validFrom?: string | null;
+  readonly validTo?: string | null;
+  readonly revisionId?: string | null;
+  readonly revisionNumber?: number | null;
 };
 
 export type InvestabilityFounderLine = {
+  readonly recordedAt?: string | null;
   readonly id: string;
   readonly title: string;
   readonly detail: string | null;
