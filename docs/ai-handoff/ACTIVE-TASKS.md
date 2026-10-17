@@ -1,5 +1,22 @@
 # Active tasks — authoritative cross-model board
 
+## 17 October 2026 — open work (Claude lead)
+
+1. **Q Pitch v6:** DONE and production-certified (manifest). Optional follow-ups:
+   - a voice-mode run on a real microphone (owner);
+   - narration in the viewer's language;
+   - a live Q-to-Q session on Capital Q's own founder account, with at most 2 Tavus sessions of 90 s or less.
+2. **Onboarding, English:** meets target. The investor first turn (about 12.6 s) is dominated by model time.
+3. **Onboarding, other languages:** PAUSED by the owner.
+   - Resume from `claude/ob1-oct16@061f6426`, which is held. Re-run English acceptance before releasing it, because it touches the English currency and scale paths.
+   - Unfinished work is on `claude/ob1-lang-wip`.
+4. **Triage:** the roughly 30 failures in the full integration suite (`pnpm test:integration`) outside onboarding.
+5. **Polish:** the photo-route 404 console noise. A uniform 204 or a client-side `hasPhoto` would keep the single "no" without the console error.
+6. **Owner only:**
+   - reconnect Google;
+   - rotate `CQ_SEED_ACCOUNT_PASSWORD`;
+   - remove fictional test accounts by their `cq_seed` markers.
+
 ## 16 October 2026 — open work (Claude lead)
 
 1. **Onboarding (top priority)** — lane ob1, branch `claude/ob1-oct16`. Goal: every stated fact saved, p50 ≤3.5 s English and <5 s in a chosen language. Next: warm onboarding copy translations on language choice, one fixed lead per language, fix "your what the company does" read-back; live re-run of checks 2–5 plus Arabic and French on AI.

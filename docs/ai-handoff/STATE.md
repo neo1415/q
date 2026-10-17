@@ -1,6 +1,60 @@
 # Capital Q — Current shared engineering state
 
-## 16 October 2026 — Claude lead (latest; supersedes older sections where they differ)
+## 17 October 2026 — Claude lead (latest; supersedes older sections where they differ)
+
+Production at 07:43 UTC:
+
+| Service      | Commit                                    |
+| ------------ | ----------------------------------------- |
+| web          | `c3044b70` (AR)                           |
+| q-api        | `7161cedb` (AQ)                           |
+| api, workers | `a5008502` (AN) or later; unchanged since |
+
+Hosted migrations: 245, none missing; no migrations shipped on 17 October.
+
+| Release | What shipped                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AK      | Hotfix: the founder Capital, Readiness and Action plan pages crashed (server component called client functions); a server/client boundary guard test was added. Live-verified for Harbourline and Ledgerfold.                                                                                                                                                                                                                                                               |
+| AL      | Onboarding: "400 mille" scale words, investor first-answer categories, voice `?section=` focus, French read-back.                                                                                                                                                                                                                                                                                                                                                           |
+| AM      | Onboarding batch latency (per-request memo, one mandate read), no first-turn 422, receipt-guard fix.                                                                                                                                                                                                                                                                                                                                                                        |
+| AN      | Q Pitch v6, both tracks: investor 22 steps, founder 17 steps, and the `/q-pitch/capital-q` 14-section board. The `Q_PITCH` destination, turn-reader v53, typed and spoken step commands with no model call, the Q&A bank, and Discover muted in pitch mode. Onboarding: the no-inference choice guard, the UNTRANSLATED translation guard with a self-healing cache, and a pre-organisation taxonomy read (reference data only, a negative test proves no org-scoped rows). |
+| AO      | One mandate update per onboarding batch (savepoint replay on refusal; integration suite 40/40 on local Supabase), read-back labels, and the first Q Pitch trigger fix.                                                                                                                                                                                                                                                                                                      |
+| AP      | Onboarding sectors always save, with digits for scale words. Q Pitch: the trigger acts when the request is filed as a question, section lighting on sub-page moves, and the founder board cut to one line per section.                                                                                                                                                                                                                                                      |
+| AQ      | The tour starts after Q's client navigation to `?qpitch`. Onboarding: covered steps are not "unsaved", identical re-records write nothing, and Arabic duals.                                                                                                                                                                                                                                                                                                                |
+| AR      | A trigger-started tour opens a fresh Home conversation, and each tour move carries its own turn id.                                                                                                                                                                                                                                                                                                                                                                         |
+
+**Q Pitch v6 is PRODUCTION_LIVE_VERIFIED.** See `docs/specs/q-pitch/CERTIFICATION_MANIFEST.md`.
+
+| Track               | Started by      | Steps | Sections lit   |
+| ------------------- | --------------- | ----- | -------------- |
+| Investor (Savanna)  | French trigger  | 22/22 | 47, none unlit |
+| Founder (Babatunde) | English trigger | 17/17 | 51, none unlit |
+
+On both tracks:
+
+- the four step commands work;
+- Discover is muted at every check;
+- bank answers are instant, with zero Q runs.
+
+Not covered by that certification:
+
+- voice: every run was captions only;
+- the Q-to-Q step is a prepared exchange, not a live Tavus session;
+- narration is English only.
+
+**Onboarding (English), live on AQ:**
+
+- founder: p50 3.2 s, max 4.2 s, one model round per turn, 17/17 facts saved;
+- investor: a 13-fact first answer saves 13/13; the turn takes about 12.6 s and can take two rounds when the model omits a free-text title.
+
+**Language work is paused by the owner** (17 Oct: "as long as english is good").
+
+- `claude/ob1-oct16@061f6426` (Intl-derived currency names and scale words, and the own-words repetition guard) is finished but **held, not released**: it also changes the English currency and scale paths.
+- Unfinished Hindi/Swahili work is pushed to `claude/ob1-lang-wip` (one failing test).
+
+Known, not fixed: company and investor photo routes answer a uniform 404 for "no photo", by design. The browser logs it as a console error on CRM and Capital pages. Running `vitest.integration.config.ts` in full shows about 30 failures outside onboarding; CI doesn't run that config, and they have not been triaged.
+
+## 16 October 2026 — Claude lead
 
 All four Railway services are on releases through **AI** (`7059dc30` deploying at 23:08 UTC; AH `4c968c15` on q-api, AG `bb1dc914` on web/api/workers). Hosted migrations: **245 applied, none missing** (latest `20261228183300`). Releases today, all CI-green and deployed:
 
