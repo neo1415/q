@@ -736,3 +736,51 @@ describe("live AO: a figure in a translated read-back is written in digits", () 
     expect(reply).not.toMatch(/million/u);
   });
 });
+
+describe("live AO: category names come from the classifier, not a read per node", () => {
+  it("reads back the categories it just resolved without fetching each node", async () => {
+    const said = "We invest in Europe and North Africa.";
+    const world = investorSession({
+      currentStepKey: "I3.geography",
+      taxonomy: {
+        europe: "a0000000-0000-4000-8000-0000000000e1",
+        "north africa": "a0000000-0000-4000-8000-0000000000e2",
+      },
+    });
+    const fetched: string[] = [];
+    const base = turn(world, said).session;
+    const session = {
+      ...base,
+      fetch: ((input: string | URL | Request, init?: RequestInit) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        if (/\/taxonomy\/nodes\/[^/?]+$/u.test(url)) fetched.push(url);
+        return (base.fetch ?? fetch)(input, init);
+      }) as typeof fetch,
+    };
+    const port = createOnboardingPort({
+      session,
+      onboardingSessionId: turn(world, said).onboardingSessionId,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [said],
+      authority: () => Promise.resolve(reading({ stated: ["I3.geography"] })),
+    });
+    const [result] = await port.record([
+      {
+        stepKey: "I3.geography",
+        value: ["Europe", "North Africa"],
+        quote: "Europe and North Africa",
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    expect(result?.outcome).toBe("COMMITTED");
+    expect(result?.recorded).toMatch(/Europe/u);
+    expect(fetched).toEqual([]);
+  });
+});
