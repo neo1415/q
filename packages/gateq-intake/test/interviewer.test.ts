@@ -457,6 +457,31 @@ describe("what the model is given", () => {
     expect(twice[0]?.dimension).toBe("company.problem");
   });
 
+  it("leans on the investor's mandate emphasis after required rules and before the general order", () => {
+    const criterionId = randomUUID();
+    const needs = questionNeedsFor({
+      policy: {
+        criteria: [
+          {
+            id: criterionId,
+            config: { type: "STAGE", allowedStageCodes: ["seed"] },
+          },
+        ],
+      } as unknown as GatewayPolicy,
+      qualification: {
+        unknowns: [criterionId],
+        criteria: [],
+      } as unknown as QualificationResult,
+      facts: [],
+      emphasis: ["claims.revenue", "company.customers"],
+    });
+    expect(needs.slice(0, 3)).toEqual([
+      { dimension: "company.stage", reason: "REQUIRED_BY_GATEWAY" },
+      { dimension: "claims.revenue", reason: "INVESTOR_EMPHASIS" },
+      { dimension: "company.customers", reason: "INVESTOR_EMPHASIS" },
+    ]);
+  });
+
   it("treats an explained solution as having described the company", () => {
     const needs = questionNeedsFor({
       policy: { criteria: [] } as unknown as GatewayPolicy,

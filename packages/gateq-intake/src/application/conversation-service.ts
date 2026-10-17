@@ -69,6 +69,17 @@ export type ConversationDependencies = {
   readonly intake: IntakeService;
   readonly interviewer: GateQInterviewer;
   readonly policies: BoundPolicyPort;
+  /**
+   * Which dimensions the gateway owner's active mandate emphasises, never
+   * its values. Absent, or failing, the interview falls back to the
+   * general investment assessment; it is never a reason to refuse a turn.
+   */
+  readonly investorEmphasisFor?:
+    | ((input: {
+        readonly tenantId: string;
+        readonly gatewayId: string;
+      }) => Promise<readonly ApplicationDimension[]>)
+    | undefined;
   /** The gateway as the world may see it. Never the private policy. */
   readonly publicGatewayFor: (
     gatewayId: string,
@@ -177,6 +188,7 @@ export function createConversationService(
     interviewer,
     policies,
     publicGatewayFor,
+    investorEmphasisFor,
     turnMemory,
     turns,
     logger,
@@ -295,6 +307,13 @@ export function createConversationService(
         turns === undefined || claimId === null
           ? null
           : await turns.readOutcome(applicationId, claimId);
+      const emphasis =
+        cached !== null || investorEmphasisFor === undefined
+          ? []
+          : await investorEmphasisFor({
+              tenantId: guest.application.tenantId,
+              gatewayId: guest.application.gatewayId,
+            }).catch(() => []);
       const outcome =
         cached === null
           ? await interviewer.turn({
@@ -316,6 +335,7 @@ export function createConversationService(
               tangents: history.tangents,
               askedAlready: history.askedAlready,
               askedCounts: history.askedCounts,
+              emphasis,
               attribution: {
                 tenantId: guest.application.tenantId,
                 correlationId: input.correlationId,

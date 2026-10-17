@@ -32,6 +32,12 @@ export type QuestionNeed = {
   readonly reason:
     | "REQUIRED_BY_GATEWAY"
     | "PREFERRED_BY_GATEWAY"
+    /**
+     * The investor's own private mandate emphasises this dimension. Only
+     * the dimension crosses: never the mandate's values, wording or
+     * thresholds (§28), and never a qualification decision.
+     */
+    | "INVESTOR_EMPHASIS"
     | "CONTRADICTION"
     | "UNDERSTANDING";
 };
@@ -104,6 +110,12 @@ export function questionNeedsFor(input: {
    * MAX_ASKS_PER_DIMENSION times is parked, whatever its reason.
    */
   readonly askedCounts?: ReadonlyMap<ApplicationDimension, number> | undefined;
+  /**
+   * Dimensions the investor's active mandate emphasises, derived by the
+   * composition from automation-eligible mandate fields. Shapes what is
+   * asked; never what qualifies.
+   */
+  readonly emphasis?: readonly ApplicationDimension[] | undefined;
 }): readonly QuestionNeed[] {
   const limit = input.limit ?? 6;
   const answered = new Set(
@@ -160,6 +172,14 @@ export function questionNeedsFor(input: {
       CRITERION_DIMENSION[criterion?.config.type ?? ""],
       "PREFERRED_BY_GATEWAY",
     );
+  }
+
+  // Then what this investor's own mandate emphasises, ahead of the general
+  // order: two founders applying to two different funds should not be asked
+  // the same things in the same order.
+  for (const dimension of input.emphasis ?? []) {
+    if (answered.has(dimension)) continue;
+    add(dimension, "INVESTOR_EMPHASIS");
   }
 
   // Then what a partner would want to know, in the order they would want
