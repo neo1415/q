@@ -56,9 +56,9 @@ update evidence.claims set visibility_scope = 'network_visible' where id = '0000
 update unicorn_candidates set value = jsonb_set(value, '{0,observations,0,source,label}', '"Different revenue claim"'::jsonb);
 select is((select count(*)::int from private.unicorn_potential_eligible_revisions((select value from unicorn_candidates))), 0, 'changed source statement cannot authorize an older explanation');
 update unicorn_candidates set value = jsonb_set(value, '{0,observations}', '[]'::jsonb);
-update knowledge.company_profiles set listed = false, visibility = null, canonical_name = null where company_id = '00000000-0000-4000-8000-0000000098c1';
+update core.companies set marketplace_visibility = 'founder_private' where id = '00000000-0000-4000-8000-0000000098c1';
 select is((select count(*)::int from private.unicorn_potential_eligible_revisions((select value from unicorn_candidates))), 0, 'withdrawn company fails closed even with no claim references');
-update knowledge.company_profiles set listed = true, visibility = 'network_visible', canonical_name = 'Unicorn Test' where company_id = '00000000-0000-4000-8000-0000000098c1';
+update core.companies set marketplace_visibility = 'network_visible' where id = '00000000-0000-4000-8000-0000000098c1';
 update core.companies set company_status = 'closed' where id = '00000000-0000-4000-8000-0000000098c1';
 select is((select count(*)::int from private.unicorn_potential_eligible_revisions((select value from unicorn_candidates))), 0, 'closed canonical company cannot expose its old score');
 update core.companies set company_status = 'active' where id = '00000000-0000-4000-8000-0000000098c1';
