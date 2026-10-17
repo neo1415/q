@@ -2,7 +2,7 @@ import { stageBandOf } from "../investiq/method-v1.js";
 /** Owner-approved provisional heuristics, not fitted probability coefficients. */
 export const UNICORN_POTENTIAL_METHOD_VERSION = "unicorn-potential.v1.0.0";
 export const UNICORN_POTENTIAL_INPUT_RULES_VERSION =
-  "unicorn-potential-inputs.v1";
+  "unicorn-potential-inputs.v2";
 export type UnicornStage = "PRE_SEED" | "SEED" | "SERIES_A_GROWTH";
 export type PillarId = `P${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12}`;
 export type CriterionRule = {

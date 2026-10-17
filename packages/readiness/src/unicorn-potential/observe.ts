@@ -1,3 +1,4 @@
+import { structuredSignals, deckStructuredFact } from "./structured-facts.js";
 import type { UnicornPotentialDto } from "@capital-q/contracts";
 import {
   INVESTOR_ELIGIBLE_SCOPES,
@@ -19,6 +20,7 @@ export type UnicornObservation = {
   readonly stale: boolean;
   readonly conflicted: boolean;
   readonly rule: string;
+  readonly inputMetadata?: Readonly<Record<string, unknown>>;
 };
 const reliabilityOf = (s: Source): number =>
   s.truthClass === "Q_INFERENCE"
@@ -47,7 +49,7 @@ function sourcesOf(inputs: InvestabilityInputs): Source[] {
       continue;
     out.push({
       id: claim.id,
-      revision: claim.assertedAt,
+      revision: claim.revisionId ?? claim.assertedAt,
       at: claim.assertedAt,
       kind: "CLAIM",
       label: claim.statement,
@@ -64,8 +66,8 @@ function sourcesOf(inputs: InvestabilityInputs): Source[] {
     if (founder.visibilityScope !== "network_visible") continue;
     out.push({
       id: founder.id,
-      revision: inputs.profile.updatedAt ?? "undated",
-      at: null,
+      revision: founder.recordedAt ?? "undated",
+      at: founder.recordedAt ?? null,
       kind: "FOUNDER_BACKGROUND",
       label: `Founder ${founder.title} ${founder.detail ?? ""}`,
       truthClass: "USER_CLAIM",
@@ -163,6 +165,85 @@ export function observeUnicornPotential(
       source.truthClass === "UNKNOWN"
     )
       continue;
+    let claim =
+      source.kind === "CLAIM"
+        ? inputs.claims.find((c) => c.id === source.id)
+        : undefined;
+    if (source.kind === "DECK_SECTION" && inputs.deck !== null) {
+      for (const section of inputs.deck.sections) {
+        for (const [index, fact] of section.facts.entries()) {
+          if (
+            source.id !==
+            `${inputs.deck.extractionId}:${section.section}:${String(index)}`
+          )
+            continue;
+          const mapped = deckStructuredFact(fact);
+          if (mapped !== null)
+            claim = {
+              id: source.id,
+              claimKey: mapped.claimKey,
+              claimType: "deck",
+              statement: source.label,
+              structuredValue: mapped.structuredValue,
+              assertedAt: inputs.deck.readAt,
+              revisionId: source.revision,
+              truthClass: source.truthClass,
+              evidenceStatus: source.evidenceStatus,
+              lifecycleStatus: source.lifecycleStatus,
+              visibilityScope: source.visibilityScope,
+            };
+        }
+      }
+    }
+    if (
+      claim?.structuredValue !== undefined &&
+      claim.structuredValue !== null
+    ) {
+      const metadata = {
+        claimKey: claim.claimKey,
+        structuredValue: claim.structuredValue,
+        validFrom: claim.validFrom ?? null,
+        validTo: claim.validTo ?? null,
+        revisionId: claim.revisionId ?? null,
+        revisionNumber: claim.revisionNumber ?? null,
+      };
+      for (const signal of structuredSignals(claim)) {
+        const policy = UNICORN_PILLARS.find((p) => p.id === signal.pillar)
+          ?.criteria[signal.criterion === "A" ? 0 : 1];
+        if (policy === undefined) continue;
+        const date = signal.at === null ? NaN : Date.parse(signal.at);
+        const asserted = Date.parse(claim.assertedAt);
+        const validFrom =
+          claim.validFrom == null ? null : Date.parse(claim.validFrom);
+        const validTo =
+          claim.validTo == null ? null : Date.parse(claim.validTo);
+        const stale =
+          source.lifecycleStatus === "STALE" ||
+          !Number.isFinite(date) ||
+          !Number.isFinite(asserted) ||
+          date > now ||
+          date > asserted ||
+          now - date > policy.freshnessDays * 86400000 ||
+          (validFrom !== null &&
+            (!Number.isFinite(validFrom) || validFrom > now)) ||
+          (validTo !== null && (!Number.isFinite(validTo) || validTo < now));
+        out.push({
+          pillar: signal.pillar,
+          criterion: signal.criterion,
+          grade: quality <= 0.5 ? Math.min(3, signal.grade) : signal.grade,
+          source: { ...source, at: signal.at },
+          reliability: stale ? quality * 0.5 : quality,
+          stale,
+          conflicted:
+            source.lifecycleStatus === "CONTRADICTORY" ||
+            source.lifecycleStatus === "DISPUTED",
+          rule: signal.rule,
+          inputMetadata: metadata,
+        });
+      }
+      // A typed canonical claim is never reinterpreted through unrelated English keywords.
+      continue;
+    }
     for (const pillar of UNICORN_PILLARS) {
       for (const [index, criterion] of pillar.criteria.entries()) {
         const text = source.label.slice(0, 4000);
