@@ -47,6 +47,7 @@ export function createUnicornPotentialService(dependencies: {
       cohortKey: JSON.stringify({
         stage: result.view.stage,
         sectors: [...new Set(read.inputs.sectorCodes)].sort(),
+        geography: "UNKNOWN",
       }),
       view: result.view,
       observations: result.observations,
@@ -56,17 +57,38 @@ export function createUnicornPotentialService(dependencies: {
       revision: recorded.revision,
     };
   };
+  let sweepCursor: string | undefined;
   return {
     recompute,
     sweep: async (
-      options: { readonly limit?: number; readonly pauseMs?: number } = {},
+      options: {
+        readonly limit?: number;
+        readonly pauseMs?: number;
+        readonly afterCompanyId?: string;
+      } = {},
     ) => {
       const limit = Math.max(
         1,
         Math.min(500, Math.trunc(options.limit ?? 100)),
       );
       const pause = Math.max(100, Math.min(10_000, options.pauseMs ?? 100));
-      const ids = await dependencies.store.listedCompanyIds(limit);
+      let ids = await dependencies.store.sweepCompanyIds(
+        dependencies.methodVersion,
+        limit,
+        options.afterCompanyId ?? sweepCursor,
+      );
+      if (
+        ids.length === 0 &&
+        options.afterCompanyId === undefined &&
+        sweepCursor !== undefined
+      ) {
+        sweepCursor = undefined;
+        ids = await dependencies.store.sweepCompanyIds(
+          dependencies.methodVersion,
+          limit,
+        );
+      }
+      sweepCursor = ids.at(-1);
       let recorded = 0;
       let unchanged = 0;
       let failed = 0;
@@ -80,7 +102,12 @@ export function createUnicornPotentialService(dependencies: {
         }
         await sleep(pause);
       }
-      return { recorded, unchanged, failed };
+      return {
+        recorded,
+        unchanged,
+        failed,
+        nextCompanyId: sweepCursor ?? null,
+      };
     },
   };
 }
