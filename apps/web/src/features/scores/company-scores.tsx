@@ -12,6 +12,7 @@ import {
   type InvestabilityDto,
   type ScoreFactor,
   type SuitabilityDto,
+  type UnicornPotentialDto,
 } from "@capital-q/contracts";
 import type { ReactNode } from "react";
 
@@ -20,11 +21,17 @@ import { cx } from "@capital-q/ui";
 import { useT } from "@/features/i18n/language";
 
 import { useCompanyScores } from "./use-company-scores";
+import { UnicornPotential, unicornPotentialLine } from "./unicorn-potential";
+
+type ScoresWithUnicorn = CompanyScoresDto & {
+  readonly unicornPotential?: UnicornPotentialDto | undefined;
+};
 
 /**
  * Investability and Suitability, side by side and never blended (owner
  * 2026-10-16; ADR 0074). Every surface that shows a company uses this one
- * component with the DTO the Q API computed:
+ * component with the DTO the Q API computed. An authorized Unicorn Potential
+ * assessment is optional and separate, with its own progressive detail:
  *
  *   full     the company profile, beside "Fit with you": each score with its
  *            band and confidence in words, its coverage, and "Why" (what
@@ -55,13 +62,16 @@ function suitabilityWords(dto: SuitabilityDto): string {
   return `${FIT_BAND_LABELS[dto.band]} · ${FIT_CONFIDENCE_LABELS[dto.confidence]}`;
 }
 
-/** The accessible sentence for both scores. */
-export function companyScoresLabel(scores: CompanyScoresDto): string {
+/** Accessible descriptions of the assessments actually authorized. */
+export function companyScoresLabel(scores: ScoresWithUnicorn): string {
   return [
     `${investabilityLine(scores.investability)}, ${investabilityWords(scores.investability).toLowerCase()}`,
     scores.suitability === null
       ? null
       : `${suitabilityLine(scores.suitability)}, ${suitabilityWords(scores.suitability).toLowerCase()}`,
+    scores.unicornPotential === undefined
+      ? null
+      : unicornPotentialLine(scores.unicornPotential),
   ]
     .filter((part) => part !== null)
     .join(". ");
@@ -181,7 +191,7 @@ export function CompanyScores({
   variant = "full",
   className,
 }: {
-  readonly scores: CompanyScoresDto;
+  readonly scores: ScoresWithUnicorn;
   readonly variant?: CompanyScoresVariant | undefined;
   readonly className?: string | undefined;
 }) {
@@ -202,6 +212,9 @@ export function CompanyScores({
           {suit === null
             ? ""
             : ` · ${t("Suit.")} ${suit.score === null ? "—" : String(suit.score)}`}
+          {scores.unicornPotential === undefined
+            ? null
+            : ` · ${unicornPotentialLine(scores.unicornPotential)}`}
         </span>
       </p>
     );
@@ -225,13 +238,22 @@ export function CompanyScores({
             {suitabilityLine(suit)}
           </span>
         )}
+        {scores.unicornPotential === undefined ? null : (
+          <span aria-hidden="true" data-score="unicorn-potential">
+            {unicornPotentialLine(scores.unicornPotential)}
+          </span>
+        )}
       </p>
     );
   }
 
   return (
     <section
-      aria-label={t("Investability and Suitability")}
+      aria-label={t(
+        scores.unicornPotential === undefined
+          ? "Investability and Suitability"
+          : "Company assessments",
+      )}
       className={cx(
         "grid grid-cols-1 gap-4 border-y border-(--cq-border-subtle) py-3 sm:grid-cols-2",
         className,
@@ -277,6 +299,12 @@ export function CompanyScores({
             missing={suit.missing}
           />
         </ScoreCell>
+      )}
+      {scores.unicornPotential === undefined ? null : (
+        <UnicornPotential
+          companyId={scores.companyId}
+          score={scores.unicornPotential}
+        />
       )}
     </section>
   );
