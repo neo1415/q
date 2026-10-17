@@ -338,4 +338,9 @@ Every other atlas feature currently has no certification entry and must not be p
   - There is no delete endpoint, so it remains.
   - No GateQ application was created.
 - **Step 12 change:** a live persona rehearses the signed-in founder's own company. On babatunde it questioned Harbourline Cargo while Q presented Capital Q. Step 12 is now a prepared exchange, labelled aloud as one, on the rehearsal lobby. It uses no paid session and no Tavus.
-- **Known blocker:** `/relationships?view=capital` throws a server error for founders on production (digest 2735418325). The track mentions Capital on the CRM overview instead of opening it.
+- **Capital (update, 17 Oct):**
+  - Hotfix AK (production `ae393b39`, live 23:57 UTC) fixed the founder Capital crash (digest 2735418325).
+  - Re-checked on production as babatunde with a read-only browser look: `/relationships?view=capital` and `&tab=raise` return 200, showing "Your raise", "Commitments" and "Your rounds".
+  - Capital is now its own founder step 8 (`s.fdr.08.capital.raise`): the round, commitments and the rounds timeline, each anchored. Later steps move up by one, to 17 steps in all.
+  - Step 8 is code-verified only: it has not been run in a browser, because its anchors are not deployed.
+  - The run receipts above use the old numbering: their steps 8–16 are now 9–17.

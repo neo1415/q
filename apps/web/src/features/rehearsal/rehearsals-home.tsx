@@ -190,7 +190,7 @@ export function RehearsalsHome({
       <section
         aria-labelledby="start-title"
         className="flex flex-col gap-3"
-        data-qp-anchor="fdr.13.rehearsals.start"
+        data-qp-anchor="fdr.14.rehearsals.start"
       >
         <div className="flex flex-col gap-0.5">
           <h2 id="start-title" className="cq-title-sm text-(--cq-text-primary)">
@@ -352,7 +352,7 @@ export function RehearsalsHome({
       <section
         aria-labelledby="history-title"
         className="flex flex-col gap-3"
-        data-qp-anchor="fdr.13.rehearsals.history"
+        data-qp-anchor="fdr.14.rehearsals.history"
       >
         <h2 id="history-title" className="cq-title-sm text-(--cq-text-primary)">
           Past rehearsals

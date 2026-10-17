@@ -139,7 +139,11 @@ export function FounderBook({
   return (
     <div className="flex flex-col gap-10">
       {current === null ? (
-        <section className="flex flex-col gap-4" aria-label="Rounds">
+        <section
+          className="flex flex-col gap-4"
+          aria-label="Rounds"
+          data-qp-anchor="fdr.08.capital.round"
+        >
           <div className="flex max-w-(--cq-layout-narrow) flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 sm:p-6">
             <h3 className="cq-title-sm text-(--cq-text-primary)">
               No round open
@@ -161,6 +165,7 @@ export function FounderBook({
         <section
           className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
           aria-label="Rounds"
+          data-qp-anchor="fdr.08.capital.round"
         >
           <RoundCard round={current} rounds={ledger.rounds} leads={leads} />
           <TotalCard totals={ledger.totals} rounds={ledger.rounds} />
@@ -174,7 +179,11 @@ export function FounderBook({
         </section>
       )}
 
-      <section className="flex flex-col gap-6" aria-labelledby="commitments">
+      <section
+        className="flex flex-col gap-6"
+        aria-labelledby="commitments"
+        data-qp-anchor="fdr.08.capital.commitments"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="commitments" className="cq-title-md text-(--cq-text-primary)">
             Commitments
@@ -223,6 +232,7 @@ export function FounderBook({
         <section
           className="flex flex-col gap-4"
           aria-labelledby="rounds-timeline"
+          data-qp-anchor="fdr.08.capital.rounds"
         >
           <h2
             id="rounds-timeline"
