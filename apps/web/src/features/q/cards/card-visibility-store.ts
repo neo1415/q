@@ -44,6 +44,13 @@ export type CardsState = {
     readonly run: string;
     readonly after: string | null;
   } | null;
+  /**
+   * Owner 2026-10-17: when each name ("one:tensorgate") or category
+   * ("category:ANSWER") was put away. Like "hide all", it puts away the
+   * cards there then: a card first seen after it is new and shows, so a
+   * new answer's cards are never born hidden.
+   */
+  readonly hiddenAt: Readonly<Record<string, number>>;
 };
 
 export const EMPTY: CardsState = {
@@ -57,9 +64,12 @@ export const EMPTY: CardsState = {
   keys: [],
   shownKeys: [],
   reopened: null,
+  hiddenAt: {},
 };
 
-export const CARDS_STORAGE_KEY = "cq:q-cards:v1";
+// v2 (2026-10-17): v1 hid every later answer that reused a title or a name
+// for the rest of the tab; its state is not read back.
+export const CARDS_STORAGE_KEY = "cq:q-cards:v2";
 const SEEN_MAX = 400;
 
 function load(): CardsState {
@@ -75,8 +85,18 @@ function load(): CardsState {
         ? value.filter((one): one is string => typeof one === "string")
         : [];
     const reopened: unknown = loaded.reopened;
+    const marks: unknown = loaded.hiddenAt;
     return {
       ...loaded,
+      hiddenAt:
+        typeof marks === "object" && marks !== null
+          ? Object.fromEntries(
+              Object.entries(marks).filter(
+                (entry): entry is [string, number] =>
+                  typeof entry[1] === "number",
+              ),
+            )
+          : {},
       keys: strings(loaded.keys),
       shownKeys: strings(loaded.shownKeys),
       reopened:
@@ -151,12 +171,28 @@ export function isHiddenIn(s: CardsState, card: CardRef): boolean {
   if (s.shownNames.some((n) => card.names.some((c) => nameMatches(n, c)))) {
     return false;
   }
-  if (s.ones.some((n) => card.names.some((c) => nameMatches(n, c)))) {
+  const seen = s.seen[card.key];
+  // Put away by name or category: the cards there at that moment only.
+  const thereAt = (mark: string) => {
+    const at = s.hiddenAt[mark];
+    return at === undefined || seen === undefined || seen <= at;
+  };
+  if (
+    s.ones.some(
+      (n) =>
+        card.names.some((c) => nameMatches(n, c)) &&
+        thereAt(`one:${cardNameKey(n)}`),
+    )
+  ) {
     return true;
   }
-  if (s.categories.includes(card.category)) return true;
+  if (
+    s.categories.includes(card.category) &&
+    thereAt(`category:${card.category}`)
+  ) {
+    return true;
+  }
   if (s.shownCategories.includes(card.category)) return false;
-  const seen = s.seen[card.key];
   return s.clearedAt !== null && seen !== undefined && seen <= s.clearedAt;
 }
 
@@ -242,6 +278,7 @@ export function hideCategory(category: QCardCategory): void {
       ? state.categories
       : [...state.categories, category],
     shownCategories: state.shownCategories.filter((c) => c !== category),
+    hiddenAt: { ...state.hiddenAt, [`category:${category}`]: state.tick },
   });
 }
 
@@ -252,6 +289,7 @@ export function hideOne(name: string): void {
     ...state,
     ones: state.ones.includes(key) ? state.ones : [...state.ones, key],
     shownNames: state.shownNames.filter((n) => cardNameKey(n) !== key),
+    hiddenAt: { ...state.hiddenAt, [`one:${key}`]: state.tick },
   });
 }
 

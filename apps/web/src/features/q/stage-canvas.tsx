@@ -68,6 +68,7 @@ export function StageCanvas({
   return (
     <div className="w-full" data-q-canvas={answerId}>
       <AnswerCanvas
+        answerKey={answerId}
         block={block}
         asked={asked}
         said={playback.said}

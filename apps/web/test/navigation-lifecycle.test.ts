@@ -510,6 +510,31 @@ describe("owner 2026-10-17: tabs and moves from any page", () => {
   });
 });
 
+describe("a move between two records of one page commits at once (owner 2026-10-17)", () => {
+  // Conversation 971c5a53, 11:19 UTC: Halyard -> Clearwater rendered on
+  // the server three times and never committed (NOT_LANDED). Without a
+  // boundary of its own, the record page could only commit once the whole
+  // new page had rendered. Each record page Q opens has its own.
+  it.each([
+    "company/[companyId]",
+    "investors/[investorOrganisationId]",
+    "relationships/company/[companyId]",
+    "relationships/investor/[investorOrganisationId]",
+    "pitch/[mediaAssetId]",
+    "daily/[editionId]",
+    "work/[delegationId]",
+    "rehearsals/company/[companyId]",
+    "rehearsals/investor/[investorOrganisationId]",
+    "rehearsals/person/[externalPersonId]",
+  ])("%s has its own loading boundary", (segment) => {
+    const app =
+      [join(process.cwd(), "apps/web/app"), join(process.cwd(), "app")].find(
+        (dir) => existsSync(dir),
+      ) ?? "";
+    expect(existsSync(join(app, "(app)", segment, "loading.tsx"))).toBe(true);
+  });
+});
+
 describe("the typed route table", () => {
   it("lists every page the signed-in app has (no drift)", () => {
     // jsdom's import.meta.url is not a file URL: from the run's root.
