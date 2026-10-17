@@ -33,7 +33,7 @@ import {
   type FitExplanation,
 } from "./answer-canvas-logic";
 import { MapBody } from "./blocks/data-blocks";
-import { useVisibleCards } from "./cards/card-visibility";
+import { answerCardRef, useVisibleCards } from "./cards/card-visibility";
 import {
   cardPagePath,
   openCardPage,
@@ -811,10 +811,13 @@ export type AnswerCanvasProps = AnswerCardActions & {
    * card and the others shrink to a strip; null or absent: all level.
    */
   readonly spotlight?: number | null | undefined;
+  /** The answer that showed these cards (its id); the title when unknown. */
+  readonly answerKey?: string | undefined;
 };
 
 export function AnswerCanvas({
   block,
+  answerKey,
   asked,
   said,
   focus,
@@ -831,11 +834,9 @@ export function AnswerCanvas({
   const reduced = useReducedMotion() === true;
   // Founder P5: cards the person cleared, by voice or click, are not drawn
   // and take no space (presentation only; the answer itself is untouched).
-  const unhidden = useVisibleCards(block.cards, (card) => ({
-    category: "ANSWER",
-    key: `answer:${block.title}:${card.key}`,
-    names: [card.name],
-  }));
+  const unhidden = useVisibleCards(block.cards, (card) =>
+    answerCardRef(answerKey ?? block.title, card),
+  );
   const shown = unhidden.filter((card) => dismissed?.has(card.key) !== true);
   const { layout, tiles } = canvasLayout(shown.length, wide);
   const table = comparesAsTable(block) && shown.length === block.cards.length;

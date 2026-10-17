@@ -20,6 +20,23 @@ import {
 // server-reachable client-actions module can import it; the hooks are here.
 export * from "./card-visibility-store";
 
+/**
+ * One answer card in the controller. Keyed by the answer that showed it
+ * (owner 2026-10-17): keyed by title alone, every later "Fit against your
+ * mandate" with the same companies was the same card, so one put away
+ * before (a clear, an X) hid each new answer's cards too.
+ */
+export function answerCardRef(
+  answerKey: string,
+  card: { readonly key: string; readonly name: string },
+): CardRef {
+  return {
+    category: "ANSWER",
+    key: `answer:${answerKey}:${card.key}`,
+    names: [card.name],
+  };
+}
+
 function useCardsVersion(): CardsState {
   return useSyncExternalStore(subscribeCards, cardsState, () => EMPTY);
 }
