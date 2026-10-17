@@ -362,7 +362,12 @@ export function useTourPorts(
       setOpen(false);
       unlightAll();
       await closePanels();
-      const handle = requestMove({ path });
+      // Each tour move is its own turn. Within one turn a move that already
+      // landed is answered by its old receipt, so a page the tour opened
+      // earlier (founder step 9 revisits step 4's investor) was "done"
+      // without a push once a Q turn was current (live 2026-10-17, the
+      // tour started from Q's answer).
+      const handle = requestMove({ path, turn: nextActId() });
       const settled = await Promise.race([
         handle.settled,
         new Promise<null>((resolve) => {
