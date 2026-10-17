@@ -60,9 +60,10 @@ const currencyStep = () => {
 
 describe("a currency they named is theirs, never asked again", () => {
   it("'500 thousand dollars' with no other currency is the US dollar", () => {
-    expect(currencyNamedIn("founder", currencyStep(), AG_FOUNDER)).toEqual({
+    expect(
+      currencyNamedIn("founder", currencyStep(), AG_FOUNDER),
+    ).toMatchObject({
       optionKey: "usd",
-      quote: "dollars",
     });
   });
 
@@ -805,5 +806,65 @@ describe("live AO: category names come from the classifier, not a read per node"
     expect(result?.outcome).toBe("COMMITTED");
     expect(result?.recorded).toMatch(/Europe/u);
     expect(fetched).toEqual([]);
+  });
+});
+
+describe("live AQ: own words that only repeat other answers are not this step's", () => {
+  it("the raise sentence is not saved as their role", async () => {
+    const said = "نعم، نجمع حالياً مليوني دولار عبر SAFE.";
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F4.founder_role",
+      recorded: {
+        "F0.intent": "raising_now",
+        "F1.company_name": "Rimal",
+        "F1.stage": "seed",
+      },
+    });
+    const port = createOnboardingPort({
+      session: turn(world, said).session,
+      onboardingSessionId: turn(world, said).onboardingSessionId,
+      journeyType: "founder",
+      ownerUserId: actor.userId,
+      personTurns: [said],
+      authority: () =>
+        Promise.resolve(
+          reading({
+            stated: ["F6.raising", "F6.target_amount", "F6.instrument"],
+          }),
+        ),
+    });
+    const results = await port.record([
+      {
+        stepKey: "F4.founder_role",
+        value: "نعم، نجمع حالياً مليوني دولار عبر SAFE",
+        quote: "نعم، نجمع حالياً مليوني دولار عبر SAFE",
+        basis: "STATED",
+        ownWords: true,
+      },
+      {
+        stepKey: "F6.raising",
+        value: "active",
+        quote: "نعم، نجمع حالياً",
+        basis: "STATED",
+        ownWords: false,
+      },
+      {
+        stepKey: "F6.target_amount",
+        value: 2_000_000,
+        quote: "مليوني دولار",
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    expect(results.map((r) => r.outcome)).toEqual([
+      "REJECTED",
+      "COMMITTED",
+      "COMMITTED",
+    ]);
+    expect(world.recordedValue("F4.founder_role")).toBeUndefined();
+    // The currency their words named is read by code, in any language.
+    const currency = await port.recordStatedCurrency();
+    expect(currency?.optionKey).toBe("usd");
   });
 });

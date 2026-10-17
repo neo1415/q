@@ -23,6 +23,8 @@ import {
   type TurnTrace,
   type InterviewDestination,
 } from "@capital-q/q-core";
+
+import { dualScaleOf, intlScaleWords } from "./scale-words.js";
 /**
  * Q conducting the interview (CQ-Q-VOICE-001 rework).
  *
@@ -625,46 +627,11 @@ export function asciiDigits(text: string): string {
     .replace(/\u066c/gu, ",");
 }
 
-/** Arabic dual forms of the scale words: two of the unit, said in one word. */
-const ARABIC_DUAL_SCALES: Readonly<Record<string, number>> = {
-  ألفا: 2e3,
-  ألفي: 2e3,
-  ألفين: 2e3,
-  الفا: 2e3,
-  الفي: 2e3,
-  الفين: 2e3,
-  مليونا: 2e6,
-  مليوني: 2e6,
-  مليونين: 2e6,
-  مليارا: 2e9,
-  ملياري: 2e9,
-  مليارين: 2e9,
-};
-
 export const SCALE_WORDS: Readonly<Record<string, number>> = {
-  // Scale words in the languages people answer in (live AJ 2026-10-16:
-  // "400 mille euros" was saved as 400). Each is unambiguous: Spanish and
-  // Portuguese "mil" is a thousand, never a million.
-  mille: 1e3,
-  mil: 1e3,
-  tausend: 1e3,
-  millions: 1e6,
-  millón: 1e6,
-  millon: 1e6,
-  millones: 1e6,
-  milhão: 1e6,
-  milhões: 1e6,
-  millionen: 1e6,
-  mio: 1e6,
-  mn: 1e6,
-  milliard: 1e9,
-  milliards: 1e9,
-  mrd: 1e9,
-  bn: 1e9,
-  lakh: 1e5,
-  lakhs: 1e5,
-  crore: 1e7,
-  crores: 1e7,
+  // Every offered language's own scale words, from Intl (live AJ
+  // 2026-10-16: "400 mille euros" was saved as 400), then the journey's
+  // English and Arabic words.
+  ...intlScaleWords(),
   // Arabic scale words ("ألف", "مليون", "مليار") and their plurals.
   ألف: 1e3,
   الف: 1e3,
@@ -678,8 +645,10 @@ export const SCALE_WORDS: Readonly<Record<string, number>> = {
   k: 1e3,
   million: 1e6,
   m: 1e6,
+  mn: 1e6,
   billion: 1e9,
   b: 1e9,
+  bn: 1e9,
 };
 
 /**
@@ -785,10 +754,13 @@ export function spokenFiguresIn(text: string): readonly number[] {
   const figures: number[] = [];
   for (let start = 0; start < tokens.length; start += 1) {
     const first = tokens[start] ?? "";
-    // Arabic duals are a figure on their own: "مليوني دولار" is two
-    // million (live AP: the raise amount was refused as no figure).
-    const dual = ARABIC_DUAL_SCALES[first.replace(/^(?:و|ب|ل)/u, "")];
-    if (dual !== undefined) {
+    // A dual is a figure on its own, in a language that counts two apart
+    // ("مليوني دولار" is two million; live AP: refused as no figure).
+    const dual =
+      SCALE_WORDS[first] === undefined && NUMBER_WORDS[first] === undefined
+        ? dualScaleOf(first, SCALE_WORDS)
+        : null;
+    if (dual !== null) {
       figures.push(dual);
       continue;
     }

@@ -43,6 +43,7 @@ import {
   type QRecommendationPublicSourceType,
 } from "@capital-q/onboarding";
 import { quoteOccursIn } from "@capital-q/q-knowledge";
+import { currencyInWords } from "./currency-names.js";
 import { turnIsEnglish } from "./reply-language.js";
 
 import {
@@ -461,6 +462,8 @@ export function createOnboardingPort(input: {
   const current = async (): Promise<OnboardingSessionView> =>
     latest ?? (await fresh());
 
+  /** The quotes of the answers being recorded together, by step. */
+  let batchQuotes = new Map<string, string>();
   /** Category names the classifier gave this turn, by node id. */
   const nodeNames = new Map<string, string>();
   const spoken = async (
@@ -1790,6 +1793,36 @@ export function createOnboardingPort(input: {
         });
       }
     }
+    // Their own words kept for a step ("Other" with text, or text for a
+    // choice) that the reading did not find stated, and that only carry
+    // the words of other answers in the same breath, are not this step's
+    // answer (live AQ, Arabic: the whole raise sentence saved as their
+    // role, because role was the question asked).
+    const ownWords =
+      resolved.note ??
+      (resolved.value.type === "TEXT" &&
+      resolved.step.configuration.stepType !== "short_text" &&
+      resolved.step.configuration.stepType !== "long_text"
+        ? resolved.value.text
+        : undefined);
+    if (
+      ownWords !== undefined &&
+      reading !== null &&
+      !statedIn(reading.stated, resolved.step.stepKey) &&
+      [...batchQuotes].some(
+        ([stepKey, quote]) =>
+          stepKey !== resolved.step.stepKey &&
+          quote.trim().length >= 4 &&
+          textStatedIn(quote, ownWords),
+      )
+    ) {
+      return done({
+        stepKey: resolved.step.stepKey,
+        outcome: "REJECTED",
+        reason:
+          "Those words are their answer to other questions recorded with this one, and nothing says they answered this question, so nothing was recorded for it. Ask it if you want to know.",
+      });
+    }
     const refused = unsupported(
       resolved.step,
       resolved.value,
@@ -2637,6 +2670,11 @@ export function createOnboardingPort(input: {
         resolving.catch(() => undefined);
         warmed.set(answer, resolving);
       }
+      // Every answer's quote in this call, by step: own words for one step
+      // that only repeat another's are not that step's answer.
+      batchQuotes = new Map(
+        answers.map((answer) => [answer.stepKey, answer.quote ?? ""] as const),
+      );
       const plans: Planned[] = [];
       // Answers whose planning failed on a service call (a category lookup
       // refused before this turn's first answers set up their profile).
@@ -2770,7 +2808,13 @@ export function createOnboardingPort(input: {
       for (const text of turns) {
         // A question names a currency without stating theirs.
         if (ASKING.test(text.trim())) continue;
-        const named = currencyNamedIn(input.journeyType, step, text);
+        const country = view.responses.find(
+          (r) => r.stepKey === "F1.country",
+        )?.value;
+        const named = currencyNamedIn(input.journeyType, step, text, {
+          countryCode:
+            country?.type === "SINGLE_SELECT" ? country.optionKey : null,
+        });
         if (named === "SEVERAL") return null;
         if (named === null) continue;
         try {
@@ -3079,10 +3123,6 @@ export function fieldClausesOf(quote: string, reading: string): string | null {
   return parts.length > 0 ? parts.join("; ").slice(0, 300) : null;
 }
 
-/** Dollars of a country other than the US: never read as US dollars. */
-const OTHER_DOLLARS =
-  /\b(?:canadian|australian|hong kong|new zealand|singapore|taiwan(?:ese)?|jamaican|namibian|liberian|zimbabwe(?:an)?|fiji(?:an)?|east caribbean|brunei|bahamian|barbadian|belize|bermudian|cayman|guyanese|trinidad|surinamese|solomon)\s+dollars?\b|\b(?:c|a|s|hk|nz|nt)\$|\b(?:cad|aud|hkd|nzd|twd|jmd)\b/iu;
-
 /** A figure in their words: digits or a spoken amount. */
 const MONEY_FIGURE =
   /\d|\b(?:thousand|million|billion|hundred|grand|mil|mn|bn)\b/iu;
@@ -3097,13 +3137,42 @@ export function currencyNamedIn(
   journeyType: "founder" | "investor",
   step: { readonly stepKey: string; readonly configuration: unknown },
   text: string,
+  /** The country they gave, to tell one dollar from another. */
+  context?: { readonly countryCode?: string | null },
 ): { readonly optionKey: string; readonly quote: string } | "SEVERAL" | null {
-  if (!MONEY_FIGURE.test(text)) return null;
-  const only = optionNamedIn(journeyType, step, text);
-  if (only === null || only === "SEVERAL") return only;
-  // A dollar the journey does not offer by name is not the US dollar.
-  if (only.optionKey === "usd" && OTHER_DOLLARS.test(text)) return null;
-  return only;
+  // A figure in digits, or said in words in any language ("مليوني").
+  if (!MONEY_FIGURE.test(text) && spokenFiguresIn(text).length === 0) {
+    return null;
+  }
+  // Currency names in every offered language, from the runtime's Intl
+  // data (owner 2026-10-17: never a per-language list), then the journey's
+  // own option names and aliases ("$", "usd").
+  const configuration = step.configuration as {
+    readonly options?: readonly { readonly optionKey?: string }[];
+  };
+  const offered = (configuration.options ?? [])
+    .map((option) => option.optionKey ?? "")
+    .filter((key) => /^[a-z]{3}$/u.test(key));
+  const named = currencyInWords(text, offered, {
+    countryCode: context?.countryCode ?? null,
+  });
+  if (named?.kind === "OTHER") return null;
+  if (named?.kind === "SEVERAL") return "SEVERAL";
+  if (named?.kind === "ONE") {
+    return {
+      optionKey: named.code.toLowerCase(),
+      quote: quoteOfCurrency(text),
+    };
+  }
+  return optionNamedIn(journeyType, step, text);
+}
+
+/** The words of theirs that carry the figure and its currency, for the record's quote. */
+function quoteOfCurrency(text: string): string {
+  const clauses = text.split(/(?<=[.!?؟،,;])\s+/u);
+  return (clauses.find((clause) => MONEY_FIGURE.test(clause)) ?? text)
+    .trim()
+    .slice(0, 300);
 }
 
 /**

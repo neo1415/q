@@ -54,6 +54,25 @@ const AG_INVESTOR =
   "Hey, so I'm a partner at Corvo Ventures, it's a small VC fund out of Lisbon. We're actively investing, cheques usually 150k to 400k euros, typical maybe 250k, mostly seed, sometimes pre-seed. We like climate, logistics and anything that makes ports less painful. Europe and North Africa. Honestly we also back a lot of second-time founders, and we never do gambling or tobacco.";
 
 export const ALWAYS_SAVE_CASES: readonly Case[] = [
+  // Logged misses (live AQ, 2026-10-17).
+  {
+    id: "aq-arabic-dollar-by-code",
+    journey: F,
+    said: "نعم، نجمع حالياً مليوني دولار عبر SAFE.",
+    stepKey: "F6.currency",
+    value: "usd",
+    quote: "دولار",
+    byCode: true,
+  },
+  {
+    id: "aq-french-euros-by-code",
+    journey: F,
+    said: "Oui, nous levons activement 400 mille euros via un SAFE.",
+    stepKey: "F6.currency",
+    value: "eur",
+    quote: "euros",
+    byCode: true,
+  },
   // Logged misses (live AP, 2026-10-17).
   {
     id: "ap-arabic-dual-million",
