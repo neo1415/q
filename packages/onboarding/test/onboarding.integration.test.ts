@@ -1339,6 +1339,78 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
     });
   });
 
+  it("a deferred canonical update runs once per batch; refused, the batch replays answer by answer (owner 2026-10-17)", async () => {
+    await withWorld(async (world) => {
+      const { adminA, build } = world;
+      const runs: string[] = [];
+      let refuseDeferred = false;
+      const coalescing = build({
+        writeTargets: [
+          {
+            targetKey: TEST_WRITE_TARGET,
+            apply: (context, response) => {
+              if (context.defer === undefined) {
+                runs.push(`now:${response.stepKey}`);
+                return Promise.resolve();
+              }
+              context.defer(TEST_WRITE_TARGET, () => {
+                runs.push("deferred");
+                if (refuseDeferred) {
+                  return Promise.reject(
+                    new ContractValidationError("refused together", [
+                      { path: "value", code: "x", message: "refused" },
+                    ]),
+                  );
+                }
+                return Promise.resolve();
+              });
+              return Promise.resolve();
+            },
+          },
+        ],
+      });
+      const { view } = await coalescing.runtime.startSession({
+        actor: adminA,
+        journeyType: "external_investor_conversion",
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      const id = view.session.id as OnboardingSessionId;
+      const out = await coalescing.runtime.submitResponses({
+        actor: adminA,
+        sessionId: id,
+        responses: [
+          { stepKey: "intent", response: select("raising_now") },
+          { stepKey: "raise_amount", response: range("5000000") },
+        ],
+        expectedSessionVersion: 1,
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      expect(out.results.map((r) => r.outcome)).toEqual([
+        "COMMITTED",
+        "COMMITTED",
+      ]);
+      // Two answers, one update.
+      expect(runs.filter((r) => r === "deferred")).toHaveLength(1);
+
+      runs.length = 0;
+      refuseDeferred = true;
+      const again = await coalescing.runtime.submitResponses({
+        actor: adminA,
+        sessionId: id,
+        responses: [{ stepKey: "raise_amount", response: range("6000000") }],
+        expectedSessionVersion: out.view.session.version,
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      // Refused together: replayed answer by answer, each writing as it
+      // commits, and each reporting its own outcome.
+      expect(runs).toEqual(["deferred", "now:raise_amount"]);
+      expect(again.results.map((r) => r.outcome)).toEqual(["COMMITTED"]);
+    });
+  });
+
   it("a rejected proposal is discarded for good: never offered again, by Q or a document re-read (lane ob1)", async () => {
     await withWorld(async (world) => {
       const { tx, service, adminA } = world;

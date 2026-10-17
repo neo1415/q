@@ -483,6 +483,17 @@ export type OnboardingWriteContext = {
    * outside a batch. A handler keeps only successful reads in it.
    */
   readonly requestMemo?: Map<string, unknown> | undefined;
+  /**
+   * In a batch only: hand this target's canonical update to the end of the
+   * batch under `key`, where it runs once, after every answer, in this
+   * transaction (several answers to one record, one update). The latest
+   * registration for a key wins; it must recompute from every current
+   * answer. If it is refused, the runtime rolls the batch back and runs it
+   * again without deferral, so each answer reports its own outcome.
+   */
+  readonly defer?:
+    | ((key: string, run: (tx: TransactionContext) => Promise<void>) => void)
+    | undefined;
 };
 
 export type OnboardingStepContextInput = {
