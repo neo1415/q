@@ -92,13 +92,10 @@ describe("the investor track (v6)", () => {
   });
 
   it("fits a premiere: narration under eight minutes at a presenter's pace", () => {
-    const words =
-      lines.join(" ").length === 0
-        ? 0
-        : lines
-            .map((l) => l.text)
-            .join(" ")
-            .split(/\s+/u).length;
+    const words = lines
+      .map((l) => l.text)
+      .join(" ")
+      .split(/\s+/u).length;
     expect(words / 150).toBeLessThan(8);
   });
 });
