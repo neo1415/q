@@ -775,3 +775,15 @@ Lanes:
 ## 2026-10-16 — Claude lead (long session)
 
 Fifteen releases (T through AI) went live; see STATE.md for the table. Owner directions recorded: any-language setting (generic, machine-translated, no per-language code); scores always present on every company from investor-visible material (ADR 0075); onboarding must save every stated fact without format demands ("Other" keeps their words); Overview follows the owner's 14-section template with a Diligence tab; Q Pitch v6 direction (see ACTIVE-TASKS). Demo-only deck confirmations were applied to 433 fictional companies (receipt in the lead's scratchpad, seed_reason demo-confirmation-2026-10-16). Next session: continue items 1–3 in ACTIVE-TASKS.
+
+## 2026-10-17 — Claude lead (overnight session)
+
+Releases AK to AR were each CI-green, released to `recovery/2026-09-12` and Railway-verified. Details are in `STATE.md` under 17 October.
+
+- **Q Pitch v6:** certified live, both tracks started by natural-language triggers. Six trigger and lighting defects were found on production and fixed: `9863aff6`, `75499404`, `65609b9c`, `c9abf3b2`, `e85f5600`, `79492cfc`.
+- **Onboarding:** saves every stated fact in English, with p50 3.2 s. Investor batch saves were cut from 4.46 s to about 3.3 s, the stage and cheque answers became one mandate update, and the 422 was removed.
+- **Local Supabase:** started in `/home/user/q-ob1` (docker plus `scripts/recovery/local-stack.sh start db`, then `supabase migration up --local`). It caught a stale integration test before release.
+- **Owner instructions:**
+  - pause language work ("as long as english is good");
+  - stop asking for permission. The user settings allow list was widened; cloud session mode itself can't be changed from chat.
+- **Next:** see `ACTIVE-TASKS.md` under 17 October.

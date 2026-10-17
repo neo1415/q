@@ -143,14 +143,17 @@ function step(input: StepInput): Built {
     },
     entry: {
       featureId: input.feature,
-      status: "CODE_VERIFIED",
+      // Promoted from production browser receipts (17 Oct, Lane P):
+      // CERTIFICATION_MANIFEST.md, "Q Pitch v6 certification".
+      status: "PRODUCTION_LIVE_VERIFIED",
       actorContext: INVESTOR_V6_ACTOR,
       fixture: input.fixture,
-      appCommit: "claude/qpitch-v6-oct16 (investor track v6)",
-      verifiedAt: "2026-10-17 (Lane P, local vitest, provider keys disabled)",
-      verifierType: "CODE",
+      appCommit:
+        "web c1b90393 (straight run); web/q-api 7161cedb (trigger run)",
+      verifiedAt: "2026-10-17 06:20-07:30 UTC",
+      verifierType: "BROWSER",
       receipt:
-        "packages/q-pitch/test/investor-v6.test.ts; apps/web/test/q-pitch-investor-anchors.test.ts",
+        "Lane P scratchpad v6/inv5 (all 22 steps lit) and v6/c-inv-en (trigger, step commands, bank); CERTIFICATION_MANIFEST.md",
       claimsAllowed: claims,
       claimsForbidden: [...input.forbidden],
       validUntil: {
