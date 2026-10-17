@@ -1,11 +1,5 @@
 // @vitest-environment jsdom
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ArrivalData } from "../src/features/briefing/arrival";
@@ -51,6 +45,8 @@ vi.mock("../src/features/work/notice-store", () => ({
 }));
 
 const { pendingCount } = await import("../src/features/briefing/opener");
+const { typedOpenerAnswer } =
+  await import("../src/features/briefing/opener-answer");
 const { ReturningWelcome } =
   await import("../src/features/home/returning-welcome");
 const { chooseReturningCards, returningGreeting, setupRemindersWaiting } =
@@ -103,16 +99,19 @@ describe("the setup reminder in Q's opener", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    // The page asks one open question (owner 2026-10-17); a voice line
+    // counts what waits, the reminder among it, never named on its own.
     const said = document.querySelector("[data-arrival-lowdown]")?.textContent;
-    expect(said).toMatch(/You have 1 thing waiting\./u);
-    // Counted, never mentioned on its own.
-    expect(said).not.toMatch(/setup|mandate/iu);
+    expect(said).toBe("What's on your mind today?");
+    expect(arrivalSpoken()).toMatch(/You have 1 thing waiting\./u);
     expect(arrivalSpoken()).not.toMatch(/setup|mandate/iu);
     expect(
       screen.queryByRole("link", { name: /Continue your mandate/u }),
     ).toBeNull();
     expect(screen.queryByText("What cheque size do you write?")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Look at it" }));
+    act(() => {
+      typedOpenerAnswer("yes", false);
+    });
     expect(
       screen.getByRole("link", { name: /Continue your mandate/u }),
     ).toBeTruthy();

@@ -119,6 +119,7 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   Muted: "مكتوم",
   Listening: "يستمع",
   "Ready when you are": "جاهز حين تكون جاهزاً",
+  "What's on your mind today?": "ما الذي يشغل بالك اليوم؟",
   "Type instead — Q hears this too": "اكتب بدلاً من ذلك — Q يسمع هذا أيضاً",
   "Ask Q about your company, capital, or relationships":
     "اسأل Q عن شركتك أو رأس مالك أو علاقاتك",

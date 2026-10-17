@@ -1,11 +1,5 @@
 // @vitest-environment jsdom
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-} from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -39,7 +33,6 @@ const { resetArrivalGate } =
   await import("../src/features/briefing/arrival-gate");
 const { typedOpenerAnswer } =
   await import("../src/features/briefing/opener-answer");
-const { onLineNote } = await import("../src/features/voice/line-cards");
 
 const uuid = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -239,7 +232,9 @@ async function landed() {
 }
 
 describe("the opener on the page", () => {
-  it("offers two clear buttons and no cards until they choose", async () => {
+  // Owner 2026-10-17: the Q page is a greeting and one open question, like
+  // a chat app's first screen; what waits comes up when they ask for it.
+  it("greets and asks one open question: no buttons, no cards until they ask", async () => {
     render(
       <>
         <ArrivalBriefing
@@ -254,39 +249,15 @@ describe("the opener on the page", () => {
     expect(screen.getByRole("heading").textContent).toBe(
       "Good morning, Laura.",
     );
-    expect(
-      document.querySelector("[data-arrival-lowdown]")?.textContent,
-    ).toMatch(/You have 3 things waiting\./u);
+    expect(document.querySelector("[data-arrival-lowdown]")?.textContent).toBe(
+      "What's on your mind today?",
+    );
     expect(document.body.textContent).not.toContain("Spheros");
     expect(document.querySelector("[data-arrival-card]")).toBeNull();
-    // The words the voice opens with are the same short ones.
-    expect(arrivalSpoken()).toMatch(/You have 3 things waiting\./u);
-    const look = screen.getByRole("button", { name: "Look at them" });
-    // 44 px or more (the large size is h-12 at every width).
-    expect(look.className).toMatch(/\bh-12\b/u);
-    expect(
-      screen.getByRole("button", { name: "Something else" }).className,
-    ).toMatch(/\bh-12\b/u);
-    fireEvent.click(look);
-    expect(openerShowsCards()).toBe(true);
-    expect(document.querySelector("[data-arrival-card]")).not.toBeNull();
     expect(screen.queryByRole("button", { name: "Look at them" })).toBeNull();
-  });
-
-  it("'Something else' asks what they'd like to know, and shows no cards", async () => {
-    render(
-      <ArrivalBriefing
-        variant="page"
-        load={() => Promise.resolve(BUSY)}
-        now={() => MORNING}
-      />,
-    );
-    await landed();
-    fireEvent.click(screen.getByRole("button", { name: "Something else" }));
-    expect(
-      document.querySelector("[data-arrival-lowdown]")?.textContent,
-    ).toMatch(/What would you like to know\?$/u);
-    expect(document.querySelector("[data-arrival-card]")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Something else" })).toBeNull();
+    // A voice line still opens by saying what waits.
+    expect(arrivalSpoken()).toMatch(/You have 3 things waiting\./u);
   });
 
   it("a typed 'yes' brings the cards up and goes no further; a question goes to Q", async () => {
@@ -303,6 +274,7 @@ describe("the opener on the page", () => {
       consumed = typedOpenerAnswer("yes", false);
     });
     expect(consumed).toBe(true);
+    expect(openerShowsCards()).toBe(true);
     expect(document.querySelector("[data-arrival-card]")).not.toBeNull();
     // Answered: anything more is for Q.
     expect(typedOpenerAnswer("what's my score?", false)).toBe(false);
@@ -323,30 +295,9 @@ describe("the opener on the page", () => {
     });
     expect(consumed).toBe(false);
     expect(document.querySelector("[data-arrival-card]")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Look at them" })).toBeNull();
   });
 
-  it("tells an open line what they chose, with the full lowdown to go through", async () => {
-    const notes: { note: string; say: string | undefined }[] = [];
-    const stop = onLineNote((note, respond, say) => {
-      if (respond) notes.push({ note, say });
-    });
-    render(
-      <ArrivalBriefing
-        variant="page"
-        load={() => Promise.resolve(BUSY)}
-        now={() => MORNING}
-      />,
-    );
-    await landed();
-    fireEvent.click(screen.getByRole("button", { name: "Look at them" }));
-    stop();
-    expect(notes).toHaveLength(1);
-    expect(notes[0]?.note).toMatch(/they chose to look/u);
-    expect(notes[0]?.say).toContain("Tensorgate");
-  });
-
-  it("with nothing waiting: no buttons, just the open question", async () => {
+  it("with nothing waiting: the same open question", async () => {
     render(
       <ArrivalBriefing
         variant="page"
@@ -355,10 +306,9 @@ describe("the opener on the page", () => {
       />,
     );
     await landed();
-    expect(screen.queryByRole("button", { name: "Look at them" })).toBeNull();
-    expect(
-      document.querySelector("[data-arrival-lowdown]")?.textContent,
-    ).toMatch(/What would you like to look at\?$/u);
+    expect(document.querySelector("[data-arrival-lowdown]")?.textContent).toBe(
+      "What's on your mind today?",
+    );
     // A "yes" with nothing offered is just words for Q.
     expect(typedOpenerAnswer("yes", false)).toBe(false);
   });
