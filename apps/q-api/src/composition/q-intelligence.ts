@@ -7,6 +7,7 @@ import { createPostgresContextEpochReader } from "@capital-q/security/postgres";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import {
   createModelGatewayQAnswer,
+  createConversationRecall,
   createQTurnReader,
   createSmallTalkReply,
   createTurnSkimmer,
@@ -553,6 +554,15 @@ export function composeQIntelligence(
     // until that migration is applied, its reads and writes fail and the
     // seam stays on memory, as before.
     coreState: createPostgresConversationCore({ sql: dependencies.sql }),
+    // Owner live 2026-10-17: a follow-up about what Q already showed,
+    // answered from the conversation's own record in one tool-free call.
+    conversationRecall: createConversationRecall({
+      gateway,
+      ...(dependencies.dataPosture === undefined
+        ? {}
+        : { dataPosture: dependencies.dataPosture }),
+      ...(logger === undefined ? {} : { logger }),
+    }),
     // RECOVERY B5: small talk in one short tool-free call.
     smallTalk: createSmallTalkReply({
       gateway,

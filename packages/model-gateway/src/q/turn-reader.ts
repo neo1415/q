@@ -4,14 +4,14 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV52ResultSchema,
+  TurnReaderV54ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
   type TurnReaderV40Result,
-  type TurnReaderV52Result,
-  type TurnReaderV7Variables,
+  type TurnReaderV54Result,
+  type TurnReaderV54Variables,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError } from "../errors.js";
@@ -34,6 +34,12 @@ export type QTurnReader = {
       readonly text: string;
     }[];
     readonly modality: "VOICE" | "TEXT";
+    /**
+     * v54: Capital Q's record of what Q already said and showed in this
+     * conversation (`conversationContextOf`), built by code from the
+     * conversation's own stored messages. Empty: nothing shown yet.
+     */
+    readonly shown?: string | undefined;
     /**
      * The other actions this run can take, from what is offered: a request
      * for one of them is never read as a document (founder live, BIZ-004).
@@ -94,6 +100,8 @@ export type QTurnReading = Omit<
   readonly teamJob?: boolean | undefined;
   /** v52: they ask what to do next, what is missing, or how ready they are. */
   readonly nextSteps?: boolean | undefined;
+  /** v54: the turn is answered by this earlier turn of Q's (SHOWN). */
+  readonly fromShown?: TurnReaderV54Result["fromShown"] | undefined;
   /** v44: garbled spoken words, read by sound; null when read as written. */
   readonly heardAs?: string | null | undefined;
   /** v28: a time they asked for, in minutes from now. */
@@ -235,6 +243,8 @@ export function readerActions(
 export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "tool",
   "moreDocuments",
+  // v54: a malformed pointer back costs the pointer, never the reading.
+  "fromShown",
 ];
 
 /** Said once after a refused reading: what to fix, never the reading. */
@@ -274,7 +284,7 @@ export function createQTurnReader(dependencies: {
         );
       }
       const variables: Omit<
-        TurnReaderV7Variables,
+        TurnReaderV54Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -291,9 +301,11 @@ export function createQTurnReader(dependencies: {
         // within TURN_READER_ACTIONS_MAX.
         actions: [...listed.listed],
         actionGroups: listed.groups,
+        // Bounded by the schema; the newest turns are kept by its builder.
+        shown: (input.shown ?? "").slice(0, 9_000),
       };
       try {
-        const rendered = renderPrompt<TurnReaderV7Variables>(registry, {
+        const rendered = renderPrompt<TurnReaderV54Variables>(registry, {
           task: "TURN_READER",
           charter: "Q_SYSTEM",
           operatingMode: "ASSESSMENT",
@@ -304,8 +316,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV52Result>> =>
-          gateway.execute<TurnReaderV52Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV54Result>> =>
+          gateway.execute<TurnReaderV54Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               // A closed classification needs little thought; left unset, a
@@ -321,7 +333,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV52ResultSchema,
+              schema: TurnReaderV54ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -363,7 +375,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV52ResultSchema.safeParse(
+        const parsed = TurnReaderV54ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

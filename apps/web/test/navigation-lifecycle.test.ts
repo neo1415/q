@@ -13,6 +13,7 @@ import {
 import {
   beginNavigationTurn,
   CONTROL_WAIT_MS,
+  NAVIGATION_LATE_RETRY_MS,
   NAVIGATION_RETRY_MS,
   NAVIGATION_WAIT_MS,
   NOT_FOUND_MARKER,
@@ -20,6 +21,7 @@ import {
   onNavigationPhase,
   onNavigationTiming,
   requestNavigation,
+  TAB_SETTLE_MS,
   type NavigationOutcome,
   type NavigationTiming,
   type NavigationPhase,
@@ -400,6 +402,111 @@ describe("the lifecycle", () => {
     });
     expect((await act).status).toBe("DONE");
     expect(selected).toBe(true);
+  });
+});
+
+/** A profile-style tab bar: each tab a link that moves shallowly on click. */
+function tabBar(
+  base: string,
+  tabs: readonly string[],
+  open: string,
+  shallow = true,
+): Record<string, HTMLAnchorElement> {
+  const links: Record<string, HTMLAnchorElement> = {};
+  for (const tab of tabs) {
+    const link = document.createElement("a");
+    link.href = `${base}?tab=${tab}`;
+    if (tab === open) link.setAttribute("aria-current", "page");
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (!shallow) return;
+      for (const other of Object.values(links)) {
+        other.removeAttribute("aria-current");
+      }
+      link.setAttribute("aria-current", "page");
+      land(`${base}?tab=${tab}`);
+    });
+    document.body.append(link);
+    links[tab] = link;
+    registerControl({ id: `tab.${tab}`, kind: "TAB", element: () => link });
+  }
+  return links;
+}
+
+describe("owner 2026-10-17: tabs and moves from any page", () => {
+  const company = "/company/c0ffee00-0000-4000-8000-000000000001";
+
+  it("a tab of the page on screen opens by its own control: no router push, VERIFIED", async () => {
+    land(company);
+    tabBar(company, ["overview", "dataroom", "deck"], "overview");
+    const move = requestNavigation({ path: `${company}?tab=dataroom` });
+    await expect(move.settled).resolves.toMatchObject({
+      status: "DONE",
+      route: `${company}?tab=dataroom`,
+    });
+    expect(pushes).toEqual([]);
+  });
+
+  it("a tab whose click does not move falls back to the router, once", async () => {
+    land(company);
+    tabBar(company, ["overview", "dataroom"], "overview", false);
+    const move = requestNavigation({ path: `${company}?tab=dataroom` });
+    expect(pushes).toEqual([]);
+    await vi.advanceTimersByTimeAsync(TAB_SETTLE_MS + 10);
+    expect(pushes).toEqual([`${company}?tab=dataroom`]);
+    land(`${company}?tab=dataroom`);
+    await expect(move.settled).resolves.toMatchObject({ status: "DONE" });
+  });
+
+  it("a tab of another page is never clicked: the router moves there with the tab in its URL", async () => {
+    land("/discover");
+    tabBar(company, ["overview", "dataroom"], "overview");
+    const move = requestNavigation({ path: `${company}?tab=dataroom` });
+    expect(pushes).toEqual([`${company}?tab=dataroom`]);
+    land(`${company}?tab=dataroom`);
+    await expect(move.settled).resolves.toMatchObject({ status: "DONE" });
+  });
+
+  it("a page's own URL rewrite mid-move (a dialog clearing its #hash) re-pushes at once, not 2.5 s later", async () => {
+    const from = "/relationships/company/c0ffee00-0000-4000-8000-000000000002";
+    land(`${from}#calls`);
+    const move = requestNavigation({ path: "/work" });
+    expect(pushes).toEqual(["/work"]);
+    // The app router restores this URL and drops the push; no new route.
+    window.history.replaceState(null, "", from);
+    await vi.advanceTimersByTimeAsync(5);
+    expect(pushes).toEqual(["/work", "/work"]);
+    // And a second drop is not the end of the move either.
+    window.history.replaceState(null, "", from);
+    await vi.advanceTimersByTimeAsync(5);
+    expect(pushes).toEqual(["/work", "/work", "/work"]);
+    // Bounded: never a loop.
+    window.history.replaceState(null, "", from);
+    await vi.advanceTimersByTimeAsync(NAVIGATION_LATE_RETRY_MS + 10);
+    expect(pushes).toHaveLength(3);
+    land("/work");
+    await expect(move.settled).resolves.toMatchObject({ status: "DONE" });
+  });
+
+  it("the router's own history writes are not a page rewrite", async () => {
+    const move = requestNavigation({ path: "/work" });
+    window.history.replaceState({ __NA: true }, "", "/home");
+    await vi.advanceTimersByTimeAsync(5);
+    expect(pushes).toEqual(["/work"]);
+    land("/work");
+    await expect(move.settled).resolves.toMatchObject({ status: "DONE" });
+  });
+
+  it("a push stuck with nothing reporting it is tried again late, then lands", async () => {
+    const move = requestNavigation({ path: "/discover" });
+    await vi.advanceTimersByTimeAsync(NAVIGATION_RETRY_MS + 10);
+    expect(pushes).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(
+      NAVIGATION_LATE_RETRY_MS - NAVIGATION_RETRY_MS,
+    );
+    expect(pushes).toHaveLength(3);
+    land("/discover");
+    await expect(move.settled).resolves.toMatchObject({ status: "DONE" });
   });
 });
 

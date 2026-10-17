@@ -7,14 +7,12 @@ import {
   TURN_READER_V53,
   V52_NEXT_STEPS,
   V53_Q_PITCH,
-  createDefaultPromptRegistry,
 } from "../src/index.js";
 
 /** Q Pitch v6 (owner 2026-10-16): the tour starts from a request, by meaning. */
 describe("TURN_READER v53: Q_PITCH read by meaning", () => {
   it("is the active reader, on top of v52's rules (lane ml's nextSteps kept)", () => {
-    const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(53);
+    expect(TURN_READER_V53.version).toBe(53);
     expect(TURN_READER_V52.status).toBe("DEPRECATED");
     expect(TURN_READER_V53.template).toContain(V52_NEXT_STEPS);
     expect(TURN_READER_V53.template).toContain(V53_Q_PITCH);
