@@ -70,8 +70,77 @@ export type UiTranslationVerdict =
         | "FIGURES"
         | "CURRENCY_CODES"
         | "PRODUCT_NAMES"
-        | "LENGTH";
+        | "LENGTH"
+        | "UNTRANSLATED";
     };
+
+/** The language a translation is into, as far as the check needs it. */
+export type UiTranslationTarget = {
+  /** Primary subtag ("fr", "ar"). */
+  readonly primary: string;
+  /** ISO 15924 script ("Latn", "Arab"). */
+  readonly script: string;
+};
+
+const SMALL_WORDS = new Set(
+  "the and for you your our are was can but not with from this that".split(" "),
+);
+
+/** The source's own English words as written, never a product name or placeholder. */
+function englishWordsOf(text: string): string[] {
+  let plain = text.replace(PLACEHOLDER, " ");
+  for (const name of PRODUCT_NAMES) plain = plain.split(name).join(" ");
+  return plain.match(/[A-Za-z][A-Za-z'’]*/gu) ?? [];
+}
+
+/**
+ * Whether a translation still carries the English it was asked to replace
+ * (live AL 2026-10-16: "Picking up where we left off." came back as
+ * "Picking là où nous nous étions arrêtés"). Structural, not semantic:
+ * - into a script other than Latin, any lower-case English source word of
+ *   four letters or more left in it (names and acronyms are upper-case);
+ * - into a Latin-script language, two source words in a row left as they
+ *   were ("left off"), or the source's own opening word (five letters or
+ *   more) opening the translation as well.
+ */
+function stillEnglish(
+  source: string,
+  translated: string,
+  target: UiTranslationTarget,
+): boolean {
+  if (target.primary === "en") return false;
+  const sourceWords = englishWordsOf(source);
+  if (sourceWords.length === 0) return false;
+  let plain = translated.replace(PLACEHOLDER, " ");
+  for (const name of PRODUCT_NAMES) plain = plain.split(name).join(" ");
+  if (target.script !== "Latn") {
+    const lowerSource = new Set(
+      source.replace(PLACEHOLDER, " ").match(/\b[a-z][a-z'’]{3,}\b/gu) ?? [],
+    );
+    const left = plain.match(/\b[a-z][a-z'’]{3,}\b/gu) ?? [];
+    return left.some((word) => lowerSource.has(word));
+  }
+  // As written: a word left untranslated keeps its exact form.
+  const words = plain.match(/[\p{L}'’]+/gu) ?? [];
+  const opening = sourceWords[0] ?? "";
+  if (opening.length >= 5 && words[0] === opening) return true;
+  const pairs = new Set<string>();
+  for (let i = 0; i + 1 < sourceWords.length; i += 1) {
+    const a = sourceWords[i] ?? "";
+    const b = sourceWords[i + 1] ?? "";
+    if (
+      a.length >= 3 &&
+      b.length >= 3 &&
+      !(SMALL_WORDS.has(a.toLowerCase()) && SMALL_WORDS.has(b.toLowerCase()))
+    ) {
+      pairs.add(`${a} ${b}`);
+    }
+  }
+  for (let i = 0; i + 1 < words.length; i += 1) {
+    if (pairs.has(`${words[i] ?? ""} ${words[i + 1] ?? ""}`)) return true;
+  }
+  return false;
+}
 
 /**
  * Whether a translation may be shown. Every `{placeholder}` must survive
@@ -82,6 +151,8 @@ export type UiTranslationVerdict =
 export function checkUiTranslation(
   source: string,
   translated: string,
+  /** The language it is into; absent, English left in it is not checked. */
+  target?: UiTranslationTarget,
 ): UiTranslationVerdict {
   const text = translated.trim();
   if (text.length === 0) return { ok: false, reason: "EMPTY" };
@@ -126,6 +197,9 @@ export function checkUiTranslation(
   const sourceQ = (source.match(LONE_Q) ?? []).length;
   if (sourceQ > 0 && (text.match(LONE_Q) ?? []).length === 0) {
     return { ok: false, reason: "PRODUCT_NAMES" };
+  }
+  if (target !== undefined && stillEnglish(source, text, target)) {
+    return { ok: false, reason: "UNTRANSLATED" };
   }
   return { ok: true };
 }
@@ -232,6 +306,7 @@ export function uiTextBatches(
 export function acceptUiTranslations(
   batch: readonly string[],
   result: UiTranslationBatchResult,
+  target?: UiTranslationTarget,
 ): {
   readonly accepted: ReadonlyMap<string, string>;
   readonly rejected: ReadonlyMap<string, UiTranslationVerdict>;
@@ -242,7 +317,7 @@ export function acceptUiTranslations(
     const source = batch[item.i];
     if (source === undefined || accepted.has(source) || rejected.has(source))
       continue;
-    const verdict = checkUiTranslation(source, item.t);
+    const verdict = checkUiTranslation(source, item.t, target);
     // The source's own edge spaces (" (email confirmed)") are kept: a
     // screen joins such pieces to its neighbours.
     const lead = /^\s*/u.exec(source)?.[0] ?? "";

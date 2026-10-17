@@ -12,6 +12,16 @@ import {
 } from "../src/composition/ui-text.js";
 
 /**
+ * A stand-in translation: the English with its words upper-cased (never
+ * the English left as it was, which the check now refuses), placeholders
+ * kept exactly.
+ */
+function marked(tag: string, text: string): string {
+  return `[${tag}] ${text.replace(/\{[^}]*\}|[a-z]+/gu, (m) =>
+    m.startsWith("{") ? m : m.toUpperCase(),
+  )}`;
+}
+/**
  * Q's code-written answers in any language (owner directive 2026-10-16):
  * one generic path through lane lang's translation layer. Only sentence
  * skeletons reach the translator; names and figures come back exactly.
@@ -51,7 +61,7 @@ function translator(ok = true) {
       modelCode: "fake",
       costUsd: 0.001,
       result: {
-        items: batch.map((text, i) => ({ i, t: `[${language.tag}] ${text}` })),
+        items: batch.map((text, i) => ({ i, t: marked(language.tag, text) })),
       },
     });
   };
@@ -88,7 +98,7 @@ describe("code-written answers in any language", () => {
       expect(sent).not.toMatch(/AlRayan|Rimal|USD|1\.5/u);
     }
     expect(out).toBe(
-      "[sw] Here is one investor who could fit: AlRayan Investment LLC. [sw] Rimal Freight raised USD 1.5m.",
+      "[sw] HERE IS ONE INVESTOR WHO COULD FIT: AlRayan Investment LLC. [sw] Rimal Freight RAISED USD 1.5m.",
     );
     expect([...rows.keys()][0]).toContain(`|${ANSWER_WORDS_VERSION}|`);
   });
@@ -130,7 +140,7 @@ describe("code-written answers in any language", () => {
     const second = await translateLines("fr", [line], who, {
       cachedOnly: true,
     });
-    expect(second.get(line)).toBe(`[fr] ${line}`);
+    expect(second.get(line)).toBe(marked("fr", line));
     expect(fake.seen).toEqual([line]);
   });
 
@@ -143,7 +153,7 @@ describe("code-written answers in any language", () => {
       cap: cap(),
     });
     const [out] = await words.localise("ar", [ANSWER], who);
-    expect(out).toMatch(/^\[ar\] Here is one investor/u);
+    expect(out).toMatch(/^\[ar\] HERE IS ONE INVESTOR/u);
   });
 
   it("keeps English for English, an unknown language, a failure or a spent cap", async () => {

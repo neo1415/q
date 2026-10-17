@@ -13,6 +13,7 @@ import {
 import {
   ANSWER_WORDS_VERSION,
   createLineTranslator,
+  createPostgresUiTextStore,
   createUiTextService,
   parseUiTranslationDailyCapUsd,
   type UiTextRow,
@@ -20,6 +21,16 @@ import {
   type UiTextTranslator,
 } from "../src/composition/ui-text.js";
 
+/**
+ * A stand-in translation: the English with its words upper-cased (never
+ * the English left as it was, which the check now refuses), placeholders
+ * kept exactly.
+ */
+function marked(tag: string, text: string): string {
+  return `[${tag}] ${text.replace(/\{[^}]*\}|[a-z]+/gu, (m) =>
+    m.startsWith("{") ? m : m.toUpperCase(),
+  )}`;
+}
 /**
  * Any-language interface (owner 2026-10-16): the English catalogue is
  * machine-translated once per language, cached, shared, checked and
@@ -51,7 +62,7 @@ function memoryStore() {
   return { store, rows, reads: () => reads };
 }
 
-/** "Settings" -> "[fr] Settings", keeping every placeholder; one item broken on purpose. */
+/** "Settings" -> marked("fr", "Settings"), keeping every placeholder; one item broken on purpose. */
 function fakeTranslator(options: { costUsd?: number; breakOne?: string } = {}) {
   const calls: { language: string; size: number; tenantId: string }[] = [];
   const translate: UiTextTranslator = (language, batch, attribution) => {
@@ -70,7 +81,7 @@ function fakeTranslator(options: { costUsd?: number; breakOne?: string } = {}) {
           t:
             text === options.breakOne
               ? text.replace(/\{[A-Za-z0-9]+\}/u, "")
-              : `[${language.tag}] ${text}`,
+              : marked(language.tag, text),
         })),
       },
     });
@@ -162,9 +173,9 @@ describe("the ui-text service", () => {
       settled: 5,
       version: UI_TEXT_CATALOG_VERSION,
     });
-    expect(second?.entries["Settings"]).toBe("[fr] Settings");
+    expect(second?.entries["Settings"]).toBe(marked("fr", "Settings"));
     expect(second?.entries["Waiting on {name}."]).toBe(
-      "[fr] Waiting on {name}.",
+      marked("fr", "Waiting on {name}."),
     );
     // Once complete, nothing more is asked of the model.
     await service.catalog("fr", actor);
@@ -348,7 +359,7 @@ describe("translateLines (Q's code-written lines, lane ml)", () => {
     });
     const first = await translateLines("fr", LINES, actor);
     expect(first.get("{v1} needs your answer by {v2}.")).toBe(
-      "[fr] {v1} needs your answer by {v2}.",
+      marked("fr", "{v1} needs your answer by {v2}."),
     );
     expect(
       memory.rows.has(`fr|${ANSWER_WORDS_VERSION}|Here's what's waiting.`),
@@ -393,7 +404,7 @@ describe("translateLines (Q's code-written lines, lane ml)", () => {
     const out = await translateLines("sw", LINES, actor);
     expect(out.has("{v1} needs your answer by {v2}.")).toBe(false);
     expect(out.get("Here's what's waiting.")).toBe(
-      "[sw] Here's what's waiting.",
+      marked("sw", "Here's what's waiting."),
     );
     const slow = createLineTranslator({
       store: memoryStore().store,
@@ -413,5 +424,103 @@ describe("translateLines (Q's code-written lines, lane ml)", () => {
     });
     expect((await translateLines("es", LINES, actor)).size).toBe(0);
     expect(fake.calls).toEqual([]);
+  });
+});
+
+describe("English left in a translation is refused (live AL 2026-10-16)", () => {
+  const fr = { primary: "fr", script: "Latn" };
+  const ar = { primary: "ar", script: "Arab" };
+
+  it("refuses a French line that keeps the English opening or a run of it", () => {
+    expect(
+      checkUiTranslation(
+        "Picking up where we left off.",
+        "Picking là où nous nous étions arrêtés.",
+        fr,
+      ),
+    ).toMatchObject({ ok: false, reason: "UNTRANSLATED" });
+    expect(
+      checkUiTranslation(
+        "Picking up where we left off.",
+        "Reprenons où nous en étions, left off.",
+        fr,
+      ),
+    ).toMatchObject({ ok: false, reason: "UNTRANSLATED" });
+    expect(
+      checkUiTranslation(
+        "Picking up where we left off.",
+        "Reprenons là où nous nous étions arrêtés.",
+        fr,
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("keeps names, acronyms and product names in any script", () => {
+    expect(
+      checkUiTranslation(
+        "Your SAFE with Capital Q is saved.",
+        "تم حفظ SAFE الخاص بك مع Capital Q.",
+        ar,
+      ),
+    ).toEqual({ ok: true });
+    expect(
+      checkUiTranslation(
+        "Here is one investor who could fit: {v1}.",
+        "هذا investor قد يناسب: {v1}.",
+        ar,
+      ),
+    ).toMatchObject({ ok: false, reason: "UNTRANSLATED" });
+  });
+
+  it("a cached translation that now fails is not served, and the fresh one replaces exactly it", async () => {
+    const queries: string[] = [];
+    const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      const text = strings.join("?");
+      queries.push(`${text} ${JSON.stringify(values)}`);
+      if (text.includes("select source_text")) {
+        return Promise.resolve([
+          {
+            source_text: "Picking up where we left off.",
+            status: "ACCEPTED",
+            translated_text: "Picking là où nous nous étions arrêtés.",
+          },
+          {
+            source_text: "Settings",
+            status: "ACCEPTED",
+            translated_text: "Paramètres",
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    }) as unknown as Parameters<typeof createPostgresUiTextStore>[0];
+    const store = createPostgresUiTextStore(sql);
+    const read = await store.read("fr", "answer-words.v2");
+    expect(read.accepted.has("Picking up where we left off.")).toBe(false);
+    expect(read.settled.has("Picking up where we left off.")).toBe(false);
+    expect(read.accepted.get("Settings")).toBe("Paramètres");
+    await store.write("fr", "answer-words.v2", [
+      {
+        source: "Picking up where we left off.",
+        status: "ACCEPTED",
+        text: "Reprenons là où nous nous étions arrêtés.",
+        modelCode: "m",
+      },
+    ]);
+    const update = queries.find((q) =>
+      q.includes("update q_runtime.ui_translations"),
+    );
+    expect(update).toBeDefined();
+    expect(update).toContain("Picking là où nous nous étions arrêtés.");
+    // A second write of the same line is insert-only again.
+    queries.length = 0;
+    await store.write("fr", "answer-words.v2", [
+      {
+        source: "Picking up where we left off.",
+        status: "ACCEPTED",
+        text: "Reprenons là où nous nous étions arrêtés.",
+        modelCode: "m",
+      },
+    ]);
+    expect(queries.some((q) => q.includes("update "))).toBe(false);
   });
 });

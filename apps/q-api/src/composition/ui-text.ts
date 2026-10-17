@@ -13,6 +13,7 @@ import type { ModelGateway, ModelSpendCap } from "@capital-q/model-gateway";
 import { languageInfo, type LanguageInfo } from "@capital-q/q-core/language";
 import {
   acceptUiTranslations,
+  checkUiTranslation,
   UI_TEXT_CATALOG_VERSION,
   UI_TEXT_HAND_GAPS,
   UI_TEXT_SOURCE,
@@ -72,7 +73,10 @@ export type UiTextStore = {
     readonly accepted: ReadonlyMap<string, string>;
     readonly settled: ReadonlySet<string>;
   }>;
-  /** Insert-only: a row already there is kept as it is. */
+  /**
+   * Insert-only, except a cached translation this store refused at read
+   * (English left in it), which the fresh result replaces.
+   */
   readonly write: (
     language: string,
     version: string,
@@ -81,6 +85,11 @@ export type UiTextStore = {
 };
 
 export function createPostgresUiTextStore(sql: DatabaseExecutor): UiTextStore {
+  // Accepted rows a later check refuses (English left in them), by
+  // language|version|source: the text seen, so a fresh translation replaces
+  // exactly that row and nothing else (live AL 2026-10-16: "Picking là où
+  // nous nous étions arrêtés" was served from the cache).
+  const stale = new Map<string, string>();
   return {
     read: async (language, version) => {
       const rows = await sql<
@@ -95,11 +104,24 @@ export function createPostgresUiTextStore(sql: DatabaseExecutor): UiTextStore {
          where language = ${language} and catalog_version = ${version}`;
       const accepted = new Map<string, string>();
       const settled = new Set<string>();
+      const target = languageInfo(language);
       for (const row of rows) {
-        settled.add(row.source_text);
         if (row.status === "ACCEPTED" && row.translated_text !== null) {
+          // A cached translation is checked as a new one is; one that fails
+          // now is not served and is asked for again.
+          if (
+            target !== null &&
+            !checkUiTranslation(row.source_text, row.translated_text, target).ok
+          ) {
+            stale.set(
+              `${language}|${version}|${row.source_text}`,
+              row.translated_text,
+            );
+            continue;
+          }
           accepted.set(row.source_text, row.translated_text);
         }
+        settled.add(row.source_text);
       }
       return { accepted, settled };
     },
@@ -127,6 +149,25 @@ export function createPostgresUiTextStore(sql: DatabaseExecutor): UiTextStore {
                       ${reasons}::text[], ${models}::text[])
                as r(source, status, text, reason, model)
         on conflict (language, catalog_version, source_hash) do nothing`;
+      // The stale rows this process refused at read: replaced by the fresh
+      // result, only while they still hold the text that was refused.
+      for (const row of rows) {
+        const key = `${language}|${version}|${row.source}`;
+        const seen = stale.get(key);
+        if (seen === undefined) continue;
+        stale.delete(key);
+        await sql`
+          update q_runtime.ui_translations
+             set status = ${row.status},
+                 translated_text = ${row.status === "ACCEPTED" ? row.text : null},
+                 rejection_reason = ${row.status === "REJECTED" ? row.reason : null},
+                 model_code = ${row.modelCode}
+           where language = ${language}
+             and catalog_version = ${version}
+             and source_hash = encode(sha256(convert_to(${row.source}, 'UTF8')), 'hex')
+             and status = 'ACCEPTED'
+             and translated_text = ${seen}`;
+      }
     },
   };
 }
@@ -326,6 +367,7 @@ export function createUiTextService(
         const { accepted, rejected } = acceptUiTranslations(
           batch,
           outcome.result,
+          info,
         );
         const rows: UiTextRow[] = [
           ...[...accepted].map(([text, translated]): UiTextRow => ({
@@ -576,6 +618,7 @@ export function createLineTranslator(dependencies: {
       const { accepted, rejected } = acceptUiTranslations(
         batch,
         outcome.result,
+        info,
       );
       const rows: UiTextRow[] = [
         ...[...accepted].map(([text, translated]): UiTextRow => ({
