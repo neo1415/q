@@ -132,6 +132,7 @@ export function createPostgresUnicornPotentialStore(options: {
     .max(2000);
   const eligibleRows = async (
     rows: readonly Row[],
+    historical = false,
   ): Promise<ReadonlySet<string>> => {
     const requests: {
       company_id: string;
@@ -177,22 +178,24 @@ export function createPostgresUnicornPotentialStore(options: {
       where (r.kind = 'CLAIM' and exists (
         select 1 from evidence.claims c where c.id::text = r.id and c.tenant_id = company.tenant_id
         and c.subject_type = 'COMPANY' and c.subject_id = company.id
-        and c.visibility_scope in ('network_visible', 'public_external') and c.lifecycle_status <> 'SUPERSEDED'
-        and c.asserted_at = r.revision::timestamptz))
+        and c.visibility_scope in ('network_visible', 'public_external') and (${historical} or c.lifecycle_status <> 'SUPERSEDED')
+        and (${historical} or c.asserted_at = r.revision::timestamptz)))
       or (r.kind = 'FOUNDER_BACKGROUND' and exists (
         select 1 from core.founder_background_entries b join core.company_members m on m.user_id = b.user_id and m.tenant_id = b.tenant_id
-        where b.id::text = r.id and m.company_id = company.id and m.is_founder and m.is_current and b.visibility_scope = 'network_visible'))
+        where b.id::text = r.id and m.company_id = company.id and m.is_founder and (${historical} or m.is_current) and b.visibility_scope = 'network_visible'))
       or (r.kind = 'DECK_SECTION' and exists (
         select 1 from evidence.deck_extractions x
         join evidence.documents d on d.id = x.document_id and d.company_id = company.id and d.tenant_id = company.tenant_id
-        join evidence.document_versions v on v.id = d.current_version_id and v.tenant_id = d.tenant_id and v.id = x.document_version_id
+        join evidence.document_versions v on v.id = x.document_version_id and v.tenant_id = d.tenant_id
+        join evidence.document_versions current_version on current_version.id = d.current_version_id and current_version.tenant_id = d.tenant_id
         left join evidence.data_room_entries e on e.document_id = d.id
         where x.id::text = split_part(r.id, ':', 1) and x.company_id = company.id
         and d.owner_kind = 'ORGANISATION' and d.document_type = 'PITCH_DECK' and d.status = 'ACTIVE'
-        and v.malware_scan_status <> 'BLOCKED' and (e.level = 'PUBLIC' or d.download_audience = 'INVESTORS')
-        and x.id = (select newer.id from evidence.deck_extractions newer where newer.document_version_id = v.id order by newer.created_at desc limit 1)
-        and not exists (select 1 from evidence.deck_section_reviews review where review.extraction_id = x.id and review.section = split_part(r.id, ':', 2) and review.action = 'DISMISS'
-          and review.created_at = (select max(last_review.created_at) from evidence.deck_section_reviews last_review where last_review.extraction_id = x.id and last_review.section = review.section))))
+        and v.malware_scan_status <> 'BLOCKED' and current_version.malware_scan_status <> 'BLOCKED'
+        and (${historical} or v.id = d.current_version_id) and (e.level = 'PUBLIC' or d.download_audience = 'INVESTORS')
+        and (${historical} or x.id = (select newer.id from evidence.deck_extractions newer where newer.document_version_id = v.id order by newer.created_at desc limit 1))
+        and (${historical} or not exists (select 1 from evidence.deck_section_reviews review where review.extraction_id = x.id and review.section = split_part(r.id, ':', 2) and review.action = 'DISMISS'
+          and review.created_at = (select max(last_review.created_at) from evidence.deck_section_reviews last_review where last_review.extraction_id = x.id and last_review.section = review.section)))))
       or (r.kind = 'PITCH' and exists (
         select 1 from media.media_assets m where m.id::text = r.id and m.owner_type = 'COMPANY' and m.owner_id = company.id and m.tenant_id = company.tenant_id
         and m.purpose = 'FOUNDER_PITCH' and m.status = 'READY' and m.moderation_status = 'ALLOWED' and m.playback_policy in ('AUTHORISED','PUBLIC') and m.deleted_at is null and m.superseded_at is null))`;
@@ -212,7 +215,7 @@ export function createPostgresUnicornPotentialStore(options: {
     const rows = await sql<
       Row[]
     >`select company_id, revision, basis_hash, cohort_key, summary, observations, assessed_at from core.company_unicorn_potential_assessments where company_id = ${companyId}::uuid and method_version = ${methodVersion} order by revision desc limit ${bounded}`;
-    const allowed = await eligibleRows(rows);
+    const allowed = await eligibleRows(rows, true);
     return rows
       .filter((row) => allowed.has(`${row.company_id}/${row.revision}`))
       .map(snapshot);
@@ -261,6 +264,7 @@ export function createPostgresUnicornPotentialStore(options: {
         Row[]
       >`select a.company_id, a.revision, a.basis_hash, a.cohort_key, a.summary, a.observations, a.assessed_at from unnest(${[...new Set(ids)]}::uuid[]) requested(id) cross join lateral (select company_id, revision, basis_hash, cohort_key, summary, observations, assessed_at from core.company_unicorn_potential_assessments where company_id = requested.id and method_version = ${methodVersion} order by revision desc limit 20) a`;
       const allowed = await eligibleRows(rows);
+      const historicalAllowed = await eligibleRows(rows, true);
       const grouped = new Map<string, UnicornPotentialSnapshot[]>();
       for (const row of rows) {
         const items = grouped.get(row.company_id) ?? [];
@@ -277,7 +281,7 @@ export function createPostgresUnicornPotentialStore(options: {
             withMomentum(
               first,
               items[1] !== undefined &&
-                allowed.has(`${id}/${items[1].revision}`)
+                historicalAllowed.has(`${id}/${items[1].revision}`)
                 ? [items[1]]
                 : [],
             ),

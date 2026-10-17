@@ -1,0 +1,15 @@
+begin;
+set search_path=extensions,public;
+select plan(10);
+select ok((select relrowsecurity from pg_class where oid='core.company_unicorn_potential_assessments'::regclass),'snapshot RLS enabled');
+select is((select count(*)::int from pg_policies where schemaname='core' and tablename='company_unicorn_potential_assessments'),0,'no raw browser policies');
+select ok(not has_table_privilege('authenticated','core.company_unicorn_potential_assessments','select'),'authenticated cannot bypass premium API');
+select ok(not has_table_privilege('anon','core.company_unicorn_potential_assessments','select'),'anonymous cannot read raw scores');
+select ok(not has_table_privilege('authenticated','core.company_unicorn_potential_assessments','insert'),'authenticated cannot write snapshots');
+select ok(has_table_privilege('service_role','core.company_unicorn_potential_assessments','insert'),'service role may append');
+select throws_ok($$update core.company_unicorn_potential_assessments set revision=100$$,'42501',null,'history update rejected');
+select throws_ok($$delete from core.company_unicorn_potential_assessments$$,'42501',null,'history deletion rejected');
+select is((select count(*)::int from billing.plan_features pf join billing.plans p on p.id=pf.plan_id where pf.included and p.key='free'),0,'free never entitled');
+select is((select count(*)::int from billing.plan_features pf join billing.plans p on p.id=pf.plan_id where pf.included and p.key in('investor_pro','fund')),2,'only pro and fund included');
+select * from finish();
+rollback;
