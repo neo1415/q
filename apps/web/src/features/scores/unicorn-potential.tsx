@@ -63,8 +63,18 @@ function Source({ source }: { readonly source: UnicornSource }) {
         {words(source.lifecycleStatus)}
       </p>
       <p className="cq-caption text-(--cq-text-tertiary)">
-        {date(source.at)} · {words(source.kind)} ·{" "}
-        {words(source.visibilityScope)}
+        {source.recordedAt === undefined ? (
+          date(source.at)
+        ) : (
+          <>
+            {source.at === null
+              ? "As-of date unknown"
+              : `As of ${date(source.at)}`}
+            {" · "}Recorded by Capital Q {date(source.recordedAt)}
+          </>
+        )}
+        {" · "}
+        {words(source.kind)} · {words(source.visibilityScope)}
       </p>
       <p className="cq-caption break-all text-(--cq-text-tertiary)">
         Source {source.id} · revision {source.revision}

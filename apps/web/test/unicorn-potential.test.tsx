@@ -117,11 +117,65 @@ describe("Unicorn Potential progressive assessment", () => {
       "user claim · self reported · current",
     );
     expect(source.textContent).toContain("Oct 17, 2026");
+    expect(source.textContent).not.toContain("Recorded by Capital Q");
     expect(source.textContent).toContain("network visible");
     expect(source.textContent).toContain("claim-P1A · revision revision-2");
     expect(source.textContent).not.toContain("verified");
     expect(screen.getByText("Bounded evidence anchor P1A")).toBeTruthy();
     expect(screen.getByText("Share dated retention cohorts")).toBeTruthy();
+  });
+
+  it("keeps an undated metric unknown when its source was recorded recently", () => {
+    const undated: UnicornPotentialDto = {
+      ...score,
+      pillars: score.pillars.map((pillar) => ({
+        ...pillar,
+        criteria: pillar.criteria.map((criterion) => ({
+          ...criterion,
+          sources: criterion.sources.map((source) => ({
+            ...source,
+            at: null,
+            recordedAt: assessedAt,
+          })),
+        })),
+      })),
+    };
+    render(<UnicornPotential score={undated} companyId="company-1" />);
+    const source = screen
+      .getByText("Founder statement P4A")
+      .closest("li") as HTMLElement;
+    expect(source.textContent).toContain("As-of date unknown");
+    expect(source.textContent).toContain("Recorded by Capital Q Oct 17, 2026");
+    expect(source.textContent).not.toContain("As of Oct 17, 2026");
+    expect(source.textContent).toContain(
+      "user claim · self reported · current",
+    );
+    expect(document.querySelector("summary")?.textContent).toContain(
+      "100% coverage",
+    );
+  });
+
+  it("distinguishes a dated observation from the later source-recording date", () => {
+    const dated: UnicornPotentialDto = {
+      ...score,
+      pillars: score.pillars.map((pillar) => ({
+        ...pillar,
+        criteria: pillar.criteria.map((criterion) => ({
+          ...criterion,
+          sources: criterion.sources.map((source) => ({
+            ...source,
+            at: "2025-06-30T00:00:00.000Z",
+            recordedAt: assessedAt,
+          })),
+        })),
+      })),
+    };
+    render(<UnicornPotential score={dated} companyId="company-1" />);
+    const source = screen
+      .getByText("Founder statement P4A")
+      .closest("li") as HTMLElement;
+    expect(source.textContent).toContain("As of Jun 30, 2025");
+    expect(source.textContent).toContain("Recorded by Capital Q Oct 17, 2026");
   });
 
   it("preserves insufficient evidence as unscored, including unknown criteria", () => {
