@@ -54,6 +54,17 @@ const AG_INVESTOR =
   "Hey, so I'm a partner at Corvo Ventures, it's a small VC fund out of Lisbon. We're actively investing, cheques usually 150k to 400k euros, typical maybe 250k, mostly seed, sometimes pre-seed. We like climate, logistics and anything that makes ports less painful. Europe and North Africa. Honestly we also back a lot of second-time founders, and we never do gambling or tobacco.";
 
 export const ALWAYS_SAVE_CASES: readonly Case[] = [
+  // Logged misses (live AO, 2026-10-17).
+  {
+    id: "ao-sectors-paraphrased-extra",
+    journey: I,
+    said: AG_INVESTOR,
+    stepKey: "I3.sectors",
+    value: ["climate", "logistics", "port technology"],
+    quote:
+      "We like climate, logistics and anything that makes ports less painful",
+    holds: "a0000000-0000-4000-8000-0000000000c1",
+  },
   // Logged misses (live AJ, 2026-10-16).
   {
     id: "aj-400-mille-euros",

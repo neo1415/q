@@ -22,6 +22,7 @@ import {
 import { codeReading } from "../src/voice/code-reading.js";
 import { resumeTurnRef } from "../src/voice/onboarding-conductor.js";
 import {
+  acknowledgementIn,
   acknowledgementParts,
   figuresInDigits,
   FIXED_LEAD,
@@ -705,5 +706,33 @@ describe("live AL: Arabic read-back has no English labels", () => {
     expect(figuresInDigits("$2 million")).toBe("$2,000,000");
     expect(figuresInDigits("€1.5m")).toBe("€1,500,000");
     expect(figuresInDigits("Seed")).toBe("Seed");
+  });
+});
+
+describe("live AO: a figure in a translated read-back is written in digits", () => {
+  it("'$2 million' becomes $2,000,000 in the composed reply", () => {
+    const parts = acknowledgementParts({
+      results: [
+        {
+          stepKey: "F6.target_amount",
+          outcome: "COMMITTED",
+          recorded: "$2 million",
+        },
+      ],
+      labelOf: () => "Raise target",
+      next: { question: "What early signal do you have?", optional: false },
+      turnIndex: 0,
+      fixedLead: true,
+    });
+    expect(parts).not.toBeNull();
+    const reply = acknowledgementIn(
+      parts as NonNullable<typeof parts>,
+      (english) => `«${english}»`,
+      () => null,
+      { question: null, tail: null },
+      { items: "؛ ", list: "، " },
+    );
+    expect(reply).toContain("$2,000,000");
+    expect(reply).not.toMatch(/million/u);
   });
 });
