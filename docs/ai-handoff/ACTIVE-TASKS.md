@@ -1,5 +1,18 @@
 # Active tasks — authoritative cross-model board
 
+## 17 October 2026, midday — Q conversation fixes (Claude lead, top priority)
+
+See [`Q-CONVERSATION-FIXES-2026-10-17.md`](Q-CONVERSATION-FIXES-2026-10-17.md) for the full table.
+
+- **Live (release AT, `9a25c149`):**
+  - Q's cards match its answer;
+  - follow-ups bind to what Q showed;
+  - moves between pages are re-sent if lost, and tabs are clicked directly.
+- **In CI (batch AU, PR #200):** fetched tool results stored per conversation (migration `20261228190000`), turn reader v55 page controls, and the dialog-state fix.
+- **Open:**
+  - cards hidden by a stale saved-list view in old conversations (`claude/qfix-room-oct17`);
+  - the recall gateway error, and the unrequested page open (`claude/qfix-cards-oct17`).
+
 ## 17 October 2026 — open work (Claude lead)
 
 1. **Q Pitch v6:** DONE and production-certified (manifest). Optional follow-ups:

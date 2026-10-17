@@ -45,6 +45,7 @@ export function StaticAnswerCards({
   return (
     <Suspense fallback={null}>
       <AnswerCanvas
+        answerKey={answerId ?? undefined}
         block={block}
         focus={focus}
         spotlight={spot.spotlight}
