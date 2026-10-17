@@ -33,7 +33,7 @@ describe("the founder track (v6)", () => {
   const graph = buildStepGraph(FOUNDER_V6_SCRIPT);
 
   it("is a numbered step graph, each step id carrying its own number", () => {
-    expect(graph.steps.length).toBe(16);
+    expect(graph.steps.length).toBe(17);
     graph.steps.forEach((step, index) => {
       const nn = String(index + 1).padStart(2, "0");
       expect(step.number).toBe(index + 1);
@@ -55,8 +55,8 @@ describe("the founder track (v6)", () => {
     // notification panel (a dialog Q opens) and the hand-over have none.
     const unlit = graph.steps.filter((s) => s.anchors.length === 0);
     expect(unlit.map((s) => s.stepId)).toEqual([
-      "s.fdr.11.notifications.panel",
-      "s.fdr.16.home.close",
+      "s.fdr.12.notifications.panel",
+      "s.fdr.17.home.close",
     ]);
   });
 
@@ -167,7 +167,7 @@ describe("Capital Q on the fourteen-section template", () => {
 
 describe("Q-to-Q: Q presents Capital Q", () => {
   const scene = FOUNDER_V6_SCRIPT.scenes.find(
-    (s) => s.sceneId === "s.fdr.12.rehearsal.q2q",
+    (s) => s.sceneId === "s.fdr.13.rehearsal.q2q",
   );
   const lines = scene?.lines ?? [];
 

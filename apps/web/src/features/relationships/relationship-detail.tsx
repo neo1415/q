@@ -944,13 +944,13 @@ function ProfileChips({ profile }: { readonly profile: CounterpartProfile }) {
 /**
  * Q Pitch v6: the record's sections a tour talks about, by card id. Inert
  * markers (`data-qp-anchor`, space-separated per track); the tour lights
- * the one Q is speaking about. fdr.10.*: the founder track's record step.
+ * the one Q is speaking about. fdr.11.*: the founder track's record step.
  */
 const QP_CARD_ANCHORS: Readonly<Record<string, string>> = {
-  deal: "fdr.10.relationship.deal",
-  history: "fdr.10.relationship.history",
-  notes: "fdr.10.relationship.notes",
-  next: "fdr.10.relationship.next",
+  deal: "fdr.11.relationship.deal",
+  history: "fdr.11.relationship.history",
+  notes: "fdr.11.relationship.notes",
+  next: "fdr.11.relationship.next",
 };
 
 function Card({

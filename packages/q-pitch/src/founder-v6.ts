@@ -461,6 +461,45 @@ const STEPS: readonly Built[] = [
   }),
   step({
     n: 8,
+    page: "capital",
+    part: "raise",
+    title: "Capital: your raise",
+    feature: "FDR-CAPITAL-RAISE",
+    route: "/relationships",
+    atlasTab: "FOUNDER",
+    spokenNames: ["capital", "raise", "commitments"],
+    actions: [
+      {
+        actionId: "ta_fdr-capital",
+        kind: "openRoute",
+        destination: "CAPITAL_RAISE",
+      },
+    ],
+    before: ["Capital is where the business of the raise actually happens."],
+    after: [
+      {
+        text: "Your round as you set it: what you're raising, on what terms, and how much is committed against it.",
+        claim: true,
+        anchor: "fdr.08.capital.round",
+      },
+      {
+        text: "Commitments: money an investor commits, or that I hear agreed in a call and you confirm, lands here, each with its investor and status.",
+        claim: true,
+        anchor: "fdr.08.capital.commitments",
+      },
+      {
+        text: "And your rounds over time: earlier, now and next.",
+        anchor: "fdr.08.capital.rounds",
+      },
+    ],
+    fixture: "The signed-in founder's Capital, Raise tab",
+    forbidden: [
+      "Any committed amount on screen as a Capital Q result",
+      "That a commitment is a closed investment",
+    ],
+  }),
+  step({
+    n: 9,
     page: "gateq",
     part: "apply",
     title: "Applying through GateQ",
@@ -480,21 +519,21 @@ const STEPS: readonly Built[] = [
     after: [
       {
         text: "Their gate is their published bar. You can see where you stand before you apply.",
-        anchor: "fdr.08.gateq.criteria",
+        anchor: "fdr.09.gateq.criteria",
       },
       {
         text: "I draft the application from your own profile. Watch it fill.",
         claim: true,
-        anchor: "fdr.08.gateq.draft",
+        anchor: "fdr.09.gateq.draft",
       },
-      { text: "Your company.", anchor: "fdr.08.gateq.field-company" },
-      { text: "Its one line.", anchor: "fdr.08.gateq.field-line" },
-      { text: "Your stage.", anchor: "fdr.08.gateq.field-stage" },
-      { text: "And where you're based.", anchor: "fdr.08.gateq.field-country" },
+      { text: "Your company.", anchor: "fdr.09.gateq.field-company" },
+      { text: "Its one line.", anchor: "fdr.09.gateq.field-line" },
+      { text: "Your stage.", anchor: "fdr.09.gateq.field-stage" },
+      { text: "And where you're based.", anchor: "fdr.09.gateq.field-country" },
       {
         text: "Nothing is sent until you review it and press Send yourself. I prepare; you decide.",
         claim: true,
-        anchor: "fdr.08.gateq.send",
+        anchor: "fdr.09.gateq.send",
       },
     ],
     fixture:
@@ -502,7 +541,7 @@ const STEPS: readonly Built[] = [
     forbidden: ["That an application was sent"],
   }),
   step({
-    n: 9,
+    n: 10,
     page: "gateq",
     part: "interview",
     title: "The GateQ interview",
@@ -521,16 +560,16 @@ const STEPS: readonly Built[] = [
       {
         text: "Once you apply, I interview you on the investor's behalf: a short conversation, by voice or video, about the things their gate cares about.",
         claim: true,
-        anchor: "fdr.09.gateq.applications",
+        anchor: "fdr.10.gateq.applications",
       },
       {
         text: "The investor then receives your application in the same structure as every other: your own words, my reading of them, and a dossier. Your claims stay labelled as your claims.",
         claim: true,
-        anchor: "fdr.09.gateq.applications",
+        anchor: "fdr.10.gateq.applications",
       },
       {
         text: "Your applications and their status live here. In a moment you'll hear me do the same kind of conversation for real, in a rehearsal.",
-        anchor: "fdr.09.gateq.applications",
+        anchor: "fdr.10.gateq.applications",
       },
     ],
     fixture: "GateQ, the signed-in founder's applications tab",
@@ -540,7 +579,7 @@ const STEPS: readonly Built[] = [
     ],
   }),
   step({
-    n: 10,
+    n: 11,
     page: "relationship",
     part: "record",
     title: "A relationship, and a meeting",
@@ -562,21 +601,21 @@ const STEPS: readonly Built[] = [
     after: [
       {
         text: "The deal, its stage and the next step.",
-        anchor: "fdr.10.relationship.deal",
+        anchor: "fdr.11.relationship.deal",
       },
       {
         text: "What happened, dated, each entry marked with who can see it.",
         claim: true,
-        anchor: "fdr.10.relationship.history",
+        anchor: "fdr.11.relationship.history",
       },
       {
         text: "Your private notes stay yours.",
-        anchor: "fdr.10.relationship.notes",
+        anchor: "fdr.11.relationship.notes",
       },
       {
         text: "From here you chat with the investor and book a meeting through the record's own booking flow. I can join the call, take notes, and afterwards ask you to confirm any commitments.",
         claim: true,
-        anchor: "fdr.10.relationship.next",
+        anchor: "fdr.11.relationship.next",
       },
     ],
     fixture:
@@ -584,7 +623,7 @@ const STEPS: readonly Built[] = [
     forbidden: ["That a meeting was booked or a message sent"],
   }),
   step({
-    n: 11,
+    n: 12,
     page: "notifications",
     part: "panel",
     title: "When something happens",
@@ -610,7 +649,7 @@ const STEPS: readonly Built[] = [
     forbidden: ["Any notification as a result Capital Q produced"],
   }),
   step({
-    n: 12,
+    n: 13,
     page: "rehearsal",
     part: "q2q",
     title: "A rehearsal: Q presents Capital Q",
@@ -636,32 +675,32 @@ const STEPS: readonly Built[] = [
     after: [
       {
         text: "The persona asks: thanks for making the time. What does Capital Q do, and why now?",
-        anchor: "fdr.12.rehearsal.stage",
+        anchor: "fdr.13.rehearsal.stage",
       },
       {
         text: "Presenting, I answer: thank you for having me. Capital Q is an investment intelligence system for private capital. Every company presents itself differently, so investors start from scratch and good companies are missed. We put every company in one standard, evidence-labelled structure, and AI can now read like an analyst at a cost every founder can reach.",
-        anchor: "fdr.12.rehearsal.stage",
+        anchor: "fdr.13.rehearsal.stage",
       },
       {
         text: "The persona presses: what can you show us today, and what is still an estimate?",
-        anchor: "fdr.12.rehearsal.stage",
+        anchor: "fdr.13.rehearsal.stage",
       },
       {
         text: "Presenting: everything you've seen today works on the real product, with demonstration companies labelled as such. We're pre-seed and bootstrapping, so we claim no traction, revenue or market size yet.",
-        anchor: "fdr.12.rehearsal.stage",
+        anchor: "fdr.13.rehearsal.stage",
       },
       {
         text: "The persona: and what are you raising?",
-        anchor: "fdr.12.rehearsal.stage",
+        anchor: "fdr.13.rehearsal.stage",
       },
       {
         text: "Presenting: a raise of USD two million, as we state it. What would you want to see from us before a next meeting?",
-        anchor: "fdr.12.rehearsal.stage",
+        anchor: "fdr.13.rehearsal.stage",
       },
       {
         text: "In a real rehearsal, you speak and I play the investor by voice, from a persona built only from what you may see about them. Afterwards I review the call: what went right, what to improve, tips for that meeting, and the full transcript.",
         claim: true,
-        anchor: "fdr.12.rehearsal.stage",
+        anchor: "fdr.13.rehearsal.stage",
       },
     ],
     fixture:
@@ -672,7 +711,7 @@ const STEPS: readonly Built[] = [
     ],
   }),
   step({
-    n: 13,
+    n: 14,
     page: "rehearsals",
     part: "home",
     title: "Your rehearsals",
@@ -691,19 +730,19 @@ const STEPS: readonly Built[] = [
       {
         text: "You pick who to practise with, I play them by voice, and every rehearsal is reviewed.",
         claim: true,
-        anchor: "fdr.13.rehearsals.start",
+        anchor: "fdr.14.rehearsals.start",
       },
       {
         text: "Every rehearsal you run is saved here with its review and score, so you can see what improved from one to the next.",
         claim: true,
-        anchor: "fdr.13.rehearsals.history",
+        anchor: "fdr.14.rehearsals.history",
       },
     ],
     fixture: "The signed-in founder's Rehearsals page",
     forbidden: ["That a rehearsal is a real meeting"],
   }),
   step({
-    n: 14,
+    n: 15,
     page: "daily",
     part: "paper",
     title: "The Q Daily",
@@ -718,14 +757,14 @@ const STEPS: readonly Built[] = [
       {
         text: "The Q Daily is a newspaper written for you, on your sector and your raise, with every story's source named. It comes on the schedule you choose, and you can switch it off.",
         claim: true,
-        anchor: "fdr.14.daily.paper",
+        anchor: "fdr.15.daily.paper",
       },
     ],
     fixture: "The signed-in founder's Q Daily (in whatever state it is)",
     forbidden: ["That a story is Capital Q's own reporting"],
   }),
   step({
-    n: 15,
+    n: 16,
     page: "work",
     part: "team",
     title: "Q's team at work",
@@ -740,19 +779,19 @@ const STEPS: readonly Built[] = [
       {
         text: "And the work. You can ask me to act for you: follow up with an investor, prepare a document, keep your profile current. Behind me is a team of specialists, a planner, a drafter, a reviewer and others, each shown with what it's doing.",
         claim: true,
-        anchor: "fdr.15.work.team",
+        anchor: "fdr.16.work.team",
       },
       {
         text: "Anything consequential waits for your approval, exactly as I prepared it.",
         claim: true,
-        anchor: "fdr.15.work.team",
+        anchor: "fdr.16.work.team",
       },
     ],
     fixture: "The signed-in founder's Work, team view",
     forbidden: ["That an agent acted without approval"],
   }),
   step({
-    n: 16,
+    n: 17,
     page: "home",
     part: "close",
     title: "Over to you",
@@ -783,7 +822,7 @@ const STEPS: readonly Built[] = [
  * Coherent only on Capital Q's own founder account, because the persona
  * rehearses the signed-in founder's company (live run, 16 Oct: on a demo
  * founder it asked about that company). The default track uses the
- * prepared exchange in step twelve instead.
+ * prepared exchange in step thirteen instead.
  */
 export const FOUNDER_V6_PRESENTER_LINES: readonly ApprovedQuestion[] = [
   {

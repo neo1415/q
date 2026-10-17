@@ -284,7 +284,7 @@ export function RehearsalLobby({
       <section
         aria-busy="true"
         className="cq-stage flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center"
-        data-qp-anchor="fdr.12.rehearsal.stage"
+        data-qp-anchor="fdr.13.rehearsal.stage"
       >
         <div className="size-24 animate-pulse rounded-full bg-(--cq-stage-surface-strong) motion-reduce:animate-none" />
         <p className="cq-body text-(--cq-stage-text)">
@@ -304,7 +304,7 @@ export function RehearsalLobby({
     <section className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
       <div
         className="cq-stage relative flex min-h-80 flex-col items-center justify-center gap-4 p-8"
-        data-qp-anchor="fdr.12.rehearsal.stage"
+        data-qp-anchor="fdr.13.rehearsal.stage"
       >
         {persona.simulation !== undefined ? (
           <CounterpartIdentity name={name} simulation={persona.simulation} />

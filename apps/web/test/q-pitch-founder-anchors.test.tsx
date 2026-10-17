@@ -89,16 +89,16 @@ describe("the GateQ draft fills field by field while lit", () => {
     const { container } = render(
       <DraftFill id="apply" labelledBy="h" className="">
         <dl>
-          <div data-qp-fill data-qp-anchor="fdr.08.gateq.field-company">
+          <div data-qp-fill data-qp-anchor="fdr.09.gateq.field-company">
             <dt>Company</dt>
             <dd>Harbourline</dd>
           </div>
-          <div data-qp-fill data-qp-anchor="fdr.08.gateq.field-line">
+          <div data-qp-fill data-qp-anchor="fdr.09.gateq.field-line">
             <dt>One line</dt>
             <dd>Trucking</dd>
           </div>
         </dl>
-        <div data-qp-anchor="fdr.08.gateq.send">Review and send</div>
+        <div data-qp-anchor="fdr.09.gateq.send">Review and send</div>
       </DraftFill>,
     );
     const section = container.querySelector("[data-qp-draft]");
@@ -106,7 +106,7 @@ describe("the GateQ draft fills field by field while lit", () => {
     const signal = new AbortController().signal;
     const settle = () => act(() => new Promise((r) => setTimeout(r, 0)));
 
-    await lightSection("fdr.08.gateq.draft", {}, signal);
+    await lightSection("fdr.09.gateq.draft", {}, signal);
     await settle();
     expect(section?.hasAttribute("data-qp-filling")).toBe(true);
     expect(fields.map((f) => f.hasAttribute("data-qp-filled"))).toEqual([
@@ -114,14 +114,14 @@ describe("the GateQ draft fills field by field while lit", () => {
       false,
     ]);
 
-    await lightSection("fdr.08.gateq.field-company", {}, signal);
+    await lightSection("fdr.09.gateq.field-company", {}, signal);
     await settle();
     expect(fields.map((f) => f.hasAttribute("data-qp-filled"))).toEqual([
       true,
       false,
     ]);
 
-    await lightSection("fdr.08.gateq.send", {}, signal);
+    await lightSection("fdr.09.gateq.send", {}, signal);
     await settle();
     expect(fields.every((f) => f.hasAttribute("data-qp-filled"))).toBe(true);
 

@@ -260,7 +260,7 @@ export function WorkforceTeam({
       aria-labelledby="workforce-team-heading"
       className="flex flex-col gap-3"
       data-workforce-team
-      data-qp-anchor="fdr.15.work.team"
+      data-qp-anchor="fdr.16.work.team"
     >
       <h2 id="workforce-team-heading" className="sr-only">
         {t("Q’s team")}
