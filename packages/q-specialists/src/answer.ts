@@ -58,6 +58,7 @@ export function recordAudienceTool(utterance: string): string | null {
 }
 import {
   QMessageIdSchema,
+  sensitivityWithin,
   type QNavigateDestination,
   type QPageManifest,
   type QResponseMessage,
@@ -136,6 +137,7 @@ import {
   type QAnswerRequest,
   type QPrereadInput,
   type QCapabilityManifest,
+  type QConversationFetch,
   type QConversationMessage,
   type QLiveDeltaBus,
   type QResearchDirective,
@@ -607,6 +609,18 @@ export type SpecialistQAnswerDependencies = {
    * createConversationRecall). Null: the record does not hold the answer,
    * and the full path looks it up. Absent: the full path, as before.
    */
+  /**
+   * Owner live 2026-10-17: what earlier runs of this conversation fetched
+   * (q_runtime.conversation_tool_results), for its owner only, newest
+   * first and bounded. Absent: none, as before.
+   */
+  readonly conversationFetched?:
+    | ((scope: {
+        readonly tenantId: string;
+        readonly userId: string;
+        readonly runId: string;
+      }) => Promise<readonly QConversationFetch[]>)
+    | undefined;
   readonly conversationRecall?:
     | ((
         request: QAnswerRequest,
@@ -3813,7 +3827,14 @@ export function createSpecialistQAnswer(
               role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
               text: m.content,
             })),
-          shown: context.text,
+          // With what those turns fetched but did not render (the
+          // owner's own, within this run's ceiling): the reader decided
+          // from what was shown; the answer may use all Q had in hand.
+          shown: conversationContextOf(
+            history,
+            latest.id,
+            request.fetchedInConversation,
+          ).text,
           turn: fromShown.turn,
         });
         if (said !== null) {
@@ -5008,9 +5029,41 @@ ${line}`;
     };
   };
 
+  /**
+   * Owner live 2026-10-17: what earlier turns of this conversation fetched,
+   * read once per turn for its owner and kept only at or below this run's
+   * sensitivity ceiling, so a follow-up and the answer have everything Q
+   * already had in hand. A failed read is no context, never a failed turn.
+   */
+  const withFetched = async (
+    request: QAnswerRequest,
+  ): Promise<QAnswerRequest> => {
+    const port = dependencies.conversationFetched;
+    if (port === undefined || request.fetchedInConversation !== undefined) {
+      return request;
+    }
+    const fetched = await port({
+      tenantId: request.tenantId,
+      userId: request.actor.userId,
+      runId: request.runId,
+    }).catch((error: unknown) => {
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "what this conversation fetched was not read; answering without it",
+      );
+      return [] as readonly QConversationFetch[];
+    });
+    const kept = fetched.filter((fetch) =>
+      sensitivityWithin(fetch.sensitivity, request.plan.maxSensitivity),
+    );
+    return kept.length === 0
+      ? request
+      : { ...request, fetchedInConversation: kept };
+  };
+
   return {
     lastResult: () => last,
-    answer: answerTurn,
+    answer: async (request) => answerTurn(await withFetched(request)),
     preread,
     discard: (runId: string) => {
       prereads.delete(runId);

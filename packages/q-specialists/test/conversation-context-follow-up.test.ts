@@ -9,6 +9,7 @@ import {
 } from "@capital-q/contracts";
 import type {
   QAnswerRequest,
+  QConversationFetch,
   QConversationMessage,
   QRuntimeRepositories,
 } from "@capital-q/q-runtime";
@@ -162,6 +163,7 @@ function seam(input: {
   readonly history: readonly QConversationMessage[];
   readonly fromShown: { turn: number; reshow: boolean } | null;
   readonly recall?: string | null;
+  readonly fetched?: readonly QConversationFetch[];
 }): Seam {
   const latest = message(input.conversationId, "USER", input.said);
   const delegated: QAnswerRequest[] = [];
@@ -226,6 +228,9 @@ function seam(input: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
+    ...(input.fetched === undefined
+      ? {}
+      : { conversationFetched: () => Promise.resolve(input.fetched ?? []) }),
     conversationRecall: (_req, recall) => {
       recalled.push({ shown: recall.shown, turn: recall.turn });
       return Promise.resolve(input.recall ?? null);
@@ -348,5 +353,71 @@ describe("follow-ups answered from the conversation (owner live 2026-10-17)", ()
       "should never be said",
     );
     expect(s.delegated).toHaveLength(1);
+  });
+});
+
+describe("what earlier turns fetched (owner live 2026-10-17)", () => {
+  it("is in the recall's record for that turn; the reader decides from what was shown; above the ceiling is left out", async () => {
+    const conversation = randomUUID();
+    const history = liveHistory(conversation);
+    const answerRun = history[1]?.runId ?? "";
+    const s = seam({
+      said: "what did you say about Clearwater's team?",
+      conversationId: conversation,
+      history,
+      fromShown: { turn: 1, reshow: false },
+      recall: "Their team was not known yet.",
+      fetched: [
+        {
+          runId: answerRun,
+          toolName: "company.get",
+          arguments: { companyId: CLEARWATER },
+          result: { team: "two founders, ex-bank model risk" },
+          sensitivity: "NETWORK_VISIBLE",
+          fetchedAt: "2026-10-17T09:14:18.000Z",
+        },
+        {
+          runId: answerRun,
+          toolName: "private.read",
+          arguments: {},
+          result: { secret: "founder-private runway" },
+          // Above this run's CONFIDENTIAL ceiling: never in its context.
+          sensitivity: "RESTRICTED",
+          fetchedAt: "2026-10-17T09:14:18.500Z",
+        },
+      ],
+    });
+    await s.answer.answer(request());
+    expect(s.delegated).toHaveLength(0);
+    expect(s.readerShown[0]).not.toContain("ex-bank model risk");
+    const shown = s.recalled[0]?.shown ?? "";
+    const first = shown.split("\n")[0] ?? "";
+    expect(first.startsWith("T1:")).toBe(true);
+    expect(first).toContain(`| fetched [{"#":1,"tool":"company.get"`);
+    expect(first).toContain("ex-bank model risk");
+    expect(shown).not.toContain("founder-private runway");
+  });
+
+  it("another conversation's fetch (a run not in this history) attaches to nothing", async () => {
+    const conversation = randomUUID();
+    const s = seam({
+      said: "what was the second one?",
+      conversationId: conversation,
+      history: liveHistory(conversation),
+      fromShown: { turn: 1, reshow: false },
+      recall: "From the record.",
+      fetched: [
+        {
+          runId: randomUUID(),
+          toolName: "company.get",
+          arguments: {},
+          result: { team: "someone else's read" },
+          sensitivity: "PUBLIC",
+          fetchedAt: "2026-10-17T09:00:00.000Z",
+        },
+      ],
+    });
+    await s.answer.answer(request());
+    expect(s.recalled[0]?.shown).not.toContain("someone else's read");
   });
 });

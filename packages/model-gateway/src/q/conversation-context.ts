@@ -1,5 +1,8 @@
 import type { QResultBlock } from "@capital-q/contracts";
-import type { QConversationMessage } from "@capital-q/q-runtime";
+import type {
+  QConversationFetch,
+  QConversationMessage,
+} from "@capital-q/q-runtime";
 
 /**
  * What Q already said and showed in this conversation, as structured
@@ -19,10 +22,17 @@ import type { QConversationMessage } from "@capital-q/q-runtime";
  * own fields, nulls and empties dropped, list items numbered), so a new
  * card kind is covered without a case here, and no words are matched.
  *
+ * What a turn fetched but did not render (QConversationFetch: a profile
+ * read for a spoken answer, a fit profile behind a sentence) is attached
+ * to that turn as `fetched`, after what it showed, so the record holds
+ * everything Q had in hand, newest turns kept first.
+ *
  * Context Firewall: the history is the run's own conversation, read under
  * the run's tenant (`listRecentForConversationOfRun`), and its blocks are
- * what this person was already shown. Nothing here reads another record,
- * and nothing here widens what any tool may read.
+ * what this person was already shown; the fetched results are the owner's
+ * own, already filtered to this run's sensitivity ceiling by their store.
+ * Nothing here reads another record, and nothing here widens what any
+ * tool may read.
  */
 
 /** How many of Q's most recent turns are kept. */
@@ -30,7 +40,7 @@ export const CONTEXT_TURNS_MAX = 8;
 const SAID_CHARS = 600;
 const STRING_CHARS = 240;
 const LIST_ITEMS_MAX = 12;
-const TURN_CHARS = 2_600;
+const TURN_CHARS = 3_200;
 /** Within the reader's SHOWN bound (TurnReaderV54VariablesSchema). */
 export const CONTEXT_CHARS_MAX = 8_000;
 
@@ -40,6 +50,12 @@ export type ShownTurn = {
   readonly messageId: string;
   readonly said: string;
   readonly blocks: readonly QResultBlock[];
+  /** What this turn's run fetched (tool and result), in call order. */
+  readonly fetched: readonly {
+    readonly tool: string;
+    readonly arguments: unknown;
+    readonly result: unknown;
+  }[];
 };
 
 export type ConversationContext = {
@@ -88,9 +104,10 @@ function compact(value: unknown, depth = 0): unknown {
 function renderTurn(turn: ShownTurn): string {
   const said = turn.said.trim().slice(0, SAID_CHARS);
   const shown = compact(turn.blocks);
+  const fetched = compact(turn.fetched);
   const line = `T${String(turn.turn)}: said ${JSON.stringify(said)}${
     shown === undefined ? "" : ` | showed ${JSON.stringify(shown)}`
-  }`;
+  }${fetched === undefined ? "" : ` | fetched ${JSON.stringify(fetched)}`}`;
   return line.length > TURN_CHARS ? `${line.slice(0, TURN_CHARS - 1)}…` : line;
 }
 
@@ -101,10 +118,29 @@ function renderTurn(turn: ShownTurn): string {
 export function conversationContextOf(
   history: readonly QConversationMessage[],
   latestId?: string,
+  fetchedInConversation: readonly QConversationFetch[] = [],
 ): ConversationContext {
   const mine = history.filter(
     (message) => message.role === "Q" && message.id !== latestId,
   );
+  // A run's results go with its last message; oldest call first.
+  const lastOfRun = new Map<string, string>();
+  for (const message of mine) lastOfRun.set(message.runId, message.id);
+  const fetchedBy = new Map<string, ShownTurn["fetched"][number][]>();
+  const inOrder = [...fetchedInConversation].sort((a, b) =>
+    a.fetchedAt.localeCompare(b.fetchedAt),
+  );
+  for (const fetch of inOrder) {
+    const messageId = lastOfRun.get(fetch.runId);
+    if (messageId === undefined) continue;
+    const list = fetchedBy.get(messageId) ?? [];
+    list.push({
+      tool: fetch.toolName,
+      arguments: fetch.arguments,
+      result: fetch.result,
+    });
+    fetchedBy.set(messageId, list);
+  }
   const turns = mine
     .slice(-CONTEXT_TURNS_MAX)
     .map((message, index): ShownTurn => ({
@@ -112,6 +148,7 @@ export function conversationContextOf(
       messageId: message.id,
       said: message.content,
       blocks: message.blocks ?? [],
+      fetched: fetchedBy.get(message.id) ?? [],
     }));
   const lines: string[] = [];
   let used = 0;

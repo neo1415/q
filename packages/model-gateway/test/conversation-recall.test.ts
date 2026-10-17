@@ -161,6 +161,27 @@ describe("the answer's note of what Q showed", () => {
     expect(note?.content).toContain(`"#":2,"name":"Clearwater Assurance"`);
   });
 
+  it("carries what that turn fetched after what it showed", () => {
+    const note = shownContextNote(
+      [listed],
+      [
+        {
+          runId: listed.runId,
+          toolName: "fit.profile",
+          arguments: {},
+          result: { cheque: "not stated" },
+          sensitivity: "NETWORK_VISIBLE",
+          fetchedAt: "2026-10-17T09:14:18.000Z",
+        },
+      ],
+    );
+    const content = note?.content ?? "";
+    expect(content.indexOf("| showed")).toBeLessThan(
+      content.indexOf("| fetched"),
+    );
+    expect(content).toContain('"cheque":"not stated"');
+  });
+
   it("is absent for a conversation where Q showed nothing (another conversation's list never leaks in)", () => {
     expect(shownContextNote([])).toBeNull();
     const other = { ...listed, role: "USER", blocks: undefined, content: "hi" };
