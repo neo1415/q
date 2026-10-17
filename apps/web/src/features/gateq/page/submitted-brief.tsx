@@ -7,6 +7,7 @@ import type {
 import { QControl } from "@/features/q/control/q-control";
 
 import { FitGlyph } from "../fit-glyph";
+import { ApplicationAsks } from "./application-asks";
 import { summaryWords } from "./summary-words";
 import { useT } from "@/features/i18n/language";
 
@@ -125,6 +126,9 @@ export function SubmittedBrief({
             "Frozen from the founder's submission. Investment decisions remain with your team.",
           )}
         </p>
+        {dossier.company.name === null ? null : (
+          <ApplicationAsks company={dossier.company.name} />
+        )}
       </header>
 
       <section
