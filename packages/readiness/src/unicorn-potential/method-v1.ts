@@ -309,3 +309,56 @@ export function pillarWeight(
     ? null
     : weights[stage === "PRE_SEED" ? 0 : stage === "SEED" ? 1 : 2];
 }
+/** Concrete weaknesses share the adverse anchor branch, but never imply material failure (0). */
+export const UNICORN_WEAKNESS_RULES: Readonly<
+  Record<PillarId, readonly [RegExp, RegExp]>
+> = {
+  P1: [
+    /\bfounder expertise.{0,50}\bdocumented skills gap\b/iu,
+    /\bfounder execution.{0,50}\brepeatedly delayed\b/iu,
+  ],
+  P2: [
+    /\baccessible market.{0,50}\bcontracting demand\b/iu,
+    /\bexpansion.{0,50}\bfailed pilot\b/iu,
+  ],
+  P3: [
+    /\bcustomer interviews.{0,50}\blow willingness to pay\b/iu,
+    /\bcustomer retention.{0,50}\bdeteriorating\b/iu,
+  ],
+  P4: [
+    /\b(revenue|usage|customer).{0,30}\bdeclined (?:by )?(?:[1-9]|[1-4]\d)%/iu,
+    /\btraction.{0,50}\bdeteriorating retention\b/iu,
+  ],
+  P5: [
+    /\bcontribution margin.{0,50}\bbelow break.even\b/iu,
+    /\bacquisition payback.{0,50}\bdeteriorating\b/iu,
+  ],
+  P6: [
+    /\bproprietary (?:technology|dataset).{0,50}\bdocumented limitation\b/iu,
+    /\bcompetitive (?:test|benchmark).{0,50}\bdisadvantage\b/iu,
+  ],
+  P7: [
+    /\bacquisition channel.{0,50}\bdeteriorating conversion\b/iu,
+    /\breferrals.{0,50}\bdeclining\b/iu,
+  ],
+  P8: [
+    /\bcurrent runway.{0,25}\b(?:[1-5]) months\b/iu,
+    /\binvestor support.{0,50}\bwithdrawn commitment\b/iu,
+  ],
+  P9: [
+    /\bcritical (?:team )?functions.{0,50}\bconfirmed vacancy\b/iu,
+    /\bmilestones.{0,50}\brepeatedly delayed\b/iu,
+  ],
+  P10: [
+    /\bstructural demand.{0,50}\bdeclining\b/iu,
+    /\bmarket window.{0,50}\bdeployment delayed\b/iu,
+  ],
+  P11: [
+    /\bcost growth.{0,50}\bexceeds revenue growth\b/iu,
+    /\brepeat deployment.{0,50}\bfailed pilot\b/iu,
+  ],
+  P12: [
+    /\becosystem partnership.{0,50}\bsuspended\b/iu,
+    /\bstrategic (?:option|opportunity).{0,50}\brejected by customer\b/iu,
+  ],
+};

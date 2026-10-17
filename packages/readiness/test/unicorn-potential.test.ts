@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { UnicornPotentialDtoSchema } from "@capital-q/contracts";
 import type { InvestabilityInputs } from "../src/investability/inputs.js";
 import { assessUnicornPotential } from "../src/unicorn-potential/assess.js";
 import {
@@ -50,6 +51,39 @@ function inputs(texts: readonly string[] = statements): InvestabilityInputs {
   };
 }
 describe("provisional Unicorn Potential pure engine", () => {
+  it("grades explicit concrete weakness1 without treating it as material failure0", () => {
+    const v = assessUnicornPotential(
+      inputs(["Current runway 4 months"]),
+      NOW,
+    ).view;
+    expect(v.pillars[7]?.criteria[0]?.grade).toBe(1);
+  });
+  it("produces a valid full trust-boundary DTO without inventing history", () => {
+    const { view } = assessUnicornPotential(inputs(), NOW);
+    expect(
+      UnicornPotentialDtoSchema.safeParse({
+        ...view,
+        assessedAt: NOW,
+        momentum: null,
+      }).success,
+    ).toBe(true);
+  });
+  it("requires60percentweightedcoverageanddoesnotimputemissingcriteria", () => {
+    const x = inputs(statements.filter((_, i) => i % 2 === 0));
+    const v = assessUnicornPotential(x, NOW).view;
+    expect(v.coverage).toBe(0.5);
+    expect(v.overallScore).toBeNull();
+    expect(v.pillars.every((p) => p.coverage === 0.5)).toBe(true);
+  });
+  it("affirmative adverse evidence grades zero while mere absence remains unknown", () => {
+    const v = assessUnicornPotential(
+      inputs(["Founder has falsified credentials"]),
+      NOW,
+    ).view;
+    expect(v.pillars[0]?.criteria[0]?.grade).toBe(0);
+    expect(v.pillars[0]?.criteria[1]?.grade).toBeNull();
+  });
+
   it("keeps twelve weights and 24 explicit criterion rubrics", () => {
     expect(UNICORN_PILLARS).toHaveLength(12);
     for (const index of [0, 1, 2])
