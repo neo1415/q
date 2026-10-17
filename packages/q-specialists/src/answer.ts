@@ -460,6 +460,24 @@ export function namedInWords(utterance: string, name: string): boolean {
   return false;
 }
 
+/** Q already showed company cards in this conversation (v56). */
+function companyCardsShownIn(
+  history: readonly {
+    readonly role: string;
+    readonly blocks?: readonly QResultBlock[] | null | undefined;
+  }[],
+): boolean {
+  return history.some(
+    (message) =>
+      message.role === "Q" &&
+      (message.blocks ?? []).some(
+        (block) =>
+          block.kind === "ANSWER_CARDS" &&
+          block.cards.some((card) => card.subject?.kind === "COMPANY"),
+      ),
+  );
+}
+
 /** Said when an earlier turn's own blocks are shown again (v54 fromShown). */
 export const RESHOWN_LINE = "Here's what I showed you, back on screen.";
 
@@ -2981,9 +2999,14 @@ export function createSpecialistQAnswer(
       request.plan.screen?.route !== "ONBOARDING" &&
       !sequences.has(conversationId)
     ) {
+      // v56: once Q has shown company cards here, a fit ranking waits for
+      // the reading, which says whether they want the next ones rather
+      // than the same ones again (production 2026-10-17, 4f07dae7).
       const instant =
         instantLaneOf(latest.content, history) ??
-        ownFitRankingOf(request, latest.content);
+        (companyCardsShownIn(history)
+          ? null
+          : ownFitRankingOf(request, latest.content));
       if (instant !== null) {
         const capabilities = await capabilitiesOf(request);
         logger?.info(
@@ -4654,6 +4677,8 @@ export function createSpecialistQAnswer(
               text: read.question.text,
               count: read.question.count ?? null,
               previous: read.question.discover?.previous ?? false,
+              // v56: past the companies already shown ("three new ones").
+              excludeShown: read.question.excludeShown === true,
             },
           }
         : {}),

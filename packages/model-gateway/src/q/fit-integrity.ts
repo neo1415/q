@@ -65,6 +65,28 @@ export function previousCardCompanyIds(
 }
 
 /**
+ * TURN_READER v56: every company Q showed as a card in this conversation's
+ * earlier answers (newest first, by canonical id), so "three new ones"
+ * twice in a row never brings back the first three. Only ids Q itself put
+ * on screen; the sweep only ever leaves these out.
+ */
+export function shownCardCompanyIds(
+  earlier: readonly QConversationMessage[],
+): readonly string[] {
+  const ids: string[] = [];
+  for (const message of [...earlier].reverse()) {
+    if (message.role !== "Q") continue;
+    for (const block of message.blocks ?? []) {
+      if (block.kind !== "ANSWER_CARDS") continue;
+      for (const card of block.cards) {
+        if (card.subject?.kind === "COMPANY") ids.push(card.subject.companyId);
+      }
+    }
+  }
+  return [...new Set(ids)];
+}
+
+/**
  * Explicit comparison names may refer to cards before intervening prose.
  * Resolve exact canonical names only, from bounded durable card history.
  * A name attached to more than one record stays ambiguous; a card without

@@ -279,6 +279,7 @@ import {
   asComparison,
   namedCardCompanyIds,
   previousCardCompanyIds,
+  shownCardCompanyIds,
   tieLine,
   withFitIntegrity,
 } from "./fit-integrity.js";
@@ -2539,6 +2540,8 @@ export function createModelGatewayQAnswer(
       (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q");
     // INC-1: "rank them" is the set the last answer showed.
     const shownBefore = previousCardCompanyIds(earlier);
+    // v56: every company card this conversation showed, for "three new ones".
+    const shownInConversation = shownCardCompanyIds(earlier);
     // A comparison naming two earlier cards keeps those records even
     // after company analysis or an evidence-gap follow-up showed no list.
     const namedComparison = /\b(compare|versus|vs|between)\b/iu.test(
@@ -2556,17 +2559,29 @@ export function createModelGatewayQAnswer(
           outcome !== null && outcome.result.ok ? outcome.result.data : null,
         ),
       }).catch(() => null);
+    // v56: when the reader read "companies other than those shown", its
+    // reading decides over the words' sweep, which would rank the same
+    // companies again (production 2026-10-17, conversation 4f07dae7).
     const sweepAsk = !sweepable
       ? null
       : withReadCount(
-          fitSweepAsk(latest.content, shownBefore, namedComparison) ??
-            (request.fitQuestion === undefined
-              ? null
-              : fitSweepAskOfReading(
-                  request.fitQuestion,
-                  shownBefore,
-                  namedComparison,
-                )),
+          request.fitQuestion?.excludeShown === true &&
+            shownInConversation.length > 0
+            ? fitSweepAskOfReading(
+                request.fitQuestion,
+                shownBefore,
+                namedComparison,
+                shownInConversation,
+              )
+            : (fitSweepAsk(latest.content, shownBefore, namedComparison) ??
+                (request.fitQuestion === undefined
+                  ? null
+                  : fitSweepAskOfReading(
+                      request.fitQuestion,
+                      shownBefore,
+                      namedComparison,
+                      shownInConversation,
+                    ))),
           request.fitQuestion?.count ?? null,
         );
     const fitSweep: Promise<FitSweepResult | null> =
@@ -2578,10 +2593,16 @@ export function createModelGatewayQAnswer(
       readonly text: string;
       readonly count: number | null;
       readonly previous?: boolean | undefined;
+      readonly excludeShown?: boolean | undefined;
     }): Promise<FitSweepResult | null> =>
       sweepable
         ? sweepFor(
-            fitSweepAskOfReading(fitQuestion, shownBefore, namedComparison),
+            fitSweepAskOfReading(
+              fitQuestion,
+              shownBefore,
+              namedComparison,
+              shownInConversation,
+            ),
           )
         : Promise.resolve(null);
     // S2b: one declared profile fact about a company named outright, read
@@ -3186,6 +3207,9 @@ export function createModelGatewayQAnswer(
       pitchMoment,
       fitSweep,
       sweptAtPrepare: sweepAsk !== null,
+      /** v56: the prepared sweep already left the shown companies out. */
+      sweptExcludingShown: (sweepAsk?.exclude?.length ?? 0) > 0,
+      shownInConversation,
       discoverFor,
       factFor,
       mapFor,
@@ -3315,6 +3339,8 @@ export function createModelGatewayQAnswer(
         pitchMoment,
         fitSweep,
         sweptAtPrepare,
+        sweptExcludingShown,
+        shownInConversation,
         discoverFor,
         factFor,
         mapFor,
@@ -4730,11 +4756,56 @@ export function createModelGatewayQAnswer(
               previous: true,
             }
           : undefined);
+      // v56: "three new ones" read after a prepare warmed on the words
+      // alone: that sweep ranks the shown companies again, so the reading's
+      // own sweep, which leaves them out, answers instead.
+      const pastShown =
+        readFit?.excludeShown === true &&
+        shownInConversation.length > 0 &&
+        !sweptExcludingShown;
       const sweep =
-        (await fitSweep) ??
-        (readFit === undefined || sweptAtPrepare
-          ? null
-          : await sweepForReading(readFit));
+        pastShown && readFit !== undefined
+          ? await sweepForReading(readFit)
+          : ((await fitSweep) ??
+            (readFit === undefined || sweptAtPrepare
+              ? null
+              : await sweepForReading(readFit)));
+      const beyondShown =
+        sweep !== null && (sweep.ask.exclude?.length ?? 0) > 0
+          ? { count: sweep.ask.count }
+          : undefined;
+      if (
+        beyondShown !== undefined &&
+        sweep !== null &&
+        sweep.fits.length === 0 &&
+        sweep.calls.some((call) => call.result.ok) &&
+        request.questionKind === "FIT" &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+      ) {
+        // Every company Capital Q can rank for them was already shown:
+        // said plainly, never the same cards again (v56).
+        const message = await persistCodeAnswer(
+          "Beyond the companies I've already shown you, I don't have another one I can put against your mandate right now.",
+        );
+        logger?.info(
+          {
+            qRunId: request.runId,
+            scope: sweep.ask.scope,
+            cards: 0,
+            excluded: sweep.excluded,
+            totalMs: Date.now() - startedAt,
+          },
+          "q answered a fit question: nothing left beyond those shown",
+        );
+        return {
+          kind: "ANSWERED",
+          messageId: message.id,
+          modelPolicyVersion: "none",
+          promptBundleVersion: rendered.bundle.bundleVersion,
+        };
+      }
       if (
         sweep !== null &&
         sweep.ask.fitAsked &&
@@ -4768,6 +4839,7 @@ export function createModelGatewayQAnswer(
             place: sweep.ask.place,
             considered: sweep.considered,
             asked: latest.content,
+            beyondShown,
           });
           const message = await persistCodeAnswer(text, [block]);
           logger?.info(
@@ -4777,6 +4849,7 @@ export function createModelGatewayQAnswer(
               place: sweep.ask.place !== null,
               cards: block.cards.length,
               considered: sweep.considered,
+              excluded: sweep.excluded,
               fitCalls: sweep.calls.length,
               totalMs: Date.now() - startedAt,
             },
