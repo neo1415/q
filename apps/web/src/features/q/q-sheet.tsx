@@ -5,7 +5,6 @@ import { useRef } from "react";
 
 import { cx } from "@capital-q/ui";
 import { Button, IconButton } from "@capital-q/ui/button";
-import { ContextIndicator } from "@capital-q/ui/context-indicator";
 import {
   ICON_SIZE,
   ICON_STROKE,
@@ -31,11 +30,10 @@ import { useDockMenu } from "../q-dock/use-dock-menu";
 import { interceptTyped } from "./typed-intercept";
 import { homeHref } from "./active-conversation";
 import { failureMessage, recoveryHint } from "./conversation";
-import { useFollowNewest } from "./follow-newest";
+import { useAnchorQuestion } from "./follow-newest";
 import { QAnswer } from "./q-answer";
 import { QNow } from "./q-now";
 import { QCanSee } from "./q-can-see";
-import { QBoard } from "./q-board";
 import { viewingOf, type QMoment } from "./q-moment";
 import { useQSession } from "./q-session";
 import { readTypedDraft } from "./control/fast-navigation";
@@ -64,17 +62,7 @@ export function QSheetConversation({
   const t = useT();
   const session = useQSession();
   const { q, turns, voice, subject, presence, spokenOnly } = session;
-  const endRef = useRef<HTMLDivElement>(null);
   const dockMenu = useDockMenu();
-
-  // Followed while the reader is at the bottom (`follow-newest`).
-  useFollowNewest(
-    endRef,
-    `${String(turns.length)}:${String(spokenOnly.length)}:${q.state.partial?.text ?? ""}`,
-    turns.at(-1)?.kind === "PERSON",
-    // The Board sits below the exchange: follow the exchange, not the end.
-    "element",
-  );
 
   const label = presence.label ?? "Ready";
   // What is being said now: the person's latest words (spoken or typed)
@@ -89,6 +77,14 @@ export function QSheetConversation({
       turns.findLastIndex((turn) => turn.kind === "PERSON")
       ? latestQ
       : undefined;
+
+  // Owner 2026-10-17: the question goes to the top and stays put while the
+  // answer arrives beneath it; the panel never chases the newest line.
+  const questionRef = useRef<HTMLParagraphElement>(null);
+  useAnchorQuestion(
+    questionRef,
+    lastPersonTurn?.id ?? lastSpoken?.text ?? undefined,
+  );
 
   return (
     <div className="flex min-h-full flex-col gap-4" data-q-sheet>
@@ -112,11 +108,6 @@ export function QSheetConversation({
           <span className="cq-label text-(--cq-text-primary)" role="status">
             {label}
           </span>
-          <ContextIndicator
-            translate={t}
-            scope={subject.scope}
-            detail={subject.kind === "NONE" ? undefined : subject.label}
-          />
           {/* Q room R1: what Q sees of the page behind the dock. */}
           <QCanSee />
         </div>
@@ -198,7 +189,13 @@ export function QSheetConversation({
             whole conversation is the Q page's Transcript. */}
         {lastPerson !== undefined ? (
           <p
-            className="cq-body-sm self-end bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)"
+            ref={questionRef}
+            // Two lines: a long prepared question (Full assessment, Risks
+            // and gaps) is the reader's, not the answer; it no longer
+            // pushes the answer below the fold. The full words stay in the
+            // title and the Q page's transcript.
+            title={lastPerson}
+            className="cq-body-sm line-clamp-2 self-end scroll-mt-3 bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)"
             data-q-panel-person
           >
             <span className="sr-only">{t("You:")} </span>
@@ -223,15 +220,9 @@ export function QSheetConversation({
           onAct={(text) => void q.ask(text)}
           quietWhenIdle
         />
-        <div ref={endRef} />
-        <QBoard
-          conversationId={q.conversationId}
-          turns={turns}
-          onAsk={(question) => void q.ask(question)}
-          onOpenArtifact={session.openArtifact}
-          compact
-          skipNoteOf={latestAnswer?.id}
-        />
+        {/* The Board is the Q page's (Open Q): beside a page the panel holds
+            the question, its answer and what waits on the person, nothing
+            older (owner 2026-10-17: declutter the panel). */}
         {q.state.failure !== null ? (
           <InlineNotice tone="warning" title={t("Q couldn't finish that")}>
             {failureMessage(q.state.failure)} {recoveryHint(q.state.failure)}

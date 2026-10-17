@@ -66,8 +66,6 @@ export const RELATIONSHIPS_AR: Readonly<Record<string, string>> = {
   "Send these questions to the founder": "أرسل هذه الأسئلة إلى المؤسس",
   "Request the documents that would answer them":
     "اطلب المستندات التي تجيب عنها",
-  "Book a first call": "احجز مكالمة أولى",
-  "Open diligence": "افتح العناية الواجبة",
   Reminder: "تذكير",
   "Time in each stage": "المدة في كل مرحلة",
   ", from {date}": "، منذ {date}",
