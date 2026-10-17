@@ -478,6 +478,13 @@ function escaped(words: string): string {
  * already see.
  */
 export function wordsNamePage(text: string, target: PageTarget): boolean {
+  if (
+    target.kind === "DESTINATION" &&
+    target.destination === "Q_PITCH" &&
+    asksForPitch(text)
+  ) {
+    return true;
+  }
   const names = Object.entries(PAGE_NAMES)
     .filter(([, named]) =>
       target.kind === "SETTINGS"
@@ -498,6 +505,20 @@ export function wordsNamePage(text: string, target: PageTarget): boolean {
   return selfCorrected(text)
     .split(/(?<=[.!?])\s+|\s*[,;]\s*(?:but|so|and)\s+/u)
     .some((sentence) => named.test(sentence) && !NOT_A_MOVE.test(sentence));
+}
+
+// Q Pitch v6 (live 2026-10-17: "Can you pitch Capital Q to me?" was read as
+// Q_PITCH by TURN_READER v53 but this gate held it, since the tour has no
+// page name in those words). A sentence that asks Q to pitch, present,
+// explain or walk through Capital Q (or "this platform") names the tour by
+// meaning. Negations and "I'm on..." still do not move.
+const PITCH_ASK =
+  /\b(?:pitch|present|demo|introduce|explain|walk\s+(?:me|us)\s+through|take\s+(?:me|us)\s+through|show\s+(?:me|us)\s+around|give\s+(?:me|us)\s+(?:a\s+)?(?:tour|pitch|demo|walkthrough|walk-through|overview)\s+of|tell\s+(?:me|us)\s+about|what(?:'s|\s+is))\b[^.!?]{0,40}\b(?:capital\s*q|this\s+(?:platform|product|app))\b/iu;
+
+function asksForPitch(text: string): boolean {
+  return selfCorrected(text)
+    .split(/(?<=[.!?])\s+/u)
+    .some((sentence) => PITCH_ASK.test(sentence) && !NOT_A_MOVE.test(sentence));
 }
 
 /** What Q says for a page Capital Q does not have. */
