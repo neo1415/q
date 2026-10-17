@@ -257,7 +257,7 @@ export async function LooksForSection({
           ) : (
             <dl className="cq-body-sm flex flex-col gap-1">
               <div
-                className="grid grid-cols-1 gap-x-4 sm:grid-cols-[10rem_1fr]"
+                className="-mx-2 grid grid-cols-1 gap-x-4 px-2 py-0.5 sm:grid-cols-[10rem_1fr]"
                 data-qp-fill
                 data-qp-anchor="fdr.08.gateq.field-company"
               >
@@ -267,7 +267,7 @@ export async function LooksForSection({
                 </dd>
               </div>
               <div
-                className="grid grid-cols-1 gap-x-4 sm:grid-cols-[10rem_1fr]"
+                className="-mx-2 grid grid-cols-1 gap-x-4 px-2 py-0.5 sm:grid-cols-[10rem_1fr]"
                 data-qp-fill
                 data-qp-anchor="fdr.08.gateq.field-line"
               >
@@ -277,7 +277,7 @@ export async function LooksForSection({
                 </dd>
               </div>
               <div
-                className="grid grid-cols-1 gap-x-4 sm:grid-cols-[10rem_1fr]"
+                className="-mx-2 grid grid-cols-1 gap-x-4 px-2 py-0.5 sm:grid-cols-[10rem_1fr]"
                 data-qp-fill
                 data-qp-anchor="fdr.08.gateq.field-stage"
               >
@@ -287,7 +287,7 @@ export async function LooksForSection({
                 </dd>
               </div>
               <div
-                className="grid grid-cols-1 gap-x-4 sm:grid-cols-[10rem_1fr]"
+                className="-mx-2 grid grid-cols-1 gap-x-4 px-2 py-0.5 sm:grid-cols-[10rem_1fr]"
                 data-qp-fill
                 data-qp-anchor="fdr.08.gateq.field-country"
               >
