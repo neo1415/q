@@ -482,7 +482,7 @@ describe("Q's moves are confirmed by the settled route (C3, R3 lifecycle)", () =
     ]);
   });
 
-  it("a move that never lands is pushed once more, then FAILED with a reason, never assumed", async () => {
+  it("a move that never lands is pushed again (bounded: early, then late), then FAILED with a reason, never assumed", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     noteRoute("/home");
     window.history.replaceState(null, "", "/home");
@@ -491,7 +491,7 @@ describe("Q's moves are confirmed by the settled route (C3, R3 lifecycle)", () =
     const move = requestMove({ path: "/documents" });
     await vi.advanceTimersByTimeAsync(21_000);
     stop();
-    expect(pushes).toEqual(["/documents", "/documents"]);
+    expect(pushes).toEqual(["/documents", "/documents", "/documents"]);
     expect(outcomes).toEqual([
       {
         status: "FAILED",
