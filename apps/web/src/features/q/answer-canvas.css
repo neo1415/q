@@ -1301,3 +1301,71 @@
     grid-column: 4;
   }
 }
+
+/*
+ * Owner 2026-10-17 (ten cards: "Ledgerfo…", "Baske…"): a company's name is
+ * never cut. It wraps; and on a card too narrow for name, score, Open and
+ * Close in one line, the name keeps the line beside the rank and Close,
+ * with the score and Open under it. Decided by the card's own width (a
+ * container query), so the grid, the row and the phone tiles all follow.
+ * The doubled classes outrank every head rule above, whatever its state.
+ */
+.cq-ac-card {
+  container-type: inline-size;
+}
+.cq-ac-card.cq-ac-card h3,
+.cq-ac-cards .cq-ac-card.cq-ac-card[data-state][data-ac-card] h3 {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+}
+.cq-ac-stripname.cq-ac-stripname {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+}
+@container (max-width: 560px) {
+  .cq-ac-card.cq-ac-card[data-state][data-ac-card] .cq-ac-head.cq-ac-head {
+    grid-template-columns: auto minmax(0, 1fr) 44px;
+    align-items: start;
+  }
+  .cq-ac-card.cq-ac-card[data-state][data-ac-card]
+    .cq-ac-head.cq-ac-head
+    > .cq-ac-rank {
+    grid-column: 1;
+    grid-row: 1;
+    margin-top: 2px;
+  }
+  .cq-ac-card.cq-ac-card[data-state][data-ac-card]
+    .cq-ac-head.cq-ac-head
+    > .cq-ac-head-main {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .cq-ac-card.cq-ac-card[data-state][data-ac-card]
+    .cq-ac-head.cq-ac-head
+    > .cq-ac-x {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 44px;
+  }
+  .cq-ac-card.cq-ac-card[data-state][data-ac-card]
+    .cq-ac-head.cq-ac-head
+    > .cq-ac-score {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    justify-items: start;
+  }
+  .cq-ac-card.cq-ac-card[data-state][data-ac-card]
+    .cq-ac-head.cq-ac-head
+    > .cq-ac-open {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: start;
+  }
+}
