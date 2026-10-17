@@ -12,9 +12,9 @@ import {
   type InvestabilityDto,
   type ScoreFactor,
   type SuitabilityDto,
-  type UnicornPotentialDto,
 } from "@capital-q/contracts";
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { cx } from "@capital-q/ui";
 
@@ -22,10 +22,6 @@ import { useT } from "@/features/i18n/language";
 
 import { useCompanyScores } from "./use-company-scores";
 import { UnicornPotential, unicornPotentialLine } from "./unicorn-potential";
-
-type ScoresWithUnicorn = CompanyScoresDto & {
-  readonly unicornPotential?: UnicornPotentialDto | undefined;
-};
 
 /**
  * Investability and Suitability, side by side and never blended (owner
@@ -63,7 +59,7 @@ function suitabilityWords(dto: SuitabilityDto): string {
 }
 
 /** Accessible descriptions of the assessments actually authorized. */
-export function companyScoresLabel(scores: ScoresWithUnicorn): string {
+export function companyScoresLabel(scores: CompanyScoresDto): string {
   return [
     `${investabilityLine(scores.investability)}, ${investabilityWords(scores.investability).toLowerCase()}`,
     scores.suitability === null
@@ -189,10 +185,13 @@ function ScoreCell({
 export function CompanyScores({
   scores,
   variant = "full",
+  unicornDetails = true,
   className,
 }: {
-  readonly scores: ScoresWithUnicorn;
+  readonly scores: CompanyScoresDto;
   readonly variant?: CompanyScoresVariant | undefined;
+  /** Profiles place the full assessment in the overview, outside the fit rail. */
+  readonly unicornDetails?: boolean | undefined;
   readonly className?: string | undefined;
 }) {
   const t = useT();
@@ -300,7 +299,15 @@ export function CompanyScores({
           />
         </ScoreCell>
       )}
-      {scores.unicornPotential === undefined ? null : (
+      {scores.unicornPotential === undefined ? null : !unicornDetails ? (
+        <Link
+          href={`/company/${encodeURIComponent(scores.companyId)}?tab=overview#unicorn-potential-${scores.companyId}`}
+          className="cq-caption min-h-11 py-3 text-(--cq-text-secondary) underline underline-offset-4 sm:col-span-2"
+          data-score="unicorn-potential"
+        >
+          {unicornPotentialLine(scores.unicornPotential)} · View assessment
+        </Link>
+      ) : (
         <UnicornPotential
           companyId={scores.companyId}
           score={scores.unicornPotential}
