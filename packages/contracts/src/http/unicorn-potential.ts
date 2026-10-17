@@ -185,14 +185,27 @@ export const UnicornPotentialDtoSchema = z
 export type UnicornPotentialDto = z.infer<typeof UnicornPotentialDtoSchema>;
 
 /** Entitled and visible, but no persisted assessment exists yet. */
-export function notAssessedUnicornPotential(methodVersion: string): UnicornPotentialDto {
+export function notAssessedUnicornPotential(
+  methodVersion: string,
+): UnicornPotentialDto {
   return {
-    status: "NOT_ASSESSED", overallScore: null, band: null,
-    confidence: "LOW", coverage: 0, stage: null,
-    methodVersion, inputRulesVersion: "unicorn-potential-inputs.v1", assessedAt: null,
-    pillars: [], up: [], down: [], missing: ["An assessment has not been recorded yet."],
-    momentum: null, benchmark: "Comparable benchmark unavailable",
+    status: "NOT_ASSESSED",
+    overallScore: null,
+    band: null,
+    confidence: "LOW",
+    coverage: 0,
+    stage: null,
+    methodVersion,
+    inputRulesVersion: "unicorn-potential-inputs.v1",
+    assessedAt: null,
+    pillars: [],
+    up: [],
+    down: [],
+    missing: ["An assessment has not been recorded yet."],
+    momentum: null,
+    benchmark: "Comparable benchmark unavailable",
   };
 }
 
-export const UNICORN_POTENTIAL_COMPANY_PATH = "/v1/companies/:companyId/unicorn-potential" as const;
+export const UNICORN_POTENTIAL_COMPANY_PATH =
+  "/v1/companies/:companyId/unicorn-potential" as const;

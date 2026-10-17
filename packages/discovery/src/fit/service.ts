@@ -32,7 +32,12 @@ import type { FitEvidenceLine } from "./stated.js";
 import type { RecommendationFeatureSnapshot } from "../features/contracts.js";
 
 import { FIT_CONFIG_CURRENT, type FitConfig } from "./config.js";
-import { assessFit, compareAssessments, type FitAssessment } from "./model.js";
+import {
+  assessFit,
+  compareAssessments,
+  notApplicableObservation,
+  type FitAssessment,
+} from "./model.js";
 import { compareFitOrder, fitOrderScore } from "./order.js";
 import { observeFit, type DeclaredFitFacts } from "./observe.js";
 
@@ -92,6 +97,12 @@ export type FitInputSource = {
 };
 
 export type FitServiceDependencies = {
+  /** Visible canonical names for company assessments before mandate setup. */
+  readonly companyIdentities?:
+    | ((
+        ids: readonly string[],
+      ) => Promise<ReadonlyMap<string, { readonly name: string }>>)
+    | undefined;
   readonly investorSubject: {
     readonly investorOrganisationFor: (
       actor: ActorContext,
@@ -203,6 +214,44 @@ export function createFitService(
   const config = dependencies.config ?? FIT_CONFIG_CURRENT;
   const clock = dependencies.clock ?? (() => new Date());
 
+  const withScores = async (
+    actor: ActorContext,
+    items: readonly FitProfileItem[],
+  ): Promise<Extract<FitProfilesResult, { kind: "OK" }>> => {
+    const investability =
+      dependencies.investability === undefined || items.length === 0
+        ? new Map<string, InvestabilityDto>()
+        : await dependencies
+            .investability(items.map((i) => i.assessment.profile.companyId))
+            .catch(() => new Map<string, InvestabilityDto>());
+    const unicornPotential =
+      dependencies.unicornPotential === undefined || items.length === 0
+        ? new Map<string, UnicornPotentialDto>()
+        : await dependencies.unicornPotential(
+            actor,
+            items.map((i) => i.assessment.profile.companyId),
+          );
+    const method = dependencies.investabilityMethodVersion ?? "investiq/v1";
+    return {
+      kind: "OK",
+      items: items.map((item) => {
+        const companyId = item.assessment.profile.companyId;
+        return {
+          ...item,
+          scores: {
+            companyId,
+            investability:
+              investability.get(companyId) ?? notAssessedInvestability(method),
+            suitability: suitabilityFromFit(item.assessment.profile),
+            ...(unicornPotential.get(companyId) === undefined
+              ? {}
+              : { unicornPotential: unicornPotential.get(companyId) }),
+          },
+        };
+      }),
+    };
+  };
+
   const profiles = async (
     actor: ActorContext,
     companyIds: readonly string[],
@@ -243,20 +292,50 @@ export function createFitService(
         unclaimed.has(r.companyId) ||
         !r.reasonCodes.some((code) => NOT_VISIBLE.has(code)),
     );
-    if (
+    const mandateId = admitted.find((r) => r.mandateId !== null)?.mandateId;
+    const noMandate =
       admitted.length > 0 &&
       admitted.every(
         (r) =>
           r.mandateId === null || r.reasonCodes.some((c) => NO_MANDATE.has(c)),
-      )
-    ) {
-      return { kind: "NO_MANDATE" };
-    }
-    const mandateId = admitted.find((r) => r.mandateId !== null)?.mandateId;
-    if (mandateId === undefined || mandateId === null) {
-      return admitted.length === 0
-        ? { kind: "OK", items: [] }
-        : { kind: "NO_MANDATE" };
+      );
+    if (noMandate || mandateId === undefined || mandateId === null) {
+      if (admitted.length === 0) return { kind: "OK", items: [] };
+      if (dependencies.companyIdentities === undefined)
+        return { kind: "NO_MANDATE" };
+      const names = await dependencies.companyIdentities(
+        admitted.map((r) => r.companyId),
+      );
+      const computedAt = clock().toISOString();
+      // A company assessment does not require an investor mandate. Suitability
+      // stays unknown with no preferences; no synthetic mandate or fit is made.
+      return withScores(
+        actor,
+        admitted.flatMap(({ companyId }) => {
+          const identity = names.get(companyId);
+          if (identity === undefined) return [];
+          const observations = Object.fromEntries(
+            FIT_PARAMETERS.map((parameter) => [
+              parameter,
+              notApplicableObservation(),
+            ]),
+          ) as Record<
+            FitParameter,
+            ReturnType<typeof notApplicableObservation>
+          >;
+          return [
+            {
+              assessment: assessFit(
+                { companyId, observations, hardRule: null },
+                config,
+                computedAt,
+              ),
+              name: identity.name,
+              line: null,
+            },
+          ];
+        }),
+      );
     }
 
     const inputs = await dependencies.inputs.read({
@@ -301,38 +380,7 @@ export function createFitService(
     }
     // Request order, as eligibility returned it. Scores are read only for
     // the companies eligibility admitted for this reader.
-    const investability =
-      dependencies.investability === undefined || items.length === 0
-        ? new Map<string, InvestabilityDto>()
-        : await dependencies
-            .investability(items.map((i) => i.assessment.profile.companyId))
-            .catch(() => new Map<string, InvestabilityDto>());
-    const unicornPotential =
-      dependencies.unicornPotential === undefined || items.length === 0
-        ? new Map<string, UnicornPotentialDto>()
-        : await dependencies.unicornPotential(
-            actor,
-            items.map((i) => i.assessment.profile.companyId),
-          );
-    const method = dependencies.investabilityMethodVersion ?? "investiq/v1";
-    return {
-      kind: "OK",
-      items: items.map((item) => {
-        const companyId = item.assessment.profile.companyId;
-        return {
-          ...item,
-          scores: {
-            companyId,
-            investability:
-              investability.get(companyId) ?? notAssessedInvestability(method),
-            suitability: suitabilityFromFit(item.assessment.profile),
-            ...(unicornPotential.get(companyId) === undefined
-              ? {}
-              : { unicornPotential: unicornPotential.get(companyId) }),
-          },
-        };
-      }),
-    };
+    return withScores(actor, items);
   };
 
   return {
@@ -494,8 +542,13 @@ export function companyScoresText(scores: CompanyScoresDto): string {
   const suit =
     scores.suitability === null ? null : suitabilityLine(scores.suitability);
   const potential = scores.unicornPotential;
-  const unicorn = potential === undefined ? null : `Unicorn Potential: ${potential.overallScore === null ? "insufficient evidence, no score" : `${potential.overallScore}/100`}; evidence coverage ${Math.round(potential.coverage * 100)}%; ${potential.confidence.toLowerCase()} confidence; method ${potential.methodVersion}. ${UNICORN_POTENTIAL_CAVEAT}`;
-  return [invWords, suit, unicorn].filter((part) => part !== null).join(". ") + ".";
+  const unicorn =
+    potential === undefined
+      ? null
+      : `Unicorn Potential: ${potential.overallScore === null ? "insufficient evidence, no score" : `${potential.overallScore}/100`}; evidence coverage ${Math.round(potential.coverage * 100)}%; ${potential.confidence.toLowerCase()} confidence; method ${potential.methodVersion}. ${UNICORN_POTENTIAL_CAVEAT}`;
+  return (
+    [invWords, suit, unicorn].filter((part) => part !== null).join(". ") + "."
+  );
 }
 
 export function fitProfileText(

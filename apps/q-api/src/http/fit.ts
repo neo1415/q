@@ -63,16 +63,27 @@ export function registerFitRoutes(
 ): void {
   const withContext = requireActorContextHook(dependencies);
 
-  app.get(UNICORN_POTENTIAL_COMPANY_PATH, { onRequest: withContext }, async (request, reply) => {
-    void reply.header("Cache-Control", "no-store");
-    const companyId = UuidSchema.safeParse((request.params as Params).companyId);
-    if (!companyId.success) return reply.callNotFound();
-    const result = await dependencies.fit.profiles(getActorContext(request), [companyId.data]);
-    const value = result.kind === "OK" ? result.items[0]?.scores?.unicornPotential : undefined;
-    // No protected score, existence or history to a free or unrelated reader.
-    if (value === undefined) return reply.callNotFound();
-    return UnicornPotentialDtoSchema.parse(value);
-  });
+  app.get(
+    UNICORN_POTENTIAL_COMPANY_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      void reply.header("Cache-Control", "no-store");
+      const companyId = UuidSchema.safeParse(
+        (request.params as Params).companyId,
+      );
+      if (!companyId.success) return reply.callNotFound();
+      const result = await dependencies.fit.profiles(getActorContext(request), [
+        companyId.data,
+      ]);
+      const value =
+        result.kind === "OK"
+          ? result.items[0]?.scores?.unicornPotential
+          : undefined;
+      // No protected score, existence or history to a free or unrelated reader.
+      if (value === undefined) return reply.callNotFound();
+      return UnicornPotentialDtoSchema.parse(value);
+    },
+  );
 
   app.get(
     FIT_COMPANIES_PATH,

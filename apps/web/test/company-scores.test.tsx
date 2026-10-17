@@ -239,6 +239,50 @@ describe("score read authorization lifetime", () => {
     render(<Card />);
     await waitFor(() => expect(port).toHaveBeenCalledTimes(2));
   });
+  it("does not combine two authorized readers queued in the same tick", async () => {
+    const entitled = vi.fn((ids: readonly string[]) =>
+      Promise.resolve(
+        ids.map((companyId) => ({
+          companyId,
+          name: "Co",
+          line: null,
+          profile: {} as never,
+          scores: { ...scored, companyId },
+        })),
+      ),
+    );
+    const denied = vi.fn(() => Promise.resolve([]));
+    function Card({
+      port,
+      label,
+    }: {
+      readonly port: (
+        ids: readonly string[],
+      ) => Promise<readonly FitCompanyDto[]>;
+      readonly label: string;
+    }) {
+      const scores = useCompanyScores([COMPANY], { port });
+      return (
+        <div data-testid={label}>
+          {scores.has(COMPANY) ? "authorized score" : "no score"}
+        </div>
+      );
+    }
+    render(
+      <>
+        <Card port={entitled} label="entitled" />
+        <Card port={denied} label="denied" />
+      </>,
+    );
+    await waitFor(() => expect(entitled).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(denied).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByTestId("entitled").textContent).toBe(
+        "authorized score",
+      ),
+    );
+    expect(screen.getByTestId("denied").textContent).toBe("no score");
+  });
   it("does not attach a new reader to an earlier in-flight request", async () => {
     let finish: ((value: readonly FitCompanyDto[]) => void) | undefined;
     const earlier = vi.fn(

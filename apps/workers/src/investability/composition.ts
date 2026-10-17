@@ -99,6 +99,7 @@ export function composeInvestability(
     assess: assessUnicornPotential,
     methodVersion: UNICORN_POTENTIAL_METHOD_VERSION,
   });
+  let firstUnicornSweep = true;
   // Share the existing event routing and paced repair tick, never the feed read.
   // AllSettled lets either independent assessment progress if the other fails.
   return {
@@ -115,9 +116,11 @@ export function composeInvestability(
       sweep: async (options) => {
         const original = await investability.sweep(options);
         const extra = await unicorn.sweep({
-          limit: Math.min(options?.limit ?? 100, 100),
+          // One paced, bounded initial backfill; subsequent repairs rotate100.
+          limit: firstUnicornSweep ? 500 : Math.min(options?.limit ?? 100, 100),
           pauseMs: options?.pauseMs ?? 250,
         });
+        firstUnicornSweep = false;
         return {
           recorded: original.recorded + extra.recorded,
           unchanged: original.unchanged + extra.unchanged,

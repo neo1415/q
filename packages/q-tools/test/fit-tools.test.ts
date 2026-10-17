@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  UNICORN_PILLAR_IDS,
+  UnicornPotentialDtoSchema,
   MODEL_TOOL_RESULT_MAX_CHARS,
   fitScoreOutOf10,
 } from "@capital-q/contracts";
@@ -18,6 +20,7 @@ import {
   createQToolExecutor,
   createQToolRegistry,
   FitTopCandidatesOutputSchema,
+  FitProfileOutputSchema,
 } from "../src/index.js";
 import {
   actorA,
@@ -65,10 +68,23 @@ const snapshot = (stage: string): RecommendationFeatureSnapshot =>
   }) as unknown as RecommendationFeatureSnapshot;
 
 function tools(
-  options: { candidates?: readonly FitCandidate[]; investor?: boolean } = {},
+  options: {
+    candidates?: readonly FitCandidate[];
+    investor?: boolean;
+    premium?: () => boolean;
+    richSources?: boolean;
+  } = {},
 ) {
   const read: string[] = [];
   const fit = createFitService({
+    unicornPotential: (_actor, ids) =>
+      Promise.resolve(
+        new Map(
+          options.premium?.() === true
+            ? ids.map((id) => [id, potentialFixture(options.richSources)])
+            : [],
+        ),
+      ),
     investorSubject: {
       investorOrganisationFor: (actor) =>
         Promise.resolve(
@@ -136,7 +152,121 @@ const call = (name: string, args: Record<string, unknown>) => ({
   arguments: args,
 });
 
+function potentialFixture(richSources = false) {
+  const weights = [12, 14, 14, 12, 8, 9, 7, 6, 7, 4, 5, 2];
+  return UnicornPotentialDtoSchema.parse({
+    status: "SCORED",
+    overallScore: 50,
+    band: "DEVELOPING",
+    confidence: "LOW",
+    coverage: 1,
+    stage: "SEED",
+    methodVersion: "unicorn-potential.v1.0.0",
+    inputRulesVersion: "unicorn-potential-inputs.v1",
+    assessedAt: "2026-10-17T12:00:00Z",
+    pillars: UNICORN_PILLAR_IDS.map((id, i) => ({
+      id,
+      label: `Pillar ${id}`,
+      weight: weights[i],
+      grade: 2,
+      contribution: (weights[i] ?? 0) / 2,
+      coverage: 1,
+      criteria: ["A", "B"].map((criterion) => ({
+        id: criterion,
+        label: `Criterion ${criterion}`,
+        state: "OBSERVED",
+        grade: 2,
+        anchor: "Plausible limited evidence",
+        sources: Array.from(
+          { length: richSources ? 12 : 1 },
+          (_, sourceIndex) => ({
+            id: `${id}-${criterion}-${sourceIndex}`,
+            revision: "revision-1",
+            at: "2026-10-17T12:00:00Z",
+            kind: "CLAIM",
+            label: richSources
+              ? "A long synthetic unit-test claim ".repeat(8).slice(0, 200)
+              : "A synthetic unit-test claim",
+            truthClass: "USER_CLAIM",
+            evidenceStatus: "SELF_REPORTED",
+            visibilityScope: "network_visible",
+            lifecycleStatus: "CURRENT",
+          }),
+        ),
+      })),
+    })),
+    up: [],
+    down: [],
+    missing: [],
+    momentum: null,
+    benchmark: "Comparable benchmark unavailable",
+  });
+}
+
 describe("fit tools", () => {
+  it("returns the persisted third assessment and exact calculation inputs only while entitled", async () => {
+    let entitled = true;
+    const { port } = tools({ premium: () => entitled });
+    const invoke = () =>
+      port.execute(
+        call("fit_profile", { companyId: COMPANY_A }),
+        contextFor(actorB, investorPlan),
+      );
+    const allowed = await invoke();
+    expect(allowed.result).toMatchObject({
+      ok: true,
+      data: { scores: { unicornPotential: potentialFixture() } },
+    });
+    if (!allowed.result.ok) throw new Error("Expected authorized score");
+    expect(JSON.stringify(allowed.result.data).length).toBeLessThan(
+      MODEL_TOOL_RESULT_MAX_CHARS,
+    );
+    expect(allowed.result.data).toMatchObject({
+      text: expect.stringContaining("Unicorn Potential: 50/100"),
+      guidance: expect.stringContaining("not a probability"),
+    });
+    entitled = false;
+    const revoked = await invoke();
+    if (!revoked.result.ok) throw new Error("Expected denied-feature profile");
+    expect(
+      FitProfileOutputSchema.parse(revoked.result.data).scores,
+    ).not.toHaveProperty("unicornPotential");
+    const foreign = await port.execute(
+      call("fit_profile", { companyId: COMPANY_B_PRIVATE }),
+      contextFor(actorB, investorPlan),
+    );
+    if (!foreign.result.ok) throw new Error("Expected hidden-company result");
+    expect(
+      FitProfileOutputSchema.parse(foreign.result.data).scores,
+    ).toBeUndefined();
+  });
+
+  it("bounds a rich evidence set without changing any calculation input", async () => {
+    const { port } = tools({ premium: () => true, richSources: true });
+    const result = await port.execute(
+      call("fit_profile", { companyId: COMPANY_A }),
+      contextFor(actorB, investorPlan),
+    );
+    expect(result.result.ok).toBe(true);
+    if (!result.result.ok) throw new Error(result.failureCode);
+    const reading = FitProfileOutputSchema.parse(result.result.data);
+    expect(JSON.stringify(reading).length).toBeLessThanOrEqual(
+      MODEL_TOOL_RESULT_MAX_CHARS,
+    );
+    expect(
+      reading.scores?.unicornPotential?.pillars.map(
+        ({ weight, grade, contribution }) => [weight, grade, contribution],
+      ),
+    ).toEqual(
+      potentialFixture().pillars.map(({ weight, grade, contribution }) => [
+        weight,
+        grade,
+        contribution,
+      ]),
+    );
+    expect(reading.guidance).toContain("representative citation");
+    expect(reading.scores?.unicornPotential?.overallScore).toBe(50);
+  });
   it("are not offered where fit is not composed", () => {
     const registry = createQToolRegistry(createDefaultQTools(fakePorts({})));
     expect(registry.list().some((r) => r.versionId.startsWith("fit."))).toBe(

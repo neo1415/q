@@ -866,7 +866,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_MESSAGES_SUFFIX}`": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_CANCEL_SUFFIX}`": Q_TRANSPORT,
   // MATCH block (ADR 0052): fit with the reader's own mandate.
-  "q-api/http/fit.ts GET UNICORN_POTENTIAL_COMPANY_PATH": cap("tool.fit_profile"),
+  "q-api/http/fit.ts GET UNICORN_POTENTIAL_COMPANY_PATH":
+    cap("tool.fit_profile"),
   "q-api/http/fit.ts GET FIT_COMPANIES_PATH": cap("tool.fit_profile"),
   "q-api/http/fit.ts GET FIT_COMPANY_PATH": cap("tool.fit_profile"),
   "q-api/http/fit.ts GET FIT_Q_VIEW_PATH": cap("tool.fit_profile"),
