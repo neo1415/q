@@ -885,3 +885,7 @@ GateQ correction source merged f584f0bb with exact CI38520775540 fully green. Ho
 ## October14 cold-opening blocker
 
 Original fact correction is deployed23a65ce3 across four SUCCESS services and real first/second interview corrections/retry passed. Newly found cold opening500 is separate: seven-character historical opening key written to8–128-character legacy session slot after transcript commit. Source repair on codex/gateq-opening-cache-fix-oct14 preserves durable key and valid legacy fallback;121 tests/22pgTAP pass. ExactCI/release/fresh cold live acceptance pending. Design75 latestaac14fd0 fixes scoped lint and audit harness; fullCI pending, no production CRM.
+
+### Unicorn release continuation — 17 October, 22:33 UTC
+
+PR217 / `codex/unicorn-qfiles-oct17`: locale failure repaired; canonical structured-input repair and UUID/current-vs-historical source guard implemented. Full hosted461 audit, package/root/app gates, exact-head protected CI, normal integration/production gates, unapplied28200000+28201500,43scoped ACCESS grants, paced backfill and actual investor/founder desktop/mobile/Q/Discover/denial acceptance remain. No release claim; Home Q files/public web paused. See workstreams/UNICORN-QFILES-OCT17.md.

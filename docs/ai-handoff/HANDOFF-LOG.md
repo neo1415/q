@@ -805,3 +805,7 @@ Release AT (`9a25c149`) shipped the cards, memory and move fixes, and they were 
 - the dialog-state fix.
 
 Open items and every SHA: `docs/ai-handoff/Q-CONVERSATION-FIXES-2026-10-17.md`.
+
+## 17 October 2026, 22:33 UTC — PR217 release repair checkpoint
+
+Recovered latest PR21717ea9a33, preserved older overlapping WIP to pushed branches. Fixed locale gate and canonical structured evidence projection/mapping; added UUID-safe current-source authorization and separately authorized history. Targeted engine/repository and focused nativePG checks passed; full new protected CI and actual hosted461 audit remain pending. Production allfourSUCCESSa70e66a8; latest migration28190000; no Unicorn migration/grant/deployment performed.43existing-org plan reconstructed without widening signup/usage rules. Exact commits, migration/test limits and next gates recorded in workstreams/UNICORN-QFILES-OCT17.md. Continue this existing PR; do not merge preserved alternate foundations wholesale.
