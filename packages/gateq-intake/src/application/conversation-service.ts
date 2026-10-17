@@ -69,6 +69,17 @@ export type ConversationDependencies = {
   readonly intake: IntakeService;
   readonly interviewer: GateQInterviewer;
   readonly policies: BoundPolicyPort;
+  /**
+   * Which dimensions the gateway owner's active mandate emphasises, never
+   * its values. Absent, or failing, the interview falls back to the
+   * general investment assessment; it is never a reason to refuse a turn.
+   */
+  readonly investorEmphasisFor?:
+    | ((input: {
+        readonly tenantId: string;
+        readonly gatewayId: string;
+      }) => Promise<readonly ApplicationDimension[]>)
+    | undefined;
   /** The gateway as the world may see it. Never the private policy. */
   readonly publicGatewayFor: (
     gatewayId: string,
@@ -130,6 +141,7 @@ function historyFrom(stored: readonly StoredTurn[]): {
     readonly text: string;
   }[];
   readonly askedAlready: readonly ApplicationDimension[];
+  readonly askedCounts: ReadonlyMap<ApplicationDimension, number>;
   readonly tangents: number;
 } {
   const recentTurns = stored.slice(-RECENT_TURNS).map((turn) => ({
@@ -139,7 +151,14 @@ function historyFrom(stored: readonly StoredTurn[]): {
   // What Q actually asked about, in the order it first asked: not what
   // happens to be answered, which is a different list.
   const askedAlready: ApplicationDimension[] = [];
+  const askedCounts = new Map<ApplicationDimension, number>();
   for (const turn of stored) {
+    if (turn.role === "Q" && turn.askingDimension !== null) {
+      askedCounts.set(
+        turn.askingDimension,
+        (askedCounts.get(turn.askingDimension) ?? 0) + 1,
+      );
+    }
     if (
       turn.askingDimension !== null &&
       !askedAlready.includes(turn.askingDimension)
@@ -158,7 +177,7 @@ function historyFrom(stored: readonly StoredTurn[]): {
       break;
     }
   }
-  return { recentTurns, askedAlready, tangents };
+  return { recentTurns, askedAlready, askedCounts, tangents };
 }
 
 export function createConversationService(
@@ -169,6 +188,7 @@ export function createConversationService(
     interviewer,
     policies,
     publicGatewayFor,
+    investorEmphasisFor,
     turnMemory,
     turns,
     logger,
@@ -287,6 +307,13 @@ export function createConversationService(
         turns === undefined || claimId === null
           ? null
           : await turns.readOutcome(applicationId, claimId);
+      const emphasis =
+        cached !== null || investorEmphasisFor === undefined
+          ? []
+          : await investorEmphasisFor({
+              tenantId: guest.application.tenantId,
+              gatewayId: guest.application.gatewayId,
+            }).catch(() => []);
       const outcome =
         cached === null
           ? await interviewer.turn({
@@ -307,6 +334,8 @@ export function createConversationService(
               // has drifted; it decides how much of a person to be about it.
               tangents: history.tangents,
               askedAlready: history.askedAlready,
+              askedCounts: history.askedCounts,
+              emphasis,
               attribution: {
                 tenantId: guest.application.tenantId,
                 correlationId: input.correlationId,

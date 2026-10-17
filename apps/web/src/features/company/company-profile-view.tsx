@@ -461,6 +461,7 @@ export function CompanyProfileView({
           <FitPanelSlot
             companyId={profile.companyId}
             companyName={profile.canonicalName}
+            relationshipState={relationshipState}
           />
         </div>
       ) : null}

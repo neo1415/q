@@ -15,7 +15,7 @@ import { DEFAULT_BRAND_HEX, contrastRatio } from "./brand-colour";
  * any time" (founder, 2026-10-06).
  *
  * Black and gold is design B's brand board: warm ivory paper and near-black
- * in light, near-black and ivory in dark, a black menu bar in both, and
+ * in light, near-black and ivory in dark, a black menu bar in dark, and
  * gold used two ways. Gold is a fill or a deep bronze for text: classic
  * gold #C9A227 reads on black (8:1) but fails on white (2.4:1), so light
  * mode's accent is bronze #8A6A12 (5.1:1 on white) with #6E5410 for hover.
@@ -57,7 +57,7 @@ export const PRESET_TOKENS = [
 export type PresetToken = (typeof PRESET_TOKENS)[number];
 export type PresetMode = Readonly<Record<PresetToken, string>>;
 
-/** The menu bar: dark in both themes, so it has one palette. */
+/** The menu bar in the dark theme (light follows the page, owner 2026-10-17). */
 export type PresetChrome = {
   readonly surface: string;
   readonly subtle: string;
@@ -207,7 +207,7 @@ const HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/u;
 /**
  * The style sheet for a preset: its light and dark tokens with the same
  * selectors tokens.css uses (so it wins by source order), the dark menu
- * bar scoped to the sidebar and the tab bar in both themes, and the Q
+ * bar scoped to the sidebar and the tab bar in the dark theme, and the Q
  * stage. Empty for classic blue, and empty if any value is not a plain
  * hex: nothing but a colour ever reaches the style element.
  */
@@ -256,7 +256,10 @@ export function presetStyleSheet(preset: BrandPreset): string {
     `:root{${block(light)}${root}}`,
     `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${block(dark)}}}`,
     `:root[data-theme="dark"]{${block(dark)}}`,
-    `.cq-shell-sidebar,.cq-bottom-nav{${nav}}`,
+    // Dark theme only: in light mode a black menu bar beside the light page
+    // read as a bug, so the bar follows the page (owner 2026-10-17).
+    `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.cq-shell-sidebar,.cq-bottom-nav){${nav}}}`,
+    `:root[data-theme="dark"] :is(.cq-shell-sidebar,.cq-bottom-nav){${nav}}`,
   ].join("\n");
 }
 
