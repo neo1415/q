@@ -38,6 +38,7 @@ import {
   searchClaimableAction,
 } from "./gateq-actions";
 import { ErrorBlock, Skeleton, StateBlock } from "./gateq-chrome";
+import { GateqUnicornAssessment } from "./unicorn-assessment";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -130,6 +131,22 @@ export function FounderApplications({
           </span>
         </div>
       ) : null}
+      {Array.from(
+        new Map(
+          applications.flatMap((application) =>
+            application.unicornPotential === undefined
+              ? []
+              : [
+                  [
+                    application.unicornPotential.companyId,
+                    application.unicornPotential,
+                  ] as const,
+                ],
+          ),
+        ).values(),
+      ).map((value) => (
+        <GateqUnicornAssessment key={value.companyId} value={value} />
+      ))}
       <section className="gq-sect">
         <h2 className="cq-title-sm">{t("Your applications")}</h2>
         <ul className="gq-hair">

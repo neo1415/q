@@ -16,6 +16,8 @@ import {
   type GateqInboxView,
 } from "@capital-q/contracts";
 
+import { syntheticUnicornAssessment } from "./fixtures/unicorn-potential";
+
 const actions = vi.hoisted(() => ({
   archiveAction: vi.fn(),
   assignAction: vi.fn(),
@@ -238,6 +240,27 @@ afterEach(() => {
 });
 
 describe("the submitted investor brief", () => {
+  it("shows the authorized current assessment outside the immutable submitted brief", () => {
+    show({
+      unicornPotential: {
+        companyId: id(80),
+        assessment: syntheticUnicornAssessment,
+      },
+    });
+    const assessment = screen.getByTestId("gateq-unicorn-assessment");
+    const brief = screen.getByRole("region", {
+      name: "Submitted investment brief",
+    });
+    expect(assessment.textContent).toContain("Current company assessment");
+    expect(brief.contains(assessment)).toBe(false);
+    expect(assessment.querySelector("summary")?.textContent).toContain(
+      "50/100",
+    );
+  });
+  it("does not manufacture a score when the server omits the premium assessment", () => {
+    show();
+    expect(screen.queryByTestId("gateq-unicorn-assessment")).toBeNull();
+  });
   it("renders the immutable claims, evidence axes, contact, gaps and diligence questions without manufacturing Q synthesis", () => {
     show();
     const brief = screen.getByRole("region", {
