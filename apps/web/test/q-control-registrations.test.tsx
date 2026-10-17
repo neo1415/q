@@ -137,11 +137,13 @@ describe("Capital's tab bar (tab.*)", () => {
       "tab.plan",
       "tab.investors",
     ]);
-    expect(tabs[0]).toEqual({
+    expect(tabs[0]).toMatchObject({
       id: "tab.overview",
       kind: "TAB",
       state: "SELECTED",
     });
+    // Owner 2026-10-17: each tab carries its own visible name for Q's reader.
+    expect(tabs.every((c) => typeof c.label === "string")).toBe(true);
     expect(screen.getAllByRole("tab")).toHaveLength(6);
   });
 

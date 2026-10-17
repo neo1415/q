@@ -219,6 +219,8 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('q_runtime', 'daily_editions',           'RLS_REQUIRED',         '{SELECT}'),
   ('q_runtime', 'daily_cluster_issues',     'INTERNAL_SERVER_ONLY', '{}'),
   ('q_runtime', 'conversation_message_marks', 'INTERNAL_SERVER_ONLY', '{}'),
+  -- Owner live 2026-10-17: what Q fetched, kept for a conversation's follow-ups.
+  ('q_runtime', 'conversation_tool_results', 'INTERNAL_SERVER_ONLY', '{}'),
   ('network', 'commitments',                'RLS_REQUIRED',         '{SELECT}'),
   -- Post-meeting outcomes (2026-10-02): pass reasons are reference rows
   -- (spec 6.6.10); a pass is read by the investor side, and by the company

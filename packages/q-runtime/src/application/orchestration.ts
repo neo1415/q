@@ -14,6 +14,7 @@ import type {
   QRunHandle,
   QRunId,
   QSensitivityClass,
+  QPageManifest,
   QScreenContext,
   QSubjectRef,
   QViewingMoment,
@@ -184,7 +185,31 @@ export type QQuestionSequenceStep =
     }
   | { readonly kind: "STOPPED"; readonly topic: string };
 
+/**
+ * One result Q already fetched in this conversation (owner live
+ * 2026-10-17; q_runtime.conversation_tool_results): a successful read-only
+ * tool result an earlier run of the same owner received, after that tool's
+ * authorize step and output validation. Read back only for the owner, at
+ * or below the current run's sensitivity ceiling, newest first. Context
+ * for follow-ups, never authority: a tool still reads anything new.
+ */
+export type QConversationFetch = {
+  /** The run (turn) that fetched it. */
+  readonly runId: string;
+  readonly toolName: string;
+  readonly arguments: unknown;
+  readonly result: unknown;
+  readonly sensitivity: QSensitivityClass;
+  readonly fetchedAt: string;
+};
+
 export type QAnswerRequest = QOrchestrationSubjectContext & {
+  /**
+   * What earlier runs of this conversation fetched (QConversationFetch),
+   * read once per turn by the answer seam. Absent: none kept, or the
+   * store is not composed.
+   */
+  readonly fetchedInConversation?: readonly QConversationFetch[] | undefined;
   /**
    * The server-resolved actor the run belongs to, re-validated by the
    * engine on every (re)start. Tools authorise against it (CQ-Q-007); it
@@ -462,6 +487,12 @@ export type QPrereadInput = {
   readonly actor: ActorContext;
   readonly correlationId: string;
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Owner 2026-10-17 (TURN_READER v55): the page's own registered controls
+   * (ids, kinds, states, a tab's visible name), exactly what the firewall
+   * passes on in the plan's screen, so the early reading can choose one.
+   */
+  readonly screenControls?: QPageManifest["controls"] | undefined;
 };
 
 export function createUnconfiguredQAnswer(): QAnswerPort {

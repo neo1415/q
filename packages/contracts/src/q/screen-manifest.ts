@@ -321,7 +321,8 @@ export const QPageManifestSchema = z
     focus: QManifestRefSchema.optional(),
     /**
      * RECOVERY-2026-10: the controls Q may operate on this page now, by
-     * semantic id and kind (ui-act.ts). Ids only; never labels or values.
+     * semantic id and kind (ui-act.ts). Ids, never values; a tab carries
+     * its own visible name, letters only (owner 2026-10-17).
      */
     controls: z
       .array(QManifestControlSchema)

@@ -38,7 +38,7 @@ export const TURN_READER_V54: PromptDefinition<
 > = {
   ...TURN_READER_V53,
   version: 54,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Owner live 2026-10-17: SHOWN (Q's own earlier turns with the records, order and figures they showed, built by code) and fromShown, read from meaning, so a follow-up about what Q already said is answered from it with no lookup, and 'show them again' shows that turn's own cards. v53's rules unchanged.",
   effectiveFrom: "2026-10-17",

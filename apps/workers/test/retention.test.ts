@@ -19,6 +19,8 @@ type Call = { text: string; values: unknown[] };
 function fakeTransactions(options: {
   readonly locked: boolean;
   readonly deadThreads: string[];
+  /** Whether 20261228190000 (conversation_tool_results) is applied. */
+  readonly fetchedTable?: boolean;
 }): { transactions: TransactionManager; calls: Call[] } {
   const calls: Call[] = [];
   const sql = (strings: unknown, ...values: unknown[]) => {
@@ -28,6 +30,9 @@ function fakeTransactions(options: {
     calls.push({ text, values });
     if (text.includes("pg_try_advisory_xact_lock")) {
       return Promise.resolve([{ locked: options.locked }]);
+    }
+    if (text.includes("to_regclass")) {
+      return Promise.resolve([{ present: options.fetchedTable ?? true }]);
     }
     if (text.startsWith("select distinct c.thread_id")) {
       return Promise.resolve(
@@ -56,6 +61,7 @@ describe("retention (DEF-A9, F-D10)", () => {
       checkpointThreads: 0,
       checkpointRows: 0,
       voiceTurns: 0,
+      fetchedResults: 0,
     });
     expect(calls).toHaveLength(1);
   });
@@ -105,6 +111,36 @@ describe("retention (DEF-A9, F-D10)", () => {
       calls.some((c) => c.text.startsWith("delete from q_runtime.checkpoint")),
     ).toBe(false);
     expect(pass.voiceTurns).toBe(3);
+  });
+
+  it("deletes only expired fetched results, oldest expiry first, bounded", async () => {
+    const { transactions, calls } = fakeTransactions({
+      locked: true,
+      deadThreads: [],
+    });
+    const pass = await runRetentionPass({ transactions });
+    const fetched = calls.find((c) =>
+      c.text.startsWith("delete from q_runtime.conversation_tool_results"),
+    );
+    expect(fetched?.text).toContain("where expires_at < now()");
+    expect(fetched?.text).toContain("order by expires_at");
+    expect(fetched?.values).toEqual([RETENTION.fetchedResultsPerPass]);
+    expect(pass.fetchedResults).toBe(3);
+  });
+
+  it("before the fetched-results migration, the rest of the pass still runs", async () => {
+    const { transactions, calls } = fakeTransactions({
+      locked: true,
+      deadThreads: ["run-1"],
+      fetchedTable: false,
+    });
+    const pass = await runRetentionPass({ transactions });
+    expect(
+      calls.some((c) =>
+        c.text.includes("delete from q_runtime.conversation_tool_results"),
+      ),
+    ).toBe(false);
+    expect(pass).toMatchObject({ checkpointThreads: 1, fetchedResults: 0 });
   });
 
   it("never touches a run that could still resume", async () => {

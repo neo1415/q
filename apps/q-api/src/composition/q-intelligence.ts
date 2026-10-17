@@ -76,6 +76,10 @@ import { createAppActionArgumentReader } from "./app-action-arguments.js";
 import { createPostgresAwaitingActions } from "./awaiting-actions.js";
 import { createPostgresConversationCore } from "./conversation-core-state.js";
 import {
+  createPostgresConversationToolResults,
+  withKeptToolResults,
+} from "./conversation-tool-results.js";
+import {
   createOwnMandateReads,
   createWorkingSnapshots,
 } from "./working-snapshot.js";
@@ -317,12 +321,17 @@ export function composeQIntelligence(
     sql,
     transactions,
     repositories,
-    tools,
+    tools: composedTools,
     gateway,
     embeddings,
     statements,
     logger,
   } = dependencies;
+  // Owner live 2026-10-17: what Q fetched in a conversation, kept for its
+  // follow-ups (20261228190000). Every read below goes through this port,
+  // so whatever a run received is in the conversation's record next turn.
+  const fetchedStore = createPostgresConversationToolResults({ sql });
+  const tools = withKeptToolResults(composedTools, fetchedStore, logger);
 
   // Authorised hybrid retrieval (CQ-RAG-004). Lexical and semantic are
   // parallel components of one step, each already constrained in SQL by the
@@ -556,6 +565,7 @@ export function composeQIntelligence(
     coreState: createPostgresConversationCore({ sql: dependencies.sql }),
     // Owner live 2026-10-17: a follow-up about what Q already showed,
     // answered from the conversation's own record in one tool-free call.
+    conversationFetched: fetchedStore.recent,
     conversationRecall: createConversationRecall({
       gateway,
       ...(dependencies.dataPosture === undefined

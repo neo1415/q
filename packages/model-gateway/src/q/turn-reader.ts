@@ -4,14 +4,15 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV54ResultSchema,
+  TurnReaderV55ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
   type TurnReaderV40Result,
   type TurnReaderV54Result,
-  type TurnReaderV54Variables,
+  type TurnReaderV55Result,
+  type TurnReaderV55Variables,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError } from "../errors.js";
@@ -55,6 +56,12 @@ export type QTurnReader = {
           readonly area?: string | undefined;
         }[]
       | undefined;
+    /**
+     * v54 (owner 2026-10-17): the tabs and sections the page on screen
+     * registered (its manifest's controls, after the firewall), so the
+     * reader picks the one asked for by meaning.
+     */
+    readonly screenControls?: readonly ReaderScreenControl[] | undefined;
     readonly attribution: {
       readonly tenantId: string;
       readonly userId: string;
@@ -100,6 +107,8 @@ export type QTurnReading = Omit<
   readonly teamJob?: boolean | undefined;
   /** v52: they ask what to do next, what is missing, or how ready they are. */
   readonly nextSteps?: boolean | undefined;
+  /** v55: the page control (a listed id) they ask to open or show now. */
+  readonly control?: string | null | undefined;
   /** v54: the turn is answered by this earlier turn of Q's (SHOWN). */
   readonly fromShown?: TurnReaderV54Result["fromShown"] | undefined;
   /** v44: garbled spoken words, read by sound; null when read as written. */
@@ -243,9 +252,42 @@ export function readerActions(
 export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "tool",
   "moreDocuments",
+  "control",
   // v54: a malformed pointer back costs the pointer, never the reading.
   "fromShown",
 ];
+
+/** One control of the page on screen, as the reader is told of it (v55). */
+export type ReaderScreenControl = {
+  readonly id: string;
+  readonly kind: string;
+  readonly state?: string | undefined;
+  readonly label?: string | undefined;
+};
+
+/** Kinds the reader may choose: what a person opens or looks at. */
+const READER_CONTROL_KINDS: ReadonlySet<string> = new Set(["TAB", "SECTION"]);
+
+/**
+ * v54: the page's tabs and sections, one per line as
+ * "id (kind, visible name, state)"; "(none)" when it has none.
+ */
+export function readerScreenControls(
+  controls: readonly ReaderScreenControl[] | undefined,
+): string {
+  const lines = (controls ?? [])
+    .filter((control) => READER_CONTROL_KINDS.has(control.kind))
+    .slice(0, 48)
+    .map((control) => {
+      const parts = [
+        control.kind,
+        ...(control.label === undefined ? [] : [control.label.slice(0, 48)]),
+        ...(control.state === undefined ? [] : [control.state]),
+      ];
+      return `${control.id.slice(0, 80)} (${parts.join(", ")})`;
+    });
+  return lines.length === 0 ? "(none)" : lines.join("\n");
+}
 
 /** Said once after a refused reading: what to fix, never the reading. */
 export const TURN_READER_CORRECTION =
@@ -284,7 +326,7 @@ export function createQTurnReader(dependencies: {
         );
       }
       const variables: Omit<
-        TurnReaderV54Variables,
+        TurnReaderV55Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -301,11 +343,12 @@ export function createQTurnReader(dependencies: {
         // within TURN_READER_ACTIONS_MAX.
         actions: [...listed.listed],
         actionGroups: listed.groups,
+        screenControls: readerScreenControls(input.screenControls),
         // Bounded by the schema; the newest turns are kept by its builder.
         shown: (input.shown ?? "").slice(0, 9_000),
       };
       try {
-        const rendered = renderPrompt<TurnReaderV54Variables>(registry, {
+        const rendered = renderPrompt<TurnReaderV55Variables>(registry, {
           task: "TURN_READER",
           charter: "Q_SYSTEM",
           operatingMode: "ASSESSMENT",
@@ -316,8 +359,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV54Result>> =>
-          gateway.execute<TurnReaderV54Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV55Result>> =>
+          gateway.execute<TurnReaderV55Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               // A closed classification needs little thought; left unset, a
@@ -333,7 +376,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV54ResultSchema,
+              schema: TurnReaderV55ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -375,7 +418,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV54ResultSchema.safeParse(
+        const parsed = TurnReaderV55ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;
