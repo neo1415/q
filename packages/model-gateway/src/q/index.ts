@@ -825,7 +825,7 @@ export function shownContextNote(
 export function referencesNote(references: string): ModelMessage {
   return {
     role: "SYSTEM",
-    content: `WHAT THEY ARE POINTING AT (Capital Q bound their words to records they already saw on their screen or in your answers; use it rather than asking which one they mean, and read the record by its id with the right tool before saying anything about it): ${references.slice(0, 600)}`,
+    content: `WHAT THEY ARE POINTING AT (Capital Q bound their words to records they already saw on their screen or in your answers; use it rather than asking which one they mean; what you already said and showed about it is in WHAT YOU ALREADY SAID AND SHOWED, and only what that does not hold is read by its id with the right tool):${references.slice(0, 600)}`,
   };
 }
 
