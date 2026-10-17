@@ -699,3 +699,45 @@ export const TurnReaderV52ResultSchema = TurnReaderV49ResultSchema.extend({
   nextSteps: z.boolean().default(false),
 }).strict();
 export type TurnReaderV52Result = z.infer<typeof TurnReaderV52ResultSchema>;
+
+export const TURN_READER_V54_SCHEMA_VERSION = 54;
+
+/**
+ * v54 (owner live 2026-10-17, conversation 971c5a53): what Q already said
+ * and showed in this conversation, turn by turn, with the records' ids,
+ * names, order and figures (SHOWN, built by code from Q's own stored
+ * messages). "So what was the second one?" re-ran the fit ranking and
+ * answered with one card; "show me the cards again" opened the saved
+ * companies instead of the three Q had named. The reader now says, from
+ * meaning, when the turn is answered by an earlier turn of SHOWN: code then
+ * answers from that record with no lookup, or shows that turn's own
+ * blocks again. Null keeps every earlier route.
+ */
+export const TurnFromShownSchema = z
+  .object({
+    /** The SHOWN turn (its T number) the answer comes from. */
+    turn: z.number().int().min(1).max(12),
+    /** They ask to see again on screen what that turn showed. */
+    reshow: z.boolean().default(false),
+  })
+  .strict();
+export type TurnFromShown = z.infer<typeof TurnFromShownSchema>;
+
+export const TurnReaderV54ResultSchema = TurnReaderV52ResultSchema.extend({
+  fromShown: TurnFromShownSchema.nullable().default(null),
+}).strict();
+export type TurnReaderV54Result = z.infer<typeof TurnReaderV54ResultSchema>;
+
+/** v54: SHOWN, Capital Q's record of its own earlier turns, built by code. */
+export const TurnReaderV54VariablesSchema = TurnReaderV7VariablesSchema.extend({
+  shown: z.string().max(9_000).default(""),
+}).strict();
+export type TurnReaderV54Variables = z.infer<
+  typeof TurnReaderV54VariablesSchema
+>;
+
+/** SHOWN carries names and words from records: data, fenced like the turns. */
+export const TURN_READER_V54_UNTRUSTED = [
+  ...TURN_READER_UNTRUSTED,
+  "shown",
+] as const;
