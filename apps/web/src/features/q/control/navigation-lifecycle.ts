@@ -1,6 +1,12 @@
 import { validateRoute, redirectedTo } from "./app-routes";
-import { controlOf } from "./registry";
-import { currentRoute } from "./route-state";
+import {
+  actionable,
+  controlOf,
+  registeredControlIds,
+  stateElement,
+  stateOf,
+} from "./registry";
+import { currentRoute, routeOfHref } from "./route-state";
 import { hardLoadUnlessVoice, routerNow, withRouter } from "./router-registry";
 
 /**
@@ -100,13 +106,23 @@ export type NavigationHandle = {
 export const NAVIGATION_WAIT_MS = 20_000;
 /** Not there by now: the push is made once more (a dropped transition). */
 export const NAVIGATION_RETRY_MS = 2_500;
+/**
+ * Still not there (a transition the router dropped twice, or one stuck
+ * behind a prefetch that never answered): the last push.
+ */
+export const NAVIGATION_LATE_RETRY_MS = 8_000;
+/** A tab of the page itself, clicked: how long its shallow move may take. */
+export const TAB_SETTLE_MS = 1_500;
 /** No router registered yet: how long a move waits for one. */
 export const ROUTER_WAIT_MS = 2_000;
 /** A named control on the new page: how long it may take to register. */
 export const CONTROL_WAIT_MS = 4_000;
 const POLL_MS = 50;
-/** The first push and one more for a dropped transition; never a loop. */
-const MAX_PUSHES = 2;
+/**
+ * The first push, one more for a dropped transition, and a last one late;
+ * never a loop.
+ */
+const MAX_PUSHES = 3;
 const LEDGER_MAX = 32;
 
 /** The not-found page's marker (app/not-found.tsx). */
@@ -427,6 +443,29 @@ function execute(entry: Entry): void {
     if (landed !== null) verify(entry, landed);
     else fail(entry, "NOT_LANDED");
   });
+  watchPageRewrites();
+  // Owner 2026-10-17 ("open the data room" was slow): a tab of the page on
+  // screen is opened by its own registered control -- the click a person
+  // makes, a shallow move with nothing fetched -- never a router push that
+  // renders the whole page again on the server (1.2 s hosted). Verified
+  // the same way, by the route the router settles on.
+  const tab = pageTabTo(expected);
+  if (tab !== null) {
+    entry.pushedAt ??= now();
+    tab.click();
+    later(entry, TAB_SETTLE_MS, () => {
+      if (!terminal(entry.state.phase) && !entry.verifying) {
+        pushThroughRouter(entry);
+      }
+    });
+    return;
+  }
+  pushThroughRouter(entry);
+}
+
+/** Through the client router: pushed, then pushed again (bounded) if dropped. */
+function pushThroughRouter(entry: Entry): void {
+  const { expected } = entry.state;
   const cancel = withRouter(ROUTER_WAIT_MS, (push) => {
     if (terminal(entry.state.phase)) return;
     if (push === null) {
@@ -450,11 +489,91 @@ function execute(entry: Entry): void {
     pushOnce();
     // A transition the router dropped (a page rewriting its own URL while
     // the move was on its way) never lands: pushed once more, not reported.
-    // Usually that is seen at once (another route commits: noteRoute); the
-    // timer covers a drop nothing reports.
-    later(entry, NAVIGATION_RETRY_MS, () => entry.repush?.());
+    // Usually that is seen at once (another route commits: noteRoute, or
+    // the page's own history call: watchPageRewrites); the timers cover a
+    // drop nothing reports.
+    later(entry, NAVIGATION_RETRY_MS, () => {
+      if (entry.pushed === 1) entry.repush?.();
+    });
+    later(entry, NAVIGATION_LATE_RETRY_MS, () => entry.repush?.());
   });
   entry.cancels.push(cancel);
+}
+
+/**
+ * The registered tab on this page whose own link goes exactly to
+ * `expected` (same path, same query), or null. Only a tab of the page on
+ * screen: a tab bar whose links leave the page is moved by the router.
+ */
+function pageTabTo(expected: string): HTMLElement | null {
+  if (typeof window === "undefined") return null;
+  const here = window.location.pathname.replace(/\/+$/u, "") || "/";
+  for (const id of registeredControlIds()) {
+    const entry = controlOf(id);
+    if (entry?.kind !== "TAB") continue;
+    const element = entry.element();
+    if (element === null || !element.isConnected) continue;
+    const link = actionable(element);
+    if (!(link instanceof HTMLAnchorElement) || link.href === "") continue;
+    const route = routeOfHref(link.href);
+    if (route === null) continue;
+    const path = route.split("?")[0]?.replace(/\/+$/u, "") || "/";
+    if (path !== here) continue;
+    if (!routesMatch(expected, route) || !routesMatch(route, expected)) {
+      continue;
+    }
+    // Already the open tab, yet the URL differs: the router decides.
+    if (stateOf("TAB", stateElement("TAB", element)) === "SELECTED") {
+      continue;
+    }
+    return link;
+  }
+  return null;
+}
+
+/** History state the app router writes for itself (its own commits). */
+function routerOwnState(data: unknown): boolean {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    ("__NA" in data || "_N" in data)
+  );
+}
+
+let watchingRewrites = false;
+
+/**
+ * Owner 2026-10-17 (moves from pages other than Home "sometimes don't
+ * happen"; hosted receipts: /work rendered on the server twice, then
+ * NOT_LANDED 20 s later). A page's own `history.replaceState` /
+ * `pushState` with a URL while Q's push is on its way (a dialog closing
+ * clears its #hash) makes the app router restore that URL and discard the
+ * push -- with no new route to report it, so nothing noticed until the
+ * timed retry, and a second drop ended the move. The page's own history
+ * call is now the sign: the move is pushed again at once (bounded).
+ * The router's own commits carry its state and are not counted.
+ */
+function watchPageRewrites(): void {
+  if (watchingRewrites || typeof window === "undefined") return;
+  watchingRewrites = true;
+  const history = window.history;
+  for (const method of ["pushState", "replaceState"] as const) {
+    // Whatever is installed now (the app router's own patch) still runs.
+    const original = history[method].bind(history);
+    history[method] = (
+      data: unknown,
+      unused: string,
+      url?: string | URL | null,
+    ): void => {
+      original(data, unused, url);
+      if (url === undefined || url === null || routerOwnState(data)) return;
+      const entry = active;
+      if (entry === null || entry.pushed === 0) return;
+      setTimeout(() => {
+        if (active === entry) entry.repush?.();
+      }, 0);
+    };
+  }
 }
 
 function remember(entry: Entry): void {
