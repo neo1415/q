@@ -21,7 +21,11 @@ import type { DiscoveredCompanyDto } from "@capital-q/contracts";
 
 type ActionResult<T> =
   | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly message: string };
+  | {
+      readonly ok: false;
+      readonly message: string;
+      readonly code?: "PREMIUM_REQUIRED";
+    };
 
 const loadSlatePageAction =
   vi.fn<
@@ -276,6 +280,30 @@ describe("Discover with filters", () => {
     await waitFor(() =>
       expect(loadSlatePageAction).toHaveBeenLastCalledWith(null, null),
     );
+  });
+
+  it("explains a server premium refusal and clears filters back to recommendations", async () => {
+    window.localStorage.setItem(
+      STORED,
+      JSON.stringify({
+        ...model.NO_DISCOVER_FILTERS,
+        unicornPotentialSort: true,
+      }),
+    );
+    loadSlatePageAction.mockResolvedValueOnce({
+      ok: false,
+      code: "PREMIUM_REQUIRED",
+      message: "Unicorn Potential filters require premium investor access.",
+    });
+    render(<InvestorFeedScreen sectors={SECTORS} />);
+    await screen.findByRole("heading", {
+      name: "Premium investor access required",
+    });
+    expect(screen.queryByText("No companies match these filters.")).toBeNull();
+    expect(screen.queryByText("Discover couldn't load.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await screen.findByRole("heading", { name: "Company 1" });
+    expect(loadSlatePageAction).toHaveBeenLastCalledWith(null, null);
   });
 
   it("a card the filters could not check says which, and stays", async () => {

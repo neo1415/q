@@ -3,6 +3,7 @@
 import { z } from "zod";
 
 import {
+  ApiProblemError,
   discoverCompanies,
   listNetworkPitches,
   listYourCompanies,
@@ -40,7 +41,11 @@ import { getSessionAccessToken } from "@/auth/session";
 
 export type FeedActionResult<T> =
   | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly message: string };
+  | {
+      readonly ok: false;
+      readonly message: string;
+      readonly code?: "PREMIUM_REQUIRED";
+    };
 
 const CursorInput = z.string().min(1).max(200);
 const CompanyIdInput = z.string().uuid();
@@ -92,7 +97,19 @@ export async function loadSlatePageAction(
       ...(filters === null ? {} : { filters: filters.data }),
     });
     return { ok: true, value: slate };
-  } catch {
+  } catch (error: unknown) {
+    if (
+      error instanceof ApiProblemError &&
+      error.status === 403 &&
+      filters !== null &&
+      (filters.data.unicornPotentialMin !== undefined ||
+        filters.data.unicornPotentialSort === true)
+    )
+      return {
+        ok: false,
+        code: "PREMIUM_REQUIRED",
+        message: "Unicorn Potential filters require premium investor access.",
+      };
     // The message is deliberately plain: a failed page is not a verdict on
     // the reader's mandate, and saying so avoids implying it is.
     return { ok: false, message: "Discover could not load right now." };
