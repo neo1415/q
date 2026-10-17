@@ -522,12 +522,22 @@ export function unrecordedStatedIn(
     readonly steps: readonly {
       readonly stepKey: string;
       readonly status: string;
+      /** Another step of its concept family holds the answer (G). */
+      readonly coveredBy?: string | undefined;
     }[];
   },
   stated: ReadonlySet<string>,
 ): string[] {
+  // A step its family already answers ("we never do gambling or tobacco"
+  // saved as what they avoid) is not unsaved (live AP: a whole model round
+  // to put the same exclusions under a third key).
   return [...stated].filter((key) =>
-    now.steps.some((row) => row.stepKey === key && row.status === "OPEN"),
+    now.steps.some(
+      (row) =>
+        row.stepKey === key &&
+        row.status === "OPEN" &&
+        row.coveredBy === undefined,
+    ),
   );
 }
 
@@ -1719,7 +1729,12 @@ export function createInterviewAgent(
         const recordedNow = new Set(port.recorded());
         const answered = new Set(
           state.steps
-            .filter((row) => row.status !== "OPEN")
+            .filter(
+              (row) =>
+                row.status !== "OPEN" ||
+                // Covered by its family's answer: nothing left to save.
+                row.coveredBy !== undefined,
+            )
             .map((row) => row.stepKey),
         );
         if (
@@ -1743,10 +1758,20 @@ export function createInterviewAgent(
         ) {
           return null;
         }
-        const results = actions.flatMap((action) => {
+        // Each step's latest outcome: an answer refused in one round and
+        // saved later in the turn (by code or the model) is saved (live AP:
+        // a refused amount, then saved by code, kept the model writing for
+        // three more rounds).
+        const latestByStep = new Map<string, OnboardingRecordResult>();
+        for (const action of actions) {
           const parsed = RecordedResultsSchema.safeParse(action.result);
-          return parsed.success ? parsed.data.results : [];
-        });
+          if (!parsed.success) continue;
+          for (const result of parsed.data.results) {
+            latestByStep.delete(result.stepKey);
+            latestByStep.set(result.stepKey, result);
+          }
+        }
+        const results = [...latestByStep.values()];
         const flow = flowFor(state);
         if (flow.next === null || flow.next.confirming) return null;
         const profile = coverageProfileFor(input.journeyType);
