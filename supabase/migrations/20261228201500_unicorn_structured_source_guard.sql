@@ -26,7 +26,9 @@ language sql stable set search_path = '' as $eligibility$
                   and old.lifecycle_status = o->'source'->>'lifecycleStatus'
                   and case when (o->'source'->>'revision') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
                     then old.id::text = lower(o->'source'->>'revision')
-                    else pg_catalog.pg_input_is_valid(o->'source'->>'revision', 'timestamp with time zone') end)
+                    when pg_catalog.pg_input_is_valid(o->'source'->>'revision', 'timestamp with time zone')
+                    then q.asserted_at = (o->'source'->>'revision')::timestamptz
+                    else false end)
               else q.lifecycle_status <> 'SUPERSEDED'
                 and (q.valid_from is null or q.valid_from <= pg_catalog.statement_timestamp())
                 and (q.valid_to is null or q.valid_to > pg_catalog.statement_timestamp())
@@ -57,7 +59,10 @@ language sql stable set search_path = '' as $eligibility$
               and old.company_id = c.id and old.tenant_id = c.tenant_id
               and d.owner_kind = 'ORGANISATION' and d.document_type = 'PITCH_DECK' and d.status = 'ACTIVE'
               and v.malware_scan_status <> 'BLOCKED' and current_v.malware_scan_status <> 'BLOCKED'
-              and (e.level = 'PUBLIC' or d.download_audience = 'INVESTORS'))
+              and (e.level = 'PUBLIC' or d.download_audience = 'INVESTORS')
+              and coalesce((select latest.action from evidence.deck_section_reviews latest
+                where latest.extraction_id = old.id and latest.section = split_part(o->'source'->>'id', ':', 2)
+                order by latest.created_at desc, latest.id desc limit 1), '') <> 'DISMISS')
             else exists (
             select 1 from lateral (
               select d.id, d.current_version_id, d.download_audience, e.level
@@ -72,6 +77,9 @@ language sql stable set search_path = '' as $eligibility$
               order by x.prompt_version desc, x.reading_number desc, x.created_at desc limit 1) x on true
             where x.id::text = split_part(o->'source'->>'id', ':', 1)
               and (d.level = 'PUBLIC' or d.download_audience = 'INVESTORS')
+              and coalesce((select latest.action from evidence.deck_section_reviews latest
+                where latest.extraction_id = x.id and latest.section = split_part(o->'source'->>'id', ':', 2)
+                order by latest.created_at desc, latest.id desc limit 1), '') <> 'DISMISS'
               and not exists (select 1 from evidence.deck_section_reviews v where v.extraction_id = x.id and v.created_at > r.assessed_at)
               and not exists (select 1 from evidence.deck_extraction_confirmations v where v.extraction_id = x.id and v.created_at > r.assessed_at)) end
           else false end, false))

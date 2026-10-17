@@ -90,11 +90,11 @@ create table evidence.claims(id uuid primary key,tenant_id uuid,subject_type tex
 create table evidence.claim_revisions(id uuid primary key,tenant_id uuid,claim_id uuid,revision_number integer,statement text,structured_value jsonb,truth_class text,evidence_status text,lifecycle_status text,changed_by_type text,changed_by_id uuid,change_reason text,valid_to timestamptz);
 create table core.founder_background_entries(id uuid,user_id uuid,tenant_id uuid,title text,detail text,supporting_document_id uuid,visibility_scope text);
 create table core.company_members(user_id uuid,tenant_id uuid,company_id uuid,is_founder boolean,is_current boolean);
-create table evidence.documents(id uuid,company_id uuid,tenant_id uuid,current_version_id uuid,owner_kind text,document_type text,status text,download_audience text,updated_at timestamptz);
-create table evidence.document_versions(id uuid,tenant_id uuid,malware_scan_status text);
+create table evidence.documents(id uuid,company_id uuid,tenant_id uuid,current_version_id uuid,owner_kind text default 'ORGANISATION',document_type text,status text default 'ACTIVE',download_audience text,updated_at timestamptz default clock_timestamp(),owner_organisation_id uuid,title text,created_by_user_id uuid);
+create table evidence.document_versions(id uuid,tenant_id uuid,malware_scan_status text,document_id uuid,version_number integer,storage_bucket text,storage_key text,original_filename text,mime_type text,size_bytes bigint,sha256 text,uploaded_by_user_id uuid);
 create table evidence.data_room_entries(document_id uuid,level text);
-create table evidence.deck_extractions(id uuid,tenant_id uuid,document_id uuid,company_id uuid,document_version_id uuid,prompt_version integer,reading_number integer,created_at timestamptz);
-create table evidence.deck_section_reviews(extraction_id uuid,created_at timestamptz);
+create table evidence.deck_extractions(id uuid,tenant_id uuid,document_id uuid,company_id uuid,document_version_id uuid,prompt_version integer,reading_number integer default 1,created_at timestamptz default clock_timestamp(),schema_version integer,sections jsonb);
+create table evidence.deck_section_reviews(id uuid,tenant_id uuid,extraction_id uuid,created_at timestamptz default clock_timestamp(),section text,action text,correction text,reviewed_by_user_id uuid);
 create table evidence.deck_extraction_confirmations(extraction_id uuid,created_at timestamptz);
 `);
 const root = new URL("../../../../", import.meta.url);
