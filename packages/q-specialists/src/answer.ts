@@ -98,8 +98,11 @@ import {
 } from "@capital-q/q-tools";
 import {
   asksForOwnMandate,
+  conversationContextOf,
   ownInvestorOrganisationIn,
   reRenderAskOf,
+  reshownBlocks,
+  shownTurnOf,
   withoutStatusTalk,
 } from "@capital-q/model-gateway/q";
 import {
@@ -290,7 +293,7 @@ export type PageControlChoice = ControlBinding & {
 };
 
 /**
- * v54: the control the reader chose, when the page listed it and it is a
+ * v55: the control the reader chose, when the page listed it and it is a
  * tab (selected) or a section (shown). Null for anything else.
  */
 export function pageControlChosen(
@@ -455,6 +458,9 @@ export function namedInWords(utterance: string, name: string): boolean {
   return false;
 }
 
+/** Said when an earlier turn's own blocks are shown again (v54 fromShown). */
+export const RESHOWN_LINE = "Here's what I showed you, back on screen.";
+
 /** Two summaries of one card: the same words, ignoring case and the full stop. */
 function sameCard(a: string, b: string): boolean {
   const plain = (text: string) =>
@@ -480,7 +486,7 @@ function turnReaderInput(
    * read as the last recent turn so "that one" and "try again" bind.
    */
   note: string | null = null,
-  /** v54: the page's own registered controls (the firewall's manifest). */
+  /** v55: the page's own registered controls (the firewall's manifest). */
   screenControls?: QPageManifest["controls"],
 ) {
   // Spoken turns carry the recogniser's utterance; typed ones never do.
@@ -489,6 +495,9 @@ function turnReaderInput(
   return {
     utterance: latest.content,
     actions,
+    // v54: what Q already said and showed here, so the reader binds "the
+    // second one" or "show them again" by meaning to an earlier turn.
+    shown: conversationContextOf(history, latest.id).text,
     recentTurns: [
       ...history
         .filter((m) => m.id !== latest.id)
@@ -628,6 +637,29 @@ export type SpecialistQAnswerDependencies = {
    * tool-free call (model-gateway createSmallTalkReply). Null: the full
    * path answers it. Absent: small talk takes the full path, as before.
    */
+  /**
+   * Owner live 2026-10-17: a follow-up the turn reader found answered by
+   * an earlier turn of Q's in this conversation (v54 fromShown), answered
+   * from that record in one tool-free call (model-gateway
+   * createConversationRecall). Null: the record does not hold the answer,
+   * and the full path looks it up. Absent: the full path, as before.
+   */
+  readonly conversationRecall?:
+    | ((
+        request: QAnswerRequest,
+        input: {
+          readonly said: string;
+          readonly recent: readonly {
+            readonly role: "USER" | "Q";
+            readonly text: string;
+          }[];
+          /** Capital Q's record of Q's own earlier turns (conversationContextOf). */
+          readonly shown: string;
+          /** The T number of SHOWN the reading pointed at. */
+          readonly turn: number;
+        },
+      ) => Promise<string | null>)
+    | undefined;
   readonly smallTalk?:
     | ((
         request: QAnswerRequest,
@@ -3240,6 +3272,8 @@ export function createSpecialistQAnswer(
     }
     // What Q showed and last did, for "that one" and "try again".
     const shown = shownItems(history);
+    // Owner live 2026-10-17: Q's own earlier turns, with what they showed.
+    const context = conversationContextOf(history, latest.id);
     const lastAction = lastActed.get(conversationId) ?? null;
     // RECOVERY-2026-10 B6: what the words point at ("the second one", "not
     // that investor, the second one", "compare those two", "go back…",
@@ -3562,7 +3596,15 @@ export function createSpecialistQAnswer(
         }
       }
       // Never past a change waiting on their word: a yes is not a list.
-      if (lane !== null && !(await waitingOnThem())) {
+      // Never before the full reading once Q has shown something here:
+      // the skim reads two turns of text, and "what was the second one?"
+      // after a list is a follow-up the reading answers from SHOWN, not
+      // a new ranking (owner live 2026-10-17).
+      if (
+        lane !== null &&
+        !context.turns.some((turn) => turn.blocks.length > 0) &&
+        !(await waitingOnThem())
+      ) {
         speculative.current?.cancel("KIND");
         readerAbort.abort();
         logger?.info(
@@ -3781,6 +3823,70 @@ export function createSpecialistQAnswer(
           };
     }
     unclearInARow.delete(conversationId);
+    // Owner live 2026-10-17 (conversation 971c5a53): the reader found the
+    // turn answered by one of Q's own earlier turns here (v54 fromShown).
+    // "Show me the cards again" shows that turn's own blocks -- the same
+    // records in the same order, never another list (it had opened the
+    // saved companies) -- and "what was the second one?" is answered from
+    // that record with no ranking, lookup or tool call. Only what this
+    // person was already shown, on their own conversation; a request to
+    // act, or a reading the record cannot answer, takes the path below.
+    const fromShown = read?.fromShown ?? null;
+    const shownTurn =
+      fromShown === null ? null : shownTurnOf(context, fromShown.turn);
+    if (
+      read !== null &&
+      fromShown !== null &&
+      shownTurn !== null &&
+      read.confidence !== "LOW" &&
+      !sequences.has(conversationId)
+    ) {
+      const asksToAct =
+        appActionOf(read) !== null ||
+        (typeof read.askedAction === "string" && read.askedAction.length > 0) ||
+        (read.handOver ?? null) !== null ||
+        read.teamJob === true;
+      const blocks = reshownBlocks(shownTurn);
+      if (fromShown.reshow && !asksToAct && blocks.length > 0) {
+        speculative.current?.cancel("ACTED");
+        logger?.info(
+          {
+            qRunId: request.runId,
+            turn: fromShown.turn,
+            blocks: blocks.length,
+          },
+          "q showed an earlier turn's own blocks again",
+        );
+        return recordAnswer(request, conversationId, RESHOWN_LINE, blocks);
+      }
+      if (
+        !fromShown.reshow &&
+        !asksToAct &&
+        (read.tool ?? null) === null &&
+        dependencies.conversationRecall !== undefined
+      ) {
+        const said = await dependencies.conversationRecall(request, {
+          said: latest.content,
+          recent: history
+            .filter((m) => m.id !== latest.id)
+            .slice(-6)
+            .map((m) => ({
+              role: m.role === "USER" ? ("USER" as const) : ("Q" as const),
+              text: m.content,
+            })),
+          shown: context.text,
+          turn: fromShown.turn,
+        });
+        if (said !== null) {
+          speculative.current?.cancel("ACTED");
+          logger?.info(
+            { qRunId: request.runId, turn: fromShown.turn },
+            "q answered a follow-up from what it already said",
+          );
+          return recordAnswer(request, conversationId, said);
+        }
+      }
+    }
     // RECOVERY B5 (audit B-05): small talk is one short tool-free call,
     // never the analyst with its prefetch and ~127 tools. Not when the turn
     // is about a record, a series is in hand, or the reading is a guess;

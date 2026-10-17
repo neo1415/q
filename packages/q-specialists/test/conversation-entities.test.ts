@@ -587,7 +587,7 @@ const chose = (control: string | null): QTurnReading => ({
   control,
 });
 
-describe("TURN_READER v54: the tab the reader chose, worked by code", () => {
+describe("TURN_READER v55: the tab the reader chose, worked by code", () => {
   it.each([
     // Garbled speech no word rule reads (live 2026-10-17 09:16).
     [
@@ -633,6 +633,58 @@ describe("TURN_READER v54: the tab the reader chose, worked by code", () => {
         ),
       ).toBe(false);
     }
+  });
+
+  // Production AT, run 5553724c: on Basketari's profile with the Data room
+  // open, "now the pitch deck" was read as making a deck ("Which company
+  // should the deck be about?") and nothing moved. With the page's tabs
+  // in the reading, its Pitch deck tab is selected, and no deck is made.
+  it("'now the pitch deck' with the Data room open selects the Pitch deck tab, never makes a deck", async () => {
+    const page: QPageManifest = {
+      ...PROFILE_PAGE,
+      controls: [
+        { id: "tab.overview", kind: "TAB", label: "Overview" },
+        {
+          id: "tab.dataroom",
+          kind: "TAB",
+          state: "SELECTED",
+          label: "Data room",
+        },
+        { id: "tab.deck", kind: "TAB", label: "Pitch deck" },
+      ],
+    };
+    const run = seam([], chose("tab.deck"));
+    const last = await run.say("now the pitch deck", page);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.content).toBe("Opening Pitch deck.");
+    expect(last?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: expect.objectContaining({
+          kind: "UI_ACT",
+          act: "SELECT_TAB",
+          target: "tab.deck",
+        }) as unknown,
+      },
+    ]);
+    expect(run.shownControls.at(-1)).toEqual(page.controls);
+  });
+
+  // Production AT: "open the data room" missed the fast lane and ran a full
+  // Q run (1.6 s). With the page's tabs in the reading it is SELECT_TAB.
+  it("'open the data room' on the profile is SELECT_TAB on its Data room tab", async () => {
+    const run = seam([], chose("tab.dataroom"));
+    const last = await run.say("open the data room", PROFILE_PAGE);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: expect.objectContaining({
+          act: "SELECT_TAB",
+          target: "tab.dataroom",
+        }) as unknown,
+      },
+    ]);
   });
 
   it("no control chosen: answered as before", async () => {

@@ -402,9 +402,18 @@ export {
   TurnReaderV52ResultSchema,
   type TurnReaderV52Result,
   TURN_READER_V54_SCHEMA_VERSION,
+  TURN_READER_V54_UNTRUSTED,
+  TURN_READER_V55_SCHEMA_VERSION,
+  TURN_READER_V55_UNTRUSTED,
+  TurnReaderV55ResultSchema,
+  TurnReaderV55VariablesSchema,
+  type TurnReaderV55Result,
+  type TurnReaderV55Variables,
+  TurnFromShownSchema,
+  type TurnFromShown,
   TurnReaderV54ResultSchema,
-  TurnReaderV54VariablesSchema,
   type TurnReaderV54Result,
+  TurnReaderV54VariablesSchema,
   type TurnReaderV54Variables,
   type TurnReference,
   type TurnReferenceOpenKind,
@@ -1454,6 +1463,16 @@ export {
 } from "./prompts/tasks/spoken-reply.v1.js";
 export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
 export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
+export { CONVERSATION_RECALL_V1 } from "./prompts/tasks/conversation-recall.v1.js";
+export {
+  CONVERSATION_RECALL_SCHEMA_NAME,
+  CONVERSATION_RECALL_SCHEMA_VERSION,
+  CONVERSATION_RECALL_UNTRUSTED,
+  ConversationRecallResultSchema,
+  ConversationRecallVariablesSchema,
+  type ConversationRecallResult,
+  type ConversationRecallVariables,
+} from "./prompts/schemas/conversation-recall.js";
 export { TURN_SKIM_V1 } from "./prompts/tasks/turn-skim.v1.js";
 export { TURN_SKIM_V2 } from "./prompts/tasks/turn-skim.v2.js";
 export { TURN_SKIM_V3 } from "./prompts/tasks/turn-skim.v3.js";
@@ -1619,8 +1638,12 @@ export {
 } from "./prompts/tasks/turn-reader.v53.js";
 export {
   TURN_READER_V54,
-  V54_SCREEN_CONTROLS,
+  V54_FROM_SHOWN,
 } from "./prompts/tasks/turn-reader.v54.js";
+export {
+  TURN_READER_V55,
+  V55_SCREEN_CONTROLS,
+} from "./prompts/tasks/turn-reader.v55.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 
 export {

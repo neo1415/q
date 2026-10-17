@@ -464,7 +464,7 @@ export type QPrereadInput = {
   readonly correlationId: string;
   readonly signal?: AbortSignal | undefined;
   /**
-   * Owner 2026-10-17 (TURN_READER v54): the page's own registered controls
+   * Owner 2026-10-17 (TURN_READER v55): the page's own registered controls
    * (ids, kinds, states, a tab's visible name), exactly what the firewall
    * passes on in the plan's screen, so the early reading can choose one.
    */

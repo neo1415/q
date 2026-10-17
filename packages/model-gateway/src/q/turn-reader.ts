@@ -4,14 +4,15 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV54ResultSchema,
+  TurnReaderV55ResultSchema,
   type PromptRegistry,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
   type TurnReaderV40Result,
   type TurnReaderV54Result,
-  type TurnReaderV54Variables,
+  type TurnReaderV55Result,
+  type TurnReaderV55Variables,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError } from "../errors.js";
@@ -34,6 +35,12 @@ export type QTurnReader = {
       readonly text: string;
     }[];
     readonly modality: "VOICE" | "TEXT";
+    /**
+     * v54: Capital Q's record of what Q already said and showed in this
+     * conversation (`conversationContextOf`), built by code from the
+     * conversation's own stored messages. Empty: nothing shown yet.
+     */
+    readonly shown?: string | undefined;
     /**
      * The other actions this run can take, from what is offered: a request
      * for one of them is never read as a document (founder live, BIZ-004).
@@ -100,8 +107,10 @@ export type QTurnReading = Omit<
   readonly teamJob?: boolean | undefined;
   /** v52: they ask what to do next, what is missing, or how ready they are. */
   readonly nextSteps?: boolean | undefined;
-  /** v54: the page control (a listed id) they ask to open or show now. */
+  /** v55: the page control (a listed id) they ask to open or show now. */
   readonly control?: string | null | undefined;
+  /** v54: the turn is answered by this earlier turn of Q's (SHOWN). */
+  readonly fromShown?: TurnReaderV54Result["fromShown"] | undefined;
   /** v44: garbled spoken words, read by sound; null when read as written. */
   readonly heardAs?: string | null | undefined;
   /** v28: a time they asked for, in minutes from now. */
@@ -244,9 +253,11 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "tool",
   "moreDocuments",
   "control",
+  // v54: a malformed pointer back costs the pointer, never the reading.
+  "fromShown",
 ];
 
-/** One control of the page on screen, as the reader is told of it (v54). */
+/** One control of the page on screen, as the reader is told of it (v55). */
 export type ReaderScreenControl = {
   readonly id: string;
   readonly kind: string;
@@ -315,7 +326,7 @@ export function createQTurnReader(dependencies: {
         );
       }
       const variables: Omit<
-        TurnReaderV54Variables,
+        TurnReaderV55Variables,
         | "operatingMode"
         | "communicationProfile"
         | "communicationGuidance"
@@ -333,9 +344,11 @@ export function createQTurnReader(dependencies: {
         actions: [...listed.listed],
         actionGroups: listed.groups,
         screenControls: readerScreenControls(input.screenControls),
+        // Bounded by the schema; the newest turns are kept by its builder.
+        shown: (input.shown ?? "").slice(0, 9_000),
       };
       try {
-        const rendered = renderPrompt<TurnReaderV54Variables>(registry, {
+        const rendered = renderPrompt<TurnReaderV55Variables>(registry, {
           task: "TURN_READER",
           charter: "Q_SYSTEM",
           operatingMode: "ASSESSMENT",
@@ -346,8 +359,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV54Result>> =>
-          gateway.execute<TurnReaderV54Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV55Result>> =>
+          gateway.execute<TurnReaderV55Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               // A closed classification needs little thought; left unset, a
@@ -363,7 +376,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV54ResultSchema,
+              schema: TurnReaderV55ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -405,7 +418,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV54ResultSchema.safeParse(
+        const parsed = TurnReaderV55ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

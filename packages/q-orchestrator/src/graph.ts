@@ -298,7 +298,7 @@ export function buildQGraph(
         actor: actorFor(state),
         correlationId: state.correlationId,
         signal: config.signal,
-        // TURN_READER v54: the page's own controls, as the firewall passes
+        // TURN_READER v55: the page's own controls, as the firewall passes
         // them on (screenWithin keeps the manifest whole).
         ...(state.screen?.manifest?.controls === undefined
           ? {}

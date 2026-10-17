@@ -122,6 +122,8 @@ export const PROMPT_IDS = [
   "PERSON_BRIEF_READER",
   /** Lead decision 2026-10-15: Q's cited, nonbinding reading of a GateQ submission. */
   "GATEQ_DOSSIER_SYNTHESIS",
+  /** Owner live 2026-10-17: a follow-up answered from what Q already showed. */
+  "CONVERSATION_RECALL",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -192,6 +194,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   MEETING_OUTCOME_READER: "meeting-outcome-reader",
   UTTERANCE_CHECK: "utterance-check",
   SMALL_TALK: "small-talk",
+  CONVERSATION_RECALL: "conversation-recall",
   TURN_SKIM: "turn-skim",
   PERSON_BRIEF_READER: "person-brief-reader",
 };

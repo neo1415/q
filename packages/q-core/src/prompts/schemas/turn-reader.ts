@@ -706,26 +706,75 @@ export type TurnReaderV52Result = z.infer<typeof TurnReaderV52ResultSchema>;
 export const TURN_READER_V54_SCHEMA_VERSION = 54;
 
 /**
- * v54 (owner 2026-10-17: "open the data room" was slow and sometimes did
- * nothing): the tabs and sections the page on screen registered arrive as
- * input (id, kind, a tab's own visible name, its state), and `control` is
- * the listed id the turn asks to open, select or show now, chosen by
- * meaning in any words and any language. Code then works that control
- * (SELECT_TAB / SCROLL_TO) with no further model call; an id the page did
- * not list is ignored. Null keeps the turn on its other readers.
+ * v54 (owner live 2026-10-17, conversation 971c5a53): what Q already said
+ * and showed in this conversation, turn by turn, with the records' ids,
+ * names, order and figures (SHOWN, built by code from Q's own stored
+ * messages). "So what was the second one?" re-ran the fit ranking and
+ * answered with one card; "show me the cards again" opened the saved
+ * companies instead of the three Q had named. The reader now says, from
+ * meaning, when the turn is answered by an earlier turn of SHOWN: code then
+ * answers from that record with no lookup, or shows that turn's own
+ * blocks again. Null keeps every earlier route.
  */
+export const TurnFromShownSchema = z
+  .object({
+    /** The SHOWN turn (its T number) the answer comes from. */
+    turn: z.number().int().min(1).max(12),
+    /** They ask to see again on screen what that turn showed. */
+    reshow: z.boolean().default(false),
+  })
+  .strict();
+export type TurnFromShown = z.infer<typeof TurnFromShownSchema>;
+
 export const TurnReaderV54ResultSchema = TurnReaderV52ResultSchema.extend({
-  control: QControlIdSchema.nullable().default(null),
+  fromShown: TurnFromShownSchema.nullable().default(null),
 }).strict();
 export type TurnReaderV54Result = z.infer<typeof TurnReaderV54ResultSchema>;
 
-/**
- * v54 variables: v7's, plus the page's own controls as lines (built by
- * code from the screen manifest). Fenced: a tab's name is page text.
- */
+/** v54: SHOWN, Capital Q's record of its own earlier turns, built by code. */
 export const TurnReaderV54VariablesSchema = TurnReaderV7VariablesSchema.extend({
-  screenControls: z.string().max(6_000).default("(none)"),
+  shown: z.string().max(9_000).default(""),
 }).strict();
 export type TurnReaderV54Variables = z.infer<
   typeof TurnReaderV54VariablesSchema
 >;
+
+/** SHOWN carries names and words from records: data, fenced like the turns. */
+export const TURN_READER_V54_UNTRUSTED = [
+  ...TURN_READER_UNTRUSTED,
+  "shown",
+] as const;
+
+export const TURN_READER_V55_SCHEMA_VERSION = 55;
+
+/**
+ * v55 (owner 2026-10-17: "open the data room" was slow and sometimes did
+ * nothing): v54's SHOWN and fromShown, plus the tabs and sections the page
+ * on screen registered (id, kind, a tab's own visible name, its state) as
+ * input, and `control`: the listed id the turn asks to open, select or
+ * show now, chosen by meaning in any words and any language. Code then
+ * works that control (SELECT_TAB / SCROLL_TO) with no further model call;
+ * an id the page did not list is ignored. Null keeps the other readers.
+ */
+export const TurnReaderV55ResultSchema = TurnReaderV54ResultSchema.extend({
+  control: QControlIdSchema.nullable().default(null),
+}).strict();
+export type TurnReaderV55Result = z.infer<typeof TurnReaderV55ResultSchema>;
+
+/**
+ * v55 variables: v54's, plus the page's own controls as lines (built by
+ * code from the screen manifest). Fenced: a tab's name is page text.
+ */
+export const TurnReaderV55VariablesSchema = TurnReaderV54VariablesSchema.extend(
+  {
+    screenControls: z.string().max(6_000).default("(none)"),
+  },
+).strict();
+export type TurnReaderV55Variables = z.infer<
+  typeof TurnReaderV55VariablesSchema
+>;
+
+export const TURN_READER_V55_UNTRUSTED = [
+  ...TURN_READER_V54_UNTRUSTED,
+  "screenControls",
+] as const;

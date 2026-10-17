@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createLogger } from "@capital-q/observability";
-import { TurnReaderV54ResultSchema } from "@capital-q/q-core";
+import { TurnReaderV55ResultSchema } from "@capital-q/q-core";
 
 import type { ModelGateway } from "../src/index.js";
 import { controlsLine } from "../src/q/manifest-fact.js";
@@ -30,7 +30,7 @@ const CONTROLS = [
   { id: "list.risks", kind: "LIST" },
 ] as const;
 
-/** Owner 2026-10-17: the reader chooses the page's tab by meaning (v54). */
+/** Owner 2026-10-17: the reader chooses the page's tab by meaning (v55). */
 describe("the turn reader is given the page's own tabs and sections", () => {
   it("lists tabs and sections with their visible names and states; never lists", () => {
     expect(readerScreenControls(CONTROLS)).toBe(
@@ -77,7 +77,7 @@ describe("the turn reader is given the page's own tabs and sections", () => {
         aboutNamedOther: false,
         control: "the data room tab",
       }),
-      TurnReaderV54ResultSchema,
+      TurnReaderV55ResultSchema,
       { lenientFields: TURN_READER_LENIENT_FIELDS },
     );
     expect(kept.ok).toBe(true);
