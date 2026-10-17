@@ -58,6 +58,7 @@ import {
   GATEQ_COMPARE_MAX,
 } from "./application-comparison";
 import { SubmittedBrief, SubmittedTranscript } from "./submitted-brief";
+import { GateqUnicornAssessment } from "./unicorn-assessment";
 
 import { FitGlyph } from "../fit-glyph";
 import {
@@ -1445,6 +1446,7 @@ function Detail({
               synthesis={detail.synthesis ?? null}
             />
           )}
+          <GateqUnicornAssessment value={detail.unicornPotential} />
           {detail.transcript != null || detail.dossier != null ? (
             <SubmittedTranscript
               turns={detail.transcript}

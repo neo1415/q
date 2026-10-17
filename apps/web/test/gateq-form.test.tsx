@@ -1113,3 +1113,39 @@ describe("the interview step, video first", () => {
     ).toBeTruthy();
   });
 });
+
+describe("GateQ submitted application recovery", () => {
+  it("links a signed-in founder from the public receipt to their applications without showing premium data", () => {
+    render(
+      <GateQForm
+        gateway={GATEWAY}
+        preview={{ step: "sent" }}
+        prefill={{
+          companyName: "Kora Health",
+          oneLiner: null,
+          stageCode: "seed",
+          country: "Nigeria",
+          contactName: null,
+          contactEmail: "amara@kora.ng",
+        }}
+      />,
+    );
+    expect(
+      screen
+        .getByRole("link", { name: "See your applications" })
+        .getAttribute("href"),
+    ).toBe("/gateq?tab=applications");
+    expect(
+      document.querySelector('[data-score="unicorn-potential"]'),
+    ).toBeNull();
+  });
+  it("does not attach account-specific results to an anonymous receipt", () => {
+    render(<GateQForm gateway={GATEWAY} preview={{ step: "sent" }} />);
+    expect(
+      screen.queryByRole("link", { name: "See your applications" }),
+    ).toBeNull();
+    expect(
+      document.querySelector('[data-score="unicorn-potential"]'),
+    ).toBeNull();
+  });
+});
