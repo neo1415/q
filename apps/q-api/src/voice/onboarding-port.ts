@@ -461,6 +461,8 @@ export function createOnboardingPort(input: {
   const current = async (): Promise<OnboardingSessionView> =>
     latest ?? (await fresh());
 
+  /** Category names the classifier gave this turn, by node id. */
+  const nodeNames = new Map<string, string>();
   const spoken = async (
     step: OnboardingStepManifest,
     value: OnboardingResponseValue,
@@ -470,15 +472,21 @@ export function createOnboardingPort(input: {
       value.type === "RESOURCE_REFERENCE" &&
       value.resourceType === "TAXONOMY_NODE"
     ) {
-      const names: string[] = [];
-      for (const id of value.resourceIds.slice(0, 8)) {
-        try {
-          names.push((await getTaxonomyNode(input.session, id)).displayName);
-        } catch {
-          // A name that cannot be read is left out, never guessed.
-        }
-      }
-      return names.join(", ");
+      // Names the classifier already gave this turn, then the rest read
+      // together (live AO: eight node reads one after another, ~0.4 s).
+      const names = await Promise.all(
+        value.resourceIds.slice(0, 8).map(async (id) => {
+          const known = nodeNames.get(id);
+          if (known !== undefined) return known;
+          try {
+            return (await getTaxonomyNode(input.session, id)).displayName;
+          } catch {
+            // A name that cannot be read is left out, never guessed.
+            return null;
+          }
+        }),
+      );
+      return names.filter((name): name is string => name !== null).join(", ");
     }
     return describeValue(step, value, recordedCurrency(view, steps)).trim();
   };
@@ -821,6 +829,7 @@ export function createOnboardingPort(input: {
           continue;
         }
         if (!ids.includes(best.nodeId)) ids.push(best.nodeId);
+        nodeNames.set(best.nodeId, best.displayName);
       }
       if (unmatched.length > 0 && ids.length > 0) {
         // The categories that matched, with their other words beside them:
