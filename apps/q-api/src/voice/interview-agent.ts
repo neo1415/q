@@ -1530,6 +1530,9 @@ export function createInterviewAgent(
         ? undefined
         : createReplySentenceStream(input.onSentence);
     let result: InterviewAgentV16Result | undefined;
+    // A reply code wrote from committed results: every field it names is
+    // on the record by construction.
+    let writtenByCode = false;
     let rounds = 0;
     let calls = 0;
     let timedOut = false;
@@ -1990,6 +1993,7 @@ export function createInterviewAgent(
         if (written !== null) {
           stream?.push(written.reply);
           result = written;
+          writtenByCode = true;
           logger.info({}, "interview reply written by code after a clean save");
           break;
         }
@@ -2144,15 +2148,20 @@ export function createInterviewAgent(
     // Field by field too: a field named as saved must be on the record.
     const onRecord = new Set(view.responses.map((r) => r.stepKey));
     const profileFields = coverageProfileFor(input.journeyType).fields;
-    const fieldBackedReply = withoutUnbackedFieldClaims(
-      backedReply,
-      view.progress.eligibleSteps
-        .filter(
-          (e) => !onRecord.has(e.stepKey) && !recorded.includes(e.stepKey),
-        )
-        .map((e) => profileFields[e.stepKey]?.label ?? "")
-        .filter((label) => label.length > 0),
-    );
+    // Live AL 2026-10-16: a code receipt quoting their words ("...market
+    // traders in Accra…") lost its whole sentence to a label match; only
+    // the model's own claims are checked.
+    const fieldBackedReply = writtenByCode
+      ? backedReply
+      : withoutUnbackedFieldClaims(
+          backedReply,
+          view.progress.eligibleSteps
+            .filter(
+              (e) => !onRecord.has(e.stepKey) && !recorded.includes(e.stepKey),
+            )
+            .map((e) => profileFields[e.stepKey]?.label ?? "")
+            .filter((label) => label.length > 0),
+        );
     if (fieldBackedReply !== backedReply) {
       logger.info(
         {},
