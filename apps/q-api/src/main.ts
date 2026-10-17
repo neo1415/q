@@ -3954,6 +3954,14 @@ export const translateLines = createLineTranslator({
 // (composition/answer-words.ts: skeletons in, data put back).
 const answerWords = createAnswerWords({ translateLines, logger });
 const acknowledgementWarmup = createAcknowledgementWarmup({
+  localiseLabels: async (actor, language, labels, options) => {
+    await translateLines(
+      language,
+      labels,
+      { tenantId: actor.tenantId, userId: actor.userId },
+      options,
+    );
+  },
   localise: (actor, language, texts, options) =>
     answerWords.localise(
       language,
@@ -6071,6 +6079,17 @@ const reportPausedAccount = async (
   }
 };
 const interviewLoop = createInterviewAgent({
+  // Choice labels ("Seed", "CEO", "US dollar") whole, through the same
+  // cache: product copy, never a name (live AL: kept English in Arabic).
+  localiseLabels: async (actor, language, labels, options) => {
+    const map = await translateLines(
+      language,
+      labels,
+      { tenantId: actor.tenantId, userId: actor.userId },
+      options,
+    );
+    return labels.map((label) => map.get(label) ?? null);
+  },
   // Onboarding starting (or going on) in a chosen language warms its
   // acknowledgement copy once per process.
   warmAcknowledgements: (actor, language, journey) => {
