@@ -128,10 +128,23 @@ export function observeUnicornPotential(
     for (const pillar of UNICORN_PILLARS) {
       for (const [index, criterion] of pillar.criteria.entries()) {
         const text = source.label.slice(0, 4000);
+        // Examples, conditional outcomes and competitor descriptions are not observations of this company.
+        if (
+          /\b(hypothetical|illustration|for example|competitor|would|could)\b/iu.test(
+            text,
+          )
+        )
+          continue;
+        const match = criterion.adverse.exec(text);
+        const deniedAdverse =
+          match !== null &&
+          /\b(?:no|not|never|no evidence that)\s*$/iu.test(
+            text.slice(0, match.index),
+          );
         // Forecasts may support only the explicitly forecast-labelled limited rule.
         const forecast =
           /\b(forecast|projection|projected|target|planned)\b/iu.test(text);
-        const adverse = criterion.adverse.test(text) && !forecast;
+        const adverse = match !== null && !deniedAdverse && !forecast;
         const weakness =
           UNICORN_WEAKNESS_RULES[pillar.id][index === 0 ? 0 : 1].test(text) &&
           !forecast;

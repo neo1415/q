@@ -51,6 +51,15 @@ function inputs(texts: readonly string[] = statements): InvestabilityInputs {
   };
 }
 describe("provisional Unicorn Potential pure engine", () => {
+  it("does not score denied allegations, hypothetical or competitor descriptions", () => {
+    for (const text of [
+      "No founder has falsified credentials",
+      "Hypothetical founder has falsified credentials",
+      "Competitor founder has falsified credentials",
+    ]) {
+      expect(assessUnicornPotential(inputs([text]), NOW).view.coverage).toBe(0);
+    }
+  });
   it("grades explicit concrete weakness1 without treating it as material failure0", () => {
     const v = assessUnicornPotential(
       inputs(["Current runway 4 months"]),
