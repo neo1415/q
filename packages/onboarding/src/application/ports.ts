@@ -476,6 +476,13 @@ export type OnboardingWriteContext = {
     readonly organisationId: OrganisationId;
     readonly subject: OnboardingSubject;
   }) => Promise<OnboardingSession>;
+  /**
+   * Reads a handler may reuse for the rest of this request only (one
+   * batch): the same context resolution or open mandate each answer would
+   * otherwise read again. Never shared across requests or people; absent
+   * outside a batch. A handler keeps only successful reads in it.
+   */
+  readonly requestMemo?: Map<string, unknown> | undefined;
 };
 
 export type OnboardingStepContextInput = {

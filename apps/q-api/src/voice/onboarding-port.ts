@@ -1915,6 +1915,15 @@ export function createOnboardingPort(input: {
     if (step === undefined || words.length === 0) return false;
     const view = await current();
     if (view.responses.some((r) => r.stepKey === stepKey)) return false;
+    // A step the journey can only save after another (the firm's name sets
+    // up the investor profile with how they invest): not tried before it,
+    // so no turn opens with a refused request (live AJ: a 422 every turn).
+    const before = SAVED_AFTER[stepKey] ?? [];
+    if (
+      before.some((needed) => !view.responses.some((r) => r.stepKey === needed))
+    ) {
+      return false;
+    }
     const value = toResponseValue(step, words);
     if (value === null) return false;
     try {
@@ -3098,3 +3107,8 @@ export function moneyFiguresIn(
   }
   return out;
 }
+
+/** Steps code fills from the platform that the journey saves only after others. */
+const SAVED_AFTER: Readonly<Record<string, readonly string[]>> = {
+  "I0.organisation_name": ["I0.investor_type"],
+};
