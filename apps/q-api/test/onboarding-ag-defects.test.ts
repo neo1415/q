@@ -548,3 +548,23 @@ describe("live AJ: a figure keeps its scale, in any language", () => {
     expect(reply).not.toMatch(/in their words|\.\.|…\./u);
   });
 });
+
+describe("live AJ: no turn opens with a request the journey must refuse", () => {
+  it("the firm's name from sign-up waits for how they invest", async () => {
+    const world = investorSession({
+      currentStepKey: "I0.investor_type",
+      recorded: {},
+    });
+    const port = createOnboardingPort({
+      session: turn(world, "").session,
+      onboardingSessionId: turn(world, "").onboardingSessionId,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [],
+    });
+    expect(
+      await port.recordFromSignup("I0.organisation_name", "Corvo Ventures"),
+    ).toBe(false);
+    expect(world.attempts()).not.toContain("I0.organisation_name");
+  });
+});

@@ -350,6 +350,26 @@ describe("no closing reply while a stated fact is unsaved (live AF 2026-10-16)",
   });
 });
 
+describe("a code receipt is never cut by the claim guard (live AL)", () => {
+  it("keeps the receipt that quotes a long description", async () => {
+    const world = founderWorld();
+    const said =
+      "We make solar cold rooms for market traders in Accra and Kumasi, rented by the day.";
+    const model = recordingModel([
+      { stepKey: "F1.description", value: said, quote: said },
+    ]);
+    const outcome = await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({ stated: ["F1.description"] })),
+      replyByCodeAfterCleanSave: true,
+    }).turn({ ...turn(world, said), actor });
+    expect(model.calls()).toBe(1);
+    expect(outcome.reply).toMatch(/We make solar cold rooms/u);
+  });
+});
+
 describe("quickAcknowledgement", () => {
   const next = { question: "What does the company do?", optional: false };
   const labelOf = (key: string) =>

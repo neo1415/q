@@ -108,11 +108,32 @@ function joinNames(names: readonly string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
 }
 
+/**
+ * Lookups repeated by every answer of one request (live AJ 2026-10-16: an
+ * investor's first answers took 1.4-4.7 s in one batch, each answer
+ * resolving the same context and listing the same mandates again). The
+ * memo is the onboarding runtime's, made for that one request and dropped
+ * with it: nothing crosses requests or people. Only successful reads are
+ * kept; every write still runs the Investor domain's own capability,
+ * version and validation checks.
+ */
+type RequestMemo = Map<string, unknown> | undefined;
+
+function remembered<T>(memo: RequestMemo, key: string): T | undefined {
+  return memo?.get(key) as T | undefined;
+}
+
+function remember(memo: RequestMemo, key: string, value: unknown): void {
+  memo?.set(key, value);
+}
+
 /** Resolve the actor context for `organisationId` from the verified principal. */
 export async function resolveInvestorContext(
   services: InvestorDomainServices,
   actor: OnboardingActor,
   organisationId: OrganisationId,
+  /** This request's memo; repeated answers reuse the resolution. */
+  memo?: RequestMemo,
 ): Promise<ActorContext> {
   if (actor.context?.organisationId === organisationId) {
     return actor.context;
@@ -120,6 +141,9 @@ export async function resolveInvestorContext(
   if (actor.principal === undefined) {
     throw new OnboardingContextRequiredError();
   }
+  const key = `context|${actor.userId}|${organisationId}`;
+  const known = remembered<ActorContext>(memo, key);
+  if (known !== undefined) return known;
   const resolution = await resolveHumanActorContext(services.resolver, {
     principal: actor.principal,
     selection: { organisationId },
@@ -127,6 +151,7 @@ export async function resolveInvestorContext(
   if (resolution.status !== "RESOLVED") {
     throw new OnboardingContextRequiredError();
   }
+  remember(memo, key, resolution.context);
   return resolution.context;
 }
 
@@ -135,6 +160,7 @@ export async function boundInvestor(
   services: InvestorDomainServices,
   actor: OnboardingActor,
   session: OnboardingSession,
+  memo?: RequestMemo,
 ): Promise<BoundInvestor> {
   if (
     session.subject === null ||
@@ -148,6 +174,7 @@ export async function boundInvestor(
       services,
       actor,
       session.organisationId,
+      memo,
     ),
     investorOrganisationId: InvestorOrganisationIdSchema.parse(
       session.subject.subjectId,
@@ -195,6 +222,7 @@ export async function mandateInScope(
   create?: {
     readonly session: OnboardingSession;
     readonly correlationId: CorrelationId;
+    readonly requestMemo?: RequestMemo;
   },
 ): Promise<InvestorMandateId> {
   const chosen = InvestorMandateIdSchema.safeParse(
@@ -203,6 +231,12 @@ export async function mandateInScope(
   if (chosen.success) {
     return chosen.data;
   }
+  // The investor's one open mandate, once per request (each answer of a
+  // batch asked again). Only an existing mandate is kept, never one this
+  // request is still creating.
+  const key = `mandate|${bound.investorOrganisationId}`;
+  const known = remembered<InvestorMandateId>(create?.requestMemo, key);
+  if (known !== undefined) return known;
   const page = await services.investors.listInvestorMandates({
     actor: bound.context,
     investorOrganisationId: bound.investorOrganisationId,
@@ -211,6 +245,7 @@ export async function mandateInScope(
   const open = page.items.filter((m) => m.status !== "CLOSED");
   const only = open.length === 1 ? open[0] : undefined;
   if (only !== undefined) {
+    remember(create?.requestMemo, key, only.id);
     return only.id;
   }
   if (open.length === 0 && create !== undefined) {
@@ -681,13 +716,13 @@ function mergeConstraints(
 async function updateMandate(
   services: InvestorDomainServices,
   bound: BoundInvestor,
-  mandateId: InvestorMandateId,
+  mandate: InvestorMandate,
   patch: (
     mandate: InvestorMandate,
   ) => Omit<UpdateInvestorMandateRequest, "expectedVersion">,
   correlationId: CorrelationId,
 ): Promise<InvestorMandate> {
-  const mandate = await currentMandate(services, bound, mandateId);
+  const mandateId = mandate.id;
   const input = parseContract(
     UpdateInvestorMandateRequestSchema,
     { expectedVersion: mandate.version, ...patch(mandate) },
@@ -725,7 +760,12 @@ async function bootstrapInvestor(
 
   if (session.subject !== null) {
     // Revising the name after binding renames the same investor organisation.
-    const bound = await boundInvestor(services, actor, session);
+    const bound = await boundInvestor(
+      services,
+      actor,
+      session,
+      context.requestMemo,
+    );
     const investor = await services.investors.getInvestorOrganisation({
       actor: bound.context,
       investorOrganisationId: bound.investorOrganisationId,
@@ -861,14 +901,21 @@ async function withMandate(
     | Omit<UpdateInvestorMandateRequest, "expectedVersion">
     | Promise<Omit<UpdateInvestorMandateRequest, "expectedVersion">>,
 ): Promise<void> {
-  const bound = await boundInvestor(services, context.actor, context.session);
+  const bound = await boundInvestor(
+    services,
+    context.actor,
+    context.session,
+    context.requestMemo,
+  );
   const mandateId = await mandateInScope(services, bound, values, context);
   const mandate = await currentMandate(services, bound, mandateId);
   const resolved = await patch(mandate);
+  // The mandate just read is the one updated: no second read. The domain
+  // still locks it and checks this version (a concurrent change refuses).
   await updateMandate(
     services,
     bound,
-    mandateId,
+    mandate,
     () => resolved,
     context.correlationId,
   );
@@ -893,6 +940,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       await services.investors.upsertMyInvestorRepresentative({
         actor: bound.context,
@@ -915,6 +963,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       const state = InvestorDeploymentStateSchema.safeParse(
         singleSelect(values, INVESTOR_STEPS.deploymentStatus)?.toUpperCase(),
@@ -947,6 +996,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       const page = await services.investors.listInvestorMandates({
         actor: bound.context,
@@ -969,6 +1019,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       const mandateId = selectedMandateId(values);
       let mandate: InvestorMandate;
@@ -1057,6 +1108,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       const wanted = portfolioNames(text(values, INVESTOR_STEPS.portfolio));
       const current = await services.investors.listInvestorPortfolioReferences({
@@ -1113,6 +1165,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       // ADR 0023: how founders may reach this organisation becomes the
       // organisation's own setting when the investor confirms. The I10 step
