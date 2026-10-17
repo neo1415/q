@@ -248,7 +248,8 @@ describe("fit tools", () => {
       contextFor(actorB, investorPlan),
     );
     expect(result.result.ok).toBe(true);
-    if (!result.result.ok) throw new Error(result.failureCode);
+    if (!result.result.ok)
+      throw new Error(result.failureCode ?? "Expected successful fit result");
     const reading = FitProfileOutputSchema.parse(result.result.data);
     expect(JSON.stringify(reading).length).toBeLessThanOrEqual(
       MODEL_TOOL_RESULT_MAX_CHARS,

@@ -32,7 +32,9 @@ select throws_ok($$insert into core.company_unicorn_potential_assessments(tenant
 
 -- Exercise the actual source predicate used by the TypeScript repository.
 insert into knowledge.company_profiles(company_id, company_tenant_id, listed, visibility, canonical_name, fingerprint, version)
-values ('00000000-0000-4000-8000-0000000098c1', pg_temp.rls_id('tenant_a'), true, 'network_visible', 'Unicorn Test', 'fixture', 1);
+values ('00000000-0000-4000-8000-0000000098c1', pg_temp.rls_id('tenant_a'), true, 'network_visible', 'Unicorn Test', 'fixture', 1)
+on conflict (company_id) do update set listed = excluded.listed, visibility = excluded.visibility,
+  canonical_name = excluded.canonical_name, fingerprint = excluded.fingerprint;
 create temporary table unicorn_candidates as select jsonb_build_array(jsonb_build_object('company_id', '00000000-0000-4000-8000-0000000098c1', 'revision', 1, 'assessed_at', clock_timestamp() + interval '1 second', 'observations', '[]'::jsonb)) as value;
 select is((select count(*)::int from private.unicorn_potential_eligible_revisions((select value from unicorn_candidates))), 1, 'listed active company with no contributing evidence remains insufficient, not denied');
 select ok(not has_function_privilege('authenticated', 'private.unicorn_potential_eligible_revisions(jsonb)', 'execute'), 'browser cannot call source eligibility oracle');
