@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,6 +28,18 @@ vi.mock("../src/features/onboarding-kit/material-actions", () => ({
 vi.mock("../src/features/q/actions", () => ({
   readQArtifactAction: () => Promise.resolve({ ok: false, message: "" }),
   readQArtifactVersionAction: () => Promise.resolve({ ok: false, message: "" }),
+}));
+// The reader's pages, without PDF.js: the URL it was asked to draw.
+const drawn = vi.hoisted(() => ({ urls: [] as string[] }));
+vi.mock("../src/features/q/room/pdf-page", () => ({
+  usePdfDocument: (url: string) => {
+    drawn.urls.push(url);
+    return {
+      state: { kind: "ready", document: { numPages: 1 } },
+      retry: () => undefined,
+    };
+  },
+  PdfPage: () => <div data-testid="pdf-page" />,
 }));
 const askAbout = vi.fn();
 vi.mock("../src/components/app-shell/global-q", () => ({
@@ -268,6 +280,43 @@ describe("the documents library", () => {
       await screen.findByRole("menuitem", { name: "Ask Q about it" }),
     );
     expect(askAbout).toHaveBeenCalledWith('About "Northstar deck": ');
+  });
+
+  it("opens an uploaded PDF in the app's reader from its signed link, with Save a copy inside", async () => {
+    const signed = "https://storage.test.invalid/signed/fy25.pdf?token=t";
+    library.documentFileAction.mockResolvedValue({
+      ok: true,
+      value: { url: signed, scanned: true },
+    });
+    const opened = vi.spyOn(window, "open");
+    const base = upload(7);
+    if (base.currentVersion === null) throw new Error("fixture has a version");
+    const pdfUpload = model.fromUpload({
+      ...base,
+      title: "FY25 accounts",
+      currentVersion: {
+        ...base.currentVersion,
+        originalFilename: "fy25-accounts.pdf",
+      },
+    });
+    render(
+      <DocumentLibrary
+        initial={{ items: [pdfUpload], cursors: { q: null, uploads: null } }}
+        companyId={null}
+      />,
+    );
+    const [openButton] = screen.getAllByRole("button", {
+      name: "Open FY25 accounts",
+    });
+    if (openButton === undefined) throw new Error("no Open control");
+    await userEvent.click(openButton);
+    const dialog = await screen.findByRole("dialog", { name: "FY25 accounts" });
+    expect(library.documentFileAction).toHaveBeenCalledWith(upload(7).id);
+    expect(opened).not.toHaveBeenCalled();
+    expect(drawn.urls).toContain(signed);
+    const save = within(dialog).getByRole("link", { name: "Save a copy" });
+    expect(save.getAttribute("href")).toBe(signed);
+    opened.mockRestore();
   });
 
   it("says what failed and offers to try again", () => {

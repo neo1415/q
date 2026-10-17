@@ -136,8 +136,11 @@ describe("the newspaper", () => {
       screen.getByRole("heading", { name: "Deals and rounds" }),
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "In brief" })).toBeTruthy();
-    const pdf = screen.getByRole("link", { name: "Download PDF" });
-    expect(pdf.getAttribute("href")).toBe(`/api/q-daily/${EDITION.id}/pdf`);
+    // Owner 2026-10-17: the PDF edition opens in the app's reader (its
+    // "Save a copy" is the download); no link sends it to the folder.
+    const pdf = screen.getByRole("button", { name: "Open PDF" });
+    expect(pdf.hasAttribute("data-daily-pdf")).toBe(true);
+    expect(document.querySelector("a[download]")).toBeNull();
   });
 
   it("folds a story's body below the lead, keeping its sources out of the fold (design-48)", () => {

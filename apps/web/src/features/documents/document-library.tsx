@@ -46,6 +46,7 @@ import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 import { DECK_AUDIENCE_OPTIONS, deckAudienceDescription } from "./deck-sharing";
 import { setDeckAudienceAction } from "./deck-sharing-actions";
 import { openDocumentViewer } from "./document-ready";
+import { InAppReader, type ReaderDocument } from "./in-app-reader";
 import {
   archiveDocumentAction,
   documentFileAction,
@@ -54,6 +55,7 @@ import {
 } from "./library-actions";
 import {
   documentTypeForFile,
+  isPdfFile,
   LIBRARY_FILTERS,
   matches,
   mergePage,
@@ -455,6 +457,7 @@ export function DocumentLibrary({
   } | null>(null);
   const [renaming, setRenaming] = useState<LibraryItem | null>(null);
   const [sharing, setSharing] = useState<LibraryItem | null>(null);
+  const [reading, setReading] = useState<ReaderDocument | null>(null);
 
   // Per device, read after hydration (the server always draws the grid).
   const view = useSyncExternalStore(
@@ -578,8 +581,19 @@ export function DocumentLibrary({
         openDocumentViewer(item.id);
         return;
       }
-      // A new tab opened now, filled when the signed link arrives, so a
-      // popup blocker never eats the click.
+      // Owner 2026-10-17: a PDF opens here, in the reader, from the same
+      // signed link (bytes browser <-> storage); "Save a copy" is inside.
+      if (isPdfFile(item.fileName)) {
+        void documentFileAction(item.id).then((link) => {
+          if (link.ok) {
+            setReading({ kind: "pdf", title: item.title, url: link.value.url });
+          } else setNotice({ text: link.message });
+        });
+        return;
+      }
+      // Other formats have no in-app renderer yet: a new tab opened now,
+      // filled when the signed link arrives, so a popup blocker never
+      // eats the click.
       const tab = window.open("", "_blank");
       void documentFileAction(item.id).then((link) => {
         if (link.ok && tab !== null) tab.location.href = link.value.url;
@@ -1095,6 +1109,8 @@ export function DocumentLibrary({
           />
         )}
       </DialogRoot>
+
+      <InAppReader document={reading} onClose={() => setReading(null)} />
     </section>
   );
 }
