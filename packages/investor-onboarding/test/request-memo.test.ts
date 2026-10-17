@@ -186,3 +186,77 @@ describe("one request reads the mandate once across its answers", () => {
     expect(counts.read).toBe(2);
   });
 });
+
+describe("in a batch, the stage and cheque answers become one mandate update", () => {
+  it("defers to the batch's end: one read, one versioned update for several answers", async () => {
+    const { createInvestorWriteTargets } =
+      await import("../src/integration/write-targets.js");
+    const counts = { read: 0, updates: 0 };
+    const mandate = {
+      id: "f0000000-0000-4000-8000-000000000001",
+      version: 1,
+      status: "DRAFT",
+      constraints: [],
+    };
+    const fake = {
+      resolver: {
+        resolveHumanContext: () =>
+          Promise.resolve({ status: "RESOLVED", context: CONTEXT }),
+      },
+      investors: {
+        listInvestorMandates: () =>
+          Promise.resolve({ items: [{ id: mandate.id, status: "DRAFT" }] }),
+        getInvestorMandate: () => {
+          counts.read += 1;
+          return Promise.resolve(mandate);
+        },
+        updateInvestorMandate: () => {
+          counts.updates += 1;
+          return Promise.resolve({ ...mandate, version: 2 });
+        },
+      },
+    } as unknown as InvestorDomainServices;
+    const target = createInvestorWriteTargets({
+      services: () => fake,
+    } as never).find((t) => t.targetKey === "investor.mandate.stage_cheque");
+    const deferred = new Map<string, (tx: unknown) => Promise<void>>();
+    const context = {
+      tx: {},
+      actor,
+      session: {
+        id: "a1000000-0000-4000-8000-000000000001",
+        subject: {
+          subjectType: "INVESTOR_ORGANISATION",
+          subjectId: "e1000000-0000-4000-8000-000000000001",
+        },
+        organisationId: ORG,
+      },
+      correlationId: "cor_x",
+      currentResponses: new Map(),
+      bindContext: () => Promise.reject(new Error("not used")),
+      requestMemo: new Map<string, unknown>(),
+      defer: (key: string, run: (tx: unknown) => Promise<void>) => {
+        deferred.set(key, run);
+      },
+    };
+    for (const response of [
+      {
+        stepKey: "I2.stages",
+        value: { type: "MULTI_SELECT", optionKeys: ["seed"] },
+      },
+      {
+        stepKey: "I2.currency",
+        value: { type: "SINGLE_SELECT", optionKey: "eur" },
+      },
+      { stepKey: "I2.cheque_min", value: { type: "RANGE", value: "150000" } },
+    ]) {
+      await target?.apply(context as never, response as never);
+    }
+    // Nothing written yet: one deferred update, for all three answers.
+    expect(counts.updates).toBe(0);
+    expect(deferred.size).toBe(1);
+    for (const run of deferred.values()) await run({});
+    expect(counts.read).toBe(1);
+    expect(counts.updates).toBe(1);
+  });
+});

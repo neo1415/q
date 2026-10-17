@@ -609,6 +609,8 @@ async function commitResponse(
     readonly resolvingSuggestionId?: OnboardingSuggestionId | undefined;
     /** Reads reused across one batch's answers (see OnboardingWriteContext). */
     readonly requestMemo?: Map<string, unknown> | undefined;
+    /** Hands a canonical update to the end of the batch (see OnboardingWriteContext). */
+    readonly defer?: OnboardingWriteContext["defer"];
   } = {},
 ): Promise<{
   readonly session: OnboardingSession;
@@ -669,6 +671,7 @@ async function commitResponse(
           currentResponses: aggregate.currentResponses,
           bindContext,
           requestMemo: options.requestMemo,
+          defer: options.defer,
         },
         validated,
       );
@@ -1268,84 +1271,132 @@ export function createOnboardingUseCases(
           ),
         };
       }
-      let session = await lockedActiveSession(
+      const active = await lockedActiveSession(
         runtime,
         tx,
         actor,
         command.sessionId,
         command.expectedSessionVersion,
       );
-      const results = new Map<number, OnboardingBatchOutcome>();
-      let changes: OnboardingPathChanges | undefined;
       // One request's reads, reused by its answers' write targets.
       const requestMemo = new Map<string, unknown>();
-      // Milliseconds per committed answer, for the batch's own log line.
-      const timings: string[] = [];
-      let open = command.responses.map((_, index) => index);
-      // Each pass commits what it can; another pass only after progress,
-      // so a batch ends after at most as many passes as it has answers.
-      for (let pass = 0; open.length > 0; pass += 1) {
-        const refusedThisPass: number[] = [];
-        for (const index of open) {
-          const item = command.responses[index];
-          if (item === undefined) continue;
-          const startedAt = performance.now();
-          try {
-            const before = session;
-            const committed = await tx.sql.savepoint(async (inner) => {
-              const unit: TransactionContext = { sql: inner };
-              const aggregate = await aggregateOf(runtime, inner, before);
-              const step = eligibleStep(aggregate, item.stepKey);
-              const validated = validateOnboardingResponse(step, item.response);
-              const done = await commitResponse(
-                runtime,
-                unit,
-                actor,
-                aggregate,
-                step,
-                validated,
-                command.correlationId,
-                { requestMemo },
-              );
-              await outbox.enqueue(
-                unit,
-                responseCommittedEvent({
-                  session: done.session,
-                  correlationId: command.correlationId,
-                  stepKey: step.stepKey,
-                  responseId: done.response.id,
-                }),
-              );
-              getOnboardingMetrics().responsesCommitted.add(1, {
-                journeyType: before.journeyType,
-                stepType: step.stepType,
+      /**
+       * Every answer, pass after pass. With `coalesce`, a write target may
+       * hand its canonical update to the end of the batch (one update for
+       * several answers to the same record, owner-approved 2026-10-17),
+       * run once below; without, each answer writes as it commits.
+       */
+      const runPasses = async (
+        coalesce: boolean,
+        within: TransactionContext,
+      ) => {
+        let session = active;
+        const results = new Map<number, OnboardingBatchOutcome>();
+        let changes: OnboardingPathChanges | undefined;
+        // Milliseconds per committed answer, for the batch's own log line.
+        const timings: string[] = [];
+        const deferred = new Map<
+          string,
+          (unit: TransactionContext) => Promise<void>
+        >();
+        const defer = coalesce
+          ? (key: string, run: (unit: TransactionContext) => Promise<void>) => {
+              // The latest answer's run reads every answer before it.
+              deferred.set(key, run);
+            }
+          : undefined;
+        let open = command.responses.map((_, index) => index);
+        // Each pass commits what it can; another pass only after progress,
+        // so a batch ends after at most as many passes as it has answers.
+        for (let pass = 0; open.length > 0; pass += 1) {
+          const refusedThisPass: number[] = [];
+          for (const index of open) {
+            const item = command.responses[index];
+            if (item === undefined) continue;
+            const startedAt = performance.now();
+            try {
+              const before = session;
+              const committed = await within.sql.savepoint(async (inner) => {
+                const unit: TransactionContext = { sql: inner };
+                const aggregate = await aggregateOf(runtime, inner, before);
+                const step = eligibleStep(aggregate, item.stepKey);
+                const validated = validateOnboardingResponse(
+                  step,
+                  item.response,
+                );
+                const done = await commitResponse(
+                  runtime,
+                  unit,
+                  actor,
+                  aggregate,
+                  step,
+                  validated,
+                  command.correlationId,
+                  { requestMemo, defer },
+                );
+                await outbox.enqueue(
+                  unit,
+                  responseCommittedEvent({
+                    session: done.session,
+                    correlationId: command.correlationId,
+                    stepKey: step.stepKey,
+                    responseId: done.response.id,
+                  }),
+                );
+                getOnboardingMetrics().responsesCommitted.add(1, {
+                  journeyType: before.journeyType,
+                  stepType: step.stepType,
+                });
+                return done;
               });
-              return done;
-            });
-            session = committed.session;
-            changes = committed.changes;
-            results.set(index, { stepKey: item.stepKey, outcome: "COMMITTED" });
-            timings.push(
-              `${item.stepKey}:${String(Math.round(performance.now() - startedAt))}`,
-            );
-          } catch (error: unknown) {
-            // A refused answer's savepoint rolled back whatever it wrote:
-            // nothing read or written for it may be reused.
-            requestMemo.clear();
-            const refusal = batchRefusalOf(error);
-            if (refusal === null) throw error;
-            results.set(index, {
-              stepKey: item.stepKey,
-              outcome: "REFUSED",
-              refusal,
-            });
-            refusedThisPass.push(index);
+              session = committed.session;
+              changes = committed.changes;
+              results.set(index, {
+                stepKey: item.stepKey,
+                outcome: "COMMITTED",
+              });
+              timings.push(
+                `${item.stepKey}:${String(Math.round(performance.now() - startedAt))}`,
+              );
+            } catch (error: unknown) {
+              // A refused answer's savepoint rolled back whatever it wrote:
+              // nothing read or written for it may be reused.
+              requestMemo.clear();
+              const refusal = batchRefusalOf(error);
+              if (refusal === null) throw error;
+              results.set(index, {
+                stepKey: item.stepKey,
+                outcome: "REFUSED",
+                refusal,
+              });
+              refusedThisPass.push(index);
+            }
           }
+          const progressed = refusedThisPass.length < open.length;
+          if (!progressed || pass >= command.responses.length) break;
+          open = refusedThisPass;
         }
-        const progressed = refusedThisPass.length < open.length;
-        if (!progressed || pass >= command.responses.length) break;
-        open = refusedThisPass;
-      }
+        for (const [key, run] of deferred) {
+          const startedAt = performance.now();
+          await run(within);
+          timings.push(
+            `${key}:${String(Math.round(performance.now() - startedAt))}`,
+          );
+        }
+        return { session, results, changes, timings };
+      };
+      // Coalesced first, inside a savepoint. If a coalesced update is
+      // refused, the batch is rolled back to it and run again answer by
+      // answer, exactly as before, so each answer saves or reports its own
+      // failure.
+      const outcome = await tx.sql
+        .savepoint(async (outer) => runPasses(true, { sql: outer }))
+        .catch(async (error: unknown) => {
+          requestMemo.clear();
+          if (batchRefusalOf(error) === null) throw error;
+          return runPasses(false, tx);
+        });
+      const { session, results, changes, timings } = outcome;
       await idempotency.recordMutation(tx, {
         sessionId: session.id,
         keyHash: idem.keyHash,

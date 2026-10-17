@@ -284,6 +284,13 @@ describe("wordsNamePage", () => {
     ["don't open discover", "DISCOVER", false],
     ["I'm on the discover page", "DISCOVER", false],
     ["Is there a Tensorgate rehearsal here I can open", "RELATIONSHIPS", false],
+    ["Can you pitch Capital Q to me?", "Q_PITCH", true],
+    ["Could you walk me through what Capital Q is?", "Q_PITCH", true],
+    ["Give me a tour of this platform", "Q_PITCH", true],
+    ["open q pitch", "Q_PITCH", true],
+    ["Don't pitch Capital Q to me", "Q_PITCH", false],
+    ["Can you pitch Capital Q to me?", "DISCOVER", false],
+    ["Show me the pipeline", "Q_PITCH", false],
   ] as const)("%s / %s -> %s", (text, destination, expected) => {
     expect(wordsNamePage(text, { kind: "DESTINATION", destination })).toBe(
       expected,
