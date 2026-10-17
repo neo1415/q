@@ -56,6 +56,7 @@ export function structuredSignals(
   )
     return [];
   const key = claim.claimKey.toLowerCase();
+  if (claim.truthClass === "ESTIMATE" && !key.startsWith("market.")) return [];
   const at =
     metricDate(v.asOf) ?? metricDate(v.periodEnd) ?? metricDate(v.period);
   const out: StructuredSignal[] = [];
@@ -82,7 +83,14 @@ export function structuredSignals(
     )
       return [];
     if (MONEY_KEYS.has(key) && n > 0) {
-      emit("P3", "A", 3, "actual_paid_revenue");
+      emit(
+        "P3",
+        "A",
+        3,
+        key === "financial.contracted_arr"
+          ? "contracted_recurring_commitment"
+          : "actual_paid_revenue",
+      );
       if (key === "financial.arr" || key === "financial.contracted_arr")
         emit("P4", "B", 3, "dated_recurring_revenue");
     }
@@ -97,7 +105,7 @@ export function structuredSignals(
       if (n >= 2) emit("P3", "B", 2, "multiple_paying_customers_not_retention");
     }
   }
-  if (v.kind === "PERCENT") {
+  if (v.kind === "PERCENT" || v.kind === "PERCENTAGE") {
     const n = number(v.value);
     if (n === null || n < -100 || n > 1000) return [];
     if (key === "financial.nrr" && n >= 0) {
@@ -111,7 +119,10 @@ export function structuredSignals(
       emit("P5", "A", 2, "gross_margin_only_not_contribution_economics");
   }
   // A growth value requires an explicit dated start and end and the metric definition.
-  if (key === "traction.growth" && v.kind === "PERCENT") {
+  if (
+    key === "traction.growth" &&
+    (v.kind === "PERCENT" || v.kind === "PERCENTAGE")
+  ) {
     const n = number(v.value),
       start = metricDate(v.periodStart),
       end = metricDate(v.periodEnd);
