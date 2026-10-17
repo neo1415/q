@@ -347,6 +347,97 @@ describe("real pipeline controls", () => {
       );
     }
   });
+  it("shows Suitability and Investability as table columns, unknown as —, and keeps Suitability the default sort", () => {
+    const scores = {
+      "c0000000-0000-4000-8000-000000000001": {
+        suitability: 74,
+        investability: null,
+      },
+    };
+    render(
+      <RelationshipPipeline
+        {...props}
+        data={{ ...data, nextCursor: null }}
+        scores={scores}
+        ranked
+      />,
+    );
+    const headers = screen
+      .getAllByRole("columnheader")
+      .map((th) => th.textContent);
+    expect(headers.slice(1, 4)).toEqual([
+      "Company",
+      "Suitability",
+      "Investability",
+    ]);
+    const kivu = screen
+      .getByRole("link", { name: "Kivu Freight" })
+      .closest("tr");
+    const cells = [...(kivu?.querySelectorAll("td") ?? [])].map(
+      (td) => td.textContent,
+    );
+    expect(cells[2]).toBe("74");
+    expect(cells[3]).toBe("—Not known yet");
+    // A company the Q API did not score: both unknown, never 0.
+    const maji = screen.getByRole("link", { name: "Maji" }).closest("tr");
+    expect(
+      [...(maji?.querySelectorAll("td") ?? [])]
+        .slice(2, 4)
+        .map((td) => td.textContent),
+    ).toEqual(["—Not known yet", "—Not known yet"]);
+
+    const sort = screen.getByRole<HTMLSelectElement>("combobox", {
+      name: "Sort relationships",
+    });
+    expect(sort.value).toBe("suitability");
+    fireEvent.change(sort, { target: { value: "recent" } });
+    expect(mock.push).toHaveBeenLastCalledWith(
+      "/relationships?view=pipeline&layout=table&sort=recent",
+    );
+  });
+  it("keeps a chosen sort, and Suitability returns to the default URL", () => {
+    render(
+      <RelationshipPipeline
+        {...props}
+        query={{ sort: "name" }}
+        scores={{}}
+        ranked={false}
+      />,
+    );
+    const sort = screen.getByRole<HTMLSelectElement>("combobox", {
+      name: "Sort relationships",
+    });
+    expect(sort.value).toBe("name");
+    fireEvent.change(sort, { target: { value: "suitability" } });
+    expect(mock.push).toHaveBeenLastCalledWith(
+      "/relationships?view=pipeline&layout=table",
+    );
+  });
+  it("says a ranked view with more pages ranks within each page", () => {
+    render(<RelationshipPipeline {...props} scores={{}} ranked />);
+    expect(
+      screen.getByText(/ranked by suitability within each page/),
+    ).toBeDefined();
+  });
+  it("shows labelled scores on Board cards", () => {
+    const { container } = render(
+      <RelationshipPipeline
+        {...props}
+        layout="board"
+        scores={{
+          "c0000000-0000-4000-8000-000000000002": {
+            suitability: 55,
+            investability: 70,
+          },
+        }}
+        ranked
+      />,
+    );
+    const card = container.querySelector('[data-board-column="CONNECTED"] li');
+    expect(card?.querySelector("[data-pipeline-scores]")?.textContent).toBe(
+      "Suitability55Investability70",
+    );
+  });
   it("orders Board columns forward path first, every state once", () => {
     expect([...BOARD_STATES].toSorted()).toEqual(
       [...RELATIONSHIP_STATES_V2].toSorted(),

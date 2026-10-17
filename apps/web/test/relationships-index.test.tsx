@@ -18,7 +18,8 @@ vi.mock("@/features/schedule/schedule-actions", () => ({
   markNoticesReadAction: vi.fn(() => Promise.resolve({ ok: true })),
   dismissReminderAction: vi.fn(() => Promise.resolve({ ok: true })),
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const { RelationshipsIndex } =
   await import("../src/features/relationships/relationships-index");
@@ -119,6 +120,100 @@ describe("RelationshipsIndex", () => {
       { target: { value: "zzz" } },
     );
     expect(screen.getByRole("status").textContent).toContain("Nothing matches");
+  });
+
+  it("ranks an investor's list by Suitability by default, unknown last, with labelled scores", () => {
+    const named = (n: number, name: string, stateSince: string) => ({
+      ...ITEM,
+      relationshipId: `a0000000-0000-4000-8000-00000000001${String(n)}`,
+      counterpart: {
+        ...ITEM.counterpart,
+        id: `c0000000-0000-4000-8000-00000000001${String(n)}`,
+        name,
+      },
+      stateSince,
+    });
+    // Newest first by time: Unscored, Middling, Best.
+    const best = named(1, "Best Fit Co", "2026-09-10T10:00:00.000Z");
+    const middling = named(2, "Middling Co", "2026-09-15T10:00:00.000Z");
+    const unscored = named(3, "Unscored Co", "2026-09-20T10:00:00.000Z");
+    const scores = {
+      [best.counterpart.id]: { suitability: 88, investability: 61 },
+      [middling.counterpart.id]: { suitability: 40, investability: null },
+    };
+    const page = render(
+      <RelationshipsIndex
+        side="INVESTOR"
+        items={[unscored, middling, best]}
+        scores={scores}
+        sort="suitability"
+      />,
+    );
+    const names = () =>
+      screen
+        .getAllByRole("article")
+        .map((card) => card.getAttribute("aria-labelledby"))
+        .map((id) => document.getElementById(id ?? "")?.textContent);
+    expect(names()).toEqual(["Best Fit Co", "Middling Co", "Unscored Co"]);
+
+    const bestCard = screen.getByRole("article", { name: "Best Fit Co" });
+    // The phone card's line: labelled numbers, never hidden.
+    const line = bestCard.querySelector("[data-pipeline-scores]");
+    expect(line?.textContent).toContain("Suitability88");
+    expect(line?.textContent).toContain("Investability61");
+    // The desktop columns name themselves to assistive technology.
+    expect(
+      bestCard.querySelector('span.block[data-pipeline-score="suitability"]')
+        ?.textContent,
+    ).toBe("Suitability 88");
+
+    // Unknown is "—" read as "Not known yet", never 0.
+    const unknown = screen
+      .getByRole("article", { name: "Unscored Co" })
+      .querySelector("[data-pipeline-scores]");
+    expect(unknown?.textContent).toContain("Suitability—Not known yet");
+    expect(unknown?.textContent).not.toMatch(/\b0\b/);
+
+    // The order is the person's to change; the choice goes in the URL.
+    const select = screen.getByRole<HTMLSelectElement>("combobox", {
+      name: "Sort relationships",
+    });
+    expect(select.value).toBe("suitability");
+    fireEvent.change(select, { target: { value: "recent" } });
+    expect(router.push).toHaveBeenLastCalledWith("/?sort=recent");
+
+    page.rerender(
+      <RelationshipsIndex
+        key="recent"
+        side="INVESTOR"
+        items={[unscored, middling, best]}
+        scores={scores}
+        sort="recent"
+      />,
+    );
+    expect(names()).toEqual(["Unscored Co", "Middling Co", "Best Fit Co"]);
+  });
+
+  it("shows a founder's list without score columns or a suitability sort", () => {
+    render(
+      <RelationshipsIndex
+        side="COMPANY"
+        items={[
+          {
+            ...ITEM,
+            counterpart: {
+              kind: "INVESTOR_ORGANISATION",
+              id: "f0000000-0000-4000-8000-000000000001",
+              name: "Savanna Seed",
+            },
+          },
+        ]}
+      />,
+    );
+    expect(document.querySelector("[data-pipeline-scores]")).toBeNull();
+    expect(
+      screen.queryByRole("combobox", { name: "Sort relationships" }),
+    ).toBeNull();
   });
 
   it("points an investor with none to Discover", () => {
