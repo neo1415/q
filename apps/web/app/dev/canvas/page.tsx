@@ -44,6 +44,7 @@ export default async function CanvasPreviewPage({
       n={Number.isFinite(n) ? n : 3}
       focus={Number.isFinite(focus) ? focus : 0}
       theme={one("theme") === "dark" ? "dark" : "light"}
+      opens={one("open") === "1"}
     />
   );
 }
