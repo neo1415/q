@@ -19,8 +19,8 @@ select ok(not has_table_privilege('anon','core.company_unicorn_potential_assessm
 select ok(not has_table_privilege('authenticated','core.company_unicorn_potential_assessments','insert'),'browser cannot write scores');
 select ok((select relrowsecurity from pg_class where oid='core.company_unicorn_potential_assessments'::regclass),'RLS enabled');
 select is((select kind from billing.features where key='intelligence.unicorn_potential'),'ACCESS','premium feature registered');
-select is((select count(*)::int from billing.plan_features pf join billing.plans p on p.id=pf.plan_id where pf.feature_key='intelligence.unicorn_potential' and pf.included and p.key not in ('investor_pro','fund')),0,'no free or default plan silently entitled');
-select ok((select bool_and(pf.included) from billing.plan_features pf join billing.plans p on p.id=pf.plan_id where pf.feature_key='intelligence.unicorn_potential' and p.key in ('investor_pro','fund')),'pro and fund plans entitled');
+select is((select count(*)::int from billing.plan_features pf join billing.plans p on p.id=pf.plan_id where pf.feature_key='intelligence.unicorn_potential' and pf.included and p.key not in ('founder_pro','investor_pro','fund')),0,'no free or default plan silently entitled');
+select is((select count(*)::int from billing.plan_features pf join billing.plans p on p.id=pf.plan_id where pf.feature_key='intelligence.unicorn_potential' and pf.included and p.key in ('founder_pro','investor_pro','fund')),3,'founder pro, investor pro and fund plans entitled');
 -- A→B→A remains legal history; only adjacent identical basis is skipped by
 -- the transactional repository, never a global unique hash constraint.
 insert into core.company_unicorn_potential_assessments(tenant_id,organisation_id,company_id,method_version,revision,basis_hash,cohort_key,status,summary,observations)
