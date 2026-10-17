@@ -37,6 +37,27 @@ function company(
 const criterion = (x: InvestabilityInputs, p: number, c = 0) =>
   assessUnicornPotential(x, NOW).view.pillars[p]?.criteria[c];
 describe("canonical structured evidence mapping", () => {
+  it("omits expired and future sources from persisted observations so recompute can authorize remaining evidence", () => {
+    for (const changes of [
+      { validTo: NOW },
+      { validTo: "2026-10-16T12:00:00.000Z" },
+      { validFrom: "2026-10-18T12:00:00.000Z" },
+      { validFrom: "invalid" },
+    ]) {
+      const input = company(
+        "financial.arr",
+        {
+          kind: "MONEY",
+          amount: "1000000",
+          currency: "USD",
+          asOf: "2026-09-30",
+        },
+        changes,
+      );
+      expect(assessUnicornPotential(input, NOW).observations).toEqual([]);
+    }
+  });
+
   it("supports canonical PERCENTAGE as well as source PERCENT vocabulary", () => {
     for (const kind of ["PERCENTAGE", "PERCENT"]) {
       expect(

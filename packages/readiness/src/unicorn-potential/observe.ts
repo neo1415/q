@@ -36,7 +36,7 @@ const reliabilityOf = (s: Source): number =>
             ? 0.5
             : 0;
 /** Admissible canonical sources only. Unconfirmed reads and transcripts remain Q inference. */
-function sourcesOf(inputs: InvestabilityInputs): Source[] {
+function sourcesOf(inputs: InvestabilityInputs, asOf: number): Source[] {
   if (!inputs.profile.listed) return [];
   const out: Source[] = [];
   for (const claim of inputs.claims) {
@@ -44,7 +44,13 @@ function sourcesOf(inputs: InvestabilityInputs): Source[] {
       !(INVESTOR_ELIGIBLE_SCOPES as readonly string[]).includes(
         claim.visibilityScope,
       ) ||
-      claim.lifecycleStatus === "SUPERSEDED"
+      claim.lifecycleStatus === "SUPERSEDED" ||
+      (claim.validFrom != null &&
+        (!Number.isFinite(Date.parse(claim.validFrom)) ||
+          Date.parse(claim.validFrom) > asOf)) ||
+      (claim.validTo != null &&
+        (!Number.isFinite(Date.parse(claim.validTo)) ||
+          Date.parse(claim.validTo) <= asOf))
     )
       continue;
     out.push({
@@ -157,7 +163,7 @@ export function observeUnicornPotential(
   const now = Date.parse(asOf);
   if (!Number.isFinite(now)) throw new Error("Invalid assessment timestamp");
   const out: UnicornObservation[] = [];
-  for (const source of sourcesOf(inputs)) {
+  for (const source of sourcesOf(inputs, now)) {
     const quality = reliabilityOf(source);
     if (
       quality === 0 ||
