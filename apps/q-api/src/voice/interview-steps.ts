@@ -625,6 +625,22 @@ export function asciiDigits(text: string): string {
     .replace(/\u066c/gu, ",");
 }
 
+/** Arabic dual forms of the scale words: two of the unit, said in one word. */
+const ARABIC_DUAL_SCALES: Readonly<Record<string, number>> = {
+  ألفا: 2e3,
+  ألفي: 2e3,
+  ألفين: 2e3,
+  الفا: 2e3,
+  الفي: 2e3,
+  الفين: 2e3,
+  مليونا: 2e6,
+  مليوني: 2e6,
+  مليونين: 2e6,
+  مليارا: 2e9,
+  ملياري: 2e9,
+  مليارين: 2e9,
+};
+
 export const SCALE_WORDS: Readonly<Record<string, number>> = {
   // Scale words in the languages people answer in (live AJ 2026-10-16:
   // "400 mille euros" was saved as 400). Each is unambiguous: Spanish and
@@ -769,6 +785,13 @@ export function spokenFiguresIn(text: string): readonly number[] {
   const figures: number[] = [];
   for (let start = 0; start < tokens.length; start += 1) {
     const first = tokens[start] ?? "";
+    // Arabic duals are a figure on their own: "مليوني دولار" is two
+    // million (live AP: the raise amount was refused as no figure).
+    const dual = ARABIC_DUAL_SCALES[first.replace(/^(?:و|ب|ل)/u, "")];
+    if (dual !== undefined) {
+      figures.push(dual);
+      continue;
+    }
     const opens =
       NUMBER_WORDS[first.replace(/-.*/, "")] !== undefined ||
       (first === "a" && SCALE_WORDS[tokens[start + 1] ?? ""] !== undefined);
