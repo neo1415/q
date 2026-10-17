@@ -27,9 +27,11 @@
  * No binaries, package archives, account data or credentials belong in Git.
  */
 import assert from "node:assert/strict";
+import console from "node:console";
+import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, URL } from "node:url";
 
 const target = new URL(
   process.env["CQ_UNICORN_PROOF_DATABASE_URL"] ??

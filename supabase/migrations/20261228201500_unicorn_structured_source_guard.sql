@@ -28,8 +28,8 @@ language sql stable set search_path = '' as $eligibility$
                     then old.id::text = lower(o->'source'->>'revision')
                     else pg_catalog.pg_input_is_valid(o->'source'->>'revision', 'timestamp with time zone') end)
               else q.lifecycle_status <> 'SUPERSEDED'
-                and (q.valid_from is null or q.valid_from <= pg_catalog.now())
-                and (q.valid_to is null or q.valid_to > pg_catalog.now())
+                and (q.valid_from is null or q.valid_from <= pg_catalog.statement_timestamp())
+                and (q.valid_to is null or q.valid_to > pg_catalog.statement_timestamp())
                 and q.statement = o->'source'->>'label'
                 and q.truth_class = o->'source'->>'truthClass'
                 and q.evidence_status = o->'source'->>'evidenceStatus'

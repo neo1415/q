@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
-select plan(17);
+select plan(18);
 insert into core.companies(id,tenant_id,organisation_id,canonical_name,slug,current_stage_code,short_description,marketplace_visibility)
 values('00000000-0000-4000-8000-000000009bc1',pg_temp.rls_id('tenant_a'),pg_temp.rls_id('org_a'),'Structured source proof','structured-source-proof','seed','Test','network_visible');
 insert into evidence.claims(id,tenant_id,subject_type,subject_id,claim_type,claim_key,statement,structured_value,asserted_by_type,asserted_by_id,asserted_at,truth_class,evidence_status,lifecycle_status,visibility_scope,current_revision_id)
@@ -32,9 +32,11 @@ select is((select count(*)::int from private.unicorn_potential_historical_revisi
 update unicorn_structured_candidate set value=jsonb_set(jsonb_set(value,'{0,observations,0,source,revision}','"00000000-0000-4000-8000-000000009bc4"'),'{0,observations,0,source,label}','"Annual recurring revenue reached two million"');
 select is((select count(*)::int from private.unicorn_potential_eligible_revisions((select value from unicorn_structured_candidate))),1,'corrected canonical UUID authorizes current source');
 insert into evidence.claim_revisions(id,tenant_id,claim_id,revision_number,statement,structured_value,truth_class,evidence_status,lifecycle_status,changed_by_type,changed_by_id,change_reason,valid_to)
-values('00000000-0000-4000-8000-000000009bc5',pg_temp.rls_id('tenant_a'),'00000000-0000-4000-8000-000000009bc2',3,'Annual recurring revenue reached two million','{"value":2000000}','USER_CLAIM','SELF_REPORTED','CURRENT','SYSTEM',pg_temp.rls_id('user_a'),'Metric expired',clock_timestamp()-interval '1 minute');
-update evidence.claims set current_revision_id='00000000-0000-4000-8000-000000009bc5',current_revision_number=3,valid_to=clock_timestamp()-interval '1 minute' where id='00000000-0000-4000-8000-000000009bc2';
+values('00000000-0000-4000-8000-000000009bc5',pg_temp.rls_id('tenant_a'),'00000000-0000-4000-8000-000000009bc2',3,'Annual recurring revenue reached two million','{"value":2000000}','USER_CLAIM','SELF_REPORTED','CURRENT','SYSTEM',pg_temp.rls_id('user_a'),'Metric expired',(select updated_at + interval '1 microsecond' from knowledge.company_profiles where company_id='00000000-0000-4000-8000-000000009bc1'));
+update evidence.claims set current_revision_id='00000000-0000-4000-8000-000000009bc5',current_revision_number=3,valid_to=(select valid_to from evidence.claim_revisions where id='00000000-0000-4000-8000-000000009bc5') where id='00000000-0000-4000-8000-000000009bc2';
 update unicorn_structured_candidate set value=jsonb_set(value,'{0,observations,0,source,revision}','"00000000-0000-4000-8000-000000009bc5"');
+update unicorn_structured_candidate set value=jsonb_set(value,'{0,assessed_at}',(select to_jsonb(updated_at::text) from knowledge.company_profiles where company_id='00000000-0000-4000-8000-000000009bc1'));
+select ok((select (value->0->>'assessed_at')::timestamptz < q.valid_to and q.valid_to < clock_timestamp() from unicorn_structured_candidate cross join evidence.claims q where q.id='00000000-0000-4000-8000-000000009bc2'),'fixture snapshot precedes actual source expiry');
 select is((select count(*)::int from private.unicorn_potential_eligible_revisions((select value from unicorn_structured_candidate))),0,'valid_to expiry withholds current even when snapshot predates expiry');
 select is((select count(*)::int from private.unicorn_potential_historical_revisions((select value from unicorn_structured_candidate))),1,'expired public source retains dated historical audit');
 update evidence.claims set visibility_scope='founder_private' where id='00000000-0000-4000-8000-000000009bc2';
