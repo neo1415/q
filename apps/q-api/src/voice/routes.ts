@@ -829,6 +829,9 @@ export function registerQVoiceRoutes(
             // they registered with, rather than asking cold.
             signup: signupContextFromToken(accessToken),
             journeyType: input.onboarding.journeyType,
+            ...(input.onboarding.focus === undefined
+              ? {}
+              : { focus: input.onboarding.focus }),
             channel: "voice",
             attribution: {
               tenantId: actor.tenantId,

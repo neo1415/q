@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { PermittedContextPlan } from "@capital-q/contracts";
+import {
+  CreateQVoiceSessionRequestSchema,
+  type PermittedContextPlan,
+} from "@capital-q/contracts";
 import { FOUNDER_DEFINITION_CURRENT } from "@capital-q/founder-onboarding";
 import type { ModelGateway } from "@capital-q/model-gateway";
 import { createLogger } from "@capital-q/observability";
@@ -26,7 +29,9 @@ import {
   RESEARCH_STARTED_LINE,
 } from "../src/voice/quick-acknowledgement.js";
 import { withoutUnbackedFieldClaims } from "../src/voice/onboarding-flow.js";
+import { scaleDroppedIn } from "../src/voice/value-support.js";
 import {
+  createOnboardingPort,
   currencyNamedIn,
   fieldPartOf,
   moneyFiguresIn,
@@ -398,5 +403,148 @@ describe("a chosen language warms the acknowledgement copy", () => {
     expect(calls.every((c) => c.size <= 40)).toBe(true);
     const total = calls.reduce((sum, c) => sum + c.size, 0);
     expect(total).toBe(onboardingAcknowledgementCopy("founder", "fr").length);
+  });
+});
+
+describe("live AI: a new investor's categories in their first answer", () => {
+  it("are planned again once that answer set up their profile", async () => {
+    const said =
+      "We're a VC fund, we invest in Europe and North Africa, mostly climate.";
+    const world = investorSession({
+      currentStepKey: "I0.investor_type",
+      taxonomy: {
+        europe: "a0000000-0000-4000-8000-0000000000e1",
+        "north africa": "a0000000-0000-4000-8000-0000000000e2",
+        climate: "a0000000-0000-4000-8000-0000000000c1",
+      },
+      taxonomyUntil: "I0.investor_type",
+    });
+    const port = createOnboardingPort({
+      session: turn(world, said).session,
+      onboardingSessionId: turn(world, said).onboardingSessionId,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [said],
+      authority: () =>
+        Promise.resolve(
+          reading({
+            stated: ["I0.investor_type", "I3.geography", "I3.sectors"],
+          }),
+        ),
+    });
+    const results = await port.record([
+      {
+        stepKey: "I0.investor_type",
+        value: "vc",
+        quote: "a VC fund",
+        basis: "STATED",
+        ownWords: false,
+      },
+      {
+        stepKey: "I3.geography",
+        value: ["Europe", "North Africa"],
+        quote: "Europe and North Africa",
+        basis: "STATED",
+        ownWords: false,
+      },
+      {
+        stepKey: "I3.sectors",
+        value: ["climate"],
+        quote: "mostly climate",
+        basis: "STATED",
+        ownWords: false,
+      },
+    ]);
+    expect(results.map((r) => r.outcome)).toEqual([
+      "COMMITTED",
+      "COMMITTED",
+      "COMMITTED",
+    ]);
+    expect(world.recordedValue("I3.geography")?.type).toBe(
+      "RESOURCE_REFERENCE",
+    );
+  });
+});
+
+describe("live AI: a stated fact off their path is kept, by code", () => {
+  it("revenue for a pre-seed company goes to their notes in its own words", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.description",
+      recorded: { "F0.intent": "raising_now", "F1.company_name": "Lakeline" },
+      ineligible: ["F5.revenue_status"],
+    });
+    const port = createOnboardingPort({
+      session: turn(world, AG_FOUNDER).session,
+      onboardingSessionId: turn(world, AG_FOUNDER).onboardingSessionId,
+      journeyType: "founder",
+      ownerUserId: actor.userId,
+      personTurns: [AG_FOUNDER],
+    });
+    const kept = await port.keepStated("F5.revenue_status", AG_FOUNDER);
+    expect(kept?.outcome).toBe("COMMITTED");
+    const notes = world.recordedValue("F7.follow_up");
+    const text = notes?.type === "TEXT" ? notes.text : "";
+    expect(text).toContain("first revenue only");
+    expect(text).not.toContain("cold-chain");
+  });
+});
+
+describe("live AI: the spoken opening of a section link opens on that section", () => {
+  it("the voice session carries the section, validated like the typed one", () => {
+    const base = {
+      onboarding: {
+        sessionId: "a0000000-0000-4000-8000-000000000001",
+        journeyType: "founder",
+      },
+    };
+    expect(
+      CreateQVoiceSessionRequestSchema.safeParse({
+        ...base,
+        onboarding: { ...base.onboarding, focus: "moats" },
+      }).success,
+    ).toBe(true);
+    expect(
+      CreateQVoiceSessionRequestSchema.safeParse({
+        ...base,
+        onboarding: { ...base.onboarding, focus: "Moats; drop table" },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("live AJ: a figure keeps its scale, in any language", () => {
+  it("'400 mille euros' is 400,000, and 400 is refused", () => {
+    expect(
+      moneyFiguresIn("nous levons 400 mille euros").map((f) => f.value),
+    ).toEqual([400_000]);
+    expect(scaleDroppedIn("400", "nous levons 400 mille euros")).toBe(true);
+    expect(scaleDroppedIn("400000", "nous levons 400 mille euros")).toBe(false);
+    expect(scaleDroppedIn("2", "2 millones de dólares")).toBe(true);
+    expect(scaleDroppedIn("11", "about 11 people")).toBe(false);
+    expect(scaleDroppedIn("150", "150 mil reais")).toBe(true);
+  });
+
+  it("the read-back has no English note and no doubled stops", () => {
+    const reply = quickAcknowledgement({
+      results: [
+        {
+          stepKey: "F1.country",
+          outcome: "COMMITTED",
+          recorded: "basés au Sénégal (in their words)",
+        },
+        {
+          stepKey: "F1.description",
+          outcome: "COMMITTED",
+          recorded:
+            "Nous proposons une plateforme de téléconsultation pour les pharmacies rurales au Sénégal.",
+        },
+      ],
+      labelOf: (key) =>
+        key === "F1.country" ? "Country" : "What the company does",
+      next: { question: "What stage is the company at?", optional: false },
+      turnIndex: 0,
+    });
+    expect(reply).not.toMatch(/in their words|\.\.|…\./u);
   });
 });
