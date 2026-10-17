@@ -157,6 +157,7 @@ export {
   type QAnswerPort,
   type QPrereadInput,
   type QAnswerRequest,
+  type QConversationFetch,
   type QCapabilityManifest,
   type QResearchDirective,
   type QQuestionSequenceStep,

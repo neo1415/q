@@ -383,6 +383,8 @@ export function controlsLine(
   const described = controls.map((control) => {
     const extra = [
       control.kind,
+      // A tab's own visible name (letters only), so it is chosen by meaning.
+      ...(control.label === undefined ? [] : [`"${control.label}"`]),
       ...(control.state === undefined ? [] : [control.state]),
       ...(control.count === undefined
         ? []

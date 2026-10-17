@@ -17,9 +17,9 @@ import {
  * phrase list.
  */
 describe("TURN_READER v54: SHOWN, read by meaning", () => {
-  it("is the active reader, v53's rules unchanged", () => {
+  it("v53's rules unchanged; v55 extends it", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(54);
+    expect(active.definition.version).toBe(55);
     expect(TURN_READER_V53.status).toBe("DEPRECATED");
     expect(TURN_READER_V54.template).toContain(V53_Q_PITCH);
     expect(TURN_READER_V54.template).toContain(V54_FROM_SHOWN);
