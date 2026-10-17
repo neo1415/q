@@ -1,4 +1,5 @@
 import type { QTurn, QTurnObjectBlock } from "./conversation";
+import { roomShowOf } from "./room/room-stage";
 
 /**
  * What the Q page shows over Q's presence (founder request 2026-10-03).
@@ -419,6 +420,11 @@ export function stageOf(
     if (one === undefined) break;
     const own = items.find((item) => item.run === one.run);
     if (own !== undefined) return { item: own, why: "SHOWN" };
+    // Owner 2026-10-17: an answer that opens a room card is the most
+    // recent display; older cards leave the stage rather than sit over it.
+    if (roomShowOf(one.turn, one.question ?? null) !== undefined) {
+      return { item: null, why: "NONE" };
+    }
     // The one the person reopened first, then newest first: the most
     // recent object the conversation is on.
     const ordered = [...items].reverse();
@@ -467,6 +473,15 @@ export function stageNoteOf(
   const earlier = items.filter((item) => item.run !== latest.run);
   const then = stageOf(earlier, before);
   if (then.item === null || then.item.run === now.item?.run) return null;
+  // The same set again (the voice line's copy, then the stored one; or
+  // the same three asked twice) replaced nothing anyone can see.
+  if (
+    now.item !== null &&
+    now.item.title === then.item.title &&
+    JSON.stringify(now.item.blocks) === JSON.stringify(then.item.blocks)
+  ) {
+    return null;
+  }
   if (isHidden(then.item)) return null;
   // A question back that was answered goes without a note.
   if (subjectOf(then.item).answeredOnce) return null;

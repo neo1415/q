@@ -62,6 +62,31 @@ const GENERIC = new Set([
   "fictional",
   "sources",
   "plan",
+  // Owner 2026-10-17: "your saved companies" reopened on "new companies".
+  "your",
+  "company",
+  "companies",
+]);
+
+/**
+ * The kinds whose title is a record's own name (a company, a person, a
+ * document). Every other kind's title is a description ("Your saved
+ * companies, side by side") whose words name nothing: only its kind words
+ * bring it back.
+ */
+const NAMED_BY_RECORD: ReadonlySet<QShowInQRoomIntent["object"]> = new Set([
+  "COMPANY_PROFILE",
+  "DATA_ROOM",
+  "PITCH_DECK",
+  "CHAT_WITH_COMPANY",
+  "CHAT_WITH_INVESTOR",
+  "WORK_PLAN",
+  "CAPITAL_ROUND",
+  "GATEQ_APPLICATION",
+  "Q_DOCUMENT",
+  "ASSUMPTIONS",
+  "EVIDENCE_BOARD",
+  "INVESTOR_LOOKS_FOR",
 ]);
 
 /** The words that name a card's subject: its record's name, then its kind. */
@@ -69,9 +94,11 @@ function subjectWords(intent: QShowInQRoomIntent): {
   readonly names: readonly string[];
   readonly kinds: readonly string[];
 } {
-  const names = folded(intent.title)
-    .split(" ")
-    .filter((word) => word.length >= 4 && !GENERIC.has(word));
+  const names = NAMED_BY_RECORD.has(intent.object)
+    ? folded(intent.title)
+        .split(" ")
+        .filter((word) => word.length >= 4 && !GENERIC.has(word))
+    : [];
   const kinds: Record<QShowInQRoomIntent["object"], readonly string[]> = {
     COMPANY_PROFILE: ["profile"],
     DATA_ROOM: ["data room", "dataroom"],
@@ -102,7 +129,8 @@ function subjectWords(intent: QShowInQRoomIntent): {
     ASSUMPTIONS: ["assumption", "assumptions", "test", "ask the founder"],
     EVIDENCE_BOARD: ["evidence", "evidenced", "claimed", "board"],
     THESIS: ["thesis", "mandate", "suggestion", "suggestions"],
-    SAVED_COMPARISON: ["compare", "comparison", "saved", "side by side"],
+    // Their saved list by name only: "compare them" is the cards on screen.
+    SAVED_COMPARISON: ["saved", "saves", "bookmarked", "bookmarks"],
     INVESTOR_FIT: ["investors", "investor", "gate", "gates", "criteria"],
     READINESS_BLUEPRINT: ["plan", "month", "months", "blueprint", "roadmap"],
     INVESTOR_REQUESTS: ["asked", "request", "requests", "questions", "answer"],
@@ -168,6 +196,56 @@ const ROOM_DOCUMENT_TYPES: ReadonlySet<string> = new Set([
   "ONE_PAGER",
   "MEMO",
 ]);
+
+/**
+ * Owner 2026-10-17: the saved companies come up only when the person asked
+ * for their saved list in that turn ("show me the cards again" had been
+ * answered with them, over the answer's own cards).
+ */
+function asksForSaved(question: string | null): boolean {
+  if (question === null) return false;
+  return subjectWords({
+    kind: "SHOW_IN_Q_ROOM",
+    object: "SAVED_COMPARISON",
+    title: "",
+  }).kinds.some((kind) => has(question, kind));
+}
+
+/**
+ * What an answer shows over Q's presence on its own (shown.ts). Such an
+ * answer replaces whatever room card was open: the most recent display in
+ * the conversation wins.
+ */
+const STAGE_DISPLAYS: ReadonlySet<string> = new Set([
+  "ANSWER_CARDS",
+  "COMPARISON_CARDS",
+  "COMPARISON",
+  "TABLE",
+  "CHART",
+  "MAP",
+  "TIMELINE",
+  "ARTIFACT_REFERENCE",
+]);
+
+function showsOnStage(turn: Extract<QTurn, { kind: "Q" }>): boolean {
+  return turn.blocks.some((block) => STAGE_DISPLAYS.has(block.kind));
+}
+
+/**
+ * The room card an answer opens, if any: its last, and never the saved
+ * companies unless the question it answers asked for them. Shared with the
+ * stage (shown.ts), so a newer room card also replaces older answer cards.
+ */
+export function roomShowOf(
+  turn: Extract<QTurn, { kind: "Q" }>,
+  question: string | null,
+): QShowInQRoomIntent | undefined {
+  return showsOf(turn)
+    .filter(
+      (show) => show.object !== "SAVED_COMPARISON" || asksForSaved(question),
+    )
+    .at(-1);
+}
 
 function showsOf(turn: Extract<QTurn, { kind: "Q" }>): QShowInQRoomIntent[] {
   const out: QShowInQRoomIntent[] = [];
@@ -251,6 +329,9 @@ export function roomStage(turns: readonly QTurn[]): RoomStage {
   let open: RoomCard | null = null;
   let note: RoomNote | null = null;
   let asked: string | null = null;
+  // The person's words the next answer replies to, kept even when they
+  // reopened a card (`asked` is cleared then).
+  let question: string | null = null;
   const movedOn = (card: RoomCard, at: string): RoomNote => ({
     id: at,
     text: `Closed ${describeCard(card.intent)} as we moved on`,
@@ -259,6 +340,7 @@ export function roomStage(turns: readonly QTurn[]): RoomStage {
   for (const [index, turn] of turns.entries()) {
     if (turn.kind === "PERSON") {
       asked = turn.text;
+      question = turn.text;
       if (asksToClose(turn.text)) {
         open = null;
         asked = null;
@@ -282,8 +364,8 @@ export function roomStage(turns: readonly QTurn[]): RoomStage {
       continue;
     }
     if (turn.streaming) continue;
-    const shows = showsOf(turn);
-    const shown = shows.at(-1);
+    const shown = roomShowOf(turn, question);
+    question = null;
     if (shown !== undefined) {
       // The same document again (a new version of the deck on screen):
       // it stays where it is, on its slide.
@@ -300,6 +382,15 @@ export function roomStage(turns: readonly QTurn[]): RoomStage {
       if (open !== null && open.key !== card.key) note = movedOn(open, turn.id);
       open = card;
       known.set(card.key, card);
+      asked = null;
+      continue;
+    }
+    // Owner 2026-10-17: an answer's own display (its cards, a table)
+    // replaces the room card, so new cards are never left under, or pushed
+    // off screen by, an older room view.
+    if (open !== null && showsOnStage(turn)) {
+      note = movedOn(open, turn.id);
+      open = null;
       asked = null;
       continue;
     }

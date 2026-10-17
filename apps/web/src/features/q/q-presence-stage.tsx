@@ -34,7 +34,10 @@ import { useT } from "@/features/i18n/language";
 
 /** W7: how long after the stage mounts its likely next code is fetched. */
 const PREFETCH_AFTER_MS = 800;
+/** The longest a set takes to fly to the Board (560 ms plus its stagger). */
+const LEAVING_MAX_MS = 1_500;
 import {
+  answerCardRef,
   hideKey,
   isHiddenIn,
   reopenStaged,
@@ -231,8 +234,19 @@ export function QPresenceStage({
   const dismiss = (item: ShownItem) => hideKey(stageCardRef(item).key);
 
   // The answer on the stage as cards, and one leaving for the Board.
+  const shownCards =
+    shown?.blocks.find(
+      (one): one is QAnswerCardsBlock => one.kind === "ANSWER_CARDS",
+    ) ?? null;
+  // Owner 2026-10-17: cards every one of which is put away draw nothing,
+  // so they are not on the stage: Q's presence stays, never a blank stage.
+  const drawable = useVisibleCards(shownCards?.cards ?? [], (card) =>
+    answerCardRef(shown?.id ?? "", card),
+  );
+  const putAway =
+    shownCards !== null && shownCards.cards.length > 0 && drawable.length === 0;
   const canvas =
-    shown === null
+    shown === null || putAway
       ? null
       : (() => {
           // The set as it was shown (INC-1): from its own blocks, so a later
@@ -273,15 +287,22 @@ export function QPresenceStage({
   useEffect(() => {
     if (leaving === null) return;
     let done = false;
+    // Owner 2026-10-17: while a set is leaving, neither the new set nor
+    // Q's presence is drawn, so the leaving always ends: on landing, on a
+    // failed flight, and at the latest after the flight's own time.
+    const land = () => {
+      if (done) return;
+      done = true;
+      setLeaving(null);
+      onBoardLanded?.();
+    };
+    const fallback = window.setTimeout(land, LEAVING_MAX_MS);
     void import("./answer-canvas")
       .then((module) => module.flyToBoard(leavingRef.current))
-      .then(() => {
-        if (done) return;
-        setLeaving(null);
-        onBoardLanded?.();
-      });
+      .then(land, land);
     return () => {
       done = true;
+      window.clearTimeout(fallback);
     };
   }, [leaving, onBoardLanded]);
 
@@ -305,7 +326,8 @@ export function QPresenceStage({
 
   // Q room W3: a data-room document open in the room's centre panel.
   const documentOpen = useRoomDocumentOpen();
-  const showing = shown !== null || roomOpen !== null || documentOpen;
+  const showing =
+    (shown !== null && !putAway) || roomOpen !== null || documentOpen;
   useEffect(() => {
     onShowingChange?.(showing);
   }, [showing, onShowingChange]);
@@ -372,6 +394,7 @@ export function QPresenceStage({
         <div ref={leavingRef} className="w-full" data-q-canvas-leaving>
           <Suspense fallback={null}>
             <AnswerCanvas
+              answerKey={leaving.id}
               block={leaving.block}
               focus={-1}
               said=""
@@ -436,7 +459,7 @@ export function QPresenceStage({
         </p>
       )}
 
-      {shown === null || canvas !== null ? null : (
+      {shown === null || canvas !== null || putAway ? null : (
         <section
           aria-labelledby={`${listId}-shown-title`}
           className="flex max-h-[60dvh] w-full flex-col overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)"
