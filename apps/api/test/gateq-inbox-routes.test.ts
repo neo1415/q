@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { parseApiConfig } from "@capital-q/config/api";
 import {
   GATEQ_INBOX_VIEWS,
+  GATEQ_INBOX_ITEM_PATH,
   GATEQ_INBOX_PACK_PATH,
   GATEQ_INBOX_PASS_PATH,
   GATEQ_INBOX_PATH,
@@ -107,12 +108,29 @@ function build() {
   const { app } = createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     gateq: {} as never,
     gateqInboxService: service,
+    gateqUnicornPotential: (...args) => {
+      calls.push({ op: "unicorn", args });
+      return Promise.resolve(new Map());
+    },
     gateqInboxActions: port as never,
   });
   return { app, calls };
 }
 
 describe("the GateQ inbox over HTTP (F4)", () => {
+  it("does not read a protected assessment when dossier authorization refuses the application", async () => {
+    const { app, calls } = build();
+    const response = await app.inject({
+      method: "GET",
+      url: gateqInboxPath(GATEQ_INBOX_ITEM_PATH, {
+        gatewayId: THEIRS,
+        applicationId: APP,
+      }),
+    });
+    expect(response.statusCode).toBe(404);
+    expect(calls.some((call) => call.op === "unicorn")).toBe(false);
+  });
+
   it("reads the caller's own gateway's inbox, and 404s anyone else's", async () => {
     const { app } = build();
     const ok = await app.inject({

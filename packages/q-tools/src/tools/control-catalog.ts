@@ -32,6 +32,7 @@ export const Q_CONTROL_CATALOG: readonly QControlCatalogEntry[] = [
   { id: "dialog.notifications", kind: "DIALOG" },
   { id: "dialog.reminder", kind: "DIALOG" },
   { id: "disclosure.gateq-transcript", kind: "DISCLOSURE" },
+  { id: "disclosure.unicorn-potential", kind: "DISCLOSURE" },
   { id: "filter.pipeline-search", kind: "FILTER" },
   { id: "filter.pipeline-sort", kind: "FILTER" },
   { id: "filter.pipeline-state", kind: "FILTER" },

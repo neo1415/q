@@ -16,6 +16,7 @@ import {
   InvestorGateFitListDtoSchema,
   InvestorGatesQuerySchema,
   type InvestorGateFitDto,
+  type GateqUnicornPotentialDto,
   GATEQ_MY_APPLICATIONS_PATH,
   ClaimableCompanyListDtoSchema,
   COMPANY_CLAIM_CONFIRM_PATH,
@@ -115,6 +116,14 @@ import {
 
 export type GateQRoutesDependencies = ActorContextDependencies & {
   readonly gateq: GateQService;
+  /** Invoked after the existing application's authorization succeeds. */
+  readonly unicornPotential?:
+    | ((
+        actor: ActorContext,
+        applicationIds: readonly string[],
+        audience: "INVESTOR" | "FOUNDER",
+      ) => Promise<ReadonlyMap<string, GateqUnicornPotentialDto>>)
+    | undefined;
   /** F2: the signed-in founder's own applications, as the investor answered them. */
   readonly myApplications?:
     | ((
@@ -359,11 +368,20 @@ export function registerGateQRoutes(
       GATEQ_MY_APPLICATIONS_PATH,
       { onRequest: withContext },
       async (request, reply) => {
-        const rows = await myApplications(getActorContext(request));
+        const actor = getActorContext(request);
+        const rows = await myApplications(actor);
+        const unicorn = await dependencies.unicornPotential?.(
+          actor,
+          rows.map((row) => row.applicationId),
+          "FOUNDER",
+        );
         void reply.header("Cache-Control", "no-store");
         return FounderApplicationListDtoSchema.parse({
           applications: rows.map((row) => ({
             applicationId: row.applicationId,
+            ...(unicorn?.has(row.applicationId)
+              ? { unicornPotential: unicorn.get(row.applicationId) }
+              : {}),
             fund: row.fund,
             sentAt: row.sentAt,
             status: row.status,
@@ -510,7 +528,16 @@ export function registerGateQRoutes(
           return undefined;
         }
         void reply.header("Cache-Control", "no-store");
-        return GateqInboxDetailDtoSchema.parse(detail);
+        const unicorn = await dependencies.unicornPotential?.(
+          getActorContext(request),
+          [detail.item.applicationId],
+          "INVESTOR",
+        );
+        const assessment = unicorn?.get(detail.item.applicationId);
+        return GateqInboxDetailDtoSchema.parse({
+          ...detail,
+          unicornPotential: assessment,
+        });
       },
     );
 

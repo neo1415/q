@@ -771,9 +771,12 @@ export function GateQForm({
                   )
                 : ""}
             </p>
-            {inApp ? (
+            {inApp || !anonymous ? (
               <div className="flex flex-wrap gap-2">
-                <a href="/gateq" className={buttonClassName("primary")}>
+                <a
+                  href="/gateq?tab=applications"
+                  className={buttonClassName("primary")}
+                >
                   {t("See your applications")}
                 </a>
               </div>

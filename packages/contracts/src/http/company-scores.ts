@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
+import { UnicornPotentialDtoSchema } from "./unicorn-potential.js";
 
 /**
  * The two scores every company carries for an investor (owner request
@@ -226,6 +227,8 @@ export const CompanyScoresDtoSchema = z
     investability: InvestabilityDtoSchema,
     /** Null for a reader with no mandate (or not an investor). */
     suitability: SuitabilityDtoSchema.nullable(),
+    /** Absent unless server-side premium and company visibility both allow. */
+    unicornPotential: UnicornPotentialDtoSchema.optional(),
   })
   .strict();
 export type CompanyScoresDto = z.infer<typeof CompanyScoresDtoSchema>;

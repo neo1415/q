@@ -49,6 +49,7 @@ import {
   FitPanelSlot,
   FitStripCell,
   ProfileFitProvider,
+  ProfileUnicornAssessment,
 } from "./material/fit-panel-slot";
 import { TeamTab } from "./material/team";
 import { pitchProfileSections } from "./pitch-profile";
@@ -593,6 +594,8 @@ export function CompanyProfileView({
                 {scores === null || scores === undefined ? null : (
                   <CompanyProfileScoresSlot>{scores}</CompanyProfileScoresSlot>
                 )}
+
+                {investor ? <ProfileUnicornAssessment /> : null}
 
                 {/*
                   The pitch-deck-shaped profile (owner 2026-10-16): the same

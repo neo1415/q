@@ -7,6 +7,7 @@ import {
   notAssessedInvestability,
   type CompanyScoresDto,
   type FitCompanyDto,
+  type UnicornPotentialDto,
 } from "@capital-q/contracts";
 
 /**
@@ -70,6 +71,61 @@ const scored: CompanyScoresDto = CompanyScoresDtoSchema.parse({
 });
 
 describe("CompanyScores", () => {
+  it("adds an entitled third assessment without changing either existing score", () => {
+    const unicornPotential: UnicornPotentialDto = {
+      status: "NOT_ASSESSED",
+      overallScore: null,
+      band: null,
+      confidence: "LOW",
+      coverage: 0,
+      stage: null,
+      methodVersion: "unicorn-potential.v1.0.0",
+      inputRulesVersion: "unicorn-inputs.v1",
+      assessedAt: null,
+      pillars: [],
+      up: [],
+      down: [],
+      missing: [],
+      momentum: null,
+      benchmark: "Comparable benchmark unavailable",
+    };
+    const premium = { ...scored, unicornPotential };
+    const { rerender } = render(<CompanyScores scores={premium} />);
+    expect(
+      document.querySelector('[data-score="investability"]')?.textContent,
+    ).toContain("58");
+    expect(
+      document.querySelector('[data-score="suitability"]')?.textContent,
+    ).toContain("80");
+    expect(
+      document.querySelector('[data-score="unicorn-potential"] > summary')
+        ?.textContent,
+    ).toContain("Not assessed yet");
+    expect(companyScoresLabel(premium)).toContain(
+      "Unicorn Potential: not assessed yet",
+    );
+    rerender(<CompanyScores scores={premium} unicornDetails={false} />);
+    const overviewLink = screen.getByRole("link", {
+      name: "Unicorn Potential: not assessed yet · View assessment",
+    });
+    expect(overviewLink.getAttribute("href")).toBe(
+      `/company/${COMPANY}?tab=overview#unicorn-potential-${COMPANY}`,
+    );
+    expect(
+      document.querySelector('[data-score="unicorn-potential"] > summary'),
+    ).toBeNull();
+    rerender(<CompanyScores scores={premium} variant="compact" />);
+    expect(
+      document.querySelector('[data-score="unicorn-potential"]')?.textContent,
+    ).toBe("Unicorn Potential: not assessed yet");
+    expect(document.querySelector("details")).toBeNull();
+    rerender(<CompanyScores scores={scored} variant="full" />);
+    expect(
+      document.querySelector('[data-score="unicorn-potential"]'),
+    ).toBeNull();
+    expect(companyScoresLabel(scored)).not.toContain("Unicorn");
+  });
+
   it("shows both scores separately, with coverage, confidence and why", () => {
     render(<CompanyScores scores={scored} variant="full" />);
     const inv = document.querySelector('[data-score="investability"]');
@@ -152,5 +208,103 @@ describe("CompanyScores", () => {
     );
     expect(calls).toHaveLength(1);
     expect([...(calls[0] ?? [])].sort()).toEqual([COMPANY, OTHER].sort());
+  });
+});
+
+describe("score read authorization lifetime", () => {
+  it("reauthorizes a company after remount instead of reusing a prior reader's result", async () => {
+    const port = vi.fn((ids: readonly string[]) =>
+      Promise.resolve(
+        ids.map((companyId) => ({
+          companyId,
+          name: "Co",
+          line: null,
+          profile: {} as never,
+          scores: { ...scored, companyId },
+        })),
+      ),
+    );
+    function Card() {
+      const scores = useCompanyScores([COMPANY], { port });
+      return <CompanyScoresFor scores={scores} companyId={COMPANY} />;
+    }
+    const first = render(<Card />);
+    await waitFor(() => expect(port).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-company-scores="compact"]'),
+      ).not.toBeNull(),
+    );
+    first.unmount();
+    render(<Card />);
+    await waitFor(() => expect(port).toHaveBeenCalledTimes(2));
+  });
+  it("does not combine two authorized readers queued in the same tick", async () => {
+    const entitled = vi.fn((ids: readonly string[]) =>
+      Promise.resolve(
+        ids.map((companyId) => ({
+          companyId,
+          name: "Co",
+          line: null,
+          profile: {} as never,
+          scores: { ...scored, companyId },
+        })),
+      ),
+    );
+    const denied = vi.fn(() => Promise.resolve([]));
+    function Card({
+      port,
+      label,
+    }: {
+      readonly port: (
+        ids: readonly string[],
+      ) => Promise<readonly FitCompanyDto[]>;
+      readonly label: string;
+    }) {
+      const scores = useCompanyScores([COMPANY], { port });
+      return (
+        <div data-testid={label}>
+          {scores.has(COMPANY) ? "authorized score" : "no score"}
+        </div>
+      );
+    }
+    render(
+      <>
+        <Card port={entitled} label="entitled" />
+        <Card port={denied} label="denied" />
+      </>,
+    );
+    await waitFor(() => expect(entitled).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(denied).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByTestId("entitled").textContent).toBe(
+        "authorized score",
+      ),
+    );
+    expect(screen.getByTestId("denied").textContent).toBe("no score");
+  });
+  it("does not attach a new reader to an earlier in-flight request", async () => {
+    let finish: ((value: readonly FitCompanyDto[]) => void) | undefined;
+    const earlier = vi.fn(
+      () =>
+        new Promise<readonly FitCompanyDto[]>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const later = vi.fn(() => Promise.resolve([]));
+    function Card({
+      port,
+    }: {
+      port: (ids: readonly string[]) => Promise<readonly FitCompanyDto[]>;
+    }) {
+      useCompanyScores([COMPANY], { port });
+      return null;
+    }
+    const first = render(<Card port={earlier} />);
+    await waitFor(() => expect(earlier).toHaveBeenCalledTimes(1));
+    first.unmount();
+    render(<Card port={later} />);
+    await waitFor(() => expect(later).toHaveBeenCalledTimes(1));
+    finish?.([]);
   });
 });

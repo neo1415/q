@@ -1,5 +1,11 @@
 # Capital Q — Current shared engineering state
 
+## Unicorn release continuation — 17 October, 22:29 UTC (latest observed state)
+
+PR217 is still OPEN and Unicorn is not deployed. Continue `codex/unicorn-qfiles-oct17`; latest recovered remote17ea9a33 had CI39072870845 database/types/build/lint PASS, test/quality FAIL on two missing locale labels. Repairs preserve the existing implementation and scoring gates; see [workstream evidence](workstreams/UNICORN-QFILES-OCT17.md#release-repair-checkpoint--17-october-2229-utc). New protected exact-head CI is mandatory before integration/release.
+
+Fresh Railway: allfour services SUCCESS `a70e66a8b82b8df00ca663e9baeeee3f3686959e`. Latest hosted migration20261228190000; Unicorn28200000 and fix-forward28201500 UNAPPLIED.43existing-org feature-specific grants planned, none applied. Full461company before/after audit and actual Unicorn production browser acceptance pending. Do not label this live or start Home file/public-web work. Preserve current Claude Q/Home/GateQ/Q Pitch changes; no wholesale old WIP merges.
+
 ## 17 October 2026 — Claude lead (latest; supersedes older sections where they differ)
 
 Production at 07:43 UTC:

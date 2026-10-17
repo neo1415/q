@@ -1,3 +1,4 @@
+import { UnicornPotentialDtoSchema } from "./unicorn-potential.js";
 import { z } from "zod";
 
 import {
@@ -197,9 +198,21 @@ export const GateqRuleStandingSchema = z.enum([
   "NOT_ANSWERED",
 ]);
 
+/** Current company assessment, separate from the immutable submitted dossier. */
+export const GateqUnicornPotentialDtoSchema = z
+  .object({
+    companyId: z.string().uuid(),
+    assessment: UnicornPotentialDtoSchema,
+  })
+  .strict();
+export type GateqUnicornPotentialDto = z.infer<
+  typeof GateqUnicornPotentialDtoSchema
+>;
+
 export const GateqInboxDetailDtoSchema = z
   .object({
     item: GateqInboxItemDtoSchema,
+    unicornPotential: GateqUnicornPotentialDtoSchema.optional(),
     rules: z
       .array(
         z
@@ -364,6 +377,7 @@ export const GATEQ_MY_APPLICATIONS_PATH = "/v1/gateq/my-applications" as const;
 
 export const FounderApplicationDtoSchema = z
   .object({
+    unicornPotential: GateqUnicornPotentialDtoSchema.optional(),
     applicationId: z.string().uuid(),
     fund: z.string().max(200),
     sentAt: z.string(),
