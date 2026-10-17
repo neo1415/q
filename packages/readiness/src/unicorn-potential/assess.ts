@@ -65,11 +65,13 @@ export function assessUnicornPotential(
                 ? rule.gap
                 : grade === 0
                   ? "Affirmative material adverse evidence"
-                  : grade === 2
-                    ? "Plausible or mixed limited evidence"
-                    : grade === 4
-                      ? "Sustained documented or corroborated execution"
-                      : "Demonstrated stage-appropriate execution",
+                  : grade === 1
+                    ? "Concrete documented weakness"
+                    : grade === 2
+                      ? "Plausible or mixed limited evidence"
+                      : grade === 4
+                        ? "Sustained documented or corroborated execution"
+                        : "Demonstrated stage-appropriate execution",
             sources: all.slice(0, 12).map((o) => ({
               ...o.source,
               label: o.source.label.slice(0, 200),

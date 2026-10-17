@@ -3,7 +3,11 @@ import {
   INVESTOR_ELIGIBLE_SCOPES,
   type InvestabilityInputs,
 } from "../investability/inputs.js";
-import { UNICORN_PILLARS, type PillarId } from "./method-v1.js";
+import {
+  UNICORN_PILLARS,
+  UNICORN_WEAKNESS_RULES,
+  type PillarId,
+} from "./method-v1.js";
 type Source =
   UnicornPotentialDto["pillars"][number]["criteria"][number]["sources"][number];
 export type UnicornObservation = {
@@ -128,12 +132,15 @@ export function observeUnicornPotential(
         const forecast =
           /\b(forecast|projection|projected|target|planned)\b/iu.test(text);
         const adverse = criterion.adverse.test(text) && !forecast;
+        const weakness =
+          UNICORN_WEAKNESS_RULES[pillar.id][index === 0 ? 0 : 1].test(text) &&
+          !forecast;
         const limited = criterion.limited.test(text);
         const positive =
           criterion.positive.test(text) &&
           !forecast &&
           !/\b(no|not|never|unproven|unverified)\b/iu.test(text);
-        if (!adverse && !limited && !positive) continue;
+        if (!adverse && !weakness && !limited && !positive) continue;
         const date = source.at === null ? NaN : Date.parse(source.at);
         const periodYears =
           pillar.id === "P4"
@@ -154,11 +161,13 @@ export function observeUnicornPotential(
         const documented = quality >= 0.85;
         const grade = adverse
           ? 0
-          : positive
-            ? sustained && documented
-              ? 4
-              : 3
-            : 2;
+          : weakness
+            ? 1
+            : positive
+              ? sustained && documented
+                ? 4
+                : 3
+              : 2;
         out.push({
           pillar: pillar.id,
           criterion: index === 0 ? "A" : "B",
@@ -169,8 +178,8 @@ export function observeUnicornPotential(
           conflicted:
             source.lifecycleStatus === "DISPUTED" ||
             source.lifecycleStatus === "CONTRADICTORY" ||
-            (adverse && positive),
-          rule: `${pillar.id}.${index === 0 ? "A" : "B"}.${adverse ? "adverse" : positive ? "demonstrated" : "limited"}`,
+            ((adverse || weakness) && positive),
+          rule: `${pillar.id}.${index === 0 ? "A" : "B"}.${adverse ? "adverse" : weakness ? "weakness" : positive ? "demonstrated" : "limited"}`,
         });
       }
     }
