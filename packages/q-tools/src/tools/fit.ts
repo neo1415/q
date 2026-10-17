@@ -57,6 +57,9 @@ export const FIT_TOP_CANDIDATES = "fit.top_candidates" as const;
 const GUIDANCE =
   'Say each company\'s fit as the score out of 10 given in text beside its profile\'s band in words ("7.5/10 · Good fit"), exactly as given; where no score is given, the band in words alone. Never a percentage, never a score of your own, never a different number. Then the parameter rows that matter, with their reasons. Unknown means not known yet, never bad. Q\'s view, if you give one, is labelled as your view and does not change the fit. When text gives Investability and Suitability, say both exactly as given, each with how much it is based on ("based on 5 of 8 areas") and its confidence: Investability is how investable the company is on its shared evidence (FDN InvestIQ), Suitability is its fit with this investor\'s mandate; they are separate scores, never add or average them. "Not enough shared evidence yet" is not a low score. Do not make a document or PDF unless the person asked for a file.';
 
+const UNICORN_GUIDANCE =
+  "If scores.unicornPotential is present, Unicorn Potential is a separate persisted growth-characteristics indicator: repeat only its actual overallScore (or insufficient evidence), explain its twelve pillars, grades, stage weights, coverage, sources and recorded momentum. Use weighted graded pillar sum divided by scored pillar weights, multiplied by 25 and rounded once; never invent an observation or treat unknown as zero. It is not a probability of reaching a $1 billion valuation. If it is absent, do not infer or reconstruct a premium score; say that assessment is unavailable for this account.";
+
 const STATUSES = [
   "OK",
   /** The person is not on an investor organisation's side. */
@@ -190,7 +193,7 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
     id: FIT_PROFILE,
     providerName: "fit_profile",
     description:
-      "Reads how well one company fits this investor's own mandate, as Capital Q computed it: a score out of 10 (when enough is known), a band and a confidence in words, and for each of nine parameters (stage, sector, geography, cheque size, business model, traction, team, thesis, round terms) an outcome and a reason. Call it whenever an investor asks how a company fits, whether it matches their mandate, or what is unknown about it. Do not work out a fit yourself.",
+      "Reads how well one company fits this investor's own mandate, as Capital Q computed it: a score out of 10 (when enough is known), a band and a confidence in words, and for each of nine parameters (stage, sector, geography, cheque size, business model, traction, team, thesis, round terms) an outcome and a reason. Also reads the entitled investor's persisted Unicorn Potential, twelve-pillar calculation, evidence and changes when available. Call it whenever an investor asks about unicorn potential, why its score changed, how a company fits, whether it matches their mandate, or what is unknown about it. Do not work out a fit yourself.",
     input: FitProfileInputSchema,
     output: FitProfileOutputSchema,
     authorize,
@@ -212,7 +215,7 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
         input.companyId,
       ]);
       const raiseView = views.get(input.companyId);
-      return {
+      const output: FitProfileOutput = {
         status: "OK",
         name: item.name,
         about: item.about ?? null,
@@ -223,7 +226,47 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
         text: fitProfileText(item.name, item.assessment.profile, {
           scores: item.scores,
         }),
-        guidance: GUIDANCE,
+        guidance:
+          item.scores?.unicornPotential === undefined
+            ? GUIDANCE
+            : `${GUIDANCE} ${UNICORN_GUIDANCE}`,
+      };
+      if (
+        JSON.stringify(output).length <= MODEL_TOOL_RESULT_MAX_CHARS ||
+        output.scores?.unicornPotential === undefined
+      )
+        return output;
+      const full = output.scores.unicornPotential;
+      // Keep every numeric input; only bound repeated evidence prose/citations.
+      // The full authorized source set remains in the company assessment.
+      const clipped = (value: string, limit: number) =>
+        value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
+      return {
+        ...output,
+        scores: {
+          ...output.scores,
+          unicornPotential: {
+            ...full,
+            missing: full.missing.map((value) => clipped(value, 100)),
+            pillars: full.pillars.map((pillar) => ({
+              ...pillar,
+              criteria: pillar.criteria.map((criterion) => ({
+                ...criterion,
+                label: clipped(criterion.label, 80),
+                anchor: clipped(criterion.anchor, 160),
+                sources: criterion.sources.slice(0, 1).map((source) => ({
+                  ...source,
+                  label: clipped(source.label, 80),
+                })),
+              })),
+            })),
+          },
+        },
+        text: fitProfileText(item.name, item.assessment.profile, {
+          scores: item.scores,
+          summaryOnly: true,
+        }),
+        guidance: `${output.guidance} Source details are bounded: one representative citation per criterion, with clipped prose. Do not claim it independently proves the grade or invent omitted evidence. The complete source set is in the company assessment; all grades, weights and contributions above remain the persisted values.`,
       };
     },
   });

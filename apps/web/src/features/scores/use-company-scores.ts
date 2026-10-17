@@ -26,21 +26,29 @@ export type ScoresPort = (
   companyIds: readonly string[],
 ) => Promise<readonly FitCompanyDto[] | null>;
 
-const waiting = new Map<
-  string,
-  ((scores: CompanyScoresDto | null) => void)[]
->();
-let pending: Set<string> | null = null;
-
-function flush(port: ScoresPort): void {
-  const ids = [...(pending ?? [])];
-  pending = null;
+type PendingScores = {
+  waiting: Map<string, ((scores: CompanyScoresDto | null) => void)[]>;
+  pending: Set<string> | null;
+};
+// A pending read is scoped to its actual authorized port, never just a company.
+let batches = new WeakMap<ScoresPort, PendingScores>();
+function bucket(port: ScoresPort): PendingScores {
+  let state = batches.get(port);
+  if (state === undefined) {
+    state = { waiting: new Map(), pending: null };
+    batches.set(port, state);
+  }
+  return state;
+}
+function flush(port: ScoresPort, state: PendingScores): void {
+  const ids = [...(state.pending ?? [])];
+  state.pending = null;
   for (let i = 0; i < ids.length; i += FIT_IDS_MAX) {
     const chunk = ids.slice(i, i + FIT_IDS_MAX);
-    // Capture this batch before I/O. A later authentication-context read
-    // must never attach to an older account's in-flight result.
-    const resolvers = new Map(chunk.map((id) => [id, waiting.get(id) ?? []]));
-    for (const id of chunk) waiting.delete(id);
+    const resolvers = new Map(
+      chunk.map((id) => [id, state.waiting.get(id) ?? []]),
+    );
+    for (const id of chunk) state.waiting.delete(id);
     void port(chunk)
       .catch(() => null)
       .then((items) => {
@@ -58,25 +66,25 @@ function request(
   id: string,
   port: ScoresPort,
 ): Promise<CompanyScoresDto | null> {
+  const state = bucket(port);
   return new Promise((resolve) => {
-    const list = waiting.get(id);
+    const list = state.waiting.get(id);
     if (list !== undefined) {
       list.push(resolve);
       return;
     }
-    waiting.set(id, [resolve]);
-    if (pending === null) {
-      pending = new Set();
-      queueMicrotask(() => flush(port));
+    state.waiting.set(id, [resolve]);
+    if (state.pending === null) {
+      state.pending = new Set();
+      queueMicrotask(() => flush(port, state));
     }
-    pending.add(id);
+    state.pending.add(id);
   });
 }
 
 /** Test seam: forget everything read. */
 export function resetCompanyScoresCache(): void {
-  waiting.clear();
-  pending = null;
+  batches = new WeakMap();
 }
 
 export function useCompanyScores(

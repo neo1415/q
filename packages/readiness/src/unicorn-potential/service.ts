@@ -31,6 +31,7 @@ export function createUnicornPotentialService(dependencies: {
   const recompute = async (
     companyId: string,
   ): Promise<UnicornPotentialOutcome> => {
+    const sourcesReadAt = clock().toISOString();
     const read = await dependencies.store.inputs(companyId);
     if (read === null) return { kind: "NOT_FOUND" };
     if (!read.inputs.profile.listed) return { kind: "NOT_LISTED" };
@@ -50,12 +51,14 @@ export function createUnicornPotentialService(dependencies: {
       }),
       view: result.view,
       observations: result.observations,
+      sourcesReadAt,
     });
     return {
       kind: recorded.created ? "RECORDED" : "UNCHANGED",
       revision: recorded.revision,
     };
   };
+  let sweepAfter: string | undefined;
   return {
     recompute,
     sweep: async (
@@ -66,7 +69,16 @@ export function createUnicornPotentialService(dependencies: {
         Math.min(500, Math.trunc(options.limit ?? 100)),
       );
       const pause = Math.max(100, Math.min(10_000, options.pauseMs ?? 100));
-      const ids = await dependencies.store.listedCompanyIds(limit);
+      let ids =
+        sweepAfter === undefined
+          ? await dependencies.store.listedCompanyIds(limit)
+          : await dependencies.store.listedCompanyIds(limit, sweepAfter);
+      if (ids.length === 0 && sweepAfter !== undefined) {
+        sweepAfter = undefined;
+        ids = await dependencies.store.listedCompanyIds(limit);
+      }
+      // Advance even on a failed company: one poisoned record cannot starve later IDs.
+      sweepAfter = ids.at(-1);
       let recorded = 0;
       let unchanged = 0;
       let failed = 0;
