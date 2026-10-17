@@ -1008,6 +1008,7 @@ export function createApp(
     registerTaxonomyRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
+      identities: security.identities,
       taxonomy: modules.taxonomy,
     });
   }
