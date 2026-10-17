@@ -290,11 +290,18 @@ describe("Discover with filters", () => {
         unicornPotentialSort: true,
       }),
     );
-    loadSlatePageAction.mockResolvedValueOnce({
-      ok: false,
-      code: "PREMIUM_REQUIRED",
-      message: "Unicorn Potential filters require premium investor access.",
-    });
+    loadSlatePageAction.mockImplementation((_cursor, filters) =>
+      Promise.resolve(
+        filters === null
+          ? page([company(1)])
+          : {
+              ok: false,
+              code: "PREMIUM_REQUIRED",
+              message:
+                "Unicorn Potential filters require premium investor access.",
+            },
+      ),
+    );
     render(<InvestorFeedScreen sectors={SECTORS} />);
     await screen.findByRole("heading", {
       name: "Premium investor access required",
