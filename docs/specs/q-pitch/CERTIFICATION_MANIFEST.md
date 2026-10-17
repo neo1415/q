@@ -385,7 +385,7 @@ Every other atlas feature currently has no certification entry and must not be p
 - **Fixed on the way:** `c9abf3b2` (steps 12–13 were verified without a push, so 3 lines were unlit on AO).
 - **Ledger:** all 22 `INVESTOR_V6_LEDGER` entries are promoted in `investor-v6.ts`.
 
-### Founder track (`tour.founder-v6`, 17 steps) — certified on direct start; trigger start pending AR
+### Founder track (`tour.founder-v6`, 17 steps) — PRODUCTION_LIVE_VERIFIED
 
 - **Straight through, run `fdr4`** (AP, direct start):
   - all 17 steps complete in 534 s; 51 anchors lit, none unlit;
@@ -400,7 +400,30 @@ Every other atlas feature currently has no certification entry and must not be p
 - **Causes, both only when the tour is started from Q's answer:**
   - Step 1: /home kept the ask's conversation. Fixed by `e85f5600` (`new=1`).
   - Step 9: the move back to step 4's investor page returned the old receipt within Q's turn. Fixed by `79492cfc` (each tour move gets its own turn).
-- **Status:** founder steps 1 and 9 started by the trigger are **pending** `e85f5600` + `79492cfc` (batch AR). The founder ledger stays CODE_VERIFIED until a trigger-started run lights them.
+- **Re-run on AR `c3044b70`** (web; q-api `7161cedb`), run `r-fdr-en`, started by the English trigger and run straight through:
+  - Q navigated to `/home?qpitch=founder-v6&new=1`;
+  - all 17 steps complete in 549 s; 51 anchors lit, none unlit (steps 1 and 9 fully lit);
+  - step 2 took 76 s; Discover muted;
+  - bank during and after the tour, each with 0 Q runs.
+- **Ledger:** all 17 `FOUNDER_V6_LEDGER` entries are promoted in `founder-v6.ts`.
+
+### Investor track on AR, started by the French trigger (run `r-inv-fr`)
+
+- "Peux-tu me présenter Capital Q ?" opened `/home?qpitch=investor-v6&new=1`.
+- All 22 steps complete in 413 s; 47 anchors lit, none unlit.
+- Discover muted at 5 of 5 checks.
+- Bank mid-tour and after the end, each with 0 Q runs.
+
+### Short of the v6 definition of done
+
+- **Voice is not certified.** Every run here is captions only.
+  - Spoken step commands and spoken Q&A use the same parser and bank (code-tested), but no microphone run was made.
+  - Natural-language triggers were typed, not spoken.
+- **Q-to-Q is a prepared exchange** (founder step 13), by lane decision: no Tavus session was run or certified.
+- **Languages:** the trigger is certified in English, French and Spanish. The narration itself is English.
+- **Console:**
+  - The AR runs logged no console errors and no page errors, except failed resource loads, which the driver does not count.
+  - Unfiltered probes saw several `404` resource loads on the CRM and Capital views; the resource was not identified. That is still open against "no console errors".
 
 ### Spend
 
