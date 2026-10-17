@@ -344,3 +344,66 @@ Every other atlas feature currently has no certification entry and must not be p
   - Capital is now its own founder step 8 (`s.fdr.08.capital.raise`): the round, commitments and the rounds timeline, each anchored. Later steps move up by one, to 17 steps in all.
   - Step 8 is code-verified only: it has not been run in a browser, because its anchors are not deployed.
   - The run receipts above use the old numbering: their steps 8–16 are now 9–17.
+
+## Q Pitch v6 certification — production AP `c1b90393` and AQ `7161cedb`, 17 Oct 2026 about 05:50–07:40 UTC (Lane P)
+
+- **Setup:**
+  - Production web, api and q-api; Chromium, captions only; 1440×900.
+  - Accounts: fictional `investor.savanna-seed@` and `babatunde.tunde-cargo@fictional.capitalq.local`.
+  - Driver: scratchpad `v6-run.mjs`. Each run's private receipts (`run-log.json`, `summary.json`, per-step screenshots, video) are in scratchpad `v6/<run>/` and are not committed.
+- **What a run checks:**
+  - every narrated line with an anchor has its section lit (`[data-qp-lit][data-qp-anchor~=id]`) within 3 s of its caption;
+  - every `<video>` on Discover is muted;
+  - typed step commands move to the expected step;
+  - bank questions answer on the overlay with no Q run (POSTs to `/api/q-ask` counted).
+
+### Natural-language trigger (Q_PITCH)
+
+| Asked, from Discover                           | Account   | Release | Result                                                                               |
+| ---------------------------------------------- | --------- | ------- | ------------------------------------------------------------------------------------ |
+| "Can you pitch Capital Q to me?"               | Savanna   | AP, AQ  | Q navigates to `/home?qpitch=investor-v6` in 2–4 s; AQ: the tour starts and runs     |
+| "Peux-tu me présenter Capital Q ?"             | Savanna   | AP, AQ  | Same; AQ run `c-inv-fr`: steps 1–12 all lit (then a driver timeout, not the product) |
+| "Could you walk me through what Capital Q is?" | Babatunde | AP, AQ  | `/home?qpitch=founder-v6`; AQ run `c-fdr-en`: all 17 steps ran                       |
+| "¿Puedes explicarme Capital Q?"                | Babatunde | AQ      | Run `c-fdr-es`: the tour started and ran                                             |
+
+- On AN and AO the trigger did not work; three fixes were needed:
+  - `9863aff6`: the words gate.
+  - `75499404`: the reader filed the request as QUESTION_TO_Q with NAVIGATE Q_PITCH.
+  - `65609b9c`: the tour entry ignored client navigation.
+- Each trigger is one Q run; the reader is TURN_READER v53.
+
+### Investor track (`tour.investor-v6`, 22 steps) — PRODUCTION_LIVE_VERIFIED
+
+- **Straight through, run `inv5`** (AP, direct start):
+  - all 22 steps complete in 413 s; 47 anchors lit, none unlit;
+  - Discover muted at 5 of 5 checks;
+  - the bank answered "How do you make money?" after the end, with 0 Q runs.
+- **Trigger run `c-inv-en`** (AQ):
+  - step commands: "back two steps" 5→3, "forward 3" 3→6, "go to step 9" 6→9, "next" 9→10;
+  - 37 anchors lit, none unlit; Discover muted 4 of 4;
+  - bank mid-tour ("What makes Capital Q defensible?") and after the end, each with 0 Q runs.
+- **Fixed on the way:** `c9abf3b2` (steps 12–13 were verified without a push, so 3 lines were unlit on AO).
+- **Ledger:** all 22 `INVESTOR_V6_LEDGER` entries are promoted in `investor-v6.ts`.
+
+### Founder track (`tour.founder-v6`, 17 steps) — certified on direct start; trigger start pending AR
+
+- **Straight through, run `fdr4`** (AP, direct start):
+  - all 17 steps complete in 534 s; 51 anchors lit, none unlit;
+  - step 2 (the 14-section board, `a037d223`) took 76 s;
+  - Discover muted; bank during and after the tour, each with 0 Q runs.
+- **Trigger run `c-fdr-es`** (AQ):
+  - all four step commands correct; bank with 0 Q runs; Discover muted;
+  - 2 lines unlit: step 1.
+- **Trigger run `c-fdr-en`** (AQ):
+  - 17 of 17 steps; 42 lit;
+  - 9 unlit: step 1 (2) and step 9 (7).
+- **Causes, both only when the tour is started from Q's answer:**
+  - Step 1: /home kept the ask's conversation. Fixed by `e85f5600` (`new=1`).
+  - Step 9: the move back to step 4's investor page returned the old receipt within Q's turn. Fixed by `79492cfc` (each tour move gets its own turn).
+- **Status:** founder steps 1 and 9 started by the trigger are **pending** `e85f5600` + `79492cfc` (batch AR). The founder ledger stays CODE_VERIFIED until a trigger-started run lights them.
+
+### Spend
+
+- About 15 Q runs for triggers and diagnosis, about $0.004 each (q-api logs: `gpt-5.6-luna`, NORMAL_DIALOGUE), so **about $0.06** in total.
+- Bank answers: no model calls.
+- No Tavus, no voice sessions; captions only.
