@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { RESUME_KEY } from "./resume";
@@ -42,9 +43,8 @@ function readResume(): Start | null {
     return null;
   }
 }
-/** Parsed once per address, so the snapshot is stable between renders. */
-function readStart(): Start | null {
-  const search = window.location.search;
+/** Parsed once per address, so the result is stable between renders. */
+function readStart(search: string): Start | null {
   if (lastRead?.search === search) return lastRead.start;
   const params = new URLSearchParams(search);
   const tour = choiceOf(params.get("qpitch"));
@@ -87,14 +87,30 @@ export function QPitchEntry({
   readonly subject?: TourSubject | null | undefined;
   readonly role: "INVESTOR" | "FOUNDER";
 }) {
-  // Read once from the address the page was opened with; false on the server.
-  // Read from the address the page was opened with; null on the server.
-  const asked = useSyncExternalStore(noSubscription, readStart, () => null);
-  // Latched: the tour must outlive the first route change, whose address no
-  // longer carries the parameter.
+  // Read from the address on every route change, not only the first load:
+  // Q's own move to "/home?qpitch=..." (the natural-language trigger, live
+  // 2026-10-17) is a client navigation, and this host lives in the layout.
+  // Latched: the tour outlives route changes whose address no longer
+  // carries the parameter; a new ask after "End tour" starts it again.
+  // Read in the browser only (the session's resume), after hydration.
+  const search = useSearchParams().toString();
+  const client = useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false,
+  );
+  const [seen, setSeen] = useState<string | null>(null);
   const [started, setStarted] = useState<Start | null>(null);
   const [ended, setEnded] = useState(false);
-  if (asked !== null && started === null) setStarted(asked);
+  if (client && seen !== search) {
+    setSeen(search);
+    const asked = readStart(search === "" ? "" : `?${search}`);
+    if (asked !== null && started === null) setStarted(asked);
+    else if (asked !== null && ended && search.includes("qpitch=")) {
+      setStarted(asked);
+      setEnded(false);
+    }
+  }
   const holding = started !== null && !ended;
   useEffect(() => {
     markQPitchRunning(holding);
