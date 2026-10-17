@@ -775,3 +775,11 @@ export {
   type SetPreferenceLearningInput,
   type SetPreferenceLearningOutput,
 } from "./tools/preference-learning.js";
+
+export {
+  createUnicornPotentialTool,
+  UNICORN_POTENTIAL,
+  UnicornPotentialInputSchema,
+  UnicornPotentialOutputSchema,
+  unicornPotentialText,
+} from "./tools/unicorn-potential.js";
