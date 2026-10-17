@@ -47,6 +47,9 @@ export const Q_CONTROL_STATES = [
 ] as const;
 export const QControlStateSchema = z.enum(Q_CONTROL_STATES);
 
+/** Bound on a tab's visible name in the manifest. */
+export const Q_CONTROL_LABEL_MAX = 48;
+
 export const QManifestControlSchema = z
   .object({
     id: QControlIdSchema,
@@ -54,6 +57,20 @@ export const QManifestControlSchema = z
     state: QControlStateSchema.optional(),
     /** LIST: how many items it holds (so "the third one" can be checked). */
     count: z.number().int().min(0).max(10_000).optional(),
+    /**
+     * TAB only (owner 2026-10-17): the tab's own visible name, in the
+     * person's language ("Data room", "Salle de données"), so Q's reader
+     * picks the tab they mean by meaning, never by matching words. Letters
+     * and spaces only (the page strips digits and signs, so a count or an
+     * amount beside a tab's name never leaves the browser); bounded.
+     */
+    label: z
+      .string()
+      .trim()
+      .min(1)
+      .max(Q_CONTROL_LABEL_MAX)
+      .regex(/^[\p{L}\p{M}][\p{L}\p{M} &'’-]*$/u)
+      .optional(),
   })
   .strict();
 export type QManifestControl = z.infer<typeof QManifestControlSchema>;

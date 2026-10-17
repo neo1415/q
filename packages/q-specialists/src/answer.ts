@@ -289,8 +289,42 @@ function controlActBlock(control: ControlBinding): QResultBlock {
   };
 }
 
+/** A control to work, with the tab's own visible name when it has one. */
+export type PageControlChoice = ControlBinding & {
+  readonly label?: string | undefined;
+};
+
+/**
+ * v55: the control the reader chose, when the page listed it and it is a
+ * tab (selected) or a section (shown). Null for anything else.
+ */
+export function pageControlChosen(
+  chosen: string | null,
+  controls: QPageManifest["controls"],
+): PageControlChoice | null {
+  if (chosen === null) return null;
+  const control = (controls ?? []).find((one) => one.id === chosen);
+  if (control === undefined || control.state === "DISABLED") return null;
+  const act =
+    control.kind === "TAB"
+      ? ("SELECT_TAB" as const)
+      : control.kind === "SECTION"
+        ? ("SCROLL_TO" as const)
+        : null;
+  if (act === null) return null;
+  return {
+    target: control.id,
+    act,
+    note: `${control.id} on their page`,
+    ...(control.label === undefined ? {} : { label: control.label }),
+  };
+}
+
 /** What Q says as it works a control (never that it is done: the receipt says). */
-function controlActLine(control: ControlBinding): string {
+function controlActLine(control: PageControlChoice): string {
+  if (control.label !== undefined && control.act === "SELECT_TAB") {
+    return `Opening ${control.label}.`;
+  }
   const name = (control.target.split(".").at(-1) ?? "").replace(/-/gu, " ");
   if (control.act === "SELECT_TAB") return `Opening the ${name} tab.`;
   if (control.act === "SELECT_ITEM") {
@@ -454,6 +488,8 @@ function turnReaderInput(
    * read as the last recent turn so "that one" and "try again" bind.
    */
   note: string | null = null,
+  /** v55: the page's own registered controls (the firewall's manifest). */
+  screenControls?: QPageManifest["controls"],
 ) {
   // Spoken turns carry the recogniser's utterance; typed ones never do.
   // The reader needs to know which: only speech can be overheard.
@@ -475,6 +511,7 @@ function turnReaderInput(
       ...(note === null ? [] : [{ role: "Q" as const, text: note }]),
     ],
     modality: spoken ? ("VOICE" as const) : ("TEXT" as const),
+    ...(screenControls === undefined ? {} : { screenControls }),
     attribution: {
       tenantId: context.tenantId,
       userId: context.userId,
@@ -2628,6 +2665,7 @@ export function createSpecialistQAnswer(
               shownItems(history),
               lastActed.get(conversationId) ?? null,
             ),
+            input.screenControls,
           ),
         )
         .catch(() => null);
@@ -3490,6 +3528,7 @@ export function createSpecialistQAnswer(
             signal,
           },
           withResolution(referenceNote(shown, lastAction), pointed),
+          request.plan.screen?.manifest?.controls,
         ),
       );
     // Read early, beside the firewall (ADR 0035), with the same words, the
@@ -3692,6 +3731,28 @@ export function createSpecialistQAnswer(
     // rather than at the end of the path.
     const misread = readingMisfit(read);
     if (misread !== null) speculative.current?.cancel(misread);
+    // Owner 2026-10-17 ("open the data room" was slow, sometimes did
+    // nothing): the reader chose, by meaning, one tab or section the page
+    // on screen registered. Worked here by code -- SELECT_TAB / SCROLL_TO
+    // on that id, the screen's receipt says whether it happened -- with no
+    // further model call. An id the page did not list is never acted on.
+    const onPage =
+      read === null || read.addressedToQ === false
+        ? null
+        : pageControlChosen(
+            read.control ?? null,
+            request.plan.screen?.manifest?.controls,
+          );
+    if (onPage !== null) {
+      speculative.current?.cancel("ACTED");
+      logger?.info(
+        { qRunId: request.runId, act: onPage.act, target: onPage.target },
+        "q is working the control the reader chose on their page",
+      );
+      return recordAnswer(request, conversationId, controlActLine(onPage), [
+        controlActBlock(onPage),
+      ]);
+    }
     if (decide !== undefined) {
       const line = await decide(
         read === null

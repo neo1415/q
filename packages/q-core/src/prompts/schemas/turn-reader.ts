@@ -1,6 +1,9 @@
 import { z } from "zod";
 
-import { QNavigateDestinationSchema } from "@capital-q/contracts";
+import {
+  QControlIdSchema,
+  QNavigateDestinationSchema,
+} from "@capital-q/contracts";
 
 import {
   QuestionToQSchema,
@@ -740,4 +743,38 @@ export type TurnReaderV54Variables = z.infer<
 export const TURN_READER_V54_UNTRUSTED = [
   ...TURN_READER_UNTRUSTED,
   "shown",
+] as const;
+
+export const TURN_READER_V55_SCHEMA_VERSION = 55;
+
+/**
+ * v55 (owner 2026-10-17: "open the data room" was slow and sometimes did
+ * nothing): v54's SHOWN and fromShown, plus the tabs and sections the page
+ * on screen registered (id, kind, a tab's own visible name, its state) as
+ * input, and `control`: the listed id the turn asks to open, select or
+ * show now, chosen by meaning in any words and any language. Code then
+ * works that control (SELECT_TAB / SCROLL_TO) with no further model call;
+ * an id the page did not list is ignored. Null keeps the other readers.
+ */
+export const TurnReaderV55ResultSchema = TurnReaderV54ResultSchema.extend({
+  control: QControlIdSchema.nullable().default(null),
+}).strict();
+export type TurnReaderV55Result = z.infer<typeof TurnReaderV55ResultSchema>;
+
+/**
+ * v55 variables: v54's, plus the page's own controls as lines (built by
+ * code from the screen manifest). Fenced: a tab's name is page text.
+ */
+export const TurnReaderV55VariablesSchema = TurnReaderV54VariablesSchema.extend(
+  {
+    screenControls: z.string().max(6_000).default("(none)"),
+  },
+).strict();
+export type TurnReaderV55Variables = z.infer<
+  typeof TurnReaderV55VariablesSchema
+>;
+
+export const TURN_READER_V55_UNTRUSTED = [
+  ...TURN_READER_V54_UNTRUSTED,
+  "screenControls",
 ] as const;

@@ -7,6 +7,7 @@ import {
   QControlKindSchema,
   QManifestControlSchema,
   Q_CONTROL_KINDS,
+  Q_CONTROL_LABEL_MAX,
   Q_MANIFEST_CONTROLS_MAX,
   QControlIdSchema,
   QUiActReceiptsRequestSchema,
@@ -22,11 +23,13 @@ import { noticeOf } from "../src/features/q/control/q-control-runtime";
 import { startReceiptReporter } from "../src/features/q/control/receipt-reporter";
 import {
   CONTROL_ID,
+  CONTROL_LABEL_MAX,
   CONTROLS_MAX,
   KIND_ACTS,
   manifestControls,
   registerControl,
   resetControls,
+  tabLabel,
 } from "../src/features/q/control/registry";
 import { currentManifest } from "../src/features/q/manifest";
 import {
@@ -153,6 +156,52 @@ describe("the control registry mirrors the lead contract (C1)", () => {
     }
   });
 
+  it("owner 2026-10-17: a tab carries its own visible name, letters only, that the contract accepts", () => {
+    expect(CONTROL_LABEL_MAX).toBe(Q_CONTROL_LABEL_MAX);
+    const tab = (text: string, aria?: string) => {
+      const link = document.createElement("a");
+      link.href = "/company/x?tab=dataroom";
+      link.textContent = text;
+      if (aria !== undefined) link.setAttribute("aria-label", aria);
+      return link;
+    };
+    expect(tabLabel(tab("Data room"))).toBe("Data room");
+    // A count or an amount beside the name never leaves the browser.
+    expect(tabLabel(tab("Messages 12"))).toBe("Messages");
+    expect(tabLabel(tab("Raise $2.5m"))).toBe("Raise");
+    expect(tabLabel(tab("Salle de données"))).toBe("Salle de données");
+    expect(tabLabel(tab("غرفة البيانات"))).toBe("غرفة البيانات");
+    expect(tabLabel(tab("ignored", "Pitch deck"))).toBe("Pitch deck");
+    expect(tabLabel(tab("123"))).toBeUndefined();
+    const element = tab("Data room 3");
+    document.body.append(element);
+    registerControl({
+      id: "tab.dataroom",
+      kind: "TAB",
+      element: () => element,
+    });
+    const [control] = manifestControls();
+    expect(control).toEqual({
+      id: "tab.dataroom",
+      kind: "TAB",
+      label: "Data room",
+    });
+    expect(QManifestControlSchema.safeParse(control).success).toBe(true);
+    // Only tabs: a section's text is the page's content, never sent.
+    const section = document.createElement("section");
+    section.textContent = "Runway 14 months, burn high";
+    document.body.append(section);
+    registerControl({
+      id: "section.risks",
+      kind: "SECTION",
+      element: () => section,
+    });
+    expect(manifestControls().find((c) => c.id === "section.risks")).toEqual({
+      id: "section.risks",
+      kind: "SECTION",
+    });
+  });
+
   it("refuses an id outside the rule, and a duplicate replaces only while mounted", () => {
     const element = document.createElement("div");
     document.body.append(element);
@@ -184,8 +233,13 @@ describe("registered controls travel in the manifest (C1)", () => {
     render(<Tabs />);
     const controls = manifestControls();
     expect(controls).toEqual([
-      { id: "tab.overview", kind: "TAB", state: "SELECTED" },
-      { id: "tab.readiness", kind: "TAB" },
+      {
+        id: "tab.overview",
+        kind: "TAB",
+        state: "SELECTED",
+        label: "overview",
+      },
+      { id: "tab.readiness", kind: "TAB", label: "readiness" },
       { id: "section.risks", kind: "SECTION" },
       { id: "list.investors", kind: "LIST", count: 3 },
       { id: "button.save", kind: "BUTTON", state: "DISABLED" },

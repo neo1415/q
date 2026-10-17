@@ -14,7 +14,8 @@ import type {
  * would click. Its state is read from that element's own ARIA attributes
  * each time it is asked for, so registering adds no second state model and
  * cannot drift from what assistive technology announces. Only ids, kinds,
- * states and list sizes leave the browser (q.screen.v2); labels never do.
+ * states and list sizes leave the browser (q.screen.v2); labels never do,
+ * except a tab's own visible name, letters only (`tabLabel`).
  *
  * W7: no runtime import from the contracts package (it would load with
  * the first paint). The id rule and the bound below are the contract's
@@ -334,6 +335,29 @@ function hidden(element: HTMLElement): boolean {
   return element.closest("[data-q-hidden]") !== null || element.hidden;
 }
 
+/** The contract's bound on a tab's name (ui-act.ts Q_CONTROL_LABEL_MAX). */
+export const CONTROL_LABEL_MAX = 48;
+
+/**
+ * Owner 2026-10-17: a tab's own visible name, as the person reads it (in
+ * their language), so Q's reader picks the tab they mean by meaning. Only
+ * letters, marks, spaces and joining signs survive: a count or an amount
+ * shown beside a name ("Messages 3") never leaves the browser. Undefined
+ * when nothing readable is left.
+ */
+export function tabLabel(element: HTMLElement): string | undefined {
+  const said = element.getAttribute("aria-label") ?? element.textContent ?? "";
+  // Whole words only: a word with a digit or a sign in it ("$2.5m", "12")
+  // is dropped entirely, not left as a stray letter.
+  const letters = said
+    .split(/\s+/u)
+    .filter((word) => /^[\p{L}\p{M}][\p{L}\p{M}&'’-]*$/u.test(word))
+    .join(" ")
+    .slice(0, CONTROL_LABEL_MAX)
+    .trim();
+  return letters.length === 0 ? undefined : letters;
+}
+
 /** Which acts each kind takes by default (ui-act.ts's own notes). */
 export const KIND_ACTS: Readonly<Record<QControlKind, readonly QUiAct[]>> = {
   TAB: ["SELECT_TAB", "ACTIVATE", "SCROLL_TO", "FOCUS"],
@@ -383,12 +407,17 @@ export function manifestControls(): QManifestControl[] {
       const counted = entry.count?.() ?? listItems(element).length;
       count = Math.max(0, Math.min(10_000, Math.round(counted)));
     }
+    const label =
+      entry.kind === "TAB"
+        ? tabLabel(stateElement(entry.kind, element))
+        : undefined;
     out.push({
       control: {
         id: entry.id,
         kind: entry.kind,
         ...(state === undefined ? {} : { state }),
         ...(count === undefined ? {} : { count }),
+        ...(label === undefined ? {} : { label }),
       },
       rank: KIND_RANK[entry.kind] * 1_000_000 + entry.order,
     });

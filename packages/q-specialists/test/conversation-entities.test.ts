@@ -324,17 +324,22 @@ const QUESTION: QTurnReading = {
   tool: null,
 } as unknown as QTurnReading;
 
-function seam(earlier: readonly QConversationMessage[] = []) {
+function seam(
+  earlier: readonly QConversationMessage[] = [],
+  reading: QTurnReading = QUESTION,
+) {
   const lines: QConversationMessage[] = [...earlier];
   const notes: (string | undefined)[] = [];
   const delegatedWith: QAnswerRequest[] = [];
+  const shownControls: unknown[] = [];
   const turns: QTurnReader = {
     read: (input) => {
       const last = input.recentTurns.at(-1);
       notes.push(
         last?.text.startsWith("[Q context]") === true ? last.text : undefined,
       );
-      return Promise.resolve(QUESTION);
+      shownControls.push(input.screenControls);
+      return Promise.resolve(reading);
     },
   };
   const answer = createSpecialistQAnswer({
@@ -384,7 +389,7 @@ function seam(earlier: readonly QConversationMessage[] = []) {
     await answer.answer(request(manifest));
     return lines.at(-1);
   };
-  return { say, notes, delegatedWith, lines };
+  return { say, notes, delegatedWith, lines, shownControls };
 }
 
 describe("references through the answer seam (Scenarios A, B, G)", () => {
@@ -556,6 +561,136 @@ describe("binding words to the page's controls", () => {
         (block) => block.kind === "UI_INTENT" && block.intent.kind === "UI_ACT",
       ),
     ).toBe(false);
+  });
+});
+
+// --- owner 2026-10-17: a tab chosen by the reader, by meaning -------------
+
+/** A company profile: its tabs, each with its own visible name. */
+const PROFILE_PAGE: QPageManifest = {
+  v: 2,
+  seq: 4,
+  inView: [],
+  sections: [],
+  dialogs: [],
+  controls: [
+    { id: "tab.overview", kind: "TAB", state: "SELECTED", label: "Overview" },
+    { id: "tab.dataroom", kind: "TAB", label: "Data room" },
+    { id: "tab.deck", kind: "TAB", label: "Pitch deck" },
+    { id: "list.risks", kind: "LIST", count: 3 },
+  ],
+};
+
+const chose = (control: string | null): QTurnReading => ({
+  ...QUESTION,
+  kind: "TOOL_REQUEST",
+  control,
+});
+
+describe("TURN_READER v55: the tab the reader chose, worked by code", () => {
+  it.each([
+    // Garbled speech no word rule reads (live 2026-10-17 09:16).
+    [
+      "Mm .Scroll- show me their, their data room",
+      "tab.dataroom",
+      "Opening Data room.",
+    ],
+    // Another language: nothing here matches words.
+    ["ouvre la salle de données", "tab.dataroom", "Opening Data room."],
+    ["déjame ver su presentación", "tab.deck", "Opening Pitch deck."],
+  ])(
+    "%j selects %s on this page, with no further model call",
+    async (said, id, line) => {
+      const run = seam([], chose(id));
+      const last = await run.say(said, PROFILE_PAGE);
+      expect(run.delegatedWith).toHaveLength(0);
+      expect(last?.content).toBe(line);
+      expect(last?.blocks).toEqual([
+        {
+          kind: "UI_INTENT",
+          intent: {
+            kind: "UI_ACT",
+            actId: expect.stringMatching(/^uia_[a-f0-9]{24}$/u) as string,
+            act: "SELECT_TAB",
+            target: id,
+          },
+        },
+      ]);
+      // The reader was given the page's own controls, names included.
+      expect(run.shownControls.at(-1)).toEqual(PROFILE_PAGE.controls);
+    },
+  );
+
+  it("an id the page did not list, or a list, is never acted on", async () => {
+    for (const id of ["tab.team", "list.risks"]) {
+      const run = seam([], chose(id));
+      const last = await run.say("zeig mir das Team", PROFILE_PAGE);
+      expect(run.delegatedWith).toHaveLength(1);
+      expect(
+        (last?.blocks ?? []).some(
+          (block) =>
+            block.kind === "UI_INTENT" && block.intent.kind === "UI_ACT",
+        ),
+      ).toBe(false);
+    }
+  });
+
+  // Production AT, run 5553724c: on Basketari's profile with the Data room
+  // open, "now the pitch deck" was read as making a deck ("Which company
+  // should the deck be about?") and nothing moved. With the page's tabs
+  // in the reading, its Pitch deck tab is selected, and no deck is made.
+  it("'now the pitch deck' with the Data room open selects the Pitch deck tab, never makes a deck", async () => {
+    const page: QPageManifest = {
+      ...PROFILE_PAGE,
+      controls: [
+        { id: "tab.overview", kind: "TAB", label: "Overview" },
+        {
+          id: "tab.dataroom",
+          kind: "TAB",
+          state: "SELECTED",
+          label: "Data room",
+        },
+        { id: "tab.deck", kind: "TAB", label: "Pitch deck" },
+      ],
+    };
+    const run = seam([], chose("tab.deck"));
+    const last = await run.say("now the pitch deck", page);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.content).toBe("Opening Pitch deck.");
+    expect(last?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: expect.objectContaining({
+          kind: "UI_ACT",
+          act: "SELECT_TAB",
+          target: "tab.deck",
+        }) as unknown,
+      },
+    ]);
+    expect(run.shownControls.at(-1)).toEqual(page.controls);
+  });
+
+  // Production AT: "open the data room" missed the fast lane and ran a full
+  // Q run (1.6 s). With the page's tabs in the reading it is SELECT_TAB.
+  it("'open the data room' on the profile is SELECT_TAB on its Data room tab", async () => {
+    const run = seam([], chose("tab.dataroom"));
+    const last = await run.say("open the data room", PROFILE_PAGE);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: expect.objectContaining({
+          act: "SELECT_TAB",
+          target: "tab.dataroom",
+        }) as unknown,
+      },
+    ]);
+  });
+
+  it("no control chosen: answered as before", async () => {
+    const run = seam([], chose(null));
+    await run.say("what's in their data room?", PROFILE_PAGE);
+    expect(run.delegatedWith).toHaveLength(1);
   });
 });
 
