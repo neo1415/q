@@ -813,3 +813,19 @@ Recovered latest PR21717ea9a33, preserved older overlapping WIP to pushed branch
 ## 18 October,05:45WAT — Unicorn release continuation
 
 Recovered narrativeWIP, verified42scoring tests, preserved current8693integration and fourproductionSUCCESS c36b99bb. Prior21727c7protectedCI39075445136 PASS; new sourcehead requires freshCI.461frozenaudit now recognizes342companies with partialevidence (baseline1), but0overall scores; maxcoverage33.5% belowunchanged60%. No migrations/grants/deployments performed. See workstreams/UNICORN-QFILES-OCT17.md latest checkpoint. Continue protected release and real unscored/gaps acceptance; never certify a numeric score without evidence.
+
+## 18 October 2026, 06:00 UTC — Claude Workstream B (investor journey, Q home, CRM, onboarding)
+
+Production `recovery/2026-09-12` = `d5600677` (all four Railway services SUCCESS; web/q-api/workers on `4ef8daec`, api on `d5600677`). Released and live-verified on fictional accounts (Atlas Health, Savanna Seed):
+- Q panel anchors the question; Next step row; GateQ dossier asks; "Draft questions" asks as a question (#212–#215).
+- Light-mode sidebar follows the page (black-and-gold preset black only in dark) (#214).
+- Quiet Q home: greeting + "What's on your mind today?", Q 10% larger, Listening/Speaking dot, attach for everyone (investor uploads go to org documents; no RAG yet) (#216).
+- Q learns by default: no consent card; DECLINED/REVOKED still respected (`q-knowledge` learning-consent) (#219).
+- GateQ follow-up depth: NEEDS_SPECIFICS for vague market/revenue/traction/customers/use-of-funds, varied wording, 2-ask cap (#220).
+- GateQ/Company requests/founder applications are CRM tabs (addresses unchanged for Q routes); Q Pitch moved to Profile; pipeline ranked by Suitability with Suitability + Investability columns; reports/documents open in an in-app reader (#221).
+- No interface sounds during a voice line or 2.5 s after Q speaks; Continue later / Use the form are buttons (#224).
+- Submitted GateQ application → investor-visible company interest via Network connection-request command (idempotent `gateq-application:<id>`) (#226). Guest applicants (no company) still have no relationship; existing applications join on the founder's next read.
+- Onboarding narrative answers: paraphrase → read back → save on yes; never "not your exact words" (#228).
+- #231: one-line API build repair (duplicate ActorContext import between #226 and Unicorn 2a6ce51ab); Codex withdrew #230/#232 in its favour.
+
+Open / next: Work one-page design awaiting owner approval (`claude/work-page-design-oct17`, video + screens under `design/work-page/deliverables/`; decisions: one Work entry, phone option A vs B). Phone CRM header shows a duplicate "Company requests" button. Onboarding opener sometimes skips the first question (NEM Insurance transcript). Live onboarding and GateQ-applicant flows not yet exercised end-to-end on production. Codex (Workstream A) asked to hold overlapping production releases while Unicorn acceptance finishes. The disposable Supabase token used for read-only queries should be revoked.
