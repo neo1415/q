@@ -712,7 +712,7 @@ function selectedAssessmentFacts(
     const { pillars, ...summary } = parsed.data;
     const source =
       "Persisted Unicorn Potential, through the person's authorized fit reader";
-    const header = `CURRENT COMPANY ASSESSMENT ${id}. Stored heuristic calculation, not verified company performance or a probability. Unknown is null, never zero. Calculation: 25 times the weighted mean of graded pillars, rounded once; insufficient evidence remains unscored. Actual stored result: ${JSON.stringify(summary)}`;
+    const header = `CURRENT COMPANY ASSESSMENT ${id}. Stored heuristic calculation, not verified company performance or a probability. Unknown is null, never zero. Calculation: 25 times the weighted mean of graded pillars, rounded once; insufficient evidence remains unscored. Actual stored result: ${JSON.stringify(summary)}${typeof read["guidance"] === "string" ? `\nAuthorized reader guidance: ${read["guidance"]}` : ""}`;
     for (const statement of [
       header,
       ...pillars.map(

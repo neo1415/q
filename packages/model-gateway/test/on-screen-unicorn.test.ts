@@ -114,6 +114,8 @@ describe("the selected persisted Unicorn assessment is read before answering", (
   it("supplies every actual pillar, grade, weight and missing input without inferring a number or copying sibling private data", () => {
     const facts = assessmentFacts({
       status: "OK",
+      guidance:
+        "Source details are bounded: representative citations do not independently prove a grade. Require client DONE before claiming EXPAND completed.",
       scores: { unicornPotential: score, privateEvaluation: "never disclose" },
     });
     expect(facts).toHaveLength(13);
@@ -124,6 +126,10 @@ describe("the selected persisted Unicorn assessment is read before answering", (
     expect(text).toContain('"coverage":0.29');
     expect(text).toContain("Dated retention cohorts");
     expect(text).not.toContain("never disclose");
+    expect(text).toContain(
+      "representative citations do not independently prove a grade",
+    );
+    expect(text).toContain("Require client DONE");
     const storedPillars = facts
       .slice(1)
       .map(
