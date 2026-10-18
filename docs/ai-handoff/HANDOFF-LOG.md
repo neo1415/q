@@ -838,3 +838,7 @@ Production `recovery/2026-09-12` = `a026a39a` (web/api on `a026a39a`; q-api/work
 - #242 → #243: owner-approved Work page, phone option B. Sidebar Discover · Explore · Q · CRM · Work; Work tabs Tasks/Documents/Pitch(founder)/Rehearsals/The Q Daily on the existing addresses; phone bar Work replaces More; More's items in a header "You" sheet with Light/Device/Dark first (ADR 0017 F4). Live-verified on Savanna Seed (phone 390px: bar, You sheet, no horizontal scroll; desktop Documents tab). Playwright mobile specs updated but not run (`shell.mobile.spec.ts` was already stale).
 
 Open: Supabase read-only token still to be revoked.
+
+## 18 October 2026, 14:20 UTC — Meet: one Q (Claude Workstream B)
+
+Owner live Meet (meeting `ef8a7091`): two Qs (Recall note-taker + Tavus face shown as "PAL AI") greeted, then went silent. Fix in #244 (face recognised as Q and named "Capital Q"; Q's lines wait for the face; a 20 s conversation window after Q answers). Face-only (no Recall) is not feasible today: Tavus delivers live `conversation.*` events only over the Daily data channel, not to `callback_url`, and Meet-mode has no Daily room for us. Owner chose: ask Tavus (draft `docs/ai-handoff/drafts/tavus-meet-events-question.md`), else Recall Output Media (one "Capital Q" bot whose camera/mic is a page hosting the Tavus face; `web_4_core` $0.60/h pay-as-you-go, needs owner cost approval).
