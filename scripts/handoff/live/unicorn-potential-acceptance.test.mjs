@@ -118,6 +118,18 @@ test("fixture preparation requires distinct evidence cases and all authorized ro
     })),
   };
   validateFixtures(value);
+  validateFixtures({
+    ...value,
+    expectedAssessmentStatus: "INSUFFICIENT_EVIDENCE",
+  });
+  assert.throws(
+    () =>
+      validateFixtures({
+        ...value,
+        expectedAssessmentStatus: "ASSUMED_SCORED",
+      }),
+    /Explicit scored/,
+  );
   assert.throws(
     () => validateFixtures({ ...value, unscoredCompanyId: id(1) }),
     /Distinct/,

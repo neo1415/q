@@ -1,6 +1,6 @@
 /** Production acceptance over existing, explicitly authorized accounts only.
  * Required CQ_UNICORN_FIXTURES_FILE (private JSON):
- * {publicConfigFile, scoredCompanyId, unscoredCompanyId, qExpectedTerms:[...], actors:[
+ * {publicConfigFile, scoredCompanyId, unscoredCompanyId, expectedAssessmentStatus?, qExpectedTerms:[...], actors:[
  *   {role:"premiumInvestor"|"freeInvestor"|"noMandateInvestor"|"premiumFounder",
  *    sessionFile, organisationId?, expectedScoreHttp:200|404,
  *    profilePath?, gateqPath?, applicationId?}]}
@@ -30,6 +30,12 @@ const ROLES = [
 const CAVEAT = "It is not the probability of reaching a $1 billion valuation.";
 export function validateFixtures(value) {
   assert.ok(value && typeof value === "object", "Fixture object required");
+  assert.ok(
+    [undefined, "SCORED", "INSUFFICIENT_EVIDENCE"].includes(
+      value.expectedAssessmentStatus,
+    ),
+    "Explicit scored or insufficient-evidence mode required",
+  );
   assert.ok(UUID.test(value.scoredCompanyId), "Scored company UUID required");
   assert.ok(
     UUID.test(value.unscoredCompanyId),
@@ -375,7 +381,10 @@ async function main() {
         continue;
       }
       if (actor.expectedScoreHttp === 200)
-        verifyAssessment(assessment.body, "SCORED");
+        verifyAssessment(
+          assessment.body,
+          fixture.expectedAssessmentStatus ?? "SCORED",
+        );
       if (actor.role === "noMandateInvestor") {
         const ordinary = await read(api, "/v1/discovery/companies?limit=1");
         assert.equal(ordinary.status, 200, "No-mandate feed refused");
@@ -699,7 +708,15 @@ async function main() {
           };
           const baseline = await collect({});
           const filtered = await collect({ unicornPotentialMin: "0" });
-          assertOrderPreserved(baseline, filtered);
+          const insufficientOnly =
+            fixture.expectedAssessmentStatus === "INSUFFICIENT_EVIDENCE";
+          if (insufficientOnly)
+            assert.equal(
+              filtered.length,
+              0,
+              "Unscored population must not fabricate filtered scores",
+            );
+          else assertOrderPreserved(baseline, filtered);
           const sorted = await collect(
             {
               unicornPotentialMin: "0",
@@ -707,10 +724,17 @@ async function main() {
             },
             1,
           );
-          assert.ok(
-            sorted.length >= 2,
-            "Need two genuine scored Discover companies",
-          );
+          if (insufficientOnly)
+            assert.equal(
+              sorted.length,
+              0,
+              "Unscored population must not fabricate a premium sort",
+            );
+          else
+            assert.ok(
+              sorted.length >= 2,
+              "Need two genuine scored Discover companies",
+            );
           let previous = 101;
           for (const item of sorted) {
             const current = await read(
@@ -753,13 +777,19 @@ async function main() {
           await page
             .getByRole("button", { name: "Show companies", exact: true })
             .click();
-          await page
-            .getByRole("heading", {
-              name: filtered[0].canonicalName,
-              exact: true,
-            })
-            .first()
-            .waitFor({ timeout: 45000 });
+          if (!insufficientOnly) {
+            await page
+              .getByRole("heading", {
+                name: filtered[0].canonicalName,
+                exact: true,
+              })
+              .first()
+              .waitFor({ timeout: 45000 });
+          } else
+            await page
+              .getByText("No companies match", { exact: false })
+              .first()
+              .waitFor({ timeout: 45000 });
           await page
             .getByRole("button", { name: /^Filters(?:,|$)/ })
             .first()
@@ -773,13 +803,19 @@ async function main() {
           await page
             .getByRole("button", { name: "Show companies", exact: true })
             .click();
-          await page
-            .getByRole("heading", {
-              name: sorted[0].canonicalName,
-              exact: true,
-            })
-            .first()
-            .waitFor({ timeout: 45000 });
+          if (!insufficientOnly) {
+            await page
+              .getByRole("heading", {
+                name: sorted[0].canonicalName,
+                exact: true,
+              })
+              .first()
+              .waitFor({ timeout: 45000 });
+          } else
+            await page
+              .getByText("No companies match", { exact: false })
+              .first()
+              .waitFor({ timeout: 45000 });
           const stored = await page.evaluate(() =>
             JSON.parse(
               window.localStorage.getItem("cq.discover.filters.v1") ?? "null",
@@ -826,6 +862,11 @@ async function main() {
         evidence,
         checks: outcomes.length,
         remaining: [
+          ...(fixture.expectedAssessmentStatus === "INSUFFICIENT_EVIDENCE"
+            ? [
+                "genuinely scored company and nonempty numeric Discover sort unavailable; not certified",
+              ]
+            : []),
           "visual screenshot inspection",
           ...(process.env.CQ_UNICORN_VERIFY_Q === "1" ? [] : ["Q explanation"]),
         ],
