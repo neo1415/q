@@ -76,6 +76,12 @@ export type QComposerProps = {
    * End during a voice session), set at its leading edge.
    */
   readonly actions?: ReactNode | undefined;
+  /**
+   * Icon controls set in the field's own icon row, before Send (Mute and
+   * End during a voice session: owner 2026-10-18, full-size buttons made
+   * the box look cluttered on a phone).
+   */
+  readonly iconActions?: ReactNode | undefined;
 };
 
 export function QComposer({
@@ -96,6 +102,7 @@ export function QComposer({
   initialValue = "",
   showContext = true,
   actions,
+  iconActions,
 }: QComposerProps) {
   const t = useUiText();
   const generatedId = useId();
@@ -199,6 +206,7 @@ export function QComposer({
           />
         </div>
         <div className="flex flex-none items-center gap-1">
+          {iconActions}
           {onAttach !== undefined ? (
             <>
               <input
