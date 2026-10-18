@@ -145,7 +145,11 @@ export function FounderApplications({
           ),
         ).values(),
       ).map((value) => (
-        <GateqUnicornAssessment key={value.companyId} value={value} />
+        <GateqUnicornAssessment
+          key={value.companyId}
+          value={value}
+          audience="FOUNDER"
+        />
       ))}
       <section className="gq-sect">
         <h2 className="cq-title-sm">{t("Your applications")}</h2>
