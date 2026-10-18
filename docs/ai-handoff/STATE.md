@@ -1,5 +1,13 @@
 # Capital Q — Current shared engineering state
 
+## Latest acceptance / ownership checkpoint — 18October06:29WAT
+
+**CanonicalAPIrepair is ClaudePR231, NOT our230/232 (withdrawn).** BothpatchesremoveoppositeActorContextimports; blindlymergingbothdeletesALLimportswithouttextconflict. Keep231sole-runtimepath. Rootalternative0aca/9e1ispushedforrecoveryonly; after231integrates, reconcileapps/api/src/main.ts tocanonicalupstreambeforeanynewsourcePR. Own230/232CI runs39100482101/39100544196/39100549036 canceled becausewithdrawn, notbecausegateswerewaived. Directcoordinationcomment231#issuecomment-6246095819 recordsownership.
+
+Unicorncodeisrunningonallfourservices butSHAsnotuniform: web/workers4ef8daecSUCCESS; APIhealthy cfd51ef6 (4efAPIbuildFAILED), q-apihealthy cfd with4efbuilding atlastread. ProtectedUnicornsource/integration/candidateallPASS. Canonical231CI pending. All43auditedexisting-org ACCESSgrants are nowAPPLIED andverified; no paidusage/subscriptionchanges. Schema248applied. Actualworkerbackfill394assessed/0scored/394insufficient,292partial,max33.5% at05:28:48UTC; continueuntilall461.
+
+ActualAPIchecks: premiuminvestor200 persistedINSUFFICIENT/coverage0.335/12pillars; no-mandateinvestor200samepermittedcompanyassessment; nonpremium404withoutpayload; founder directinvestorroute404asintended (ownassessmentthroughGateQ). Secondarycompany200/INSUFFICIENT/coverage0. Existingfounderapplication200andselectedownerapplicationpresent. Authenticatedbrowserharnessisrunning inexplicitinsufficient-evidencemode withQenabled; notyetcertified. FinaluniformSHA/allchecks andrealbrowser/securityscreenshotsstillpending.
+
 ## Latest combined-release blocker — 18October06:24WAT
 
 Another engineer promoted PR229 as4ef8daeccbb6f6874cd52f8f2743b6fe7d457ac4 during227rollout. It containscfdUnicorn unchanged plus226/228GateQ/onboarding. Its API build FAILED: TS2300 duplicateActorContext imports atmain.ts2/241, caused bytextualmergeof217/226. ActiveAPI/q-api/workers reachedhealthy cfd51ef6; web still914atlastread while4efbuildsqueue. Do NOTclaimuniform4efdeployment orCIgreen:229candidate39100138762build/typesFAIL; source/integration/candidateUnicorn gates allPASS, oldproductionpush39100042323CANCELED bynew4efrun39100142562.
