@@ -120,6 +120,19 @@ export type ApplicationRelationshipDependencies = {
     readonly applicationId: string;
     readonly relationshipId: string;
   }) => Promise<void>;
+  /**
+   * Owner 2026-10-17: the application reaches the investor as interest
+   * from the company (Network's own connection-request command, so one
+   * interest, idempotent), which puts it in their pipeline. Absent in
+   * tests that only join.
+   */
+  readonly expressInterest?:
+    | ((input: {
+        readonly actor: ActorContext;
+        readonly investorOrganisationId: string;
+        readonly applicationId: string;
+      }) => Promise<void>)
+    | undefined;
 };
 
 /**
@@ -148,6 +161,11 @@ export function createApplicationRelationshipJoin(
     await dependencies.setRelationship({
       applicationId: input.applicationId,
       relationshipId,
+    });
+    await dependencies.expressInterest?.({
+      actor: input.actor,
+      investorOrganisationId: pair.investorOrganisationId,
+      applicationId: input.applicationId,
     });
     return relationshipId;
   };
