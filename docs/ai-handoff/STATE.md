@@ -1,5 +1,13 @@
 # Capital Q — Current shared engineering state
 
+## Latest Unicorn rollout — 18 October,06:17WAT
+
+PR227 merged normally as **cfd51ef60191e560a4726fa08695712fa62972f9**, after source39098259746, integration39098720633 and candidate39098756517 allpassed everyprotectedgate. Candidateacba and productioncfd have identicaltrees. Source217 prematureintegration was quarantined until allchecks passed; no prematureproductionpromotion. ProductionpushCI39100042323 is running. Both reviewed migrations28200000/28201500 are APPLIED, hosted248/none missing.
+
+AllfourRailway have newcfd rollout entries: workers3900b0db-47c1-4fda-8da6-b3196557c3cd, API ddd84b38-4ac5-4082-8233-78b1a1eee67a, q-api3760c9be-1ec6-42c0-9d86-288343ad06ff BUILDING; web114e027c-512b-452d-8f73-d468f205c0b1 QUEUED atlastread. Do NOT callthese running yet. Prioractiveweb914ae664a; backendthreec36b99bb. Rollbackproduction914ae664a21c53acf4af8ed63abc88d672f72489; retainadditiveschema/history.
+
+43scopedACCESSgrants remainUNAPPLIED. NextverifyallfouractiveSUCCESS cfd, applyauditedgrants, allowexistingpacedworkerbackfill (2minstartupdelay), queryactualassessmentcounts, runcorrectedrealbrowserharness+source/entitlementwithdrawalchecks andinspectdesktop/mobile/screenshots/Qanswers. All461frozeninputs remaininsufficient;342partialcoverage,max33.5%; no numericpositiveproductioncertification. NewGateQ226/610915b3d staysunreleased inintegration, outside227. Operator/helper/docsupdates are pushed on `codex/unicorn-qfiles-oct17` after217; runtimecandidate staysfixed.
+
 ## Latest release HOLD — 18 October, 05:56 WAT
 
 - PR217 integrated as **acba6869895001c0cada2817a574f5fa6159beb5** on `build/int-rc`. GitHub merged immediately when auto-merge was requested even though source tests/lint were pending. This was premature; **do not promote production until all source/integration/candidate gates pass**. Never use auto-merge here as a substitute for explicitly reading completed gates.
