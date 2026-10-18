@@ -357,7 +357,7 @@ function monetaryFigure(
     /^(?:about\s+|approximately\s+|~\s*)?(USD|EUR|GBP|NGN|KES|ZAR|AUD|CAD|INR|VND|SGD|CHF|JPY|CNY|\$|£|€|₦|₹|₫)\s*(\d[\d,]*(?:\.\d+)?)\s*(k|m|million|billion|bn)?(?:\s+(?:annual revenue|ARR|MRR|run.rate))?$/iu.exec(
       text,
     );
-  if (m === null) return null;
+  if (m === null || m[1] === undefined) return null;
   const amount =
     Number(m[2]?.replace(/,/gu, "")) *
     (["m", "million"].includes((m[3] ?? "").toLowerCase())

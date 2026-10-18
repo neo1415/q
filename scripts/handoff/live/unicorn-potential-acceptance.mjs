@@ -664,6 +664,14 @@ async function main() {
           await page.keyboard.press("Escape");
           q = "PASS_CURRENT_RUN_RENDERED";
         }
+        await panel.locator(":scope > summary").scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: join(
+            evidence,
+            `${actor.role}-${device}-assessment-viewport.png`,
+          ),
+          fullPage: false,
+        });
         await page.screenshot({
           path: join(evidence, `${actor.role}-${device}.png`),
           fullPage: true,
