@@ -224,12 +224,18 @@ describe("fit tools", () => {
     const authorized = FitProfileOutputSchema.parse(allowed.result.data);
     expect(authorized.text).toContain("Unicorn Potential: 50/100");
     expect(authorized.guidance).toContain("not a probability");
+    expect(authorized.guidance).toContain("disclosure.unicorn-potential");
+    expect(authorized.guidance).toContain("act EXPAND");
+    expect(authorized.guidance).toContain("client DONE receipt");
     entitled = false;
     const revoked = await invoke();
     if (!revoked.result.ok) throw new Error("Expected denied-feature profile");
     expect(
       FitProfileOutputSchema.parse(revoked.result.data).scores,
     ).not.toHaveProperty("unicornPotential");
+    expect(
+      FitProfileOutputSchema.parse(revoked.result.data).guidance,
+    ).toContain("do not infer or reconstruct a premium score");
     const foreign = await port.execute(
       call("fit_profile", { companyId: COMPANY_B_PRIVATE }),
       contextFor(actorB, investorPlan),

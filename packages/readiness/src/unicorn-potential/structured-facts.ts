@@ -9,13 +9,27 @@ export type StructuredSignal = {
 };
 export function metricDate(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  if (
-    /^(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+20\d\d$/iu.test(
+  const namedMonth =
+    /^(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(20\d\d)$/iu.exec(
       value.trim(),
-    )
-  ) {
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+    );
+  if (namedMonth !== null) {
+    const month =
+      [
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "may",
+        "jun",
+        "jul",
+        "aug",
+        "sep",
+        "oct",
+        "nov",
+        "dec",
+      ].indexOf((namedMonth[1] ?? "").slice(0, 3).toLowerCase()) + 1;
+    return `${namedMonth[2]}-${String(month).padStart(2, "0")}-01T00:00:00.000Z`;
   }
   const match = /^(20\d\d)-(0[1-9]|1[0-2])(?:-([0-2]\d|3[01]))?$/u.exec(value);
   if (match === null) return null;
@@ -125,6 +139,16 @@ export function structuredSignals(
       if (n >= 2) emit("P3", "B", 2, "multiple_paying_customers_not_retention");
     }
   }
+  if (key === "financial.runway_months" && v.kind === "MONTHS") {
+    const months = number(v.value);
+    if (months !== null && months >= 0 && months <= 1200)
+      emit(
+        "P8",
+        "A",
+        months >= 12 ? 3 : months > 0 ? 2 : 0,
+        "measured_current_cash_runway",
+      );
+  }
   if (v.kind === "PERCENT" || v.kind === "PERCENTAGE") {
     const n = number(v.value);
     if (n === null || n < -100 || n > 1000) return [];
@@ -153,7 +177,7 @@ export function structuredSignals(
       start !== null &&
       end !== null &&
       start < end &&
-      ["REVENUE", "USERS", "USAGE", "PAYING_CUSTOMERS"].includes(
+      ["ARR", "REVENUE", "USERS", "USAGE", "PAYING_CUSTOMERS"].includes(
         String(v.metric),
       )
     )
@@ -209,6 +233,7 @@ export function deckStructuredFact(fact: {
 } | null {
   if (fact.kind !== "FIGURE" || fact.value === null) return null;
   const label = fact.label.trim().toLowerCase();
+  const text = fact.value.trim();
   const key =
     DECK_KEYS[label] ??
     (/\b(?:arr|annual recurring revenue)\b/iu.test(label)
@@ -217,21 +242,86 @@ export function deckStructuredFact(fact: {
         ? "financial.monthly_revenue"
         : /\b(?:tam|sam|som|market size)\b/iu.test(label)
           ? "market.size"
-          : undefined);
+          : /\bnet revenue retention\b|\bNRR\b/iu.test(`${label} ${text}`)
+            ? "financial.nrr"
+            : undefined);
   if (key === undefined) return null;
-  const text = fact.value.trim();
   if (
     /\b(forecast|projected|projection|target|planned)\b/iu.test(
       `${label} ${text}`,
     )
   )
     return null;
+  if (key === "financial.arr" && /\b(trend|growth)\b/iu.test(label)) {
+    const window =
+      /^(?:from\s+)?(.+?)\s+in\s+(.+?)\s+to\s+(.+?)\s+in\s+(.+)$/iu.exec(text);
+    if (window === null) return null;
+    const start = monetaryFigure(window[1] ?? ""),
+      end = monetaryFigure(window[3] ?? "");
+    const periodStart = metricDate(window[2]),
+      periodEnd = metricDate(window[4]);
+    if (
+      start === null ||
+      end === null ||
+      start.currency !== end.currency ||
+      Number(start.amount) <= 0 ||
+      periodStart === null ||
+      periodEnd === null ||
+      periodStart >= periodEnd
+    )
+      return null;
+    return {
+      claimKey: "traction.growth",
+      structuredValue: {
+        kind: "PERCENT",
+        metric: "ARR",
+        value:
+          ((Number(end.amount) - Number(start.amount)) / Number(start.amount)) *
+          100,
+        periodStart: periodStart.slice(0, 10),
+        periodEnd: periodEnd.slice(0, 10),
+        startAmount: start.amount,
+        endAmount: end.amount,
+        currency: start.currency,
+        asOf: fact.asOf,
+      },
+    };
+  }
+  if (key === "financial.runway_months") {
+    const months =
+      /^(?:about\s+|approximately\s+|~\s*)?(\d+(?:\.\d+)?)\s+months?$/iu.exec(
+        text,
+      );
+    return months === null
+      ? null
+      : {
+          claimKey: key,
+          structuredValue: {
+            kind: "MONTHS",
+            value: months[1],
+            asOf: fact.asOf,
+          },
+        };
+  }
   if (
     key === "financial.nrr" ||
     key === "financial.gross_margin" ||
     key === "financial.contribution_margin"
   ) {
-    const m = /^(-?\d+(?:\.\d+)?)\s*%$/u.exec(text);
+    const m =
+      /^(-?\d+(?:\.\d+)?)\s*%(?:\s+(net revenue retention|NRR|gross margin|contribution margin))?$/iu.exec(
+        text,
+      );
+    const annotation = m?.[2]?.toLowerCase();
+    const expected =
+      key === "financial.nrr"
+        ? ["net revenue retention", "nrr"]
+        : [
+            key === "financial.gross_margin"
+              ? "gross margin"
+              : "contribution margin",
+          ];
+    if (annotation !== undefined && !expected.includes(annotation)) return null;
     return m === null
       ? null
       : {
@@ -252,11 +342,22 @@ export function deckStructuredFact(fact: {
           },
         };
   }
+  const money = monetaryFigure(text);
+  return money === null
+    ? null
+    : {
+        claimKey: key,
+        structuredValue: { kind: "MONEY", ...money, asOf: fact.asOf },
+      };
+}
+function monetaryFigure(
+  text: string,
+): { readonly amount: string; readonly currency: string } | null {
   const m =
     /^(?:about\s+|approximately\s+|~\s*)?(USD|EUR|GBP|NGN|KES|ZAR|AUD|CAD|INR|VND|SGD|CHF|JPY|CNY|\$|£|€|₦|₹|₫)\s*(\d[\d,]*(?:\.\d+)?)\s*(k|m|million|billion|bn)?(?:\s+(?:annual revenue|ARR|MRR|run.rate))?$/iu.exec(
       text,
     );
-  if (m === null) return null;
+  if (m === null || m[1] === undefined) return null;
   const amount =
     Number(m[2]?.replace(/,/gu, "")) *
     (["m", "million"].includes((m[3] ?? "").toLowerCase())
@@ -266,22 +367,18 @@ export function deckStructuredFact(fact: {
         : (m[3] ?? "").toLowerCase() === "k"
           ? 1e3
           : 1);
+  if (!Number.isFinite(amount)) return null;
   return {
-    claimKey: key,
-    structuredValue: {
-      kind: "MONEY",
-      amount: String(amount),
-      currency:
-        {
-          $: "USD",
-          "£": "GBP",
-          "€": "EUR",
-          "₦": "NGN",
-          "₹": "INR",
-          "₫": "VND",
-        }[m[1] ?? ""] ?? m[1]?.toUpperCase(),
-      asOf: fact.asOf,
-    },
+    amount: String(amount),
+    currency:
+      {
+        $: "USD",
+        "£": "GBP",
+        "€": "EUR",
+        "₦": "NGN",
+        "₹": "INR",
+        "₫": "VND",
+      }[m[1] ?? ""] ?? m[1]?.toUpperCase(),
   };
 }
 const DECK_KEYS: Readonly<Record<string, string>> = {
@@ -296,6 +393,10 @@ const DECK_KEYS: Readonly<Record<string, string>> = {
   "gross margin": "financial.gross_margin",
   "contribution margin": "financial.contribution_margin",
   "market size": "market.size",
+  runway: "financial.runway_months",
+  "current runway": "financial.runway_months",
+  "cash runway": "financial.runway_months",
+  "runway at current burn": "financial.runway_months",
 };
 /** Current, confirmed narrative claims have a capture date, not an invented measurement period. */
 export function confirmedNarrativeSignals(

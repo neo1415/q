@@ -58,7 +58,7 @@ const GUIDANCE =
   'Say each company\'s fit as the score out of 10 given in text beside its profile\'s band in words ("7.5/10 · Good fit"), exactly as given; where no score is given, the band in words alone. Never a percentage, never a score of your own, never a different number. Then the parameter rows that matter, with their reasons. Unknown means not known yet, never bad. Q\'s view, if you give one, is labelled as your view and does not change the fit. When text gives Investability and Suitability, say both exactly as given, each with how much it is based on ("based on 5 of 8 areas") and its confidence: Investability is how investable the company is on its shared evidence (FDN InvestIQ), Suitability is its fit with this investor\'s mandate; they are separate scores, never add or average them. "Not enough shared evidence yet" is not a low score. Do not make a document or PDF unless the person asked for a file.';
 
 const UNICORN_GUIDANCE =
-  "If scores.unicornPotential is present, Unicorn Potential is a separate persisted growth-characteristics indicator: repeat only its actual overallScore (or insufficient evidence), explain its twelve pillars, grades, stage weights, coverage, sources and recorded momentum. Use weighted graded pillar sum divided by scored pillar weights, multiplied by 25 and rounded once; never invent an observation or treat unknown as zero. It is not a probability of reaching a $1 billion valuation. If it is absent, do not infer or reconstruct a premium score; say that assessment is unavailable for this account.";
+  "If scores.unicornPotential is present, Unicorn Potential is a separate persisted growth-characteristics indicator: repeat only its actual overallScore (or insufficient evidence), explain its twelve pillars, grades, stage weights, coverage, sources and recorded momentum. Use weighted graded pillar sum divided by scored pillar weights, multiplied by 25 and rounded once; never invent an observation or treat unknown as zero. It is not a probability of reaching a $1 billion valuation. If it is absent, do not infer or reconstruct a premium score; say that assessment is unavailable for this account. A visible assessment card is not proof that its details are expanded. When the entitled person asks to open or show the Unicorn Potential assessment or its calculation on the company Overview, call operate_screen with target disclosure.unicorn-potential and act EXPAND before drafting the explanation. EXPAND is idempotent; do not substitute ACTIVATE or assume the panel is already open. Do not say it opened without the client DONE receipt; until confirmed, describe the opening as requested rather than completed.";
 
 const STATUSES = [
   "OK",
@@ -228,7 +228,7 @@ export function createFitProfileTool(ports: QToolPorts): AnyQToolDefinition {
         }),
         guidance:
           item.scores?.unicornPotential === undefined
-            ? GUIDANCE
+            ? `${GUIDANCE} Unicorn Potential is unavailable for this account; do not infer or reconstruct a premium score from other scores, public company facts or earlier conversation results.`
             : `${GUIDANCE} ${UNICORN_GUIDANCE}`,
       };
       if (

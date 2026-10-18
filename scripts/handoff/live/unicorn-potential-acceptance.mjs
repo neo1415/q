@@ -229,6 +229,7 @@ async function main() {
     });
   const outcomes = [];
   let browser;
+  let activePage;
   try {
     const require = createRequire(
       new URL("../../../apps/web/package.json", import.meta.url),
@@ -352,15 +353,17 @@ async function main() {
           })),
         );
         const page = await context.newPage();
+        activePage = page;
         await page.goto(
           new URL(
-            actor.profilePath ?? `/companies/${fixture.scoredCompanyId}`,
+            actor.profilePath ?? `/company/${fixture.scoredCompanyId}`,
             web,
           ).href,
           { waitUntil: "domcontentloaded", timeout: 60000 },
         );
         await page
-          .locator('[data-company-scores="full"]')
+          .getByRole("heading", { name: visible.name, exact: true })
+          .first()
           .waitFor({ timeout: 45000 });
         assert.equal(
           await page.locator('[data-score="unicorn-potential"]').count(),
@@ -463,6 +466,7 @@ async function main() {
           sessionStorage.setItem("cq.splash.seen", "1"),
         );
         const page = await context.newPage();
+        activePage = page;
         const runs = [];
         page.on("request", (r) => {
           const m = /\/q\/runs\/([0-9a-f-]{36})\/events/i.exec(
@@ -474,7 +478,7 @@ async function main() {
           new URL(
             actor.role === "premiumFounder"
               ? actor.gateqPath
-              : (actor.profilePath ?? `/companies/${fixture.scoredCompanyId}`),
+              : (actor.profilePath ?? `/company/${fixture.scoredCompanyId}`),
             web,
           ).href,
           { waitUntil: "domcontentloaded", timeout: 60000 },
@@ -483,7 +487,7 @@ async function main() {
           .locator(
             actor.role === "premiumFounder"
               ? `[data-testid="gateq-unicorn-assessment"] #unicorn-potential-${founderAssessment.companyId}`
-              : '[data-score="unicorn-potential"]',
+              : 'details[data-score="unicorn-potential"]',
           )
           .first();
         await panel.waitFor({ timeout: 45000 });
@@ -597,13 +601,21 @@ async function main() {
             "COMPLETED",
             "Fresh Q answer did not complete",
           );
+          write("investor-q-run.json", run);
           const latest = run.messages.findLast(
             (m) => m.role === "Q" && m.runId === run.runId,
           );
           assert.ok(latest?.text && latest.messageId, "Fresh answer absent");
           assert.ok(
-            latest.text.includes(String(assessment.body.overallScore)) &&
-              /unicorn|potential/i.test(latest.text),
+            /unicorn|potential/i.test(latest.text) &&
+              (assessment.body.overallScore === null
+                ? /insufficient|unscored|no (?:overall )?.{0,25}score|not.{0,25}score/i.test(
+                    latest.text,
+                  ) &&
+                  !/\b\d{1,3}(?:\.\d+)?\s*(?:\/\s*100|out of 100)\b/i.test(
+                    latest.text,
+                  )
+                : latest.text.includes(String(assessment.body.overallScore))),
             "Q score explanation mismatch",
           );
           for (const term of fixture.qExpectedTerms)
@@ -611,10 +623,6 @@ async function main() {
               latest.text.toLowerCase().includes(term.toLowerCase()),
               "Q omitted configured real evidence term",
             );
-          assert.ok(
-            (await panel.getAttribute("open")) !== null,
-            "Q failed to open actual assessment",
-          );
           const hasReceipt = () =>
             receipts.some((payload) =>
               (payload.reports ?? []).some(
@@ -625,6 +633,11 @@ async function main() {
             );
           for (let n = 0; n < 30 && !hasReceipt(); n++)
             await page.waitForTimeout(100);
+          write("q-ui-receipts.json", receipts);
+          assert.ok(
+            (await panel.getAttribute("open")) !== null,
+            "Q failed to open actual assessment",
+          );
           assert.ok(hasReceipt(), "Q opening has no exact target DONE receipt");
           await page.evaluate((source) => {
             window.__cqUnicornReadAnswer = Function(`return (${source})`)();
@@ -651,13 +664,21 @@ async function main() {
           await page.keyboard.press("Escape");
           q = "PASS_CURRENT_RUN_RENDERED";
         }
+        await panel.locator(":scope > summary").scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: join(
+            evidence,
+            `${actor.role}-${device}-assessment-viewport.png`,
+          ),
+          fullPage: false,
+        });
         await page.screenshot({
           path: join(evidence, `${actor.role}-${device}.png`),
           fullPage: true,
         });
         if (actor.role === "premiumInvestor") {
           await page.goto(
-            new URL(`/companies/${fixture.unscoredCompanyId}`, web).href,
+            new URL(`/company/${fixture.unscoredCompanyId}`, web).href,
             { waitUntil: "domcontentloaded", timeout: 60000 },
           );
           const thinPanel = page.locator(
@@ -873,6 +894,9 @@ async function main() {
       }),
     );
   } catch (error) {
+    await activePage
+      ?.screenshot({ path: join(evidence, "failure.png"), fullPage: true })
+      .catch(() => undefined);
     write("failure.json", {
       message: String(error?.message ?? error),
       stack: error?.stack,
