@@ -238,7 +238,6 @@ import {
   createIntakeTaxonomyPort,
 } from "./gateq/intake-ports.js";
 import {
-  type ActorContext,
   CapabilitySchema,
   createAuthorizationService,
   OrganisationIdSchema,
