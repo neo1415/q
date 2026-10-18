@@ -22,6 +22,49 @@ export const RelationshipPipelineQuerySchema = z
 export type RelationshipPipelineQuery = z.infer<
   typeof RelationshipPipelineQuerySchema
 >;
+
+/**
+ * The CRM's Unicorn Potential views (owner 2026-10-18): ranked by the
+ * persisted, premium-gated assessment, highest first, optionally narrowed
+ * to a score floor (the band edges), to scored companies only, or to those
+ * with insufficient evidence. They are web views over the reader's own
+ * authorised pipeline: the API never sees them (it has no scores), and a
+ * saved view keeps one in its `sort`, so no stored key changes.
+ */
+export const PIPELINE_UNICORN_SORTS = [
+  "unicorn",
+  "unicorn-scored",
+  "unicorn-40",
+  "unicorn-60",
+  "unicorn-80",
+  "unicorn-insufficient",
+] as const;
+export type PipelineUnicornSort = (typeof PIPELINE_UNICORN_SORTS)[number];
+export function isPipelineUnicornSort(
+  value: unknown,
+): value is PipelineUnicornSort {
+  return (
+    typeof value === "string" &&
+    (PIPELINE_UNICORN_SORTS as readonly string[]).includes(value)
+  );
+}
+
+/** The pipeline query as the web page reads it: the API's, or a Unicorn view. */
+export const RelationshipPipelineViewQuerySchema =
+  RelationshipPipelineQuerySchema.extend({
+    sort: z
+      .enum([
+        "recent",
+        "oldest",
+        "name",
+        "name-desc",
+        ...PIPELINE_UNICORN_SORTS,
+      ])
+      .optional(),
+  }).strict();
+export type RelationshipPipelineViewQuery = z.infer<
+  typeof RelationshipPipelineViewQuerySchema
+>;
 export const RelationshipPipelineDtoSchema = z
   .object({
     items: z.array(RelationshipSummaryDtoSchema).max(50),

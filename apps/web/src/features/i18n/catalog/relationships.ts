@@ -694,4 +694,32 @@ export const RELATIONSHIPS_AR: Readonly<Record<string, string>> = {
   "no pro-rata right": "بلا حق المشاركة التناسبية",
   "no document attached": "لا مستند مرفق",
   corrected: "مُصحَّح",
+  // CRM Unicorn Potential (2026-10-18).
+  "Unicorn Potential": "إمكانية الشركة المليارية",
+  "Insufficient evidence": "أدلة غير كافية",
+  "Not assessed": "لم يُقيَّم بعد",
+  "Unicorn Potential, highest first": "إمكانية الشركة المليارية، الأعلى أولاً",
+  "Unicorn Potential: any": "إمكانية الشركة المليارية: الكل",
+  "Unicorn Potential: all companies": "إمكانية الشركة المليارية: كل الشركات",
+  "Unicorn Potential: with a score": "إمكانية الشركة المليارية: بدرجة",
+  "Unicorn Potential: 40 and above": "إمكانية الشركة المليارية: 40 فأكثر",
+  "Unicorn Potential: 60 and above": "إمكانية الشركة المليارية: 60 فأكثر",
+  "Unicorn Potential: 80 and above": "إمكانية الشركة المليارية: 80 فأكثر",
+  "Unicorn Potential: insufficient evidence":
+    "إمكانية الشركة المليارية: أدلة غير كافية",
+  "Unicorn Potential first": "إمكانية الشركة المليارية أولاً",
+  "Unicorn Potential scored": "إمكانية الشركة المليارية بدرجة",
+  "Unicorn Potential 40+": "إمكانية الشركة المليارية 40+",
+  "Unicorn Potential 60+": "إمكانية الشركة المليارية 60+",
+  "Unicorn Potential 80+": "إمكانية الشركة المليارية 80+",
+  "Unicorn: insufficient evidence": "المليارية: أدلة غير كافية",
+  "ranked by Unicorn Potential across your pipeline":
+    "مرتبة حسب إمكانية الشركة المليارية عبر قائمتك كلها",
+  "Insufficient evidence is not a low score: those companies have no Unicorn Potential yet.":
+    "الأدلة غير الكافية ليست درجة منخفضة: هذه الشركات لم تُقيَّم بعد.",
+  "No company in this view has a Unicorn Potential score here yet.":
+    "لا توجد بعد شركة في هذا العرض بدرجة إمكانية مليارية ضمن هذا النطاق.",
+  "Most companies don't have enough evidence for a numerical assessment yet. Every relationship is still in your pipeline.":
+    "معظم الشركات لا تملك بعد أدلة كافية لتقييم رقمي. كل علاقاتك ما زالت في قائمتك.",
+  "Show all relationships": "اعرض كل العلاقات",
 };
