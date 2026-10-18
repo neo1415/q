@@ -76,6 +76,12 @@ import {
   MONEY_STEP,
 } from "./interview-steps.js";
 import { SPOKEN_QUESTIONS } from "./step-copy.js";
+import {
+  heardBack,
+  isParaphraseRationale,
+  paraphraseRationale,
+  readBackReplyOf,
+} from "./paraphrase-confirmation.js";
 
 /**
  * What the loop is told when it tries to fill an upload step with words.
@@ -267,6 +273,12 @@ export type BoundOnboardingPort = OnboardingToolPort &
         readonly rationale: string | null;
       }[]
     >;
+    /**
+     * Q's held summaries the person just agreed to: pending since before
+     * this turn, said back in Q's last turn, and affirmed by their latest
+     * words. Code accepts these without waiting on a model.
+     */
+    readonly affirmedParaphrases: () => Promise<ReadonlySet<string>>;
   };
 
 /**
@@ -1282,6 +1294,106 @@ export function createOnboardingPort(input: {
   };
 
   /**
+   * Whether free text is theirs: in their words (the quote, or the turn of
+   * theirs it is cut from), or read back to them in Q's last turn and
+   * agreed to in their latest words ("Nixo, right?" "Yes."). A reply that
+   * changes what was read back agrees to none of it.
+   */
+  const textInTheirWords = (text: string, quote: string): boolean => {
+    const latest = input.personTurns[0];
+    const readBack =
+      input.lastQTurn !== undefined &&
+      textStatedIn(text, input.lastQTurn) &&
+      latest !== undefined &&
+      quoteOccursIn(quote, latest) &&
+      readBackReplyOf(latest) !== "CORRECT";
+    return (
+      readBack ||
+      textStatedIn(text, quote) ||
+      // Or the field's part of the same turn of theirs the quote is from
+      // (a quote cut short before the words about this field).
+      input.personTurns.some(
+        (said) => quoteOccursIn(quote, said) && textStatedIn(text, said),
+      )
+    );
+  };
+
+  /** Whether every sentence of theirs that holds the quote only asks. */
+  const askedOnly = (quote: string): boolean => {
+    const words = quote.trim().toLowerCase().slice(0, 40);
+    const holding = input.personTurns
+      .filter((said) => quoteOccursIn(quote, said))
+      .flatMap((said) => said.match(/[^.?!]+[.?!]*/gu) ?? [said])
+      .filter((sentence) => sentence.toLowerCase().includes(words));
+    return (
+      holding.length > 0 &&
+      holding.every((sentence) => ASKING.test(sentence.trim()))
+    );
+  };
+
+  /**
+   * A narrative answer (what the company does, the problem, the solution,
+   * the business model, the opportunity, the vision) in Q's words rather
+   * than theirs is held as Q's summary for their yes, never written and
+   * never refused (owner live 2026-10-17): Q says it back in one line and
+   * their agreement saves exactly that text through accept.
+   */
+  const holdParaphrase = async (
+    step: OnboardingStepManifest,
+    value: Extract<OnboardingResponseValue, { type: "TEXT" }>,
+    quote: string,
+  ): Promise<OnboardingRecordResult> => {
+    const question = (
+      SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+    ).slice(0, 400);
+    if (askedOnly(quote)) {
+      return {
+        stepKey: step.stepKey,
+        outcome: "REJECTED",
+        question,
+        reason:
+          "Their words there only ask a question, so nothing was held or recorded. A question is never their answer; ask them if you want to know.",
+      };
+    }
+    if (store !== undefined) {
+      try {
+        await store.recommend({
+          userId,
+          sessionId: input.onboardingSessionId,
+          stepKey: step.stepKey,
+          value,
+          rationale: paraphraseRationale(quote),
+          runId: input.runId ?? null,
+        });
+      } catch (error: unknown) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "reason" in error &&
+          error.reason === "SUGGESTION_REJECTED_BEFORE"
+        ) {
+          return {
+            stepKey: step.stepKey,
+            outcome: "REJECTED",
+            question,
+            reason:
+              "They turned that exact summary down before. Offer a different one-line summary of what they said and ask if it is right.",
+          };
+        }
+        // Not kept: their yes to the read-back still records it, as text
+        // Q read back to them.
+      }
+    }
+    return {
+      stepKey: step.stepKey,
+      outcome: "REJECTED",
+      question,
+      reason:
+        'Held for their confirmation, not saved yet: this is your summary of what they said. Say it back now in one line, word for word ("So ... - shall I save that?"); their yes saves it. Never say you could not save it, never ask for their own or exact words.',
+    };
+  };
+
+  /**
    * A STATED value must be one its quote gives (unknown stays unknown):
    * a figure they stated, or read back to them and confirmed; free text
    * in their own words. Which option or category the words mean stays the
@@ -1361,23 +1473,10 @@ export function createOnboardingPort(input: {
     // step itself ("bridge dot com"), so it is not the words verbatim.
     // Text Q read back to them ("Nixo, right?") and they agreed to in
     // their latest words is theirs, as a read-back figure is.
-    const readBack =
-      value.type === "TEXT" &&
-      input.lastQTurn !== undefined &&
-      textStatedIn(value.text, input.lastQTurn) &&
-      input.personTurns[0] !== undefined &&
-      quoteOccursIn(answer.quote, input.personTurns[0]);
     if (
       value.type === "TEXT" &&
-      !readBack &&
       !step.stepKey.endsWith(".website") &&
-      !textStatedIn(value.text, answer.quote) &&
-      // Or the field's part of the same turn of theirs the quote is from
-      // (a quote cut short before the words about this field).
-      !input.personTurns.some(
-        (said) =>
-          quoteOccursIn(answer.quote, said) && textStatedIn(value.text, said),
-      )
+      !textInTheirWords(value.text, answer.quote)
     ) {
       return refuse(
         "That text is not in their words, so nothing was recorded. Free text is recorded in the person's own words, and only for the question it answers.",
@@ -1632,6 +1731,32 @@ export function createOnboardingPort(input: {
         reason:
           "A choice is delegated only by what they say now, handing it to you; that quote is not from their latest words, so nothing was recorded.",
       });
+    }
+    // A narrative answer in Q's words: held for their yes, never refused
+    // for not being their exact words (owner live 2026-10-17). Holding
+    // writes nothing, so it does not wait on the self-statement gate: "go
+    // ahead and paraphrase it" states nothing, and still gets the summary
+    // of what they said before read back to them.
+    const narrative = steps.get(answer.stepKey);
+    if (
+      answer.basis !== "DELEGATED" &&
+      narrative !== undefined &&
+      PARAPHRASABLE.has(narrative.configuration.stepType) &&
+      typeof answer.value === "string" &&
+      answer.value.trim().length > 0 &&
+      !textInTheirWords(answer.value.trim(), answer.quote)
+    ) {
+      const resolvedText = await (warmed.get(answer) ?? resolve(answer));
+      if (!resolvedText.ok) return done(resolvedText.result);
+      if (resolvedText.value.type === "TEXT") {
+        return done(
+          await holdParaphrase(
+            resolvedText.step,
+            resolvedText.value,
+            answer.quote,
+          ),
+        );
+      }
     }
     // Their latest words name one choice by its own label, verbatim ("first
     // revenue only"): that is their answer, decided by code, not a reading
@@ -2217,8 +2342,34 @@ export function createOnboardingPort(input: {
         // independently of the acting model: another instruction is not
         // an approval of an earlier recommendation (ACC/E3 live,
         // 2026-09-25).
-        const authority = (await input.authority?.()) ?? null;
-        if (authority === null || !authority.approved.has(stepKey)) {
+        // Q's summary of their words binds to exactly the words they heard:
+        // one Q never said back to them is not theirs to approve.
+        const paraphrase = isParaphraseRationale(held.rationale);
+        if (
+          paraphrase &&
+          (held.value.type !== "TEXT" ||
+            !heardBack(held.value.text, input.lastQTurn))
+        ) {
+          results.push({
+            stepKey,
+            outcome: "REJECTED",
+            reason:
+              "Held for their confirmation: your summary was not said back to them word for word, so nothing was recorded. Say it back in one line exactly as held and ask if you should save it.",
+          });
+          continue;
+        }
+        // A plain yes (or "go ahead and save it") to the summary they just
+        // heard is decided by code; anything else is the reader's.
+        const affirmed =
+          paraphrase &&
+          readBackReplyOf(input.personTurns[0] ?? "") === "AFFIRM";
+        const authority = affirmed
+          ? null
+          : ((await input.authority?.()) ?? null);
+        if (
+          !affirmed &&
+          (authority === null || !authority.approved.has(stepKey))
+        ) {
           results.push({
             stepKey,
             outcome: "REJECTED",
@@ -2829,6 +2980,22 @@ export function createOnboardingPort(input: {
         },
       });
     },
+    affirmedParaphrases: async () => {
+      const latest = input.personTurns[0];
+      if (latest === undefined || readBackReplyOf(latest) !== "AFFIRM") {
+        return new Set<string>();
+      }
+      return new Set(
+        (await heard)
+          .filter(
+            (held) =>
+              isParaphraseRationale(held.rationale) &&
+              held.value.type === "TEXT" &&
+              heardBack(held.value.text, input.lastQTurn),
+          )
+          .map((held) => held.stepKey),
+      );
+    },
     pendingRecommendations: async () => {
       const view = await current();
       const list = await pendingNow().catch(() => []);
@@ -2910,6 +3077,9 @@ export function shortWordIn(quote: string, said: string): boolean {
 }
 
 /** A sentence that asks rather than states: by its mark or how it opens. */
+/** Steps whose answer is a narrative Q may summarise for their yes. */
+const PARAPHRASABLE: ReadonlySet<string> = new Set(["long_text", "voice_text"]);
+
 const ASKING =
   /[?؟]\s*$|^(?:what|which|who|whom|whose|when|where|why|how|is|are|do|does|did|can|could|should|would|will|shall|tell me|curious|i wonder|any idea|هل|ما|ماذا|كيف|لماذا|متى|أين|من)\b/iu;
 

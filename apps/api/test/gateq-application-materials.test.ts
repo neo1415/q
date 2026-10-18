@@ -123,6 +123,27 @@ describe("a shared application joins the canonical relationship (F27)", () => {
     return { join, recorded };
   }
 
+  // Owner 2026-10-17: the application reaches the investor's pipeline.
+  it("after joining, hands the application to the investor as interest", async () => {
+    const calls: unknown[] = [];
+    const join = createApplicationRelationshipJoin({
+      link: () =>
+        Promise.resolve({ companyId: "c1", investorOrganisationId: "i1" }),
+      ensureRelationship: () => Promise.resolve({ relationshipId: "r1" }),
+      setRelationship: () => Promise.resolve(),
+      expressInterest: (input) => {
+        calls.push(input);
+        return Promise.resolve();
+      },
+    });
+    await expect(
+      join({ applicationId: "a1", tenantId: "t1", actor: FOUNDER }),
+    ).resolves.toBe("r1");
+    expect(calls).toEqual([
+      { actor: FOUNDER, investorOrganisationId: "i1", applicationId: "a1" },
+    ]);
+  });
+
   it("the old scope is the exact refusal the seed hit", () => {
     expect(() =>
       registry.validate({

@@ -121,6 +121,7 @@ import {
 } from "./step-copy-language.js";
 import { settleKnownAnswers } from "./known-answers.js";
 import { textStatedIn } from "./value-support.js";
+import { isParaphraseRationale } from "./paraphrase-confirmation.js";
 
 /**
  * The onboarding interview as a tool-calling Q run (ADR 0016).
@@ -468,6 +469,14 @@ const ASKED_AGAIN = "#again";
 /** The prompt's bound on the turn notes (INTERVIEW_AGENT variables). */
 const TURN_NOTES_MAX = 1_500;
 
+/**
+ * How a narrative answer is saved (owner live 2026-10-17): Q's faithful
+ * summary, read back and saved on their yes; never refused for not being
+ * their exact words.
+ */
+const PARAPHRASE_NOTE =
+  'Free-text answer (company, problem, solution, model, opportunity, vision): record a faithful one- or two-sentence summary of what they said, quoting their words; it is held, so say it back word for word ("So ... - shall I save that?"). Their yes saves it; a correction: record the revised summary and confirm again. Never ask for their own or exact words.';
+
 /** What the journey still holds open, for the turn notes. */
 export type JourneyOpenings = {
   readonly signupName: string | null;
@@ -480,6 +489,12 @@ export type JourneyOpenings = {
     readonly value: string;
     readonly because: string | null;
   }[];
+  /**
+   * Q's summaries of their narrative answers, held for their yes and not
+   * yet said back to them (owner live 2026-10-17).
+   */
+  readonly unsaidSummaries?:
+    readonly { readonly stepKey: string; readonly value: string }[] | undefined;
   readonly unasked: readonly {
     readonly stepKey: string;
     readonly question: string;
@@ -565,6 +580,12 @@ export function turnNotesFor(input: {
   /** Proactive flow guidance (owner 2026-10-16), first among the notes. */
   readonly flow?: string | undefined;
   /**
+   * A narrative question (what the company does, the vision...) is the
+   * one just asked, or Q's summary of one waits for their yes: how such an
+   * answer is saved is said this turn (owner live 2026-10-17).
+   */
+  readonly narrative?: boolean | undefined;
+  /**
    * Steps their latest words state that are open and not on the record
    * yet (live AG 2026-10-16: geography and sectors stated, never recorded,
    * then claimed as saved). Named first so this round records them.
@@ -590,6 +611,7 @@ export function turnNotesFor(input: {
   if (input.flow !== undefined && input.flow.length > 0) {
     notes.push(input.flow);
   }
+  if (input.narrative === true) notes.push(PARAPHRASE_NOTE);
   const held = input.held;
   if (held !== undefined) {
     const list = (items: readonly string[]) =>
@@ -661,6 +683,13 @@ export function turnNotesFor(input: {
       notes.push(
         `They already answered these earlier in this conversation and they are not on the record yet: record each now from those words (quote them); never ask them again: ${open.givenEarlier
           .map((g) => `${g.stepKey} ("${g.words.slice(0, 120)}")`)
+          .join("; ")}`,
+      );
+    }
+    if (open.unsaidSummaries !== undefined && open.unsaidSummaries.length > 0) {
+      notes.push(
+        `Your summary of their answer, held for their yes and not said to them yet: say it back now in one line, word for word, and ask if you should save it: ${open.unsaidSummaries
+          .map((s) => `${s.stepKey} = "${s.value}"`)
           .join("; ")}`,
       );
     }
@@ -1285,13 +1314,24 @@ export function createInterviewAgent(
           input.journeyType === "investor" ? "firm's name" : "company's name",
         signupStepKey,
         unsaidFindings: pending
-          .filter((p) => p.rationale !== null && !saidByQ(p.value))
+          .filter(
+            (p) =>
+              p.rationale !== null &&
+              !isParaphraseRationale(p.rationale) &&
+              !saidByQ(p.value),
+          )
           .slice(0, 6)
           .map((p) => ({
             stepKey: p.stepKey,
             value: p.value.slice(0, 200),
             because: p.rationale === null ? null : p.rationale.slice(0, 120),
           })),
+        unsaidSummaries: pending
+          .filter(
+            (p) => isParaphraseRationale(p.rationale) && !saidByQ(p.value),
+          )
+          .slice(0, 2)
+          .map((p) => ({ stepKey: p.stepKey, value: p.value.slice(0, 400) })),
         givenEarlier: (() => {
           const seen = new Set<string>();
           const given: { stepKey: string; words: string }[] = [];
@@ -1428,6 +1468,16 @@ export function createInterviewAgent(
           research: researchNote,
           open,
           held: heldNote,
+          narrative:
+            !opening &&
+            ((open?.unsaidSummaries?.length ?? 0) > 0 ||
+              journeySteps.some(
+                (step) =>
+                  step.stepKey ===
+                    (lastAsked.get(input.onboardingSessionId) ?? null) &&
+                  (step.configuration.stepType === "long_text" ||
+                    step.configuration.stepType === "voice_text"),
+              )),
         });
       return {
         authority,
@@ -1569,16 +1619,21 @@ export function createInterviewAgent(
      * accept_recommendation uses, instead of hoping the model calls it.
      * Once per turn; whatever the model records besides stands.
      */
-    let approvalsRecorded = false;
+    // Each step is tried once per turn: by Q's summary the person just
+    // agreed to (decided by code, before the first round), then by what
+    // the reading found approved.
+    const approvalsTried = new Set<string>();
     const recordApproved = async (approved: ReadonlySet<string>) => {
-      if (approvalsRecorded || approved.size === 0) return;
-      approvalsRecorded = true;
+      if (approved.size === 0) return;
+      const fresh = [...approved].filter((key) => !approvalsTried.has(key));
+      if (fresh.length === 0) return;
+      for (const key of fresh) approvalsTried.add(key);
       const pendingNow = new Set(
         (await port.pendingRecommendations().catch(() => [])).map(
           (item) => item.stepKey,
         ),
       );
-      const stepKeys = [...approved].filter((key) => pendingNow.has(key));
+      const stepKeys = fresh.filter((key) => pendingNow.has(key));
       if (stepKeys.length === 0) return;
       const results = await port.accept(stepKeys).catch(() => []);
       actions.push({
@@ -1956,6 +2011,20 @@ export function createInterviewAgent(
       // Before the first round, only what they said in earlier turns; the
       // latest words are the model's to record, and code's after its round.
       await recordStatedCurrency(true);
+      // Q's summary they just agreed to ("yes", "go ahead and save it") is
+      // saved by code before any round, so the reply can say it is saved
+      // and never asks for it again (owner live 2026-10-17).
+      if (!opening) {
+        const agreed = await port
+          .affirmedParaphrases()
+          .catch(() => new Set<string>());
+        if (agreed.size > 0) {
+          const before = actions.length;
+          await recordApproved(agreed);
+          state = await port.state();
+          if (actions.length !== before) open = await journeyOpenings();
+        }
+      }
       while (
         result === undefined &&
         rounds < MAX_ROUNDS &&

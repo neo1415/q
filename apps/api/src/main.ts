@@ -238,6 +238,7 @@ import {
   createIntakeTaxonomyPort,
 } from "./gateq/intake-ports.js";
 import {
+  type ActorContext,
   CapabilitySchema,
   createAuthorizationService,
   OrganisationIdSchema,
@@ -1313,9 +1314,30 @@ const gateqLogger = createLogger(apiServiceIdentity(config), {
 // P14/F27: a founder's application joins the ONE canonical company-investor
 // relationship through Network's own command (source GATEQ), never a
 // parallel record. Discovery is the founder's own side (founder_private).
+// The connection service is composed further down; bound here once it is
+// (a join before then, e.g. the start-up backfill, joins without it and the
+// next join of the same application adds the interest).
+const gateqInterest: {
+  express?: (input: {
+    readonly actor: ActorContext;
+    readonly investorOrganisationId: string;
+    readonly applicationId: string;
+  }) => Promise<void>;
+} = {};
 const joinGateqRelationship = createApplicationRelationshipJoin({
   link: (input) => gateqFounders.link(input),
   setRelationship: (input) => gateqFounders.setRelationship(input),
+  expressInterest: async (input) => {
+    const express = gateqInterest.express;
+    if (express === undefined) return;
+    try {
+      await express(input);
+    } catch (error: unknown) {
+      // Already connected (or the pair otherwise past interest): the
+      // relationship is joined either way; never fail the application.
+      gateqLogger.warn({ err: error }, "gateq application interest skipped");
+    }
+  },
   ensureRelationship: async (command) => {
     const ensured = await gateqNetwork.ensureRelationship({
       actor: command.actor,
@@ -1772,6 +1794,16 @@ const connections = createConnectionService({
     },
   },
 });
+// GateQ applications reach the investor's pipeline as company interest.
+gateqInterest.express = async (input) => {
+  await connections.requestConnection({
+    actor: input.actor,
+    investorOrganisationId: input.investorOrganisationId,
+    idempotencyKey: `gateq-application:${input.applicationId}`,
+    correlationId: CorrelationIdSchema.parse(`cor_${crypto.randomUUID()}`),
+    gateqApplicationId: input.applicationId,
+  });
+};
 
 // Pitch media. Composed after discovery because a viewer's right to play
 // a pitch (CQ-MEDIA-011) is the same REC-001 evaluation the feed runs on
