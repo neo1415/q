@@ -131,6 +131,8 @@ async function authoriseSender(
   dependencies: ConnectionRequestDependencies,
   actor: ActorContext,
   rawInvestorOrganisationId: string,
+  /** Applied through the investor's own GateQ gate: their invitation. */
+  invited = false,
 ): Promise<Sender> {
   if (actor.organisationId === undefined) {
     throw new ActorContextRequiredError();
@@ -165,6 +167,17 @@ async function authoriseSender(
     rawInvestorOrganisationId,
   );
   if (!parsed.success) throw new InterestNotFoundError();
+  // An application through the investor's published gate is their own
+  // invitation (owner 2026-10-17): their network visibility and inbound
+  // rule govern unsolicited requests, not this. The caller has already
+  // resolved the pair from the application itself.
+  if (invited) {
+    return {
+      company,
+      investorOrganisationId: parsed.data,
+      inboundPreference: null,
+    };
+  }
   // Absent and not visible are one answer.
   const investor = await dependencies.investorReach.visibleInvestor(
     actor,
@@ -226,14 +239,22 @@ export function createRequestConnection(
     readonly investorOrganisationId: string;
     readonly idempotencyKey: string;
     readonly correlationId: CorrelationId;
+    /**
+     * Owner 2026-10-17: a founder's submitted GateQ application reaches
+     * the investor as interest from the company, so it sits in their
+     * pipeline (and Company requests) like any other request.
+     */
+    readonly gateqApplicationId?: string | undefined;
   }): Promise<ConnectionRequestResult> => {
     const { actor } = command;
+    const viaGateq = command.gateqApplicationId !== undefined;
     const sender = await authoriseSender(
       dependencies,
       actor,
       command.investorOrganisationId,
+      viaGateq,
     );
-    await requireReachable(dependencies, sender);
+    if (!viaGateq) await requireReachable(dependencies, sender);
 
     let parties;
     try {
@@ -253,7 +274,10 @@ export function createRequestConnection(
     const requestHash = sha256Hex(
       JSON.stringify({ investorOrganisationId: sender.investorOrganisationId }),
     );
-    const source = { type: "DISCOVER" as const };
+    const source =
+      command.gateqApplicationId === undefined
+        ? { type: "DISCOVER" as const }
+        : { type: "GATEQ" as const, id: command.gateqApplicationId };
 
     return transactions.run(async (tx) => {
       await interestRequests.lock(tx, actor.userId, organisationId, keyHash);
@@ -344,6 +368,7 @@ export function createRequestConnection(
           companyId: relationship.companyId,
           investorOrganisationId: relationship.investorOrganisationId,
           inboundPreference: sender.inboundPreference ?? "NOT_STATED",
+          ...(viaGateq ? { via: "GATEQ_APPLICATION" } : {}),
         },
         correlationId: command.correlationId,
       });

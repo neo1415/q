@@ -438,6 +438,35 @@ describe("Founder Connection Requests against local PostgreSQL", () => {
     );
   });
 
+  // Owner 2026-10-17: a GateQ application is the investor's own invitation.
+  it("a GateQ application reaches a CLOSED or unseen investor as company interest, once", async () => {
+    await withWorld(
+      async ({ tx, connections, preference, founder, investorA }) => {
+        preference.set(investorA, "CLOSED");
+        const apply = () =>
+          connections.requestConnection({
+            actor: founder,
+            investorOrganisationId: investorA,
+            idempotencyKey: "gateq-application:app-1",
+            correlationId: CORRELATION(),
+            gateqApplicationId: "00000000-0000-4000-8000-00000000a001",
+          });
+        const first = await apply();
+        expect(first.deduplicated).toBe(false);
+        expect((await apply()).deduplicated).toBe(true);
+        preference.delete(investorA);
+        expect((await apply()).deduplicated).toBe(true);
+        const [row] = await tx.sql<{ n: number }[]>`
+          select count(*)::int as n from network.relationship_events e
+            join network.relationships r on r.id = e.relationship_id
+           where r.investor_organisation_id = ${investorA}
+             and e.event_type = 'interest_expressed'
+             and e.visibility_scope = 'relationship_shared'`;
+        expect(row?.n).toBe(1);
+      },
+    );
+  });
+
   it("an investor the founder may not see is not found, and a member without a role cannot send", async () => {
     await withWorld(
       async ({
