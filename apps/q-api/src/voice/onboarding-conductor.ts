@@ -150,6 +150,27 @@ export function nextUnansweredStep(
   };
 }
 
+/**
+ * The open step Q's last line was asking, when that line carries the step's
+ * own question. A reopening asks it again rather than jumping to the next
+ * required step (live NEM 2026-10-17: the greeting asked what the company
+ * does, voice opened five seconds later and Q asked the stage instead).
+ */
+export function stepStillAsked(
+  view: OnboardingSessionView,
+  journeyType: "founder" | "investor",
+  lastQLine: string,
+): NextStep | null {
+  const said = lastQLine.toLowerCase();
+  const step = definitionFor(journeyType).steps.find((s) => {
+    const question = SPOKEN_QUESTIONS[s.stepKey] ?? s.configuration.prompt;
+    return question.length > 0 && said.includes(question.toLowerCase());
+  });
+  return step === undefined
+    ? null
+    : nextUnansweredStep(view, journeyType, [step.stepKey]);
+}
+
 // ---------------------------------------------------------------------------
 // Q leads
 // ---------------------------------------------------------------------------
@@ -708,13 +729,25 @@ export function createOnboardingConductor(
       section === undefined
         ? null
         : nextUnansweredStep(view, input.journeyType, section.stepKeys);
-    const next = focused ?? nextUnansweredStep(view, input.journeyType);
+    // Q's last line still waiting for its answer is asked again; with
+    // nothing said back yet there is nothing to pick up from, so it is just
+    // asked again.
+    const lastQ = kept?.items.findLast((t) => t.role === "Q")?.text ?? "";
+    const spoken =
+      kept?.items.some((t) => t.role !== "Q") ??
+      input.recentTurns.some((t) => t.role === "person");
+    const pending =
+      focused === null && view.session.status !== "COMPLETED"
+        ? stepStillAsked(view, input.journeyType, lastQ)
+        : null;
+    const ask = focused ?? pending;
+    const next = ask ?? nextUnansweredStep(view, input.journeyType);
     let lines: readonly Line[] =
-      focused === null
+      ask === null
         ? resumeLines(view, input.journeyType)
         : [
-            { text: PICKING_UP },
-            { text: focused.question, stepKey: focused.stepKey },
+            ...(spoken || focused !== null ? [{ text: PICKING_UP }] : []),
+            { text: ask.question, stepKey: ask.stepKey },
           ];
     let asking =
       next === null ? null : askingFor(next.stepKey, input.journeyType, view);
@@ -743,7 +776,7 @@ export function createOnboardingConductor(
     // one idempotent reference, so the API keeps one.
     const items = kept?.items ?? [];
     const last = items.at(-1);
-    if (!(last?.role === "Q" && last.text === reply)) {
+    if (!(last?.role === "Q" && last.text.includes(reply))) {
       keep(
         input,
         reply,

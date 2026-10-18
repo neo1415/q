@@ -26,6 +26,7 @@ import {
   dispatchTurn,
   isSelfLookup,
   nextUnansweredStep,
+  stepStillAsked,
   resumeLine,
   type ConductorPortFactory,
 } from "../src/voice/onboarding-conductor.js";
@@ -847,5 +848,28 @@ describe("the conductor's own lines in the person's language (ob1 live on AF)", 
         "[fr] Picking up where we left off. [fr] ",
       ),
     );
+  });
+});
+
+describe("a reopening asks the question still waiting (live NEM 2026-10-17)", () => {
+  const view = stuckView({ answered: ["F0.intent", "F1.company_name"] });
+  const greeting =
+    "Oyeniyi, you're setting up NEM Insurance. I'll get the company profile ready; it should take about two minutes. In a sentence or two, what does the company do?";
+
+  it("finds the open step Q's last line asked, not the next required one", () => {
+    expect(nextUnansweredStep(view, "founder")?.stepKey).not.toBe(
+      "F1.description",
+    );
+    expect(stepStillAsked(view, "founder", greeting)?.stepKey).toBe(
+      "F1.description",
+    );
+  });
+
+  it("asks nothing again once that step is answered, or for a line that asked no step", () => {
+    const answered = stuckView({
+      answered: ["F0.intent", "F1.company_name", "F1.description"],
+    });
+    expect(stepStillAsked(answered, "founder", greeting)).toBeNull();
+    expect(stepStillAsked(view, "founder", "Noted.")).toBeNull();
   });
 });
