@@ -908,3 +908,107 @@ describe("meeting host: waiting for the other participant (live bug 2026-10-09)"
     expect(JSON.stringify(stats)).not.toContain("agenda");
   });
 });
+
+describe("meeting host: a conversation with Q (owner 2026-10-18, live ef8a7091)", () => {
+  function answered(host: ReturnType<typeof createMeetingHost>) {
+    run(
+      host,
+      { kind: "JOIN", participant: ADAEZE, at: T0 },
+      { kind: "JOIN", participant: TUNDE, at: T0 + 1_000 },
+    );
+    const asked = host.handle({
+      kind: "UTTERANCE",
+      participant: ADAEZE,
+      text: "Q, what's this call about?",
+      at: T0 + 120_000,
+    });
+    expect(asked.filter((a) => a.kind === "COMPOSE")).toHaveLength(1);
+    host.reply("It's about the seed round.");
+    // Tick until Q says it; the follow-ups below are timed from then.
+    for (let at = T0 + 121_000; at < T0 + 160_000; at += 500) {
+      const spoken = said(host.handle({ kind: "TICK", at }));
+      if (spoken.some((a) => a.text === "It's about the seed round.")) {
+        return at;
+      }
+    }
+    throw new Error("Q never answered");
+  }
+  const composes = (actions: readonly HostAction[]) =>
+    actions.filter((a) => a.kind === "COMPOSE").length;
+
+  it("hears the follow-up of the person Q just answered without its name", () => {
+    const host = createMeetingHost(CONTEXT);
+    const at = answered(host);
+    const followUp = host.handle({
+      kind: "UTTERANCE",
+      participant: ADAEZE,
+      text: "and how much are they raising",
+      at: at + 8_000,
+    });
+    expect(composes(followUp)).toBe(1);
+  });
+
+  it("not someone else, not much later, and not a line turned to another person by name", () => {
+    const host = createMeetingHost(CONTEXT);
+    const at = answered(host);
+    expect(
+      composes(
+        host.handle({
+          kind: "UTTERANCE",
+          participant: TUNDE,
+          text: "and how much are they raising",
+          at: at + 2_000,
+        }),
+      ),
+    ).toBe(0);
+    expect(
+      composes(
+        host.handle({
+          kind: "UTTERANCE",
+          participant: ADAEZE,
+          text: "Tunde what do you think",
+          at: at + 3_000,
+        }),
+      ),
+    ).toBe(0);
+    // Turning to Tunde ended the conversation with Q.
+    expect(
+      composes(
+        host.handle({
+          kind: "UTTERANCE",
+          participant: ADAEZE,
+          text: "and how much are they raising",
+          at: at + 4_000,
+        }),
+      ),
+    ).toBe(0);
+  });
+
+  it("ends a while after Q's answer", () => {
+    const host = createMeetingHost(CONTEXT);
+    const at = answered(host);
+    expect(
+      composes(
+        host.handle({
+          kind: "UTTERANCE",
+          participant: ADAEZE,
+          text: "and how much are they raising",
+          at: at + 60_000,
+        }),
+      ),
+    ).toBe(0);
+  });
+
+  it("never greets its own face, whatever label Meet gives it", () => {
+    const host = createMeetingHost(CONTEXT);
+    const out = run(
+      host,
+      { kind: "JOIN", participant: ADAEZE, at: T0 },
+      { kind: "JOIN", participant: P("8", "PAL AI"), at: T0 + 5_000 },
+      { kind: "JOIN", participant: P("7", "Capital Q"), at: T0 + 6_000 },
+    );
+    const lines = said(out).map((s) => s.text);
+    expect(lines.some((l) => /PAL|Capital,/.test(l))).toBe(false);
+    expect(lines.filter((l) => l.startsWith("Hi "))).toHaveLength(1);
+  });
+});

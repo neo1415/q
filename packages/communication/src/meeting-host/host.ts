@@ -369,6 +369,14 @@ export const FRESH_SPEECH_MS = 1_500;
 
 /** P4: how long after a bare "hey q" the person's next line is the request. */
 export const CALL_FOLLOW_MS = 8_000;
+
+/**
+ * After Q answers someone, their next words within this long of Q
+ * finishing are still to Q, without its name (owner 2026-10-18: "we should
+ * be able to converse"; live ef8a7091 answered twice, then every follow-up
+ * went unheard). A line to someone else by name ends it.
+ */
+export const CONVERSE_MS = 20_000;
 /** 2026-10-08: the final words of a line answered early arrive within this. */
 export const EARLY_MATCH_MS = 10_000;
 /** P4: a bare "hey q" with nothing after it is answered after this. */
@@ -430,7 +438,10 @@ export const HOST_AT_TIME =
 export const HOST_UNAVAILABLE =
   "I've said all I can for this call; I'll keep taking notes.";
 
-const BOT_NAME = /^q\b.*capital q/i;
+// Q in the call: the note-taker ("Q · Capital Q ...") and its face, which
+// Meet showed under the provider's own label, "PAL AI" (live 2026-10-18,
+// meeting ef8a7091: greeted as a guest and asked to introduce itself).
+const BOT_NAME = /^(?:q\b.*capital q|capital q\b|pal ai$)/i;
 /** Q's own words heard back within this long are its echo, not a person. */
 export const ECHO_WINDOW_MS = 45_000;
 
@@ -853,6 +864,9 @@ export function createMeetingHost(
   let introduced = false;
   let offeredRecap = false;
   let composing = false;
+  /** Whom Q's next answer is for, and how long they can keep talking to Q. */
+  let replyTo: string | null = null;
+  let conversing: { participantId: string; until: number } | null = null;
   let left = false;
   let quiet = false;
   /**
@@ -944,6 +958,9 @@ export function createMeetingHost(
     sayingSince = at;
     // About fifteen characters a second when spoken.
     busyUntil = at + Math.ceil((next.text.length / 15) * 1_000);
+    if (next.why === "REPLY" && replyTo !== null) {
+      conversing = { participantId: replyTo, until: busyUntil + CONVERSE_MS };
+    }
     // Time Q spends on its own line is not time the others waited: lines
     // queued behind it age (and are held) from when it finishes.
     const waitBehind = busyUntil - Math.max(at, 0);
@@ -1202,6 +1219,33 @@ export function createMeetingHost(
     ];
   }
 
+  /**
+   * Still talking with Q: the person Q just answered, soon after, and not
+   * turning to someone else in the call by name.
+   */
+  function stillConversing(
+    participantId: string,
+    text: string,
+    at: number,
+  ): boolean {
+    if (
+      conversing === null ||
+      conversing.participantId !== participantId ||
+      at > conversing.until
+    ) {
+      return false;
+    }
+    const lead = plain(text).split(" ")[0] ?? "";
+    const toSomeoneElse = humans().some(
+      (h) =>
+        h.participant.id !== participantId &&
+        lead.length > 1 &&
+        plain(firstName(speakerFor(h, h.participant))) === lead,
+    );
+    if (toSomeoneElse) conversing = null;
+    return !toSomeoneElse;
+  }
+
   function speakerFor(entry: Present, participant: CallParticipant): string {
     return (
       entry.party?.name ??
@@ -1227,6 +1271,7 @@ export function createMeetingHost(
       return [];
     }
     const speaker = speakerFor(entry, participant);
+    replyTo = participant.id;
     const revision = heard.revision === true;
     // meet2-64: one answer at a time, and only to the latest question.
     // Asked again while Q is composing: the newer question waits and
@@ -1299,7 +1344,10 @@ export function createMeetingHost(
       });
       return;
     }
-    if (addressedToQ(text) && !onlyCallsQ(text)) {
+    if (
+      (addressedToQ(text) && !onlyCallsQ(text)) ||
+      stillConversing(event.participant.id, text, event.at)
+    ) {
       forming.set(event.participant.id, {
         entry,
         participant: event.participant,
@@ -1540,7 +1588,12 @@ export function createMeetingHost(
           }
           break;
         }
-        if (!addressedToQ(text)) break;
+        if (
+          !addressedToQ(text) &&
+          !stillConversing(event.participant.id, text, event.at)
+        ) {
+          break;
+        }
         if (onlyCallsQ(text)) {
           called = {
             participantId: event.participant.id,

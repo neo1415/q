@@ -8,7 +8,7 @@
  *   rehearsal  "Babatunde · Harbourline Cargo (Q rehearsal)"
  *              "Harbourline Cargo (Q rehearsal)" when no person is named
  *   interview  "Q · Savanna Seed Partners (AI interviewer)"
- *   meeting    "Q · Capital Q (AI assistant)"
+ *   meeting    "Capital Q"
  */
 export const TAVUS_PARTICIPANT_LABEL_MAX = 100;
 
@@ -50,6 +50,8 @@ export function tavusParticipantLabel(role: TavusParticipantRole): string {
         : cap("Q · ", fund, " (AI interviewer)");
     }
     case "MEETING":
-      return "Q · Capital Q (AI assistant)";
+      // Plain, as the owner asked (2026-10-18): Meet showed the provider's
+      // default "PAL AI" instead of the earlier decorated label.
+      return "Capital Q";
   }
 }
