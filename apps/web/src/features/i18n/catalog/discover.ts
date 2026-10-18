@@ -91,6 +91,10 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "Narrows your recommendations. The order stays as Q ranked them.":
     "يضيّق توصياتك. ويبقى الترتيب كما رتّبه Q.",
   "Next video": "المقطع التالي",
+  "No scored companies match these filters.":
+    "لا توجد شركات ذات درجة تطابق عوامل التصفية هذه.",
+  "Unicorn Potential needs sufficient current evidence before an overall score is available. This view excludes companies without a score; missing evidence is not a judgment of business quality.":
+    "تتطلب إمكانات النمو إلى شركة يونيكورن أدلة حالية كافية قبل إتاحة درجة إجمالية. يستبعد هذا العرض الشركات التي لا تتوفر لها درجة؛ ونقص الأدلة ليس حكماً على جودة الأعمال.",
   "No companies match these filters.": "لا توجد شركات تطابق عوامل التصفية هذه.",
   "No founder has shared a video with everyone yet.":
     "لم يشارك أي مؤسس مقطعاً مع الجميع بعد.",
