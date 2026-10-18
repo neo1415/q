@@ -1,0 +1,665 @@
+{
+  "metadata": {
+    "synthetic": true,
+    "scenario": "illustrative-high-growth-v1",
+    "label": "Illustrative high-growth scenario — synthetic evidence"
+  },
+  "company": "KUUZA AI",
+  "asOf": "2026-10-18T00:00:00.000Z",
+  "stageNote": "Pre-seed. No funding round is public (UNKNOWN, not zero); the scenario assumes a small angel round and keeps the company at pre-seed.",
+  "inputs": {
+    "companyId": "synthetic-kuuza",
+    "stageCode": "pre_seed",
+    "sectorCodes": ["enterprise_software", "hr_tech"],
+    "businessModelCodes": ["b2b_saas"],
+    "profile": {
+      "listed": true,
+      "description": true,
+      "website": true,
+      "updatedAt": "2026-10-15T09:00:00.000Z"
+    },
+    "verification": {
+      "organisation": false,
+      "domain": false,
+      "decidedAt": null
+    },
+    "founders": [
+      {
+        "id": "kuuza-founder-ceo",
+        "title": "and CEO",
+        "detail": "previously built and led a Lagos aviation skills business that assesses crews on simulators; the technical cofounder has 8 years of experience building speech and conversational software.",
+        "recordedAt": "2026-10-15T09:00:00.000Z",
+        "documentSupported": false,
+        "visibilityScope": "network_visible",
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P1.A"
+        }
+      }
+    ],
+    "claims": [
+      {
+        "id": "kuuza-p1b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p1b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "founder.execution",
+        "statement": "The founders shipped the enterprise roleplay scorecard in July 2026 and changed the scoring rubric in response to customer feedback from 9 accounts.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P1.B"
+        }
+      },
+      {
+        "id": "kuuza-p2a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p2a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "market.accessible_demand",
+        "statement": "Bottom-up accessible market sized from customer spending of USD 180 per frontline seat per year (median of 14 paying accounts, Q3 2026) across about 410,000 contact-centre and B2B sales seats in Nigeria and Kenya, or about USD 74 million per year.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P2.A"
+        }
+      },
+      {
+        "id": "kuuza-p2b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p2b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "market.expansion",
+        "statement": "Expansion into Kenya: 3 Nairobi contact-centre operators became paying customers between July 2026 and September 2026 through a signed distribution agreement with a local BPO association.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P2.B"
+        }
+      },
+      {
+        "id": "kuuza-p3a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p3a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "customers.problem_validation",
+        "statement": "Signed purchase orders from 14 accounts cite the same problem: supervisors spend about 6 hours a week shadowing each new agent's live calls; orders average USD 1,000 per month.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P3.A"
+        }
+      },
+      {
+        "id": "kuuza-p3b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p3b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "customers.retention",
+        "statement": "Retained customers: 6 of the 7 accounts whose first annual term ended between April 2026 and September 2026 renewed, at an average of 1.3 times their original seat count.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P3.B"
+        }
+      },
+      {
+        "id": "kuuza-p4a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p4a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "traction.revenue_velocity",
+        "statement": "Recurring revenue grew 41% quarter on quarter in 2026: USD 28,500 in Q2 (April 2026 to June 2026) to USD 40,200 in Q3 (July 2026 to September 2026).",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P4.A"
+        }
+      },
+      {
+        "id": "kuuza-p4b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p4b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "traction.recurring_revenue",
+        "statement": "Recurring revenue from 14 subscribed accounts reached USD 14,000 MRR in September 2026 (USD 168,000 annualised); 92% is billed on annual subscriptions.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P4.B"
+        }
+      },
+      {
+        "id": "kuuza-p5a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p5a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "financial.contribution_economics",
+        "statement": "Positive contribution margin of 71% measured on Q3 2026 actual revenue of USD 40,200 after speech-model inference, hosting and onboarding costs of USD 11,650.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P5.A"
+        }
+      },
+      {
+        "id": "kuuza-p5b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p5b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "financial.acquisition_payback",
+        "statement": "Acquisition payback measured at 7.0 months for accounts won in Q2 2026 and Q3 2026: blended CAC of USD 5,000 per account against USD 710 monthly contribution per account.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P5.B"
+        }
+      },
+      {
+        "id": "kuuza-p6a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p6a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "product.differentiated_asset",
+        "statement": "Proprietary dataset deployed in production scoring: 38,000 scored West African sales and service roleplay calls in English, Pidgin and Swahili, used by customers since June 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P6.A"
+        }
+      },
+      {
+        "id": "kuuza-p7a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p7a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "distribution.channel",
+        "statement": "Partner-led distribution channel through two contact-centre BPO associations is repeatable: it sourced 9 of the 14 paying accounts across Q2 2026 and Q3 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P7.A"
+        }
+      },
+      {
+        "id": "kuuza-p7b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p7b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "distribution.organic_pull",
+        "statement": "Sales conversion from free demo to paid account measured at 18% for demos booked between April 2026 and September 2026; referrals from existing accounts sourced 4 new accounts in the same period.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P7.B"
+        }
+      },
+      {
+        "id": "kuuza-p8a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p8a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "capital.runway",
+        "statement": "Current runway is 19 months at September 2026 net burn of USD 9,500 per month, from cash of USD 180,000 held on 30 September 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P8.A"
+        }
+      },
+      {
+        "id": "kuuza-p8b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p8b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "capital.strategic_support",
+        "statement": "Strategic support executed in May 2026: a USD 250,000 angel round from two West African contact-centre operators, with an active agreement giving KUUZA supervised access to their agent floors.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P8.B"
+        }
+      },
+      {
+        "id": "kuuza-p9a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p9a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "team.function_coverage",
+        "statement": "Technical, commercial and operational functions are covered: the technical cofounder leads a 4-person engineering team, a commercial lead runs enterprise sales, and an operations lead appointed in June 2026 runs customer onboarding.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P9.A"
+        }
+      },
+      {
+        "id": "kuuza-p9b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p9b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "team.delivery",
+        "statement": "Product milestones for 2026 were delivered on time: enterprise scorecard in July 2026, Kenya launch in August 2026 and multilingual voice in September 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P9.B"
+        }
+      },
+      {
+        "id": "kuuza-p10a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p10a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "market.timing",
+        "statement": "Technology shift documented: real-time speech models with sub-second latency became commercially available in 2024 and 2025, letting roleplay simulation replace supervisor call shadowing at a fraction of its cost.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P10.A"
+        }
+      },
+      {
+        "id": "kuuza-p10b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p10b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "market.window",
+        "statement": "The market window is being used: KUUZA is deployed with 14 paying accounts in Nigeria and Kenya as of September 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P10.B"
+        }
+      },
+      {
+        "id": "kuuza-p11a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p11a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "financial.operating_leverage",
+        "statement": "Revenue growth exceeds cost growth in actual 2026 results: Q3 2026 revenue rose 41% over Q2 2026 while total operating costs rose 12%.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P11.A"
+        }
+      },
+      {
+        "id": "kuuza-p11b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p11b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "operations.repeat_deployment",
+        "statement": "Repeat deployments completed in 2026: one onboarding playbook took all 14 accounts across Lagos, Abuja and Nairobi live in under 10 working days each.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P11.B"
+        }
+      },
+      {
+        "id": "kuuza-p12a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p12a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "ecosystem.partnership",
+        "statement": "Ecosystem partnership executed in August 2026 with a Kenyan BPO association, giving its members discounted seats and co-delivered onboarding.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P12.A"
+        }
+      },
+      {
+        "id": "kuuza-p12b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-p12b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "strategy.adjacent_opportunity",
+        "statement": "Strategic opportunity in hiring assessment has a signed customer: a Lagos bank licensed KUUZA roleplay scoring for graduate recruitment screening in September 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P12.B"
+        }
+      },
+      {
+        "id": "kuuza-arr",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-arr.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario_metric",
+        "claimKey": "financial.arr",
+        "statement": "ARR run-rate USD 168,000 at September 2026 (MRR USD 14,000 x 12).",
+        "structuredValue": {
+          "kind": "MONEY",
+          "amount": "168000",
+          "currency": "USD",
+          "asOf": "2026-09"
+        },
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "structured"
+        }
+      },
+      {
+        "id": "kuuza-nrr",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-nrr.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario_metric",
+        "claimKey": "financial.nrr",
+        "statement": "Net revenue retention 111% for the April 2026 to September 2026 renewal cohort.",
+        "structuredValue": {
+          "kind": "PERCENT",
+          "value": "111",
+          "asOf": "2026-09"
+        },
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "structured"
+        }
+      },
+      {
+        "id": "kuuza-cm",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-cm.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario_metric",
+        "claimKey": "financial.contribution_margin",
+        "statement": "Contribution margin 71% on Q3 2026 revenue.",
+        "structuredValue": {
+          "kind": "PERCENT",
+          "value": "71",
+          "asOf": "2026-09"
+        },
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "structured"
+        }
+      },
+      {
+        "id": "kuuza-runway",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-runway.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario_metric",
+        "claimKey": "financial.runway_months",
+        "statement": "Cash runway 19 months at 30 September 2026.",
+        "structuredValue": {
+          "kind": "MONTHS",
+          "value": "19",
+          "asOf": "2026-09-30"
+        },
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "structured"
+        }
+      },
+      {
+        "id": "kuuza-growth",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "kuuza-growth.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario_metric",
+        "claimKey": "traction.growth",
+        "statement": "Revenue up 41% from Q2 2026 to Q3 2026.",
+        "structuredValue": {
+          "kind": "PERCENT",
+          "metric": "REVENUE",
+          "value": "41",
+          "periodStart": "2026-04",
+          "periodEnd": "2026-09",
+          "currency": "USD"
+        },
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "structured"
+        }
+      }
+    ],
+    "deck": null,
+    "pitch": null
+  }
+}
