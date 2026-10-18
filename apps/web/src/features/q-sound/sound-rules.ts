@@ -6,7 +6,8 @@ import type { QApertureState } from "../q-aperture/aperture-state";
  * ready... not too much"). Pure, so every rule is tested:
  *
  * - Only for real state: the same transitions that move Q's presence.
- * - Never while Q is speaking; never in Discover's swipe path.
+ * - Never while Q is speaking or a voice conversation is open; never in
+ *   Discover's swipe path.
  * - At most one sound every 0.6 s; the rest are dropped, not queued.
  * - The hum plays only on the Q page, only while a job runs, and stops by
  *   itself after 20 s. It is ambient, so a person who asks the system for
@@ -61,6 +62,9 @@ export const WORKING_TONE_AFTER_MS = 700;
 export function isWorkingState(state: QApertureState): boolean {
   return BUSY.has(state);
 }
+
+/** No sound this soon after Q's voice stops (pauses between sentences). */
+export const QUIET_AFTER_SPEECH_MS = 2_500;
 
 /** No two sounds closer than this; the later one is dropped. */
 export const MIN_GAP_MS = 600;
@@ -118,6 +122,12 @@ export type SoundContext = {
   readonly mode: SoundMode;
   /** Q's voice is playing. */
   readonly speaking: boolean;
+  /**
+   * A voice conversation is open. Owner 2026-10-17: Q's state flips
+   * between speaking, listening and thinking many times a turn, and each
+   * flip beeped while Q talked; Q's own voice is the feedback there.
+   */
+  readonly voiceLine?: boolean | undefined;
   /** The current path, e.g. "/home" or "/discover". */
   readonly pathname: string;
   readonly reducedMotion: boolean;
@@ -139,7 +149,7 @@ export function inSwipePath(pathname: string): boolean {
 /** Whether a sound may play now. */
 export function soundAllowed(sound: QSound, context: SoundContext): boolean {
   if (context.mode === "OFF") return false;
-  if (context.speaking) return false;
+  if (context.speaking || context.voiceLine === true) return false;
   if (inSwipePath(context.pathname)) return false;
   if (context.mode === "QUIET" && !QUIET_SOUNDS.has(sound)) return false;
   if (sound === "hum") {

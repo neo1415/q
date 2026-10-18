@@ -83,4 +83,28 @@ describe("presence while Q works (ADR 0062)", () => {
       soundAllowed("working", { ...base, mode: "ON", pathname: "/discover" }),
     ).toBe(false);
   });
+
+  // Owner 2026-10-17: a beep kept sounding while Q talked.
+  it("plays nothing while a voice conversation is open", () => {
+    const base = {
+      mode: "ON" as const,
+      speaking: false,
+      pathname: "/home",
+      reducedMotion: false,
+      reducedTransparency: false,
+      now: 10_000,
+      lastAt: null,
+    };
+    for (const sound of [
+      "wake",
+      "listenOn",
+      "listenOff",
+      "working",
+      "ping",
+      "sent",
+    ] as const) {
+      expect(soundAllowed(sound, { ...base, voiceLine: true })).toBe(false);
+      expect(soundAllowed(sound, base)).toBe(true);
+    }
+  });
 });

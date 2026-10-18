@@ -269,14 +269,17 @@ export function FounderOnboardingScreen({
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-(--cq-layout-reading) flex-col gap-6 px-4 py-6">
         <div className="flex items-center justify-between gap-2">
-          <ContinueLater className="cq-label min-h-11 text-(--cq-text-tertiary) hover:text-(--cq-text-primary)" />
+          {/* Owner 2026-10-17: both ways out are plain buttons, not faint
+              text, so nobody feels trapped in setup. */}
+          <ContinueLater />
           <span className="cq-label text-(--cq-text-primary)">
             {t("Founder setup")}
           </span>
           <Button
-            variant="quiet"
+            variant="secondary"
             size="compact"
             onClick={() => setMode("form")}
+            data-use-the-form
           >
             {t("Use the form")}
           </Button>
