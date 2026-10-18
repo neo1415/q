@@ -1,0 +1,250 @@
+[
+  {
+    "field": "product_name",
+    "value": "Capital Q (marketed as CapitalQ™)",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.fdncapitalpartners.com/capitalq/",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "TM registration unknown"
+  },
+  {
+    "field": "category",
+    "value": "AI-native Investment Intelligence Operating System for private capital",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "repo:docs/product-sources/text/Real_CAPITAL_Q_PRODUCT_SPECIFICATION.txt",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Locked product source, Ch.1 §3.1"
+  },
+  {
+    "field": "public_url",
+    "value": "https://www.fdncapitalpartners.com/capitalq/",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.fdncapitalpartners.com/capitalq/",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "HTTP 200 on 2026-10-18; bare domain 301s to www"
+  },
+  {
+    "field": "documented_landing_url_stale",
+    "value": "https://www.fdncapitalpartners.com/capitalq.html returns 404",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.fdncapitalpartners.com/capitalq.html",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Designated in docs/ai-handoff/LANDING-PROMISES.md on 2026-10-11; page moved"
+  },
+  {
+    "field": "app_host",
+    "value": "https://capital-qweb-production.up.railway.app",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "repo:docs/ai-handoff/STATE.md",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Railway default host; NOT an official brand domain"
+  },
+  {
+    "field": "custom_app_domain",
+    "value": "None designated; NEXT_PUBLIC_SITE_URL not present; origin via CQ_WEB_ORIGIN",
+    "status": "UNKNOWN",
+    "sourceUrl": "repo:apps/web/app/layout.tsx",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "capitalq.app only suggested in docs/handoff/setup-email-and-meetings.md; capitalq.ai/capq.ai not to be used"
+  },
+  {
+    "field": "publisher",
+    "value": "FDN Capital Partners hosts and markets the CapitalQ™ page",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.fdncapitalpartners.com/capitalq/",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": null
+  },
+  {
+    "field": "fdn_offices",
+    "value": "Doha, Qatar; Lagos, Nigeria",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.fdncapitalpartners.com/contact/",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "No street address or registration number"
+  },
+  {
+    "field": "legal_entity",
+    "value": "Not established",
+    "status": "UNKNOWN",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Capital Q's owning entity and FDN relationship unknown"
+  },
+  {
+    "field": "investiq_ownership",
+    "value": "InvestIQ is FDN Capital Partners' proprietary methodology; Capital Q implements it",
+    "status": "OWNER_PROVIDED",
+    "sourceUrl": "repo:docs/adr/0068-investiq-fdn-methodology-reconciliation.md",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Owner decision 2026-10-15"
+  },
+  {
+    "field": "cofounder_1",
+    "value": "Zino Mario",
+    "status": "OWNER_PROVIDED",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Publicly Partner at FDN (SELF_REPORTED, https://www.fdncapitalpartners.com/team/)"
+  },
+  {
+    "field": "cofounder_2",
+    "value": "David Okonkwo",
+    "status": "OWNER_PROVIDED",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Name conflict: FDN team page lists 'David Nwankwo', Managing Partner, who 'created Capital Q'"
+  },
+  {
+    "field": "fdn_managing_partner",
+    "value": "David Nwankwo, Managing Partner (Strategy, Capital & Ecosystem); credited with creating Capital Q",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.fdncapitalpartners.com/team/",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Confirm against owner-provided 'David Okonkwo'"
+  },
+  {
+    "field": "business_model",
+    "value": "Layer 1 Diagnosis free; Layer 2 Strategic Intelligence Pro; Layer 3 optional Human Execution",
+    "status": "OWNER_PROVIDED",
+    "sourceUrl": "repo:docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "PADL Ch5 Decision #85, Locked"
+  },
+  {
+    "field": "no_pay_to_rank",
+    "value": "Payment never influences ranking",
+    "status": "OWNER_PROVIDED",
+    "sourceUrl": "repo:docs/adr/0034-plans-entitlements-metering-and-billing.md",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": null
+  },
+  {
+    "field": "pricing",
+    "value": "No prices set in any source",
+    "status": "UNKNOWN",
+    "sourceUrl": "repo:docs/adr/0034-plans-entitlements-metering-and-billing.md",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "ADR 0034 PROPOSED; facilitation fee is a founder direction only"
+  },
+  {
+    "field": "revenue",
+    "value": "Not published",
+    "status": "UNKNOWN",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": null
+  },
+  {
+    "field": "paying_customers",
+    "value": "None evidenced",
+    "status": "UNKNOWN",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "43 feature access grants are not revenue evidence"
+  },
+  {
+    "field": "hosting",
+    "value": "Railway (web, api, q-api, workers) europe-west4; Supabase eu-central-1",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "repo:docs/ai-handoff/STATE.md",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "ADR 0014"
+  },
+  {
+    "field": "investability_suitability",
+    "value": "Two separate investor-visible scores with coverage gates; fit-order.v2 ranks 0.75 Suitability + 0.25 Investability",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "repo:docs/adr/0074-investability-and-suitability-scores.md",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "InvestIQ constants are uncalibrated hypotheses"
+  },
+  {
+    "field": "unicorn_potential",
+    "value": "Deterministic 12-pillar/24-criterion provisional indicator; 0 numeric scores among 461 companies",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "repo:docs/adr/0076-unicorn-potential-provisional-indicator.md",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Not a probability or forecast; production counts per STATE.md/audit 2026-10-18"
+  },
+  {
+    "field": "gateq",
+    "value": "Embeddable inbound investment gateway resolving to canonical relationship",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "repo:docs/product-sources/text/CapitalQ_GateQ_Product_Feature_Specification.txt",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Text journey live-verified with fictional accounts (handoff 13-14 Oct)"
+  },
+  {
+    "field": "explore",
+    "value": "Masonry grid of network-visible pitches with closed-vocabulary reasons",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "repo:docs/adr/0055-explore.md",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": null
+  },
+  {
+    "field": "relationship_hub",
+    "value": "Event-sourced relationship state; Hub H1 live-verified",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "repo:docs/ai-handoff/ACTIVE-TASKS.md",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Fictional accounts"
+  },
+  {
+    "field": "private_markets_aum",
+    "value": "~US$13T late 2024; >US$20T by 2030 (projection)",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.businesswire.com/news/home/20241216468500/en",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "BlackRock estimate"
+  },
+  {
+    "field": "africa_vc_2025_avca",
+    "value": "US$3.9bn, 506 deals (incl. US$1.8bn venture debt)",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.ecofinagency.com/news-finances/1402-52907-africa-vc-funding-climbs-to-3-9bn-in-2025-led-by-local-funds-avca",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Reported AVCA figure"
+  },
+  {
+    "field": "africa_vc_2025_partech",
+    "value": "US$4.1bn, 570 transactions",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://allafrica.com/stories/202601250064.html",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Reported Partech figure"
+  },
+  {
+    "field": "genai_adoption_ma",
+    "value": "86% of US corporate and PE M&A professionals have adopted GenAI",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.deloitte.com/us/en/about/press-room/deloitte-survey-genai-in-mna.html",
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "Deloitte 2025 survey"
+  },
+  {
+    "field": "tam_illustrative",
+    "value": "~US$1.3bn/yr",
+    "status": "ASSUMPTION",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "13T AUM x 0.01% software spend"
+  },
+  {
+    "field": "sam_illustrative",
+    "value": "~US$9.6M/yr",
+    "status": "ASSUMPTION",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "1,500 investor orgs x $6k + 20,000 founders x 5% x $600"
+  },
+  {
+    "field": "som_illustrative",
+    "value": "~US$0.6M ARR in 3 years",
+    "status": "ASSUMPTION",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:40:00Z",
+    "note": "See research.md §13"
+  }
+]
