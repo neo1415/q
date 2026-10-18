@@ -154,7 +154,7 @@ describe("SYNTHETIC numerical native round trip (thin parents/auth fixture ports
         const first = (
           await store.current([company], UNICORN_POTENTIAL_METHOD_VERSION)
         ).get(company);
-        expect(first?.inputRulesVersion).toBe("unicorn-potential-inputs.v3");
+        expect(first?.inputRulesVersion).toBe("unicorn-potential-inputs.v4");
         expect(first?.pillars.map((pillar) => pillar.grade)).toEqual(
           expectedGrades,
         );
