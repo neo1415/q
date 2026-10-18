@@ -5,6 +5,10 @@ import {
   type ApplicationDimension,
   type ApplicationFact,
 } from "../contracts/index.js";
+import {
+  missingSpecifics,
+  QUANTITATIVE_DIMENSIONS,
+} from "./answer-specificity.js";
 
 /**
  * What is worth asking next, and why (CQ-GATE-002 §22, §28).
@@ -39,7 +43,18 @@ export type QuestionNeed = {
      */
     | "INVESTOR_EMPHASIS"
     | "CONTRADICTION"
-    | "UNDERSTANDING";
+    | "UNDERSTANDING"
+    /**
+     * Answered, but not in decision-grade terms ("we have a big market").
+     * One follow-up for the specific missing element; still parked after
+     * MAX_ASKS_PER_DIMENSION like everything else.
+     */
+    | "NEEDS_SPECIFICS";
+  /**
+   * NEEDS_SPECIFICS only: the kind of figure still missing, in platform
+   * words. Never the applicant's own text and never a threshold.
+   */
+  readonly missing?: string;
 };
 
 /** Which application dimension answers which kind of criterion. */
@@ -136,13 +151,18 @@ export function questionNeedsFor(input: {
   const add = (
     dimension: ApplicationDimension | undefined,
     reason: QuestionNeed["reason"],
+    missing?: string,
   ): void => {
     if (dimension === undefined) return;
     if (seen.has(dimension)) return;
     if (parked(dimension)) return;
     if (!APPLICATION_DIMENSIONS.includes(dimension)) return;
     seen.add(dimension);
-    needs.push({ dimension, reason });
+    needs.push(
+      missing === undefined
+        ? { dimension, reason }
+        : { dimension, reason, missing },
+    );
   };
 
   const criterionById = new Map(
@@ -172,6 +192,14 @@ export function questionNeedsFor(input: {
       CRITERION_DIMENSION[criterion?.config.type ?? ""],
       "PREFERRED_BY_GATEWAY",
     );
+  }
+
+  // Then an answer that is on record but says nothing an investor can act
+  // on. Asked next, while the founder still has the thread, and before new
+  // topics: depth on what they raised beats breadth across what they did not.
+  for (const dimension of QUANTITATIVE_DIMENSIONS) {
+    const missing = missingSpecifics(dimension, input.facts);
+    if (missing !== null) add(dimension, "NEEDS_SPECIFICS", missing);
   }
 
   // Then what this investor's own mandate emphasises, ahead of the general

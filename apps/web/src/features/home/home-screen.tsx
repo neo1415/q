@@ -1,4 +1,4 @@
-import { Suspense, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 
@@ -15,7 +15,6 @@ import {
 import { PersonaCards } from "@/features/persona/persona-cards";
 import { WorkPanel } from "@/features/work/work-panel";
 import { ArrivalStage } from "@/features/briefing/arrival-stage";
-import { FounderNext } from "@/features/readiness/founder-next";
 import type { QSubjectInput } from "@/features/q/actions";
 
 import {
@@ -221,26 +220,16 @@ export async function HomeScreen({
               : "BRIEFING",
       };
       const greeting = returningGreeting(facts, await serverUiLanguage());
+      // Owner 2026-10-17: the greeting and one question, nothing more; a
+      // founder's next steps are Q's to give when asked (and on Readiness).
       welcome = (
-        <>
-          <ReturningWelcome
-            greeting={greeting}
-            cards={chooseReturningCards(facts)}
-            subject={askSubject(context)}
-            briefing={briefing}
-            setupReminders={setupRemindersWaiting(facts)}
-          />
-          {/*
-            Q.01/Q.04: a founder's next question from Q and next three
-            steps. Streams in on its own; renders nothing when there is
-            nothing to show, so Home stays Q first.
-          */}
-          {context.kind === "FOUNDER" ? (
-            <Suspense fallback={null}>
-              <FounderNext />
-            </Suspense>
-          ) : null}
-        </>
+        <ReturningWelcome
+          greeting={greeting}
+          cards={chooseReturningCards(facts)}
+          subject={askSubject(context)}
+          briefing={briefing}
+          setupReminders={setupRemindersWaiting(facts)}
+        />
       );
       welcomeLine = greeting.spoken;
       welcomeLead = greeting.headline;

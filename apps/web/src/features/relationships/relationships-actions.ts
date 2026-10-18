@@ -9,39 +9,37 @@ import {
   relationshipDigests,
   type RelationshipDigest,
 } from "./relationship-data";
-import { listOrder, pageAfter } from "./relationships-view";
+import { PAGE_SIZE } from "./relationships-view";
 
 /**
- * The next page of the Relationships list (cursor pagination, 2026-10-04).
- * The cursor is input, never proof: the page is cut from the person's own
- * list as the API returns it under their session, so a cursor can only
- * page through what they could already see.
+ * The details of the Relationships list's next rows. The list is ordered
+ * on the page (by Suitability or by time, owner 2026-10-17), so the next
+ * rows are named by id. The ids are input, never proof: only rows of the
+ * person's own list, as the API returns it under their session, are read.
  */
-const Cursor = z
-  .string()
-  .max(120)
-  .regex(/^[0-9T:.+Z-]{20,40}~[0-9a-f-]{36}$/i);
+const Ids = z.array(z.string().uuid()).min(1).max(PAGE_SIZE);
 
-export async function moreRelationshipDigestsAction(cursor: string): Promise<
+export async function moreRelationshipDigestsAction(
+  ids: readonly string[],
+): Promise<
   | {
       readonly ok: true;
       readonly digests: Readonly<Record<string, RelationshipDigest>>;
       readonly ids: readonly string[];
-      readonly next: string | null;
     }
   | { readonly ok: false }
 > {
-  const parsed = Cursor.safeParse(cursor);
+  const parsed = Ids.safeParse(ids);
   if (!parsed.success) return { ok: false };
   const context = await resolveOwnContext();
   const items = await ownRelationships(context);
   if (items === undefined) return { ok: false };
-  const page = pageAfter(items.toSorted(listOrder), parsed.data);
-  const digests = await relationshipDigests(context, page.items);
+  const wanted = new Set(parsed.data);
+  const page = items.filter((item) => wanted.has(item.relationshipId));
+  const digests = await relationshipDigests(context, page);
   return {
     ok: true,
     digests,
-    ids: page.items.map((item) => item.relationshipId),
-    next: page.next,
+    ids: page.map((item) => item.relationshipId),
   };
 }

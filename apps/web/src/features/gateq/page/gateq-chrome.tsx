@@ -12,6 +12,7 @@ import {
 import { QControl } from "@/features/q/control/q-control";
 
 import "../gateq.css";
+import { HubNavigation } from "@/features/relationships/hub-navigation";
 
 /**
  * The GateQ page's own frame (F2, design a/gateq.html): the title, the
@@ -72,6 +73,13 @@ export function GateqChrome({
       className="gq-wrap"
       style={maxWidth === undefined ? undefined : { maxWidth }}
     >
+      {/* GateQ is a CRM tab (owner 2026-10-17): the CRM's tabs lead. */}
+      <div className="mb-4">
+        <HubNavigation
+          side={role === "FOUNDER" ? "COMPANY" : "INVESTOR"}
+          view={role === "FOUNDER" ? "applications" : "gateq"}
+        />
+      </div>
       <div className="gq-sect-h items-center flex-wrap">
         <h1 className="cq-title-lg">GateQ</h1>
         {action}

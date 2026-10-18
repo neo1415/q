@@ -16,29 +16,21 @@ const hrefs = (
     g.items.map((i) => i.href),
   );
 
-describe("Q Pitch in the sidebar (owner request, 15 Oct)", () => {
-  it("is listed only when the server enabled it", () => {
-    expect(hrefs("investor_private")).not.toContain("/q-pitch");
-    expect(hrefs("investor_private", false)).not.toContain("/q-pitch");
-    expect(hrefs("investor_private", true)).toContain("/q-pitch");
+describe("Q Pitch out of the sidebar (owner, 17 Oct): Profile links it", () => {
+  it("is never a sidebar or More entry, enabled or not", () => {
+    for (const scope of [
+      "founder_private",
+      "investor_private",
+      "unset",
+    ] as const) {
+      expect(hrefs(scope, true)).not.toContain("/q-pitch");
+      expect(
+        moreSectionsFor(scope, { qPitch: true }).map((i) => i.href),
+      ).not.toContain("/q-pitch");
+    }
   });
 
-  it("is role-aware: a founder or investor workspace, never an unset one", () => {
-    expect(hrefs("founder_private", true)).toContain("/q-pitch");
-    expect(hrefs("unset", true)).not.toContain("/q-pitch");
-  });
-
-  it("sits in Workspace, and the phone's More sheet lists it too", () => {
-    const workspace = navigationGroupsFor("investor_private", {
-      qPitch: true,
-    }).find((g) => g.label === "Workspace");
-    expect(workspace?.items.map((i) => i.href)).toContain("/q-pitch");
-    expect(
-      moreSectionsFor("investor_private", { qPitch: true }).map((i) => i.href),
-    ).toContain("/q-pitch");
-  });
-
-  it("is a registered app route", () => {
+  it("is still a registered app route, so Q opens it directly", () => {
     expect(APP_ROUTE_PATTERNS).toContain("/q-pitch");
   });
 });

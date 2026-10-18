@@ -1,6 +1,5 @@
 "use client";
 
-import { PreferenceLearningAsk } from "@/features/settings/preference-learning";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -11,6 +10,7 @@ import { askQAction, type QSubjectInput } from "@/features/q/actions";
 import { useQSurfaceTools } from "@/features/q/q-surface-tools";
 
 import { ArrivalBriefing } from "@/features/briefing/arrival-briefing";
+import { OPEN_QUESTION } from "@/features/briefing/opener";
 import {
   setArrivalSetupReminders,
   useArrivalStatus,
@@ -111,7 +111,9 @@ export function ReturningWelcome({
   const cardsRef = useRef<HTMLUListElement>(null);
   useClaimWhenSeen(cardsRef, reminding);
   const shownCards =
-    putOff || held ? cards.filter((card) => card.reminder !== true) : cards;
+    // Owner 2026-10-17: no quick-link cards under the greeting; only an
+    // unfinished setup's reminder, which needs them, stays.
+    (putOff || held ? [] : cards).filter((card) => card.reminder === true);
 
   const ask = async (card: ReturningCard, prompt: string) => {
     if (asking !== null) return;
@@ -163,7 +165,7 @@ export function ReturningWelcome({
               {greeting.headline}
             </h1>
             <p className="cq-body-lg cq-prose text-balance text-(--cq-text-secondary)">
-              {greeting.question}
+              {t(OPEN_QUESTION)}
             </p>
           </div>
         }
@@ -260,13 +262,6 @@ export function ReturningWelcome({
           {t("Remind me next week")}
         </button>
       ) : null}
-
-      {/*
-        Lane ob1: once, after the greeting and its choices, never before:
-        may Q learn how they like to work? Renders nothing unless asking
-        is due (never answered, or "Not now" more than 30 days ago).
-      */}
-      <PreferenceLearningAsk />
 
       {/* Polite, so a failed ask is read out without taking focus. */}
       <p

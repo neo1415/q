@@ -14,7 +14,16 @@ import type {
  * 2026-10-16: the CRM landed on Pipeline). Reports are part of the
  * Overview; `/results` and `/crm?view=reports` redirect there.
  */
-export type HubView = "overview" | "pipeline" | "capital";
+export type HubView =
+  | "overview"
+  | "pipeline"
+  | "capital"
+  // Owner 2026-10-17: GateQ and company requests (an investor's) and a
+  // founder's applications are CRM tabs, not sidebar entries. They stay
+  // their own pages at their own addresses, so Q's routes are unchanged.
+  | "gateq"
+  | "requests"
+  | "applications";
 export type HubSide = "INVESTOR" | "COMPANY" | "NONE";
 export type PipelineLayout = "list" | "table" | "board";
 
@@ -53,11 +62,32 @@ export function pipelineListHref(
  * Results became CRM). Each is a real, server-read view; the period
  * report lives in the Overview. Nothing here is a placeholder tab.
  */
-export function hubTabs(): readonly {
+export function hubTabs(side: HubSide = "NONE"): readonly {
   readonly view: HubView;
   readonly label: string;
   readonly href: string;
 }[] {
+  const extra: readonly {
+    readonly view: HubView;
+    readonly label: string;
+    readonly href: string;
+  }[] =
+    side === "INVESTOR"
+      ? [
+          { view: "gateq", label: "GateQ", href: "/gateq" },
+          { view: "requests", label: "Company requests", href: "/investors" },
+        ]
+      : side === "COMPANY"
+        ? [
+            // Opens on their applications; "GateQ" so it doesn't repeat
+            // the GateQ page's own Applications tab.
+            {
+              view: "applications",
+              label: "GateQ",
+              href: "/gateq?tab=applications",
+            },
+          ]
+        : [];
   return [
     {
       view: "overview",
@@ -74,6 +104,7 @@ export function hubTabs(): readonly {
       label: "Capital",
       href: CAPITAL_VIEW_HREF,
     },
+    ...extra,
   ];
 }
 

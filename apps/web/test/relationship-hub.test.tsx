@@ -173,12 +173,7 @@ describe("Hub foundation", () => {
       );
   });
   it("registers only rendered role destinations and confirms already selected tab", async () => {
-    render(
-      <>
-        <HubRelated side="COMPANY" />
-        <HubNavigation view="overview" />
-      </>,
-    );
+    render(<HubNavigation view="overview" side="COMPANY" />);
     expect(
       manifestControls().some((entry) => entry.id === "button.hub-gateq"),
     ).toBe(true);
