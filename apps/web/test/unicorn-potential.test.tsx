@@ -84,6 +84,43 @@ afterEach(() => {
 });
 
 describe("Unicorn Potential progressive assessment", () => {
+  it("shows three priority gaps first and keeps every remaining exact-gap action behind a closed disclosure", () => {
+    render(
+      <UnicornPotential
+        score={{
+          ...score,
+          missing: [
+            "First gap",
+            "Second gap",
+            "Third gap",
+            "Fourth gap",
+            "Fifth gap",
+          ],
+        }}
+        companyId="company-1"
+      />,
+    );
+    const more = screen
+      .getByText("Show 2 more evidence gaps")
+      .closest("details") as HTMLDetailsElement;
+    expect(more.open).toBe(false);
+    for (const gap of ["First gap", "Second gap", "Third gap"]) {
+      expect(more.contains(screen.getByText(gap))).toBe(false);
+    }
+    expect(within(more).getAllByRole("button", { hidden: true })).toHaveLength(
+      2,
+    );
+    fireEvent.click(within(more).getByText("Show 2 more evidence gaps"));
+    expect(more.open).toBe(true);
+    fireEvent.click(
+      within(more).getByRole("button", {
+        name: "Ask Q about missing evidence: Fourth gap",
+        hidden: true,
+      }),
+    );
+    expect(q.askAbout.mock.calls[0]?.[0]).toContain("Fourth gap");
+    expect(q.askNow).not.toHaveBeenCalled();
+  });
   it("opens an exact evidence gap as a reviewable Q draft without sending", () => {
     render(<UnicornPotential score={score} companyId="company-1" />);
     fireEvent.click(
