@@ -628,6 +628,7 @@ async function main() {
               (payload.reports ?? []).some(
                 (report) =>
                   report.intent?.target === "disclosure.unicorn-potential" &&
+                  report.intent?.act === "EXPAND" &&
                   report.receipt?.status === "DONE",
               ),
             );
