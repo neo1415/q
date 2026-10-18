@@ -223,6 +223,35 @@ describe("Discover with filters", () => {
     expect(window.localStorage.getItem(STORED)).toBeNull();
   });
 
+  it.each([{ unicornPotentialMin: 0 }, { unicornPotentialSort: true }])(
+    "explains an empty scored view without judging companies and restores normal browsing: %j",
+    async (selection) => {
+      window.localStorage.setItem(
+        STORED,
+        JSON.stringify({ ...model.NO_DISCOVER_FILTERS, ...selection }),
+      );
+      loadSlatePageAction.mockImplementation((_cursor, filters) =>
+        Promise.resolve(
+          filters === null
+            ? page([company(2)])
+            : page([], ["NONE_MATCH_FILTERS"]),
+        ),
+      );
+      render(<InvestorFeedScreen sectors={SECTORS} />);
+      await screen.findByText("No scored companies match these filters.");
+      expect(
+        screen.getByText(/Unicorn Potential needs sufficient current evidence/),
+      ).toBeTruthy();
+      expect(
+        screen.getByRole("link", { name: "Open Explore" }).getAttribute("href"),
+      ).toBe("/explore");
+      fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+      await screen.findByRole("heading", { name: "Company 2" });
+      expect(loadSlatePageAction).toHaveBeenLastCalledWith(null, null);
+      expect(window.localStorage.getItem(STORED)).toBeNull();
+    },
+  );
+
   it("the sheet edits a draft; Show companies restarts the feed under the new filters", async () => {
     render(<InvestorFeedScreen sectors={SECTORS} />);
     await screen.findByRole("heading", { name: "Company 1" });
