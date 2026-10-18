@@ -155,10 +155,11 @@ export function createPostgresInvestabilityStore(options: {
             title: string;
             detail: string | null;
             supported: boolean;
+            created_at: Date;
             visibility_scope: string;
           }[]
         >`
-          select b.id, b.title, b.detail,
+          select b.id, b.title, b.detail, b.created_at,
                  b.supporting_document_id is not null as supported,
                  b.visibility_scope
             from core.founder_background_entries b
@@ -180,10 +181,16 @@ export function createPostgresInvestabilityStore(options: {
             lifecycle_status: InvestabilityClaimInput["lifecycleStatus"];
             visibility_scope: string;
             asserted_at: Date;
+            structured_value: unknown;
+            valid_from: Date | null;
+            valid_to: Date | null;
+            current_revision_id: string | null;
+            current_revision_number: number | null;
           }[]
         >`
           select id, claim_type, claim_key, statement, truth_class,
-                 evidence_status, lifecycle_status, visibility_scope, asserted_at
+                 evidence_status, lifecycle_status, visibility_scope, asserted_at, structured_value,
+                 valid_from, valid_to, current_revision_id, current_revision_number
             from evidence.claims
            where tenant_id = ${company.tenant_id}::uuid
              and subject_type = 'COMPANY'
@@ -253,6 +260,7 @@ export function createPostgresInvestabilityStore(options: {
           founders: founders.map((row): InvestabilityFounderLine => ({
             id: row.id,
             title: row.title,
+            recordedAt: iso(row.created_at),
             detail: row.detail,
             documentSupported: row.supported,
             visibilityScope: row.visibility_scope,
@@ -260,6 +268,16 @@ export function createPostgresInvestabilityStore(options: {
           claims: claims.map((row): InvestabilityClaimInput => ({
             id: row.id,
             claimType: row.claim_type,
+            structuredValue:
+              row.structured_value !== null &&
+              typeof row.structured_value === "object" &&
+              !Array.isArray(row.structured_value)
+                ? Object.fromEntries(Object.entries(row.structured_value))
+                : null,
+            validFrom: iso(row.valid_from),
+            validTo: iso(row.valid_to),
+            revisionId: row.current_revision_id,
+            revisionNumber: row.current_revision_number,
             claimKey: row.claim_key,
             statement: row.statement,
             truthClass: row.truth_class,

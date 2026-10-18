@@ -4,11 +4,15 @@ import {
   unknownDeckSection,
   type DeckSection,
 } from "@capital-q/contracts";
-import type { DatabaseExecutor } from "@capital-q/database";
+import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import { createPostgresDataRoom } from "@capital-q/evidence";
 import { reviewedDeckSections } from "@capital-q/permissions";
 import {
   createInvestabilityService,
+  createPostgresUnicornPotentialStore,
+  createUnicornPotentialService,
+  assessUnicornPotential,
+  UNICORN_POTENTIAL_METHOD_VERSION,
   createPostgresInvestabilityStore,
   type InvestabilityDeckPort,
   type InvestabilityService,
@@ -78,13 +82,51 @@ export function createInvestabilityDeckPort(
   };
 }
 
-export function composeInvestability(sql: DatabaseExecutor): {
+export function composeInvestability(
+  sql: DatabaseExecutor,
+  transactions?: TransactionManager,
+): {
   readonly service: InvestabilityService;
 } {
+  const investability = createInvestabilityService({
+    store: createPostgresInvestabilityStore({ sql }),
+    deck: createInvestabilityDeckPort(sql),
+  });
+  if (transactions === undefined) return { service: investability };
+  const unicorn = createUnicornPotentialService({
+    store: createPostgresUnicornPotentialStore({ sql, transactions }),
+    deck: createInvestabilityDeckPort(sql),
+    assess: assessUnicornPotential,
+    methodVersion: UNICORN_POTENTIAL_METHOD_VERSION,
+  });
+  let firstUnicornSweep = true;
+  // Share the existing event routing and paced repair tick, never the feed read.
+  // AllSettled lets either independent assessment progress if the other fails.
   return {
-    service: createInvestabilityService({
-      store: createPostgresInvestabilityStore({ sql }),
-      deck: createInvestabilityDeckPort(sql),
-    }),
+    service: {
+      recompute: async (companyId) => {
+        const [original, extra] = await Promise.allSettled([
+          investability.recompute(companyId),
+          unicorn.recompute(companyId),
+        ]);
+        if (original.status === "rejected") throw original.reason;
+        if (extra.status === "rejected") throw extra.reason;
+        return original.value;
+      },
+      sweep: async (options) => {
+        const original = await investability.sweep(options);
+        const extra = await unicorn.sweep({
+          // One paced, bounded initial backfill; subsequent repairs rotate100.
+          limit: firstUnicornSweep ? 500 : Math.min(options?.limit ?? 100, 100),
+          pauseMs: options?.pauseMs ?? 250,
+        });
+        firstUnicornSweep = false;
+        return {
+          recorded: original.recorded + extra.recorded,
+          unchanged: original.unchanged + extra.unchanged,
+          failed: original.failed + extra.failed,
+        };
+      },
+    },
   };
 }

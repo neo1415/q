@@ -896,7 +896,7 @@ const withDocumentReadings = (
   withDiligenceSummary(withDeckReading(inner));
 // Investability (owner 2026-10-16): InvestIQ over investor-eligible inputs,
 // recomputed on the events that change them, and swept for the rest.
-const investability = composeInvestability(database.sql);
+const investability = composeInvestability(database.sql, database.transactions);
 const documentEvents = createQueueRunner({
   queue: DOMAIN_EVENTS_QUEUE,
   client: queues,

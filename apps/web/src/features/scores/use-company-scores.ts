@@ -18,43 +18,46 @@ import { fitProfilesAction } from "@/features/fit/fit-actions";
  * batched into one `/v1/fit/companies` call (up to 50), through the reader's
  * own session (server action). The Q API answers only for companies this
  * reader may see; anything else is simply absent, and a card without
- * scores is still a card. Results are kept briefly so scrolling back does
- * not ask again. No score is ever computed here.
+ * scores is still a card. Every mounted read is authorized afresh; premium and investor-private
+ * results are never retained in a company-id-only browser cache. No score is computed here.
  */
 
 export type ScoresPort = (
   companyIds: readonly string[],
 ) => Promise<readonly FitCompanyDto[] | null>;
 
-const TTL_MS = 60_000;
-
-type Entry = { readonly at: number; readonly scores: CompanyScoresDto | null };
-
-const cache = new Map<string, Entry>();
-const waiting = new Map<
-  string,
-  ((scores: CompanyScoresDto | null) => void)[]
->();
-let pending: Set<string> | null = null;
-
-function flush(port: ScoresPort): void {
-  const ids = [...(pending ?? [])];
-  pending = null;
+type PendingScores = {
+  waiting: Map<string, ((scores: CompanyScoresDto | null) => void)[]>;
+  pending: Set<string> | null;
+};
+// A pending read is scoped to its actual authorized port, never just a company.
+let batches = new WeakMap<ScoresPort, PendingScores>();
+function bucket(port: ScoresPort): PendingScores {
+  let state = batches.get(port);
+  if (state === undefined) {
+    state = { waiting: new Map(), pending: null };
+    batches.set(port, state);
+  }
+  return state;
+}
+function flush(port: ScoresPort, state: PendingScores): void {
+  const ids = [...(state.pending ?? [])];
+  state.pending = null;
   for (let i = 0; i < ids.length; i += FIT_IDS_MAX) {
     const chunk = ids.slice(i, i + FIT_IDS_MAX);
+    const resolvers = new Map(
+      chunk.map((id) => [id, state.waiting.get(id) ?? []]),
+    );
+    for (const id of chunk) state.waiting.delete(id);
     void port(chunk)
       .catch(() => null)
       .then((items) => {
         const byId = new Map(
           (items ?? []).map((item) => [item.companyId, item.scores ?? null]),
         );
-        const at = Date.now();
-        for (const id of chunk) {
-          const scores = byId.get(id) ?? null;
-          cache.set(id, { at, scores });
-          for (const resolve of waiting.get(id) ?? []) resolve(scores);
-          waiting.delete(id);
-        }
+        for (const id of chunk)
+          for (const resolve of resolvers.get(id) ?? [])
+            resolve(byId.get(id) ?? null);
       });
   }
 }
@@ -63,30 +66,25 @@ function request(
   id: string,
   port: ScoresPort,
 ): Promise<CompanyScoresDto | null> {
-  const hit = cache.get(id);
-  if (hit !== undefined && Date.now() - hit.at < TTL_MS) {
-    return Promise.resolve(hit.scores);
-  }
+  const state = bucket(port);
   return new Promise((resolve) => {
-    const list = waiting.get(id);
+    const list = state.waiting.get(id);
     if (list !== undefined) {
       list.push(resolve);
       return;
     }
-    waiting.set(id, [resolve]);
-    if (pending === null) {
-      pending = new Set();
-      queueMicrotask(() => flush(port));
+    state.waiting.set(id, [resolve]);
+    if (state.pending === null) {
+      state.pending = new Set();
+      queueMicrotask(() => flush(port, state));
     }
-    pending.add(id);
+    state.pending.add(id);
   });
 }
 
 /** Test seam: forget everything read. */
 export function resetCompanyScoresCache(): void {
-  cache.clear();
-  waiting.clear();
-  pending = null;
+  batches = new WeakMap();
 }
 
 export function useCompanyScores(

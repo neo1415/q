@@ -12,6 +12,7 @@ import { ChevronDown, ICON_SIZE } from "@capital-q/ui/icons";
 import { FitPanel, useCompanyFit, type CompanyFit } from "@/features/fit";
 import { useT } from "@/features/i18n/language";
 import { CompanyScores } from "@/features/scores";
+import { UnicornPotential } from "@/features/scores/unicorn-potential";
 
 /**
  * The fit panel's place on a company profile (overnight plan A1/B3/B4).
@@ -85,7 +86,21 @@ export function ProfileCompanyScores({
     <CompanyScores
       scores={fit.fit.scores}
       variant="full"
+      unicornDetails={false}
       className={className}
+    />
+  );
+}
+
+/** Same authorized profile read, with room for evidence and twelve pillars. */
+export function ProfileUnicornAssessment() {
+  const fit = useContext(ProfileFit);
+  if (fit.status !== "READY" || fit.fit.scores?.unicornPotential === undefined)
+    return null;
+  return (
+    <UnicornPotential
+      companyId={fit.fit.companyId}
+      score={fit.fit.scores.unicornPotential}
     />
   );
 }

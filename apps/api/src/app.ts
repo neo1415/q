@@ -352,6 +352,7 @@ export type ApiModules = {
     GateQRoutesDependencies["inboxService"] | undefined;
   /** F3: find and claim a company; an investor's saved startup search. */
   readonly companyClaims?: CompanyClaims | undefined;
+  readonly gateqUnicornPotential?: GateQRoutesDependencies["unicornPotential"];
   readonly gateqMyApplications?: GateQRoutesDependencies["myApplications"];
   /** Q.05: published gates for the founder's own company. */
   readonly gateqInvestorGates?: GateQRoutesDependencies["investorGates"];
@@ -960,6 +961,7 @@ export function createApp(
       identities: security.identities,
       claims: modules.companyClaims,
       myApplications: modules.gateqMyApplications,
+      unicornPotential: modules.gateqUnicornPotential,
       investorGates: modules.gateqInvestorGates,
       publicReplyPromise: modules.gateqPublicReplyPromise,
       entitlements: modules.billing?.entitlements,

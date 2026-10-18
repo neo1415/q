@@ -261,6 +261,11 @@ export const SlateCursorSchema = z
      * The Discover filters' fingerprint the page was read under; absent
      * for an unfiltered scroll. A request with other filters starts again.
      */
+    /** Authorized explicit Unicorn selection snapshot; no score values. */
+    u: z
+      .string()
+      .regex(/^[0-9a-f]{16}$/)
+      .optional(),
     f: z
       .string()
       .regex(/^[0-9a-f]{16}$/)

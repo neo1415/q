@@ -126,3 +126,31 @@ describe("the page and the Q intent carry filters", () => {
     ).toBe(false);
   });
 });
+
+describe("explicit Unicorn Potential filters", () => {
+  it("roundtrips explicit zero and sorting without altering ordinary filters", () => {
+    const filters = DiscoverFiltersQuerySchema.parse({
+      unicornPotentialMin: "0",
+      unicornPotentialSort: "true",
+      country: "NG",
+    });
+    expect(discoverFiltersToQuery(filters)).toEqual({
+      unicornPotentialMin: "0",
+      unicornPotentialSort: "true",
+      country: "NG",
+    });
+    expect(isEmptyDiscoverFilters(filters)).toBe(false);
+    expect(activeDiscoverFilterCount(filters)).toBe(2);
+  });
+  it("rejects out of range or ambiguous score parameters", () => {
+    for (const value of ["-1", "101", "1.5", "", "00", "1e2"])
+      expect(
+        DiscoverFiltersQuerySchema.safeParse({ unicornPotentialMin: value })
+          .success,
+      ).toBe(false);
+    expect(
+      DiscoverFiltersQuerySchema.safeParse({ unicornPotentialSort: "yes" })
+        .success,
+    ).toBe(false);
+  });
+});

@@ -1,6 +1,6 @@
 import type { DiscoverFilters } from "@capital-q/contracts";
 
-import type { FeedTransport } from "./feed-transport";
+import { FeedPremiumAccessError, type FeedTransport } from "./feed-transport";
 import { loadSlatePageAction, recordDecisionAction } from "./feed-actions";
 import { authorisePlaybackAction } from "./playback-source";
 import type { AuthorisePlayback } from "./playback-authorizations";
@@ -27,7 +27,11 @@ export function actionFeedTransport(
   return {
     loadSlate: async ({ cursor }) => {
       const result = await loadSlatePageAction(cursor ?? null, filters);
-      if (!result.ok) throw new Error(result.message);
+      if (!result.ok) {
+        if (result.code === "PREMIUM_REQUIRED")
+          throw new FeedPremiumAccessError();
+        throw new Error(result.message);
+      }
       return result.value;
     },
 

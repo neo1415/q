@@ -1,4 +1,5 @@
 import {
+  ApiProblemError,
   discoverCompanies,
   passCompany,
   saveCompany,
@@ -7,7 +8,7 @@ import {
 } from "@capital-q/api-client";
 import type { DiscoverFilters } from "@capital-q/contracts";
 
-import type { FeedTransport } from "./feed-transport";
+import { FeedPremiumAccessError, type FeedTransport } from "./feed-transport";
 
 /**
  * The real wire behind the feed controller (CQ-WEB-021).
@@ -29,11 +30,23 @@ export function apiFeedTransport(
   filters: DiscoverFilters | null = null,
 ): FeedTransport {
   return {
-    loadSlate: ({ cursor }) =>
-      discoverCompanies(session, {
-        ...(cursor === undefined ? {} : { cursor }),
-        ...(filters === null ? {} : { filters }),
-      }),
+    loadSlate: async ({ cursor }) => {
+      try {
+        return await discoverCompanies(session, {
+          ...(cursor === undefined ? {} : { cursor }),
+          ...(filters === null ? {} : { filters }),
+        });
+      } catch (error: unknown) {
+        if (
+          error instanceof ApiProblemError &&
+          error.status === 403 &&
+          (filters?.unicornPotentialMin !== undefined ||
+            filters?.unicornPotentialSort === true)
+        )
+          throw new FeedPremiumAccessError();
+        throw error;
+      }
+    },
 
     decide: ({ companyId, intent, slateId, clientEventId }) => {
       // `slateId` is optional on the wire and omitted rather than sent as
