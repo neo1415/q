@@ -89,7 +89,7 @@
   },
   {
     "field": "cofounder_2",
-    "value": "David Okonkwo",
+    "value": "David Nwankwo",
     "status": "OWNER_PROVIDED",
     "sourceUrl": null,
     "fetchedAt": "2026-10-18T17:40:00Z",
@@ -101,7 +101,7 @@
     "status": "SELF_REPORTED",
     "sourceUrl": "https://www.fdncapitalpartners.com/team/",
     "fetchedAt": "2026-10-18T17:40:00Z",
-    "note": "Confirm against owner-provided 'David Okonkwo'"
+    "note": "Confirm against owner-provided 'David Nwankwo'"
   },
   {
     "field": "business_model",
